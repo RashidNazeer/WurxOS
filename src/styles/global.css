@@ -99,6 +99,18 @@ a:hover { color: var(--accent-hover); }
               background-color var(--dur-fast) var(--ease-out);
 }
 .wx-input::placeholder { color: var(--input-placeholder); }
+
+/* Bootstrap's default `.form-control::placeholder` color (around #6c757d)
+   is too close to entered-text grey, making example-value placeholders
+   on report forms look like real data. Force it to the same faded tone
+   we use for our wx-* inputs so users can immediately tell empty fields
+   apart from filled ones. */
+.form-control::placeholder,
+.form-control-sm::placeholder,
+.form-select::placeholder {
+  color: var(--input-placeholder) !important;
+  opacity: 0.7;
+}
 .wx-input:hover { border-color: var(--border-strong); }
 .wx-input:focus {
   border-color: var(--accent);
