@@ -1,0 +1,18 @@
+node_modules
+.vercel
+.env
+.env.local
+.env.*.local
+
+# Local notes / planning docs — not needed in production
+PROGRESS.md
+TEST_LATER.md
+README.md
+
+# Large snapshots / backups
+*.tar.gz
+*.zip
+
+# Supabase server-side code is deployed separately via `supabase functions deploy`;
+# it has no business in the Vite bundle.
+supabase

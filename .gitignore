@@ -1,0 +1,29 @@
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+.vercel
+
+# Migration helpers — private credentials and run logs
+migration/firebase-admin-key.json
+migration/logs/
+migration/node_modules/
+migration/.env*
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# OS / editor cruft
+Thumbs.db
+*.swp
+*.swo
+

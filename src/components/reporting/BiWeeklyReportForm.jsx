@@ -1,0 +1,1027 @@
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useBrands } from '../../contexts/BrandsContext';
+import {
+  emptyBiWeeklyReport, getBiWeeklyPeriodsFromAnchor,
+  saveBiWeeklyReport, getBiWeeklyReportsForBrand, getBiWeeklyReport,
+  changeBiWeeklyReportPeriod, getBiWeeklyAnchor, setBiWeeklyAnchor,
+  detectNextBiWeeklyPeriod,
+  REPORT_STATUSES,
+} from '../../utils/biWeeklyReportingService';
+import { getUserCustomFields, saveUserCustomFields, cleanNumericInput } from '../../utils/reportingService';
+import {
+  generateOverallInsight, generateCreatorsInsight, generateVideosInsight,
+  generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
+  generateAllInsights,
+} from '../../utils/aiInsights';
+import { notifyReportSubmitted } from '../../utils/reportNotifications';
+import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import RichTextEditor from '../shared/RichTextEditor';
+
+/* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
+
+function SectionHeader({ icon, title, color, required }) {
+  return (
+    <div className="d-flex align-items-center gap-2 mb-3 mt-4">
+      <div className="rounded-2 d-flex align-items-center justify-content-center"
+        style={{ width: 32, height: 32, background: color + '18' }}>
+        <i className={`bi ${icon}`} style={{ fontSize: '0.9rem', color }} />
+      </div>
+      <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+        {title}
+        {required && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
+      </h6>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder, note, width }) {
+  // Use type="text" + inputMode="decimal" for numeric fields so users can paste
+  // formatted strings like "$3,456.9" — type="number" silently rejects them.
+  const isNum = type === 'number';
+  return (
+    <div style={{ flex: width ? `0 0 ${width}` : '1 1 140px', minWidth: 100 }}>
+      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{label}</label>
+      <input type={isNum ? 'text' : type}
+        inputMode={isNum ? 'decimal' : undefined}
+        className="form-control form-control-sm" placeholder={placeholder || label}
+        value={value} onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} style={{ borderRadius: 8 }} />
+      {note && <div className="text-muted" style={{ fontSize: '0.6rem' }}>{note}</div>}
+    </div>
+  );
+}
+
+// Auto-growing textarea: resizes to fit content as user types, and stays
+// manually resizable via the drag handle in the bottom-right corner.
+function AutoGrowTextarea({ value, minRows = 3, placeholder, onChange, style }) {
+  const ref = React.useRef(null);
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
+  React.useEffect(() => { resize(); }, [value]);
+  return (
+    <textarea ref={ref}
+      className="form-control form-control-sm"
+      rows={minRows}
+      placeholder={placeholder}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      onInput={resize}
+      style={{ borderRadius: 8, resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
+    />
+  );
+}
+
+function TextArea({ label, value, onChange, rows = 3, placeholder }) {
+  return (
+    <div className="mt-2">
+      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{label}</label>
+      <AutoGrowTextarea value={value} minRows={rows}
+        placeholder={placeholder || 'Add insights for this section…'}
+        onChange={onChange} />
+    </div>
+  );
+}
+
+function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
+  return (
+    <div className="mt-2">
+      <div className="d-flex align-items-center justify-content-between mb-1">
+        <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>Insights</label>
+        <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
+          style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 8, fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
+          onClick={onGenerate} disabled={loading}>
+          {loading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
+            : <><i className="bi bi-stars" /> Generate with AI</>}
+        </button>
+      </div>
+      <RichTextEditor value={value || ''} onChange={onChange}
+        minHeight={Math.max(100, rows * 28)}
+        placeholder="Add insights for this section or click ✨ to auto-generate…" />
+    </div>
+  );
+}
+
+function ArraySection({ items, setItems, fields, addLabel }) {
+  const add = () => {
+    const empty = {};
+    fields.forEach(f => { empty[f.key] = ''; });
+    setItems([...items, empty]);
+  };
+  const remove = (i) => setItems(items.filter((_, idx) => idx !== i));
+  const update = (i, key, val) => {
+    const copy = [...items];
+    copy[i] = { ...copy[i], [key]: val };
+    setItems(copy);
+  };
+
+  return (
+    <div>
+      {items.map((item, i) => (
+        <div key={i} className="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 rounded-3" style={{ background: '#f8fafc' }}>
+          <div className="text-muted fw-bold" style={{ fontSize: '0.68rem', width: 20, textAlign: 'center', paddingBottom: 8 }}>
+            {i + 1}
+          </div>
+          {fields.map(f => (
+            <Field key={f.key} label={f.label} value={item[f.key] || ''} type={f.type || 'text'}
+              onChange={v => update(i, f.key, v)} width={f.width} placeholder={f.placeholder} />
+          ))}
+          {items.length > 1 && (
+            <button className="btn btn-sm btn-outline-danger border-0 mb-1" onClick={() => remove(i)}
+              style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+              <i className="bi bi-trash3" />
+            </button>
+          )}
+        </div>
+      ))}
+      <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
+        style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={add}>
+        <i className="bi bi-plus-circle" /> {addLabel || 'Add Row'}
+      </button>
+    </div>
+  );
+}
+
+/* ── Main Form ────────────────────────────────────────────────────────────── */
+
+export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel }) {
+  const { user, profile } = useAuth();
+  const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
+  const userRole = profile?.role || '';
+  const apcProfile = (userRole === 'apc' || userRole === 'ipc') ? { userName: profile?.display_name || '' } : null;
+  const userProfile = { displayName: profile?.display_name || '' };
+  const { brands } = useBrands();
+
+  const [selectedBrand, setSelectedBrand] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [existingReports, setExistingReports] = useState([]);
+  const [data, setData] = useState(emptyBiWeeklyReport());
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(!!editReportId);
+  const [detectingPeriod, setDetectingPeriod] = useState(false);
+  const [aiLoading, setAiLoading] = useState({}); // per-section loading state
+  const [customFieldDefs, setCustomFieldDefs] = useState([]); // [{id, name}]
+  const [reportStatus, setReportStatus] = useState('draft');
+  const [rejectionNote, setRejectionNote] = useState('');
+  const [anchorData, setAnchorData] = useState(null);
+  const [anchorStartInput, setAnchorStartInput] = useState('');
+
+  // Step: 0=brand, 1=anchor setup, 2=form
+  const [step, setStep] = useState(editReportId ? 2 : 0);
+
+  const myBrands = brands;
+
+  // Auto-select if single brand
+  useEffect(() => {
+    if (!editReportId && myBrands.length === 1 && !selectedBrand) {
+      setSelectedBrand(myBrands[0]);
+    }
+  }, [myBrands, selectedBrand, editReportId]);
+
+  // Load user's custom field templates
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    getUserCustomFields(currentUser.uid).then(setCustomFieldDefs).catch(() => {});
+  }, [currentUser]);
+
+  // When brand is selected: load anchor + reports, detect next period, advance step — all in one effect
+  useEffect(() => {
+    if (!selectedBrand || editReportId) return;
+    let cancelled = false;
+    setDetectingPeriod(true);
+
+    (async () => {
+      const [anchor, reports] = await Promise.all([
+        getBiWeeklyAnchor(selectedBrand.id),
+        getBiWeeklyReportsForBrand(selectedBrand.id),
+      ]);
+      if (cancelled) return;
+      setAnchorData(anchor);
+      setExistingReports(reports);
+      setDetectingPeriod(false);
+
+      if (!anchor) {
+        // No anchor yet — show anchor setup
+        setStep(1);
+      } else if (reports.length === 0) {
+        // Anchor set but no reports yet — first period is anchor start
+        const firstPeriod = getBiWeeklyPeriodsFromAnchor(anchor.anchorStart, 1)[0];
+        setSelectedPeriod(firstPeriod);
+        setStep(2);
+      } else {
+        // Auto-detect next period
+        const next = detectNextBiWeeklyPeriod(reports, anchor.anchorStart);
+        if (next) {
+          setSelectedPeriod(next);
+          setStep(2);
+        } else {
+          setStep(1);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedBrand, editReportId]);
+
+  // Always load existing reports when brand is selected (needed for edit mode AI comparison)
+  useEffect(() => {
+    if (!selectedBrand || !editReportId) return;
+    getBiWeeklyReportsForBrand(selectedBrand.id).then(setExistingReports);
+  }, [selectedBrand, editReportId]);
+
+  // Load report for editing
+  useEffect(() => {
+    if (!editReportId) return;
+    (async () => {
+      setLoading(true);
+      const r = await getBiWeeklyReport(editReportId);
+      if (r) {
+        const brand = brands.find(b => b.id === r.brandId);
+        setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
+        setSelectedPeriod({ period: r.period, startDate: r.periodStart, endDate: r.periodEnd, label: r.periodLabel, year: r.year, month: r.month });
+        setData({
+          overallPerformance: r.overallPerformance || emptyBiWeeklyReport().overallPerformance,
+          overallNotes: r.overallNotes || {},
+          overallInsights: r.overallInsights || '',
+          topCreators: r.topCreators || emptyBiWeeklyReport().topCreators,
+          topCreatorsInsights: r.topCreatorsInsights || '',
+          topVideos: r.topVideos || emptyBiWeeklyReport().topVideos,
+          topVideosInsights: r.topVideosInsights || '',
+          gmvMax: r.gmvMax || emptyBiWeeklyReport().gmvMax,
+          gmvMaxInsights: r.gmvMaxInsights || '',
+          productHighlights: r.productHighlights || emptyBiWeeklyReport().productHighlights,
+          productHighlightsInsights: r.productHighlightsInsights || '',
+          offsitePerformance: r.offsitePerformance || emptyBiWeeklyReport().offsitePerformance,
+          offsiteInsights: r.offsiteInsights || '',
+          upcomingCampaigns: r.upcomingCampaigns || '',
+          operationalUpdates: r.operationalUpdates || '',
+          recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
+          actionItems: '',
+          customFields: r.customFields || {},
+        });
+        setReportStatus(r.status || 'approved');
+        setRejectionNote(r.rejectionNote || '');
+        setStep(2);
+      }
+      setLoading(false);
+    })();
+  }, [editReportId, brands]);
+
+  const handleBrandSelect = (brand) => {
+    setSelectedBrand(brand);
+    // Step will be set by the useEffect after anchor + reports load
+  };
+
+  // Data updaters
+  const setPerf = useCallback((key, val) => {
+    setData(d => ({ ...d, overallPerformance: { ...d.overallPerformance, [key]: val } }));
+  }, []);
+  const setPerfNote = useCallback((key, val) => {
+    setData(d => ({ ...d, overallNotes: { ...d.overallNotes, [key]: val } }));
+  }, []);
+  const setOffsite = useCallback((key, val) => {
+    setData(d => ({ ...d, offsitePerformance: { ...d.offsitePerformance, [key]: val } }));
+  }, []);
+
+  // Previous report = the one created before this one. Stable across OL date edits.
+  const previousReport = useMemo(() => {
+    if (!existingReports.length || !selectedPeriod) return null;
+    const tsOf = r => r.createdAt?.toMillis ? r.createdAt.toMillis()
+      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
+      : null;
+    const current = editReportId ? existingReports.find(r => r.id === editReportId) : null;
+    const currentTs = current ? tsOf(current) : Date.now();
+    const candidates = existingReports.filter(r => {
+      if (current && r.id === current.id) return false;
+      const ts = tsOf(r);
+      if (ts != null && currentTs != null) return ts < currentTs;
+      return (r.periodStart || '') < selectedPeriod.startDate;
+    });
+    candidates.sort((a, b) => {
+      const aTs = tsOf(a), bTs = tsOf(b);
+      if (aTs != null && bTs != null) return bTs - aTs;
+      return (b.periodStart || '').localeCompare(a.periodStart || '');
+    });
+    return candidates[0] || null;
+  }, [existingReports, selectedPeriod, editReportId]);
+
+  // APC-only submission gates: duplicate period or prior not yet OL-approved
+  const isApc = userRole === 'apc';
+  const duplicateForThisPeriod = useMemo(() => {
+    if (!isApc || !existingReports.length || !selectedPeriod) return null;
+    return existingReports.find(r =>
+      r.periodStart === selectedPeriod.startDate &&
+      r.id !== editReportId &&
+      r.status && r.status !== 'draft'
+    ) || null;
+  }, [isApc, existingReports, selectedPeriod, editReportId]);
+  const priorPendingApproval = useMemo(() => {
+    if (!isApc || !previousReport) return null;
+    return (previousReport.status && previousReport.status !== 'approved') ? previousReport : null;
+  }, [isApc, previousReport]);
+  const submitBlock = duplicateForThisPeriod
+    ? { kind: 'duplicate', report: duplicateForThisPeriod }
+    : priorPendingApproval
+      ? { kind: 'pendingPrior', report: priorPendingApproval }
+      : null;
+
+  const brandName = selectedBrand?.name || selectedBrand?.brandName || 'Unknown';
+
+  // AI insight generator for a single section
+  const runAi = async (section, fn, insightKey) => {
+    setAiLoading(s => ({ ...s, [section]: true }));
+    try {
+      const text = await fn(data, previousReport, brandName, selectedPeriod?.label || '');
+      setData(d => ({ ...d, [insightKey]: text }));
+    } catch (err) {
+      alert('AI generation failed: ' + err.message);
+    } finally {
+      setAiLoading(s => ({ ...s, [section]: false }));
+    }
+  };
+
+  // Custom field management (saved to user's template)
+  const addCustomField = async () => {
+    const name = window.prompt('Name for new custom field:', 'Notes');
+    if (!name || !name.trim()) return;
+    const newField = { id: `cf_${Date.now()}`, name: name.trim() };
+    const updated = [...customFieldDefs, newField];
+    setCustomFieldDefs(updated);
+    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+  };
+
+  const renameCustomField = async (fieldId) => {
+    const field = customFieldDefs.find(f => f.id === fieldId);
+    const name = window.prompt('Rename field:', field?.name || '');
+    if (!name || !name.trim()) return;
+    const updated = customFieldDefs.map(f => f.id === fieldId ? { ...f, name: name.trim() } : f);
+    setCustomFieldDefs(updated);
+    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+  };
+
+  const deleteCustomField = async (fieldId) => {
+    if (!window.confirm('Remove this custom field from all future reports? (Existing reports keep their data)')) return;
+    const updated = customFieldDefs.filter(f => f.id !== fieldId);
+    setCustomFieldDefs(updated);
+    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+  };
+
+  const setCustomFieldValue = useCallback((fieldId, val, name) => {
+    setData(d => ({
+      ...d,
+      customFields: { ...(d.customFields || {}), [fieldId]: { name, value: val } },
+    }));
+  }, []);
+
+  // Validation — return array of missing field names
+  const validate = () => {
+    const missing = [];
+    if (!selectedPeriod) missing.push('Bi-weekly period');
+    const op = data.overallPerformance || {};
+    const opRequired = {
+      gmv: 'GMV', affiliateGmv: 'Affiliate GMV', orders: 'Orders',
+      samplesApproved: 'Samples Approved', roi: 'ROI',
+      shopPerformanceScore: 'Shop Performance Score', videosPosted: 'Videos Posted',
+    };
+    Object.entries(opRequired).forEach(([k, label]) => {
+      if (op[k] === '' || op[k] == null) missing.push(`Overall: ${label}`);
+    });
+    if (!data.overallNotes?.samplesApproved) missing.push('Overall: MTD Approved');
+    if (!data.overallNotes?.videosPosted) missing.push('Overall: Total Videos');
+
+    if (!(data.topCreators || []).some(c => c.name && c.name.trim()))
+      missing.push('Top Creators (at least 1 with name)');
+    if (!(data.topVideos || []).some(v => v.creatorName && v.creatorName.trim()))
+      missing.push('Top Videos (at least 1 with creator name)');
+    if (!(data.gmvMax || []).some(g => g.campaign && g.campaign.trim()))
+      missing.push('GMV Max (at least 1 with campaign)');
+    if (!(data.productHighlights || []).some(p => p.productName && p.productName.trim()))
+      missing.push('Product Highlights (at least 1 with product name)');
+
+    if (!data.upcomingCampaigns || !data.upcomingCampaigns.trim())
+      missing.push('Current & Upcoming Campaigns');
+    if (!data.operationalUpdates || !data.operationalUpdates.trim())
+      missing.push('Operational Updates');
+    // Offsite Performance, Recommendations & Action Items are optional
+
+    return missing;
+  };
+
+  const handleGenerateAll = async () => {
+    setAiLoading({ all: true });
+    try {
+      const insights = await generateAllInsights(data, previousReport, brandName, selectedPeriod?.label || '');
+      setData(d => ({ ...d, ...insights }));
+    } catch (err) {
+      alert('AI generation failed: ' + err.message);
+    } finally {
+      setAiLoading({});
+    }
+  };
+
+  // Allow user to change the period of a report being edited
+  const handleChangePeriod = async () => {
+    if (!editReportId || !selectedBrand) return;
+    const opts = getBiWeeklyPeriodsFromAnchor(anchorData?.anchorStart || selectedPeriod.startDate, 20);
+    const labels = opts.map((o, i) => `${i + 1}. ${o.label}`).join('\n');
+    const choice = window.prompt(
+      `Pick the correct period number (1-${opts.length}):\n\n${labels}\n\nCurrent: ${selectedPeriod?.label}`,
+      ''
+    );
+    const idx = parseInt(choice, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= opts.length) return;
+    const newPeriod = opts[idx];
+    if (newPeriod.startDate === selectedPeriod?.startDate) return;
+    if (!window.confirm(`Change period to: ${newPeriod.label}? The report will be re-saved under the new date.`)) return;
+    try {
+      const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
+      const newId = await changeBiWeeklyReportPeriod(editReportId, newPeriod, {
+        brandId: selectedBrand.id,
+        brandName: selectedBrand.name || selectedBrand.brandName || 'Unknown',
+        ...data,
+        createdBy: currentUser.uid,
+        createdByName: userName,
+      });
+      alert('Period changed successfully. The report list will refresh.');
+      if (onSaved) onSaved({ id: newId, brandId: selectedBrand.id });
+    } catch (err) {
+      alert('Failed to change period: ' + err.message);
+    }
+  };
+
+  // Set the bi-weekly anchor for a brand (first-time setup)
+  const handleSetAnchor = async () => {
+    if (!anchorStartInput || !selectedBrand) return;
+    setSaving(true);
+    try {
+      const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
+      await setBiWeeklyAnchor(selectedBrand.id, anchorStartInput, currentUser.uid, userName);
+      const anchor = { brandId: selectedBrand.id, anchorStart: anchorStartInput };
+      setAnchorData(anchor);
+      const firstPeriod = getBiWeeklyPeriodsFromAnchor(anchorStartInput, 1)[0];
+      setSelectedPeriod(firstPeriod);
+      setStep(2);
+    } catch (err) {
+      alert('Failed to set anchor: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const _doSave = async (status, extra = {}) => {
+    if (!selectedBrand || !selectedPeriod) return;
+    setSaving(true);
+    try {
+      const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
+      // Strip customFields entries whose field def was deleted — otherwise the view
+      // keeps rendering them from the stored report doc.
+      const validIds = new Set(customFieldDefs.map(f => f.id));
+      const cleanedCustomFields = Object.fromEntries(
+        Object.entries(data.customFields || {}).filter(([id]) => validIds.has(id))
+      );
+      const cleanedData = { ...data, customFields: cleanedCustomFields };
+      const savedId = await saveBiWeeklyReport({
+        brandId: selectedBrand.id,
+        brandName,
+        periodInfo: selectedPeriod,
+        data: cleanedData,
+        uid: currentUser.uid,
+        userName,
+        status,
+        extraFields: extra,
+      });
+      if (onSaved) onSaved({
+        id: savedId,
+        brandId: selectedBrand.id,
+        brandName,
+        periodLabel: selectedPeriod.label,
+        periodStart: selectedPeriod.startDate,
+        periodEnd: selectedPeriod.endDate,
+        period: selectedPeriod.period,
+        year: selectedPeriod.year,
+        month: selectedPeriod.month,
+        createdByName: userName,
+        status,
+        ...data,
+        ...extra,
+      });
+    } catch (err) {
+      alert('Failed to save report: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Save progress without validation — keeps current draft status */
+  const handleSaveDraft = () => _doSave('draft', { rejectionNote: rejectionNote || null });
+
+  /** Save without status change — used by TL/OL editing a non-draft report */
+  const handleSaveChanges = () => _doSave(reportStatus);
+
+  /** Validate then submit — sets status to 'submitted' and locks APC editing */
+  const handleSubmitReport = async () => {
+    if (!selectedBrand || !selectedPeriod) return;
+    if (submitBlock?.kind === 'duplicate') {
+      alert(`You've already submitted a report for ${selectedPeriod.label}. You can't submit another one for the same period.`);
+      return;
+    }
+    if (submitBlock?.kind === 'pendingPrior') {
+      const prev = submitBlock.report;
+      alert(`Your previous report (${prev.periodLabel}) is still waiting for OL approval. It needs to be approved before you can submit a new one.`);
+      return;
+    }
+    const missing = validate();
+    if (missing.length > 0) {
+      alert('Please fill in all required fields before submitting:\n\n• ' + missing.join('\n• '));
+      return;
+    }
+    if (!window.confirm('Submit this report for Team Lead review?\n\nOnce submitted you will not be able to edit it unless the TL rejects it back to you.')) return;
+    const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
+    await _doSave('submitted', {
+      rejectionNote: null,
+      submittedAt: new Date().toISOString(),
+      submittedBy: currentUser.uid,
+      submittedByName: userName,
+    });
+    notifyReportSubmitted({
+      report: {
+        id: `${selectedBrand.id}_bw_${selectedPeriod.startDate}`,
+        brandId: selectedBrand.id,
+        brandName: selectedBrand.name || selectedBrand.brandName,
+        periodLabel: selectedPeriod.label,
+        createdBy: currentUser.uid,
+      },
+      sender: { uid: currentUser.uid, name: userName },
+      type: 'biweekly',
+    });
+  };
+
+  if (loading) {
+    return <div className="d-flex align-items-center justify-content-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2" />Loading report…</div>;
+  }
+
+  /* ── Step 0: Brand selection ──────────────────────────────────────────── */
+  if (step === 0) {
+    // If brand auto-selected but still detecting period, show loading
+    if (detectingPeriod) {
+      return <div className="d-flex align-items-center justify-content-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2" />Detecting next period…</div>;
+    }
+
+    return (
+      <div>
+        {onCancel && (
+          <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={onCancel}>
+            <i className="bi bi-arrow-left me-1" /> Back to reports
+          </button>
+        )}
+        <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>New Bi-Weekly Report</h5>
+        <p className="text-muted small mb-4">Select the brand you're reporting for</p>
+        <div className="row g-3">
+          {myBrands.map(b => (
+            <div key={b.id} className="col-md-6 col-lg-4">
+              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 14, cursor: 'pointer' }}
+                onClick={() => handleBrandSelect(b)}>
+                <div className="card-body p-3 d-flex align-items-center gap-3">
+                  <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
+                    style={{ width: 42, height: 42, fontSize: '0.7rem', background: '#3b82f6' }}>
+                    {(b.name || b.brandName || '??').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: '0.9rem' }}>{b.name || b.brandName}</div>
+                    <div className="text-muted" style={{ fontSize: '0.7rem' }}>Select to report</div>
+                  </div>
+                  <i className="bi bi-chevron-right ms-auto text-muted" />
+                </div>
+              </button>
+            </div>
+          ))}
+          {myBrands.length === 0 && (
+            <div className="text-center py-4 text-muted">
+              <i className="bi bi-shop" style={{ fontSize: '2rem' }} />
+              <p className="mt-2">No brands assigned to you.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Step 1: Anchor setup (first-time — no anchor exists yet) ─────────── */
+  if (step === 1) {
+    // Compute preview end date
+    let previewEnd = '';
+    if (anchorStartInput) {
+      const d = new Date(anchorStartInput + 'T00:00:00');
+      d.setDate(d.getDate() + 13);
+      previewEnd = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    const startDisplay = anchorStartInput
+      ? new Date(anchorStartInput + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
+
+    return (
+      <div>
+        <button className="btn btn-sm btn-link text-muted p-0 mb-3"
+          onClick={() => { setStep(0); setSelectedBrand(null); setAnchorStartInput(''); }}>
+          <i className="bi bi-arrow-left me-1" /> Back to brands
+        </button>
+        <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>
+          {selectedBrand?.name || selectedBrand?.brandName} — Set Bi-Weekly Anchor
+        </h5>
+        <p className="text-muted small mb-4">
+          This is the first bi-weekly report for this brand. Select the start date of the first 2-week period.
+          All future bi-weekly periods will automatically follow from this date.
+        </p>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 420 }}>
+          <div className="card-body p-4">
+            <label className="form-label fw-semibold" style={{ fontSize: '0.8rem', color: '#374151' }}>
+              <i className="bi bi-calendar2-range me-1 text-primary" /> Starting Date of Period 1
+            </label>
+            <input
+              type="date"
+              className="form-control mb-3"
+              value={anchorStartInput}
+              onChange={e => setAnchorStartInput(e.target.value)}
+              style={{ borderRadius: 8, fontSize: '0.85rem' }}
+            />
+            {anchorStartInput && (
+              <div className="rounded-3 p-3 mb-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                <div className="fw-semibold" style={{ fontSize: '0.8rem', color: '#0369a1' }}>
+                  <i className="bi bi-calendar-check me-1" /> Period 1 Preview
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#0c4a6e', marginTop: 4 }}>
+                  {startDisplay} — {previewEnd}
+                </div>
+                <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
+                  Period 2 will start 14 days later, and so on automatically.
+                </div>
+              </div>
+            )}
+            <button
+              className="btn btn-primary w-100"
+              style={{ borderRadius: 8, fontSize: '0.85rem' }}
+              onClick={handleSetAnchor}
+              disabled={!anchorStartInput || saving}
+            >
+              {saving ? <><span className="spinner-border spinner-border-sm me-2" />Setting…</> : <><i className="bi bi-check2-circle me-1" />Confirm Starting Period & Begin Report</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Step 2: Data entry form ──────────────────────────────────────────── */
+  const brandLabel = selectedBrand?.name || selectedBrand?.brandName || '';
+  const curSym = currencySymbol(data.currency || DEFAULT_CURRENCY);
+
+  return (
+    <div>
+      {onCancel && (
+        <button className="btn btn-sm btn-link text-muted p-0 mb-2" onClick={onCancel}>
+          <i className="bi bi-arrow-left me-1" /> {editReportId ? 'Cancel editing' : 'Back to reports'}
+        </button>
+      )}
+      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div>
+          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>
+            {editReportId ? 'Edit' : 'New'} Bi-Weekly Report
+          </h5>
+          <p className="text-muted small mb-0 d-flex align-items-center gap-2 flex-wrap">
+            <span>{brandLabel} — {selectedPeriod?.label}</span>
+            {editReportId && (
+              <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 6, fontSize: '0.65rem', padding: '1px 8px' }}
+                onClick={handleChangePeriod} title="Move this report to a different period">
+                <i className="bi bi-calendar-event" /> Change Period
+              </button>
+            )}
+          </p>
+        </div>
+        <div className="d-flex gap-2 flex-wrap">
+          <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+            style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 10, fontSize: '0.78rem', border: 'none' }}
+            onClick={handleGenerateAll} disabled={!!aiLoading.all} title="AI generates insights for all 6 sections">
+            {aiLoading.all ? <><span className="spinner-border spinner-border-sm" /> Generating All…</>
+              : <><i className="bi bi-stars" /> Generate All Insights</>}
+          </button>
+          {(reportStatus === 'draft' || !editReportId) ? (
+            <>
+              <button className="btn btn-outline-secondary btn-sm px-3 d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 10 }} onClick={handleSaveDraft} disabled={saving}>
+                {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-floppy" />} Save Draft
+              </button>
+              <button className="btn btn-sm px-4 d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 10, background: submitBlock ? '#94a3b8' : '#2563eb', color: 'white', border: 'none' }}
+                onClick={handleSubmitReport} disabled={saving || !!submitBlock}
+                title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this period' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
+                {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-send-fill" /> Submit Report</>}
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-dark btn-sm px-4 d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 10 }} onClick={handleSaveChanges} disabled={saving}>
+              {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save Changes</>}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
+      {submitBlock?.kind === 'duplicate' && (
+        <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
+          style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e' }}>
+          <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
+          <div>
+            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedPeriod.label}</div>
+            <div style={{ fontSize: '0.78rem', marginTop: 2 }}>You can't submit another report for the same period.</div>
+          </div>
+        </div>
+      )}
+      {submitBlock?.kind === 'pendingPrior' && (
+        <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
+          style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e' }}>
+          <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
+          <div>
+            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report awaiting OL approval</div>
+            <div style={{ fontSize: '0.78rem', marginTop: 2 }}>
+              Your {submitBlock.report.periodLabel} report is still <strong>{REPORT_STATUSES[submitBlock.report.status]?.label || submitBlock.report.status}</strong>.
+              It needs to be approved by the Operation Lead before you can submit a new one. You can keep drafting this report in the meantime.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Rejection banner (shown when report was rejected back) ────── */}
+      {rejectionNote && reportStatus === 'draft' && editReportId && (
+        <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
+          style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+          <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
+          <div>
+            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>This report was returned for revision</div>
+            <div style={{ fontSize: '0.78rem', marginTop: 2 }}>{rejectionNote}</div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Currency picker (applies to every monetary field below) ──── */}
+      <div className="d-flex align-items-center gap-3 mb-3 p-2 rounded-3"
+        style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+        <i className="bi bi-currency-exchange" style={{ color: '#64748b' }} />
+        <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: '#334155' }}>
+          Report currency:
+        </label>
+        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 8 }}
+          value={data.currency || DEFAULT_CURRENCY}
+          onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
+          {CURRENCIES.map(c => (
+            <option key={c.code} value={c.code}>
+              {c.symbol}  ·  {c.code} — {c.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+          All monetary fields below use this currency.
+        </span>
+      </div>
+
+      {/* ─── Section 1: Overall Performance ─────────────────────────────── */}
+      <SectionHeader icon="bi-graph-up-arrow" title="Overall Performance" color="#3b82f6" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <div className="d-flex flex-wrap gap-2 mb-2">
+            <Field label={`GMV (${curSym})`} value={data.overallPerformance.gmv} onChange={v => setPerf('gmv', v)} type="number" placeholder="55834.62" />
+            <Field label={`Affiliate GMV (${curSym})`} value={data.overallPerformance.affiliateGmv} onChange={v => setPerf('affiliateGmv', v)} type="number" placeholder="49494.24" />
+            <Field label="Orders" value={data.overallPerformance.orders} onChange={v => setPerf('orders', v)} type="number" placeholder="813" />
+            <Field label="Samples Approved" value={data.overallPerformance.samplesApproved} onChange={v => setPerf('samplesApproved', v)} type="number" placeholder="488" />
+          </div>
+          <div className="d-flex flex-wrap gap-2 mb-2">
+            <Field label="ROI" value={data.overallPerformance.roi} onChange={v => setPerf('roi', v)} type="number" placeholder="2.76" />
+            <Field label="Shop Performance Score" value={data.overallPerformance.shopPerformanceScore} onChange={v => setPerf('shopPerformanceScore', v)} type="number" placeholder="4.7" />
+            <Field label="Videos Posted" value={data.overallPerformance.videosPosted} onChange={v => setPerf('videosPosted', v)} type="number" placeholder="1377" />
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <Field label="MTD Approved (Samples Month-to-Date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
+            <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px" />
+          </div>
+          <InsightArea value={data.overallInsights} onChange={v => setData(d => ({ ...d, overallInsights: v }))}
+            loading={!!aiLoading.overall || !!aiLoading.all}
+            onGenerate={() => runAi('overall', generateOverallInsight, 'overallInsights')} />
+        </div>
+      </div>
+
+      {/* ─── Section 2: Top Creators ────────────────────────────────────── */}
+      <SectionHeader icon="bi-star-fill" title="Top Creators" color="#f59e0b" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
+            addLabel="Add Creator"
+            fields={[
+              { key: 'name', label: 'Creator Name', width: '160px' },
+              { key: 'videosPosted', label: 'Videos', type: 'number', width: '80px' },
+              { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
+              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+              { key: 'notes', label: 'Notes', width: '140px' },
+            ]} />
+          <InsightArea value={data.topCreatorsInsights} onChange={v => setData(d => ({ ...d, topCreatorsInsights: v }))}
+            loading={!!aiLoading.creators || !!aiLoading.all}
+            onGenerate={() => runAi('creators', generateCreatorsInsight, 'topCreatorsInsights')} />
+        </div>
+      </div>
+
+      {/* ─── Section 3: Top Videos ──────────────────────────────────────── */}
+      <SectionHeader icon="bi-play-circle-fill" title="Top Videos" color="#8b5cf6" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
+            addLabel="Add Video"
+            fields={[
+              { key: 'creatorName', label: 'Creator', width: '140px' },
+              { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
+              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+              { key: 'views', label: 'Views', type: 'number', width: '90px' },
+              { key: 'productClicks', label: 'Product Clicks', width: '110px', placeholder: '3.97K or 3970' },
+              { key: 'notes', label: 'Notes', width: '120px' },
+            ]} />
+          <InsightArea value={data.topVideosInsights} onChange={v => setData(d => ({ ...d, topVideosInsights: v }))}
+            loading={!!aiLoading.videos || !!aiLoading.all}
+            onGenerate={() => runAi('videos', generateVideosInsight, 'topVideosInsights')} />
+        </div>
+      </div>
+
+      {/* ─── Section 4: GMV Max Performance ─────────────────────────────── */}
+      <SectionHeader icon="bi-rocket-takeoff-fill" title="GMV Max Performance" color="#ef4444" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
+            addLabel="Add Campaign"
+            fields={[
+              { key: 'campaign', label: 'Campaign', width: '130px' },
+              { key: 'spend', label: `Spend (${curSym})`, type: 'number', width: '100px' },
+              { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
+              { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
+              { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
+              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+              { key: 'notes', label: 'Notes', width: '140px' },
+            ]} />
+          <InsightArea value={data.gmvMaxInsights} onChange={v => setData(d => ({ ...d, gmvMaxInsights: v }))}
+            loading={!!aiLoading.gmvMax || !!aiLoading.all}
+            onGenerate={() => runAi('gmvMax', generateGmvMaxInsight, 'gmvMaxInsights')} />
+        </div>
+      </div>
+
+      {/* ─── Section 5: Product Highlights ──────────────────────────────── */}
+      <SectionHeader icon="bi-box-seam-fill" title="Product Highlights" color="#06b6d4" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
+            addLabel="Add Product"
+            fields={[
+              { key: 'productId', label: 'Product ID', width: '140px' },
+              { key: 'productName', label: 'Product Name', width: '160px' },
+              { key: 'unitsSold', label: 'Units Sold', type: 'number', width: '90px' },
+              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+              { key: 'newVideos', label: 'New Videos', type: 'number', width: '90px' },
+              { key: 'notes', label: 'Notes', width: '130px' },
+            ]} />
+          <InsightArea value={data.productHighlightsInsights} onChange={v => setData(d => ({ ...d, productHighlightsInsights: v }))}
+            loading={!!aiLoading.products || !!aiLoading.all}
+            onGenerate={() => runAi('products', generateProductsInsight, 'productHighlightsInsights')} />
+        </div>
+      </div>
+
+      {/* ─── Section 6: Offsite Performance (optional) ──────────────────── */}
+      <SectionHeader icon="bi-globe2" title="Offsite Performance" color="#10b981" />
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <div className="d-flex flex-wrap gap-2 mb-2">
+            <Field label={`Offsite GMV (${curSym})`} value={data.offsitePerformance.offsiteGmv} onChange={v => setOffsite('offsiteGmv', v)} type="number" placeholder="1725.49" />
+            <Field label={`TikTok Shop GMV (${curSym})`} value={data.offsitePerformance.tiktokShopGmv} onChange={v => setOffsite('tiktokShopGmv', v)} type="number" placeholder="55834.62" />
+            <Field label="Off-site Effect (%)" value={data.offsitePerformance.offsiteEffect} onChange={v => setOffsite('offsiteEffect', v)} type="number" placeholder="3.09" />
+          </div>
+          <InsightArea value={data.offsiteInsights} onChange={v => setData(d => ({ ...d, offsiteInsights: v }))}
+            loading={!!aiLoading.offsite || !!aiLoading.all}
+            onGenerate={() => runAi('offsite', generateOffsiteInsight, 'offsiteInsights')} />
+        </div>
+      </div>
+
+      {/* ─── Current & Upcoming Campaigns (mandatory) ───────────────────── */}
+      <SectionHeader icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" color="#ec4899" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <RichTextEditor value={data.upcomingCampaigns || ''}
+            onChange={v => setData(d => ({ ...d, upcomingCampaigns: v }))}
+            minHeight={140}
+            placeholder="List any upcoming campaigns, launches or planned promotions" />
+        </div>
+      </div>
+
+      {/* ─── Operational Updates (mandatory) ─────────────────────────────── */}
+      <SectionHeader icon="bi-gear-fill" title="Operational Updates" color="#6366f1" required />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <RichTextEditor value={data.operationalUpdates || ''}
+            onChange={v => setData(d => ({ ...d, operationalUpdates: v }))}
+            minHeight={140}
+            placeholder="Describe the workflow and operational tasks completed this period" />
+        </div>
+      </div>
+
+      {/* ─── Recommendations & Action Items (optional) ───────────────────── */}
+      <SectionHeader icon="bi-lightbulb-fill" title="Recommendations & Action Items" color="#f59e0b" />
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <RichTextEditor value={data.recommendations || ''}
+            onChange={v => setData(d => ({ ...d, recommendations: v }))}
+            minHeight={160}
+            placeholder="Share your recommendations and action items for next steps" />
+        </div>
+      </div>
+
+      {/* ─── Optional: Custom Fields (per user) ──────────────────────────── */}
+      <div className="d-flex align-items-center justify-content-between mb-3 mt-4">
+        <div className="d-flex align-items-center gap-2">
+          <div className="rounded-2 d-flex align-items-center justify-content-center"
+            style={{ width: 32, height: 32, background: '#8b5cf618' }}>
+            <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: '#8b5cf6' }} />
+          </div>
+          <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+            My Custom Fields (Optional)
+          </h6>
+        </div>
+        <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
+          style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={addCustomField}>
+          <i className="bi bi-plus-circle" /> Add Custom Field
+        </button>
+      </div>
+      {customFieldDefs.length === 0 ? (
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+          <div className="card-body p-3 text-center text-muted" style={{ fontSize: '0.78rem' }}>
+            No custom fields yet. Click <strong>+ Add Custom Field</strong> to create your own sections.
+            These fields are just for you — other users won't see them.
+          </div>
+        </div>
+      ) : (
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+          <div className="card-body p-3">
+            {customFieldDefs.map((field, i) => (
+              <div key={field.id} className={i > 0 ? 'mt-3 pt-3' : ''}
+                style={i > 0 ? { borderTop: '1px solid #e2e8f0' } : {}}>
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: '#1e293b' }}>
+                    {field.name}
+                  </label>
+                  <div className="d-flex gap-1">
+                    <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                      onClick={() => renameCustomField(field.id)} title="Rename">
+                      <i className="bi bi-pencil" />
+                    </button>
+                    <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                      onClick={() => deleteCustomField(field.id)} title="Delete from my template">
+                      <i className="bi bi-trash3" />
+                    </button>
+                  </div>
+                </div>
+                <RichTextEditor
+                  value={(() => {
+                    const v = data.customFields?.[field.id];
+                    if (!v) return '';
+                    return typeof v === 'string' ? v : (v.value || '');
+                  })()}
+                  onChange={v => setCustomFieldValue(field.id, v, field.name)}
+                  minHeight={120}
+                  placeholder={`Add notes for ${field.name}…`} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Bottom action bar ────────────────────────────────────────────── */}
+      <div className="d-flex justify-content-end gap-2 mt-4 pb-4">
+        {(reportStatus === 'draft' || !editReportId) ? (
+          <>
+            <button className="btn btn-outline-secondary btn-sm px-4 d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 10 }} onClick={handleSaveDraft} disabled={saving}>
+              {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-floppy" />} Save Draft
+            </button>
+            <button className="btn btn-sm px-5 d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 10, background: submitBlock ? '#94a3b8' : '#2563eb', color: 'white', border: 'none' }}
+              onClick={handleSubmitReport} disabled={saving || !!submitBlock}
+              title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this period' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
+              {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-send-fill" /> Submit Report</>}
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-dark btn-sm px-5 d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: 10 }} onClick={handleSaveChanges} disabled={saving}>
+            {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save Changes</>}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,21 @@
+{
+  "name": "WurxOS",
+  "short_name": "WurxOS",
+  "description": "WurxCrew operations — brands, attendance, incentives, performance.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#c2704e",
+  "background_color": "#0f0f0f",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"]
+}

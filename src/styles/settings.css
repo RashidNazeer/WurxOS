@@ -1,0 +1,352 @@
+/* ============================================================
+   Settings — dedicated nav panel + airy content area
+   Pattern matches the reference: Settings becomes its own column
+   with its own header + search, separated from the main app shell.
+   ============================================================ */
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 228px 1fr;
+  gap: 18px;
+  align-items: start;
+  /* Pull the settings experience flush to the page top so the
+     dedicated Settings header sits directly under the app topbar. */
+  margin-top: -14px;
+}
+
+/* ---------- Left panel ---------- */
+.settings-panel-nav {
+  /* Sticky inside the shell-content scroll context. The parent has
+     overflow-x: hidden which creates a scroll parent, so top: 0
+     pins the panel to the top of that context as you scroll. */
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: calc(100vh - 68px);
+  overflow-y: auto;
+  padding: 16px 0 24px;
+  scrollbar-width: thin;
+}
+.settings-panel-nav::-webkit-scrollbar       { width: 6px; }
+.settings-panel-nav::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
+.settings-panel-nav:hover::-webkit-scrollbar-thumb { background: var(--border-default); }
+
+/* Panel header — back arrow + label, echoes the ss */
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 14px;
+}
+.settings-panel-back {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.settings-panel-back:hover { background: var(--surface-2); color: var(--text-primary); }
+.settings-panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* Search */
+.settings-search {
+  position: relative;
+  margin: 0 4px 14px;
+}
+.settings-search input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-1);
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.settings-search input::placeholder { color: var(--text-muted); }
+.settings-search input:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.settings-search-icon {
+  position: absolute; left: 11px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* Groups — small uppercase section labels (no icon) to match the
+   brand-detail "SECTIONS" header style. */
+.settings-nav-group {
+  padding: 8px 0 4px;
+}
+.settings-nav-group + .settings-nav-group {
+  margin-top: 4px;
+}
+.settings-nav-group-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+  padding: 6px 12px 8px;
+}
+
+/* Leaf items — icon + label, left-rail accent when active.
+   Mirrors .bd-menu-item from brandDetail.css so the two pages
+   feel consistent. */
+.settings-nav-btn {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur-fast), color var(--dur-fast);
+  margin-bottom: 1px;
+  font-size: 13.5px;
+  font-weight: 600;
+  position: relative;
+  white-space: nowrap;
+}
+.settings-nav-btn-icon {
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  color: currentColor;
+  opacity: 0.9;
+}
+.settings-nav-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.settings-nav-btn[data-active='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.settings-nav-btn[data-active='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+.settings-nav-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.settings-nav-btn[disabled]:hover { background: transparent; color: var(--text-secondary); }
+
+.settings-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.settings-soon-badge {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-3, #e2e8f0);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- Content side ---------- */
+.settings-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.settings-content-header {
+  padding: 0 2px 4px;
+}
+.settings-content-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.settings-content-subtitle {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+/* Card for each panel — subtle, airy */
+.settings-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+/* The section icon is optional in this layout — the big page title
+   above the card takes most of the visual weight. Keep it subtle. */
+.settings-section-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+}
+.settings-section-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+.settings-section-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.settings-section-body { padding: 22px 24px; }
+
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.settings-row:first-child { border-top: 0; padding-top: 4px; }
+
+.settings-row-label-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+.settings-row-label-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.settings-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Theme preview cards */
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.theme-card {
+  position: relative;
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  text-align: left;
+  background: transparent;
+  color: inherit;
+}
+.theme-card:hover { border-color: var(--border-strong); }
+.theme-card[data-active='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.theme-card-preview {
+  height: 78px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.theme-card-label {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.theme-card-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Coming-soon stub */
+.settings-coming-soon {
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+}
+.settings-coming-soon-title {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 14.5px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 0;
+  }
+  .settings-panel-nav {
+    position: static;
+    max-height: none;
+    padding: 8px 0;
+  }
+  .settings-content { padding-top: 0; }
+  .settings-section-header { padding: 14px 16px; }
+  .settings-section-body   { padding: 18px; }
+}

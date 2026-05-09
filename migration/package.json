@@ -1,0 +1,16 @@
+{
+  "name": "wurxos-v2-migration",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One-shot Firebase (v1) -> Supabase (v2) data migration. Read-only on v1.",
+  "scripts": {
+    "audit": "node run.js audit",
+    "step": "node run.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^12.4.0"
+  }
+}

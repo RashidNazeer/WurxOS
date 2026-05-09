@@ -1,0 +1,506 @@
+/* ============================================================
+   Rich modal primitives — used by ResourceModal as the reference
+   implementation. Future modals opt in by composing these pieces.
+
+   Layout hierarchy on top of the existing `.wx-modal-backdrop` and
+   `.wx-modal` shell:
+
+     .wx-m-head          ← icon tile + title + subtitle + close
+       .wx-m-head-icon
+       .wx-m-head-text
+         .wx-m-head-title
+         .wx-m-head-sub
+
+     .wx-m-body          ← same as .wx-modal-body (extra spacing)
+
+     .wx-m-field         ← label row + input (+ optional helper)
+       .wx-m-field-head
+         .wx-m-field-label
+         .wx-m-field-meta   (REQUIRED / Optional / helper text)
+
+     .wx-m-input-shell   ← wrapper for prefix + input + suffix pills
+       .wx-m-input-prefix
+       .wx-m-input-suffix
+
+     .wx-m-textarea-shell  ← textarea + bottom-right char counter
+       .wx-m-char-count
+
+     .wx-m-cards          ← grid of selectable card options
+       .wx-m-card         ← single card (icon + title + sub + check)
+         .is-active
+
+     .wx-m-foot           ← footer with left hints + right buttons
+       .wx-m-kbd-hints
+       <kbd/>
+   ============================================================ */
+
+/* ---- Richer backdrop (subtle darker glass for contrast) ---- */
+.wx-m-backdrop {
+  background: rgba(8, 10, 14, 0.56);
+  backdrop-filter: blur(6px);
+}
+
+/* ---- Header ------------------------------------------------- */
+.wx-m-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+.wx-m-head-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+}
+.wx-m-head-text { flex: 1; min-width: 0; }
+.wx-m-head-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.wx-m-head-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.wx-m-head-close {
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  flex-shrink: 0;
+}
+.wx-m-head-close:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+/* ---- Stepper (optional — for multi-step modals) ------------- */
+.wx-m-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px 0;
+  flex-wrap: wrap;
+}
+.wx-m-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.wx-m-step-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  transition: all var(--dur-fast);
+}
+.wx-m-step.is-active { color: var(--text-primary); }
+.wx-m-step.is-active .wx-m-step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.wx-m-step.is-done { color: var(--text-secondary); }
+.wx-m-step.is-done .wx-m-step-dot {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
+  color: var(--accent);
+}
+.wx-m-step-sep {
+  flex: 1;
+  height: 1px;
+  min-width: 16px;
+  background: linear-gradient(
+    to right,
+    var(--border-subtle),
+    color-mix(in srgb, var(--border-subtle) 30%, transparent)
+  );
+}
+
+/* ---- Body --------------------------------------------------- */
+.wx-m-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---- Review block (shown on the final step of step-modals) --- */
+.wx-m-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wx-m-review-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.wx-m-review-row + .wx-m-review-row { margin-top: -4px; }
+.wx-m-review-k {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.wx-m-review-v {
+  font-size: 13px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+/* ---- Field -------------------------------------------------- */
+.wx-m-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wx-m-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wx-m-field-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.wx-m-field-meta {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.wx-m-field-meta.is-required { color: var(--accent); }
+.wx-m-field-meta.is-warn     { color: var(--warning); }
+
+/* ---- Input shell (prefix + input + suffix) ------------------ */
+.wx-m-input-shell {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  overflow: hidden;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.wx-m-input-shell:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.wx-m-input-shell > input,
+.wx-m-input-shell > textarea {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  outline: none;
+  min-width: 0;
+}
+.wx-m-input-shell > input::placeholder,
+.wx-m-input-shell > textarea::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+}
+.wx-m-input-prefix {
+  padding: 0 12px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-right: 1px solid var(--border-subtle);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: -0.02em;
+}
+.wx-m-input-suffix {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 5px 6px 5px 0;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  align-self: center;
+}
+.wx-m-input-suffix::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.wx-m-input-suffix.is-ok    { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
+.wx-m-input-suffix.is-warn  { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
+.wx-m-input-suffix.is-bad   { background: color-mix(in srgb, var(--danger)  14%, transparent); color: var(--danger); }
+
+/* Plain input helper (no prefix wrapper, matches styling) */
+.wx-m-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.wx-m-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* ---- Textarea shell with char counter ----------------------- */
+.wx-m-textarea-shell {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.wx-m-textarea-shell:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.wx-m-textarea-shell textarea {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 10px 12px 22px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  outline: none;
+  resize: vertical;
+  min-height: 70px;
+  font-family: inherit;
+}
+.wx-m-textarea-shell textarea::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+}
+.wx-m-char-count {
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.wx-m-char-count.is-warn { color: var(--warning); }
+
+/* ---- Card picker grid --------------------------------------- */
+.wx-m-cards {
+  display: grid;
+  gap: 8px;
+}
+.wx-m-cards[data-cols="2"] { grid-template-columns: repeat(2, 1fr); }
+.wx-m-cards[data-cols="3"] { grid-template-columns: repeat(3, 1fr); }
+.wx-m-cards[data-cols="4"] { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 540px) {
+  .wx-m-cards[data-cols="4"] { grid-template-columns: repeat(2, 1fr); }
+}
+
+.wx-m-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  font-family: inherit;
+  color: var(--text-primary);
+}
+.wx-m-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.wx-m-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.wx-m-card-main { min-width: 0; flex: 1; }
+.wx-m-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.wx-m-card-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-m-card.is-active {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
+  border-color: var(--accent);
+}
+.wx-m-card.is-active .wx-m-card-icon {
+  background: var(--accent);
+  color: #fff;
+}
+.wx-m-card-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 3px var(--surface-1);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all var(--dur-fast);
+}
+.wx-m-card.is-active .wx-m-card-check { opacity: 1; transform: scale(1); }
+
+/* Compact card (icon on top, for 4-up grid) */
+.wx-m-card.is-compact {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 14px 10px;
+  gap: 8px;
+}
+.wx-m-card.is-compact .wx-m-card-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+/* ---- Opt-in / checkbox card (reuse of existing pattern) ----- */
+.wx-m-optin {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.wx-m-optin:hover { background: var(--surface-2); }
+.wx-m-optin.is-active {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-subtle));
+}
+.wx-m-optin input { margin-top: 2px; }
+.wx-m-optin-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.wx-m-optin-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* ---- Footer ------------------------------------------------- */
+.wx-m-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  flex: 0 0 auto;
+}
+.wx-m-kbd-hints {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.wx-m-kbd-hints kbd {
+  font-family: inherit;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.wx-m-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .wx-m-kbd-hints { display: none; }
+  .wx-m-foot { justify-content: flex-end; }
+}

@@ -1,0 +1,902 @@
+/* ============================================================
+   Attendance — two-card hero, history table, manager sections
+   ============================================================ */
+
+.att-banner {
+  margin-top: 4px;
+  max-width: 680px;
+}
+
+/* ---------------------------------------------------
+   Top-level tabs (Today / History)
+   --------------------------------------------------- */
+.att-tabs {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+.att-tab {
+  padding: 8px 20px;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.att-tab:hover { color: var(--text-primary); }
+.att-tab.is-active {
+  background: var(--surface-1);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------------------------------------------------
+   Two-card dashboard
+   --------------------------------------------------- */
+.att-dash {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+@media (max-width: 960px) {
+  .att-dash { grid-template-columns: 1fr; }
+}
+
+.att-dash-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+.att-dash-card-dark {
+  background: #0d0d10;
+  color: #fff;
+  border-color: transparent;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.att-dash-card-dark::after {
+  /* soft spotlight top-right */
+  content: '';
+  position: absolute;
+  top: -100px; right: -100px;
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(255,255,255,0.05), transparent 70%);
+  pointer-events: none;
+}
+
+/* Eyebrow label */
+.att-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.att-eyebrow-dark { color: rgba(255, 255, 255, 0.55); }
+
+/* ---- Live wall clock ---- */
+.att-wall-clock {
+  display: flex;
+  align-items: baseline;
+  font-size: clamp(56px, 9vw, 96px);
+  font-weight: 800;
+  letter-spacing: -3px;
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-top: -4px;
+}
+.att-wall-sep { margin: 0 2px; }
+.att-wall-fade { color: color-mix(in srgb, var(--text-primary) 28%, transparent); }
+
+.att-sched {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.att-sched strong { color: var(--text-primary); }
+
+.att-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
+}
+
+/* ---- Mini stats (3-col) ---- */
+.att-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.att-mini-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.att-mini-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.att-mini-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-mini-stat-value.is-mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+.att-mini-stat-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ---- Location chips (compact) ---- */
+.att-loc-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.att-loc-chip {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.att-loc-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+.att-loc-chip.is-active {
+  background: var(--text-primary);
+  color: var(--surface-1);
+  border-color: var(--text-primary);
+}
+
+/* ---- Primary action (big pill button) ---- */
+.att-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  border: 0;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+  padding: 0 24px;
+  position: relative;
+}
+.att-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+.att-primary:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 20px -8px rgba(0,0,0,0.28); }
+.att-primary-dark {
+  background: #0d0d10;
+  color: #fff;
+}
+.att-primary-dark svg { margin-left: auto; }
+.att-primary-danger {
+  background: #e64a4a;
+  color: #fff;
+}
+.att-primary-danger svg { margin-left: auto; }
+
+.att-wrapped {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
+}
+.att-wrapped-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.att-wrapped-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.att-wrapped-sub strong { color: var(--text-primary); font-weight: 700; }
+
+.att-primary-pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+}
+.att-dot-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: att-pulse 1.5s ease-in-out infinite;
+}
+
+/* ---- Secondary row ---- */
+.att-secondary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.att-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.att-secondary:not(:disabled):hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+.att-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+.att-secondary.is-active {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+}
+.att-emoji { font-size: 13px; }
+
+.att-kbd-hint {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: -2px;
+}
+.att-kbd-hint kbd {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+  color: var(--text-primary);
+  font-weight: 700;
+  margin: 0 2px;
+}
+
+/* ---- Dark card (TODAY) ---- */
+.att-dash-heading {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0;
+}
+.att-big-number {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  margin-top: 8px;
+}
+.att-big-hours, .att-big-mins {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+.att-big-mins { margin-left: 10px; }
+.att-big-unit {
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  margin-left: 2px;
+}
+.att-big-sub {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.att-progress-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.att-progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 600;
+}
+.att-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.att-progress-fill {
+  height: 100%;
+  background: #fff;
+  border-radius: 999px;
+  transition: width 0.6s var(--ease-out);
+}
+.att-progress-track-sm { height: 4px; background: var(--surface-2); max-width: 100px; }
+.att-progress-fill-dark { background: var(--text-primary); }
+
+.att-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.att-dash-stat { display: flex; flex-direction: column; gap: 3px; }
+.att-dash-stat-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+.att-dash-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   History
+   ============================================================ */
+.att-history {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.att-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.att-history-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.att-history-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.att-history-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.att-range-tabs {
+  display: inline-flex;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  gap: 2px;
+}
+.att-range-tab {
+  padding: 6px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.att-range-tab:hover { color: var(--text-primary); }
+.att-range-tab.is-active { background: var(--surface-2); color: var(--text-primary); }
+
+.att-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.att-export-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+
+/* ---- Table ---- */
+.att-hist-table { display: flex; flex-direction: column; }
+.att-hist-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr 0.9fr 0.8fr 1.1fr 1fr 0.9fr;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+.att-hist-row:first-child { border-top: 0; }
+.att-hist-head-row {
+  padding: 10px 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.att-hist-val {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.att-hist-arrow { color: var(--text-muted); font-weight: 500; }
+.att-hist-loc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: right;
+}
+
+.att-date-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.att-date-tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.att-date-tile.is-today { background: #0d0d10; color: #fff; }
+.att-date-tile-month {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, currentColor 55%, transparent);
+  margin-top: 3px;
+}
+.att-date-tile-day {
+  font-size: 17px;
+  font-weight: 800;
+  margin-top: 2px;
+}
+.att-date-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.att-date-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.att-hist-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* History status pill */
+.att-hist-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.att-hist-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.att-hist-pill.is-ontime  { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success); }
+.att-hist-pill.is-late    { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
+.att-hist-pill.is-halfday { background: color-mix(in srgb, var(--info)    14%, transparent); color: var(--info); }
+.att-hist-pill.is-pending { background: var(--surface-2); color: var(--text-secondary); }
+.att-hist-pill.is-live    { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.att-hist-pill.is-break   { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
+.att-hist-pill.is-auto    { background: color-mix(in srgb, var(--danger)  14%, transparent); color: var(--danger); }
+
+.att-hist-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.att-hist-footer strong { color: var(--text-primary); font-weight: 700; }
+
+@media (max-width: 960px) {
+  .att-hist-row:not(.att-hist-team-row) {
+    grid-template-columns: 1.4fr 1.2fr 0.8fr 1fr;
+  }
+  /* Hide Break (4), Target (5), Location (7) — keep Date, In→Out, Worked, Status */
+  .att-hist-row:not(.att-hist-team-row) > :nth-child(4),
+  .att-hist-row:not(.att-hist-team-row) > :nth-child(5),
+  .att-hist-row:not(.att-hist-team-row) > :nth-child(7) { display: none; }
+}
+@media (max-width: 640px) {
+  .att-hist-row:not(.att-hist-team-row) { grid-template-columns: 1.4fr 1fr auto; }
+  /* Also hide Worked (3) on narrow — keep Date, In→Out, Status */
+  .att-hist-row:not(.att-hist-team-row) > :nth-child(3) { display: none; }
+}
+
+/* ---------------------------------------------------
+   Team tab — rollup cards + table variant
+   --------------------------------------------------- */
+.att-team-filter {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  max-width: 200px;
+  border-radius: var(--radius-pill);
+}
+
+.att-team-rollup {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.att-team-rollup-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--dur-fast);
+}
+.att-team-rollup-card:hover {
+  background: var(--surface-3);
+  border-color: var(--border-subtle);
+}
+.att-team-rollup-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-team-rollup-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+.att-team-rollup-hrs {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Team table has an extra User column → override the default grid */
+.att-hist-team-row {
+  grid-template-columns: 1.4fr 1.6fr 1.2fr 0.9fr 0.8fr 1fr 0.9fr !important;
+}
+.att-team-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.att-team-user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-team-user-role {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+@media (max-width: 960px) {
+  .att-hist-team-row {
+    grid-template-columns: 1.3fr 1.4fr 1.1fr 0.8fr 1fr !important;
+  }
+  /* Hide Break (5) and Location (7) on medium */
+  .att-hist-team-row > :nth-child(5),
+  .att-hist-team-row > :nth-child(7) { display: none; }
+}
+@media (max-width: 640px) {
+  .att-hist-team-row {
+    grid-template-columns: 1.3fr 1.4fr auto !important;
+  }
+  /* Keep Date, User, Status — hide In→Out(3), Worked(4), Break(5), Location(7) */
+  .att-hist-team-row > :nth-child(3),
+  .att-hist-team-row > :nth-child(4) { display: none; }
+}
+
+@keyframes att-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* ============================================================
+   Manager sections (preserved)
+   ============================================================ */
+.att-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.att-status-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.att-status-pill-on    { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.att-status-pill-on::before { animation: att-pulse 1.6s ease-in-out infinite; }
+.att-status-pill-break { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
+.att-status-pill-pending { background: color-mix(in srgb, var(--accent)  16%, transparent); color: var(--accent); }
+.att-status-pill-out   { background: var(--surface-2); color: var(--text-muted); }
+.att-status-pill-none  { background: var(--surface-2); color: var(--text-muted); }
+
+.att-section {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.att-section-header {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.att-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.att-section-count {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.att-section-count.is-warn {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+}
+
+.att-approval-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+.att-approval-row:first-of-type { border-top: 0; }
+
+.att-team-row {
+  display: grid;
+  grid-template-columns: 40px 1.4fr 1fr 1fr 1fr 110px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+.att-team-row:first-of-type { border-top: 0; }
+.att-team-row .att-cell-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.att-team-row .att-cell-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.att-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.att-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.att-avatar-sm { width: 28px; height: 28px; font-size: 10.5px; }
+
+.att-empty {
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.att-empty-title {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 640px) {
+  .att-team-row {
+    grid-template-columns: 36px 1fr auto;
+  }
+  .att-team-row .att-cell-times,
+  .att-team-row .att-cell-loc { display: none; }
+}
+
+/* ============================================================
+   Mobile pass — phones (≤640px)
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Tabs: scroll horizontally instead of wrapping into two rows. */
+  .att-tabs {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .att-tabs::-webkit-scrollbar { display: none; }
+  .att-tab { flex: 0 0 auto; padding: 7px 14px; font-size: 12.5px; }
+
+  /* Hero cards — tighter padding, less vertical real estate. */
+  .att-dash-card { padding: 16px 16px; gap: 12px; }
+
+  /* Wall clock shrinks — clamp upper bound so 9vw doesn't blow it up
+     past the card width on tablets-in-portrait. */
+  .att-wall-clock { font-size: clamp(44px, 14vw, 64px); letter-spacing: -2px; }
+
+  /* Mini stats: 3 columns is too tight at phone width. Drop to 2,
+     and let the third (Breaks today) wrap below. */
+  .att-mini-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .att-mini-stat-value { font-size: 18px; }
+
+  /* Big "today" number — keep readable but smaller. */
+  .att-big-hours, .att-big-mins { font-size: 44px; }
+  .att-big-unit { font-size: 18px; }
+  .att-dash-heading { font-size: 18px; }
+
+  /* Dash stats strip — keep 3 columns but tighten gaps. */
+  .att-dash-stats { gap: 6px; padding-top: 14px; }
+  .att-dash-stat-value { font-size: 17px; }
+  .att-dash-stat-label { font-size: 9.5px; letter-spacing: 0.08em; }
+
+  /* Secondary actions: 3 across is fine, but tighten padding. */
+  .att-secondary { padding: 9px 8px; font-size: 11.5px; gap: 4px; }
+
+  /* History header — stack title + actions vertically. */
+  .att-history { padding: 14px 14px; }
+  .att-history-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .att-history-actions { gap: 8px; }
+  .att-team-filter { max-width: 100%; flex: 1 1 auto; }
+  .att-range-tabs { flex: 1 1 auto; justify-content: center; }
+  .att-export-btn { padding: 7px 12px; }
+
+  /* History rows — already collapsed via the existing rule. Just
+     make sure the date tile + label cell can shrink without forcing
+     overflow when the user has long weekday names. */
+  .att-date-cell { gap: 8px; }
+  .att-date-tile { width: 38px; height: 38px; }
+  .att-date-tile-day { font-size: 15px; }
+  .att-date-name { font-size: 12.5px; }
+
+  /* Approval / edit rows — actions wrap under the details on phones
+     so the Approve/Reject buttons don't get squeezed off-screen. */
+  .att-approval-row {
+    grid-template-columns: 36px 1fr !important;
+    grid-template-areas:
+      'avatar info'
+      'actions actions';
+    gap: 10px 12px;
+    padding: 12px 14px;
+  }
+  .att-approval-row > :nth-child(1) { grid-area: avatar; }
+  .att-approval-row > :nth-child(2) { grid-area: info; }
+  .att-approval-row > :nth-child(3) {
+    grid-area: actions;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* Team rollup cards — single column on phone. */
+  .att-team-rollup { grid-template-columns: 1fr; }
+
+  /* Footer summary stacks on narrow. */
+  .att-hist-footer { flex-direction: column; gap: 4px; }
+}

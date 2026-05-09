@@ -1,0 +1,690 @@
+/* ============================================================
+   App Shell — sidebar, topbar, content
+   All colors reference tokens. Works cleanly in both themes.
+   ============================================================ */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w, 240px) 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'sidebar topbar'
+    'sidebar content';
+  min-height: 100vh;
+  background: var(--surface-0);
+  transition: grid-template-columns var(--dur-base) var(--ease-out);
+}
+.shell[data-collapsed='true'] { --sidebar-w: 68px; }
+
+/* ---------- Sidebar ---------- */
+.shell-sidebar {
+  grid-area: sidebar;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  /* Use dvh (dynamic viewport height) so the sidebar reliably fills
+     the visible viewport on mobile/narrow browsers where 100vh
+     can extend behind the address bar/dynamic UI. Fallback to vh
+     for older browsers. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  z-index: 10;
+}
+.shell-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 14px 18px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 68px;
+}
+.shell-sidebar-toggle {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.shell-sidebar-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.shell-sidebar-header .brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 15px;
+  box-shadow: 0 4px 10px -4px var(--accent-ring);
+}
+.shell-sidebar-header .brand-text {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.shell-sidebar-header .brand-name {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 14.5px;
+  line-height: 1.1;
+}
+.shell-sidebar-header .brand-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.shell-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  /* Hide the scrollbar — content still scrolls but no track shows. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.shell-nav::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* ---------- Sidebar footer ----------
+   Compact one-row strip pinned to the bottom of the sidebar:
+     [• WurxOS · v2]            [?]
+   No heavy divider or gradient — reads as a quiet status bar
+   rather than a separate footer card. */
+.shell-sidebar-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+/* User mini card at the top of the footer — avatar + name + role.
+   Subtle accent tint so it reads as a distinct "you" block without
+   looking like a button. */
+.shell-sidebar-user {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.shell-sidebar-user-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid; place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.shell-sidebar-user-avatar img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.shell-sidebar-user-meta { min-width: 0; }
+.shell-sidebar-user-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-sidebar-user-role {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.shell-sidebar-footer-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.shell-sidebar-footer-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.shell-sidebar-footer-btn svg { opacity: 0.85; }
+
+.shell-sidebar-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  min-width: 0;
+}
+.shell-sidebar-footer-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent);
+  flex: 0 0 auto;
+}
+
+/* Collapsed sidebar — hide labels, center the icons */
+.shell[data-collapsed='true'] .shell-sidebar-footer {
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px 10px;
+  gap: 6px;
+}
+.shell[data-collapsed='true'] .shell-sidebar-footer-brand {
+  display: none;
+}
+
+.shell-nav-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 14px 10px 6px;
+}
+
+.shell-nav-link,
+.shell-nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.shell-nav-link:hover,
+.shell-nav-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.shell-nav-link.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.shell-nav-link .icon,
+.shell-nav-toggle .icon {
+  flex: 0 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+.shell-nav-link .label,
+.shell-nav-toggle .label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-nav-toggle .chev {
+  flex: 0 0 auto;
+  opacity: 0.6;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.shell-nav-toggle[data-open='true'] .chev { transform: rotate(90deg); }
+
+.shell-nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 6px 10px;
+  margin-left: 18px;
+  border-left: 1px solid var(--border-subtle);
+}
+.shell-nav-sub .shell-nav-link {
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+/* v1-parity menu search — sits between the brand header and the
+   nav list. Hidden when the sidebar is collapsed. */
+.shell-sidebar-search {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 10px 12px 6px;
+}
+.shell-sidebar-search-icon {
+  position: absolute;
+  left: 21px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.shell-sidebar-search-input {
+  width: 100%;
+  padding: 7px 28px 7px 30px;
+  font-size: 12.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.shell-sidebar-search-input:focus {
+  border-color: var(--accent);
+}
+.shell-sidebar-search-input::placeholder {
+  color: var(--text-muted);
+}
+.shell-sidebar-search-clear {
+  position: absolute;
+  right: 17px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+.shell-sidebar-search-clear:hover {
+  color: var(--text-primary);
+  background: var(--surface-3);
+}
+
+.shell-nav-empty {
+  padding: 14px 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Collapsed mode hides labels, sub menus, sections */
+.shell[data-collapsed='true'] .brand-text,
+.shell[data-collapsed='true'] .shell-nav-link .label,
+.shell[data-collapsed='true'] .shell-nav-toggle .label,
+.shell[data-collapsed='true'] .shell-nav-toggle .chev,
+.shell[data-collapsed='true'] .shell-nav-section-label,
+.shell[data-collapsed='true'] .shell-nav-sub { display: none; }
+
+.shell[data-collapsed='true'] .shell-nav-link,
+.shell[data-collapsed='true'] .shell-nav-toggle {
+  justify-content: center;
+  padding: 10px;
+}
+
+/* In collapsed mode the brand mark is the only thing in the header
+   besides the toggle — center the row and keep the toggle visible
+   so users can expand again. */
+.shell[data-collapsed='true'] .shell-sidebar-header {
+  padding: 14px 8px;
+  justify-content: center;
+  gap: 6px;
+  flex-direction: column;
+}
+.shell[data-collapsed='true'] .shell-sidebar-toggle {
+  margin-left: 0;
+}
+
+/* ---------- Topbar ---------- */
+.shell-topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 68px;
+}
+.shell-topbar-left { display: flex; align-items: center; gap: 14px; }
+.shell-topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.shell-topbar-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.shell-topbar-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.shell-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.shell-icon-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* User avatar button */
+.shell-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.shell-user-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.shell-user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+.shell-user-meta { text-align: left; line-height: 1.15; }
+.shell-user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.shell-user-role { font-size: 11px; color: var(--text-muted); }
+
+/* User dropdown */
+.shell-user-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 50;
+  animation: shell-pop 0.15s var(--ease-out);
+}
+@keyframes shell-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.shell-user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+.shell-user-menu-item:hover { background: var(--surface-2); }
+.shell-user-menu-item.danger { color: var(--danger); }
+.shell-user-menu-item.danger:hover { background: var(--danger-soft); }
+.shell-user-menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 2px;
+}
+
+/* ---------- Content ---------- */
+.shell-content {
+  grid-area: content;
+  padding: 24px 28px 48px;
+  overflow-x: hidden;
+}
+/* Fill the available width — dashboards feel cramped with a 1200px
+   cap on wide monitors. Pages can still self-constrain if they want. */
+.shell-content-inner { max-width: none; margin: 0; }
+
+.page-header {
+  margin-bottom: 22px;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+.page-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ---------- Mobile menu button (hamburger in topbar) ---------- */
+.shell-mobile-menu-btn {
+  display: none;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.shell-mobile-menu-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.shell-topbar-titles { min-width: 0; }
+.shell-topbar-title  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Mobile ---------- */
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'topbar' 'content';
+  }
+  .shell-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base) var(--ease-out);
+    box-shadow: var(--shadow-xl);
+  }
+  .shell[data-mobile-open='true'] .shell-sidebar { transform: translateX(0); }
+  .shell-mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 9;
+  }
+  .shell-content { padding: 20px 16px 40px; }
+
+  /* Show hamburger; hide the desktop sidebar collapse toggle inside the
+     drawer's header (no point on mobile — the drawer is full-height). */
+  .shell-mobile-menu-btn { display: inline-flex; }
+
+  /* Tighten the topbar so the hamburger + title fit alongside the
+     bell, theme toggle, and avatar without overflowing. */
+  .shell-topbar { padding: 10px 14px; min-height: 60px; gap: 8px; }
+  .shell-topbar-left { gap: 10px; flex: 1; min-width: 0; }
+  .shell-topbar-right { gap: 6px; }
+  .shell-topbar-title { font-size: 14.5px; }
+  .shell-topbar-subtitle { display: none; }
+
+  /* Drop the user name + role text down to a tap target. The avatar
+     + chevron are still visible so the dropdown still works. */
+  .shell-user-btn { padding: 4px 6px 4px 4px; gap: 6px; }
+  .shell-user-meta { display: none; }
+}
+
+/* Below 480px: hide avatars in the user menu trigger to save space
+   when global search and the bell are also competing for room. */
+@media (max-width: 480px) {
+  .shell-content { padding: 16px 12px 32px; }
+  .shell-content-inner { padding: 0; }
+  .shell-user-btn .shell-user-avatar { width: 28px; height: 28px; font-size: 11px; }
+}
+
+/* ------------------------------------------------------------
+   Global search
+   ------------------------------------------------------------ */
+.global-search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 11px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  font-size: 12.5px;
+  min-width: 180px;
+}
+.global-search-trigger:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.global-search-label { flex: 1; text-align: left; color: var(--text-muted); }
+.global-search-kbd {
+  font-size: 10.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+}
+.global-search-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  max-height: 460px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1200;
+  animation: wx-pop 0.14s var(--ease-out);
+}
+.global-search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.global-search-input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.global-search-clear {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+.global-search-clear:hover { background: var(--surface-2); color: var(--text-primary); }
+.global-search-body { overflow-y: auto; padding: 6px; flex: 1; min-height: 0; }
+.global-search-hint {
+  padding: 22px 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+.global-search-group { margin-bottom: 6px; }
+.global-search-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.global-search-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.global-search-item:hover { background: var(--surface-2); }
+
+@media (max-width: 720px) {
+  .global-search-trigger { min-width: 40px; padding: 7px 10px; }
+  .global-search-label, .global-search-kbd { display: none; }
+}

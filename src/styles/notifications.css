@@ -1,0 +1,451 @@
+/* ============================================================
+   Notifications — bell badge, dropdown, sidebar dots
+   ============================================================ */
+
+/* Bell button */
+.notif-bell {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all var(--dur-fast);
+}
+.notif-bell:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.notif-bell-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface-1);
+  box-sizing: content-box;
+}
+
+/* Pulsing dot (animation for active events) */
+.notif-bell-badge::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid var(--danger);
+  opacity: 0;
+  animation: notif-pulse 1.8s ease-out infinite;
+}
+@keyframes notif-pulse {
+  0%   { transform: scale(0.7); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* ============================================================
+   Dropdown panel — modern, sectioned, avatar-first
+   ============================================================ */
+.notif-panel {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: min(560px, 75vh);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: wx-pop 0.16s var(--ease-out);
+}
+.notif-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  gap: 10px;
+}
+.notif-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notif-panel-title-count {
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  min-width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.notif-panel-action {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--dur-fast);
+}
+.notif-panel-action:hover {
+  color: var(--accent);
+  background: var(--surface-2);
+}
+
+/* Filter pills row */
+.notif-panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 12px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Lock the row height so switching tabs never reflows the panel. */
+  min-height: 42px;
+  align-items: center;
+}
+.notif-panel-tabs::-webkit-scrollbar { display: none; }
+.notif-tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--dur-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Fixed height so the active state doesn't make the tab taller. */
+  height: 26px;
+}
+.notif-tab:hover { color: var(--text-primary); background: var(--surface-2); }
+.notif-tab.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.notif-tab-count {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 5px;
+  border-radius: 999px;
+  /* Fixed width + height keeps both inactive and active pills identical. */
+  min-width: 18px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.notif-tab.is-active .notif-tab-count {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.notif-panel-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0 8px;
+  /* Keep wheel events inside this scroll area instead of bubbling to the
+     document (which would scroll the page underneath). */
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+.notif-section {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 10px 16px 6px;
+  /* Stay pinned to the top of the scroll area as the user scrolls past. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-1);
+  backdrop-filter: blur(6px);
+}
+.notif-panel-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  text-align: center;
+}
+
+/* Notification item — avatar + body + time */
+.notif-item {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 16px;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  position: relative;
+  transition: background var(--dur-fast);
+}
+.notif-item:hover { background: var(--surface-2); }
+.notif-item-unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.notif-avatar {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.notif-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.notif-avatar-cat {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface-1);
+  font-size: 9px;
+}
+.notif-avatar-cat-task   { background: var(--accent);  color: #fff; }
+.notif-avatar-cat-report { background: #818cf8;        color: #fff; }
+.notif-avatar-cat-brand  { background: #eab308;        color: #fff; }
+.notif-avatar-cat-paid_collab { background: #10b981;   color: #fff; }
+.notif-avatar-cat-leave  { background: #06b6d4;        color: #fff; }
+.notif-avatar-cat-resource { background: #ec4899;      color: #fff; }
+.notif-avatar-cat-performance { background: #f59e0b;   color: #fff; }
+.notif-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
+
+.notif-item-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.notif-item-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.notif-item-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.notif-item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.notif-item-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.notif-empty {
+  padding: 36px 20px 30px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.notif-empty-illu {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+}
+.notif-empty-title {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.notif-empty-text {
+  font-size: 12.5px;
+}
+
+/* ------------------------------------------------------------
+   Page-level notification row (richer than the dropdown item)
+   ------------------------------------------------------------ */
+.notif-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: background var(--dur-fast);
+}
+.notif-row:last-child { border-bottom: 0; }
+.notif-row:hover { background: var(--surface-2); }
+.notif-row-unread::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+.notif-row-unread { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+.notif-row-unread:hover { background: color-mix(in srgb, var(--accent-soft) 75%, transparent); }
+
+.notif-row-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+.notif-row-icon-task   { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.notif-row-icon-report { background: rgba(99, 102, 241, 0.18);   color: #818cf8; }
+.notif-row-icon-brand  { background: rgba(234, 179, 8, 0.18);    color: #eab308; }
+.notif-row-icon-paid   { background: rgba(16, 185, 129, 0.18);   color: #10b981; }
+.notif-row-icon-system { background: var(--surface-3);           color: var(--text-muted); }
+
+.notif-row-content { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.notif-row-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.notif-row-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.notif-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.notif-row-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.notif-row-chip-task   { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.notif-row-chip-report { background: rgba(99, 102, 241, 0.16);   color: #818cf8; }
+.notif-row-chip-brand  { background: rgba(234, 179, 8, 0.16);    color: #eab308; }
+.notif-row-chip-paid   { background: rgba(16, 185, 129, 0.16);   color: #10b981; }
+
+.notif-row-newdot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.notif-row-time {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .notif-row { grid-template-columns: 36px 1fr; padding: 12px 14px; }
+  .notif-row-time { grid-column: 2; margin-top: 2px; font-size: 11px; }
+}
+
+/* Sidebar unread dot — tiny pulsing peach dot on nav items */
+.sidebar-unread-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface-1);
+}
+.sidebar-unread-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: notif-pulse 1.8s ease-out infinite;
+}

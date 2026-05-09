@@ -1,0 +1,546 @@
+/* ============================================================
+   Reports — cards grid, form sections, status chips
+   ============================================================ */
+
+.report-tabs {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+}
+.report-tab {
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.report-tab:hover { color: var(--text-primary); }
+.report-tab-active { background: var(--surface-1); color: var(--accent); box-shadow: var(--shadow-sm); }
+
+.report-month-nav {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px; padding: 3px;
+}
+.report-month-nav button {
+  width: 32px; height: 32px;
+  border: 0; background: transparent; cursor: pointer;
+  display: grid; place-items: center;
+  border-radius: 50%; color: var(--text-secondary);
+}
+.report-month-nav button:hover { background: var(--surface-3); color: var(--text-primary); }
+.report-month-nav-label {
+  padding: 0 14px; font-size: 13.5px; font-weight: 600; color: var(--text-primary);
+  min-width: 140px; text-align: center;
+}
+
+/* Grid */
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.report-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.report-card:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.report-card-head {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+}
+.report-card-brand-name {
+  font-weight: 700; color: var(--text-primary); font-size: 14.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.report-card-period {
+  font-size: 12.5px; color: var(--text-muted); margin-top: 2px;
+}
+
+.report-status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.report-status-badge-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+}
+
+.report-card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 10px; border-top: 1px solid var(--border-subtle);
+  font-size: 11.5px; color: var(--text-muted);
+}
+
+/* ============ Report form / view (modal) ============ */
+.report-modal {
+  width: 100%;
+  max-width: 920px;
+  max-height: 92vh;
+}
+.report-form-step {
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ============================================================
+   Report page layout (was previously a modal; promoted to a
+   full page so users can enter the large amount of data
+   comfortably and scroll naturally). The hero sits above the
+   section list; the action bar sticks to the bottom of the
+   viewport so Save/Submit stay one click away no matter how
+   far down the user has scrolled.
+   ============================================================ */
+.report-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Leave room for the sticky action bar so the last section
+     isn't hidden behind it. */
+  padding-bottom: 72px;
+}
+.report-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+  align-self: flex-start;
+}
+.report-back:hover { color: var(--accent); }
+
+.report-page-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: linear-gradient(
+    180deg,
+    var(--surface-1) 0%,
+    color-mix(in srgb, var(--accent-soft) 24%, var(--surface-1)) 100%
+  );
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.report-page-hero-main { flex: 1; min-width: 0; }
+.report-page-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.report-page-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.report-page-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  /* Stretch edge-to-edge inside the shell-content inner wrapper
+     by cancelling its left/right padding. */
+  margin: 0 -28px -48px;
+  padding: 12px 28px;
+  background: var(--surface-1);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 -4px 16px -8px rgba(0, 0, 0, 0.15);
+}
+@media (max-width: 720px) {
+  .report-page-actions { margin: 0 -16px -40px; padding: 10px 16px; }
+  .report-page { padding-bottom: 64px; }
+}
+
+.report-section {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  overflow: hidden;
+  /* Parent `.report-form-step` is a flex column inside an `overflow-y:
+     auto` modal body. Without flex-shrink:0, each section would be
+     squashed by the flex algorithm trying to fit all of them into the
+     viewport, clipping titles and hiding inputs. Pinning shrink to 0
+     lets the modal scroll as intended. */
+  flex-shrink: 0;
+}
+.report-section-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.report-section-title {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; color: var(--text-primary); font-size: 14px;
+}
+.report-section-title-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center;
+}
+.report-section-body {
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* Row tables (top creators, gmv max, etc.) */
+.report-row-table {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.report-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.report-row:last-child { border-bottom: 0; }
+.report-row .wx-input { padding: 8px 10px; font-size: 13px; }
+.report-row-del {
+  border: 0; background: transparent; color: var(--text-muted);
+  width: 30px; height: 34px; display: grid; place-items: center; cursor: pointer;
+  border-radius: var(--radius-sm); flex: 0 0 30px;
+}
+.report-row-del:hover { color: var(--danger); background: var(--danger-soft); }
+.report-add-row {
+  border: 0; background: transparent; color: var(--accent);
+  padding: 10px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  border-top: 1px dashed var(--border-default);
+  width: 100%;
+  text-align: left;
+}
+.report-add-row:hover { background: var(--accent-soft); }
+
+.report-rejection-note {
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.report-approved-banner {
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  background: var(--success-soft);
+  color: var(--success);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ============================================================
+   ReportView — approved/verified/submitted read-only view with
+   trend charts, week-over-week deltas, and comparison tables.
+   ============================================================ */
+.report-view .rv-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.rv-stat {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.rv-stat-head { display: flex; align-items: center; gap: 8px; }
+.rv-stat-dot  { width: 10px; height: 10px; border-radius: 4px; }
+.rv-stat-label {
+  font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.rv-stat-value {
+  font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.rv-stat-delta { font-size: 11px; font-weight: 700; margin-top: 2px; }
+.rv-stat-delta.is-up   { color: var(--success); }
+.rv-stat-delta.is-down { color: var(--danger); }
+.rv-stat-sub { font-size: 11px; color: var(--text-muted); }
+
+.rv-delta { font-size: 11px; font-weight: 700; }
+.rv-delta.is-up   { color: var(--success); }
+.rv-delta.is-down { color: var(--danger); }
+.rv-new { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+
+/* Tables */
+.rv-table-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  background: var(--surface-1);
+}
+.rv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.rv-table thead tr {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.rv-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.rv-table td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+.rv-td-label { font-weight: 700; color: var(--text-primary); }
+.rv-td-strong { font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.rv-td-muted { color: var(--text-muted); font-size: 11.5px; }
+
+/* Charts */
+.rv-charts { display: flex; flex-direction: column; gap: 10px; }
+.rv-chart {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.rv-chart-title {
+  font-size: 12px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.rv-chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 720px) {
+  .rv-chart-grid { grid-template-columns: 1fr; }
+}
+
+/* Pie section */
+.rv-pie-wrap {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.rv-pie {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .rv-pie { grid-template-columns: 1fr; }
+}
+.rv-pie-legend { display: flex; flex-direction: column; gap: 6px; }
+.rv-pie-legend-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-secondary);
+}
+.rv-pie-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.rv-pie-name { font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-pie-pct { margin-left: auto; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.rv-pie-val { min-width: 80px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* Insight boxes */
+.rv-insight {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Prose text blocks */
+.rv-prose {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+/* Rich-content from RichTextEditor — force app font, paragraph spacing.
+   When .rich-content is also present, drop white-space: pre-wrap so HTML
+   <p> tags handle paragraph breaks instead of literal newlines. */
+.rich-content {
+  white-space: normal;
+}
+.rich-content p { margin: 0 0 0.6em; }
+.rich-content p:last-child { margin-bottom: 0; }
+.rich-content ul, .rich-content ol { padding-left: 1.4rem; margin: 0.4em 0; }
+.rich-content h1 { font-size: 1.5rem; font-weight: 700; margin: 0.6em 0; }
+.rich-content h2 { font-size: 1.25rem; font-weight: 700; margin: 0.5em 0; }
+.rich-content h3 { font-size: 1.05rem; font-weight: 600; margin: 0.4em 0; }
+.rich-content a { color: var(--accent); text-decoration: underline; }
+.rich-content,
+.rich-content *:not(code):not(pre):not(kbd):not(samp) {
+  font-family: inherit !important;
+}
+
+/* Highlight marks rendered in views */
+mark.rh { padding: 0 1px; border-radius: 2px; }
+mark.rh[data-color='yellow'][data-intensity='light']  { background: #fef9c3; color: inherit; }
+mark.rh[data-color='yellow'][data-intensity='medium'] { background: #fef08a; color: inherit; }
+mark.rh[data-color='yellow'][data-intensity='dark']   { background: #fde047; color: inherit; }
+mark.rh[data-color='green'][data-intensity='light']   { background: #dcfce7; color: inherit; }
+mark.rh[data-color='green'][data-intensity='medium']  { background: #bbf7d0; color: inherit; }
+mark.rh[data-color='green'][data-intensity='dark']    { background: #86efac; color: inherit; }
+mark.rh[data-color='pink'][data-intensity='light']    { background: #fce7f3; color: inherit; }
+mark.rh[data-color='pink'][data-intensity='medium']   { background: #f9a8d4; color: inherit; }
+mark.rh[data-color='pink'][data-intensity='dark']     { background: #f472b6; color: inherit; }
+mark.rh[data-color='blue'][data-intensity='light']    { background: #dbeafe; color: inherit; }
+mark.rh[data-color='blue'][data-intensity='medium']   { background: #93c5fd; color: inherit; }
+mark.rh[data-color='blue'][data-intensity='dark']     { background: #60a5fa; color: inherit; }
+mark.rh[data-color='orange'][data-intensity='light']  { background: #ffedd5; color: inherit; }
+mark.rh[data-color='orange'][data-intensity='medium'] { background: #fdba74; color: inherit; }
+mark.rh[data-color='orange'][data-intensity='dark']   { background: #fb923c; color: inherit; }
+
+/* Highlightable area — different cursor when highlighter mode is on */
+.highlightable-content.highlighter-active { cursor: text; }
+.highlightable-content[data-busy='1'] { opacity: 0.85; }
+
+/* Period picker grid */
+.period-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.period-picker-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all var(--dur-fast);
+}
+.period-picker-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.period-picker-item[data-used='true'] { opacity: 0.5; cursor: not-allowed; }
+
+/* ============================================================
+   Mobile pass — phones (≤640px)
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Cards grid: ensure 1-col fallback on phones narrower than 300px. */
+  .reports-grid { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+
+  /* Type tabs + month nav — let them scroll horizontally instead of
+     forcing a wrap that breaks the toolbar layout. */
+  .report-tabs { flex: 0 0 auto; }
+  .report-tab { padding: 7px 14px; font-size: 12.5px; }
+
+  .report-month-nav-label {
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 12.5px;
+  }
+  .report-month-nav button { width: 28px; height: 28px; }
+
+  /* Status filter chip strip — keep horizontal but allow scroll instead
+     of wrapping mid-row. */
+  .wx-toolbar { gap: 8px; }
+  .report-status-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  .report-status-chips::-webkit-scrollbar { display: none; }
+  .report-status-chips > * { flex: 0 0 auto; }
+
+  /* Card head: status badge can shrink under brand name when it's long
+     instead of forcing horizontal overflow. */
+  .report-card { padding: 14px; }
+  .report-card-head { flex-wrap: wrap; }
+  .report-status-badge { font-size: 10.5px; padding: 3px 8px; }
+
+  /* Report editor / view page:
+     - Hero stacks vertically (avatar + title block on its own row).
+     - Sticky action bar already handled at 720px breakpoint. */
+  .report-page-hero {
+    padding: 14px 16px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .report-page-title { font-size: 16px; }
+
+  /* Sections — tighter padding so the inputs have room. */
+  .report-section-head { padding: 10px 12px; }
+  .report-section-body { padding: 12px; gap: 10px; }
+  .report-section-title { font-size: 13px; }
+  .report-section-title-icon { width: 24px; height: 24px; }
+
+  /* Row-table rows stack vertically; the delete button sits on its own
+     line at the right so the inputs aren't squeezed to ~80px each. */
+  .report-row {
+    flex-wrap: wrap;
+    padding: 10px;
+    gap: 6px;
+  }
+  .report-row .wx-input { flex: 1 1 100%; min-width: 0; }
+  .report-row-del { margin-left: auto; }
+
+  /* Read-only view: stat grid drops to 2-col so values stay legible. */
+  .report-view .rv-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .rv-stat { padding: 10px 12px; }
+  .rv-stat-value { font-size: 17px; }
+
+  /* Tables inside read-only view scroll horizontally rather than
+     getting cropped — wrap already has overflow:auto, just tighten
+     padding so more columns fit on screen. */
+  .rv-table th, .rv-table td { padding: 8px 10px; }
+  .rv-table { font-size: 12px; }
+}

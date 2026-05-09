@@ -1,0 +1,6 @@
+node_modules/
+firebase-admin-key.json
+*.json.bak
+.env
+.env.local
+logs/

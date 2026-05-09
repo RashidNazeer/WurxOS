@@ -1,0 +1,33 @@
+/* ============================================================
+   Client Portal — shared report view + print-to-PDF styles
+   ============================================================ */
+
+@media print {
+  /* Hide chrome that shouldn't print */
+  .portal-toolbar { display: none !important; }
+
+  /* Force a clean white background regardless of theme */
+  html, body, .portal-page {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* Avoid splitting a card across pages when possible */
+  .wx-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Make absolute card width stable on paper */
+  .portal-page > div { max-width: 100% !important; }
+
+  /* Hide interactive focus rings / scroll shadows */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  a { color: #111 !important; text-decoration: underline; }
+
+  /* Avoid tiny colors getting lost */
+  .portal-header h1 { color: #111 !important; }
+}

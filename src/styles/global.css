@@ -1,0 +1,397 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Form elements (button, input, select, textarea) do NOT inherit
+   font-family from their parent by default — browsers apply a
+   user-agent system font. That made <button>-based navs (Settings
+   sidebar, Brand detail sections) look "boring" with the OS font
+   while <a>/<NavLink>-based navs (main sidebar) correctly picked
+   up Inter / Jakarta / Manrope / etc. via --font-sans. Forcing
+   inherit here makes the user's font choice apply universally. */
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--dur-base) var(--ease-out),
+              color var(--dur-base) var(--ease-out);
+}
+
+/* User font-size preference — zoom scales text + spacing + icons
+   together, which is what users expect from a "font size" control.
+   Applied to the content area only (NOT body) so viewport units
+   inside the layout shell (sidebar/topbar) compute correctly.
+   Putting zoom on body breaks 100vh / 100dvh inside zoomed elements
+   in Chromium, which made the sidebar render shorter than the
+   viewport. The sidebar/topbar use the natural font-size since
+   they're a fixed chrome and shouldn't shrink with the user's
+   content scale preference. */
+html[data-font-size='compact']     .shell-content { zoom: 0.925; }
+html[data-font-size='default']     .shell-content { zoom: 1.0;   }
+html[data-font-size='comfortable'] .shell-content { zoom: 1.075; }
+html[data-font-size='large']       .shell-content { zoom: 1.15;  }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: var(--accent-hover); }
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Scrollbar (subtle, themed) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--surface-0);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* ============ Form primitives ============ */
+.wx-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--input-text);
+  /* Firefox/Chrome sometimes pick a UA-default (white) caret when the
+     element inherits an unusual color context (nested cards, themed
+     tokens). Lock it to the text color so it's always visible. */
+  caret-color: var(--input-text);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out);
+}
+.wx-input::placeholder { color: var(--input-placeholder); }
+.wx-input:hover { border-color: var(--border-strong); }
+.wx-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-ring);
+}
+.wx-input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Custom chevron for <select> so it matches the rest of the app in both themes */
+select.wx-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+[data-theme='dark'] select.wx-input {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23faf7f2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.6'><polyline points='6 9 12 15 18 9'/></svg>");
+}
+
+/* Date/time inputs: make the indicator icon themeable */
+.wx-input::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+}
+.wx-input:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
+[data-theme='dark'] .wx-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Native checkbox color — respect accent */
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.wx-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.wx-input-group {
+  position: relative;
+}
+.wx-input-group .wx-input { padding-left: 42px; }
+.wx-input-group-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+.wx-input-group-action {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+}
+.wx-input-group-action:hover { color: var(--text-primary); background: var(--surface-2); }
+
+/* ============ Buttons ============ */
+.wx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+  user-select: none;
+}
+.wx-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.wx-btn:active:not(:disabled) { transform: translateY(1px); }
+
+.wx-btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 4px 14px -4px var(--accent-ring);
+}
+.wx-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 8px 20px -6px var(--accent-ring);
+}
+
+.wx-btn-ghost {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+.wx-btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.wx-btn-block { width: 100%; }
+
+/* ============ Alert / banners ============ */
+.wx-alert {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid transparent;
+}
+.wx-alert-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.wx-alert-success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+.wx-alert-info    { background: var(--info-soft);    color: var(--info);    border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+
+/* ============ Card ============ */
+.wx-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ============ Spinner ============ */
+.wx-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: wx-spin 0.7s linear infinite;
+}
+@keyframes wx-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============ Segmented toggle (reusable) ============ */
+.wx-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.wx-seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: calc(var(--radius-md) - 3px);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.wx-seg-btn:hover { color: var(--text-primary); }
+.wx-seg-btn.is-active {
+  background: var(--surface-1);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Incentive plan editor / details — Row 2 grid (target / achieved /
+   compensation) gets too cramped on phones. Stack vertically below
+   640px so each input has full width. !important defeats the inline
+   gridTemplateColumns set in the JSX. */
+@media (max-width: 640px) {
+  .incentive-item-row-grid,
+  .incentive-item-row-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Performance: existing flag rows pack type / severity / reason / X
+     into 70+80+1fr+auto columns. On phones the type and severity pills
+     squeeze the reason text into a 30-40px slot. Stack instead — type
+     and severity stay inline (a single meta line), reason on its own
+     row, delete button parks at the right of the meta line. */
+  .perf-flag-row {
+    grid-template-columns: auto auto 1fr !important;
+    grid-template-areas:
+      'type sev del'
+      'reason reason reason' !important;
+    row-gap: 4px !important;
+  }
+  .perf-flag-row > :nth-child(1) { grid-area: type; }
+  .perf-flag-row > :nth-child(2) { grid-area: sev; }
+  .perf-flag-row > :nth-child(3) { grid-area: reason; }
+  .perf-flag-row > :nth-child(4) { grid-area: del; justify-self: end; }
+
+  /* Add-flag and add-warning rows: stack inputs full-width with the
+     submit button below. Same trick as the inline row above. */
+  .perf-flag-add {
+    grid-template-columns: 1fr 1fr auto !important;
+    grid-template-areas:
+      'type sev add'
+      'reason reason reason' !important;
+    row-gap: 6px !important;
+  }
+  .perf-flag-add > :nth-child(1) { grid-area: type; }
+  .perf-flag-add > :nth-child(2) { grid-area: sev; }
+  .perf-flag-add > :nth-child(3) { grid-area: reason; }
+  .perf-flag-add > :nth-child(4) { grid-area: add; justify-self: end; }
+
+  .perf-warn-add {
+    grid-template-columns: 1fr auto !important;
+    grid-template-areas:
+      'sev add'
+      'reason reason' !important;
+    row-gap: 6px !important;
+  }
+  .perf-warn-add > :nth-child(1) { grid-area: sev; }
+  .perf-warn-add > :nth-child(2) { grid-area: reason; }
+  .perf-warn-add > :nth-child(3) { grid-area: add; justify-self: end; }
+
+  /* Performance config modal — collapse 3-col and 4-col input rows to
+     2-col on phones so each NumField has room. */
+  .perf-cfg-3col,
+  .perf-cfg-4col { grid-template-columns: 1fr 1fr !important; }
+
+  /* Audit log — fixed-pixel 5-col grid (~600px wide) doesn't fit on
+     phones. Stack as a card: When + Action on top row, Actor + Entity
+     on second, Summary spanning full-width below. The header row hides
+     since each card carries its own labels via inline styling. */
+  .audit-row.wx-list-header { display: none !important; }
+  .audit-row {
+    grid-template-columns: 1fr auto !important;
+    grid-template-areas:
+      'when    action'
+      'actor   entity'
+      'summary summary' !important;
+    row-gap: 6px !important;
+    padding: 12px 14px !important;
+  }
+  .audit-row > :nth-child(1) { grid-area: when; }
+  .audit-row > :nth-child(2) { grid-area: actor; }
+  .audit-row > :nth-child(3) { grid-area: action; justify-self: end; }
+  .audit-row > :nth-child(4) { grid-area: summary; }
+  .audit-row > :nth-child(5) { grid-area: entity; justify-self: end; }
+
+  /* Bug cards — pills group on the right squeezes title to ~50% on
+     narrow phones. Drop pills below content. */
+  .bug-card {
+    grid-template-columns: 1fr !important;
+  }
+  .bug-card > :last-child {
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+  }
+
+  /* Suggestion cards — vote button stays left, content + pills wrap
+     together. Allow the card to fall to 2 cols (vote | rest) cleanly
+     instead of squeezing the right action slot. */
+  .suggestion-card {
+    grid-template-columns: auto 1fr !important;
+  }
+  .suggestion-card > :nth-child(3) {
+    grid-column: 1 / -1;
+    justify-self: flex-start;
+  }
+
+  /* Resource Planner tab strip — 7 buttons wrap into 3 ugly rows on
+     phones. Switch to a horizontal scroller and tighten button padding. */
+  .rp-tabs-strip {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rp-tabs-strip::-webkit-scrollbar { display: none; }
+  .rp-tabs-strip > * {
+    flex: 0 0 auto;
+    padding: 6px 12px !important;
+    font-size: 12.5px !important;
+  }
+}
