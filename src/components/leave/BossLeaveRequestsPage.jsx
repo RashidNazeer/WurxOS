@@ -21,6 +21,12 @@ const ROLE_LABELS = { tl: 'Team Lead', ol: 'Operation Lead', apc: 'APC' };
 function getCatCfg(val) { return REQUEST_CATEGORIES.find(c => c.value === val) || REQUEST_CATEGORIES[0]; }
 function countDays(s, e) { return Math.max(1, Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1); }
 function formatDate(ts) { if (!ts) return '—'; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function formatDateTime(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 function getRequestTitle(r) {
   if (r.category === 'leave') return LEAVE_TYPES[r.leaveType] ? `${LEAVE_TYPES[r.leaveType]} Leave` : 'Leave Request';
   if (r.category === 'other') return r.otherTitle || 'Other Request';
@@ -112,7 +118,19 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
           {request.intermediateApproval && request.intermediateApproval.status === 'approved' && (
             <div className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3" style={{ background: '#e6f4ea', border: '1px solid #b7dfc4' }}>
               <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '0.75rem' }} />
-              <span className="small">Approved by <strong>{request.intermediateApproval.approverName}</strong> ({ROLE_LABELS[request.intermediateApproval.approverRole] || request.intermediateApproval.approverRole})</span>
+              <span className="small">
+                {request.intermediateApproval.forwardToBoss ? 'Forwarded' : 'Approved'} by <strong>{request.intermediateApproval.approverName}</strong>
+                {request.intermediateApproval.approverRole && ` (${ROLE_LABELS[request.intermediateApproval.approverRole] || request.intermediateApproval.approverRole})`}
+                {request.intermediateApproval.resolvedAt && (
+                  <span className="text-muted" style={{ marginLeft: 6 }}>
+                    · {(() => {
+                      const ts = request.intermediateApproval.resolvedAt;
+                      const d = ts.toDate ? ts.toDate() : new Date(ts);
+                      return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+                    })()}
+                  </span>
+                )}
+              </span>
             </div>
           )}
 
@@ -464,12 +482,35 @@ export default function BossLeaveRequestsPage() {
                         </div>
                         <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.76rem' }}>{r.reason}</p>
 
-                        {r.intermediateApproval && (
-                          <div className="mt-2 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1" style={{ background: r.intermediateApproval.status === 'approved' ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
-                            <i className={`bi ${r.intermediateApproval.status === 'approved' ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
-                            {r.intermediateApproval.status === 'approved' ? 'Approved' : 'Rejected'} by {r.intermediateApproval.approverName}
-                          </div>
-                        )}
+                        {r.intermediateApproval && (() => {
+                          const it = r.intermediateApproval;
+                          const isApproved = it.status === 'approved';
+                          const verb = isApproved ? (it.forwardToBoss ? 'Forwarded' : 'Approved') : 'Rejected';
+                          const when = formatDateTime(it.resolvedAt);
+                          return (
+                            <div className="mt-2 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
+                              style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
+                              <i className={`bi ${isApproved ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
+                              {verb} by {it.approverName}
+                              {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
+                            </div>
+                          );
+                        })()}
+
+                        {r.bossApproval && (() => {
+                          const ba = r.bossApproval;
+                          const isApproved = ba.status === 'approved' || (!ba.status && r.status === 'approved');
+                          const verb = isApproved ? 'Approved' : 'Rejected';
+                          const when = formatDateTime(ba.resolvedAt);
+                          return (
+                            <div className="mt-2 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
+                              style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500, marginLeft: 4 }}>
+                              <i className={`bi ${isApproved ? 'bi-shield-check text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
+                              Boss: {verb}{ba.approverName ? ` by ${ba.approverName}` : ''}
+                              {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
+                            </div>
+                          );
+                        })()}
 
                         {r.bossApproval?.rejectReason && (
                           <div className="mt-2 rounded-2 p-2" style={{ background: '#fff0f0', border: '1px solid #f5c0c0' }}>

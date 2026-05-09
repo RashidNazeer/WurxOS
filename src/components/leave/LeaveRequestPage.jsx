@@ -41,6 +41,16 @@ function formatDate(ts) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatDateTime(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
+
 function countDays(start, end) {
   return Math.max(1, Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1);
 }
@@ -699,13 +709,41 @@ export default function LeaveRequestPage() {
                 </div>
                 <p className="text-muted small mb-1 mt-1">{r.reason}</p>
 
-                {r.intermediateApproval && (
-                  <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1" style={{ background: r.intermediateApproval.status === 'approved' ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
-                    <i className={`bi ${r.intermediateApproval.status === 'approved' ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
-                    {r.intermediateApproval.status === 'approved' ? 'Approved' : 'Rejected'} by {r.intermediateApproval.approverName}
-                    {r.intermediateApproval.forwardToBoss && ' · Forwarded to Boss'}
-                  </div>
-                )}
+                {/* Approval audit trail — shows TL/OL stage and Boss stage,
+                    each with approver name + decision timestamp. Both are
+                    rendered when the request was forwarded through both
+                    stages (TL → Boss); single stage requests show one pill. */}
+                {r.intermediateApproval && (() => {
+                  const it = r.intermediateApproval;
+                  const isApproved = it.status === 'approved';
+                  const verb = isApproved
+                    ? (it.forwardToBoss ? 'Forwarded' : 'Approved')
+                    : 'Rejected';
+                  const when = formatDateTime(it.resolvedAt);
+                  return (
+                    <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
+                      style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
+                      <i className={`bi ${isApproved ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
+                      {verb} by {it.approverName}
+                      {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
+                    </div>
+                  );
+                })()}
+
+                {r.bossApproval && (() => {
+                  const ba = r.bossApproval;
+                  const isApproved = ba.status === 'approved' || (!ba.status && r.status === 'approved');
+                  const verb = isApproved ? 'Approved' : 'Rejected';
+                  const when = formatDateTime(ba.resolvedAt);
+                  return (
+                    <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
+                      style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500, marginLeft: 4 }}>
+                      <i className={`bi ${isApproved ? 'bi-shield-check text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
+                      Boss: {verb}{ba.approverName ? ` by ${ba.approverName}` : ''}
+                      {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
+                    </div>
+                  );
+                })()}
 
                 {r.status === 'rejected' && r.intermediateApproval?.rejectReason && (
                   <div className="mt-2 rounded-2 p-2" style={{ background: '#fff0f0', border: '1px solid #f5c0c0' }}>
