@@ -75,12 +75,35 @@ function ModalShell({ onClose, title, subtitle, children }) {
       <div className="wx-card" style={{
         position: 'relative', width: '100%', maxWidth: 720, zIndex: 1, borderRadius: 18,
         maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0,
+        overflow: 'hidden',
       }}>
-        <div style={{ padding: '18px 22px 10px', borderBottom: '1px solid var(--border)' }}>
-          <h6 style={{ fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.01em', fontSize: 15 }}>{title}</h6>
-          {subtitle && <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: 0 }}>{subtitle}</p>}
+        {/* Header — fixed top with title + close button */}
+        <div style={{
+          padding: '16px 22px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'flex-start', gap: 12,
+          flexShrink: 0, background: 'var(--surface-1)',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h6 style={{ fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.01em', fontSize: 15, color: 'var(--text-primary)' }}>{title}</h6>
+            {subtitle && <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: 0, lineHeight: 1.4 }}>{subtitle}</p>}
+          </div>
+          <button
+            type="button" onClick={onClose} aria-label="Close" title="Close"
+            style={{
+              width: 32, height: 32, flexShrink: 0,
+              borderRadius: 8, border: '1px solid var(--border)',
+              background: 'var(--surface-1)', color: 'var(--text-secondary)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', padding: 0, transition: 'background 120ms ease, color 120ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
+            <XIcon width="16" height="16" />
+          </button>
         </div>
-        <div style={{ padding: '14px 22px', flexGrow: 1, overflowY: 'auto' }}>
+        {/* Scrollable body */}
+        <div style={{ padding: '14px 22px', flexGrow: 1, overflowY: 'auto', minHeight: 0 }}>
           {children}
         </div>
       </div>
@@ -91,8 +114,13 @@ function ModalShell({ onClose, title, subtitle, children }) {
 function ModalFooter({ onClose, saving, canSave, onSave }) {
   return (
     <div style={{
-      marginTop: 18, paddingTop: 14, display: 'flex', gap: 8,
-      justifyContent: 'flex-end', borderTop: '1px solid var(--border)',
+      marginTop: 18,
+      marginInline: -22, marginBottom: -14,
+      padding: '14px 22px',
+      display: 'flex', gap: 8, justifyContent: 'flex-end',
+      borderTop: '1px solid var(--border)',
+      background: 'var(--surface-1)',
+      position: 'sticky', bottom: -14,
     }}>
       <button className="wx-btn wx-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
       <button className="wx-btn wx-btn-primary" onClick={onSave} disabled={saving || !canSave}>
