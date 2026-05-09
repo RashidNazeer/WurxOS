@@ -128,19 +128,25 @@ export function getWeeksForMonth(year, month, anchorStr) {
 }
 
 export function detectNextWeek(existing, anchorStr) {
-  if (!anchorStr) return null;
-  const anchor = parseDate(anchorStr);
-  let lastStart = anchor;
+  // Caller may pass `anchorStr` (the brand's first-week start) to seed the
+  // chain, OR omit it when prior reports already exist — we'll derive the
+  // chain head from the latest report's period_start in that case. Returns
+  // null only when neither is available (truly first-time, no anchor set).
+  let lastStart = anchorStr ? parseDate(anchorStr) : null;
   let lastNum = 0;
-  existing.forEach((r) => {
+  let weeklyCount = 0;
+  (existing || []).forEach((r) => {
     if (r.type !== 'weekly') return;
     const s = parseDate(r.period_start);
-    if (s && (!lastStart || s >= lastStart)) {
+    if (!s) return;
+    weeklyCount++;
+    if (!lastStart || s >= lastStart) {
       lastStart = s;
       lastNum = Math.max(lastNum, r.period_number || 0);
     }
   });
-  const next = addDays(lastStart, existing.length ? 7 : 0);
+  if (!lastStart) return null;
+  const next = addDays(lastStart, weeklyCount > 0 ? 7 : 0);
   return makeWeekFromStart(next, (lastNum || 0) + 1);
 }
 
