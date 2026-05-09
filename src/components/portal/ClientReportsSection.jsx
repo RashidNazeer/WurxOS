@@ -1,31 +1,197 @@
 import { useMemo, useState } from 'react';
+import WeeklyReportView from '../reporting/WeeklyReportView';
+import MonthlyReportView from '../reporting/MonthlyReportView';
 
 /**
  * Public reports viewer for the client portal.
  *
  * Receives the bundled `reports` array from get_client_access (already
- * filtered to approved + permitted brands and types). Lets the viewer
- * pick a brand, then a report; renders the report's `data` jsonb as
- * plain read-only sections.
+ * filtered to approved + permitted brands and types). Renders the
+ * exact same WeeklyReportView / MonthlyReportView used inside the app
+ * (in clientView mode — no edit/copy/highlighter toolbar) so clients
+ * see the full editorial dashboard for each report.
+ *
+ * Chrome mirrors v1's client portal:
+ *   1. Dark hero card "{Weekly|Monthly} Reports · {client} · N brands"
+ *   2. Report-type tab pills (only granted types appear)
+ *   3. Month navigator + brand filter
+ *   4. Reports grouped by brand → click to open the full dashboard view
  */
-export default function ClientReportsSection({ reports = [], brands = [] }) {
-  const grouped = useMemo(() => {
-    const m = new Map();
-    for (const r of reports) {
-      const key = r.brand_id;
-      if (!m.has(key)) m.set(key, []);
-      m.get(key).push(r);
-    }
-    for (const arr of m.values()) {
-      arr.sort((a, b) => (b.period_start || '').localeCompare(a.period_start || ''));
-    }
-    return m;
-  }, [reports]);
 
-  const [selectedBrandId, setSelectedBrandId] = useState(brands[0]?.id || null);
-  const brandReports = grouped.get(selectedBrandId) || [];
-  const [selectedReportId, setSelectedReportId] = useState(brandReports[0]?.id || null);
-  const selected = brandReports.find(r => r.id === selectedReportId) || brandReports[0] || null;
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+
+function monthKey(y, m) { return `${y}-${String(m + 1).padStart(2, '0')}`; }
+function num(v) { const n = parseFloat(v); return Number.isNaN(n) ? 0 : n; }
+
+// Convert a row from get_client_access (snake_case, flattened) into the
+// v1-style shape that WeeklyReportView / MonthlyReportView expect.
+// _normReport in reportsApi.js does this for joined queries; the portal
+// RPC returns a slimmer shape (no joined author/brand objects), so we
+// inline a smaller adapter here.
+function adaptReportForView(r) {
+  if (!r) return r;
+  const data = r.data || {};
+  const base = {
+    id: r.id,
+    type: r.type,
+    brandId: r.brand_id,
+    brandName: r.brand_name || data.brandName || '',
+    status: r.status || 'approved',
+    sectionsEnabled: r.sections_enabled || data.sectionsEnabled || null,
+    createdByName: r.author_name || data.createdByName || '',
+    // Spread data fields onto the root so report.overallPerformance,
+    // report.topCreators, report.gmvMax, etc. all work unchanged.
+    ...data,
+  };
+  if (r.type === 'monthly') {
+    return {
+      ...base,
+      year: r.period_year,
+      month: r.period_month,
+      monthKey: r.period_year != null && r.period_month != null
+        ? `${r.period_year}-${String(r.period_month + 1).padStart(2, '0')}`
+        : null,
+      monthLabel: r.period_label || data.monthLabel || '',
+    };
+  }
+  if (r.type === 'biweekly') {
+    return {
+      ...base,
+      period: r.period_number || 1,
+      year: r.period_year,
+      month: r.period_month,
+      periodStart: r.period_start,
+      periodEnd: r.period_end,
+      periodLabel: r.period_label || '',
+    };
+  }
+  // Weekly
+  return {
+    ...base,
+    week: r.period_number || 1,
+    year: r.period_year,
+    month: r.period_month,
+    weekStart: r.period_start,
+    weekEnd: r.period_end,
+    weekLabel: r.period_label || '',
+  };
+}
+
+export default function ClientReportsSection({ reports = [], brands = [] }) {
+  const adapted = useMemo(() => reports.map(adaptReportForView), [reports]);
+
+  // Available report types (from what's actually been shared).
+  const availableTypes = useMemo(() => {
+    const set = new Set(adapted.map(r => r.type).filter(Boolean));
+    return ['weekly', 'biweekly', 'monthly'].filter(t => set.has(t));
+  }, [adapted]);
+
+  const [activeType, setActiveType] = useState(availableTypes[0] || 'weekly');
+
+  // Default month: most recent that has data of the active type.
+  const initialMonth = useMemo(() => {
+    const inType = adapted.filter(r => r.type === activeType && (r.weekStart || r.periodStart || r.monthKey));
+    inType.sort((a, b) => {
+      const ka = a.monthKey || (a.weekStart || a.periodStart || '').slice(0, 7);
+      const kb = b.monthKey || (b.weekStart || b.periodStart || '').slice(0, 7);
+      return kb.localeCompare(ka);
+    });
+    const top = inType[0];
+    if (top) {
+      if (top.monthKey) {
+        const [y, m] = top.monthKey.split('-').map(Number);
+        return { y, m: m - 1 };
+      }
+      const ws = top.weekStart || top.periodStart;
+      if (ws) {
+        const [y, m] = ws.split('-').map(Number);
+        return { y, m: m - 1 };
+      }
+    }
+    const now = new Date();
+    return { y: now.getFullYear(), m: now.getMonth() };
+  }, [adapted, activeType]);
+
+  const [calYear, setCalYear] = useState(initialMonth.y);
+  const [calMonth, setCalMonth] = useState(initialMonth.m);
+  const [filterBrand, setFilterBrand] = useState('');
+  const [viewReport, setViewReport] = useState(null);
+
+  // Reset month/brand when active type changes; jump to its newest data.
+  // (Doing this via key + remount on tab change keeps the code simple.)
+
+  const inType = useMemo(
+    () => adapted.filter(r => r.type === activeType),
+    [adapted, activeType],
+  );
+
+  const brandOptions = useMemo(() => {
+    const s = new Set();
+    inType.forEach(r => r.brandName && s.add(r.brandName));
+    return [...s].sort();
+  }, [inType]);
+
+  const filtered = useMemo(() => {
+    const mk = monthKey(calYear, calMonth);
+    return inType.filter(r => {
+      const start = r.monthKey ? r.monthKey + '-01' : (r.weekStart || r.periodStart || '');
+      if (!start) return false;
+      if (!start.startsWith(mk)) return false;
+      if (filterBrand && r.brandName !== filterBrand) return false;
+      return true;
+    });
+  }, [inType, calYear, calMonth, filterBrand]);
+
+  const grouped = useMemo(() => {
+    const map = new Map();
+    filtered.forEach(r => {
+      const key = r.brandName || 'Unknown';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(r);
+    });
+    map.forEach(list => list.sort((a, b) => {
+      const ka = a.weekStart || a.periodStart || (a.monthKey ? a.monthKey + '-01' : '');
+      const kb = b.weekStart || b.periodStart || (b.monthKey ? b.monthKey + '-01' : '');
+      return ka.localeCompare(kb);
+    }));
+    return map;
+  }, [filtered]);
+
+  const prevMonth = () => {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
+  };
+
+  // ── Detail view ────────────────────────────────────────────────────
+  if (viewReport) {
+    const brandReports = inType.filter(r => r.brandId === viewReport.brandId);
+    const prev = findPreviousReport(brandReports, viewReport);
+    return (
+      <div>
+        <button
+          onClick={() => setViewReport(null)}
+          style={{
+            background: 'transparent', border: 0, padding: 0,
+            color: 'var(--text-muted)', fontSize: 13, marginBottom: 12,
+            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}>
+          <span style={{ fontSize: 14 }}>←</span> Back to reports
+        </button>
+        {viewReport.type === 'monthly' ? (
+          <MonthlyReportView report={viewReport} previousReport={prev} clientView />
+        ) : (
+          <WeeklyReportView report={viewReport} previousReport={prev} allReports={brandReports} clientView />
+        )}
+      </div>
+    );
+  }
 
   if (reports.length === 0) {
     return (
@@ -39,150 +205,182 @@ export default function ClientReportsSection({ reports = [], brands = [] }) {
     );
   }
 
+  // ── List view ──────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 280px) 1fr', gap: 16 }}>
-      <div className="wx-card" style={{ padding: 14, alignSelf: 'flex-start', position: 'sticky', top: 64 }}>
-        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 8 }}>
-          Brand
+    <div>
+      {/* Hero header — matches v1's dark gradient + "{type} Reports" title */}
+      <div className="card border-0 shadow-sm mb-4" style={{
+        borderRadius: 14, background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
+      }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-center gap-3">
+            <div className="rounded-3 d-flex align-items-center justify-content-center"
+              style={{ width: 52, height: 52, background: 'rgba(245,213,168,0.2)' }}>
+              <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '1.5rem', color: '#f5d5a8' }} />
+            </div>
+            <div>
+              <h4 className="fw-bold mb-0">
+                {activeType === 'biweekly' ? 'Bi-Weekly' : activeType === 'monthly' ? 'Monthly' : 'Weekly'} Reports
+              </h4>
+              <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>
+                {brandOptions.length} brand{brandOptions.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
         </div>
-        <select className="wx-input" style={{ width: '100%', marginBottom: 14, fontSize: 13 }}
-          value={selectedBrandId || ''}
-          onChange={e => { setSelectedBrandId(e.target.value); setSelectedReportId(null); }}>
-          {brands.map(b => (
-            <option key={b.id} value={b.id}>{b.brand_name}</option>
+      </div>
+
+      {/* Tabs — only when multiple types granted */}
+      {availableTypes.length > 1 && (
+        <ul className="nav nav-pills mb-4 gap-2">
+          {availableTypes.map(t => (
+            <li key={t} className="nav-item">
+              <button
+                className={`nav-link ${activeType === t ? 'active' : ''}`}
+                style={{
+                  fontSize: '0.82rem', borderRadius: 8, fontWeight: 600,
+                  background: activeType === t ? '#1e293b' : '#fff',
+                  color: activeType === t ? '#fff' : '#1e293b',
+                  border: '1px solid #e2e8f0',
+                }}
+                onClick={() => setActiveType(t)}>
+                <i className={`bi ${t === 'biweekly' ? 'bi-calendar2-week-fill' : t === 'monthly' ? 'bi-calendar-month-fill' : 'bi-file-earmark-bar-graph'} me-1`} />
+                {t === 'biweekly' ? 'Bi-Weekly' : t === 'monthly' ? 'Monthly' : 'Weekly'} Reports
+              </button>
+            </li>
           ))}
-        </select>
+        </ul>
+      )}
 
-        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 8 }}>
-          Reports ({brandReports.length})
-        </div>
-        {brandReports.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>No approved reports for this brand.</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '60vh', overflowY: 'auto' }}>
-            {brandReports.map(r => {
-              const isSel = (selected?.id === r.id);
-              const tint = r.type === 'biweekly' ? '#0ea5e9' : '#3b82f6';
-              return (
-                <button key={r.id} type="button" onClick={() => setSelectedReportId(r.id)}
-                  style={{
-                    textAlign: 'left', padding: '8px 10px', borderRadius: 8,
-                    background: isSel ? `${tint}1a` : 'transparent',
-                    border: `1px solid ${isSel ? tint : 'transparent'}`,
-                    cursor: 'pointer',
-                  }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>{r.period_label || '—'}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'capitalize', marginTop: 2 }}>{r.type}</div>
-                </button>
-              );
-            })}
+      {/* Month navigator + brand filter */}
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
+          <div className="d-flex align-items-center gap-2">
+            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={prevMonth}
+              style={{ width: 32, height: 32, padding: 0 }}>
+              <i className="bi bi-chevron-left" style={{ fontSize: '0.8rem' }} />
+            </button>
+            <div className="fw-bold" style={{ fontSize: '0.92rem', minWidth: 140, textAlign: 'center' }}>
+              {MONTH_NAMES[calMonth]} {calYear}
+            </div>
+            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={nextMonth}
+              style={{ width: 32, height: 32, padding: 0 }}>
+              <i className="bi bi-chevron-right" style={{ fontSize: '0.8rem' }} />
+            </button>
+            <button className="btn btn-sm btn-outline-secondary ms-1" style={{ borderRadius: 8, fontSize: '0.72rem' }}
+              onClick={() => { const n = new Date(); setCalYear(n.getFullYear()); setCalMonth(n.getMonth()); }}>
+              Today
+            </button>
           </div>
-        )}
-      </div>
-
-      <div>
-        {selected ? <ReportPanel report={selected} brands={brands} /> : (
-          <div className="wx-card" style={{ padding: 32, textAlign: 'center' }}>
-            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Pick a report to view.</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ReportPanel({ report, brands }) {
-  const brand = brands.find(b => b.id === report.brand_id);
-  const data = report.data || {};
-
-  return (
-    <div className="wx-card" style={{ padding: 22 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
-        <div>
-          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-            {report.type === 'biweekly' ? 'Bi-weekly report' : 'Weekly report'}
-          </div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-            {brand?.brand_name || report.brand_name || 'Report'}
-          </h2>
-          <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-            {fmtDate(report.period_start)} – {fmtDate(report.period_end)}
-            {report.author_name && <> · by {report.author_name}</>}
+          <div className="d-flex align-items-center gap-2">
+            <select className="form-select form-select-sm" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}
+              style={{ width: 180, borderRadius: 8 }}>
+              <option value="">All Brands</option>
+              {brandOptions.map(b => <option key={b}>{b}</option>)}
+            </select>
+            <span className="text-muted small">{filtered.length} reports</span>
           </div>
         </div>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px', borderRadius: 999,
-          background: 'color-mix(in srgb, var(--success) 18%, transparent)',
-          color: 'var(--success)', fontWeight: 700, fontSize: 11,
-          textTransform: 'uppercase', letterSpacing: '0.05em',
-        }}>✓ Approved</span>
       </div>
 
-      {Object.keys(data).length === 0 ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>This report has no content.</div>
+      {/* Brand-grouped report cards */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-5">
+          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#dee2e6' }} />
+          <p className="text-muted mt-3 mb-0">
+            No {activeType} reports for {MONTH_NAMES[calMonth]} {calYear}.
+          </p>
+        </div>
       ) : (
-        Object.entries(data).map(([key, value]) => (
-          <Section key={key} title={humanize(key)} value={value} />
+        [...grouped.entries()].map(([brandName, brandReports]) => (
+          <div key={brandName} className="mb-4">
+            <div className="d-flex align-items-center gap-2 mb-3">
+              <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
+                style={{ width: 32, height: 32, fontSize: '0.6rem', background: '#3b82f6' }}>
+                {brandName.slice(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <div className="fw-bold" style={{ fontSize: '0.92rem' }}>{brandName}</div>
+                <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+                  {brandReports.length} report{brandReports.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            </div>
+            <div className="row g-3">
+              {brandReports.map(r => {
+                const prev = findPreviousReport(brandReports, r);
+                const perf = r.overallPerformance || {};
+                const prevPerf = prev?.overallPerformance || {};
+                const gmvChange = num(prevPerf.gmv)
+                  ? (((num(perf.gmv) - num(prevPerf.gmv)) / num(prevPerf.gmv)) * 100)
+                  : null;
+                const label = r.weekLabel || r.periodLabel || r.monthLabel || '—';
+                return (
+                  <div key={r.id} className="col-md-6 col-lg-4">
+                    <div className="card border-0 shadow-sm h-100"
+                      style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s' }}
+                      onClick={() => setViewReport(r)}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                      <div className="card-body p-3">
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                          <div className="fw-bold" style={{ fontSize: '0.82rem' }}>{label}</div>
+                          <i className="bi bi-chevron-right text-muted" style={{ fontSize: '0.75rem' }} />
+                        </div>
+                        <div className="d-flex flex-wrap gap-3">
+                          <div>
+                            <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>GMV</div>
+                            <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
+                              ${Number(num(perf.gmv)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>ORDERS</div>
+                            <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
+                              {Number(num(perf.orders)).toLocaleString()}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>ROI</div>
+                            <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
+                              {num(perf.roi).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                        {gmvChange !== null && (
+                          <div className="mt-1" style={{
+                            fontSize: '0.65rem', fontWeight: 600,
+                            color: gmvChange >= 0 ? '#16a34a' : '#dc2626',
+                          }}>
+                            <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
+                            {gmvChange >= 0 ? '+' : ''}{gmvChange.toFixed(1)}% vs prev{' '}
+                            {activeType === 'biweekly' ? 'period' : activeType === 'monthly' ? 'month' : 'week'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ))
       )}
     </div>
   );
 }
 
-function Section({ title, value }) {
-  if (value == null || value === '') return null;
-  return (
-    <div style={{ marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, fontWeight: 700 }}>
-        {title}
-      </div>
-      <div style={{ color: 'var(--text-primary)', fontSize: 13.5, lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-        {renderValue(value)}
-      </div>
-    </div>
-  );
-}
-
-function renderValue(v) {
-  if (v == null || v === '') return <span style={{ color: 'var(--text-muted)' }}>—</span>;
-  if (typeof v === 'string') {
-    // Strip HTML tags from rich-text content for safe rendering
-    return <span dangerouslySetInnerHTML={{ __html: v }} />;
-  }
-  if (typeof v === 'number') return String(v);
-  if (Array.isArray(v)) {
-    if (v.length === 0) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
-    return (
-      <ul style={{ margin: 0, paddingLeft: 18 }}>
-        {v.map((item, i) => <li key={i} style={{ marginBottom: 4 }}>{renderValue(item)}</li>)}
-      </ul>
-    );
-  }
-  if (typeof v === 'object') {
-    return (
-      <div style={{ display: 'grid', gap: 6 }}>
-        {Object.entries(v).map(([k, val]) => (
-          <div key={k}>
-            <strong style={{ color: 'var(--text-secondary)' }}>{humanize(k)}:</strong>{' '}
-            {renderValue(val)}
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return String(v);
-}
-
-function humanize(key) {
-  return String(key)
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim();
-}
-
-function fmtDate(d) {
-  if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function findPreviousReport(list, current) {
+  const cur = current.weekStart || current.periodStart || (current.monthKey ? current.monthKey + '-01' : '');
+  if (!cur) return null;
+  return [...list]
+    .filter(r => {
+      const s = r.weekStart || r.periodStart || (r.monthKey ? r.monthKey + '-01' : '');
+      return s && s < cur;
+    })
+    .sort((a, b) => {
+      const sa = a.weekStart || a.periodStart || (a.monthKey ? a.monthKey + '-01' : '');
+      const sb = b.weekStart || b.periodStart || (b.monthKey ? b.monthKey + '-01' : '');
+      return sb.localeCompare(sa);
+    })[0] || null;
 }

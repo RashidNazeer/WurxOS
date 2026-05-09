@@ -579,7 +579,7 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
 }
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
-export default function WeeklyReportView({ report, previousReport, allReports }) {
+export default function WeeklyReportView({ report, previousReport, allReports, clientView = false }) {
   const printRef = useRef();
   const { profile } = useAuth();
   const userRole = profile?.role || '';
@@ -708,42 +708,44 @@ export default function WeeklyReportView({ report, previousReport, allReports })
 
   return (
     <div>
-      {/* ─── Action bar (above the canvas) ──────────────────────────────── */}
-      <div className="d-flex justify-content-end gap-2 mb-3 flex-wrap">
-        {highlighterActive && (
-          <HighlighterPicker
-            color={highlightColor} onColorChange={setHighlightColor}
-            intensity={highlightIntensity} onIntensityChange={setHighlightIntensity}
-          />
-        )}
-        <button
-          type="button"
-          onClick={() => setHighlighterActive(v => !v)}
-          className={`btn btn-sm d-inline-flex align-items-center gap-2 ${highlighterActive ? 'btn-warning' : 'btn-outline-warning'}`}
-          style={{ borderRadius: 10, fontSize: '0.78rem' }}
-          title={highlighterActive
-            ? 'Highlighter is ON — drag across text to highlight, drag across an existing highlight to remove it. Click to turn off.'
-            : 'Turn on highlighter — then drag across any text to highlight it for everyone viewing this report.'}>
-          <i className="bi bi-highlighter" />
-          {highlighterActive ? 'Highlighter ON · click to stop' : 'Highlighter'}
-        </button>
-        {userRole === 'tl' && (
-          <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10, fontSize: '0.78rem',
-              background: copyState === 'done' ? C.green : C.ink,
-              color: 'white', border: 'none' }}
-            onClick={handleCopyInsights}
-            title="Copy all insights to clipboard">
-            <i className={`bi ${copyState === 'done' ? 'bi-check-circle-fill' : 'bi-clipboard-check'}`} />
-            {copyState === 'done' ? 'Copied!' : 'Copy All Insights'}
+      {/* ─── Action bar (above the canvas) — hidden in clientView ─────────── */}
+      {!clientView && (
+        <div className="d-flex justify-content-end gap-2 mb-3 flex-wrap">
+          {highlighterActive && (
+            <HighlighterPicker
+              color={highlightColor} onColorChange={setHighlightColor}
+              intensity={highlightIntensity} onIntensityChange={setHighlightIntensity}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setHighlighterActive(v => !v)}
+            className={`btn btn-sm d-inline-flex align-items-center gap-2 ${highlighterActive ? 'btn-warning' : 'btn-outline-warning'}`}
+            style={{ borderRadius: 10, fontSize: '0.78rem' }}
+            title={highlighterActive
+              ? 'Highlighter is ON — drag across text to highlight, drag across an existing highlight to remove it. Click to turn off.'
+              : 'Turn on highlighter — then drag across any text to highlight it for everyone viewing this report.'}>
+            <i className="bi bi-highlighter" />
+            {highlighterActive ? 'Highlighter ON · click to stop' : 'Highlighter'}
           </button>
-        )}
-        <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 10, fontSize: '0.78rem', background: C.ink, color: '#fff', border: 'none' }}
-          onClick={handleExport}>
-          <i className="bi bi-file-earmark-pdf" /> Export PDF
-        </button>
-      </div>
+          {userRole === 'tl' && (
+            <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 10, fontSize: '0.78rem',
+                background: copyState === 'done' ? C.green : C.ink,
+                color: 'white', border: 'none' }}
+              onClick={handleCopyInsights}
+              title="Copy all insights to clipboard">
+              <i className={`bi ${copyState === 'done' ? 'bi-check-circle-fill' : 'bi-clipboard-check'}`} />
+              {copyState === 'done' ? 'Copied!' : 'Copy All Insights'}
+            </button>
+          )}
+          <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: 10, fontSize: '0.78rem', background: C.ink, color: '#fff', border: 'none' }}
+            onClick={handleExport}>
+            <i className="bi bi-file-earmark-pdf" /> Export PDF
+          </button>
+        </div>
+      )}
 
       {/* ─── Canvas (printable) ─────────────────────────────────────────── */}
       <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 18, border: `1px solid ${C.line}` }}>
