@@ -43,36 +43,64 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
       };
 
       const bossC = center(bossRef.current);
-      const olCs  = ols.map(o => ({ id: o.id, ...(center(olRefs.current[o.id]) || {}) }));
-      const tlCs  = visibleTls.map(t => ({ id: t.id, ...(center(tlRefs.current[t.id]) || {}) }));
+      const olCs  = ols.map(o => ({ id: o.id, ...(center(olRefs.current[o.id]) || {}) })).filter(o => o.x != null);
+      const tlCs  = visibleTls.map(t => ({ id: t.id, ...(center(tlRefs.current[t.id]) || {}) })).filter(t => t.x != null);
 
-      // Boss → each OL
+      // Boss → each OL (kept as smooth bezier — small fan, looks clean)
       if (bossC) {
-        olCs.forEach((ol, i) => {
-          if (ol.x == null) return;
+        olCs.forEach((ol) => {
           list.push({
             key: `b-${ol.id}`,
             d:   curve(bossC.x, bossC.bottom, ol.x, ol.top),
             stroke: 'url(#grad-purple)',
+            width: 2,
           });
         });
       }
 
-      // OLs → each TL (fan from "OL row centroid" so we don't lie about
-      // who reports to whom). For simplicity use each OL → each TL with
-      // low opacity, layered.
-      tlCs.forEach(tl => {
-        if (tl.x == null) return;
-        olCs.forEach(ol => {
-          if (ol.x == null) return;
+      // OL row → TL grid: single trunk → horizontal bus → short stubs.
+      // This replaces the previous N×M fan that crossed itself with a
+      // proper org-chart tree connector. Visually implies "the OL row
+      // collectively oversees every TL" without drawing N×M curves.
+      if (olCs.length > 0 && tlCs.length > 0) {
+        // OL row centroid (x = average of OL x's; y = bottom of OL row)
+        const olAvgX  = olCs.reduce((s, o) => s + o.x, 0) / olCs.length;
+        const olRowBottom = Math.max(...olCs.map(o => o.bottom));
+        // TL row top + horizontal extent
+        const tlRowTop  = Math.min(...tlCs.map(t => t.top));
+        const minTlX    = Math.min(...tlCs.map(t => t.x));
+        const maxTlX    = Math.max(...tlCs.map(t => t.x));
+        // Bus sits halfway between OL bottom and TL top
+        const busY = olRowBottom + (tlRowTop - olRowBottom) * 0.55;
+
+        // 1. Trunk: from OL centroid straight down to the bus
+        list.push({
+          key: 'trunk-ol',
+          d: `M ${olAvgX} ${olRowBottom} L ${olAvgX} ${busY}`,
+          stroke: 'url(#grad-soft)',
+          width: 2.5,
+        });
+        // 2. Horizontal bus across the full TL extent (only if more than one TL)
+        if (tlCs.length > 1) {
+          const busLeft  = Math.min(minTlX, olAvgX);
+          const busRight = Math.max(maxTlX, olAvgX);
           list.push({
-            key: `${ol.id}-${tl.id}`,
-            d:   curve(ol.x, ol.bottom, tl.x, tl.top),
+            key: 'bus',
+            d: `M ${busLeft} ${busY} L ${busRight} ${busY}`,
             stroke: 'url(#grad-soft)',
-            opacity: olCs.length > 1 ? 0.55 : 1,
+            width: 2.5,
+          });
+        }
+        // 3. Stubs: from the bus down into each TL card top
+        tlCs.forEach(tl => {
+          list.push({
+            key: `stub-${tl.id}`,
+            d: `M ${tl.x} ${busY} L ${tl.x} ${tl.top}`,
+            stroke: 'url(#grad-soft)',
+            width: 2,
           });
         });
-      });
+      }
 
       setPaths(list);
       setSize({ w, h });
@@ -109,10 +137,10 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
         </defs>
         {paths.map(p => (
           <path key={p.key} d={p.d} fill="none"
-            stroke={p.stroke} strokeWidth="2" strokeLinecap="round"
-            strokeDasharray="0"
+            stroke={p.stroke} strokeWidth={p.width ?? 2} strokeLinecap="round"
+            strokeLinejoin="round"
             opacity={p.opacity ?? 1}
-            style={{ filter: 'drop-shadow(0 0 4px rgba(124,58,237,0.25))' }} />
+            style={{ filter: 'drop-shadow(0 0 4px rgba(124,58,237,0.20))' }} />
         ))}
       </svg>
 
@@ -125,7 +153,7 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
 
       {/* OLs */}
       {ols.length > 0 && (
-        <div className="d-flex justify-content-center flex-wrap gap-3 mb-4 position-relative" style={{ zIndex: 1 }}>
+        <div className="d-flex justify-content-center flex-wrap gap-3 position-relative" style={{ zIndex: 1, marginBottom: 44 }}>
           {ols.map(ol => (
             <OLCard key={ol.id}
               nodeRef={(el) => { olRefs.current[ol.id] = el; }}
