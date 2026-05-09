@@ -130,19 +130,27 @@ export function getWeeksForMonth(year, month, anchorStr) {
 export function detectNextWeek(existing, anchorStr) {
   // Caller may pass `anchorStr` (the brand's first-week start) to seed the
   // chain, OR omit it when prior reports already exist — we'll derive the
-  // chain head from the latest report's period_start in that case. Returns
+  // chain head from the latest report's start date in that case. Returns
   // null only when neither is available (truly first-time, no anchor set).
+  //
+  // `existing` items come back from getReportsForBrand() in the v1 shape
+  // produced by _normReport(): {weekStart, weekEnd, week, ...} — NOT v2
+  // column names. Read both `weekStart` (v1-shape, normalized) and
+  // `period_start` (raw v2 row) to be safe across callers.
   let lastStart = anchorStr ? parseDate(anchorStr) : null;
   let lastNum = 0;
   let weeklyCount = 0;
   (existing || []).forEach((r) => {
-    if (r.type !== 'weekly') return;
-    const s = parseDate(r.period_start);
+    // Skip non-weekly only when the type field is present (v1 doc shape
+    // doesn't carry `type`; v2 raw rows do).
+    if (r.type && r.type !== 'weekly') return;
+    const startStr = r.weekStart || r.period_start;
+    const s = parseDate(startStr);
     if (!s) return;
     weeklyCount++;
     if (!lastStart || s >= lastStart) {
       lastStart = s;
-      lastNum = Math.max(lastNum, r.period_number || 0);
+      lastNum = Math.max(lastNum, r.week || r.period_number || 0);
     }
   });
   if (!lastStart) return null;
