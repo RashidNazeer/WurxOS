@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { listBrandsForReporting } from '../lib/reportsApi';
 import { supabase } from '../lib/supabase';
@@ -48,11 +48,23 @@ export function useBrands() {
 
   // Standalone fallback: each component that calls useBrands() fetches once.
   const { user, profile } = useAuth();
+  const uid = user?.id;
+  const role = profile?.role;
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Per-hook unique channel suffix. Multiple useBrands() consumers can
+  // mount in the same render tree (e.g. weekly-report form + page);
+  // sharing one channel name across them caused
+  //   "cannot add `postgres_changes` callbacks ... after `subscribe()`"
+  // because the second consumer would try to attach `.on()` to the
+  // first consumer's already-subscribed channel object behind the scenes.
+  const instanceIdRef = useRef(null);
+  if (instanceIdRef.current === null) {
+    instanceIdRef.current = Math.random().toString(36).slice(2, 10);
+  }
 
   useEffect(() => {
-    if (!user || !profile?.role) {
+    if (!uid || !role) {
       setBrands([]);
       setLoading(true);
       return undefined;
@@ -61,7 +73,7 @@ export function useBrands() {
     setLoading(true);
     (async () => {
       try {
-        const rows = await listBrandsForReporting({ role: profile.role, uid: user.id });
+        const rows = await listBrandsForReporting({ role, uid });
         if (!cancelled) {
           setBrands((rows || []).map(_normBrand));
           setLoading(false);
@@ -74,12 +86,13 @@ export function useBrands() {
       }
     })();
 
-    // Realtime: refetch on any brands-table change. Cheap (single channel).
+    // Realtime: refetch on any brands-table change. Channel name is
+    // unique per hook instance so multiple consumers don't collide.
     const ch = supabase
-      .channel(`brands-ctx-${user.id}`)
+      .channel(`brands-ctx-${uid}-${instanceIdRef.current}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, async () => {
         try {
-          const rows = await listBrandsForReporting({ role: profile.role, uid: user.id });
+          const rows = await listBrandsForReporting({ role, uid });
           if (!cancelled) setBrands((rows || []).map(_normBrand));
         } catch { /* ignore */ }
       })
@@ -89,7 +102,7 @@ export function useBrands() {
       cancelled = true;
       supabase.removeChannel(ch);
     };
-  }, [user, profile?.role]);
+  }, [uid, role]);
 
   return useMemo(() => {
     const byId = new Map(brands.map((b) => [b.id, b]));
