@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import WeeklyReportView from '../reporting/WeeklyReportView';
 import MonthlyReportView from '../reporting/MonthlyReportView';
+import BrandSectionsPanel from './BrandSectionsPanel';
 
 /**
  * Public reports viewer for the client portal.
@@ -80,8 +81,33 @@ function adaptReportForView(r) {
   };
 }
 
-export default function ClientReportsSection({ reports = [], brands = [] }) {
+export default function ClientReportsSection({
+  reports = [],
+  brands = [],
+  sections = [],         // [{ brand_id, sections: [{id, name, ...}] }]
+  sectionValues = [],    // flat list across permitted reports
+  token = null,
+  onMutate,
+}) {
   const adapted = useMemo(() => reports.map(adaptReportForView), [reports]);
+
+  // Lookups: per-brand section template list, and per-report value rows.
+  const sectionsByBrand = useMemo(() => {
+    const m = new Map();
+    for (const row of sections || []) {
+      m.set(row.brand_id, row.sections || []);
+    }
+    return m;
+  }, [sections]);
+  const valuesByReport = useMemo(() => {
+    const m = new Map();
+    for (const v of sectionValues || []) {
+      const arr = m.get(v.report_id) || [];
+      arr.push(v);
+      m.set(v.report_id, arr);
+    }
+    return m;
+  }, [sectionValues]);
 
   // Available report types (from what's actually been shared).
   const availableTypes = useMemo(() => {
@@ -173,6 +199,8 @@ export default function ClientReportsSection({ reports = [], brands = [] }) {
   if (viewReport) {
     const brandReports = inType.filter(r => r.brandId === viewReport.brandId);
     const prev = findPreviousReport(brandReports, viewReport);
+    const brandSections = sectionsByBrand.get(viewReport.brandId) || [];
+    const reportValues  = valuesByReport.get(viewReport.id) || [];
     return (
       <div>
         <button
@@ -189,6 +217,18 @@ export default function ClientReportsSection({ reports = [], brands = [] }) {
         ) : (
           <WeeklyReportView report={viewReport} previousReport={prev} allReports={brandReports} clientView />
         )}
+        {/* Custom client sections — appears below the report dashboard.
+            In client-mode (token present) they can add/edit/remove. */}
+        <BrandSectionsPanel
+          brandId={viewReport.brandId}
+          brandName={viewReport.brandName}
+          reportId={viewReport.id}
+          sections={brandSections}
+          sectionValues={reportValues}
+          token={token}
+          readOnly={!token}
+          onMutate={onMutate}
+        />
       </div>
     );
   }
