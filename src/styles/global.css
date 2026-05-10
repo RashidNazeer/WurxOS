@@ -121,8 +121,18 @@ a:hover { color: var(--accent-hover); }
    when [data-theme='dark'] is active. Light mode stays untouched.
    ============================================================ */
 [data-theme='dark'] .card {
-  background-color: var(--surface-1);
+  background-color: var(--surface-1) !important;
   color: var(--text-primary);
+  border-color: var(--border-subtle);
+  --bs-card-bg: var(--surface-1);
+  --bs-card-color: var(--text-primary);
+  --bs-card-border-color: var(--border-subtle);
+}
+[data-theme='dark'] .card-body,
+[data-theme='dark'] .card-header,
+[data-theme='dark'] .card-footer {
+  color: var(--text-primary);
+  background-color: transparent;
   border-color: var(--border-subtle);
 }
 [data-theme='dark'] .form-control,
@@ -206,12 +216,25 @@ a:hover { color: var(--accent-hover); }
   border-color: var(--info);
 }
 [data-theme='dark'] .table {
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
   border-color: var(--border-subtle);
+  --bs-table-color: var(--text-primary);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--border-subtle);
+  --bs-table-striped-bg: var(--surface-2);
+  --bs-table-striped-color: var(--text-primary);
+  --bs-table-hover-bg: var(--surface-2);
+  --bs-table-hover-color: var(--text-primary);
 }
 [data-theme='dark'] .table > :not(caption) > * > * {
   background-color: transparent;
   border-bottom-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+[data-theme='dark'] .table tbody tr,
+[data-theme='dark'] .table tbody td,
+[data-theme='dark'] .table tbody th {
+  color: var(--text-primary);
 }
 [data-theme='dark'] .alert-danger {
   background-color: var(--danger-soft);
