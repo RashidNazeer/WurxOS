@@ -67,8 +67,8 @@ export default function ReportFiltersPopover({ filters, onClear }) {
               right: 0,
               zIndex: 1000,
               width: 320,
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border-default)',
               borderRadius: 14,
               padding: 0,
               boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.35), 0 8px 16px -6px rgba(15, 23, 42, 0.15)',
@@ -78,14 +78,14 @@ export default function ReportFiltersPopover({ filters, onClear }) {
               style={{
                 padding: '12px 14px',
                 background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%)',
-                borderBottom: '1px solid #e2e8f0',
+                borderBottom: '1px solid var(--border-subtle)',
               }}>
-              <div className="fw-bold" style={{ fontSize: '0.84rem', color: '#1e293b' }}>
-                <i className="bi bi-sliders me-2" style={{ color: '#3b82f6' }} />Filters
+              <div className="fw-bold" style={{ fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+                <i className="bi bi-sliders me-2" style={{ color: 'var(--info)' }} />Filters
               </div>
               {activeCount > 0 && (
                 <button type="button" className="btn btn-sm p-0 d-inline-flex align-items-center gap-1"
-                  style={{ fontSize: '0.7rem', color: '#64748b', background: 'none', border: 'none' }}
+                  style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', background: 'none', border: 'none' }}
                   onClick={() => { onClear(); }}>
                   <i className="bi bi-x-circle" /> Clear all
                 </button>
@@ -109,7 +109,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
                   </div>
                 ))}
               </div>
-              <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid #f1f5f9' }}>
+              <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                 <button type="button" className="btn btn-sm btn-dark px-3"
                   style={{ borderRadius: 8, fontSize: '0.76rem' }}
                   onClick={() => setOpen(false)}>

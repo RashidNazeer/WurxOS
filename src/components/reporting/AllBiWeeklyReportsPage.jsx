@@ -518,7 +518,7 @@ export default function AllBiWeeklyReportsPage() {
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -549,7 +549,7 @@ export default function AllBiWeeklyReportsPage() {
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Bi-Weekly Reports</h5>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Bi-Weekly Reports</h5>
           <p className="text-muted small mb-0">
             {userRole === 'tl' ? 'Reports from your team' : 'All brand reports across the organization'}
             {' · '}{reports.length} total
@@ -563,8 +563,8 @@ export default function AllBiWeeklyReportsPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: '#eff6ff' }}>
-                <i className="bi bi-file-earmark-bar-graph" style={{ color: '#3b82f6' }} />
+                style={{ width: 36, height: 36, background: 'var(--info-soft)' }}>
+                <i className="bi bi-file-earmark-bar-graph" style={{ color: 'var(--info)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{monthStats.reportCount}</div>
@@ -577,8 +577,8 @@ export default function AllBiWeeklyReportsPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: '#f0fdf4' }}>
-                <i className="bi bi-shop" style={{ color: '#10b981' }} />
+                style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
+                <i className="bi bi-shop" style={{ color: 'var(--success)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{monthStats.brandCount}</div>
@@ -591,8 +591,8 @@ export default function AllBiWeeklyReportsPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: '#fef3c7' }}>
-                <i className="bi bi-currency-dollar" style={{ color: '#f59e0b' }} />
+                style={{ width: 36, height: 36, background: 'var(--warning-soft)' }}>
+                <i className="bi bi-currency-dollar" style={{ color: 'var(--warning)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>
@@ -610,7 +610,7 @@ export default function AllBiWeeklyReportsPage() {
                 onClick={() => setFilterStatus(f => f === 'verified' ? '' : 'verified')}>
                 <div className="card-body p-3 d-flex align-items-center gap-2">
                   <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                    style={{ width: 36, height: 36, background: '#ede9fe' }}>
+                    style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
                     <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
                   </div>
                   <div>
@@ -625,8 +625,8 @@ export default function AllBiWeeklyReportsPage() {
                 onClick={() => setFilterStatus(f => f === 'approved' ? '' : 'approved')}>
                 <div className="card-body p-3 d-flex align-items-center gap-2">
                   <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                    style={{ width: 36, height: 36, background: '#dcfce7' }}>
-                    <i className="bi bi-shield-check-fill" style={{ color: '#16a34a' }} />
+                    style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
+                    <i className="bi bi-shield-check-fill" style={{ color: 'var(--success)' }} />
                   </div>
                   <div>
                     <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{monthStats.approved}</div>
@@ -699,8 +699,8 @@ export default function AllBiWeeklyReportsPage() {
       {/* Bulk action bar */}
       {canBulkDelete && selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 0, zIndex: 5, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10 }}>
-          <span className="fw-bold" style={{ color: '#991b1b', fontSize: '0.82rem' }}>
+          style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>
             <i className="bi bi-check2-square me-1" />
             {selected.size} selected
           </span>
@@ -720,7 +720,7 @@ export default function AllBiWeeklyReportsPage() {
       {/* Results — one continuous grid, brand shown on each card */}
       {filtered.length === 0 ? (
         <div className="text-center py-5">
-          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#dee2e6' }} />
+          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
           <p className="text-muted mt-3 mb-0">No bi-weekly reports for {MONTH_NAMES[calMonth]} {calYear}.</p>
         </div>
       ) : (
@@ -755,7 +755,7 @@ export default function AllBiWeeklyReportsPage() {
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
                     e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.03)';
-                    if (!isSel) e.currentTarget.style.borderColor = '#e2e8f0';
+                    if (!isSel) e.currentTarget.style.borderColor = 'var(--border-subtle)';
                   }}>
                   {canBulkDelete && (
                     <label
@@ -774,7 +774,7 @@ export default function AllBiWeeklyReportsPage() {
                     </label>
                   )}
                   <div className="card-body p-3">
-                    <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid #f1f5f9', paddingLeft: canBulkDelete ? 28 : 0 }}>
+                    <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-subtle)', paddingLeft: canBulkDelete ? 28 : 0 }}>
                       <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
                         style={{ width: 26, height: 26, fontSize: '0.58rem', background: '#3b82f6' }}>
                         {brandName.slice(0, 2).toUpperCase()}
@@ -782,7 +782,7 @@ export default function AllBiWeeklyReportsPage() {
                       <div className="fw-bold text-truncate" style={{ fontSize: '0.8rem' }}>{brandName}</div>
                       {clientName && (
                         <span className="badge rounded-pill d-inline-flex align-items-center gap-1 flex-shrink-0"
-                          style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.6rem', fontWeight: 600, border: '1px solid #fde68a', padding: '3px 8px' }}
+                          style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.6rem', fontWeight: 600, border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', padding: '3px 8px' }}
                           title={`Client: ${clientName}`}>
                           <i className="bi bi-person-badge" style={{ fontSize: '0.62rem' }} />
                           {clientName}
@@ -793,8 +793,8 @@ export default function AllBiWeeklyReportsPage() {
 
                     <div className="d-flex align-items-center gap-2 mb-2">
                       <div className="rounded-2 d-flex align-items-center justify-content-center"
-                        style={{ width: 28, height: 28, background: '#eff6ff' }}>
-                        <i className="bi bi-calendar-week" style={{ fontSize: '0.75rem', color: '#3b82f6' }} />
+                        style={{ width: 28, height: 28, background: 'var(--info-soft)' }}>
+                        <i className="bi bi-calendar-week" style={{ fontSize: '0.75rem', color: 'var(--info)' }} />
                       </div>
                       <div>
                         <div className="fw-bold" style={{ fontSize: '0.82rem' }}>{r.periodLabel}</div>

@@ -76,14 +76,14 @@ function RangeEditor({ report, type, siblings, onSaved, onClose }) {
             value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
       </div>
-      <div className="rounded-2 p-2 mb-3" style={{ background: '#f1f5f9', fontSize: '0.72rem', color: '#475569' }}>
+      <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
         <i className="bi bi-info-circle me-1" />
         Only this report's dates change. Other reports for this brand stay where they are. The "previous report" comparison is based on creation order, so you can shift dates without breaking deltas.
       </div>
 
       {overlaps.length > 0 && (
-        <div className="rounded-2 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-          <i className="bi bi-exclamation-triangle-fill" style={{ color: '#d97706', marginTop: 2 }} />
+        <div className="rounded-2 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+          <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--warning)', marginTop: 2 }} />
           <div style={{ fontSize: '0.72rem', color: '#78350f', lineHeight: 1.5 }}>
             <strong>Heads up — these dates overlap {overlaps.length} other report{overlaps.length === 1 ? '' : 's'} for this brand:</strong>
             <ul className="mb-0 mt-1" style={{ paddingLeft: 18 }}>
@@ -153,14 +153,14 @@ function MonthlyEditor({ report, siblings, onSaved, onClose }) {
           </select>
         </div>
       </div>
-      <div className="rounded-2 p-2 mb-3" style={{ background: '#f1f5f9', fontSize: '0.72rem', color: '#475569' }}>
+      <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
         <i className="bi bi-info-circle me-1" />
         Only this report's month changes. Other monthly reports for this brand stay where they are.
       </div>
 
       {conflict && (
-        <div className="rounded-2 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-          <i className="bi bi-x-circle-fill" style={{ color: '#dc2626', marginTop: 2 }} />
+        <div className="rounded-2 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
+          <i className="bi bi-x-circle-fill" style={{ color: 'var(--danger)', marginTop: 2 }} />
           <div style={{ fontSize: '0.72rem', color: '#7f1d1d', lineHeight: 1.5 }}>
             <strong>{conflict.monthLabel || conflict.monthKey}</strong> already has a report for this brand. Pick a different month.
           </div>
@@ -178,13 +178,13 @@ function MonthlyEditor({ report, siblings, onSaved, onClose }) {
 function Shell({ title, subtitle, onClose, children }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14, overflow: 'hidden' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start justify-content-between mb-3">
             <div>
               <h6 className="fw-bold mb-0 d-flex align-items-center gap-2">
-                <i className="bi bi-calendar-event" style={{ color: '#2563eb' }} /> {title}
+                <i className="bi bi-calendar-event" style={{ color: 'var(--info)' }} /> {title}
               </h6>
               {subtitle && <div className="text-muted small mt-1">{subtitle}</div>}
             </div>

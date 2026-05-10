@@ -26,9 +26,9 @@ function SectionHeader({ icon, title, color, required }) {
         style={{ width: 32, height: 32, background: color + '18' }}>
         <i className={`bi ${icon}`} style={{ fontSize: '0.9rem', color }} />
       </div>
-      <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+      <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
         {title}
-        {required && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
+        {required && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>}
       </h6>
     </div>
   );
@@ -41,7 +41,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, note, width
   const isNum = type === 'number';
   return (
     <div style={{ flex: width ? `0 0 ${width}` : '1 1 140px', minWidth: 100 }}>
-      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{label}</label>
+      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
         className="form-control form-control-sm" placeholder={placeholder || label}
@@ -78,7 +78,7 @@ function AutoGrowTextarea({ value, minRows = 3, placeholder, onChange, style }) 
 function TextArea({ label, value, onChange, rows = 3, placeholder }) {
   return (
     <div className="mt-2">
-      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{label}</label>
+      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
       <AutoGrowTextarea value={value} minRows={rows}
         placeholder={placeholder || 'Add insights for this section…'}
         onChange={onChange} />
@@ -90,7 +90,7 @@ function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
   return (
     <div className="mt-2">
       <div className="d-flex align-items-center justify-content-between mb-1">
-        <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>Insights</label>
+        <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Insights</label>
         <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
           style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 8, fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
           onClick={onGenerate} disabled={loading}>
@@ -121,7 +121,7 @@ function ArraySection({ items, setItems, fields, addLabel }) {
   return (
     <div>
       {items.map((item, i) => (
-        <div key={i} className="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 rounded-3" style={{ background: '#f8fafc' }}>
+        <div key={i} className="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 rounded-3" style={{ background: 'var(--surface-2)' }}>
           <div className="text-muted fw-bold" style={{ fontSize: '0.68rem', width: 20, textAlign: 'center', paddingBottom: 8 }}>
             {i + 1}
           </div>
@@ -622,7 +622,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
         )}
-        <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>New Weekly Report</h5>
+        <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>New Weekly Report</h5>
         <p className="text-muted small mb-4">Select the brand you're reporting for</p>
         <div className="row g-3">
           {myBrands.map(b => (
@@ -670,7 +670,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
           onClick={() => { setStep(0); setSelectedBrand(null); setWeekStartInput(''); }}>
           <i className="bi bi-arrow-left me-1" /> Back to brands
         </button>
-        <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>
+        <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
           {selectedBrand?.name || selectedBrand?.brandName} — Set Weekly Anchor
         </h5>
         <p className="text-muted small mb-4">
@@ -729,7 +729,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
       )}
       <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
             {editReportId ? 'Edit' : 'New'} Weekly Report
           </h5>
           <p className="text-muted small mb-0 d-flex align-items-center gap-2 flex-wrap">
@@ -747,7 +747,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
           <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
             onChange={e => handleImportPdf(e.target.files?.[0])} />
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 10, fontSize: '0.78rem' }}
+            style={{ background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, fontSize: '0.78rem' }}
             onClick={() => pdfInputRef.current?.click()} disabled={importing}
             title="Upload a PDF (Google Doc export) to auto-fill this form">
             {importing ? <><span className="spinner-border spinner-border-sm" /> Reading PDF…</>
@@ -786,7 +786,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ─── Duplicate week guard ─────────────────────────────────────── */}
       {duplicateForThisWeek && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
           <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
           <div className="flex-grow-1" style={{ fontSize: '0.78rem' }}>
             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>This week already has a report</div>
@@ -817,7 +817,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ─── Rejection banner (shown when report was rejected back) ────── */}
       {rejectionNote && reportStatus === 'draft' && editReportId && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
           <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>This report was returned for revision</div>
@@ -829,7 +829,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedWeek.label}</div>
@@ -839,7 +839,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report awaiting OL approval</div>
@@ -853,9 +853,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ─── Currency picker (applies to every monetary field below) ──── */}
       <div className="d-flex align-items-center gap-3 mb-3 p-2 rounded-3"
-        style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-        <i className="bi bi-currency-exchange" style={{ color: '#64748b' }} />
-        <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: '#334155' }}>
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+        <i className="bi bi-currency-exchange" style={{ color: 'var(--text-secondary)' }} />
+        <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           Report currency:
         </label>
         <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 8 }}
@@ -1033,7 +1033,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
             style={{ width: 32, height: 32, background: '#8b5cf618' }}>
             <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: '#8b5cf6' }} />
           </div>
-          <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: '#1e293b' }}>
+          <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
             My Custom Fields (Optional)
           </h6>
         </div>
@@ -1054,9 +1054,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
           <div className="card-body p-3">
             {customFieldDefs.map((field, i) => (
               <div key={field.id} className={i > 0 ? 'mt-3 pt-3' : ''}
-                style={i > 0 ? { borderTop: '1px solid #e2e8f0' } : {}}>
+                style={i > 0 ? { borderTop: '1px solid var(--border-subtle)' } : {}}>
                 <div className="d-flex align-items-center justify-content-between mb-1">
-                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: '#1e293b' }}>
+                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                     {field.name}
                   </label>
                   <div className="d-flex gap-1">
