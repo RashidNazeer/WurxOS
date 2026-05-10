@@ -716,7 +716,7 @@ export default function CampaignTrackerPage() {
 
               {/* Tab switcher (add mode only) */}
               {modalMode === 'add' && (
-                <div className="px-4" style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <div className="px-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                   <button
                     className={`ct-modal-tab-btn ${modalTab === 'manual' ? 'active' : ''}`}
                     onClick={() => { setModalTab('manual'); setFormError(''); }}

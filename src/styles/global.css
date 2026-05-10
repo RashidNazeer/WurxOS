@@ -244,6 +244,225 @@ a:hover { color: var(--accent-hover); }
   padding: 1px 5px;
   border-radius: 4px;
 }
+
+/* Bootstrap modal classes — used heavily by v1-port pages
+   (CampaignTracker, ProductCampaigns, brand tabs). Without these
+   overrides the dialog renders white-on-black in dark mode. */
+[data-theme='dark'] .modal-content {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .modal-header,
+[data-theme='dark'] .modal-footer {
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .modal-title {
+  color: var(--text-primary);
+}
+/* The default Bootstrap close X is a black SVG — invisible on dark.
+   `filter: invert()` flips it white without touching light mode. */
+[data-theme='dark'] .btn-close {
+  filter: invert(0.9);
+}
+[data-theme='dark'] .modal-backdrop.show {
+  opacity: 0.65;
+}
+
+/* Bootstrap input add-ons */
+[data-theme='dark'] .input-group-text {
+  background-color: var(--surface-2);
+  color: var(--text-secondary);
+  border-color: var(--input-border);
+}
+
+/* Hover row tint for .table-hover */
+[data-theme='dark'] .table-hover > tbody > tr:hover > * {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+[data-theme='dark'] .table > thead {
+  background-color: var(--surface-2);
+}
+[data-theme='dark'] .table > thead > tr > th {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-subtle);
+}
+
+/* List groups (settings panels, brand cards) */
+[data-theme='dark'] .list-group-item {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .list-group-item.active {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+
+/* Pagination */
+[data-theme='dark'] .page-link {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .page-link:hover {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+[data-theme='dark'] .page-item.active .page-link {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+[data-theme='dark'] .page-item.disabled .page-link {
+  background-color: var(--surface-1);
+  color: var(--text-muted);
+}
+
+/* Bootstrap text-* utility tints — keep semantic meaning but use
+   our brighter dark-mode variants so they read on near-black. */
+[data-theme='dark'] .text-success { color: var(--success) !important; }
+[data-theme='dark'] .text-danger  { color: var(--danger)  !important; }
+[data-theme='dark'] .text-warning { color: var(--warning) !important; }
+[data-theme='dark'] .text-info    { color: var(--info)    !important; }
+[data-theme='dark'] .text-primary { color: var(--info)    !important; }
+[data-theme='dark'] .text-white   { color: var(--text-inverse) !important; }
+
+/* bg-light is used as a chip/pill background in many v1-port files.
+   On dark theme the white pill stays white otherwise. */
+[data-theme='dark'] .bg-light {
+  background-color: var(--surface-2) !important;
+  color: var(--text-primary);
+}
+[data-theme='dark'] .bg-white {
+  background-color: var(--surface-1) !important;
+}
+[data-theme='dark'] .bg-dark {
+  background-color: var(--surface-3) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Bootstrap alerts beyond .alert-danger */
+[data-theme='dark'] .alert-success {
+  background-color: var(--success-soft);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+[data-theme='dark'] .alert-warning {
+  background-color: var(--warning-soft);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+[data-theme='dark'] .alert-info {
+  background-color: var(--info-soft);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+}
+[data-theme='dark'] .alert-primary {
+  background-color: var(--info-soft);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+}
+[data-theme='dark'] .alert-secondary {
+  background-color: var(--surface-2);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+/* Bootstrap success/danger filled buttons (not common but used on
+   some v1-port pages — Submit/Save/Delete actions). */
+[data-theme='dark'] .btn-success {
+  background-color: var(--success);
+  color: var(--text-inverse);
+  border-color: var(--success);
+}
+[data-theme='dark'] .btn-danger {
+  background-color: var(--danger);
+  color: var(--text-inverse);
+  border-color: var(--danger);
+}
+[data-theme='dark'] .btn-warning {
+  background-color: var(--warning);
+  color: var(--text-inverse);
+  border-color: var(--warning);
+}
+[data-theme='dark'] .btn-primary {
+  background-color: var(--info);
+  color: var(--text-inverse);
+  border-color: var(--info);
+}
+[data-theme='dark'] .btn-outline-success {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 50%, transparent);
+  background-color: transparent;
+}
+[data-theme='dark'] .btn-outline-success:hover {
+  background-color: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+  border-color: var(--success);
+}
+[data-theme='dark'] .btn-outline-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  background-color: transparent;
+}
+[data-theme='dark'] .btn-outline-danger:hover {
+  background-color: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+[data-theme='dark'] .btn-outline-warning {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 50%, transparent);
+  background-color: transparent;
+}
+[data-theme='dark'] .btn-outline-warning:hover {
+  background-color: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+/* Bootstrap form-check (checkboxes/radios) */
+[data-theme='dark'] .form-check-input {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+}
+[data-theme='dark'] .form-check-input:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+[data-theme='dark'] .form-check-label {
+  color: var(--text-primary);
+}
+
+/* Native datetime/date input picker icon — Chromium renders it
+   black, which becomes invisible on a dark input. Invert it. */
+[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
+[data-theme='dark'] input[type='datetime-local']::-webkit-calendar-picker-indicator,
+[data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator,
+[data-theme='dark'] input[type='month']::-webkit-calendar-picker-indicator,
+[data-theme='dark'] input[type='week']::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
+
+/* Bootstrap "border" utilities (used as "border" plain) — make them
+   visible against dark surfaces */
+[data-theme='dark'] .border,
+[data-theme='dark'] .border-top,
+[data-theme='dark'] .border-bottom,
+[data-theme='dark'] .border-start,
+[data-theme='dark'] .border-end {
+  border-color: var(--border-subtle) !important;
+}
+
+/* HR */
+[data-theme='dark'] hr {
+  border-color: var(--border-subtle);
+  opacity: 1;
+}
 .wx-input:hover { border-color: var(--border-strong); }
 .wx-input:focus {
   border-color: var(--accent);
