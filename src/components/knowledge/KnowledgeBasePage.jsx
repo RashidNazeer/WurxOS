@@ -136,24 +136,24 @@ function CommentSection({ docId, docTitle, currentUser, userName }) {
       {comments.length > 0 && (
         <div className="d-flex flex-column gap-2 mb-2" style={{ maxHeight: 240, overflowY: 'auto' }}>
           {comments.map(c => (
-            <div key={c.id} className="rounded-2 p-2" style={{ background: c.userId === currentUser.uid ? '#e8f0fe' : '#f8f9fa', border: '1px solid #e9ecef' }}>
+            <div key={c.id} className="rounded-2 p-2" style={{ background: c.userId === currentUser.uid ? 'var(--info-soft)' : 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
               <div className="d-flex align-items-center gap-2 mb-1">
-                <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                  style={{ width: 20, height: 20, background: c.userId === currentUser.uid ? '#0d6efd' : '#6c757d', fontSize: '0.5rem' }}>
+                <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                  style={{ width: 20, height: 20, background: c.userId === currentUser.uid ? 'var(--info)' : 'var(--text-muted)', color: 'var(--text-inverse)', fontSize: '0.5rem' }}>
                   {(c.userName || '?').slice(0, 2).toUpperCase()}
                 </span>
-                <span className="fw-semibold" style={{ fontSize: '0.72rem' }}>{c.userName}</span>
-                <span className="text-muted" style={{ fontSize: '0.62rem' }}>{formatTime(c.createdAt)}</span>
+                <span className="fw-semibold" style={{ fontSize: '0.72rem', color: 'var(--text-primary)' }}>{c.userName}</span>
+                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{formatTime(c.createdAt)}</span>
               </div>
-              <p className="mb-0 small" style={{ fontSize: '0.78rem' }}>{c.text}</p>
+              <p className="mb-0 small" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{c.text}</p>
               {c.bossReply && (
-                <div className="mt-2 rounded-2 p-2" style={{ background: '#fff3e0', border: '1px solid #ffe0b2' }}>
+                <div className="mt-2 rounded-2 p-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                   <div className="d-flex align-items-center gap-1 mb-1">
-                    <i className="bi bi-star-fill" style={{ color: '#fd7e14', fontSize: '0.58rem' }} />
-                    <span className="fw-semibold" style={{ fontSize: '0.68rem', color: '#e65100' }}>Boss Reply</span>
-                    <span className="text-muted" style={{ fontSize: '0.58rem' }}>{formatTime(c.bossReplyAt)}</span>
+                    <i className="bi bi-star-fill" style={{ color: 'var(--warning)', fontSize: '0.58rem' }} />
+                    <span className="fw-semibold" style={{ fontSize: '0.68rem', color: 'var(--warning)' }}>Boss Reply</span>
+                    <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>{formatTime(c.bossReplyAt)}</span>
                   </div>
-                  <p className="mb-0 small" style={{ fontSize: '0.76rem' }}>{c.bossReply}</p>
+                  <p className="mb-0 small" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>{c.bossReply}</p>
                 </div>
               )}
             </div>
@@ -375,16 +375,17 @@ export default function KnowledgeBasePage() {
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-book" style={{ fontSize: '1.15rem' }} />
             Knowledge Base
           </h5>
-          <p className="text-muted small mb-0">Company documents, SOPs, and policies</p>
+          <p className="small mb-0" style={{ color: 'var(--text-muted)' }}>Company documents, SOPs, and policies</p>
         </div>
         {canPropose && (
           <button
-            className="btn btn-sm btn-dark d-inline-flex align-items-center gap-2"
-            style={{ borderRadius: 10, fontWeight: 600, fontSize: '0.82rem', padding: '7px 14px' }}
+            className="btn btn-sm d-inline-flex align-items-center gap-2"
+            style={{ borderRadius: 10, fontWeight: 600, fontSize: '0.82rem', padding: '7px 14px',
+                     background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' }}
             onClick={() => setShowPropose(true)}
           >
             <i className="bi bi-plus-lg" /> Propose Document
@@ -402,20 +403,23 @@ export default function KnowledgeBasePage() {
               className="d-inline-flex align-items-center gap-1 rounded-pill border px-3 py-1"
               style={{
                 fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
-                background: activeTab === tab.value ? '#1a1a2e' : '#f8f9fa',
-                color: activeTab === tab.value ? '#fff' : '#495057',
-                borderColor: activeTab === tab.value ? '#1a1a2e' : '#dee2e6',
+                background: activeTab === tab.value ? 'var(--accent)' : 'var(--surface-2)',
+                color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                borderColor: activeTab === tab.value ? 'var(--accent)' : 'var(--border-subtle)',
               }}
               onClick={() => { setActiveTab(tab.value); setSearch(''); setExpandedId(null); }}>
               <i className={`bi ${tab.icon}`} style={{ fontSize: '0.72rem' }} />
               {tab.label}
               {count > 0 && (
-                <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700, background: activeTab === tab.value ? 'rgba(255,255,255,0.2)' : '#dee2e6', color: activeTab === tab.value ? '#fff' : '#6c757d', lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
+                <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700,
+                  background: activeTab === tab.value ? 'rgba(255,255,255,0.25)' : 'var(--surface-3)',
+                  color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-muted)',
+                  lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
                   {count}
                 </span>
               )}
               {unread > 0 && (
-                <span className="rounded-circle flex-shrink-0" style={{ width: 6, height: 6, background: '#dc3545' }} />
+                <span className="rounded-circle flex-shrink-0" style={{ width: 6, height: 6, background: 'var(--danger)' }} />
               )}
             </button>
           );
@@ -426,12 +430,13 @@ export default function KnowledgeBasePage() {
       {!loading && allItems.length > 0 && (
         <div className="d-flex gap-2 mb-4 flex-wrap align-items-center">
           <div className="position-relative" style={{ maxWidth: 280 }}>
-            <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
+            <i className="bi bi-search position-absolute" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none', color: 'var(--text-muted)' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search documents…"
-              style={{ paddingLeft: 30, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+              style={{ paddingLeft: 30, borderRadius: 8, background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+              value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           {availableVersions.length > 0 && (
-            <select className="form-select form-select-sm" style={{ maxWidth: 160, borderRadius: 8 }}
+            <select className="form-select form-select-sm" style={{ maxWidth: 160, borderRadius: 8, background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
               value={versionFilter} onChange={e => setVersionFilter(e.target.value)}>
               <option value="all">All Versions</option>
               <option value="latest">Latest Only</option>
@@ -443,14 +448,14 @@ export default function KnowledgeBasePage() {
 
       {/* Content */}
       {loading ? (
-        <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
+        <div className="d-flex align-items-center gap-2 py-5" style={{ color: 'var(--text-muted)' }}><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : tabItems.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
-            <i className="bi bi-book text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
+            <i className="bi bi-book" style={{ fontSize: '1.6rem', opacity: 0.45, color: 'var(--text-muted)' }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">{search ? 'No matching documents' : 'No documents yet'}</p>
-          <p className="text-muted small mb-0">Documents will appear here once added by the boss.</p>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{search ? 'No matching documents' : 'No documents yet'}</p>
+          <p className="small mb-0" style={{ color: 'var(--text-muted)' }}>Documents will appear here once added by the boss.</p>
         </div>
       ) : (
         <div className="d-flex flex-column gap-3">
@@ -458,43 +463,43 @@ export default function KnowledgeBasePage() {
             const isRead = acks[item.id];
             const isExpanded = expandedId === item.id;
             return (
-              <div key={item.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${isRead ? '#198754' : '#fd7e14'}` }}>
+              <div key={item.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${isRead ? 'var(--success)' : 'var(--warning)'}`, background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-start justify-content-between">
                     <div className="flex-grow-1">
                       <div className="d-flex align-items-center gap-2 mb-1">
                         <a href={item.url} target="_blank" rel="noopener noreferrer" className="fw-semibold small text-decoration-none"
-                          style={{ color: '#0d6efd' }} onClick={e => e.stopPropagation()}>
+                          style={{ color: 'var(--info)' }} onClick={e => e.stopPropagation()}>
                           <i className="bi bi-box-arrow-up-right me-1" style={{ fontSize: '0.68rem' }} />
                           {item.title}
                         </a>
                         {activeTab === 'all' && (() => { const t = TABS.find(x => x.value === item.tab); return t ? (
-                          <span className="badge rounded-pill" style={{ background: '#f0f1f5', color: '#6c757d', fontSize: '0.56rem', fontWeight: 500 }}>{t.label}</span>
+                          <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', fontSize: '0.56rem', fontWeight: 500 }}>{t.label}</span>
                         ) : null; })()}
                         {isRead ? (
-                          <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>
                             <i className="bi bi-check-circle-fill me-1" style={{ fontSize: '0.52rem' }} />Read
                           </span>
                         ) : (
-                          <span className="badge rounded-pill" style={{ background: '#fff3e0', color: '#fd7e14', fontSize: '0.58rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.58rem' }}>
                             <i className="bi bi-circle me-1" style={{ fontSize: '0.52rem' }} />Unread
                           </span>
                         )}
                       </div>
-                      {item.description && <p className="text-muted small mb-1" style={{ fontSize: '0.76rem' }}>{item.description}</p>}
+                      {item.description && <p className="small mb-1" style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>{item.description}</p>}
                       <VideoEmbed url={item.url} />
                       <div className="d-flex align-items-center gap-2 flex-wrap" style={{ fontSize: '0.65rem', marginTop: 4 }}>
                         {item.version && (
-                          <span className="badge rounded-pill" style={{ background: '#f0fdf4', color: '#16a34a', fontSize: '0.6rem', border: '1px solid #bbf7d0' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.6rem', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
                             <i className="bi bi-tag-fill me-1" />{item.version}
                           </span>
                         )}
                         {item.version && latestVersionMap[item.id] && (
-                          <span className="badge rounded-pill" style={{ background: '#eff6ff', color: '#2563eb', fontSize: '0.55rem', border: '1px solid #bfdbfe' }}>Latest</span>
+                          <span className="badge rounded-pill" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.55rem', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>Latest</span>
                         )}
-                        <span className="text-muted">Added {formatDate(item.createdAt)}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>Added {formatDate(item.createdAt)}</span>
                         {item.updatedByName && (
-                          <span className="text-muted">· by {item.updatedByName}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>· by {item.updatedByName}</span>
                         )}
                       </div>
                       {/* Delivery Roadmap — linked changes for this SOP */}
@@ -505,20 +510,22 @@ export default function KnowledgeBasePage() {
                         );
                         if (docChanges.length === 0) return null;
                         return (
-                          <div className="mt-2 rounded-2 p-2" style={{ background: '#fefce8', border: '1px solid #fef08a' }}>
+                          <div className="mt-2 rounded-2 p-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                             <div className="d-flex align-items-center gap-1 mb-1">
-                              <i className="bi bi-signpost-split" style={{ fontSize: '0.65rem', color: '#ca8a04' }} />
-                              <span className="fw-semibold" style={{ fontSize: '0.68rem', color: '#a16207' }}>Delivery Roadmap</span>
+                              <i className="bi bi-signpost-split" style={{ fontSize: '0.65rem', color: 'var(--warning)' }} />
+                              <span className="fw-semibold" style={{ fontSize: '0.68rem', color: 'var(--warning)' }}>Delivery Roadmap</span>
                             </div>
                             {docChanges.map(c => {
-                              const stColors = { pending: '#fd7e14', approved: '#198754', in_progress: '#0d6efd', completed: '#8b5cf6', implemented: '#16a34a' };
+                              // Use semantic-token CSS variables so the dots/pills read in both themes.
+                              const stTokens = { pending: 'var(--warning)', approved: 'var(--success)', in_progress: 'var(--info)', completed: '#8b5cf6', implemented: 'var(--success)' };
                               const stLabels = { pending: 'Pending', approved: 'Approved', in_progress: 'In Progress', completed: 'Completed', implemented: 'Implemented' };
+                              const tint = stTokens[c.status] || 'var(--text-muted)';
                               return (
-                                <div key={c.id} className="d-flex align-items-center gap-2 py-1" style={{ fontSize: '0.68rem' }}>
-                                  <span className="rounded-circle flex-shrink-0" style={{ width: 6, height: 6, background: stColors[c.status] || '#94a3b8' }} />
+                                <div key={c.id} className="d-flex align-items-center gap-2 py-1" style={{ fontSize: '0.68rem', color: 'var(--text-primary)' }}>
+                                  <span className="rounded-circle flex-shrink-0" style={{ width: 6, height: 6, background: tint }} />
                                   <span className="fw-medium text-truncate" style={{ maxWidth: 200 }}>{c.title}</span>
-                                  <span className="badge rounded-pill" style={{ background: `${stColors[c.status]}15`, color: stColors[c.status], fontSize: '0.55rem' }}>{stLabels[c.status] || c.status}</span>
-                                  {c.ownerName && <span className="text-muted" style={{ fontSize: '0.6rem' }}>· {c.ownerName}</span>}
+                                  <span className="badge rounded-pill" style={{ background: `color-mix(in srgb, ${tint} 18%, transparent)`, color: tint, fontSize: '0.55rem' }}>{stLabels[c.status] || c.status}</span>
+                                  {c.ownerName && <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>· {c.ownerName}</span>}
                                 </div>
                               );
                             })}
@@ -530,17 +537,17 @@ export default function KnowledgeBasePage() {
                     <div className="d-flex align-items-center gap-2 flex-shrink-0 ms-3">
                       {isRead ? (
                         <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2"
-                          style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => handleUnacknowledge(item.id)}>
+                          style={{ fontSize: '0.7rem', borderRadius: 6, color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }} onClick={() => handleUnacknowledge(item.id)}>
                           <i className="bi bi-x" /> Undo
                         </button>
                       ) : (
-                        <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1 px-2"
-                          style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => handleAcknowledge(item.id)}>
+                        <button className="btn btn-sm d-inline-flex align-items-center gap-1 px-2"
+                          style={{ fontSize: '0.7rem', borderRadius: 6, background: 'var(--success)', color: 'var(--text-inverse)', border: '1px solid var(--success)' }} onClick={() => handleAcknowledge(item.id)}>
                           <i className="bi bi-check2" /> Mark as Read
                         </button>
                       )}
                       <button className="btn btn-sm btn-outline-secondary px-2"
-                        style={{ fontSize: '0.7rem', borderRadius: 6 }}
+                        style={{ fontSize: '0.7rem', borderRadius: 6, color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }}
                         onClick={() => setExpandedId(isExpanded ? null : item.id)}>
                         <i className={`bi bi-chat-dots${isExpanded ? '-fill' : ''}`} />
                       </button>
@@ -560,19 +567,19 @@ export default function KnowledgeBasePage() {
       {/* ── Submission Success Dialog ── */}
       {proposeSuccess && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setProposeSuccess(false)} />
-          <div className="card border-0 shadow-lg text-center" style={{ position: 'relative', width: '100%', maxWidth: 400, zIndex: 1, borderRadius: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setProposeSuccess(false)} />
+          <div className="card border-0 shadow-lg text-center" style={{ position: 'relative', width: '100%', maxWidth: 400, zIndex: 1, borderRadius: 16, background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
             <div className="card-body p-4">
               <div className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                style={{ width: 56, height: 56, background: '#e6f4ea' }}>
-                <i className="bi bi-check-lg text-success" style={{ fontSize: '1.6rem' }} />
+                style={{ width: 56, height: 56, background: 'var(--success-soft)' }}>
+                <i className="bi bi-check-lg" style={{ fontSize: '1.6rem', color: 'var(--success)' }} />
               </div>
-              <h6 className="fw-bold mb-2">Submitted for Review</h6>
-              <p className="text-muted small mb-3" style={{ lineHeight: 1.5 }}>
+              <h6 className="fw-bold mb-2" style={{ color: 'var(--text-primary)' }}>Submitted for Review</h6>
+              <p className="small mb-3" style={{ lineHeight: 1.5, color: 'var(--text-muted)' }}>
                 Your document has been submitted successfully and will be reviewed by your Employer / Boss.
                 You'll be notified once it's approved.
               </p>
-              <button className="btn btn-sm btn-dark px-4" style={{ borderRadius: 10 }} onClick={() => setProposeSuccess(false)}>
+              <button className="btn btn-sm px-4" style={{ borderRadius: 10, background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' }} onClick={() => setProposeSuccess(false)}>
                 Got it
               </button>
             </div>
@@ -609,46 +616,50 @@ function ProposeModal({ onClose, onSave, saving }) {
     onSave({ title, url, description: desc, tab, version });
   }
 
+  // Themed input style — Bootstrap form-control doesn't honor our tokens
+  // by default, so apply them inline here. Same shape as other v2 modals.
+  const inputStyle = { background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
-              <h6 className="fw-bold mb-0">Propose a Document</h6>
-              <p className="text-muted small mb-0">Submit for boss approval — visibility will be set upon approval</p>
+              <h6 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>Propose a Document</h6>
+              <p className="small mb-0" style={{ color: 'var(--text-muted)' }}>Submit for boss approval — visibility will be set upon approval</p>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="btn btn-sm border-0 rounded-circle" onClick={onClose}
+              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
               <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
             </button>
           </div>
           <form onSubmit={handleSubmit}>
             {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}
             <div className="mb-3">
-              <label className="form-label small fw-semibold">Title <span className="text-danger">*</span></label>
-              <input type="text" className="form-control" placeholder="Document title" value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+              <label className="form-label small fw-semibold" style={{ color: 'var(--text-primary)' }}>Title <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <input type="text" className="form-control" placeholder="Document title" value={title} onChange={e => setTitle(e.target.value)} autoFocus style={inputStyle} />
             </div>
             <div className="mb-3">
-              <label className="form-label small fw-semibold">Link / URL <span className="text-danger">*</span></label>
-              <input type="url" className="form-control form-control-sm" placeholder="https://docs.google.com/…" value={url} onChange={e => setUrl(e.target.value)} />
+              <label className="form-label small fw-semibold" style={{ color: 'var(--text-primary)' }}>Link / URL <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <input type="url" className="form-control form-control-sm" placeholder="https://docs.google.com/…" value={url} onChange={e => setUrl(e.target.value)} style={inputStyle} />
             </div>
             <div className="mb-3">
-              <label className="form-label small fw-semibold">Description <span className="text-muted fw-normal">(optional)</span></label>
-              <textarea className="form-control" rows={2} placeholder="Brief description…" value={desc} onChange={e => setDesc(e.target.value)} />
+              <label className="form-label small fw-semibold" style={{ color: 'var(--text-primary)' }}>Description <span className="fw-normal" style={{ color: 'var(--text-muted)' }}>(optional)</span></label>
+              <textarea className="form-control" rows={2} placeholder="Brief description…" value={desc} onChange={e => setDesc(e.target.value)} style={inputStyle} />
             </div>
             <div className="mb-3">
-              <label className="form-label small fw-semibold">Category</label>
+              <label className="form-label small fw-semibold" style={{ color: 'var(--text-primary)' }}>Category</label>
               <div className="d-flex gap-2 flex-wrap">
                 {TABS.map(t => (
                   <button key={t.value} type="button" onClick={() => setTab(t.value)}
                     className="d-inline-flex align-items-center gap-1 rounded-pill border"
                     style={{
                       fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px',
-                      background: tab === t.value ? '#1a1a2e' : '#f8f9fa',
-                      color: tab === t.value ? '#fff' : '#495057',
-                      borderColor: tab === t.value ? '#1a1a2e' : '#dee2e6',
+                      background: tab === t.value ? 'var(--accent)' : 'var(--surface-2)',
+                      color: tab === t.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                      borderColor: tab === t.value ? 'var(--accent)' : 'var(--border-subtle)',
                       cursor: 'pointer', transition: 'all 0.12s',
                     }}>
                     <i className={`bi ${t.icon}`} style={{ fontSize: '0.65rem' }} />{t.label}
@@ -658,13 +669,15 @@ function ProposeModal({ onClose, onSave, saving }) {
             </div>
             {SOP_TABS.includes(tab) && (
               <div className="mb-3">
-                <label className="form-label small fw-semibold">SOP Version <span className="text-danger">*</span></label>
-                <input type="text" className="form-control form-control-sm" placeholder="e.g. v1.0" value={version} onChange={e => setVersion(e.target.value)} />
+                <label className="form-label small fw-semibold" style={{ color: 'var(--text-primary)' }}>SOP Version <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input type="text" className="form-control form-control-sm" placeholder="e.g. v1.0" value={version} onChange={e => setVersion(e.target.value)} style={inputStyle} />
               </div>
             )}
             <div className="d-flex gap-2 justify-content-end">
-              <button type="button" className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" disabled={saving}>
+              <button type="button" className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}
+                style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }}>Cancel</button>
+              <button type="submit" className="btn btn-sm px-3 d-inline-flex align-items-center gap-1" disabled={saving}
+                style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' }}>
                 {saving ? <><span className="spinner-border spinner-border-sm" /> Submitting…</> : <><i className="bi bi-send" /> Submit for Approval</>}
               </button>
             </div>

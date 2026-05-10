@@ -111,6 +111,139 @@ a:hover { color: var(--accent-hover); }
   color: var(--input-placeholder) !important;
   opacity: 0.7;
 }
+
+/* ============================================================
+   Bootstrap class overrides for DARK theme only.
+   Many v1-port pages render with raw Bootstrap classes (.card,
+   .form-control, .btn-light, .table, etc.) which Bootstrap paints
+   white. In dark mode that creates white slabs on a near-black
+   background. We override those defaults to consume our tokens
+   when [data-theme='dark'] is active. Light mode stays untouched.
+   ============================================================ */
+[data-theme='dark'] .card {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .form-control,
+[data-theme='dark'] .form-select {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--input-border);
+}
+[data-theme='dark'] .form-control:focus,
+[data-theme='dark'] .form-select:focus {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+[data-theme='dark'] .form-label {
+  color: var(--text-primary);
+}
+[data-theme='dark'] .text-muted {
+  color: var(--text-muted) !important;
+}
+[data-theme='dark'] .text-dark {
+  color: var(--text-primary) !important;
+}
+[data-theme='dark'] .text-secondary {
+  color: var(--text-secondary) !important;
+}
+[data-theme='dark'] .btn-light {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .btn-light:hover,
+[data-theme='dark'] .btn-light:focus {
+  background-color: var(--surface-3);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+[data-theme='dark'] .btn-dark {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+[data-theme='dark'] .btn-dark:hover,
+[data-theme='dark'] .btn-dark:focus {
+  background-color: var(--accent-hover);
+  color: var(--on-accent);
+  border-color: var(--accent-hover);
+}
+[data-theme='dark'] .btn-outline-secondary {
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+  background-color: transparent;
+}
+[data-theme='dark'] .btn-outline-secondary:hover,
+[data-theme='dark'] .btn-outline-secondary:focus {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+[data-theme='dark'] .btn-outline-dark {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+  background-color: transparent;
+}
+[data-theme='dark'] .btn-outline-dark:hover,
+[data-theme='dark'] .btn-outline-dark:focus {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+[data-theme='dark'] .btn-outline-primary {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 50%, transparent);
+  background-color: transparent;
+}
+[data-theme='dark'] .btn-outline-primary:hover,
+[data-theme='dark'] .btn-outline-primary:focus {
+  background-color: color-mix(in srgb, var(--info) 18%, transparent);
+  color: var(--info);
+  border-color: var(--info);
+}
+[data-theme='dark'] .table {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+[data-theme='dark'] .table > :not(caption) > * > * {
+  background-color: transparent;
+  border-bottom-color: var(--border-subtle);
+}
+[data-theme='dark'] .alert-danger {
+  background-color: var(--danger-soft);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+[data-theme='dark'] .dropdown-menu {
+  background-color: var(--surface-1);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+[data-theme='dark'] .dropdown-item {
+  color: var(--text-primary);
+}
+[data-theme='dark'] .dropdown-item:hover,
+[data-theme='dark'] .dropdown-item:focus {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+[data-theme='dark'] .nav-pills .nav-link {
+  color: var(--text-secondary);
+}
+[data-theme='dark'] .nav-pills .nav-link.active {
+  background-color: var(--accent);
+  color: var(--on-accent);
+}
+[data-theme='dark'] code {
+  color: var(--accent);
+  background-color: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
 .wx-input:hover { border-color: var(--border-strong); }
 .wx-input:focus {
   border-color: var(--accent);

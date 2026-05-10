@@ -156,7 +156,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -189,9 +189,9 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                     className="d-inline-flex align-items-center gap-1 rounded-pill border"
                     style={{
                       fontSize: '0.75rem', fontWeight: 600, padding: '4px 10px',
-                      background: selectedTab === t.value ? '#1a1a2e' : '#f8f9fa',
-                      color: selectedTab === t.value ? '#fff' : '#495057',
-                      borderColor: selectedTab === t.value ? '#1a1a2e' : '#dee2e6',
+                      background: selectedTab === t.value ? 'var(--accent)' : 'var(--surface-2)',
+                      color: selectedTab === t.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                      borderColor: selectedTab === t.value ? 'var(--accent)' : 'var(--border-subtle)',
                       cursor: 'pointer', transition: 'all 0.12s',
                     }}>
                     <i className={`bi ${t.icon}`} style={{ fontSize: '0.65rem' }} />{t.label}
@@ -222,9 +222,9 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                     className="d-inline-flex align-items-center gap-1 rounded-pill border"
                     style={{
                       fontSize: '0.78rem', fontWeight: 600, padding: '5px 12px',
-                      background: visType === v.value ? '#1a1a2e' : '#f8f9fa',
-                      color: visType === v.value ? '#fff' : '#495057',
-                      borderColor: visType === v.value ? '#1a1a2e' : '#dee2e6',
+                      background: visType === v.value ? 'var(--accent)' : 'var(--surface-2)',
+                      color: visType === v.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                      borderColor: visType === v.value ? 'var(--accent)' : 'var(--border-subtle)',
                       cursor: 'pointer', transition: 'all 0.12s',
                     }}>
                     <i className={`bi ${v.icon}`} style={{ fontSize: '0.72rem' }} />{v.label}
@@ -234,13 +234,13 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
 
               {/* Role selector */}
               {visType === 'roles' && (
-                <div className="rounded-2 p-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                <div className="rounded-2 p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div className="d-flex gap-2 flex-wrap">
                     {[
-                      { value: 'tl',   label: 'Team Leads',          color: '#0d6efd' },
+                      { value: 'tl',   label: 'Team Leads',          color: 'var(--info)' },
                       { value: 'ol',   label: 'Operation Leads',     color: '#6610f2' },
                       { value: 'pctl', label: 'Paid Collab TLs',     color: '#d63384' },
-                      { value: 'apc',  label: 'APCs',                color: '#198754' },
+                      { value: 'apc',  label: 'APCs',                color: 'var(--success)' },
                       { value: 'ipc',  label: 'IPCs',                color: '#0dcaf0' },
                     ].map(r => {
                       const sel = visRoles.includes(r.value);
@@ -249,7 +249,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                           className="d-inline-flex align-items-center gap-1 rounded-pill border"
                           style={{
                             fontSize: '0.76rem', fontWeight: 600, padding: '5px 12px',
-                            background: sel ? r.color : '#fff', color: sel ? '#fff' : r.color,
+                            background: sel ? r.color : 'var(--surface-1)', color: sel ? 'var(--text-inverse)' : r.color,
                             borderColor: sel ? r.color : `${r.color}55`, cursor: 'pointer',
                           }}>
                           <i className={`bi ${sel ? 'bi-check-circle-fill' : 'bi-circle'}`} style={{ fontSize: '0.65rem' }} />{r.label}
@@ -265,7 +265,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
 
               {/* User selector */}
               {visType === 'users' && (
-                <div className="rounded-2 p-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+                <div className="rounded-2 p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div className="position-relative mb-2">
                     <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.72rem', pointerEvents: 'none' }} />
                     <input type="text" className="form-control form-control-sm" placeholder="Search users…"
@@ -277,7 +277,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                         const u = allUsers.find(x => x.id === uid);
                         return (
                           <span key={uid} className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                            style={{ background: '#e8f0fe', border: '1px solid #c5d5ff', fontSize: '0.68rem', fontWeight: 500, color: '#0d6efd' }}>
+                            style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.68rem', fontWeight: 500, color: 'var(--info)' }}>
                             {u ? (u.displayName || u.userName || u.email) : uid}
                             <i className="bi bi-x" style={{ cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => toggleUser(uid)} />
                           </span>
@@ -291,11 +291,11 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                       const name = u.displayName || u.userName || u.email;
                       return (
                         <div key={u.id} className="d-flex align-items-center gap-2 rounded-2 p-2 mb-1"
-                          style={{ background: sel ? '#e8f0fe' : '#fff', border: `1px solid ${sel ? '#c5d5ff' : '#e9ecef'}`, cursor: 'pointer' }}
+                          style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                           onClick={() => toggleUser(u.id)}>
                           <input type="checkbox" className="form-check-input flex-shrink-0" checked={sel} readOnly style={{ cursor: 'pointer' }} />
                           <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                            style={{ width: 22, height: 22, background: sel ? '#0d6efd' : '#adb5bd', fontSize: '0.5rem' }}>
+                            style={{ width: 22, height: 22, background: sel ? 'var(--info)' : 'var(--text-muted)', fontSize: '0.5rem' }}>
                             {name.slice(0, 2).toUpperCase()}
                           </span>
                           <div className="flex-grow-1" style={{ minWidth: 0 }}>
@@ -356,7 +356,7 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 580, zIndex: 1, borderRadius: 16, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-header bg-white border-0 pt-4 pb-2 px-4 flex-shrink-0" style={{ borderRadius: '16px 16px 0 0' }}>
           <div className="d-flex align-items-center justify-content-between mb-2">
@@ -368,10 +368,10 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
           <p className="text-muted small mb-2">{item.title}</p>
 
           <div className="d-flex align-items-center gap-2 mb-3">
-            <div className="flex-grow-1 rounded-pill" style={{ height: 8, background: '#e9ecef' }}>
-              <div className="rounded-pill" style={{ height: 8, width: `${totalUsers > 0 ? (readCount / totalUsers) * 100 : 0}%`, background: '#198754', transition: 'width 0.3s' }} />
+            <div className="flex-grow-1 rounded-pill" style={{ height: 8, background: 'var(--surface-3)' }}>
+              <div className="rounded-pill" style={{ height: 8, width: `${totalUsers > 0 ? (readCount / totalUsers) * 100 : 0}%`, background: 'var(--success)', transition: 'width 0.3s' }} />
             </div>
-            <span className="small fw-semibold" style={{ color: '#198754', whiteSpace: 'nowrap' }}>{readCount}/{totalUsers}</span>
+            <span className="small fw-semibold" style={{ color: 'var(--success)', whiteSpace: 'nowrap' }}>{readCount}/{totalUsers}</span>
           </div>
 
           <div className="d-flex gap-2 align-items-center">
@@ -391,14 +391,14 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
             <p className="text-muted small text-center py-3">No users match.</p>
           ) : (
             <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
-              <thead><tr style={{ color: '#9ca3af' }}><th>User</th><th>Role</th><th>Status</th><th>Read At</th></tr></thead>
+              <thead><tr style={{ color: 'var(--text-muted)' }}><th>User</th><th>Role</th><th>Status</th><th>Read At</th></tr></thead>
               <tbody>
                 {rows.map(r => (
                   <tr key={r.id}>
                     <td>
                       <div className="d-flex align-items-center gap-2">
                         <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                          style={{ width: 24, height: 24, background: r.ack ? '#198754' : '#dee2e6', fontSize: '0.5rem' }}>
+                          style={{ width: 24, height: 24, background: r.ack ? 'var(--success)' : 'var(--border-subtle)', fontSize: '0.5rem' }}>
                           {r.name.slice(0, 2).toUpperCase()}
                         </span>
                         <div>
@@ -410,9 +410,9 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
                     <td><span className="text-muted">{ROLE_LABELS[r.role] || r.role}</span></td>
                     <td>
                       {r.ack ? (
-                        <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem' }}><i className="bi bi-check-circle-fill me-1" />Read</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.62rem' }}><i className="bi bi-check-circle-fill me-1" />Read</span>
                       ) : (
-                        <span className="badge rounded-pill" style={{ background: '#fff3e0', color: '#fd7e14', fontSize: '0.62rem' }}><i className="bi bi-circle me-1" />Unread</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.62rem' }}><i className="bi bi-circle me-1" />Unread</span>
                       )}
                     </td>
                     <td className="text-muted" style={{ fontSize: '0.7rem' }}>{r.ack ? formatDate(r.ack.readAt) : '—'}</td>
@@ -462,11 +462,11 @@ function BossCommentSection({ docId }) {
       </div>
       <div className="d-flex flex-column gap-2" style={{ maxHeight: 300, overflowY: 'auto' }}>
         {comments.map(c => (
-          <div key={c.id} className="rounded-2 p-2" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+          <div key={c.id} className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center justify-content-between mb-1">
               <div className="d-flex align-items-center gap-2">
-                <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                  style={{ width: 20, height: 20, background: '#6c757d', fontSize: '0.5rem' }}>
+                <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                  style={{ width: 20, height: 20, background: 'var(--text-muted)', color: 'var(--text-inverse)', fontSize: '0.5rem' }}>
                   {(c.userName || '?').slice(0, 2).toUpperCase()}
                 </span>
                 <span className="fw-semibold" style={{ fontSize: '0.72rem' }}>{c.userName}</span>
@@ -487,10 +487,10 @@ function BossCommentSection({ docId }) {
             </div>
             <p className="mb-0 small" style={{ fontSize: '0.76rem' }}>{c.text}</p>
             {c.bossReply && (
-              <div className="mt-2 rounded-2 p-2" style={{ background: '#fff3e0', border: '1px solid #ffe0b2' }}>
+              <div className="mt-2 rounded-2 p-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                 <div className="d-flex align-items-center gap-1 mb-1">
-                  <i className="bi bi-star-fill" style={{ color: '#fd7e14', fontSize: '0.58rem' }} />
-                  <span className="fw-semibold" style={{ fontSize: '0.68rem', color: '#e65100' }}>Your Reply</span>
+                  <i className="bi bi-star-fill" style={{ color: 'var(--warning)', fontSize: '0.58rem' }} />
+                  <span className="fw-semibold" style={{ fontSize: '0.68rem', color: 'var(--warning)' }}>Your Reply</span>
                   <span className="text-muted" style={{ fontSize: '0.58rem' }}>{formatTime(c.bossReplyAt)}</span>
                 </div>
                 <p className="mb-0 small" style={{ fontSize: '0.76rem' }}>{c.bossReply}</p>
@@ -626,7 +626,7 @@ export default function BossKnowledgeBasePage() {
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-book" style={{ fontSize: '1.15rem' }} />
             Knowledge Base
           </h5>
@@ -635,16 +635,16 @@ export default function BossKnowledgeBasePage() {
         <div className="d-flex gap-2">
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 8, fontSize: '0.8rem',
-              background: duplicateCount > 0 ? '#fef3c7' : '#f8fafc',
-              color: duplicateCount > 0 ? '#92400e' : '#475569',
-              border: `1px solid ${duplicateCount > 0 ? '#fcd34d' : '#cbd5e1'}` }}
+              background: duplicateCount > 0 ? 'var(--warning-soft)' : 'var(--surface-2)',
+              color: duplicateCount > 0 ? 'var(--warning)' : 'var(--text-secondary)',
+              border: `1px solid ${duplicateCount > 0 ? 'color-mix(in srgb, var(--warning) 50%, transparent)' : 'var(--border-default)'}` }}
             onClick={() => setShowDuplicates(true)}
             title={duplicateCount > 0 ? `${duplicateCount} duplicate group(s) found` : 'Scan for duplicate docs'}>
             <i className="bi bi-clipboard-check" style={{ fontSize: '0.72rem' }} />
             Check Duplicates
             {duplicateCount > 0 && (
               <span className="badge rounded-pill"
-                style={{ background: '#f59e0b', color: '#fff', fontSize: '0.62rem', marginLeft: 4 }}>
+                style={{ background: 'var(--warning)', color: 'var(--text-inverse)', fontSize: '0.62rem', marginLeft: 4 }}>
                 {duplicateCount}
               </span>
             )}
@@ -667,21 +667,21 @@ export default function BossKnowledgeBasePage() {
         <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, border: '2px solid #fbbf24' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-3">
-              <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: '#fffbeb' }}>
-                <i className="bi bi-clock-history" style={{ color: '#d97706', fontSize: '0.95rem' }} />
+              <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: 'var(--warning-soft)' }}>
+                <i className="bi bi-clock-history" style={{ color: 'var(--warning)', fontSize: '0.95rem' }} />
               </div>
               <div>
-                <div className="fw-bold small" style={{ color: '#92400e' }}>Pending Submissions</div>
+                <div className="fw-bold small" style={{ color: 'var(--warning)' }}>Pending Submissions</div>
                 <div className="text-muted" style={{ fontSize: '0.68rem' }}>{pendingItems.length} document{pendingItems.length > 1 ? 's' : ''} awaiting your approval</div>
               </div>
             </div>
             {pendingItems.map(p => (
               <div key={p.id} className="rounded-3 p-3 mb-2 d-flex align-items-start justify-content-between gap-3"
-                style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                style={{ background: 'var(--warning-soft)', border: '1px solid #fde68a' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="fw-semibold small">{p.title}</div>
                   {p.description && <div className="text-muted" style={{ fontSize: '0.72rem' }}>{p.description}</div>}
-                  <div className="d-flex align-items-center gap-2 mt-1 flex-wrap" style={{ fontSize: '0.68rem', color: '#6c757d' }}>
+                  <div className="d-flex align-items-center gap-2 mt-1 flex-wrap" style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                     <span><i className="bi bi-person-circle me-1" />Submitted by <strong>{p.submittedByName}</strong> ({(p.submittedByRole || '').toUpperCase()})</span>
                     <span><i className="bi bi-tag me-1" />{TABS.find(t => t.value === p.tab)?.label || p.tab}</span>
                     {p.url && <a href={p.url} target="_blank" rel="noreferrer" className="text-primary text-decoration-none"><i className="bi bi-link-45deg me-1" />View link</a>}
@@ -725,15 +725,15 @@ export default function BossKnowledgeBasePage() {
               className="d-inline-flex align-items-center gap-1 rounded-pill border px-3 py-1"
               style={{
                 fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
-                background: activeTab === tab.value ? '#1a1a2e' : '#f8f9fa',
-                color: activeTab === tab.value ? '#fff' : '#495057',
-                borderColor: activeTab === tab.value ? '#1a1a2e' : '#dee2e6',
+                background: activeTab === tab.value ? 'var(--accent)' : 'var(--surface-2)',
+                color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                borderColor: activeTab === tab.value ? 'var(--accent)' : 'var(--border-subtle)',
               }}
               onClick={() => { setActiveTab(tab.value); setSearch(''); setExpandedId(null); }}>
               <i className={`bi ${tab.icon}`} style={{ fontSize: '0.72rem' }} />
               {tab.label}
               {count > 0 && (
-                <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700, background: activeTab === tab.value ? 'rgba(255,255,255,0.2)' : '#dee2e6', color: activeTab === tab.value ? '#fff' : '#6c757d', lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
+                <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700, background: activeTab === tab.value ? 'rgba(255,255,255,0.25)' : 'var(--surface-3)', color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-muted)', lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
                   {count}
                 </span>
               )}
@@ -757,8 +757,8 @@ export default function BossKnowledgeBasePage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : tabItems.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-book text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
           <p className="fw-semibold text-dark mb-1">{search ? 'No matching documents' : 'No documents in this category'}</p>
@@ -774,19 +774,19 @@ export default function BossKnowledgeBasePage() {
                   <div className="d-flex align-items-start justify-content-between">
                     <div className="flex-grow-1">
                       <div className="d-flex align-items-center gap-2 mb-1">
-                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="fw-semibold small text-decoration-none" style={{ color: '#0d6efd' }}>
+                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="fw-semibold small text-decoration-none" style={{ color: 'var(--info)' }}>
                           <i className="bi bi-box-arrow-up-right me-1" style={{ fontSize: '0.68rem' }} />
                           {item.title}
                         </a>
                         {activeTab === 'all' && (() => { const t = TABS.find(x => x.value === item.tab); return t ? (
-                          <span className="badge rounded-pill" style={{ background: '#f0f1f5', color: '#6c757d', fontSize: '0.56rem', fontWeight: 500 }}>{t.label}</span>
+                          <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', fontSize: '0.56rem', fontWeight: 500 }}>{t.label}</span>
                         ) : null; })()}
                       </div>
                       {item.description && <p className="text-muted small mb-1" style={{ fontSize: '0.76rem' }}>{item.description}</p>}
                       <VideoEmbed url={item.url} />
                       <div className="d-flex align-items-center gap-2 flex-wrap" style={{ fontSize: '0.65rem', marginTop: 4 }}>
                         {item.version && (
-                          <span className="badge rounded-pill" style={{ background: '#f0fdf4', color: '#16a34a', fontSize: '0.6rem', border: '1px solid #bbf7d0' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.6rem', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
                             <i className="bi bi-tag-fill me-1" />{item.version}
                           </span>
                         )}
@@ -795,15 +795,15 @@ export default function BossKnowledgeBasePage() {
                           <span className="text-muted">· Updated by {item.updatedByName} on {formatDate(item.updatedAt)}</span>
                         )}
                         {(!item.visibility || item.visibility.type === 'everyone') && (
-                          <span className="badge rounded-pill" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.58rem' }}><i className="bi bi-globe me-1" />Everyone</span>
+                          <span className="badge rounded-pill" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.58rem' }}><i className="bi bi-globe me-1" />Everyone</span>
                         )}
                         {item.visibility?.type === 'roles' && (
-                          <span className="badge rounded-pill" style={{ background: '#f0ebff', color: '#6610f2', fontSize: '0.58rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'color-mix(in srgb, #6610f2 14%, transparent)', color: '#6610f2', fontSize: '0.58rem' }}>
                             <i className="bi bi-people me-1" />{(item.visibility.roles || []).map(r => ROLE_LABELS[r] || r).join(', ')}
                           </span>
                         )}
                         {item.visibility?.type === 'users' && (
-                          <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>
                             <i className="bi bi-person-check me-1" />{(item.visibility.userIds || []).length} user{(item.visibility.userIds || []).length !== 1 ? 's' : ''}
                           </span>
                         )}
@@ -909,7 +909,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -924,7 +924,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
           </div>
 
           {pendingDoc.url && (
-            <div className="rounded-2 p-2 mb-3 d-flex align-items-center gap-2" style={{ background: '#f0f4ff', border: '1px solid #c5d5ff', fontSize: '0.78rem' }}>
+            <div className="rounded-2 p-2 mb-3 d-flex align-items-center gap-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.78rem' }}>
               <i className="bi bi-link-45deg text-primary" />
               <a href={pendingDoc.url} target="_blank" rel="noreferrer" className="text-primary text-decoration-none text-truncate">{pendingDoc.url}</a>
             </div>
@@ -941,9 +941,9 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
                 className="d-inline-flex align-items-center gap-1 rounded-pill border"
                 style={{
                   fontSize: '0.78rem', fontWeight: 600, padding: '5px 12px',
-                  background: visType === v.value ? '#1a1a2e' : '#f8f9fa',
-                  color: visType === v.value ? '#fff' : '#495057',
-                  borderColor: visType === v.value ? '#1a1a2e' : '#dee2e6',
+                  background: visType === v.value ? 'var(--accent)' : 'var(--surface-2)',
+                  color: visType === v.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                  borderColor: visType === v.value ? 'var(--accent)' : 'var(--border-subtle)',
                   cursor: 'pointer',
                 }}>
                 <i className={`bi ${v.icon}`} style={{ fontSize: '0.72rem' }} />{v.label}
@@ -952,7 +952,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
           </div>
 
           {visType === 'roles' && (
-            <div className="rounded-2 p-3 mb-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+            <div className="rounded-2 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               <div className="d-flex gap-2 flex-wrap">
                 {VIS_ROLE_OPTIONS.map(({ value, label }) => {
                   const sel = visRoles.includes(value);
@@ -961,8 +961,8 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
                       className="d-inline-flex align-items-center gap-1 rounded-pill border"
                       style={{
                         fontSize: '0.76rem', fontWeight: 600, padding: '5px 12px',
-                        background: sel ? '#0d6efd' : '#fff', color: sel ? '#fff' : '#0d6efd',
-                        borderColor: sel ? '#0d6efd' : '#0d6efd55', cursor: 'pointer',
+                        background: sel ? 'var(--info)' : 'var(--surface-1)', color: sel ? 'var(--text-inverse)' : 'var(--info)',
+                        borderColor: sel ? 'var(--info)' : 'color-mix(in srgb, var(--info) 35%, transparent)', cursor: 'pointer',
                       }}>
                       <i className={`bi ${sel ? 'bi-check-circle-fill' : 'bi-circle'}`} style={{ fontSize: '0.65rem' }} />{label}
                     </button>
@@ -973,7 +973,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
           )}
 
           {visType === 'users' && (
-            <div className="rounded-2 p-3 mb-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+            <div className="rounded-2 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               <input type="text" className="form-control form-control-sm mb-2" placeholder="Search users…"
                 value={userSearch} onChange={e => setUserSearch(e.target.value)} style={{ borderRadius: 8 }} />
               {visUserIds.length > 0 && (
@@ -982,7 +982,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
                     const u = allUsers.find(x => x.id === uid);
                     return (
                       <span key={uid} className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                        style={{ background: '#e8f0fe', border: '1px solid #c5d5ff', fontSize: '0.68rem', fontWeight: 500, color: '#0d6efd' }}>
+                        style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.68rem', fontWeight: 500, color: 'var(--info)' }}>
                         {u ? (u.displayName || u.userName || u.email) : uid}
                         <i className="bi bi-x" style={{ cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => toggleUser(uid)} />
                       </span>
@@ -996,7 +996,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
                   const name = u.displayName || u.userName || u.email;
                   return (
                     <div key={u.id} className="d-flex align-items-center gap-2 rounded-2 p-2 mb-1"
-                      style={{ background: sel ? '#e8f0fe' : '#fff', border: `1px solid ${sel ? '#c5d5ff' : '#e9ecef'}`, cursor: 'pointer' }}
+                      style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                       onClick={() => toggleUser(u.id)}>
                       <input type="checkbox" className="form-check-input flex-shrink-0" checked={sel} readOnly />
                       <span className="fw-medium text-truncate" style={{ fontSize: '0.75rem' }}>{name}</span>

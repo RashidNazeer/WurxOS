@@ -14,21 +14,21 @@ function GroupBlock({ title, subtitle, groups, onDelete, deletingId }) {
     <div className="mb-4">
       <div className="d-flex align-items-center gap-2 mb-2">
         <h6 className="fw-bold mb-0 small">{title}</h6>
-        <span className="badge rounded-pill" style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.65rem' }}>
+        <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.65rem' }}>
           {groups.length} group{groups.length === 1 ? '' : 's'}
         </span>
       </div>
       {subtitle && <div className="text-muted small mb-2" style={{ fontSize: '0.72rem' }}>{subtitle}</div>}
       <div className="d-flex flex-column gap-2">
         {groups.map(g => (
-          <div key={g.key} className="rounded-3 p-2" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
-            <div className="small text-muted mb-1" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>
+          <div key={g.key} className="rounded-3 p-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+            <div className="small mb-1" style={{ fontSize: '0.7rem', wordBreak: 'break-all', color: 'var(--text-muted)' }}>
               <i className="bi bi-collection me-1" /><code>{g.key}</code> · {g.list.length} copies
             </div>
             <div className="d-flex flex-column gap-1">
               {g.list.map(it => (
                 <div key={it.id} className="rounded-2 d-flex align-items-center gap-2 p-2"
-                  style={{ background: '#fff', border: '1px solid #fde68a' }}>
+                  style={{ background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="fw-semibold text-truncate" style={{ fontSize: '0.82rem' }}>{it.title || '(untitled)'}</div>
                     <div className="text-muted d-flex flex-wrap gap-2" style={{ fontSize: '0.68rem' }}>
@@ -37,7 +37,7 @@ function GroupBlock({ title, subtitle, groups, onDelete, deletingId }) {
                       {it.createdByName && <span><i className="bi bi-person me-1" />{it.createdByName}</span>}
                       {it.createdAt && <span><i className="bi bi-calendar3 me-1" />{formatDate(it.createdAt)}</span>}
                       {it.approvalStatus && it.approvalStatus !== 'approved' && (
-                        <span className="badge" style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.6rem' }}>{it.approvalStatus}</span>
+                        <span className="badge" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.6rem' }}>{it.approvalStatus}</span>
                       )}
                     </div>
                     {it.url && (
@@ -89,10 +89,10 @@ export default function DuplicateCheckerModal({ items, onClose }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 780, zIndex: 1, borderRadius: 14, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="px-4 pt-4 pb-3 d-flex align-items-start justify-content-between" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <div className="px-4 pt-4 pb-3 d-flex align-items-start justify-content-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
             <h6 className="fw-bold mb-0 d-flex align-items-center gap-2">
-              <i className="bi bi-clipboard-check" style={{ color: '#d97706' }} />
+              <i className="bi bi-clipboard-check" style={{ color: 'var(--warning)' }} />
               Duplicate Checker
             </h6>
             <div className="text-muted small mt-1">
@@ -109,10 +109,10 @@ export default function DuplicateCheckerModal({ items, onClose }) {
 
         <div className="flex-grow-1 p-4" style={{ overflowY: 'auto' }}>
           {urlGroups.length === 0 && titleGroups.length === 0 ? (
-            <div className="rounded-3 p-4 text-center" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}>
-              <i className="bi bi-check-circle-fill" style={{ color: '#16a34a', fontSize: '2rem' }} />
-              <div className="fw-semibold mt-2" style={{ color: '#065f46' }}>No duplicates — you're clean.</div>
-              <div className="text-muted small">All {items?.length || 0} docs have unique URLs and titles.</div>
+            <div className="rounded-3 p-4 text-center" style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+              <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)', fontSize: '2rem' }} />
+              <div className="fw-semibold mt-2" style={{ color: 'var(--success)' }}>No duplicates — you're clean.</div>
+              <div className="small" style={{ color: 'var(--text-muted)' }}>All {items?.length || 0} docs have unique URLs and titles.</div>
             </div>
           ) : (
             <>
@@ -134,7 +134,7 @@ export default function DuplicateCheckerModal({ items, onClose }) {
           )}
         </div>
 
-        <div className="px-4 py-3 d-flex justify-content-end" style={{ borderTop: '1px solid #f1f5f9' }}>
+        <div className="px-4 py-3 d-flex justify-content-end" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Close</button>
         </div>
       </div>
