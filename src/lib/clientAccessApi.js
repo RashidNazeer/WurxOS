@@ -118,7 +118,18 @@ function friendly(code) {
   }
 }
 
-export function buildClientAccessUrl(token) {
+// Domain hosting v1 — Firebase Hosting redirects /client/<token> to
+// v2's /portal/access/<token>, so the v1 URL still works for the 32
+// historical links we synced over. Boss/OL sees the original v1 URL
+// for those rows so they don't accidentally re-share a URL the
+// client doesn't recognise.
+const V1_BASE = 'https://wurxos.web.app';
+
+export function buildClientAccessUrl(token, opts = {}) {
+  const { legacyV1 = false } = opts;
+  if (legacyV1) {
+    return `${V1_BASE}/client/${token}`;
+  }
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   return `${base}/portal/access/${token}`;
 }

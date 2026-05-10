@@ -49,7 +49,7 @@ export default function ClientAccessPage() {
   function openEdit(c)  { setEditLink(c);     setShowModal(true); }
 
   async function handleCopy(c) {
-    const url = buildClientAccessUrl(c.token);
+    const url = buildClientAccessUrl(c.token, { legacyV1: !!c.legacy_v1 });
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(c.id);
@@ -164,7 +164,7 @@ export default function ClientAccessPage() {
 
 // ── Card ──────────────────────────────────────────────────────────
 function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) {
-  const url = buildClientAccessUrl(link.token);
+  const url = buildClientAccessUrl(link.token, { legacyV1: !!link.legacy_v1 });
   const brandNames = (link.brand_ids || []).map(bid => {
     const br = brands.find(b => b.id === bid);
     return br ? br.brand_name : null;
@@ -243,6 +243,17 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
           )}
         </div>
 
+        {link.legacy_v1 && (
+          <div style={{
+            fontSize: 10.5, fontWeight: 700, color: '#92400e',
+            background: '#fef3c7', border: '1px solid #fde68a',
+            borderRadius: 999, padding: '2px 8px',
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            marginBottom: 6, alignSelf: 'flex-start',
+          }} title="This link was originally shared with the client from v1. The v1 URL still works — it redirects to the v2 portal automatically.">
+            <i className="bi bi-clock-history" style={{ fontSize: 9 }} /> Legacy v1 link
+          </div>
+        )}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: 8, borderRadius: 8,
