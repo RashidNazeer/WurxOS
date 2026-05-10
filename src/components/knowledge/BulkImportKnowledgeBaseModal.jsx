@@ -211,10 +211,10 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 820, zIndex: 1, borderRadius: 14, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="px-4 pt-4 pb-3 d-flex align-items-start justify-content-between" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <div className="px-4 pt-4 pb-3 d-flex align-items-start justify-content-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
             <h6 className="fw-bold mb-0 d-flex align-items-center gap-2">
-              <i className="bi bi-file-earmark-arrow-up" style={{ color: '#2563eb' }} />
+              <i className="bi bi-file-earmark-arrow-up" style={{ color: 'var(--info)' }} />
               Bulk Import Knowledge Base
             </h6>
             <div className="text-muted small mt-1">Paste CSV text or upload a .csv file. All rows are approved & visible by your rules.</div>
@@ -227,14 +227,14 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
 
         <div className="flex-grow-1 p-4" style={{ overflowY: 'auto' }}>
           {/* Format guide */}
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div className="fw-semibold small">CSV format</div>
               <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={downloadTemplate}>
                 <i className="bi bi-download" /> Download template
               </button>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
               Columns (in any order, header row required):
               <div className="mt-1">
                 <code>title, url, description, tab, version, visibilityType, roles, userEmails</code>
@@ -247,9 +247,9 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
                 <li><strong>userEmails</strong>: comma- or semicolon-separated emails resolved to the app's user accounts (when visibilityType=users)</li>
               </ul>
             </div>
-            <div className="mt-2 rounded-2 p-2 d-flex align-items-start gap-2" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-              <i className="bi bi-exclamation-triangle-fill" style={{ color: '#d97706', fontSize: '0.82rem', marginTop: 2 }} />
-              <div style={{ fontSize: '0.7rem', color: '#78350f', lineHeight: 1.5 }}>
+            <div className="mt-2 rounded-2 p-2 d-flex align-items-start gap-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+              <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--warning)', fontSize: '0.82rem', marginTop: 2 }} />
+              <div style={{ fontSize: '0.7rem', color: 'var(--warning)', lineHeight: 1.5 }}>
                 <strong>Excel tip:</strong> Excel trims <code>1.0</code> → <code>1</code> on numeric cells. To keep version strings intact, either use <code>v1.0</code> / <code>1.0.0</code>, format the Version column as <strong>Text</strong> before typing, prefix the value with an apostrophe (<code>'1.0</code>), or edit in Google Sheets.
               </div>
             </div>
@@ -290,19 +290,19 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
           {parsed && !parsed.headerError && (
             <div>
               <div className="d-flex gap-3 mb-2 small">
-                <span className="badge rounded-pill" style={{ background: '#dcfce7', color: '#15803d' }}>
+                <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
                   <i className="bi bi-check-circle me-1" />{parsed.validCount} valid
                 </span>
                 {parsed.invalidCount > 0 && (
-                  <span className="badge rounded-pill" style={{ background: '#fee2e2', color: '#b91c1c' }}>
+                  <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
                     <i className="bi bi-exclamation-triangle me-1" />{parsed.invalidCount} with errors
                   </span>
                 )}
               </div>
 
-              <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
                 <table className="table table-sm mb-0" style={{ fontSize: '0.72rem' }}>
-                  <thead style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
+                  <thead style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
                     <tr>
                       <th style={{ width: 40 }}>Line</th>
                       <th>Title</th>
@@ -313,19 +313,19 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
                   </thead>
                   <tbody>
                     {parsed.rows.map(r => (
-                      <tr key={r.lineNumber} style={{ background: r.ok ? '#fff' : '#fff7f7' }}>
+                      <tr key={r.lineNumber} style={{ background: r.ok ? 'var(--surface-1)' : 'var(--danger-soft)' }}>
                         <td>{r.lineNumber}</td>
-                        <td>{r.raw.title || <span className="text-muted">—</span>}</td>
+                        <td>{r.raw.title || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                         <td><code>{r.raw.tab}</code></td>
                         <td>
                           <code>{r.raw.visibilityType}</code>
-                          {r.raw.visibilityType === 'roles' && r.raw.roles && <span className="ms-1 text-muted">{r.raw.roles}</span>}
-                          {r.raw.visibilityType === 'users' && r.raw.userEmails && <span className="ms-1 text-muted">{r.raw.userEmails}</span>}
+                          {r.raw.visibilityType === 'roles' && r.raw.roles && <span className="ms-1" style={{ color: 'var(--text-muted)' }}>{r.raw.roles}</span>}
+                          {r.raw.visibilityType === 'users' && r.raw.userEmails && <span className="ms-1" style={{ color: 'var(--text-muted)' }}>{r.raw.userEmails}</span>}
                         </td>
                         <td>
                           {r.ok
-                            ? <span style={{ color: '#15803d' }}>✓ OK</span>
-                            : <span style={{ color: '#b91c1c' }}>✗ {r.errors.join('; ')}</span>}
+                            ? <span style={{ color: 'var(--success)' }}>✓ OK</span>
+                            : <span style={{ color: 'var(--danger)' }}>✗ {r.errors.join('; ')}</span>}
                         </td>
                       </tr>
                     ))}
@@ -344,7 +344,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
           )}
         </div>
 
-        <div className="px-4 py-3 d-flex justify-content-end gap-2" style={{ borderTop: '1px solid #f1f5f9' }}>
+        <div className="px-4 py-3 d-flex justify-content-end gap-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Close</button>
         </div>
       </div>
