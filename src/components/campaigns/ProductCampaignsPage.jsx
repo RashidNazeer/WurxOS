@@ -19,10 +19,12 @@ import {
   removeProductCampaign,
 } from '../../lib/productCampaignsApiV1';
 
+// `bg` uses translucent semantic-soft tokens so the tile reads on
+// both light and dark surfaces. `color` is the brand text color.
 const PROMO_TYPES = [
-  { key: 'individual',  label: 'Individual Product Promotion', icon: 'bi-tag',      color: '#0d6efd', bg: '#e8f0fe' },
-  { key: 'cart_level',  label: 'Cart Level Promotion',         icon: 'bi-cart',     color: '#198754', bg: '#e6f4ea' },
-  { key: 'coupon',      label: 'Coupon',                       icon: 'bi-ticket-perforated', color: '#6610f2', bg: '#f0ebff' },
+  { key: 'individual',  label: 'Individual Product Promotion', icon: 'bi-tag',                color: 'var(--info)',    bg: 'var(--info-soft)' },
+  { key: 'cart_level',  label: 'Cart Level Promotion',         icon: 'bi-cart',               color: 'var(--success)', bg: 'var(--success-soft)' },
+  { key: 'coupon',      label: 'Coupon',                       icon: 'bi-ticket-perforated',  color: '#6610f2',        bg: 'color-mix(in srgb, #6610f2 14%, transparent)' },
 ];
 
 function getPromoCfg(type) { return PROMO_TYPES.find(p => p.key === type) || PROMO_TYPES[0]; }
@@ -279,7 +281,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 14, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0', flexShrink: 0 }}>
           <div>
@@ -310,7 +312,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
               )}
             </div>
           ) : (
-            <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3" style={{ background: '#f8f9fa' }}>
+            <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3" style={{ background: 'var(--surface-2)' }}>
               <div>
                 <div className="fw-bold small">{selectedProduct?.productName}</div>
                 <div className="text-muted" style={{ fontSize: '0.68rem' }}>
@@ -322,7 +324,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
 
           {/* Selected product info */}
           {!isEdit && selectedProduct && (
-            <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+            <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3" style={{ background: 'var(--success-soft)', border: '1px solid #bbf7d0' }}>
               <i className="bi bi-check-circle-fill text-success" />
               <div>
                 <div className="fw-bold small">{selectedProduct.productName}</div>
@@ -340,7 +342,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
           </button>
 
           {showPaste && (
-            <div className="card border-0 rounded-3 mb-3" style={{ background: '#f0f4ff', border: '1px solid #c5d5ff' }}>
+            <div className="card border-0 rounded-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid #c5d5ff' }}>
               <div className="card-body p-3">
                 <textarea className="form-control form-control-sm mb-2" rows={6} value={pasteText}
                   onChange={e => setPasteText(e.target.value)}
@@ -350,7 +352,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
                 </button>
 
                 {parsed && (
-                  <div className="mt-3 rounded-2 p-3" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+                  <div className="mt-3 rounded-2 p-3" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
                     <div className="small fw-semibold mb-2">Parsed Data:</div>
                     {parsed.promotions.map((p, i) => (
                       <div key={i} className="small mb-1">
@@ -385,7 +387,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
           {promotions.map((p, i) => {
             const cfg = getPromoCfg(p.type);
             return (
-              <div key={i} className="card border-0 rounded-3 mb-2" style={{ background: '#f8f9fa' }}>
+              <div key={i} className="card border-0 rounded-3 mb-2" style={{ background: 'var(--surface-2)' }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center justify-content-between mb-2">
                     <select className="form-select form-select-sm" style={{ width: 'auto', fontSize: '0.78rem' }}
@@ -417,7 +419,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
 
           {/* Final price preview (primary) */}
           {retailPrice > 0 && promotions.length > 0 && (
-            <div className="rounded-3 p-3 mb-3 d-flex align-items-center justify-content-between" style={{ background: '#0f172a', color: '#fff' }}>
+            <div className="rounded-3 p-3 mb-3 d-flex align-items-center justify-content-between" style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}>
               <div>
                 <div className="small fw-semibold">Final Price</div>
                 <div className="text-muted" style={{ fontSize: '0.62rem' }}>Primary product</div>
@@ -446,7 +448,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
                   {skus.map((s, idx) => {
                     const sFinal = computeSkuFinalPrice(promotions, s);
                     return (
-                      <div key={s.id || idx} className="rounded-3 p-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div key={s.id || idx} className="rounded-3 p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                         <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
                           <div>
                             <div className="fw-bold" style={{ fontSize: '0.82rem' }}>{s.skuName || 'Unnamed SKU'}</div>
@@ -457,7 +459,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
                           {parseFloat(s.retailPrice) > 0 && (
                             <div className="text-end">
                               <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>Final</div>
-                              <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#198754' }}>${sFinal.toFixed(2)}</div>
+                              <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--success)' }}>${sFinal.toFixed(2)}</div>
                             </div>
                           )}
                         </div>
@@ -655,7 +657,7 @@ export default function ProductCampaignsPage() {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Product Campaigns</h4>
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Product Campaigns</h4>
           <p className="text-muted small mb-0">{products.length} campaign{products.length !== 1 ? 's' : ''} across {brands.length} brand{brands.length !== 1 ? 's' : ''}</p>
         </div>
         <button className="btn btn-dark btn-sm d-inline-flex align-items-center gap-1" onClick={openAdd}>
@@ -708,10 +710,10 @@ export default function ProductCampaignsPage() {
           <span className="spinner-border spinner-border-sm" /> Loading...
         </div>
       ) : products.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 12 }}>
-          <i className="bi bi-megaphone" style={{ fontSize: '2.5rem', color: '#cbd5e1' }} />
-          <p className="fw-semibold text-dark mt-3 mb-1">No campaigns yet</p>
-          <p className="text-muted small mb-3">Add your first product campaign to track promotions and expiry dates.</p>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 12 }}>
+          <i className="bi bi-megaphone" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
+          <p className="fw-semibold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>No campaigns yet</p>
+          <p className="small mb-3" style={{ color: 'var(--text-muted)' }}>Add your first product campaign to track promotions and expiry dates.</p>
           <button className="btn btn-dark btn-sm" onClick={openAdd}>Add Campaign</button>
         </div>
       ) : (
@@ -729,7 +731,7 @@ export default function ProductCampaignsPage() {
             return (
               <div key={`${p._brandId}-${p.id}`} className="col-md-6 col-lg-4">
                 <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
-                  <div style={{ height: 4, background: urgent ? '#ef4444' : activePromos.length > 0 ? '#22c55e' : '#94a3b8' }} />
+                  <div style={{ height: 4, background: urgent ? 'var(--danger)' : activePromos.length > 0 ? 'var(--success)' : 'var(--text-muted)' }} />
                   <div className="card-body p-4">
                     {/* Header */}
                     <div className="d-flex align-items-start justify-content-between mb-2">
@@ -737,7 +739,7 @@ export default function ProductCampaignsPage() {
                         <div className="fw-bold text-truncate" style={{ fontSize: '0.92rem' }}>{p.productName}</div>
                         <div className="text-muted" style={{ fontSize: '0.7rem' }}>{p._brandName}</div>
                         {p.addedByName && (
-                          <div className="d-inline-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.62rem', color: '#64748b' }}>
+                          <div className="d-inline-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.62rem', color: 'var(--text-secondary)' }}>
                             <i className="bi bi-person-circle" />
                             <span>Added by <span className="fw-medium">{p.addedByName}</span></span>
                             {p.addedByRole && (
@@ -760,19 +762,19 @@ export default function ProductCampaignsPage() {
 
                     {/* Badges */}
                     <div className="d-flex gap-1 flex-wrap mb-3">
-                      <span className="badge rounded-pill" style={{ background: p.type === 'focus' ? '#fef3c7' : '#f3f4f6', color: p.type === 'focus' ? '#92400e' : '#6c757d', fontSize: '0.62rem' }}>
+                      <span className="badge rounded-pill" style={{ background: p.type === 'focus' ? 'var(--warning-soft)' : 'var(--surface-2)', color: p.type === 'focus' ? 'var(--warning)' : 'var(--text-muted)', fontSize: '0.62rem' }}>
                         {p.type === 'focus' ? 'Focus' : 'Non-Focus'}
                       </span>
                       {p.productId && (
                         <span className="badge rounded-pill bg-light text-muted border" style={{ fontSize: '0.6rem' }}>ID: {p.productId}</span>
                       )}
                       {(p.skus || []).length > 0 && (
-                        <span className="badge rounded-pill" style={{ background: '#eef2ff', color: '#4338ca', fontSize: '0.62rem', border: '1px solid #c7d2fe' }}>
+                        <span className="badge rounded-pill" style={{ background: 'color-mix(in srgb, #4338ca 14%, transparent)', color: '#4338ca', fontSize: '0.62rem', border: '1px solid color-mix(in srgb, #4338ca 35%, transparent)' }}>
                           <i className="bi bi-stack me-1" />{p.skus.length} SKU{p.skus.length !== 1 ? 's' : ''}
                         </span>
                       )}
                       {urgent && (
-                        <span className="badge rounded-pill" style={{ background: '#fff0f0', color: '#dc3545', fontSize: '0.62rem', border: '1px solid #fecaca' }}>
+                        <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.62rem', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
                           <i className="bi bi-exclamation-triangle me-1" />{soonestEnd <= 0 ? 'Expired' : `${soonestEnd}d left`}
                         </span>
                       )}
@@ -788,8 +790,8 @@ export default function ProductCampaignsPage() {
                       </div>
                       {activePromos.length > 0 && (
                         <div>
-                          <div style={{ fontSize: '0.62rem', fontWeight: 600, color: '#198754' }}>CURRENT</div>
-                          <div className="fw-bold" style={{ fontSize: '1.1rem', color: '#198754' }}>${finalPrice.toFixed(2)}</div>
+                          <div style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--success)' }}>CURRENT</div>
+                          <div className="fw-bold" style={{ fontSize: '1.1rem', color: 'var(--success)' }}>${finalPrice.toFixed(2)}</div>
                         </div>
                       )}
                     </div>
@@ -801,19 +803,19 @@ export default function ProductCampaignsPage() {
                       const days = daysUntil(pr.endDate);
                       return (
                         <div key={i} className="d-flex align-items-center gap-2 rounded-2 p-2 mb-1"
-                          style={{ background: isExpired ? '#f3f4f6' : cfg.bg, opacity: isExpired ? 0.5 : 1, fontSize: '0.75rem' }}>
+                          style={{ background: isExpired ? 'var(--surface-2)' : cfg.bg, opacity: isExpired ? 0.55 : 1, fontSize: '0.75rem' }}>
                           <i className={`bi ${cfg.icon}`} style={{ color: cfg.color, fontSize: '0.7rem' }} />
                           <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                            <div className="fw-medium text-truncate" style={{ color: isExpired ? '#6c757d' : cfg.color }}>
+                            <div className="fw-medium text-truncate" style={{ color: isExpired ? 'var(--text-muted)' : cfg.color }}>
                               {pr.name || cfg.label}
                             </div>
                             {pr.endDate && (
-                              <div className="text-muted" style={{ fontSize: '0.65rem' }}>
-                                Ends {pr.endDate} {!isExpired && days <= 2 && days >= 0 && <span className="text-danger fw-bold">({days}d left!)</span>}
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                Ends {pr.endDate} {!isExpired && days <= 2 && days >= 0 && <span className="fw-bold" style={{ color: 'var(--danger)' }}>({days}d left!)</span>}
                               </div>
                             )}
                           </div>
-                          <span className="fw-bold flex-shrink-0" style={{ color: isExpired ? '#6c757d' : '#dc3545' }}>
+                          <span className="fw-bold flex-shrink-0" style={{ color: isExpired ? 'var(--text-muted)' : 'var(--danger)' }}>
                             −${(pr.discount || 0).toFixed(2)}
                           </span>
                         </div>
@@ -826,7 +828,7 @@ export default function ProductCampaignsPage() {
 
                     {/* SKU variants — each with its own final price */}
                     {(p.skus || []).length > 0 && (
-                      <div className="mt-3 pt-3" style={{ borderTop: '1px dashed #e2e8f0' }}>
+                      <div className="mt-3 pt-3" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
                         <div className="d-flex align-items-center gap-1 mb-2">
                           <i className="bi bi-stack" style={{ fontSize: '0.7rem', color: '#4338ca' }} />
                           <span className="fw-semibold text-muted text-uppercase" style={{ fontSize: '0.6rem', letterSpacing: '0.06em' }}>
@@ -838,7 +840,7 @@ export default function ProductCampaignsPage() {
                           const hasActive = (p.promotions || []).some(pr => pr.status === 'active');
                           return (
                             <div key={s.id} className="d-flex align-items-center justify-content-between rounded-2 px-2 py-1 mb-1"
-                              style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                               <div className="text-truncate" style={{ minWidth: 0, fontSize: '0.75rem', fontWeight: 500 }}>
                                 {s.skuName || 'Unnamed SKU'}
                               </div>
@@ -847,7 +849,7 @@ export default function ProductCampaignsPage() {
                                   ${(s.retailPrice || 0).toFixed(2)}
                                 </span>
                                 {hasActive && (
-                                  <span className="fw-bold" style={{ fontSize: '0.82rem', color: '#198754' }}>
+                                  <span className="fw-bold" style={{ fontSize: '0.82rem', color: 'var(--success)' }}>
                                     ${sFinal.toFixed(2)}
                                   </span>
                                 )}
@@ -904,7 +906,7 @@ function BrandPickerModal({ brands, onPick, onClose }) {
   );
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg"
         style={{ position: 'relative', width: '100%', maxWidth: 380, zIndex: 1, borderRadius: 14, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0', flexShrink: 0 }}>

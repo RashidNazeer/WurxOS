@@ -20,11 +20,13 @@ import {
 
 const STATUS_OPTIONS = ['Ongoing', 'Upcoming', 'Ended', 'Deactivated'];
 
+// Translucent fills work in both themes; pair with semantic tokens
+// for text so it stays readable on light AND dark surfaces.
 const STATUS_STYLE = {
-  Ongoing:     { bg: 'rgba(34,197,94,0.12)',   color: '#15803d', border: 'rgba(34,197,94,0.3)'   },
-  Upcoming:    { bg: 'rgba(59,130,246,0.12)',  color: '#1d4ed8', border: 'rgba(59,130,246,0.3)'  },
-  Ended:       { bg: 'rgba(107,114,128,0.10)', color: '#6b7280', border: 'rgba(107,114,128,0.25)' },
-  Deactivated: { bg: 'rgba(239,68,68,0.10)',   color: '#dc2626', border: 'rgba(239,68,68,0.25)'  },
+  Ongoing:     { bg: 'rgba(34,197,94,0.16)',   color: 'var(--success)',    border: 'rgba(34,197,94,0.40)'  },
+  Upcoming:    { bg: 'rgba(59,130,246,0.16)',  color: 'var(--info)',       border: 'rgba(59,130,246,0.40)' },
+  Ended:       { bg: 'rgba(107,114,128,0.18)', color: 'var(--text-muted)', border: 'rgba(107,114,128,0.35)' },
+  Deactivated: { bg: 'rgba(239,68,68,0.16)',   color: 'var(--danger)',     border: 'rgba(239,68,68,0.35)'  },
 };
 
 const EMPTY_FORM = {
@@ -43,19 +45,19 @@ const STYLES = `
     border-radius: 4px;
   }
   .ct-paste-table input:focus, .ct-paste-table select:focus {
-    background: #fff !important;
-    border-color: #93c5fd !important;
+    background: var(--input-bg) !important;
+    border-color: var(--accent) !important;
     outline: none;
     box-shadow: 0 0 0 2px rgba(59,130,246,0.15) !important;
   }
   .ct-days-badge { display: inline-block; border-radius: 9999px; padding: 1px 8px; font-size: 0.72rem; font-weight: 600; }
   .ct-modal-tab-btn {
     border: none; background: none; padding: 8px 16px;
-    font-size: 0.83rem; font-weight: 500; color: #94a3b8;
+    font-size: 0.83rem; font-weight: 500; color: var(--text-muted);
     border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s;
   }
-  .ct-modal-tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 600; }
-  .ct-modal-tab-btn:hover:not(.active) { color: #475569; }
+  .ct-modal-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .ct-modal-tab-btn:hover:not(.active) { color: var(--text-secondary); }
 `;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -211,12 +213,14 @@ function DaysLeftBadge({ ts, status }) {
   const days = daysUntil(ts);
   if (days === null) return <span className="text-muted">—</span>;
 
+  // Translucent fills work in both themes; pair them with semantic
+  // tokens so the text is readable on light AND dark surfaces.
   const [bg, color] =
-    days <= 0  ? ['rgba(239,68,68,0.12)',   '#dc2626'] :
-    days <= 1  ? ['rgba(239,68,68,0.12)',   '#dc2626'] :
-    days <= 3  ? ['rgba(249,115,22,0.12)',  '#ea580c'] :
-    days <= 7  ? ['rgba(234,179,8,0.12)',   '#ca8a04'] :
-               ['rgba(34,197,94,0.12)',    '#16a34a'];
+    days <= 0  ? ['rgba(239,68,68,0.18)',  'var(--danger)']  :
+    days <= 1  ? ['rgba(239,68,68,0.18)',  'var(--danger)']  :
+    days <= 3  ? ['rgba(249,115,22,0.18)', 'var(--warning)'] :
+    days <= 7  ? ['rgba(234,179,8,0.18)',  'var(--warning)'] :
+                 ['rgba(34,197,94,0.18)',  'var(--success)'];
 
   return (
     <span className="ct-days-badge" style={{ background: bg, color }}>
@@ -491,7 +495,7 @@ export default function CampaignTrackerPage() {
       {/* ── Header ── */}
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
-          <h4 className="mb-1 fw-bold" style={{ color: '#1e293b' }}>Campaign Tracker</h4>
+          <h4 className="mb-1 fw-bold" style={{ color: 'var(--text-primary)' }}>Campaign Tracker</h4>
           <p className="mb-0 text-muted" style={{ fontSize: '0.82rem' }}>
             Track promotions across brands and get reminders before they expire.
           </p>
@@ -510,7 +514,7 @@ export default function CampaignTrackerPage() {
           {/* Search bar */}
           <div className="position-relative mb-2">
             <i className="bi bi-search position-absolute"
-              style={{ left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '0.82rem' }} />
+              style={{ left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.82rem' }} />
             <input
               className="form-control form-control-sm"
               placeholder="Search campaigns by name..."
@@ -544,7 +548,7 @@ export default function CampaignTrackerPage() {
 
             {/* Start time filter */}
             <div className="d-flex align-items-center gap-1">
-              <span style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap' }}>Start from</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Start from</span>
               <input
                 type="date"
                 className="form-control form-control-sm"
@@ -556,7 +560,7 @@ export default function CampaignTrackerPage() {
 
             {/* End time filter */}
             <div className="d-flex align-items-center gap-1">
-              <span style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap' }}>End by</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>End by</span>
               <input
                 type="date"
                 className="form-control form-control-sm"
@@ -601,9 +605,9 @@ export default function CampaignTrackerPage() {
           <div className="table-responsive">
             <table className="table table-hover mb-0" style={{ fontSize: '0.83rem' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)' }}>
                   {['Brand', 'Promotion Name', 'Status', 'Start Time', 'End Time', 'Type', 'Days Left', ''].map(h => (
-                    <th key={h} className="px-3 py-2 fw-semibold" style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} className="px-3 py-2 fw-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -625,7 +629,7 @@ export default function CampaignTrackerPage() {
                           <div className="text-muted text-truncate" style={{ fontSize: '0.72rem' }}>{c.notes}</div>
                         )}
                         {c.addedByName && (
-                          <div className="d-inline-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          <div className="d-inline-flex align-items-center gap-1 mt-1" style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
                             <i className="bi bi-person-circle" />
                             <span>Added by <span className="fw-medium">{c.addedByName}</span></span>
                             {c.addedByRole && (
@@ -654,7 +658,7 @@ export default function CampaignTrackerPage() {
                       <td className="px-3 py-2" style={{ whiteSpace: 'nowrap' }}>
                         {deleteId === c.id ? (
                           <div className="d-flex align-items-center gap-1">
-                            <span style={{ fontSize: '0.72rem', color: '#dc2626' }}>Delete?</span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Delete?</span>
                             <button
                               className="btn btn-danger btn-sm py-0 px-2"
                               style={{ fontSize: '0.72rem' }}
@@ -698,7 +702,7 @@ export default function CampaignTrackerPage() {
           Add / Edit Modal
       ══════════════════════════════════════════════════════════════════════ */}
       {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.45)', zIndex: 1050 }}>
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.55)', zIndex: 1050 }}>
           <div className="modal-dialog modal-lg modal-dialog-scrollable" style={{ maxWidth: modalTab === 'paste' && pasteRows ? 860 : 600 }}>
             <div className="modal-content">
 
@@ -896,22 +900,22 @@ export default function CampaignTrackerPage() {
                         ) : (
                           <div style={{ overflowX: 'auto' }}>
                             <table className="table table-sm table-bordered ct-paste-table mb-0" style={{ minWidth: 700 }}>
-                              <thead style={{ background: '#f8fafc' }}>
+                              <thead style={{ background: 'var(--surface-2)' }}>
                                 <tr>
-                                  <th style={{ width: 30, textAlign: 'center', fontSize: '0.72rem', color: '#64748b' }}>#</th>
-                                  <th style={{ fontSize: '0.72rem', color: '#64748b' }}>Promotion Name</th>
-                                  <th style={{ width: 130, fontSize: '0.72rem', color: '#64748b' }}>Status</th>
-                                  <th style={{ width: 165, fontSize: '0.72rem', color: '#64748b' }}>Start Time</th>
-                                  <th style={{ width: 165, fontSize: '0.72rem', color: '#64748b' }}>End Time</th>
-                                  <th style={{ width: 115, fontSize: '0.72rem', color: '#64748b' }}>Type</th>
-                                  <th style={{ width: 115, fontSize: '0.72rem', color: '#64748b' }}>Notes</th>
+                                  <th style={{ width: 30, textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>#</th>
+                                  <th style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Promotion Name</th>
+                                  <th style={{ width: 130, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Status</th>
+                                  <th style={{ width: 165, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Start Time</th>
+                                  <th style={{ width: 165, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>End Time</th>
+                                  <th style={{ width: 115, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Type</th>
+                                  <th style={{ width: 115, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Notes</th>
                                   <th style={{ width: 32 }} />
                                 </tr>
                               </thead>
                               <tbody>
                                 {pasteRows.map((row, i) => (
                                   <tr key={i}>
-                                    <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem' }}>{i + 1}</td>
+                                    <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.72rem' }}>{i + 1}</td>
                                     <td>
                                       <input
                                         value={row.promotionName}
@@ -958,7 +962,7 @@ export default function CampaignTrackerPage() {
                                     <td style={{ textAlign: 'center' }}>
                                       <button
                                         className="btn btn-link p-0"
-                                        style={{ color: '#ef4444', lineHeight: 1 }}
+                                        style={{ color: 'var(--danger)', lineHeight: 1 }}
                                         onClick={() => updatePasteRow(i, '__delete__')}
                                         title="Remove row"
                                       >

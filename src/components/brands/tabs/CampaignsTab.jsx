@@ -13,10 +13,10 @@ import {
 const STATUS_OPTIONS = ['Ongoing', 'Upcoming', 'Ended', 'Deactivated'];
 
 const STATUS_STYLE = {
-  Ongoing:     { bg: 'rgba(34,197,94,0.12)',   color: '#15803d', border: 'rgba(34,197,94,0.3)'    },
-  Upcoming:    { bg: 'rgba(59,130,246,0.12)',  color: '#1d4ed8', border: 'rgba(59,130,246,0.3)'   },
-  Ended:       { bg: 'rgba(107,114,128,0.10)', color: '#6b7280', border: 'rgba(107,114,128,0.25)' },
-  Deactivated: { bg: 'rgba(239,68,68,0.10)',   color: '#dc2626', border: 'rgba(239,68,68,0.25)'   },
+  Ongoing:     { bg: 'rgba(34,197,94,0.16)',   color: 'var(--success)',    border: 'rgba(34,197,94,0.40)'  },
+  Upcoming:    { bg: 'rgba(59,130,246,0.16)',  color: 'var(--info)',       border: 'rgba(59,130,246,0.40)' },
+  Ended:       { bg: 'rgba(107,114,128,0.18)', color: 'var(--text-muted)', border: 'rgba(107,114,128,0.35)' },
+  Deactivated: { bg: 'rgba(239,68,68,0.16)',   color: 'var(--danger)',     border: 'rgba(239,68,68,0.35)'  },
 };
 
 const EMPTY_FORM = {
@@ -47,11 +47,11 @@ function DaysLeftBadge({ ts, status }) {
     const end = ts.toDate ? ts.toDate() : new Date(ts);
     const days = Math.ceil((end - new Date()) / (1000 * 60 * 60 * 24));
     const [bg, color] =
-      days <= 0 ? ['rgba(239,68,68,0.12)',   '#dc2626'] :
-      days <= 1 ? ['rgba(239,68,68,0.12)',   '#dc2626'] :
-      days <= 3 ? ['rgba(249,115,22,0.12)',  '#ea580c'] :
-      days <= 7 ? ['rgba(234,179,8,0.12)',   '#ca8a04'] :
-                  ['rgba(34,197,94,0.12)',   '#16a34a'];
+      days <= 0 ? ['rgba(239,68,68,0.18)',  'var(--danger)']  :
+      days <= 1 ? ['rgba(239,68,68,0.18)',  'var(--danger)']  :
+      days <= 3 ? ['rgba(249,115,22,0.18)', 'var(--warning)'] :
+      days <= 7 ? ['rgba(234,179,8,0.18)',  'var(--warning)'] :
+                  ['rgba(34,197,94,0.18)',  'var(--success)'];
     return (
       <span style={{ display:'inline-block', borderRadius:9999, padding:'1px 8px', fontSize:'0.72rem', fontWeight:600, background:bg, color }}>
         {days <= 0 ? 'Today' : `${days}d`}
@@ -221,7 +221,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
       {/* ── Header ── */}
       <div className="d-flex align-items-center justify-content-between mb-3">
         <div>
-          <h5 className="mb-0 fw-bold" style={{ color: '#1e293b' }}>Campaigns</h5>
+          <h5 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>Campaigns</h5>
           <p className="mb-0 text-muted" style={{ fontSize: '0.82rem' }}>
             {campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''} for {brand.brandName}
           </p>
@@ -247,7 +247,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
       <div className="d-flex gap-2 mb-3 flex-wrap align-items-center">
         <div className="position-relative flex-grow-1" style={{ minWidth: 180 }}>
           <i className="bi bi-search position-absolute"
-            style={{ left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '0.8rem' }} />
+            style={{ left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }} />
           <input
             className="form-control form-control-sm"
             placeholder="Search campaigns..."
@@ -295,7 +295,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
           <div className="table-responsive">
             <table className="table table-hover mb-0" style={{ fontSize: '0.83rem' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)' }}>
                   <th className="px-3 py-2" style={{ width: 36 }}>
                     <input
                       type="checkbox"
@@ -306,7 +306,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
                     />
                   </th>
                   {['Promotion Name', 'Status', 'Start Time', 'End Time', 'Type', 'Days Left', ''].map(h => (
-                    <th key={h} className="px-3 py-2 fw-semibold" style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} className="px-3 py-2 fw-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -348,7 +348,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
                       <td className="px-3 py-2" style={{ whiteSpace: 'nowrap' }}>
                         {deleteId === c.id ? (
                           <div className="d-flex align-items-center gap-1">
-                            <span style={{ fontSize: '0.72rem', color: '#dc2626' }}>Delete?</span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>Delete?</span>
                             <button className="btn btn-danger btn-sm py-0 px-2" style={{ fontSize: '0.72rem' }} onClick={handleDelete}>Yes</button>
                             <button className="btn btn-light btn-sm py-0 px-2" style={{ fontSize: '0.72rem' }} onClick={() => setDeleteId(null)}>No</button>
                           </div>
@@ -374,7 +374,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
 
       {/* ── Bulk delete confirm modal ── */}
       {bulkConfirm && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.45)', zIndex: 1060 }}>
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.55)', zIndex: 1060 }}>
           <div className="modal-dialog" style={{ maxWidth: 380 }}>
             <div className="modal-content">
               <div className="modal-header border-0 pb-0">
@@ -398,7 +398,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
 
       {/* ── Add / Edit modal ── */}
       {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.45)', zIndex: 1050 }}>
+        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.55)', zIndex: 1050 }}>
           <div className="modal-dialog modal-dialog-scrollable" style={{ maxWidth: 560 }}>
             <div className="modal-content">
               <div className="modal-header border-0 pb-0">
