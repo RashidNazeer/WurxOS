@@ -386,15 +386,21 @@ export async function upsertDraft({ id, brandId, authorId, type, period, data })
 export async function submitReport(id, data) {
   const { data: auth } = await supabase.auth.getUser();
   const me = auth?.user?.id;
+  // Only write `data` when the caller passed a value. The OL acting-as-APC
+  // flow calls submitReport(id, null) to mean "leave the current data
+  // untouched, just flip the status" — and `data` is NOT NULL on the
+  // reports table, so writing null would 23502 the row out.
+  const patch = {
+    status: 'submitted',
+    submitted_at: new Date().toISOString(),
+    submitted_by: me,
+    rejection_note: null,  // clear previous rejection note on resubmit
+  };
+  if (data != null) patch.data = data;
+
   const { data: saved, error } = await supabase
     .from('reports')
-    .update({
-      data,
-      status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      submitted_by: me,
-      rejection_note: null,  // clear previous rejection note on resubmit
-    })
+    .update(patch)
     .eq('id', id)
     .select()
     .single();
