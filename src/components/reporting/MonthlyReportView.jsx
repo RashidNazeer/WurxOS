@@ -11,6 +11,7 @@ import HighlightableContent from '../common/HighlightableContent';
 import HighlighterPicker, { useHighlightStyle } from '../common/HighlighterPicker';
 import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandReportLinks';
 import { useAuth } from '../../contexts/AuthContext';
+import BrandSectionsPanel from '../portal/BrandSectionsPanel';
 
 /* ─── Editorial palette (amber accents on near-monochrome) ─────────────── */
 const C = {
@@ -1284,6 +1285,18 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           );
         })()}
       </div>
+
+      {/* Client custom sections — read-only for app users. In clientView
+          the portal mounts its own writable panel after this. */}
+      {!clientView && (
+        <BrandSectionsPanel
+          brandId={report.brandId}
+          brandName={report.brandName}
+          reportId={report.id}
+          readOnly
+          selfFetch
+        />
+      )}
     </div>
   );
 }

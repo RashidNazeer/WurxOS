@@ -14,24 +14,35 @@ export default function ClientPortalPage() {
   const [error, setError]       = useState('');
   const [activeTab, setActiveTab] = useState(null);
 
+  const loadAccess = (preserveTab = false) => {
+    return fetchSharedAccess(token)
+      .then((d) => {
+        setData(d);
+        if (!preserveTab) {
+          const types = d?.access?.share_types || [];
+          const first = types.find(t => ['weekly','biweekly','monthly'].includes(t))
+            ? 'reports'
+            : types.includes('paidCollab') ? 'paidCollab'
+            : types.includes('gmvMax')     ? 'gmvMax'
+            : null;
+          setActiveTab(first);
+        }
+      });
+  };
+
   useEffect(() => {
     let cancelled = false;
-    fetchSharedAccess(token)
-      .then((d) => {
-        if (cancelled) return;
-        setData(d);
-        const types = d?.access?.share_types || [];
-        const first = types.find(t => ['weekly','biweekly','monthly'].includes(t))
-          ? 'reports'
-          : types.includes('paidCollab') ? 'paidCollab'
-          : types.includes('gmvMax')     ? 'gmvMax'
-          : null;
-        setActiveTab(first);
-      })
+    loadAccess(false)
       .catch((e) => { if (!cancelled) setError(e.message || 'Failed to load.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Called by BrandSectionsPanel after a successful add/rename/remove/set
+  // so the portal re-renders with the updated sections + values without
+  // dropping the user's current tab.
+  const refresh = () => loadAccess(true).catch(() => {});
 
   const perms = useMemo(() => {
     const t = data?.access?.share_types || [];
@@ -70,10 +81,12 @@ export default function ClientPortalPage() {
     );
   }
 
-  const access  = data?.access || {};
-  const brands  = data?.brands || [];
-  const reports = data?.reports || [];
-  const gmv     = data?.gmv_max || [];
+  const access        = data?.access || {};
+  const brands        = data?.brands || [];
+  const reports       = data?.reports || [];
+  const gmv           = data?.gmv_max || [];
+  const sections      = data?.sections || [];          // [{ brand_id, sections: [...] }]
+  const sectionValues = data?.section_values || [];    // flat list across all permitted reports
 
   const tabsVisible = [perms.reports, perms.paidCollab, perms.gmvMax].filter(Boolean).length;
   const showTabs = tabsVisible >= 2;
@@ -125,7 +138,13 @@ export default function ClientPortalPage() {
       )}
 
       <div style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 20px' }}>
-        {activeTab === 'reports'    && <ClientReportsSection reports={reports} brands={brands} />}
+        {activeTab === 'reports'    && (
+          <ClientReportsSection
+            reports={reports} brands={brands}
+            sections={sections} sectionValues={sectionValues}
+            token={access.token} onMutate={refresh}
+          />
+        )}
         {activeTab === 'paidCollab' && <ClientPaidCollabSection brands={brands} />}
         {activeTab === 'gmvMax'     && <ClientGmvMaxSection gmv={gmv} brands={brands} />}
       </div>
