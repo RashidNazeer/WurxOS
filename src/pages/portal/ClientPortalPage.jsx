@@ -141,6 +141,7 @@ export default function ClientPortalPage() {
         {activeTab === 'reports'    && (
           <ClientReportsSection
             reports={reports} brands={brands}
+            shareTypes={access.share_types || []}
             sections={sections} sectionValues={sectionValues}
             token={access.token} onMutate={refresh}
           />

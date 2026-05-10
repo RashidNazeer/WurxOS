@@ -1,30 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import WeeklyReportView from '../reporting/WeeklyReportView';
 import MonthlyReportView from '../reporting/MonthlyReportView';
 import BrandSectionsPanel from './BrandSectionsPanel';
 
 /**
- * Public reports viewer for the client portal.
+ * Public reports viewer for the client portal — exact match to v1's
+ * latest ClientReportsDashboard (origin/main as of May 2026):
  *
- * Receives the bundled `reports` array from get_client_access (already
- * filtered to approved + permitted brands and types). Renders the
- * exact same WeeklyReportView / MonthlyReportView used inside the app
- * (in clientView mode — no edit/copy/highlighter toolbar) so clients
- * see the full editorial dashboard for each report.
+ *   1. Dark hero card "{Weekly|Bi-Weekly|Monthly} Reports · N brands"
+ *   2. Report-type tab pills — appear when more than 1 type is granted
+ *      via share_types. Empty types still get a tab so the client can
+ *      see "no approved reports yet" rather than a missing section.
+ *   3. Brand filter dropdown — only when more than 1 brand
+ *   4. Reports grouped by brand → click opens the full dashboard view
  *
- * Chrome mirrors v1's client portal:
- *   1. Dark hero card "{Weekly|Monthly} Reports · {client} · N brands"
- *   2. Report-type tab pills (only granted types appear)
- *   3. Month navigator + brand filter
- *   4. Reports grouped by brand → click to open the full dashboard view
+ * v1 dropped the month/date navigator (commit 515cf30) — clients see
+ * every approved report. We match that here.
  */
 
-const MONTH_NAMES = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-];
-
-function monthKey(y, m) { return `${y}-${String(m + 1).padStart(2, '0')}`; }
 function num(v) { const n = parseFloat(v); return Number.isNaN(n) ? 0 : n; }
 
 // Convert a row from get_client_access (snake_case, flattened) into the
@@ -84,6 +77,7 @@ function adaptReportForView(r) {
 export default function ClientReportsSection({
   reports = [],
   brands = [],
+  shareTypes = [],       // ['weekly','biweekly','monthly','paidCollab','gmvMax']
   sections = [],         // [{ brand_id, sections: [{id, name, ...}] }]
   sectionValues = [],    // flat list across permitted reports
   token = null,
@@ -109,45 +103,26 @@ export default function ClientReportsSection({
     return m;
   }, [sectionValues]);
 
-  // Available report types (from what's actually been shared).
+  // Tab list comes from share_types (granted set) — NOT from data. That
+  // way every granted report type gets a tab even if no reports of that
+  // type are approved yet, so the client doesn't think the section is
+  // missing entirely. Order matches v1: weekly, biweekly, monthly.
   const availableTypes = useMemo(() => {
-    const set = new Set(adapted.map(r => r.type).filter(Boolean));
-    return ['weekly', 'biweekly', 'monthly'].filter(t => set.has(t));
-  }, [adapted]);
+    const granted = new Set(shareTypes || []);
+    return ['weekly', 'biweekly', 'monthly'].filter(t => granted.has(t));
+  }, [shareTypes]);
 
   const [activeType, setActiveType] = useState(availableTypes[0] || 'weekly');
-
-  // Default month: most recent that has data of the active type.
-  const initialMonth = useMemo(() => {
-    const inType = adapted.filter(r => r.type === activeType && (r.weekStart || r.periodStart || r.monthKey));
-    inType.sort((a, b) => {
-      const ka = a.monthKey || (a.weekStart || a.periodStart || '').slice(0, 7);
-      const kb = b.monthKey || (b.weekStart || b.periodStart || '').slice(0, 7);
-      return kb.localeCompare(ka);
-    });
-    const top = inType[0];
-    if (top) {
-      if (top.monthKey) {
-        const [y, m] = top.monthKey.split('-').map(Number);
-        return { y, m: m - 1 };
-      }
-      const ws = top.weekStart || top.periodStart;
-      if (ws) {
-        const [y, m] = ws.split('-').map(Number);
-        return { y, m: m - 1 };
-      }
+  // If the granted set changes (e.g. Boss flips a toggle while client is
+  // viewing), make sure the active tab is one of the granted ones.
+  useEffect(() => {
+    if (availableTypes.length > 0 && !availableTypes.includes(activeType)) {
+      setActiveType(availableTypes[0]);
     }
-    const now = new Date();
-    return { y: now.getFullYear(), m: now.getMonth() };
-  }, [adapted, activeType]);
+  }, [availableTypes, activeType]);
 
-  const [calYear, setCalYear] = useState(initialMonth.y);
-  const [calMonth, setCalMonth] = useState(initialMonth.m);
   const [filterBrand, setFilterBrand] = useState('');
   const [viewReport, setViewReport] = useState(null);
-
-  // Reset month/brand when active type changes; jump to its newest data.
-  // (Doing this via key + remount on tab change keeps the code simple.)
 
   const inType = useMemo(
     () => adapted.filter(r => r.type === activeType),
@@ -160,16 +135,15 @@ export default function ClientReportsSection({
     return [...s].sort();
   }, [inType]);
 
+  // No date filtering — clients see every approved report (matches v1's
+  // origin/main commit 515cf30: "remove date filter — clients see every
+  // approved report").
   const filtered = useMemo(() => {
-    const mk = monthKey(calYear, calMonth);
     return inType.filter(r => {
-      const start = r.monthKey ? r.monthKey + '-01' : (r.weekStart || r.periodStart || '');
-      if (!start) return false;
-      if (!start.startsWith(mk)) return false;
       if (filterBrand && r.brandName !== filterBrand) return false;
       return true;
     });
-  }, [inType, calYear, calMonth, filterBrand]);
+  }, [inType, filterBrand]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -178,22 +152,14 @@ export default function ClientReportsSection({
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(r);
     });
+    // Sort each brand's reports newest first (v1 origin/main does this).
     map.forEach(list => list.sort((a, b) => {
       const ka = a.weekStart || a.periodStart || (a.monthKey ? a.monthKey + '-01' : '');
       const kb = b.weekStart || b.periodStart || (b.monthKey ? b.monthKey + '-01' : '');
-      return ka.localeCompare(kb);
+      return kb.localeCompare(ka);
     }));
     return map;
   }, [filtered]);
-
-  const prevMonth = () => {
-    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
-    else setCalMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
-    else setCalMonth(m => m + 1);
-  };
 
   // ── Detail view ────────────────────────────────────────────────────
   if (viewReport) {
@@ -229,18 +195,6 @@ export default function ClientReportsSection({
           readOnly={!token}
           onMutate={onMutate}
         />
-      </div>
-    );
-  }
-
-  if (reports.length === 0) {
-    return (
-      <div className="wx-card" style={{ padding: 32, textAlign: 'center' }}>
-        <div style={{ fontSize: 28, opacity: 0.4 }}>📋</div>
-        <div style={{ fontWeight: 700, marginTop: 8, color: 'var(--text-secondary)' }}>No approved reports yet</div>
-        <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: '4px 0 0' }}>
-          Reports will appear here once they're approved by your account team.
-        </p>
       </div>
     );
   }
@@ -292,44 +246,29 @@ export default function ClientReportsSection({
         </ul>
       )}
 
-      {/* Month navigator + brand filter */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
-          <div className="d-flex align-items-center gap-2">
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={prevMonth}
-              style={{ width: 32, height: 32, padding: 0 }}>
-              <i className="bi bi-chevron-left" style={{ fontSize: '0.8rem' }} />
-            </button>
-            <div className="fw-bold" style={{ fontSize: '0.92rem', minWidth: 140, textAlign: 'center' }}>
-              {MONTH_NAMES[calMonth]} {calYear}
-            </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={nextMonth}
-              style={{ width: 32, height: 32, padding: 0 }}>
-              <i className="bi bi-chevron-right" style={{ fontSize: '0.8rem' }} />
-            </button>
-            <button className="btn btn-sm btn-outline-secondary ms-1" style={{ borderRadius: 8, fontSize: '0.72rem' }}
-              onClick={() => { const n = new Date(); setCalYear(n.getFullYear()); setCalMonth(n.getMonth()); }}>
-              Today
-            </button>
-          </div>
-          <div className="d-flex align-items-center gap-2">
+      {/* Brand filter — only when there's more than one brand. v1's
+          recent commit (515cf30) removed the date filter; clients see
+          every approved report. */}
+      {brandOptions.length > 1 && (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+          <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
+            <span className="text-muted small">
+              {filtered.length} approved report{filtered.length !== 1 ? 's' : ''}
+            </span>
             <select className="form-select form-select-sm" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}
-              style={{ width: 180, borderRadius: 8 }}>
+              style={{ width: 200, borderRadius: 8 }}>
               <option value="">All Brands</option>
               {brandOptions.map(b => <option key={b}>{b}</option>)}
             </select>
-            <span className="text-muted small">{filtered.length} reports</span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Brand-grouped report cards */}
       {filtered.length === 0 ? (
         <div className="text-center py-5">
           <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#dee2e6' }} />
-          <p className="text-muted mt-3 mb-0">
-            No {activeType} reports for {MONTH_NAMES[calMonth]} {calYear}.
-          </p>
+          <p className="text-muted mt-3 mb-0">No approved reports available yet.</p>
         </div>
       ) : (
         [...grouped.entries()].map(([brandName, brandReports]) => (
