@@ -13,22 +13,25 @@ import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandRep
 import { useAuth } from '../../contexts/AuthContext';
 import BrandSectionsPanel from '../portal/BrandSectionsPanel';
 
-/* ─── Editorial palette (amber accents on near-monochrome) ─────────────── */
+/* ─── Editorial palette ───────────────────────────────────────────────────
+ *   Same theme-aware structure as WeeklyReportView. Hero stays as a
+ *   dark warm slab in both modes (it's deliberately inverted).
+ * ─────────────────────────────────────────────────────────────────────── */
 const C = {
-  ink: '#0f172a',
-  inkDim: '#475569',
-  muted: '#94a3b8',
-  line: '#e9ecef',
-  surface: '#ffffff',
-  surfaceAlt: '#f8fafc',
-  hero: '#1f1208',
-  amber: '#d97706',
-  amberSoft: '#fef3c7',
-  amberLine: '#fcd34d',
-  green: '#16a34a',
-  greenSoft: '#dcfce7',
-  red: '#dc2626',
-  redSoft: '#fee2e2',
+  ink:        'var(--text-primary)',
+  inkDim:     'var(--text-secondary)',
+  muted:      'var(--text-muted)',
+  line:       'var(--border-subtle)',
+  surface:    'var(--surface-1)',
+  surfaceAlt: 'var(--surface-2)',
+  hero:       '#1f1208',
+  amber:      'var(--warning)',
+  amberSoft:  'var(--warning-soft)',
+  amberLine:  'color-mix(in srgb, var(--warning) 50%, transparent)',
+  green:      'var(--success)',
+  greenSoft:  'var(--success-soft)',
+  red:        'var(--danger)',
+  redSoft:    'var(--danger-soft)',
 };
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */

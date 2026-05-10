@@ -32,7 +32,7 @@ function fmtCompactDollars(n) {
 }
 
 // Tiny inline bar chart used in the stat cards
-function Sparkbars({ values = [], color = '#94a3b8', muted = '#e2e8f0', highlightLast = false }) {
+function Sparkbars({ values = [], color = 'var(--text-muted)', muted = 'var(--border-subtle)', highlightLast = false }) {
   if (!values.length) return <div style={{ height: 18, marginTop: 12 }} />;
   return (
     <div className="d-flex align-items-end gap-1" style={{ height: 18, marginTop: 12 }}>
@@ -55,7 +55,7 @@ function StatCard({ icon, iconBg, iconColor, value, subtitle, label, trendDelta,
     ? (trendDelta > 0 ? `+${trendDelta}` : `${trendDelta}`)
     : null;
   return (
-    <div className="rounded-3 h-100" style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '14px 16px' }}>
+    <div className="rounded-3 h-100" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', padding: '14px 16px' }}>
       <div className="d-flex align-items-start justify-content-between mb-3">
         <div className="rounded-2 d-flex align-items-center justify-content-center"
           style={{ width: 30, height: 30, background: iconBg }}>
@@ -71,8 +71,8 @@ function StatCard({ icon, iconBg, iconColor, value, subtitle, label, trendDelta,
           </span>
         )}
       </div>
-      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>{label}</div>
-      <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: '#0f172a' }}>
+      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{label}</div>
+      <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
         {value} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>{subtitle}</span>
       </div>
       <Sparkbars values={bars || []} highlightLast color={barColor || '#94a3b8'} muted="#e2e8f0" />
@@ -597,7 +597,7 @@ export default function AllWeeklyReportsPage() {
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -628,11 +628,11 @@ export default function AllWeeklyReportsPage() {
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#0f172a', letterSpacing: '-0.01em' }}>Weekly Reports</h4>
-          <div className="d-flex align-items-center gap-2 flex-wrap" style={{ fontSize: '0.82rem', color: '#64748b' }}>
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Weekly Reports</h4>
+          <div className="d-flex align-items-center gap-2 flex-wrap" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
             <span>{userRole === 'tl' ? 'Reports from your team' : 'All brand reports across the organization'}</span>
             <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-              style={{ background: '#f0fdf4', color: '#15803d', fontSize: '0.72rem', fontWeight: 600 }}>
+              style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.72rem', fontWeight: 600 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
               Live · synced {syncedAgo}
             </span>
@@ -695,19 +695,19 @@ export default function AllWeeklyReportsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilterStatus(filterStatus === 'approved' ? '' : 'approved')}
             title="Click to filter approved reports">
-            <div className="rounded-3 h-100 p-3" style={{ background: '#fff', border: filterStatus === 'approved' ? '1.5px solid #16a34a' : '1px solid #e2e8f0' }}>
+            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'approved' ? '1.5px solid #16a34a' : '1px solid #e2e8f0' }}>
               <div className="d-flex align-items-start justify-content-between mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
-                  style={{ width: 30, height: 30, background: '#dcfce7' }}>
-                  <i className="bi bi-check2" style={{ color: '#16a34a', fontSize: '0.85rem' }} />
+                  style={{ width: 30, height: 30, background: 'var(--success-soft)' }}>
+                  <i className="bi bi-check2" style={{ color: 'var(--success)', fontSize: '0.85rem' }} />
                 </div>
                 <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                  style={{ background: '#f0fdf4', color: '#15803d', fontSize: '0.66rem', fontWeight: 600 }}>
+                  style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.66rem', fontWeight: 600 }}>
                   {monthStats.approvalRate}% rate
                 </span>
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>Approved</div>
-              <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: '#0f172a' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Approved</div>
+              <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
                 {monthStats.approved} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>of {monthStats.reportCount}</span>
               </div>
               <Sparkbars values={monthStats.barPcts} highlightLast color="#16a34a" muted="#e2e8f0" />
@@ -721,22 +721,22 @@ export default function AllWeeklyReportsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilterStatus(filterStatus === 'verified' ? '' : 'verified')}
             title="Click to filter pending approval">
-            <div className="rounded-3 h-100 p-3" style={{ background: '#fff', border: filterStatus === 'verified' ? '1.5px solid #ea580c' : '1px solid #e2e8f0' }}>
+            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'verified' ? '1.5px solid #ea580c' : '1px solid #e2e8f0' }}>
               <div className="d-flex align-items-start justify-content-between mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
                   style={{ width: 30, height: 30, background: '#fff7ed' }}>
-                  <i className="bi bi-hourglass-split" style={{ color: '#ea580c', fontSize: '0.85rem' }} />
+                  <i className="bi bi-hourglass-split" style={{ color: 'var(--warning)', fontSize: '0.85rem' }} />
                 </div>
                 {monthStats.pendingOverdue > 0 && (
                   <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                    style={{ background: '#fef2f2', color: '#dc2626', fontSize: '0.66rem', fontWeight: 600 }}>
+                    style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.66rem', fontWeight: 600 }}>
                     <i className="bi bi-arrow-up-right" />
                     {monthStats.pendingOverdue} over 24h
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>Pending approval</div>
-              <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: '#0f172a' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Pending approval</div>
+              <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
                 {monthStats.pendingApproval} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting</span>
               </div>
               <Sparkbars values={monthStats.barPcts} highlightLast color="#ea580c" muted="#e2e8f0" />
@@ -746,15 +746,15 @@ export default function AllWeeklyReportsPage() {
       </div>
 
       {/* Month navigator + filters — sleek inline pill row */}
-      <div className="rounded-3 mb-4" style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '10px 12px' }}>
+      <div className="rounded-3 mb-4" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', padding: '10px 12px' }}>
         <div className="d-flex flex-wrap gap-2 align-items-center">
           <button className="btn btn-sm btn-light border d-inline-flex align-items-center justify-content-center rounded-circle" onClick={prevMonth}
             style={{ width: 30, height: 30, padding: 0 }}>
             <i className="bi bi-chevron-left" style={{ fontSize: '0.78rem' }} />
           </button>
           <div className="d-inline-flex align-items-center gap-2 rounded-3 px-3 py-1"
-            style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.78rem', fontWeight: 600, color: '#0f172a' }}>
-            <i className="bi bi-calendar3" style={{ fontSize: '0.78rem', color: '#64748b' }} />
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <i className="bi bi-calendar3" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }} />
             {MONTH_NAMES[calMonth]} {calYear}
           </div>
           <button className="btn btn-sm btn-light border d-inline-flex align-items-center justify-content-center rounded-circle" onClick={nextMonth}
@@ -770,7 +770,7 @@ export default function AllWeeklyReportsPage() {
           <div className="position-relative" style={{ flex: '1 1 240px', minWidth: 200, maxWidth: 360 }}>
             <i className="bi bi-search position-absolute text-muted" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', pointerEvents: 'none' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search brand…"
-              style={{ paddingLeft: 32, borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc' }}
+              style={{ paddingLeft: 32, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}
               value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
           </div>
 
@@ -789,9 +789,9 @@ export default function AllWeeklyReportsPage() {
                   className="btn btn-sm rounded-3 px-3 d-inline-flex align-items-center gap-1"
                   style={{
                     fontSize: '0.78rem', fontWeight: 600,
-                    background: active ? '#0f172a' : '#fff',
-                    color:      active ? '#fff'    : '#475569',
-                    border: active ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                    background: active ? 'var(--accent)'      : 'var(--surface-1)',
+                    color:      active ? 'var(--on-accent)'   : 'var(--text-secondary)',
+                    border:     active ? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
                   }}>
                   {opt.v === '' && <i className="bi bi-funnel" style={{ fontSize: '0.72rem' }} />}
                   {opt.label}
@@ -819,8 +819,8 @@ export default function AllWeeklyReportsPage() {
       {/* Bulk action bar */}
       {canBulkDelete && selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 0, zIndex: 5, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10 }}>
-          <span className="fw-bold" style={{ color: '#991b1b', fontSize: '0.82rem' }}>
+          style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>
             <i className="bi bi-check2-square me-1" />
             {selected.size} selected
           </span>
@@ -839,7 +839,7 @@ export default function AllWeeklyReportsPage() {
 
       {/* Results — polished card grid */}
       {filtered.length === 0 ? (
-        <div className="text-center py-5 rounded-3" style={{ background: '#fff', border: '1px dashed #e2e8f0' }}>
+        <div className="text-center py-5 rounded-3" style={{ background: 'var(--surface-1)', border: '1px dashed #e2e8f0' }}>
           <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#cbd5e1' }} />
           <p className="text-muted mt-3 mb-0">No reports for {MONTH_NAMES[calMonth]} {calYear}.</p>
         </div>
@@ -884,8 +884,8 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
   const statusPillStyle = (() => {
     if (status === 'approved')  return { bg: '#ede9fe', color: '#6d28d9' };
     if (status === 'verified')  return { bg: '#ffedd5', color: '#c2410c' };
-    if (status === 'submitted') return { bg: '#dbeafe', color: '#1d4ed8' };
-    return { bg: '#f1f5f9', color: '#475569' };
+    if (status === 'submitted') return { bg: '#dbeafe', color: 'var(--info)' };
+    return { bg: '#f1f5f9', color: 'var(--text-secondary)' };
   })();
 
   // Mini sparkline of brand's recent GMV (last 6 weeks ending at this report)
@@ -902,7 +902,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
   return (
     <div className="col-12 col-md-6 col-xl-4">
       <div className="rounded-3 h-100 position-relative" style={{
-        background: '#fff',
+        background: 'var(--surface-1)',
         border: isSelected ? '2px solid #ef4444' : '1px solid #e2e8f0',
         cursor: 'pointer',
         transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
@@ -916,7 +916,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'none';
           e.currentTarget.style.boxShadow = 'none';
-          if (!isSelected) e.currentTarget.style.borderColor = '#e2e8f0';
+          if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-subtle)';
         }}>
         {selectable && (
           <label
@@ -941,7 +941,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             {initials}
           </div>
           <div className="flex-grow-1" style={{ minWidth: 0 }}>
-            <div className="fw-bold text-truncate" style={{ fontSize: '0.95rem', color: '#0f172a', letterSpacing: '-0.01em' }}>{brandName}</div>
+            <div className="fw-bold text-truncate" style={{ fontSize: '0.95rem', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{brandName}</div>
             <div className="text-muted text-truncate" style={{ fontSize: '0.7rem' }}>
               by {r.createdByName || '—'}
               {clientName && <span> · {clientName}</span>}
@@ -956,15 +956,15 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         </div>
 
         {/* Week + platform line */}
-        <div className="d-flex align-items-center gap-2 px-3 pb-2 pt-1" style={{ borderTop: '1px solid #f1f5f9' }}>
-          <span className="fw-semibold" style={{ fontSize: '0.78rem', color: '#0f172a' }}>{r.weekLabel || `Week ${r.week}`}</span>
+        <div className="d-flex align-items-center gap-2 px-3 pb-2 pt-1" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <span className="fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{r.weekLabel || `Week ${r.week}`}</span>
           {(r.year || (r.weekStart && r.weekStart.length >= 4)) && (
             <span className="text-muted" style={{ fontSize: '0.72rem' }}>
               · {r.year || r.weekStart.slice(0, 4)}
             </span>
           )}
           <span className="ms-auto rounded-pill d-inline-flex align-items-center gap-1"
-            style={{ background: '#dcfce7', color: '#166534', fontSize: '0.62rem', fontWeight: 600, padding: '3px 8px' }}>
+            style={{ background: 'var(--success-soft)', color: '#166534', fontSize: '0.62rem', fontWeight: 600, padding: '3px 8px' }}>
             <i className="bi bi-tiktok" style={{ fontSize: '0.62rem' }} />
             TikTok
           </span>
@@ -988,7 +988,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         {/* Sparkline footer (vs prev week) */}
         {gmvChange != null && seriesBars.length > 1 && (
           <div className="d-flex align-items-center gap-2 px-3 py-2"
-            style={{ borderTop: '1px solid #f1f5f9', background: '#fafafa', borderRadius: '0 0 12px 12px' }}>
+            style={{ borderTop: '1px solid var(--border-subtle)', background: '#fafafa', borderRadius: '0 0 12px 12px' }}>
             <span className="text-muted" style={{ fontSize: '0.7rem' }}>vs prev week</span>
             <div className="flex-grow-1">
               <Sparkbars values={seriesBars} highlightLast color={gmvChange >= 0 ? '#16a34a' : '#dc2626'} muted="#e2e8f0" />
@@ -1009,7 +1009,7 @@ function CardStat({ label, value, note, noteColor }) {
   return (
     <div style={{ minWidth: 0 }}>
       <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.04em' }}>{label}</div>
-      <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+      <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: 2 }}>{value}</div>
       {note && (
         <div style={{ fontSize: '0.65rem', color: noteColor || '#64748b', fontWeight: 600, marginTop: 2 }}>{note}</div>
       )}

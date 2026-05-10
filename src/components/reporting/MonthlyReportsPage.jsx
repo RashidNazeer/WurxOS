@@ -214,7 +214,7 @@ export default function MonthlyReportsPage() {
         </div>
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -232,7 +232,7 @@ export default function MonthlyReportsPage() {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Monthly Reports</h5>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Monthly Reports</h5>
           <p className="text-muted small mb-0">
             {isTL ? 'Reports for your brands' : 'Your monthly brand reports'} · {reports.length} total
           </p>
@@ -286,7 +286,7 @@ export default function MonthlyReportsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-5">
-          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#dee2e6' }} />
+          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
           <p className="text-muted mt-3 mb-1">No monthly reports yet for {year}.</p>
           <button className="btn btn-sm btn-outline-dark mt-2" onClick={() => setView('new')}>
             <i className="bi bi-plus-circle me-1" /> Create your first
@@ -303,7 +303,7 @@ export default function MonthlyReportsPage() {
               <div key={r.id} className="col-12 col-md-6 col-lg-4">
                 <div className="card h-100" style={{
                   borderRadius: 14, cursor: 'pointer',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border-subtle)',
                   boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
                   transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
                 }}
@@ -316,17 +316,17 @@ export default function MonthlyReportsPage() {
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
                     e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04)';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
                   }}>
                   <div className="card-body p-3">
-                    <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                       <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
                         style={{ width: 26, height: 26, fontSize: '0.58rem', background: '#3b82f6' }}>
                         {(r.brandName || '??').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="fw-bold text-truncate" style={{ fontSize: '0.85rem', minWidth: 0 }}>{r.brandName}</div>
                       <span className="badge rounded-pill d-inline-flex align-items-center gap-1 flex-shrink-0 ms-auto"
-                        style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem', fontWeight: 700, border: '1px solid #bfdbfe', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                        style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.7rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', padding: '4px 10px', whiteSpace: 'nowrap' }}
                         title={`Reporting month: ${monthLabel}`}>
                         <i className="bi bi-calendar-month" style={{ fontSize: '0.7rem' }} />
                         {monthLabel}
@@ -335,11 +335,11 @@ export default function MonthlyReportsPage() {
                     </div>
                     <div className="d-flex align-items-center gap-2 mb-2">
                       <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                        style={{ width: 32, height: 32, background: '#eff6ff' }}>
-                        <i className="bi bi-calendar-month" style={{ fontSize: '0.95rem', color: '#3b82f6' }} />
+                        style={{ width: 32, height: 32, background: 'var(--info-soft)' }}>
+                        <i className="bi bi-calendar-month" style={{ fontSize: '0.95rem', color: 'var(--info)' }} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: 1.2 }}>{monthLabel}</div>
+                        <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{monthLabel}</div>
                         <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: 2 }}>
                           <span className="text-muted" style={{ fontSize: '0.68rem' }}>by {r.createdByName}</span>
                           <StatusBadge status={getReportStatus(r)} />
@@ -349,7 +349,7 @@ export default function MonthlyReportsPage() {
                     <div className="d-flex flex-wrap gap-3">
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>GMV</div>
-                        <div className="fw-bold" style={{ fontSize: '0.92rem', color: '#16a34a' }}>{fmt$(totalGmv, r.currency)}</div>
+                        <div className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--success)' }}>{fmt$(totalGmv, r.currency)}</div>
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>ORDERS</div>

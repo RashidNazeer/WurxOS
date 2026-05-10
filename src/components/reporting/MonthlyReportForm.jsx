@@ -24,7 +24,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, width = '10
   return (
     <div style={{ width, minWidth: 100 }}>
       {label && (
-        <label className="form-label mb-1" style={{ fontSize: '0.66rem', fontWeight: 600, color: '#64748b' }}>{label}</label>
+        <label className="form-label mb-1" style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
       )}
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
@@ -76,7 +76,7 @@ function ArraySection({ items, setItems, fields, addLabel, minRows = 1 }) {
   return (
     <div>
       {items.map((item, i) => (
-        <div key={i} className="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 rounded-3" style={{ background: '#f8fafc' }}>
+        <div key={i} className="d-flex flex-wrap gap-2 align-items-end mb-2 p-2 rounded-3" style={{ background: 'var(--surface-2)' }}>
           <div className="text-muted fw-bold" style={{ fontSize: '0.68rem', width: 20, textAlign: 'center', paddingBottom: 8 }}>
             {i + 1}
           </div>
@@ -113,7 +113,7 @@ function ComparisonChip({ thisVal, lastVal, format = 'num' }) {
   if (p !== 0) pct = ((c - p) / Math.abs(p)) * 100;
   const color = pct == null ? '#64748b' : pct >= 0 ? '#16a34a' : '#dc2626';
   return (
-    <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: 2 }}>
+    <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', marginTop: 2 }}>
       Last: <strong>{fmt(p)}</strong>
       {pct != null && (
         <span style={{ color, marginLeft: 6, fontWeight: 600 }}>
@@ -129,7 +129,7 @@ function SectionCard({ icon, title, children, color = '#3b82f6', actions }) {
   return (
     <div className="card mb-3" style={{
       borderRadius: 12,
-      border: '1px solid #e2e8f0',
+      border: '1px solid var(--border-subtle)',
       boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
     }}>
       <div className="card-body p-3">
@@ -579,7 +579,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
         )}
-        <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>New Monthly Report</h5>
+        <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>New Monthly Report</h5>
         <p className="text-muted small mb-4">Select the brand you're reporting for</p>
         <div className="row g-3">
           {myBrands.map(b => (
@@ -619,7 +619,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={() => setStep(0)}>
           <i className="bi bi-arrow-left me-1" /> Change brand
         </button>
-        <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>First Monthly Report — {brandName}</h5>
+        <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>First Monthly Report — {brandName}</h5>
         <p className="text-muted small mb-4">Pick the month you want to report on. After this, the next month will be auto-detected.</p>
         <div className="row g-2" style={{ maxWidth: 720 }}>
           {opts.map(m => (
@@ -649,7 +649,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
             onClick={() => onCancel ? onCancel() : setStep(0)}>
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
-          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
             {brandName} — {selectedMonth?.label}
           </h5>
           <div className="d-flex align-items-center gap-2 flex-wrap">
@@ -676,7 +676,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
             onChange={e => handleImportPdf(e.target.files?.[0])} />
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, fontSize: '0.78rem' }}
+            style={{ background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.78rem' }}
             onClick={() => pdfInputRef.current?.click()} disabled={importing}
             title="Upload a Monthly report PDF (Google Doc export) to auto-fill this form">
             {importing ? <><span className="spinner-border spinner-border-sm" /> Reading PDF…</>
@@ -722,7 +722,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {rejectionNote && reportStatus === 'draft' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
           <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -734,7 +734,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedMonth?.label}</div>
@@ -744,7 +744,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#92400e' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report awaiting OL approval</div>
@@ -758,9 +758,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Currency picker (applies to every monetary field below) ──── */}
       <div className="d-flex align-items-center gap-3 mb-3 p-2 rounded-3"
-        style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-        <i className="bi bi-currency-exchange" style={{ color: '#64748b' }} />
-        <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: '#334155' }}>
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+        <i className="bi bi-currency-exchange" style={{ color: 'var(--text-secondary)' }} />
+        <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           Report currency:
         </label>
         <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 8 }}
@@ -783,12 +783,12 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         const enabledCount = MONTHLY_SECTIONS.filter(s => enabled[s.key]).length;
         return (
           <div className="card mb-3" style={{
-            borderRadius: 12, border: '1px solid #e2e8f0',
+            borderRadius: 12, border: '1px solid var(--border-subtle)',
             background: '#fafbfc', boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
           }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-2">
-                <i className="bi bi-list-check" style={{ color: '#3b82f6' }} />
+                <i className="bi bi-list-check" style={{ color: 'var(--info)' }} />
                 <h6 className="fw-bold mb-0" style={{ fontSize: '0.88rem' }}>Sections in this report</h6>
                 <span className="text-muted" style={{ fontSize: '0.7rem' }}>
                   ({enabledCount}/{MONTHLY_SECTIONS.length} shown)
@@ -803,8 +803,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
                     <label className="d-flex align-items-center gap-2 p-2 rounded-2"
                       style={{
                         cursor: 'pointer', userSelect: 'none',
-                        background: enabled[s.key] ? '#fff' : '#f1f5f9',
-                        border: `1px solid ${enabled[s.key] ? '#cbd5e1' : '#e2e8f0'}`,
+                        background: enabled[s.key] ? 'var(--surface-1)' : 'var(--surface-2)',
+                        border: `1px solid ${enabled[s.key] ? 'var(--border-default)' : 'var(--border-subtle)'}`,
                         opacity: enabled[s.key] ? 1 : 0.7,
                       }}>
                       <input type="checkbox" className="form-check-input m-0"
@@ -1098,9 +1098,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           <div>
             {customFieldDefs.map((field, i) => (
               <div key={field.id} className={i > 0 ? 'mt-3 pt-3' : ''}
-                style={i > 0 ? { borderTop: '1px solid #e2e8f0' } : {}}>
+                style={i > 0 ? { borderTop: '1px solid var(--border-subtle)' } : {}}>
                 <div className="d-flex align-items-center justify-content-between mb-1">
-                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: '#1e293b' }}>
+                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                     {field.name}
                   </label>
                   <div className="d-flex gap-1">

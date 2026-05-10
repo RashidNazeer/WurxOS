@@ -471,7 +471,7 @@ export default function AllMonthlyReportsPage() {
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -501,7 +501,7 @@ export default function AllMonthlyReportsPage() {
     <div>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Monthly Reports</h5>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Monthly Reports</h5>
           <p className="text-muted small mb-0">
             {userRole === 'tl' ? 'Reports from your team' : 'All monthly brand reports'} · {reports.length} total
           </p>
@@ -514,8 +514,8 @@ export default function AllMonthlyReportsPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: '#eff6ff' }}>
-                <i className="bi bi-file-earmark-bar-graph" style={{ color: '#3b82f6' }} />
+                style={{ width: 36, height: 36, background: 'var(--info-soft)' }}>
+                <i className="bi bi-file-earmark-bar-graph" style={{ color: 'var(--info)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{monthStats.reportCount}</div>
@@ -528,8 +528,8 @@ export default function AllMonthlyReportsPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: '#f0fdf4' }}>
-                <i className="bi bi-shop" style={{ color: '#10b981' }} />
+                style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
+                <i className="bi bi-shop" style={{ color: 'var(--success)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{monthStats.brandCount}</div>
@@ -542,8 +542,8 @@ export default function AllMonthlyReportsPage() {
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: '#fef3c7' }}>
-                <i className="bi bi-currency-dollar" style={{ color: '#f59e0b' }} />
+                style={{ width: 36, height: 36, background: 'var(--warning-soft)' }}>
+                <i className="bi bi-currency-dollar" style={{ color: 'var(--warning)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>
@@ -560,7 +560,7 @@ export default function AllMonthlyReportsPage() {
               onClick={() => setFilterStatus(f => f === 'verified' ? '' : 'verified')}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 36, height: 36, background: '#ede9fe' }}>
+                  style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
                   <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
                 </div>
                 <div>
@@ -575,8 +575,8 @@ export default function AllMonthlyReportsPage() {
             <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 36, height: 36, background: '#dcfce7' }}>
-                  <i className="bi bi-shield-check-fill" style={{ color: '#16a34a' }} />
+                  style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
+                  <i className="bi bi-shield-check-fill" style={{ color: 'var(--success)' }} />
                 </div>
                 <div>
                   <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{monthStats.approved}</div>
@@ -634,8 +634,8 @@ export default function AllMonthlyReportsPage() {
       {/* Bulk action bar */}
       {canBulkDelete && selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 0, zIndex: 5, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10 }}>
-          <span className="fw-bold" style={{ color: '#991b1b', fontSize: '0.82rem' }}>
+          style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>
             <i className="bi bi-check2-square me-1" />
             {selected.size} selected
           </span>
@@ -655,7 +655,7 @@ export default function AllMonthlyReportsPage() {
       {/* Report cards */}
       {filtered.length === 0 ? (
         <div className="text-center py-5">
-          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#dee2e6' }} />
+          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
           <p className="text-muted mt-3 mb-0">No reports for {calYear}.</p>
         </div>
       ) : (
@@ -685,7 +685,7 @@ export default function AllMonthlyReportsPage() {
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
                     e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04)';
-                    if (!isSel) e.currentTarget.style.borderColor = '#e2e8f0';
+                    if (!isSel) e.currentTarget.style.borderColor = 'var(--border-subtle)';
                   }}>
                   {canBulkDelete && (
                     <label
@@ -704,14 +704,14 @@ export default function AllMonthlyReportsPage() {
                     </label>
                   )}
                   <div className="card-body p-3">
-                    <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid #f1f5f9', paddingLeft: canBulkDelete ? 28 : 0 }}>
+                    <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-subtle)', paddingLeft: canBulkDelete ? 28 : 0 }}>
                       <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
                         style={{ width: 26, height: 26, fontSize: '0.58rem', background: '#3b82f6' }}>
                         {brandName.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="fw-bold text-truncate" style={{ fontSize: '0.85rem', minWidth: 0 }}>{brandName}</div>
                       <span className="badge rounded-pill d-inline-flex align-items-center gap-1 flex-shrink-0 ms-auto"
-                        style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem', fontWeight: 700, border: '1px solid #bfdbfe', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                        style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.7rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', padding: '4px 10px', whiteSpace: 'nowrap' }}
                         title={`Reporting month: ${monthLabel}`}>
                         <i className="bi bi-calendar-month" style={{ fontSize: '0.7rem' }} />
                         {monthLabel}
@@ -720,16 +720,16 @@ export default function AllMonthlyReportsPage() {
                     </div>
                     <div className="d-flex align-items-center gap-2 mb-2">
                       <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                        style={{ width: 32, height: 32, background: '#eff6ff' }}>
-                        <i className="bi bi-calendar-month" style={{ fontSize: '0.95rem', color: '#3b82f6' }} />
+                        style={{ width: 32, height: 32, background: 'var(--info-soft)' }}>
+                        <i className="bi bi-calendar-month" style={{ fontSize: '0.95rem', color: 'var(--info)' }} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#1e293b', lineHeight: 1.2 }}>{monthLabel}</div>
+                        <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{monthLabel}</div>
                         <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: 2 }}>
                           <span className="text-muted" style={{ fontSize: '0.68rem' }}>by {r.createdByName}</span>
                           {clientName && (
                             <span className="badge rounded-pill d-inline-flex align-items-center gap-1 flex-shrink-0"
-                              style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.6rem', fontWeight: 600, border: '1px solid #fde68a', padding: '2px 7px' }}
+                              style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.6rem', fontWeight: 600, border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', padding: '2px 7px' }}
                               title={`Client: ${clientName}`}>
                               <i className="bi bi-person-badge" style={{ fontSize: '0.6rem' }} />
                               {clientName}
@@ -742,7 +742,7 @@ export default function AllMonthlyReportsPage() {
                     <div className="d-flex flex-wrap gap-3">
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>GMV</div>
-                        <div className="fw-bold" style={{ fontSize: '0.92rem', color: '#16a34a' }}>{fmt$(totalGmv, r.currency)}</div>
+                        <div className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--success)' }}>{fmt$(totalGmv, r.currency)}</div>
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>ORDERS</div>

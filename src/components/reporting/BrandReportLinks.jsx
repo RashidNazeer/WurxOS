@@ -49,11 +49,11 @@ function LinkCard({ link, accent }) {
       rel="noopener noreferrer"
       className="d-flex align-items-center gap-3 text-decoration-none"
       style={{
-        background: '#fff',
-        border: '1px solid #e9ecef',
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 12,
         padding: '14px 16px',
-        color: '#1e293b',
+        color: 'var(--text-primary)',
         transition: 'transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease',
       }}
       onMouseEnter={e => {
@@ -64,7 +64,7 @@ function LinkCard({ link, accent }) {
       onMouseLeave={e => {
         e.currentTarget.style.transform = '';
         e.currentTarget.style.boxShadow = '';
-        e.currentTarget.style.borderColor = '#e9ecef';
+        e.currentTarget.style.borderColor = 'var(--border-subtle)';
       }}
       title={link.url}>
       <div style={{
@@ -75,7 +75,7 @@ function LinkCard({ link, accent }) {
         <i className={`bi ${kind.icon}`} style={{ fontSize: '1.1rem' }} />
       </div>
       <div className="flex-grow-1" style={{ minWidth: 0 }}>
-        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', letterSpacing: '-0.01em' }}>{link.label}</div>
+        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{link.label}</div>
         <div className="d-flex align-items-center gap-2 mt-1">
           <span style={{
             fontSize: '0.62rem', fontWeight: 600,
@@ -83,7 +83,7 @@ function LinkCard({ link, accent }) {
             padding: '1px 7px', borderRadius: 999,
             letterSpacing: '0.02em',
           }}>{kind.label}</span>
-          <span style={{ fontSize: '0.7rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {getDomain(link.url)}
           </span>
         </div>
@@ -132,8 +132,8 @@ function StandaloneSection({ section, accent }) {
   if (links.length === 0) return null;
   return (
     <div className="mt-3" style={{
-      background: '#ffffff',
-      border: '1px solid #e9ecef',
+      background: 'var(--surface-1)',
+      border: '1px solid var(--border-subtle)',
       borderRadius: 14,
       padding: '20px 22px',
     }}>
@@ -146,10 +146,10 @@ function StandaloneSection({ section, accent }) {
           <i className="bi bi-bookmark-fill" style={{ fontSize: '1rem' }} />
         </div>
         <div>
-          <div style={{ fontSize: '1.02rem', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+          <div style={{ fontSize: '1.02rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
             {section.name}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
             {links.length} link{links.length !== 1 ? 's' : ''}
           </div>
         </div>

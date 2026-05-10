@@ -33,7 +33,7 @@ export default function GmvMaxReportingPage() {
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#0f172a' }}>
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-bar-chart-line-fill me-2" style={{ color: '#0ea5e9' }} />
             GMV Max Reporting
           </h4>
@@ -53,10 +53,10 @@ export default function GmvMaxReportingPage() {
                 <span className="text-muted" style={{ fontSize: '0.7rem' }}>{filtered.length}</span>
               </div>
               <div className="input-group input-group-sm mb-2">
-                <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}>
+                <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}>
                   <i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} />
                 </span>
-                <input className="form-control border-0" placeholder="Search brand…" style={{ background: '#f1f5f9' }}
+                <input className="form-control border-0" placeholder="Search brand…" style={{ background: 'var(--surface-2)' }}
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               {loading ? (
@@ -74,9 +74,9 @@ export default function GmvMaxReportingPage() {
                         style={{
                           borderRadius: 10,
                           padding: '8px 10px',
-                          background: isSel ? '#0ea5e91a' : '#fff',
-                          border: `1px solid ${isSel ? '#0ea5e9' : '#e9ecef'}`,
-                          color: isSel ? '#0369a1' : '#1e293b',
+                          background: isSel ? 'color-mix(in srgb, #0ea5e9 18%, transparent)' : 'var(--surface-1)',
+                          border: `1px solid ${isSel ? '#0ea5e9' : 'var(--border-subtle)'}`,
+                          color: isSel ? '#0ea5e9' : 'var(--text-primary)',
                           fontSize: '0.82rem', fontWeight: isSel ? 600 : 500,
                         }}
                         onClick={() => setSelectedId(b.id)}>
@@ -106,7 +106,7 @@ export default function GmvMaxReportingPage() {
           ) : (
             <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
               <div className="card-body p-5 text-center">
-                <i className="bi bi-arrow-left-circle" style={{ fontSize: '2rem', color: '#94a3b8' }} />
+                <i className="bi bi-arrow-left-circle" style={{ fontSize: '2rem', color: 'var(--text-muted)' }} />
                 <h6 className="fw-bold mt-3 mb-1">Pick a brand to start</h6>
                 <p className="text-muted small mb-0">Select a brand from the list to enter monthly or weekly GMV Max data.</p>
               </div>

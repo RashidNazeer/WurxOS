@@ -332,7 +332,7 @@ export default function BiWeeklyReportsPage() {
         </div>
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#991b1b' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -427,7 +427,7 @@ export default function BiWeeklyReportsPage() {
                   return (
                     <div key={report.id} className="col-md-6 col-lg-4 col-xl-3">
                       <div className="rounded-3 p-3 h-100"
-                        style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', cursor: 'pointer' }}
+                        style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => handleViewReport(report)}>
                         <div className="d-flex align-items-center gap-2 mb-1">
                           <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '0.75rem' }} />
@@ -462,7 +462,7 @@ export default function BiWeeklyReportsPage() {
           </div>
         ) : filteredReports.length === 0 ? (
           <div className="text-center py-4">
-            <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2rem', color: '#dee2e6' }} />
+            <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2rem', color: 'var(--text-muted)' }} />
             <p className="text-muted mt-2 mb-0" style={{ fontSize: '0.85rem' }}>No reports for {MONTH_NAMES[calMonth]} {calYear}.</p>
           </div>
         ) : (
@@ -483,8 +483,8 @@ export default function BiWeeklyReportsPage() {
                     <div className="card-body p-3">
                       <div className="d-flex align-items-center justify-content-between mb-2">
                         <div className="d-flex align-items-center gap-2">
-                          <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: '#eff6ff' }}>
-                            <i className="bi bi-calendar-week" style={{ fontSize: '0.85rem', color: '#3b82f6' }} />
+                          <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: 'var(--info-soft)' }}>
+                            <i className="bi bi-calendar-week" style={{ fontSize: '0.85rem', color: 'var(--info)' }} />
                           </div>
                           <div>
                             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>{r.periodLabel}</div>
@@ -542,7 +542,7 @@ export default function BiWeeklyReportsPage() {
     <div>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Bi-Weekly Reports</h5>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Bi-Weekly Reports</h5>
           <p className="text-muted small mb-0">Overview of your brands and bi-weekly report submission status</p>
         </div>
         <button className="btn btn-dark btn-sm px-4 d-inline-flex align-items-center gap-1"
@@ -556,8 +556,8 @@ export default function BiWeeklyReportsPage() {
         <div className="col-6 col-lg-3">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
-              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: '#eff6ff' }}>
-                <i className="bi bi-shop" style={{ color: '#3b82f6' }} />
+              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--info-soft)' }}>
+                <i className="bi bi-shop" style={{ color: 'var(--info)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{stats.totalBrands}</div>
@@ -569,8 +569,8 @@ export default function BiWeeklyReportsPage() {
         <div className="col-6 col-lg-3">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
-              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: '#dcfce7' }}>
-                <i className="bi bi-check-circle-fill" style={{ color: '#16a34a' }} />
+              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
+                <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{stats.submittedThisWeek}</div>
@@ -582,8 +582,8 @@ export default function BiWeeklyReportsPage() {
         <div className="col-6 col-lg-3">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
-              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: '#fef3c7' }}>
-                <i className="bi bi-clock-fill" style={{ color: '#f59e0b' }} />
+              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--warning-soft)' }}>
+                <i className="bi bi-clock-fill" style={{ color: 'var(--warning)' }} />
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{stats.pending}</div>
@@ -597,7 +597,7 @@ export default function BiWeeklyReportsPage() {
             <div className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer' }}
               onClick={() => setOverviewFilter(f => f === 'needs_review' ? '' : 'needs_review')}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: '#ede9fe' }}>
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
                   <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
                 </div>
                 <div>
@@ -611,8 +611,8 @@ export default function BiWeeklyReportsPage() {
           <div className="col-6 col-lg-3">
             <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: '#fee2e2' }}>
-                  <i className="bi bi-exclamation-triangle-fill" style={{ color: '#dc2626' }} />
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--danger-soft)' }}>
+                  <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--danger)' }} />
                 </div>
                 <div>
                   <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{stats.overdue}</div>
@@ -645,7 +645,7 @@ export default function BiWeeklyReportsPage() {
       {/* Brand cards grid */}
       {filteredBrandSummaries.length === 0 ? (
         <div className="text-center py-5">
-          <i className="bi bi-shop" style={{ fontSize: '2.5rem', color: '#dee2e6' }} />
+          <i className="bi bi-shop" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
           <p className="text-muted mt-3 mb-0">No brands match your filters.</p>
         </div>
       ) : (
@@ -676,11 +676,11 @@ export default function BiWeeklyReportsPage() {
                       {s.thisWeekStatus ? (
                         <StatusBadge status={s.thisWeekStatus} />
                       ) : s.isOverdue ? (
-                        <span className="badge rounded-pill" style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.62rem' }}>
+                        <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.62rem' }}>
                           <i className="bi bi-exclamation-triangle me-1" />Overdue
                         </span>
                       ) : (
-                        <span className="badge rounded-pill" style={{ background: '#fef3c7', color: '#d97706', fontSize: '0.62rem' }}>
+                        <span className="badge rounded-pill" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.62rem' }}>
                           <i className="bi bi-clock me-1" />Pending
                         </span>
                       )}
@@ -693,7 +693,7 @@ export default function BiWeeklyReportsPage() {
                     )}
 
                     {s.latest ? (
-                      <div className="p-2 rounded-2 mb-2" style={{ background: '#f8fafc' }}>
+                      <div className="p-2 rounded-2 mb-2" style={{ background: 'var(--surface-2)' }}>
                         <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>LAST REPORT — {s.latest.periodLabel}</div>
                         <div className="d-flex gap-3 mt-1">
                           <div>
@@ -711,7 +711,7 @@ export default function BiWeeklyReportsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="p-2 rounded-2 mb-2 text-center text-muted" style={{ background: '#f8fafc', fontSize: '0.72rem' }}>
+                      <div className="p-2 rounded-2 mb-2 text-center text-muted" style={{ background: 'var(--surface-2)', fontSize: '0.72rem' }}>
                         No reports yet
                       </div>
                     )}
