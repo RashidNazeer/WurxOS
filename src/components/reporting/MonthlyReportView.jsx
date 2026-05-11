@@ -308,7 +308,9 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
       }}>
         <div style={{
           position: 'absolute', top: 10, right: 10,
-          background: 'rgba(255,255,255,0.92)', color: C.ink, borderRadius: 4,
+          // Pill is fixed-white in both themes (video thumbnail
+          // background), so the rank text stays dark in both themes.
+          background: 'rgba(255,255,255,0.92)', color: '#0f172a', borderRadius: 4,
           fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', minWidth: 22, textAlign: 'center',
         }}>{rank}</div>
         <div style={{
@@ -325,7 +327,8 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
           <div style={{
             position: 'absolute', right: 10, bottom: 10,
             width: 30, height: 30, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.95)', color: C.ink,
+            // Fixed-white play icon button — text stays dark in both themes.
+            background: 'rgba(255,255,255,0.95)', color: '#0f172a',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
           }}>
@@ -756,7 +759,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
             <span>$1 → ${(gmv / spend).toFixed(2)}</span>
           </div>
           <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ background: C.ink, color: '#fff', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
+            <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
               {ms(spend)} in
             </div>
             <div style={{ flex: 1, background: C.amber, color: C.hero, fontSize: '0.66rem', fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -934,8 +937,8 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           {(userRole === 'tl' || userRole === 'pctl') && (
             <button className="btn btn-sm d-inline-flex align-items-center gap-1"
               style={{ borderRadius: 10, fontSize: '0.78rem',
-                background: copyState === 'done' ? C.green : C.ink,
-                color: 'white', border: 'none' }}
+                background: copyState === 'done' ? 'var(--success)' : 'var(--accent)',
+                color: 'var(--on-accent)', border: 'none' }}
               onClick={handleCopyInsights}
               title="Copy all insights to clipboard">
               <i className={`bi ${copyState === 'done' ? 'bi-check-circle-fill' : 'bi-clipboard-check'}`} />
@@ -943,7 +946,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             </button>
           )}
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10, fontSize: '0.78rem', background: C.ink, color: '#fff', border: 'none' }}
+            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
             onClick={handleExport}>
             <i className="bi bi-file-earmark-pdf" /> Export PDF
           </button>
