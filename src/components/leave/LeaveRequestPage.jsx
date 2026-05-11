@@ -680,8 +680,11 @@ export default function LeaveRequestPage() {
     rejected: myRequests.filter(r => r.status === 'rejected').length,
   }), [myRequests]);
 
+  // Count only requests waiting at THIS user's level. TL acts on
+  // pending_tl; OL acts on pending_ol. Requests already forwarded to
+  // Boss (pending_boss) shouldn't inflate the OL's queue badge.
   const teamPendingCount = useMemo(() => {
-    if (isOL) return teamRequests.filter(r => r.status.startsWith('pending')).length;
+    if (isOL) return teamRequests.filter(r => r.status === 'pending_ol').length;
     return teamRequests.filter(r => r.status === 'pending_tl').length;
   }, [teamRequests, isOL]);
 
@@ -780,7 +783,16 @@ export default function LeaveRequestPage() {
               <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1" style={{ background: stCfg.bg, color: stCfg.color, fontSize: '0.68rem', fontWeight: 600 }}>
                 <i className={`bi ${stCfg.icon}`} style={{ fontSize: '0.58rem' }} />{stCfg.label}
               </span>
-              {showActions && (isTL ? r.status === 'pending_tl' : r.status?.startsWith('pending')) && (
+              {showActions && (
+                // Only show Approve/Reject when it's actually THIS user's
+                // turn in the chain. TL acts on pending_tl; OL acts on
+                // pending_ol. Anything past their level (pending_boss /
+                // approved / rejected) hides the buttons — which is why
+                // the OL was previously able to click Approve on requests
+                // already forwarded to Boss and get "not authorized".
+                (isTL && r.status === 'pending_tl') ||
+                (isOL && r.status === 'pending_ol')
+              ) && (
                 <div className="d-flex gap-1">
                   <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2"
                     style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => setApproveTarget(r)}>

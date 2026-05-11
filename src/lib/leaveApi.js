@@ -291,10 +291,31 @@ function mapTypeToCategory(type) {
     default:           return { category: type || 'other', leaveType: null };
   }
 }
-function mapStatusToV1(status, current_level) {
+// Map (status, level, requester_role) → v1 status label.
+//
+// The label drives which approver tier the UI shows as "yours". The
+// historical mapping only used `current_level` and assumed the
+// requester was always an APC — that's wrong: a TL request at level 1
+// is OL's turn, not TL's, and a TL request at level 2 is Boss's turn.
+// Mislabelling it as `pending_ol` let the OL click Approve twice and
+// the server rejected the second click as "not authorized".
+function mapStatusToV1(status, current_level, requester_role) {
   if (status === 'pending') {
-    if (current_level === 1) return 'pending_tl';
-    if (current_level === 2) return 'pending_ol';
+    const r = requester_role || 'apc';
+    if (r === 'apc' || r === 'ipc') {
+      if (current_level === 1) return 'pending_tl';
+      if (current_level === 2) return 'pending_ol';
+      return 'pending_boss';
+    }
+    if (r === 'tl' || r === 'pctl') {
+      if (current_level === 1) return 'pending_ol';
+      return 'pending_boss';
+    }
+    if (r === 'ol') {
+      return 'pending_boss';
+    }
+    // Unknown role — fall through to a safe label that the OL UI gate
+    // won't auto-include (it only accepts pending_tl / pending_ol).
     return 'pending_boss';
   }
   if (status === 'cancelled') return 'withdrawn';
@@ -337,7 +358,7 @@ export function _normLeave(row) {
     requesterRole:   row.requester?.role || '',
     requesterQuota:  row.requester?.leave_quota || null,
     assignedTo:      null, // multi-stage approver derived server-side, not stored on row
-    status:          mapStatusToV1(row.status, row.current_level),
+    status:          mapStatusToV1(row.status, row.current_level, row.requester?.role),
     currentLevel:    row.current_level || 1,
     intermediateApproval: intermediate,
     bossApproval:    boss,
@@ -381,14 +402,32 @@ export async function listAllLeavesV1() {
 // Realtime: subscribe to all visible leave_requests.
 export function subscribeLeaves(onChange) {
   let stopped = false;
+  // Always call onChange (even with []) on the initial fetch, regardless
+  // of whether it succeeds — otherwise a network blip or RLS quirk
+  // leaves the page spinning forever. The caller flips `loading` off
+  // inside the callback, so we MUST fire it for the UI to recover.
   (async () => {
-    try { const rows = await listAllLeavesV1(); if (!stopped) onChange(rows); }
-    catch { /* ignore */ }
+    try {
+      const rows = await listAllLeavesV1();
+      if (!stopped) onChange(rows);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[subscribeLeaves] initial fetch failed', err);
+      if (!stopped) onChange([]);
+    }
   })();
   const ch = supabase
-    .channel('leave-requests-all')
+    .channel(`leave-requests-${Math.random().toString(36).slice(2, 8)}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'leave_requests' },
-      async () => { try { const rows = await listAllLeavesV1(); if (!stopped) onChange(rows); } catch { /* ignore */ } })
+      async () => {
+        try {
+          const rows = await listAllLeavesV1();
+          if (!stopped) onChange(rows);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[subscribeLeaves] refresh after change failed', err);
+        }
+      })
     .subscribe();
   return () => { stopped = true; supabase.removeChannel(ch); };
 }
