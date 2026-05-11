@@ -19,6 +19,42 @@ const LOCATIONS = [
   { key: 'wfh',      label: 'Work From Home',   icon: 'bi-house-door', color: '#16a34a' },
 ];
 
+// All attendance display + editing is locked to Pakistan time
+// regardless of the viewer's laptop TZ. Without this, an OL working
+// from the US sees their team's "6:37 PM" as "6:37 AM" and the edit
+// picker's validator interprets their typed "6:37 PM" as
+// 6:37 PM in their LOCAL zone (e.g. US), which then crosses midnight
+// UTC and shows up as "in the future" relative to the current PKT
+// moment. Two helpers:
+//   * toPktLocalInput(Date) → "YYYY-MM-DDTHH:MM" rendered in PKT,
+//     suitable as the value/min/max of a <input type="datetime-local">.
+//   * fromPktLocalInput(str) → Date object for the moment represented
+//     by that string interpreted as Pakistan time.
+function toPktLocalInput(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(date);
+  const get = (k) => parts.find((p) => p.type === k)?.value || '00';
+  // en-CA can return '24' for midnight hour — fold to '00'.
+  let hh = get('hour');
+  if (hh === '24') hh = '00';
+  return `${get('year')}-${get('month')}-${get('day')}T${hh}:${get('minute')}`;
+}
+function fromPktLocalInput(str) {
+  // "YYYY-MM-DDTHH:MM" interpreted as Pakistan time. PKT is UTC+5,
+  // no DST, so a fixed offset is correct.
+  if (!str) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(str);
+  if (!m) return null;
+  // Build the UTC moment by subtracting 5h.
+  return new Date(Date.UTC(
+    Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+    Number(m[4]) - 5, Number(m[5]),
+  ));
+}
+
 function statusColor(s) {
   if (s === 'clocked-in')       return '#16a34a';
   if (s === 'on-break')         return '#f59e0b';
@@ -40,9 +76,17 @@ function statusLabel(s) {
  * Live analog clock — SVG, hands move every second based on `now`
  * ───────────────────────────────────────────────────────────────────────────── */
 function AnalogClock({ now, accent = '#16a34a', size = 200 }) {
-  const h = now.getHours() % 12;
-  const m = now.getMinutes();
-  const s = now.getSeconds();
+  // Hands point at Pakistan time so the analog dial agrees with the
+  // digital display and the attendance records.
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(now);
+  const pn = (k) => Number(parts.find((p) => p.type === k)?.value || '0');
+  let h24 = pn('hour'); if (h24 === 24) h24 = 0;
+  const h = h24 % 12;
+  const m = pn('minute');
+  const s = pn('second');
 
   const hourDeg   = (h * 30) + (m * 0.5);
   const minuteDeg = (m * 6)  + (s * 0.1);
@@ -388,13 +432,27 @@ export default function ClockWidget() {
     setAdjustTarget(null);
   }
 
-  // Formatted digital clock strings
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
+  // Formatted digital clock strings — locked to Pakistan time so the
+  // big display agrees with everywhere else in the attendance UI.
+  const pktParts = useMemo(() => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(now);
+    const get = (k) => parts.find((p) => p.type === k)?.value || '00';
+    let h = get('hour');
+    if (h === '24') h = '00';
+    return { hh: h, mm: get('minute'), ss: get('second') };
+  }, [now]);
+  const hh = pktParts.hh;
+  const mm = pktParts.mm;
+  const ss = pktParts.ss;
   const dateStr = useMemo(() => {
-    const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return now.toLocaleDateString(undefined, opts);
+    const opts = {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      timeZone: 'Asia/Karachi',
+    };
+    return now.toLocaleDateString('en-US', opts);
   }, [now]);
 
   const locInfo = LOCATIONS.find(l => l.key === record?.location);
@@ -446,8 +504,11 @@ export default function ClockWidget() {
   async function handleSubmitEditClockIn() {
     setEditError('');
     if (!editTime) { setEditError('Please pick a time.'); return; }
-    const picked = new Date(editTime);
-    if (isNaN(picked.getTime())) { setEditError('Invalid time.'); return; }
+    // Interpret the picker value as Pakistan time so a viewer on a
+    // non-PKT laptop picking "6:37 PM" gets 6:37 PM in PKT, not their
+    // local 6:37 PM. The DB stores UTC so this just shifts the moment.
+    const picked = fromPktLocalInput(editTime);
+    if (!picked || isNaN(picked.getTime())) { setEditError('Invalid time.'); return; }
     const pickedMs = picked.getTime();
     const nowMs = Date.now();
     // Shift-aware window. WurxCrew runs 4pm–12am and 6pm–2am night
@@ -784,9 +845,12 @@ export default function ClockWidget() {
                         <button className="att-secondary-btn"
                           onClick={() => {
                             const d = record.clockIn?.toDate ? record.clockIn.toDate() : new Date(record.clockIn);
-                            const pad = n => String(n).padStart(2, '0');
-                            const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                            setEditTime(local); setEditReason(''); setEditError('');
+                            // Pre-fill the picker in Pakistan time so a
+                            // user on a non-PKT laptop still sees their
+                            // shift's real moment (Asia/Karachi is the
+                            // canonical zone for attendance).
+                            setEditTime(toPktLocalInput(d));
+                            setEditReason(''); setEditError('');
                             setShowEditClockIn(true);
                           }}>
                           <i className="bi bi-pencil-square" /> Edit time
@@ -930,28 +994,15 @@ export default function ClockWidget() {
                   className="form-control form-control-sm"
                   value={editTime}
                   onChange={e => setEditTime(e.target.value)}
-                  max={(() => {
-                    // Cap at "now" in the browser's local time so the
-                    // user can't pick a future moment.
-                    const d = new Date();
-                    const pad = n => String(n).padStart(2, '0');
-                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                  })()}
-                  min={(() => {
-                    // 18 hours back from now — covers any night shift
-                    // that crosses midnight. Without an explicit min,
-                    // the browser's datepicker happily lets the user
-                    // scroll to next year and then the JS validator
-                    // shouts at them; with min, the picker won't even
-                    // let them pick something invalid.
-                    const d = new Date(Date.now() - 18 * 60 * 60 * 1000);
-                    const pad = n => String(n).padStart(2, '0');
-                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                  })()}
+                  // max + min both rendered in Pakistan time so the
+                  // datepicker shows valid options for a PKT-locked
+                  // shift regardless of the viewer's laptop timezone.
+                  max={toPktLocalInput(new Date())}
+                  min={toPktLocalInput(new Date(Date.now() - 18 * 60 * 60 * 1000))}
                 />
                 <div className="text-muted mt-1" style={{ fontSize: '0.66rem' }}>
-                  Current: {fmtTime(record?.clockIn)} · pick any time within the last 18 hours
-                  (covers night shifts spanning midnight)
+                  Current: {fmtTime(record?.clockIn)} (Pakistan time) · pick any time
+                  within the last 18 hours
                 </div>
               </div>
 

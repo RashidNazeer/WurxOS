@@ -161,10 +161,20 @@ export function fmtDurationLive(ms) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// All attendance display is locked to Pakistan time (Asia/Karachi)
+// regardless of the viewer's browser TZ. WurxCrew shifts are defined
+// in Pakistan time and the DB stores Karachi-locked timestamps; if a
+// remote OL on a US laptop sees "6:37 AM" instead of "6:37 PM",
+// the timezone slip downstream of fmtTime is what creates the
+// "edit time says future" bugs (memory: project_overview /
+// reference_wurxos_v2_supabase — Asia/Karachi is the canonical zone).
 export function fmtTime(ts) {
   if (!ts) return '—';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZone: 'Asia/Karachi',
+  });
 }
 
 export function fmtMs(ms) {
