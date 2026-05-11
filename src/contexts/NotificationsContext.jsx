@@ -98,10 +98,19 @@ export function NotificationsProvider({ children }) {
   }, [uid]);
 
   // Tab-focus safety net — if realtime dropped while the tab was in
-  // the background, refetch counts the moment the user comes back.
+  // the background, refetch counts when the user comes back. Throttled
+  // to once per 30 seconds so rapid tab-switching doesn't fire a flood
+  // of fetches (every list query touches the notifications table).
   useEffect(() => {
     if (!uid) return;
-    function onVisible() { if (document.visibilityState === 'visible') loadRef.current?.(); }
+    let lastFetch = 0;
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastFetch < 30 * 1000) return;
+      lastFetch = now;
+      loadRef.current?.();
+    }
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   // eslint-disable-next-line react-hooks/exhaustive-deps
