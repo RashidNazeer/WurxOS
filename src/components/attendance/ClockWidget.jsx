@@ -450,11 +450,24 @@ export default function ClockWidget() {
     if (isNaN(picked.getTime())) { setEditError('Invalid time.'); return; }
     const pickedMs = picked.getTime();
     const nowMs = Date.now();
-    // Shift-aware window: allow editing back up to 18h to cover night shifts
-    // that span midnight (e.g. 6pm–2am shift edited at 1am must accept 6pm "yesterday").
+    // Shift-aware window. WurxCrew runs 4pm–12am and 6pm–2am night
+    // shifts, so a user editing at 1am should still be able to set
+    // their clock-in to 6pm of the previous calendar day. Rules:
+    //   * never in the FUTURE (real absolute future)
+    //   * within the last 18 hours so the night-shift case works
+    //     end-to-end (clock-in 6pm + ~8h shift + grace = 18h is plenty)
+    //   * if a record already exists, also allow up to 18h BEFORE
+    //     the recorded clock_in so a TL/Boss editing the old entry
+    //     isn't restricted to the current 18h window
     const minMs = nowMs - 18 * 60 * 60 * 1000;
-    if (pickedMs > nowMs) { setEditError('Clock-in time cannot be in the future.'); return; }
-    if (pickedMs < minMs) { setEditError('Clock-in time must be within the last 18 hours.'); return; }
+    if (pickedMs > nowMs) {
+      setEditError('Clock-in time cannot be in the future.');
+      return;
+    }
+    if (pickedMs < minMs) {
+      setEditError('Clock-in time must be within the last 18 hours (covers night shifts spanning midnight).');
+      return;
+    }
     if (!editReason.trim() && isApcOrIpc) { setEditError('Please add a short reason.'); return; }
 
     setEditSaving(true);
@@ -918,13 +931,27 @@ export default function ClockWidget() {
                   value={editTime}
                   onChange={e => setEditTime(e.target.value)}
                   max={(() => {
+                    // Cap at "now" in the browser's local time so the
+                    // user can't pick a future moment.
                     const d = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  })()}
+                  min={(() => {
+                    // 18 hours back from now — covers any night shift
+                    // that crosses midnight. Without an explicit min,
+                    // the browser's datepicker happily lets the user
+                    // scroll to next year and then the JS validator
+                    // shouts at them; with min, the picker won't even
+                    // let them pick something invalid.
+                    const d = new Date(Date.now() - 18 * 60 * 60 * 1000);
                     const pad = n => String(n).padStart(2, '0');
                     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
                   })()}
                 />
                 <div className="text-muted mt-1" style={{ fontSize: '0.66rem' }}>
-                  Current: {fmtTime(record?.clockIn)} · must be today and not in the future
+                  Current: {fmtTime(record?.clockIn)} · pick any time within the last 18 hours
+                  (covers night shifts spanning midnight)
                 </div>
               </div>
 
