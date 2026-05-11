@@ -5,6 +5,7 @@ import { queryClient } from './lib/queryClient';
 import { lazyWithRetry as lazy } from './lib/lazyWithRetry';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ErrorReporterProvider } from './contexts/ErrorReporterContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
@@ -153,6 +154,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <ErrorReporterProvider>
           <BrowserRouter>
           <Routes>
             {/* Public */}
@@ -422,6 +424,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
+          </ErrorReporterProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
