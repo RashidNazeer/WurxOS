@@ -284,15 +284,38 @@ export function AuthProvider({ children }) {
   }, [session?.user?.id, recheckSession]);
 
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') recheckSession(); };
-    const onOnline  = () => recheckSession();
+    let lastProfileRefresh = 0;
+    const refreshProfileIfStale = () => {
+      // If we missed a realtime UPDATE event on the profiles table
+      // (WebSocket dropped, tab was sleeping, network blip), the
+      // user's `reports_to`, role, or brand-assignment can be stale
+      // — which produces "my TL says he's offline but he's actually
+      // clocked in" and similar reassignment-related symptoms.
+      // Re-fetch the profile on tab focus, throttled to once / minute.
+      const uid = session?.user?.id;
+      if (!uid) return;
+      const now = Date.now();
+      if (now - lastProfileRefresh < 60 * 1000) return;
+      lastProfileRefresh = now;
+      loadProfile(uid).catch(() => {});
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        recheckSession();
+        refreshProfileIfStale();
+      }
+    };
+    const onOnline = () => {
+      recheckSession();
+      refreshProfileIfStale();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);
     };
-  }, [recheckSession]);
+  }, [recheckSession, session?.user?.id, loadProfile]);
 
   const signUp = useCallback(async ({ email, password, displayName }) => {
     const { data, error } = await supabase.auth.signUp({
