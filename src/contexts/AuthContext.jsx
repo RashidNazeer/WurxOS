@@ -70,22 +70,22 @@ export function AuthProvider({ children }) {
     //    We only update session state here; the effect below reacts to it.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
-      // Drop no-op updates. Supabase fires TOKEN_REFRESHED roughly
-      // hourly with a brand-new session object whose user id is the
-      // same. Without this guard, every refresh would re-render every
+      // Drop no-op updates. Supabase fires TOKEN_REFRESHED with a brand-
+      // new session object every hour AND every time the tab regains
+      // focus after long inactivity — in both cases the access_token is
+      // a new JWT string but the underlying user hasn't changed.
+      // Without this guard, every refresh would re-render every
       // useAuth() consumer and re-fire any effect whose deps include
-      // `user` or `session` by reference (we have several), creating
-      // a perceived "full app reload" on navigation. Compare by the
-      // fields that actually matter: user id + access/refresh tokens.
+      // `user` or `session` by reference (we have several), making a
+      // routine focus-recheck look like a full app reload.
+      //
+      // Dedupe on user id alone — that's what consumers actually care
+      // about. The Supabase client manages its own token internally;
+      // the session object we hold is just a snapshot for the UI, so
+      // keeping the old reference when only tokens rotated is safe.
       setSession((prev) => {
         if (!prev && !newSession) return prev;
-        if (
-          prev &&
-          newSession &&
-          prev.user?.id === newSession.user?.id &&
-          prev.access_token === newSession.access_token &&
-          prev.refresh_token === newSession.refresh_token
-        ) {
+        if (prev && newSession && prev.user?.id === newSession.user?.id) {
           return prev;
         }
         return newSession;
