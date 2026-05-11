@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -17,6 +17,7 @@ import {
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
+import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
@@ -243,6 +244,33 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   const [selectedPeriod, setSelectedPeriod] = useState(null);
   const [existingReports, setExistingReports] = useState([]);
   const [data, setData] = useState(emptyBiWeeklyReport());
+
+  // Auto-save in-progress new reports to localStorage every 30s.
+  // Same pattern as WeeklyReportForm — see that file for rationale.
+  const draftKey = {
+    type: 'biweekly',
+    uid: currentUser?.uid,
+    brandId: selectedBrand?.id,
+    periodStart: selectedPeriod?.startDate,
+  };
+  const { clear: clearLocalDraft } = useReportAutosave({
+    ...draftKey,
+    data,
+    enabled: !editReportId,
+  });
+  const restoredKeyRef = useRef('');
+  useEffect(() => {
+    if (editReportId) return;
+    if (!draftKey.uid || !draftKey.brandId || !draftKey.periodStart) return;
+    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}`;
+    if (restoredKeyRef.current === k) return;
+    restoredKeyRef.current = k;
+    const saved = loadDraft(draftKey);
+    if (saved?.data) {
+      setData((d) => ({ ...d, ...saved.data }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editReportId, draftKey.uid, draftKey.brandId, draftKey.periodStart]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!!editReportId);
   const [detectingPeriod, setDetectingPeriod] = useState(false);
@@ -681,6 +709,8 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
         status,
         extraFields: extra,
       });
+      // Successful save — drop the local auto-save backup.
+      clearLocalDraft();
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,

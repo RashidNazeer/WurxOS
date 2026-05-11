@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -17,6 +17,7 @@ import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
+import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
@@ -244,6 +245,39 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [existingReports, setExistingReports] = useState([]);
   const [data, setData] = useState(emptyReport());
+
+  // Auto-save in-progress new reports to localStorage every 30s so a
+  // mid-edit sign-out, tab crash, or deploy doesn't lose the work.
+  // Only enabled on the new-report flow — editing an existing report
+  // already writes to the DB on every Save.
+  const draftKey = {
+    type: 'weekly',
+    uid: currentUser?.uid,
+    brandId: selectedBrand?.id,
+    periodStart: selectedWeek?.startDate,
+  };
+  const { clear: clearLocalDraft } = useReportAutosave({
+    ...draftKey,
+    data,
+    enabled: !editReportId,
+  });
+  // Once we know brand + week (and we're NOT editing), restore any
+  // locally-saved draft. Runs once per (brand, week) pair.
+  const restoredKeyRef = useRef('');
+  useEffect(() => {
+    if (editReportId) return;
+    if (!draftKey.uid || !draftKey.brandId || !draftKey.periodStart) return;
+    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}`;
+    if (restoredKeyRef.current === k) return;
+    restoredKeyRef.current = k;
+    const saved = loadDraft(draftKey);
+    if (saved?.data) {
+      // Merge over the empty template so any new fields we've added
+      // since the draft was saved still have sane defaults.
+      setData((d) => ({ ...d, ...saved.data }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editReportId, draftKey.uid, draftKey.brandId, draftKey.periodStart]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!!editReportId);
   const [detectingWeek, setDetectingWeek] = useState(false);
@@ -738,6 +772,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         status,
         extraFields: extra,
       });
+      // Successful save — drop the local auto-save backup. The
+      // server now has the canonical copy.
+      clearLocalDraft();
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,
