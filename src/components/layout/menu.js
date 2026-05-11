@@ -58,48 +58,44 @@ const REPORTS_GROUP = {
 };
 
 // --- Requests collapsible group (v1: REQUEST_SUB) ------------------
-// v1 places Approvals + Leave & WFH + Bug Reports + Suggestions inside
-// a "Requests" collapsible. Boss/OL get the Approvals child since
-// they handle leave approvals; everyone else just sees their own
-// Leave & WFH (which we map to /leave for them, /leave/approvals for
-// approvers — TL/PCTL get both via Approvals child).
+// Both /leave and /leave/approvals render the same LeaveRouter, which
+// dispatches by role: Boss/Developer get the approval queue,
+// everyone else gets My + Team tabs. So we only expose ONE entry —
+// having both "My Leave" and "Leave Approvals" in the menu was a
+// duplicate that caused user confusion (and showed the older buggy
+// implementation if the user clicked the wrong one).
 const REQUESTS_GROUP_BOSS = {
   label: 'Requests',
   icon: MessageIcon,
   children: [
-    { label: 'Leave Approvals', to: '/leave/approvals' },
-    { label: 'Bug Reports',     to: '/bugs' },
-    { label: 'Suggestions',     to: '/suggestions' },
+    { label: 'Leave Requests', to: '/leave' },
+    { label: 'Bug Reports',    to: '/bugs' },
+    { label: 'Suggestions',    to: '/suggestions' },
   ],
 };
-// OL applies for leave AND approves — show both.
 const REQUESTS_GROUP_OL = {
   label: 'Requests',
   icon: MessageIcon,
   children: [
-    { label: 'My Leave',        to: '/leave' },
-    { label: 'Leave Approvals', to: '/leave/approvals' },
-    { label: 'Bug Reports',     to: '/bugs' },
-    { label: 'Suggestions',     to: '/suggestions' },
+    { label: 'Leave',       to: '/leave' },
+    { label: 'Bug Reports', to: '/bugs' },
+    { label: 'Suggestions', to: '/suggestions' },
   ],
 };
-// TL/PCTL — apply + approve.
 const REQUESTS_GROUP_APPROVER = {
   label: 'Requests',
   icon: MessageIcon,
   children: [
-    { label: 'My Leave',        to: '/leave' },
-    { label: 'Leave Approvals', to: '/leave/approvals' },
-    { label: 'Bug Reports',     to: '/bugs' },
-    { label: 'Suggestions',     to: '/suggestions' },
+    { label: 'Leave',       to: '/leave' },
+    { label: 'Bug Reports', to: '/bugs' },
+    { label: 'Suggestions', to: '/suggestions' },
   ],
 };
-// APC/IPC — only apply.
 const REQUESTS_GROUP_APPLIER = {
   label: 'Requests',
   icon: MessageIcon,
   children: [
-    { label: 'My Leave',    to: '/leave' },
+    { label: 'Leave',       to: '/leave' },
     { label: 'Bug Reports', to: '/bugs' },
     { label: 'Suggestions', to: '/suggestions' },
   ],

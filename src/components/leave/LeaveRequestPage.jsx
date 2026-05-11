@@ -531,25 +531,33 @@ export default function LeaveRequestPage() {
 
   // RLS-scoped subscribe pulls everything the user is allowed to see
   // (own + team if TL, all if OL/Boss). We split into my/team in memo.
+  //
+  // CRITICAL: depend on `currentUser?.uid` (stable string), NOT
+  // `currentUser` (a new object identity every render). The previous
+  // [currentUser] dep made this effect tear down and re-subscribe on
+  // every render — including renders triggered by setAllLeaves itself
+  // — keeping the page in a perpetual "loading" state and never
+  // delivering data to the UI.
+  const uid = currentUser?.uid;
   useEffect(() => {
-    if (!currentUser) return;
+    if (!uid) return;
     const unsub = subscribeLeaves((rows) => {
       setAllLeaves(rows);
       setLoading(false);
     });
     return () => unsub();
-  }, [currentUser]);
+  }, [uid]);
 
   // Quota
   useEffect(() => {
-    if (!currentUser) return;
+    if (!uid) return;
     (async () => {
       try {
-        const q = await getMyLeaveQuota(currentUser.uid);
+        const q = await getMyLeaveQuota(uid);
         setLeaveQuota(q);
       } catch { /* ignore */ }
     })();
-  }, [currentUser]);
+  }, [uid]);
 
   const myRequests   = useMemo(() => allLeaves.filter(r => r.requestedBy === currentUser?.uid), [allLeaves, currentUser]);
   const teamRequests = useMemo(() => {
@@ -752,17 +760,18 @@ export default function LeaveRequestPage() {
 
                   // Audience-aware label:
                   //   Forwarded:
-                  //     * the forwarder themselves → "Forwarded by [forwarder]"
-                  //     * Boss (the recipient)     → "Forwarded by [forwarder]"
-                  //     * everyone else            → "Forwarded to [Boss name]"
+                  //     * Boss (the recipient) → "Forwarded by [forwarder]"
+                  //                              (Boss needs to know who acted)
+                  //     * everyone else        → "Forwarded to [Boss name]"
+                  //                              (the relevant fact is who's
+                  //                              sitting on the decision now —
+                  //                              the forwarder is incidental)
                   //   Approved/Rejected:
-                  //     * always "Approved by [approver]" / "Rejected by [approver]"
-                  //       — these are final decisions, the actor is the
-                  //       point of information for everyone.
+                  //     * always "Approved/Rejected by [approver]" — these
+                  //       are final decisions; the actor is the point.
                   let label;
                   if (isForwarded) {
-                    const iAmForwarder = currentUser?.uid && it.approverId === currentUser.uid;
-                    if (iAmForwarder || isBoss) {
+                    if (isBoss) {
                       label = `Forwarded by ${it.approverName}`;
                     } else {
                       label = `Forwarded to ${bossInfo?.display_name || 'Boss'}`;
