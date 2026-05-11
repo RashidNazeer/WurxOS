@@ -179,13 +179,32 @@ export function getBiWeeklyPeriodsFromAnchor(anchorStr, count = 30) {
 }
 
 export function detectNextBiWeeklyPeriod(existing, anchorStr) {
-  if (!anchorStr) return null;
-  const all = getBiWeeklyPeriodsFromAnchor(anchorStr, 60);
-  const lastStart = existing
-    .filter((r) => r.type === 'biweekly')
-    .map((r) => r.period_start)
+  // Mirror of the weekly fix (c1dac39 / 66542d1). Callers may pass
+  // `anchorStr` (the brand's first-period start) to seed the chain,
+  // OR omit it when prior reports already exist — we'll derive the
+  // chain head from the latest report's start date in that case.
+  //
+  // `existing` items come back from getBiWeeklyReportsForBrand() in
+  // the v1 shape produced by _normReport(): {periodStart, periodEnd,
+  // period, ...} — NOT v2 column names. Read both `periodStart` (v1-
+  // shape, normalized) and `period_start` (raw v2 row) to be safe.
+  //
+  // Returns null only when neither an anchor nor any prior report is
+  // available (truly first-time, no anchor set, no reports yet).
+  const reports = (existing || []).filter((r) => !r.type || r.type === 'biweekly');
+  const lastStart = reports
+    .map((r) => r.periodStart || r.period_start)
+    .filter(Boolean)
     .sort()
     .pop();
+
+  // Derive the anchor: prefer the explicit one, otherwise back-compute
+  // from the latest report so the period chain stays aligned to the
+  // brand's existing 14-day grid.
+  const effectiveAnchor = anchorStr || lastStart;
+  if (!effectiveAnchor) return null;
+
+  const all = getBiWeeklyPeriodsFromAnchor(effectiveAnchor, 60);
   if (!lastStart) return all[0];
   const idx = all.findIndex((p) => p.startDate === lastStart);
   return idx >= 0 ? all[idx + 1] || null : all[0];

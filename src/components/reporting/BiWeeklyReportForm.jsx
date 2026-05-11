@@ -246,9 +246,34 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       setExistingReports(reports);
       setDetectingPeriod(false);
 
-      if (!anchor) {
-        // No anchor yet — show anchor setup
+      if (!anchor && reports.length === 0) {
+        // No anchor and no reports — first-time setup, show anchor picker.
         setStep(1);
+      } else if (!anchor && reports.length > 0) {
+        // Anchor was never saved (or got lost) but the brand already has
+        // reports — chain off the latest report's start date instead of
+        // forcing the APC back to the anchor-picker. Mirrors weekly's
+        // fallback so users aren't stuck re-anchoring an existing brand.
+        const next = detectNextBiWeeklyPeriod(reports, null);
+        if (next) {
+          setSelectedPeriod(next);
+          setStep(2);
+          // Self-heal: back-compute the anchor (oldest report's start)
+          // and persist it so this fallback branch only fires once per
+          // brand. Best-effort — RLS may reject for non-OL users, in
+          // which case we silently keep going; the helper still works.
+          const oldestStart = [...reports]
+            .map((r) => r.periodStart || r.period_start)
+            .filter(Boolean)
+            .sort()[0];
+          if (oldestStart) {
+            setBiWeeklyAnchor(selectedBrand.id, oldestStart)
+              .then((saved) => { if (!cancelled) setAnchorData(saved); })
+              .catch(() => {});
+          }
+        } else {
+          setStep(1);
+        }
       } else if (reports.length === 0) {
         // Anchor set but no reports yet — first period is anchor start
         const firstPeriod = getBiWeeklyPeriodsFromAnchor(anchor.anchorStart, 1)[0];
