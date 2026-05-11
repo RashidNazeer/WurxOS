@@ -719,27 +719,231 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
 
 // ── Pillar Bar ───────────────────────────────────────────────────────────────
 
-function PillarBar({ pillar, score, weight }) {
+function PillarBar({ pillar, score, weight, detail }) {
   const level = score !== null ? getLevel(score) : null;
+  const [open, setOpen] = useState(false);
+  const hasDetail = !!detail;
   return (
-    <div className="rounded-3 p-3" style={{ background: '#fff', border: '1px solid #e9ecef' }}>
-      <div className="d-flex align-items-center justify-content-between mb-2">
-        <div className="d-flex align-items-center gap-2">
-          <i className={`bi ${pillar.icon}`} style={{ color: pillar.color, fontSize: '0.9rem' }} />
-          <span className="small fw-semibold">{pillar.label}</span>
-          <span className="text-muted" style={{ fontSize: '0.6rem' }}>({weight}%)</span>
+    <div className="rounded-3" style={{ background: '#fff', border: '1px solid #e9ecef', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => hasDetail && setOpen((v) => !v)}
+        className="w-100 text-start p-3"
+        style={{
+          background: 'transparent', border: 'none',
+          cursor: hasDetail ? 'pointer' : 'default',
+        }}
+      >
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <div className="d-flex align-items-center gap-2">
+            <i className={`bi ${pillar.icon}`} style={{ color: pillar.color, fontSize: '0.9rem' }} />
+            <span className="small fw-semibold">{pillar.label}</span>
+            <span className="text-muted" style={{ fontSize: '0.6rem' }}>({weight}%)</span>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            {score !== null ? (
+              <span className="fw-bold small" style={{ color: level.color }}>{score}/100</span>
+            ) : (
+              <span className="text-muted" style={{ fontSize: '0.7rem' }}>N/A</span>
+            )}
+            {hasDetail && (
+              <i
+                className={`bi ${open ? 'bi-chevron-up' : 'bi-chevron-down'} text-muted`}
+                style={{ fontSize: '0.75rem' }}
+              />
+            )}
+          </div>
         </div>
-        {score !== null ? (
-          <span className="fw-bold small" style={{ color: level.color }}>{score}/100</span>
-        ) : (
-          <span className="text-muted" style={{ fontSize: '0.7rem' }}>N/A</span>
-        )}
-      </div>
-      <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-        <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || '#e9ecef', transition: 'width 0.4s' }} />
-      </div>
+        <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
+          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || '#e9ecef', transition: 'width 0.4s' }} />
+        </div>
+      </button>
+      {hasDetail && open && (
+        <div className="px-3 pb-3" style={{ borderTop: '1px solid #f3f4f6' }}>
+          <div className="pt-3">{detail}</div>
+        </div>
+      )}
     </div>
   );
+}
+
+// Renders the per-pillar drill-down on My Performance. Aggregates +
+// key events only — no raw dumps. Each block knows how to handle
+// missing data ("Not rated yet", "No incentives", etc.).
+function PillarDetail({ pillarKey, ctx }) {
+  const {
+    myRecord, myIncRecord, myAttendanceDays, myFlags, month,
+    workingDays,
+  } = ctx;
+
+  if (pillarKey === 'performance') {
+    const metrics = myRecord?.metrics || null;
+    if (!metrics) {
+      return (
+        <div className="text-muted small">
+          Not rated yet for {getMonthLabel(month)}. Your TL or OL will rate
+          you on the metrics below at the end of the month.
+        </div>
+      );
+    }
+    return (
+      <div className="d-flex flex-column gap-2">
+        <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+          Each metric is rated 0–100. The pillar score is the average.
+          {myRecord?.evaluatedByName && <> Rated by <strong>{myRecord.evaluatedByName}</strong>.</>}
+        </div>
+        {METRICS.map((m) => {
+          const v = Number(metrics[m.key]) || 0;
+          const lvl = getLevel(v);
+          return (
+            <div key={m.key} className="d-flex align-items-center gap-2"
+              style={{ fontSize: '0.75rem' }}>
+              <i className={`bi ${m.icon}`} style={{ color: '#6c757d', fontSize: '0.78rem', flex: '0 0 14px' }} />
+              <span style={{ flex: 1, color: '#374151' }}>{m.label}</span>
+              <div className="rounded-pill" style={{ flex: '0 0 90px', height: 5, background: '#e9ecef', overflow: 'hidden' }}>
+                <div className="h-100 rounded-pill" style={{ width: `${v}%`, background: lvl.color }} />
+              </div>
+              <span className="fw-semibold" style={{ flex: '0 0 38px', textAlign: 'right', color: lvl.color }}>
+                {v}/100
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (pillarKey === 'incentives') {
+    const items = [
+      ...(myIncRecord?.incentives || []).map((x) => ({ ...x, _kind: 'incentive' })),
+      ...(myIncRecord?.bonuses    || []).map((x) => ({ ...x, _kind: 'bonus' })),
+    ];
+    if (items.length === 0) {
+      return (
+        <div className="text-muted small">
+          No incentives or bonuses set for {getMonthLabel(month)} yet.
+        </div>
+      );
+    }
+    const completedCount = items.filter((i) => i.completed).length;
+    return (
+      <div className="d-flex flex-column gap-2">
+        <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+          Score = completed / total items, expressed as a percentage.
+          Currently <strong>{completedCount}</strong> of <strong>{items.length}</strong> completed.
+        </div>
+        {items.map((it, i) => (
+          <div key={i} className="d-flex align-items-start gap-2 rounded-2 p-2"
+            style={{
+              background: it.completed ? '#f0fdf4' : '#f9fafb',
+              border: `1px solid ${it.completed ? '#b7dfc4' : '#e9ecef'}`,
+              fontSize: '0.74rem',
+            }}>
+            <i className={`bi ${it.completed ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}
+              style={{ fontSize: '0.8rem', marginTop: 2 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="fw-semibold" style={{ color: '#1f2937' }}>
+                {it.title || it.label || (it._kind === 'bonus' ? 'Bonus' : 'Incentive')}
+                <span className="text-muted ms-1" style={{ fontSize: '0.6rem', fontWeight: 500 }}>
+                  · {it._kind}
+                </span>
+              </div>
+              {it.amount != null && it.amount !== '' && (
+                <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+                  {Number(it.amount).toLocaleString('en-US')} PKR
+                </div>
+              )}
+              {it.description && (
+                <div style={{ color: '#374151', marginTop: 2 }}>{it.description}</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (pillarKey === 'attendance') {
+    const effective = myAttendanceDays.effective || 0;
+    const leaveDays = myAttendanceDays.leaveDays || 0;
+    const covered   = effective + leaveDays;
+    const wd        = workingDays;
+    const pct       = wd > 0 ? Math.round((covered / wd) * 100) : 100;
+    const missed    = Math.max(0, wd - covered);
+    return (
+      <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
+        <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+          Score = covered days / working days (Mon–Fri). Approved
+          medical / emergency leaves count toward "covered".
+        </div>
+        <div className="d-flex justify-content-between rounded-2 p-2"
+          style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+          <span>Working days this month</span>
+          <strong>{wd}</strong>
+        </div>
+        <div className="d-flex justify-content-between rounded-2 p-2"
+          style={{ background: '#f0fdf4', border: '1px solid #b7dfc4' }}>
+          <span>Days present (real clock-ins + adjustments)</span>
+          <strong>{effective}</strong>
+        </div>
+        <div className="d-flex justify-content-between rounded-2 p-2"
+          style={{ background: '#eff6ff', border: '1px solid #93c5fd' }}>
+          <span>Approved leave days</span>
+          <strong>{leaveDays}</strong>
+        </div>
+        {missed > 0 && (
+          <div className="d-flex justify-content-between rounded-2 p-2"
+            style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+            <span>Days not covered</span>
+            <strong className="text-danger">{missed}</strong>
+          </div>
+        )}
+        <div className="d-flex justify-content-between rounded-2 p-2 fw-bold"
+          style={{ background: '#f3f4f6', border: '1px solid #e9ecef' }}>
+          <span>Covered ({covered} / {wd})</span>
+          <span>{pct}%</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (pillarKey === 'flags') {
+    // Filter to this month only — same logic as calcFlagsScore so the
+    // numbers shown match the score.
+    const monthFlags = (myFlags || []).filter((f) => {
+      if (!f.createdAt) return false;
+      const d = f.createdAt?.toDate ? f.createdAt.toDate() : new Date(f.createdAt);
+      const fm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return fm === month;
+    });
+    const greens = monthFlags.filter((f) => f.type === 'green').length;
+    const reds   = monthFlags.filter((f) => f.type === 'red').length;
+    return (
+      <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
+        <div className="text-muted" style={{ fontSize: '0.68rem' }}>
+          Score starts at <strong>{FLAG_BASE_SCORE}</strong>. Each green flag this
+          month adds <strong>+{FLAG_GREEN_DELTA}</strong>; each red flag subtracts
+          <strong> {FLAG_RED_DELTA}</strong>. Capped at 0–100. Flags from earlier
+          months don't affect this score.
+        </div>
+        <div className="d-flex justify-content-between rounded-2 p-2"
+          style={{ background: '#f0fdf4', border: '1px solid #b7dfc4' }}>
+          <span><i className="bi bi-flag-fill me-1" style={{ color: '#198754' }} />Green flags this month</span>
+          <strong>{greens}</strong>
+        </div>
+        <div className="d-flex justify-content-between rounded-2 p-2"
+          style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+          <span><i className="bi bi-flag-fill me-1" style={{ color: '#dc3545' }} />Red flags this month</span>
+          <strong>{reds}</strong>
+        </div>
+        {monthFlags.length === 0 && (
+          <div className="text-muted small">No flags in {getMonthLabel(month)} yet.</div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
@@ -1160,11 +1364,35 @@ export default function PerformancePage() {
             </div>
           )}
 
-          {/* Pillar breakdown */}
-          <h6 className="fw-bold mb-3" style={{ fontSize: '0.9rem' }}><i className="bi bi-layers me-2" />Score Breakdown</h6>
+          {/* Pillar breakdown — click any pillar to expand and see how
+              its score was computed. */}
+          <h6 className="fw-bold mb-3" style={{ fontSize: '0.9rem' }}>
+            <i className="bi bi-layers me-2" />Score Breakdown
+            <span className="text-muted ms-2" style={{ fontSize: '0.65rem', fontWeight: 500 }}>
+              · click a row to see the breakdown
+            </span>
+          </h6>
           <div className="d-flex flex-column gap-2 mb-4">
             {PILLARS.map(p => (
-              <PillarBar key={p.key} pillar={p} score={myPillarScores[p.key]} weight={weights[p.key]} />
+              <PillarBar
+                key={p.key}
+                pillar={p}
+                score={myPillarScores[p.key]}
+                weight={weights[p.key]}
+                detail={
+                  <PillarDetail
+                    pillarKey={p.key}
+                    ctx={{
+                      myRecord,
+                      myIncRecord,
+                      myAttendanceDays,
+                      myFlags,
+                      month,
+                      workingDays: workingDaysInMonth(month),
+                    }}
+                  />
+                }
+              />
             ))}
           </div>
 
