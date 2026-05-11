@@ -732,15 +732,28 @@ export default function LeaveRequestPage() {
                     stages (TL → Boss); single stage requests show one pill. */}
                 {r.intermediateApproval && (() => {
                   const it = r.intermediateApproval;
-                  const isApproved = it.status === 'approved';
-                  const verb = isApproved
-                    ? (it.forwardToBoss ? 'Forwarded' : 'Approved')
-                    : 'Rejected';
+                  // Three possible intermediate states from buildApprovalShim:
+                  //   'approved'  → "Approved by X"   (green)
+                  //   'forwarded' → "Forwarded by X"  (green — still positive)
+                  //   'rejected'  → "Rejected by X"   (red)
+                  // Previously the code only checked === 'approved' and
+                  // rendered everything else as red "Rejected", which made
+                  // a 'forwarded' decision look like a rejection. Treat
+                  // both approve and forward as positive.
+                  const isApproved  = it.status === 'approved';
+                  const isForwarded = it.status === 'forwarded' || it.forwardToBoss;
+                  const isPositive  = isApproved || isForwarded;
+                  // Defensive: if the request is currently pending but
+                  // the shim somehow returned a 'rejected' intermediate
+                  // (would only happen with stale data), don't render it
+                  // — the status pill already shows the real state.
+                  if (!isPositive && r.status?.startsWith('pending')) return null;
+                  const verb = isForwarded ? 'Forwarded' : (isApproved ? 'Approved' : 'Rejected');
                   const when = formatDateTime(it.resolvedAt);
                   return (
                     <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                      style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
-                      <i className={`bi ${isApproved ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
+                      style={{ background: isPositive ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
+                      <i className={`bi ${isPositive ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
                       {verb} by {it.approverName}
                       {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
                     </div>

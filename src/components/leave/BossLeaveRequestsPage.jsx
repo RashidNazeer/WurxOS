@@ -115,7 +115,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
             <div className="text-muted small mt-1">{request.reason}</div>
           </div>
 
-          {request.intermediateApproval && request.intermediateApproval.status === 'approved' && (
+          {request.intermediateApproval && (request.intermediateApproval.status === 'approved' || request.intermediateApproval.status === 'forwarded') && (
             <div className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3" style={{ background: '#e6f4ea', border: '1px solid #b7dfc4' }}>
               <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '0.75rem' }} />
               <span className="small">
@@ -484,13 +484,18 @@ export default function BossLeaveRequestsPage() {
 
                         {r.intermediateApproval && (() => {
                           const it = r.intermediateApproval;
-                          const isApproved = it.status === 'approved';
-                          const verb = isApproved ? (it.forwardToBoss ? 'Forwarded' : 'Approved') : 'Rejected';
+                          // forwarded + approved both render as positive (green).
+                          // See LeaveRequestPage.jsx for the same fix.
+                          const isApproved  = it.status === 'approved';
+                          const isForwarded = it.status === 'forwarded' || it.forwardToBoss;
+                          const isPositive  = isApproved || isForwarded;
+                          if (!isPositive && r.status?.startsWith('pending')) return null;
+                          const verb = isForwarded ? 'Forwarded' : (isApproved ? 'Approved' : 'Rejected');
                           const when = formatDateTime(it.resolvedAt);
                           return (
                             <div className="mt-2 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                              style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
-                              <i className={`bi ${isApproved ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
+                              style={{ background: isPositive ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
+                              <i className={`bi ${isPositive ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
                               {verb} by {it.approverName}
                               {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
                             </div>
