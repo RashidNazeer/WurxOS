@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import HighlighterPicker, { useHighlightStyle } from './HighlighterPicker';
 
 /**
@@ -69,20 +69,20 @@ export default function RichTextEditor({
     intensity: highlightIntensity, setIntensity: setHighlightIntensity,
   } = useHighlightStyle();
 
-  // Initial mount — load html
-  useEffect(() => {
-    if (ref.current && ref.current.innerHTML !== value) {
-      ref.current.innerHTML = value || '';
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Sync from outside when not focused
-  useEffect(() => {
+  // Sync external value → editor innerHTML.
+  //
+  // useLayoutEffect (not useEffect) so the sync runs BEFORE the browser
+  // paints. Otherwise on the very first paint the user briefly sees an
+  // empty editor before the async data lands. Empty-array deps for the
+  // initial-mount sync; value-deps for subsequent prop changes.
+  // Don't clobber while the user is typing.
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (document.activeElement !== el && el.innerHTML !== (value || '')) {
-      el.innerHTML = value || '';
+    const next = value || '';
+    if (document.activeElement === el) return;
+    if (el.innerHTML !== next) {
+      el.innerHTML = next;
     }
   }, [value]);
 
