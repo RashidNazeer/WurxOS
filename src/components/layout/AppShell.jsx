@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import KeyboardShortcuts from './KeyboardShortcuts';
+import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import '../../styles/shell.css';
 
 // Suspense fallback for lazy-loaded route chunks. Keeps the shell
@@ -120,9 +121,16 @@ export default function AppShell() {
       />
       <main className="shell-content">
         <div className="shell-content-inner">
-          <Suspense fallback={<RouteFallback />}>
-            <Outlet />
-          </Suspense>
+          {/* Error boundary catches render errors in lazy routes so
+              a bug on one page doesn't leave the user staring at a
+              fully blank screen. Logs to app_events with the stack
+              trace. routeKey resets the boundary on navigation so a
+              transient error doesn't keep other pages broken. */}
+          <RouteErrorBoundary routeKey={location.pathname}>
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
+          </RouteErrorBoundary>
         </div>
       </main>
       <KeyboardShortcuts />

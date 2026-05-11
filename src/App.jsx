@@ -114,8 +114,22 @@ function PublicOnly({ children }) {
 // Developers land directly on the bug triage page — same pattern
 // as v1's /dev/dashboard = DevBugDashboard.
 function DashboardRouter() {
-  const { profile } = useAuth();
-  if (!profile) return null;
+  const { profile, loading } = useAuth();
+  // Render a real spinner while the profile is still loading instead
+  // of returning null. Previously this returned null on every render
+  // where profile wasn't ready yet, so during a brief refetch / RLS
+  // hiccup the dashboard route went blank. Users called it 'blank
+  // page after switching pages' — same root cause.
+  if (loading || !profile) {
+    return (
+      <div style={{
+        display: 'grid', placeItems: 'center', minHeight: '40vh',
+        color: 'var(--text-muted)',
+      }}>
+        <span className="wx-spinner" style={{ color: 'var(--accent)' }} />
+      </div>
+    );
+  }
   if (profile.role === 'developer') return <Navigate to="/bugs" replace />;
   if (profile.role === 'boss')      return <BossDashboard />;
   return <RoleDashboard />;
