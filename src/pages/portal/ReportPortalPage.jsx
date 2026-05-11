@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchSharedReport } from '../../lib/reportShareApi';
 import { AlertIcon, CheckIcon, ReportIcon } from '../../components/common/Icon';
+import { useForceLightTheme } from './useForceLightTheme';
 import '../../styles/reports.css';
 import '../../styles/portal.css';
 
 export default function ReportPortalPage() {
+  // External clients always see the report in light mode.
+  useForceLightTheme();
+
   const { token } = useParams();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);

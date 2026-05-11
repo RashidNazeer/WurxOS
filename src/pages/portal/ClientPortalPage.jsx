@@ -5,9 +5,13 @@ import ClientReportsSection from '../../components/portal/ClientReportsSection';
 import ClientPaidCollabSection from '../../components/portal/ClientPaidCollabSection';
 import ClientGmvMaxSection from '../../components/portal/ClientGmvMaxSection';
 import { AlertIcon } from '../../components/common/Icon';
+import { useForceLightTheme } from './useForceLightTheme';
 import '../../styles/portal.css';
 
 export default function ClientPortalPage() {
+  // External clients always see the portal in light mode.
+  useForceLightTheme();
+
   const { token } = useParams();
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
