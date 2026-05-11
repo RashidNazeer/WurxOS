@@ -6,6 +6,9 @@ import {
   listEvaluableUsers, listFlagsForUser, getRatingFor, countWarningsForUser,
   // Mutations
   saveRating, saveFlag, saveWarning, getV1Weights, saveV1Weights,
+  // Flag removal request flow
+  requestFlagRemoval, decideFlagRemoval, removeFlagDirect,
+  listFlagRemovalRequests,
   // Attendance helpers (re-exported from attendanceApi for parity)
   fetchRosterMonth, computeMonthlyDays, getAdjustmentsForMonth,
 } from '../../lib/performanceApi';
@@ -290,8 +293,12 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
 
 // ── View Flags Modal ─────────────────────────────────────────────────────────
 
-function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
+function ViewFlagsModal({
+  user, flags, onClose, canManage, onAddFlag,
+  currentUserId, currentUserRole, pendingRemovals = {}, onFlagsChanged,
+}) {
   const [tab, setTab] = useState('green');
+  const [busy, setBusy] = useState({}); // flagId → bool (per-flag spinner)
   const filtered = flags.filter(f => f.type === tab);
 
   const fmtTimestamp = (d) => {
@@ -309,6 +316,52 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
     if (isNaN(dt.getTime())) return null;
     return dt.toLocaleString(undefined, { year: 'numeric', month: 'long' });
   };
+
+  const isBoss = currentUserRole === 'boss';
+  const isOl   = currentUserRole === 'ol';
+
+  // OL can request removal of flags THEY created; Boss can delete
+  // directly. Both actions go through server-side RPCs that enforce
+  // the same rules — these checks just hide the buttons when they
+  // wouldn't succeed.
+  const canRequestRemoval = (f) =>
+    isOl && f.addedBy === currentUserId && !pendingRemovals[f.id];
+  const canBossRemove = (f) => isBoss;
+
+  async function handleRequestRemoval(flag) {
+    const reason = window.prompt(
+      'Why should this flag be removed? Boss will see your reason.\n\n(Short explanation, e.g. "Was a misunderstanding — the campaign was completed on time.")',
+      ''
+    );
+    if (!reason || !reason.trim()) return;
+    if (reason.trim().length < 3) {
+      alert('Please give a longer reason (3+ characters).');
+      return;
+    }
+    setBusy((b) => ({ ...b, [flag.id]: true }));
+    try {
+      await requestFlagRemoval(flag.id, reason.trim());
+      onFlagsChanged?.({ kind: 'request', flag });
+      alert('Removal request sent to Boss for approval.');
+    } catch (err) {
+      alert('Failed to send request: ' + (err.message || 'unknown error'));
+    } finally {
+      setBusy((b) => ({ ...b, [flag.id]: false }));
+    }
+  }
+
+  async function handleBossRemove(flag) {
+    if (!window.confirm('Remove this flag immediately? This cannot be undone.')) return;
+    setBusy((b) => ({ ...b, [flag.id]: true }));
+    try {
+      await removeFlagDirect(flag.id);
+      onFlagsChanged?.({ kind: 'removed', flag });
+    } catch (err) {
+      alert('Failed to remove flag: ' + (err.message || 'unknown error'));
+    } finally {
+      setBusy((b) => ({ ...b, [flag.id]: false }));
+    }
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -353,6 +406,8 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
                 const w = WEIGHTAGES.find(x => x.key === f.weightage) || WEIGHTAGES[0];
                 const ts = fmtTimestamp(f.createdAt);
                 const month = fmtMonth(f.createdAt);
+                const pending = pendingRemovals[f.id];
+                const isBusy = !!busy[f.id];
                 return (
                   <div key={f.id} className="rounded-3 p-3" style={{ background: tab === 'green' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${tab === 'green' ? '#b7dfc4' : '#fecaca'}` }}>
                     <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -377,6 +432,47 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
                         </div>
                       )}
                     </div>
+                    {/* Pending-removal banner — visible to everyone who
+                        can see this flag so the state is unambiguous. */}
+                    {pending && (
+                      <div className="mt-2 rounded-2 px-2 py-1 d-flex align-items-center gap-2"
+                        style={{ background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '0.66rem', color: '#9a3412' }}>
+                        <i className="bi bi-hourglass-split" />
+                        <span>
+                          Removal pending Boss approval
+                          {pending.requester?.display_name && <> · requested by {pending.requester.display_name}</>}
+                        </span>
+                      </div>
+                    )}
+                    {/* Action buttons — OL who created the flag can
+                        request removal; Boss can remove directly. */}
+                    {(canRequestRemoval(f) || canBossRemove(f)) && (
+                      <div className="d-flex gap-2 mt-2">
+                        {canBossRemove(f) ? (
+                          <button
+                            className="btn btn-sm d-inline-flex align-items-center gap-1"
+                            style={{
+                              background: '#fff', border: '1px solid #fecaca', color: '#b91c1c',
+                              borderRadius: 6, fontSize: '0.7rem', padding: '3px 10px',
+                            }}
+                            disabled={isBusy}
+                            onClick={() => handleBossRemove(f)}>
+                            <i className="bi bi-trash" /> {isBusy ? 'Removing…' : 'Remove flag'}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm d-inline-flex align-items-center gap-1"
+                            style={{
+                              background: '#fff', border: '1px solid #c7d2fe', color: '#4338ca',
+                              borderRadius: 6, fontSize: '0.7rem', padding: '3px 10px',
+                            }}
+                            disabled={isBusy}
+                            onClick={() => handleRequestRemoval(f)}>
+                            <i className="bi bi-send" /> {isBusy ? 'Sending…' : 'Request removal'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -391,6 +487,110 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pending Flag-Removal Requests panel (Boss only) ──────────────────────────
+// Renders the OL-submitted flag-removal requests that Boss has yet to decide.
+// Each row: requester, flagged user, reason, original flag context, and
+// Approve / Reject buttons (with note). Approve hard-deletes the flag and
+// recalculates that month's score automatically (handled server-side).
+
+function FlagRemovalRequestsPanel({ requests, onChanged }) {
+  const [busy, setBusy] = useState({}); // requestId → bool
+
+  async function handleDecide(req, action) {
+    let note = null;
+    if (action === 'reject') {
+      note = window.prompt(
+        'Optional note for the OL on why you rejected this:',
+        ''
+      );
+      if (note === null) return; // cancelled
+    }
+    if (!window.confirm(
+      action === 'approve'
+        ? 'Approve removal? The flag will be deleted and the month\'s score will recalculate. The OL and the flagged user will be notified.'
+        : 'Reject this removal request? The flag stays in place. The OL will be notified.'
+    )) return;
+    setBusy((b) => ({ ...b, [req.id]: true }));
+    try {
+      await decideFlagRemoval(req.id, action, note);
+      onChanged?.();
+    } catch (err) {
+      alert('Failed to decide request: ' + (err.message || 'unknown error'));
+    } finally {
+      setBusy((b) => ({ ...b, [req.id]: false }));
+    }
+  }
+
+  return (
+    <div className="rounded-3 p-3 mb-3" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+      <div className="d-flex align-items-center gap-2 mb-2">
+        <i className="bi bi-hourglass-split" style={{ color: '#c2410c' }} />
+        <h6 className="fw-bold mb-0" style={{ fontSize: '0.88rem', color: '#9a3412' }}>
+          Pending flag-removal requests ({requests.length})
+        </h6>
+      </div>
+      <div className="d-flex flex-column gap-2">
+        {requests.map((r) => {
+          const isBusy = !!busy[r.id];
+          const flagDate = r.flag?.created_at ? new Date(r.flag.created_at) : null;
+          const monthLabel = flagDate && !isNaN(flagDate.getTime())
+            ? flagDate.toLocaleString(undefined, { year: 'numeric', month: 'long' })
+            : null;
+          return (
+            <div key={r.id} className="rounded-3 p-3" style={{ background: '#fff', border: '1px solid #fed7aa' }}>
+              <div className="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="small fw-semibold" style={{ color: '#1a1a2e' }}>
+                    {r.requester?.display_name || 'OL'} requested removal of a flag on{' '}
+                    <span style={{ color: '#7c2d12' }}>{r.user?.display_name || 'a teammate'}</span>
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.7rem', marginTop: 2 }}>
+                    {r.flag?.type === 'green' ? 'Green flag' : 'Red flag'}
+                    {r.flag?.severity && <> · {r.flag.severity}</>}
+                    {monthLabel && <> · affects {monthLabel} score</>}
+                  </div>
+                </div>
+                <div className="d-flex gap-1 flex-shrink-0">
+                  <button
+                    className="btn btn-sm d-inline-flex align-items-center gap-1"
+                    style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.72rem' }}
+                    disabled={isBusy}
+                    onClick={() => handleDecide(r, 'approve')}>
+                    <i className="bi bi-check-lg" /> Approve
+                  </button>
+                  <button
+                    className="btn btn-sm d-inline-flex align-items-center gap-1"
+                    style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 6, fontSize: '0.72rem' }}
+                    disabled={isBusy}
+                    onClick={() => handleDecide(r, 'reject')}>
+                    <i className="bi bi-x-lg" /> Reject
+                  </button>
+                </div>
+              </div>
+              {/* OL's reason */}
+              <div className="rounded-2 p-2" style={{ background: '#f9fafb', border: '1px solid #e5e7eb', fontSize: '0.74rem' }}>
+                <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  Reason
+                </div>
+                <div style={{ color: '#1f2937', whiteSpace: 'pre-wrap' }}>{r.reason}</div>
+              </div>
+              {/* Original flag's reason for context */}
+              {r.flag?.reason && (
+                <div className="rounded-2 p-2 mt-2" style={{ background: '#fef2f2', border: '1px solid #fecaca', fontSize: '0.72rem' }}>
+                  <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    Original flag
+                  </div>
+                  <div style={{ color: '#7f1d1d', whiteSpace: 'pre-wrap' }}>{r.flag.reason}</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -585,6 +785,14 @@ export default function PerformancePage() {
   const [teamAttendance, setTeamAttendance] = useState({}); // { userId: daysPresent }
   const [teamSubTab, setTeamSubTab]       = useState(isBoss ? 'ols' : effectiveRole === 'ol' ? 'tls' : 'apcs');
 
+  // Pending flag-removal requests, keyed by flag id — used by the
+  // ViewFlagsModal to render the 'Removal pending Boss approval'
+  // state inline. Loaded lazily (RLS scopes rows to involved users).
+  const [pendingRemovals, setPendingRemovals] = useState({});
+  // All pending removal requests Boss has yet to decide. Drives the
+  // "Pending flag removal requests" panel on the Team tab.
+  const [pendingRemovalRequests, setPendingRemovalRequests] = useState([]);
+
   // Filters
   const [search, setSearch]         = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
@@ -722,11 +930,62 @@ export default function PerformancePage() {
         setTeamLeaves({});
         setTeamAttendance(attMap);
       }
+
+      // Load pending flag-removal requests. RLS limits visibility to:
+      // - the OL who requested (sees their own)
+      // - the flagged user (sees pending state on their flag)
+      // - Boss (sees everything in their approval queue)
+      try {
+        const pendingList = await listFlagRemovalRequests({ status: 'pending' });
+        const map = {};
+        pendingList.forEach((p) => { map[p.flagId] = p; });
+        setPendingRemovals(map);
+        setPendingRemovalRequests(pendingList);
+      } catch {
+        // RLS may reject for users not involved in any request — that
+        // just means no pending state to show. Silent fallback.
+        setPendingRemovals({});
+        setPendingRemovalRequests([]);
+      }
+
       setLoading(false);
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, currentUser?.uid]);
+
+  // Re-fetch flags + pending removals after a mutation (Boss direct
+  // remove, OL request, Boss approve/reject). Keeps the modal + main
+  // page in sync without reloading the entire performance dataset.
+  async function refreshFlagState() {
+    try {
+      // My flags
+      if (effectiveRole !== 'boss') {
+        const myList = await listFlagsForUser(currentUser.uid);
+        setMyFlags(myList);
+      }
+      // Team flags
+      if (hasTeamTab) {
+        const flagList = await listAllFlags();
+        const idSet = new Set(teamUsers.map((u) => u.id));
+        const flagMap = {};
+        flagList.forEach((x) => {
+          if (!idSet.has(x.userId)) return;
+          if (!flagMap[x.userId]) flagMap[x.userId] = [];
+          flagMap[x.userId].push(x);
+        });
+        setTeamFlags(flagMap);
+      }
+      // Pending removals
+      const pendingList = await listFlagRemovalRequests({ status: 'pending' });
+      const map = {};
+      pendingList.forEach((p) => { map[p.flagId] = p; });
+      setPendingRemovals(map);
+      setPendingRemovalRequests(pendingList);
+    } catch (err) {
+      console.warn('[flag-refresh]', err);
+    }
+  }
 
   // ── Build user rows with pillar scores ──
   const teamSubTabs = useMemo(() => {
@@ -907,17 +1166,54 @@ export default function PerformancePage() {
           {myFlags.length > 0 && (
             <>
               <h6 className="fw-bold mb-3" style={{ fontSize: '0.9rem' }}><i className="bi bi-flag me-2" />Flags</h6>
+              {/* Scope banner — match the modal so the user understands
+                  flags only affect the score of the month they were
+                  created in. The flag itself stays visible in history. */}
+              <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2"
+                style={{ background: 'var(--info-soft, #eff6ff)', border: '1px solid var(--info, #93c5fd)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: 'var(--info, #2563eb)' }} />
+                <span>
+                  Each flag affects the performance score of <strong>only the month it was created in</strong>.
+                  The flag itself stays visible in history below.
+                </span>
+              </div>
               <div className="d-flex flex-column gap-2">
                 {myFlags.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 8).map(f => {
                   const w = WEIGHTAGES.find(x => x.key === f.weightage) || WEIGHTAGES[0];
+                  const created = f.createdAt ? new Date(f.createdAt) : null;
+                  const isValid = created && !isNaN(created.getTime());
+                  const tsLabel = isValid
+                    ? created.toLocaleString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric',
+                        hour: 'numeric', minute: '2-digit',
+                      })
+                    : null;
+                  const monthLabel = isValid
+                    ? created.toLocaleString(undefined, { year: 'numeric', month: 'long' })
+                    : null;
                   return (
                     <div key={f.id} className="rounded-3 p-3" style={{ background: f.type === 'green' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${f.type === 'green' ? '#b7dfc4' : '#fecaca'}` }}>
-                      <div className="d-flex align-items-start justify-content-between gap-2">
+                      <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
                         <span className="small fw-medium">{f.description}</span>
                         <span className="badge rounded-pill flex-shrink-0" style={{ background: w.bg, color: w.color, fontSize: '0.58rem' }}>{w.label}</span>
                       </div>
-                      <div className="text-muted mt-1" style={{ fontSize: '0.65rem' }}>
-                        By {f.addedByName}{f.createdAt && <span> · {new Date(f.createdAt).toLocaleDateString()}</span>}
+                      <div className="d-flex flex-column gap-1" style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                        <div className="d-flex align-items-center gap-1">
+                          <i className="bi bi-person" style={{ opacity: 0.7 }} />
+                          <span>Flagged by <strong>{f.addedByName || 'Unknown'}</strong></span>
+                        </div>
+                        {tsLabel && (
+                          <div className="d-flex align-items-center gap-1">
+                            <i className="bi bi-clock" style={{ opacity: 0.7 }} />
+                            <span>{tsLabel}</span>
+                          </div>
+                        )}
+                        {monthLabel && (
+                          <div className="d-flex align-items-center gap-1">
+                            <i className="bi bi-calendar3" style={{ opacity: 0.7 }} />
+                            <span>Affects <strong>{monthLabel}</strong> score</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -940,6 +1236,15 @@ export default function PerformancePage() {
       ) : (
         /* ═══ TEAM PERFORMANCE ═══ */
         <>
+          {/* Boss-only: pending flag-removal requests panel. Shown
+              above the team table so Boss can act on them quickly. */}
+          {isBoss && pendingRemovalRequests.length > 0 && (
+            <FlagRemovalRequestsPanel
+              requests={pendingRemovalRequests}
+              onChanged={refreshFlagState}
+            />
+          )}
+
           {/* Sub-tabs */}
           {teamSubTabs.length > 1 && (
             <div className="d-flex gap-1 mb-3">
@@ -1104,7 +1409,17 @@ export default function PerformancePage() {
 
       {/* Modals */}
       {rateTarget && <RateModal user={rateTarget} existing={teamRecords[rateTarget.id]} month={month} onClose={() => setRateTarget(null)} onSaved={handleRateSaved} />}
-      {flagsTarget && <ViewFlagsModal user={flagsTarget} flags={teamFlags[flagsTarget.id] || []} canManage={canRate(effectiveRole, flagsTarget.role || flagsTarget.userRole || 'apc')} onClose={() => setFlagsTarget(null)} onAddFlag={type => setAddFlagTarget({ user: flagsTarget, type })} />}
+      {flagsTarget && <ViewFlagsModal
+        user={flagsTarget}
+        flags={teamFlags[flagsTarget.id] || []}
+        canManage={canRate(effectiveRole, flagsTarget.role || flagsTarget.userRole || 'apc')}
+        onClose={() => setFlagsTarget(null)}
+        onAddFlag={type => setAddFlagTarget({ user: flagsTarget, type })}
+        currentUserId={currentUser?.uid}
+        currentUserRole={effectiveRole}
+        pendingRemovals={pendingRemovals}
+        onFlagsChanged={refreshFlagState}
+      />}
       {addFlagTarget && <AddFlagModal user={addFlagTarget.user} flagType={addFlagTarget.type} onClose={() => setAddFlagTarget(null)} onSaved={handleFlagAdded} />}
       {warnTarget && <WarnModal user={warnTarget} warningCount={teamWarnings[warnTarget.id] || 0} onClose={() => setWarnTarget(null)} onSaved={handleWarnSaved} />}
       {showWeights && <WeightsModal weights={weights} onClose={() => setShowWeights(false)} onSaved={({ weights: w }) => { setWeights(w); setShowWeights(false); }} />}

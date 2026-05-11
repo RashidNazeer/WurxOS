@@ -405,6 +405,86 @@ export async function saveFlag({ userId, type, weightage, description }) {
   return _normFlag(data);
 }
 
+// ─── Flag removal request flow ─────────────────────────────────────
+// OL who created a flag submits a removal request → Boss approves /
+// rejects. Boss can also delete flags directly (no request needed).
+// Server enforces all permissions via security-definer RPCs.
+
+function _normFlagRemoval(r) {
+  if (!r) return r;
+  return {
+    id:            r.id,
+    flagId:        r.flag_id,
+    userId:        r.user_id,
+    requestedBy:   r.requested_by,
+    reason:        r.reason || '',
+    status:        r.status || 'pending',
+    decidedBy:     r.decided_by,
+    decidedAt:     r.decided_at,
+    decisionNote:  r.decision_note,
+    createdAt:     r.created_at,
+    requester:     r.requester || null,
+    user:          r.user || null,
+    flag:          r.flag || null,
+  };
+}
+
+export async function requestFlagRemoval(flagId, reason) {
+  const { data, error } = await supabase.rpc('flag_removal_request', {
+    p_flag_id: flagId,
+    p_reason:  reason,
+  });
+  if (error) throw new Error(error.message);
+  return _normFlagRemoval(data);
+}
+
+export async function decideFlagRemoval(requestId, action, note = null) {
+  const { data, error } = await supabase.rpc('flag_removal_decide', {
+    p_request_id: requestId,
+    p_action:     action,        // 'approve' | 'reject'
+    p_note:       note,
+  });
+  if (error) throw new Error(error.message);
+  return _normFlagRemoval(data);
+}
+
+// Boss-only direct removal (skips the request flow).
+export async function removeFlagDirect(flagId) {
+  const { error } = await supabase.rpc('flag_remove_direct', { p_flag_id: flagId });
+  if (error) throw new Error(error.message);
+}
+
+// Pending removal requests for any flags the current user is involved
+// in (as flag owner, requester, or Boss). RLS filters automatically.
+export async function listFlagRemovalRequests({ status = null } = {}) {
+  let q = supabase
+    .from('flag_removal_requests')
+    .select(`
+      *,
+      requester:requested_by(id, display_name, role),
+      user:user_id(id, display_name, role),
+      flag:flag_id(id, type, severity, reason, created_at)
+    `)
+    .order('created_at', { ascending: false });
+  if (status) q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data || []).map(_normFlagRemoval);
+}
+
+// Just the pending requests for THIS flag (used to show 'pending Boss
+// approval' state in the flag list).
+export async function getPendingRemovalForFlag(flagId) {
+  const { data, error } = await supabase
+    .from('flag_removal_requests')
+    .select('*, requester:requested_by(id, display_name)')
+    .eq('flag_id', flagId)
+    .eq('status', 'pending')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return _normFlagRemoval(data);
+}
+
 // Add a warning (v1 schema: reason only).
 export async function saveWarning({ userId, reason }) {
   const { data: me } = await supabase.auth.getUser();
