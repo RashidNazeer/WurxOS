@@ -23,10 +23,35 @@ export default function ClientAccessPage() {
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterClient, setFilterClient] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editLink, setEditLink] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+
+  // Distinct client_name values across all current links — drives the
+  // Client filter dropdown AND the datalist suggestions in the modal.
+  // Trimmed + case-folded for the dedupe so 'Kelsey' and 'kelsey ' map
+  // to one canonical entry, while the display uses the most common
+  // original casing.
+  const clientNames = useMemo(() => {
+    const counts = new Map(); // normalized → { display, n }
+    for (const l of links) {
+      const raw = (l.client_name || '').trim();
+      if (!raw) continue;
+      const norm = raw.toLowerCase();
+      const cur = counts.get(norm);
+      if (cur) {
+        cur.n += 1;
+        // Prefer the most-frequently-seen casing for display
+      } else {
+        counts.set(norm, { display: raw, n: 1 });
+      }
+    }
+    return [...counts.values()]
+      .map((v) => v.display)
+      .sort((a, b) => a.localeCompare(b));
+  }, [links]);
 
   const filtered = useMemo(() => {
     return links.filter(c => {
@@ -41,9 +66,12 @@ export default function ClientAccessPage() {
       }
       if (filterStatus === 'active'   && !c.active) return false;
       if (filterStatus === 'disabled' &&  c.active) return false;
+      if (filterClient) {
+        if ((c.client_name || '').trim().toLowerCase() !== filterClient.toLowerCase()) return false;
+      }
       return true;
     });
-  }, [links, search, filterStatus, brands]);
+  }, [links, search, filterStatus, filterClient, brands]);
 
   function openCreate() { setEditLink(null);  setShowModal(true); }
   function openEdit(c)  { setEditLink(c);     setShowModal(true); }
@@ -98,9 +126,20 @@ export default function ClientAccessPage() {
               <option value="active">Active</option>
               <option value="disabled">Disabled</option>
             </select>
-            {(search || filterStatus) && (
+            {clientNames.length > 0 && (
+              <select className="wx-input" style={{ width: 'auto', minWidth: 150, fontSize: 12.5, padding: '6px 8px' }}
+                value={filterClient}
+                onChange={(e) => setFilterClient(e.target.value)}
+                title="Filter links by client">
+                <option value="">All Clients</option>
+                {clientNames.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            )}
+            {(search || filterStatus || filterClient) && (
               <button className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }}
-                onClick={() => { setSearch(''); setFilterStatus(''); }}>
+                onClick={() => { setSearch(''); setFilterStatus(''); setFilterClient(''); }}>
                 <XIcon width="12" height="12" /> Clear
               </button>
             )}
@@ -135,6 +174,7 @@ export default function ClientAccessPage() {
       {showModal && (
         <ClientAccessModal
           link={editLink} brands={brands}
+          existingClientNames={clientNames}
           onClose={() => { setShowModal(false); setEditLink(null); }}
           onSaved={() => {
             setShowModal(false); setEditLink(null);
@@ -272,7 +312,7 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
 }
 
 // ── Create / edit modal ─────────────────────────────────────────────
-function ClientAccessModal({ link, brands, onClose, onSaved }) {
+function ClientAccessModal({ link, brands, existingClientNames = [], onClose, onSaved }) {
   const [clientName, setClientName] = useState(link?.client_name || '');
   const [label, setLabel] = useState(link?.label || '');
   const [shareTypes, setShareTypes] = useState(link?.share_types || ['weekly']);
@@ -331,9 +371,24 @@ function ClientAccessModal({ link, brands, onClose, onSaved }) {
         <div style={{ padding: 22, flexGrow: 1, overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>Client name</label>
-              <input className="wx-input" placeholder="e.g. NuDerma Clinical"
+              <label style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                Client name
+                {existingClientNames.length > 0 && (
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 6 }}>
+                    (pick or type new)
+                  </span>
+                )}
+              </label>
+              {/* Datalist gives autocomplete from existing clients but
+                  still lets the user type a brand-new name. This keeps
+                  the umbrella name ('Kelsey') consistent across all
+                  her brand links so the Client filter groups them. */}
+              <input className="wx-input" placeholder="e.g. Kelsey"
+                list="client-access-name-suggestions"
                 value={clientName} onChange={e => setClientName(e.target.value)} />
+              <datalist id="client-access-name-suggestions">
+                {existingClientNames.map((n) => <option key={n} value={n} />)}
+              </datalist>
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
