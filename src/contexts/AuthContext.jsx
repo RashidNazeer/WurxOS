@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { logAppEvent } from '../lib/appEvents';
 
 const AuthContext = createContext(null);
 
@@ -70,6 +71,10 @@ export function AuthProvider({ children }) {
       if (!mounted) return;
       setSession(data.session);
       bootstrapped.current = true;
+      logAppEvent(data.session?.user?.id, 'auth.bootstrap', {
+        hasSession: !!data.session,
+        expiresAt: data.session?.expires_at || null,
+      });
       // If no session we can finish loading immediately;
       // otherwise the profile effect below will finish it.
       if (!data.session) setLoading(false);
@@ -78,8 +83,14 @@ export function AuthProvider({ children }) {
     // 2) Subscribe to auth changes. DO NOT call any Supabase DB method
     //    inside this callback — it will deadlock the auth listener.
     //    We only update session state here; the effect below reacts to it.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
+      // Diagnostic — log every auth event so we can correlate refreshes
+      // with their trigger.
+      logAppEvent(newSession?.user?.id, `auth.${event}`, {
+        hasSession: !!newSession,
+        expiresAt: newSession?.expires_at || null,
+      });
       // Drop no-op updates. Supabase fires TOKEN_REFRESHED with a brand-
       // new session object every hour AND every time the tab regains
       // focus after long inactivity — in both cases the access_token is
@@ -182,7 +193,13 @@ export function AuthProvider({ children }) {
       failCountRef.current += 1;
       // eslint-disable-next-line no-console
       console.warn(`[auth] session check failed (${failCountRef.current}/${SESSION_FAIL_THRESHOLD}): ${why}`);
+      logAppEvent(session?.user?.id, 'auth.recheck_fail', {
+        why,
+        count: failCountRef.current,
+        threshold: SESSION_FAIL_THRESHOLD,
+      });
       if (failCountRef.current >= SESSION_FAIL_THRESHOLD) {
+        logAppEvent(session?.user?.id, 'auth.session_invalid', { why });
         setSessionInvalid(true);
       }
     };
@@ -282,6 +299,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Log BEFORE the await so we capture the trigger even if the
+    // sign-out network call hangs.
+    logAppEvent(session?.user?.id, 'auth.signed_out_explicit', {
+      from: typeof window !== 'undefined' ? window.location.pathname : null,
+    });
     // Wipe both layers BEFORE the auth call so nothing stale paints
     // between sign-out and the redirect to /login. lastLoadedUidRef
     // also flips so the next sign-in's user-swap branch fires even
@@ -292,7 +314,7 @@ export function AuthProvider({ children }) {
     setProfile(null);
     setSessionInvalid(false);
     await supabase.auth.signOut();
-  }, [qc]);
+  }, [qc, session?.user?.id]);
 
   const refreshProfile = useCallback(
     () => (session?.user?.id ? loadProfile(session.user.id) : null),
