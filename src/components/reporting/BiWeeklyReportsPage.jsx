@@ -286,9 +286,12 @@ export default function BiWeeklyReportsPage() {
     const detailIdx = sortedSource.findIndex(r => r.id === detailReport.id);
     const prev = detailIdx > 0 ? sortedSource[detailIdx - 1] : null;
     const rStatus = getReportStatus(detailReport);
-    // Edit is allowed based on role + status
+    // Edit is allowed based on role + status:
+    //   - APC: only their own drafts (before submitting).
+    //   - TL : while still at their stage (draft OR submitted).
+    //          Once they Verify the report moves to OL, locking TL out.
     const canEdit = (userRole === 'apc' && rStatus === 'draft') ||
-                    (userRole === 'tl' && rStatus === 'submitted');
+                    (userRole === 'tl'  && (rStatus === 'draft' || rStatus === 'submitted'));
     const canVerify = userRole === 'tl' && rStatus === 'submitted';
     // TL can only return to APC while the report is at the TL stage
     // (status: submitted). Once verified, ownership has passed to OL —
@@ -350,6 +353,7 @@ export default function BiWeeklyReportsPage() {
     return (
       <BiWeeklyReportForm
         editReportId={view === 'edit' ? editId : null}
+        prefillBrandId={view === 'new' ? selectedBrandId : null}
         onSaved={handleSaved}
         onCancel={() => { setView(selectedBrandId ? 'brand' : 'overview'); setEditId(null); }}
       />
@@ -500,7 +504,11 @@ export default function BiWeeklyReportsPage() {
                           </button>
                           <ul className="dropdown-menu dropdown-menu-end" style={{ fontSize: '0.78rem' }}>
                             <li><button className="dropdown-item" onClick={() => handleViewReport(r)}><i className="bi bi-eye me-2" />View Report</button></li>
-                            {((userRole === 'apc' && getReportStatus(r) === 'draft') || (userRole === 'tl' && getReportStatus(r) === 'submitted')) && (
+                            {(() => {
+                              const s = getReportStatus(r);
+                              return ((userRole === 'apc' && s === 'draft') ||
+                                      (userRole === 'tl'  && (s === 'draft' || s === 'submitted')));
+                            })() && (
                               <li><button className="dropdown-item" onClick={() => handleEdit(r.id)}><i className="bi bi-pencil me-2" />Edit</button></li>
                             )}
                             {userRole === 'tl' && getReportStatus(r) === 'submitted' && (
