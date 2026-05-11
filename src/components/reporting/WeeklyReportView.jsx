@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -721,6 +721,36 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     setTimeout(() => { win.print(); }, 500);
   };
 
+  // Word (.docx) export. Lazy-import the docx builder so the ~150KB
+  // library only loads on demand, not on every weekly-report view.
+  const [docxBusy, setDocxBusy] = useState(false);
+  const handleExportWord = async () => {
+    if (docxBusy) return;
+    setDocxBusy(true);
+    try {
+      const { buildWeeklyReportDocx } = await import('../../utils/weeklyReportDocx');
+      const blob = await buildWeeklyReportDocx({
+        report,
+        previousReport,
+        currency: currencySymbol(report.currency || DEFAULT_CURRENCY),
+      });
+      const safeBrand = (report.brandName || 'Brand').replace(/[\\/:*?"<>|]/g, '_');
+      const safeWeek  = (report.weekLabel || '').replace(/[\\/:*?"<>|]/g, '_');
+      const fileName  = `Weekly Report - ${safeBrand} - ${safeWeek}.docx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error('[export-word] failed:', err);
+      alert('Failed to export Word document. Please try again.');
+    } finally {
+      setDocxBusy(false);
+    }
+  };
+
   return (
     <div>
       {/* ─── Action bar (above the canvas) — hidden in clientView ─────────── */}
@@ -758,6 +788,15 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
             onClick={handleExport}>
             <i className="bi bi-file-earmark-pdf" /> Export PDF
+          </button>
+          <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+            onClick={handleExportWord}
+            disabled={docxBusy}
+            title="Download report as a Word (.docx) document">
+            {docxBusy
+              ? (<><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Building…</>)
+              : (<><i className="bi bi-file-earmark-word" /> Export Word</>)}
           </button>
         </div>
       )}
