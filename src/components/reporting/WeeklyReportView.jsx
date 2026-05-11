@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
-import { num, pctChange } from '../../utils/reportingService';
+import { num, pctChange, resolveWeeklySectionsEnabled } from '../../utils/reportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichContent, { isHtml } from '../common/RichContent';
 import HighlightableContent from '../common/HighlightableContent';
@@ -645,6 +645,10 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
   const notes = report.overallNotes || {};
   const offsite = report.offsitePerformance || {};
   const prevOffsite = prev.offsitePerformance || {};
+  // Per-report section toggles. Disabled sections render nothing in the
+  // view at all. Old reports (no sectionsEnabled set) default to all-on
+  // via resolveWeeklySectionsEnabled.
+  const sectEnabled = resolveWeeklySectionsEnabled(report.sectionsEnabled);
 
   const productData = (report.productHighlights || []).filter(p => p.productName);
   const totalProductGmv = productData.reduce((s, p) => s + num(p.gmv), 0);
@@ -790,6 +794,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         )}
 
         {/* ─── Hero stat grid (4 + 4) ──────────────────────────────────── */}
+        {sectEnabled.overallPerformance && (<>
         <div className="row g-3 mb-3">
           <div className="col-6 col-lg-3">
             <StatCard label="GMV (Gross Merchandise Value)" value={m(perf.gmv)}
@@ -845,12 +850,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         {hasPrev && (
           <ComparisonPanel current={perf} previous={prevPerf} prevLabel={prev.weekLabel} currency={currency} />
         )}
+        </>)}
 
         {/* ─── Top Creators + Products row ─────────────────────────────── */}
-        {(sortedCreators.length > 0 || sortedProducts.length > 0) && (
+        {(sectEnabled.topCreators || sectEnabled.productHighlights) && (sortedCreators.length > 0 || sortedProducts.length > 0) && (
           <div className="row g-3">
             {/* Creators */}
-            {sortedCreators.length > 0 && (
+            {sectEnabled.topCreators && sortedCreators.length > 0 && (
               <div className="col-12 col-lg-7">
                 <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
                   <div className="px-3 py-3">
@@ -868,7 +874,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
               </div>
             )}
             {/* Products */}
-            {sortedProducts.length > 0 && (
+            {sectEnabled.productHighlights && sortedProducts.length > 0 && (
               <div className="col-12 col-lg-5">
                 <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
                   <div className="px-3 py-3">
@@ -891,7 +897,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         )}
 
         {/* ─── Top Videos (poster cards) ───────────────────────────────── */}
-        {sortedVideos.length > 0 && (
+        {sectEnabled.topVideos && sortedVideos.length > 0 && (
           <>
             <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px 18px 20px', marginTop: 12 }}>
               <SectionHead
@@ -912,9 +918,9 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         )}
 
         {/* ─── GMV Max + Offsite (side-by-side) ────────────────────────── */}
-        {((report.gmvMax || []).some(g => g.campaign) || num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
+        {((sectEnabled.gmvMax && (report.gmvMax || []).some(g => g.campaign)) || (sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0))) && (
           <div className="row g-3 mt-1">
-            {(report.gmvMax || []).some(g => g.campaign) && (
+            {sectEnabled.gmvMax && (report.gmvMax || []).some(g => g.campaign) && (
               <div className="col-12 col-lg-7">
                 <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px' }}>
                   <SectionHead title="GMV Max performance" eyebrow="Brand-managed campaigns · overall stats" />
@@ -971,7 +977,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
             )}
-            {(num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
+            {sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
               <div className="col-12 col-lg-5">
                 <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px' }}>
                   <SectionHead title="Offsite performance" eyebrow="Halo from non-TikTok channels" />
@@ -1021,7 +1027,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         <TrendsPanel trendData={trendData} currency={currency} />
 
         {/* ─── Long-form rich-text sections (modernized) ───────────────── */}
-        {(() => {
+        {sectEnabled.upcomingCampaigns && (() => {
           const links = findReportLinks('Current & Upcoming Campaigns');
           const hasContent = report.upcomingCampaigns && report.upcomingCampaigns.trim();
           if (!hasContent && !links) return null;
@@ -1041,7 +1047,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           );
         })()}
 
-        {(() => {
+        {sectEnabled.operationalUpdates && (() => {
           const links = findReportLinks('Operational Updates');
           const hasContent = report.operationalUpdates && report.operationalUpdates.trim();
           if (!hasContent && !links) return null;
@@ -1061,7 +1067,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           );
         })()}
 
-        {(() => {
+        {sectEnabled.recommendations && (() => {
           const links = findReportLinks('Recommendations & Action Items');
           const hasRec = report.recommendations && report.recommendations.trim();
           const hasAction = report.actionItems && report.actionItems.trim();

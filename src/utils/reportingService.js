@@ -49,6 +49,10 @@ export {
   getUserCustomFields,
   saveUserCustomFields,
 
+  // Sections-enabled (per-report show/hide toggles)
+  WEEKLY_SECTIONS,
+  resolveWeeklySectionsEnabled,
+
   // Legacy label repair (Boss-only utility)
   repairWeeklyLabels,
 } from '../lib/reportsApi';

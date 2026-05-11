@@ -863,6 +863,28 @@ export function resolveSectionsEnabled(raw) {
 }
 
 // ---------------------------------------------------------------------
+// WEEKLY_SECTIONS + helper (mirrors monthly but for weekly/biweekly forms).
+// Same shape and column (sections_enabled jsonb on reports), different
+// section list. Keys match the camelCase fields in EMPTY_REPORT_DATA so
+// the form/view can drive visibility off them directly.
+// ---------------------------------------------------------------------
+export const WEEKLY_SECTIONS = [
+  { key: 'overallPerformance',  title: 'Overall Performance',           required: true  },
+  { key: 'topCreators',         title: 'Top Creators',                  required: true  },
+  { key: 'topVideos',           title: 'Top Videos',                    required: true  },
+  { key: 'gmvMax',              title: 'GMV Max Performance',           required: true  },
+  { key: 'productHighlights',   title: 'Product Highlights',            required: true  },
+  { key: 'offsitePerformance',  title: 'Offsite Performance',           required: false },
+  { key: 'upcomingCampaigns',   title: 'Current & Upcoming Campaigns',  required: true  },
+  { key: 'operationalUpdates',  title: 'Operational Updates',           required: true  },
+  { key: 'recommendations',     title: 'Recommendations & Action Items', required: false },
+];
+const _DEFAULT_WEEKLY_SECTIONS_ENABLED = Object.fromEntries(WEEKLY_SECTIONS.map((s) => [s.key, true]));
+export function resolveWeeklySectionsEnabled(raw) {
+  return { ..._DEFAULT_WEEKLY_SECTIONS_ENABLED, ...(raw || {}) };
+}
+
+// ---------------------------------------------------------------------
 // Empty-report templates (v1's emptyReport / emptyBiWeeklyReport / emptyMonthlyReport)
 // ---------------------------------------------------------------------
 export function emptyReport() { return EMPTY_REPORT_DATA(); }
@@ -996,10 +1018,15 @@ async function _saveReportV1({ type, brandId, weekInfo, data, uid, status = 'dra
     last_edited_by: uid,
     updated_at:     new Date().toISOString(),
   };
-  // Monthly only: persist sectionsEnabled into its own column (also keep
-  // copy in data so old code reading from data.sectionsEnabled still works)
+  // Persist sectionsEnabled into its own column for all report types
+  // (also keep a copy in data so old code reading from data.sectionsEnabled
+  // still works). Monthly uses its own default section list; weekly and
+  // biweekly share the weekly default.
   if (type === 'monthly') {
     payload.sections_enabled = sectionsEnabled || _DEFAULT_SECTIONS_ENABLED;
+    payload.data.sectionsEnabled = payload.sections_enabled;
+  } else if (type === 'weekly' || type === 'biweekly') {
+    payload.sections_enabled = sectionsEnabled || _DEFAULT_WEEKLY_SECTIONS_ENABLED;
     payload.data.sectionsEnabled = payload.sections_enabled;
   }
   if (existingId) {

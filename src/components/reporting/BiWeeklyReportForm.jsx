@@ -8,7 +8,7 @@ import {
   detectNextBiWeeklyPeriod,
   REPORT_STATUSES,
 } from '../../utils/biWeeklyReportingService';
-import { getUserCustomFields, saveUserCustomFields, cleanNumericInput } from '../../utils/reportingService';
+import { getUserCustomFields, saveUserCustomFields, cleanNumericInput, WEEKLY_SECTIONS, resolveWeeklySectionsEnabled } from '../../utils/reportingService';
 import {
   generateOverallInsight, generateCreatorsInsight, generateVideosInsight,
   generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
@@ -20,17 +20,50 @@ import RichTextEditor from '../shared/RichTextEditor';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
-function SectionHeader({ icon, title, color, required }) {
+function SectionHeader({ icon, title, color, required, enabled = true, onToggle }) {
+  const togglable = typeof onToggle === 'function';
   return (
     <div className="d-flex align-items-center gap-2 mb-3 mt-4">
       <div className="rounded-2 d-flex align-items-center justify-content-center"
-        style={{ width: 32, height: 32, background: color + '18' }}>
-        <i className={`bi ${icon}`} style={{ fontSize: '0.9rem', color }} />
+        style={{
+          width: 32, height: 32,
+          background: enabled ? color + '18' : 'var(--surface-2)',
+          opacity: enabled ? 1 : 0.55,
+        }}>
+        <i className={`bi ${icon}`} style={{
+          fontSize: '0.9rem',
+          color: enabled ? color : 'var(--text-muted)',
+        }} />
       </div>
-      <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+      <h6 className="fw-bold mb-0" style={{
+        fontSize: '0.95rem',
+        color: enabled ? 'var(--text-primary)' : 'var(--text-muted)',
+        textDecoration: enabled ? 'none' : 'line-through',
+      }}>
         {title}
-        {required && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>}
+        {required && enabled && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>}
       </h6>
+      {!enabled && (
+        <span className="badge" style={{
+          background: 'var(--surface-2)', color: 'var(--text-muted)',
+          fontSize: '0.62rem', fontWeight: 600, letterSpacing: 0.3,
+        }}>
+          HIDDEN
+        </span>
+      )}
+      {togglable && (
+        <div className="form-check form-switch mb-0 ms-auto" style={{ paddingLeft: '2.4em' }}>
+          <input
+            className="form-check-input"
+            type="checkbox"
+            role="switch"
+            checked={!!enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            title={enabled ? 'Hide this section in the report' : 'Show this section in the report'}
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -271,6 +304,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
           actionItems: '',
           customFields: r.customFields || {},
+          sectionsEnabled: resolveWeeklySectionsEnabled(r.sectionsEnabled),
         });
         setReportStatus(r.status || 'approved');
         setRejectionNote(r.rejectionNote || '');
@@ -403,36 +437,39 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
     }));
   }, []);
 
-  // Validation — return array of missing field names
+  // Validation — return array of missing field names. Disabled sections
+  // (via the inline toggle on each SectionHeader) are skipped entirely.
   const validate = () => {
     const missing = [];
     if (!selectedPeriod) missing.push('Bi-weekly period');
-    const op = data.overallPerformance || {};
-    const opRequired = {
-      gmv: 'GMV', affiliateGmv: 'Affiliate GMV', orders: 'Orders',
-      samplesApproved: 'Samples Approved', roi: 'ROI',
-      shopPerformanceScore: 'Shop Performance Score', videosPosted: 'Videos Posted',
-    };
-    Object.entries(opRequired).forEach(([k, label]) => {
-      if (op[k] === '' || op[k] == null) missing.push(`Overall: ${label}`);
-    });
-    if (!data.overallNotes?.samplesApproved) missing.push('Overall: MTD Approved');
-    if (!data.overallNotes?.videosPosted) missing.push('Overall: Total Videos');
+    const en = resolveWeeklySectionsEnabled(data.sectionsEnabled);
+    if (en.overallPerformance) {
+      const op = data.overallPerformance || {};
+      const opRequired = {
+        gmv: 'GMV', affiliateGmv: 'Affiliate GMV', orders: 'Orders',
+        samplesApproved: 'Samples Approved', roi: 'ROI',
+        shopPerformanceScore: 'Shop Performance Score', videosPosted: 'Videos Posted',
+      };
+      Object.entries(opRequired).forEach(([k, label]) => {
+        if (op[k] === '' || op[k] == null) missing.push(`Overall: ${label}`);
+      });
+      if (!data.overallNotes?.samplesApproved) missing.push('Overall: MTD Approved');
+      if (!data.overallNotes?.videosPosted) missing.push('Overall: Total Videos');
+    }
 
-    if (!(data.topCreators || []).some(c => c.name && c.name.trim()))
+    if (en.topCreators && !(data.topCreators || []).some(c => c.name && c.name.trim()))
       missing.push('Top Creators (at least 1 with name)');
-    if (!(data.topVideos || []).some(v => v.creatorName && v.creatorName.trim()))
+    if (en.topVideos && !(data.topVideos || []).some(v => v.creatorName && v.creatorName.trim()))
       missing.push('Top Videos (at least 1 with creator name)');
-    if (!(data.gmvMax || []).some(g => g.campaign && g.campaign.trim()))
+    if (en.gmvMax && !(data.gmvMax || []).some(g => g.campaign && g.campaign.trim()))
       missing.push('GMV Max (at least 1 with campaign)');
-    if (!(data.productHighlights || []).some(p => p.productName && p.productName.trim()))
+    if (en.productHighlights && !(data.productHighlights || []).some(p => p.productName && p.productName.trim()))
       missing.push('Product Highlights (at least 1 with product name)');
 
-    if (!data.upcomingCampaigns || !data.upcomingCampaigns.trim())
+    if (en.upcomingCampaigns && (!data.upcomingCampaigns || !data.upcomingCampaigns.trim()))
       missing.push('Current & Upcoming Campaigns');
-    if (!data.operationalUpdates || !data.operationalUpdates.trim())
+    if (en.operationalUpdates && (!data.operationalUpdates || !data.operationalUpdates.trim()))
       missing.push('Operational Updates');
-    // Offsite Performance, Recommendations & Action Items are optional
 
     return missing;
   };
@@ -704,6 +741,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   /* ── Step 2: Data entry form ──────────────────────────────────────────── */
   const brandLabel = selectedBrand?.name || selectedBrand?.brandName || '';
   const curSym = currencySymbol(data.currency || DEFAULT_CURRENCY);
+  const sectEnabled = resolveWeeklySectionsEnabled(data.sectionsEnabled);
+  const toggleSection = (key) => (val) => setData(d => ({
+    ...d,
+    sectionsEnabled: { ...resolveWeeklySectionsEnabled(d.sectionsEnabled), [key]: val },
+  }));
 
   return (
     <div>
@@ -816,7 +858,9 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       </div>
 
       {/* ─── Section 1: Overall Performance ─────────────────────────────── */}
-      <SectionHeader icon="bi-graph-up-arrow" title="Overall Performance" color="#3b82f6" required />
+      <SectionHeader icon="bi-graph-up-arrow" title="Overall Performance" color="#3b82f6" required
+        enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')} />
+      {sectEnabled.overallPerformance && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <div className="d-flex flex-wrap gap-2 mb-2">
@@ -839,9 +883,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             onGenerate={() => runAi('overall', generateOverallInsight, 'overallInsights')} />
         </div>
       </div>
+      )}
 
       {/* ─── Section 2: Top Creators ────────────────────────────────────── */}
-      <SectionHeader icon="bi-star-fill" title="Top Creators" color="#f59e0b" required />
+      <SectionHeader icon="bi-star-fill" title="Top Creators" color="#f59e0b" required
+        enabled={sectEnabled.topCreators} onToggle={toggleSection('topCreators')} />
+      {sectEnabled.topCreators && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
@@ -858,9 +905,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             onGenerate={() => runAi('creators', generateCreatorsInsight, 'topCreatorsInsights')} />
         </div>
       </div>
+      )}
 
       {/* ─── Section 3: Top Videos ──────────────────────────────────────── */}
-      <SectionHeader icon="bi-play-circle-fill" title="Top Videos" color="#8b5cf6" required />
+      <SectionHeader icon="bi-play-circle-fill" title="Top Videos" color="#8b5cf6" required
+        enabled={sectEnabled.topVideos} onToggle={toggleSection('topVideos')} />
+      {sectEnabled.topVideos && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
@@ -878,9 +928,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             onGenerate={() => runAi('videos', generateVideosInsight, 'topVideosInsights')} />
         </div>
       </div>
+      )}
 
       {/* ─── Section 4: GMV Max Performance ─────────────────────────────── */}
-      <SectionHeader icon="bi-rocket-takeoff-fill" title="GMV Max Performance" color="#ef4444" required />
+      <SectionHeader icon="bi-rocket-takeoff-fill" title="GMV Max Performance" color="#ef4444" required
+        enabled={sectEnabled.gmvMax} onToggle={toggleSection('gmvMax')} />
+      {sectEnabled.gmvMax && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
@@ -899,9 +952,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             onGenerate={() => runAi('gmvMax', generateGmvMaxInsight, 'gmvMaxInsights')} />
         </div>
       </div>
+      )}
 
       {/* ─── Section 5: Product Highlights ──────────────────────────────── */}
-      <SectionHeader icon="bi-box-seam-fill" title="Product Highlights" color="#06b6d4" required />
+      <SectionHeader icon="bi-box-seam-fill" title="Product Highlights" color="#06b6d4" required
+        enabled={sectEnabled.productHighlights} onToggle={toggleSection('productHighlights')} />
+      {sectEnabled.productHighlights && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
@@ -919,9 +975,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             onGenerate={() => runAi('products', generateProductsInsight, 'productHighlightsInsights')} />
         </div>
       </div>
+      )}
 
       {/* ─── Section 6: Offsite Performance (optional) ──────────────────── */}
-      <SectionHeader icon="bi-globe2" title="Offsite Performance" color="#10b981" />
+      <SectionHeader icon="bi-globe2" title="Offsite Performance" color="#10b981"
+        enabled={sectEnabled.offsitePerformance} onToggle={toggleSection('offsitePerformance')} />
+      {sectEnabled.offsitePerformance && (
       <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <div className="d-flex flex-wrap gap-2 mb-2">
@@ -934,9 +993,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             onGenerate={() => runAi('offsite', generateOffsiteInsight, 'offsiteInsights')} />
         </div>
       </div>
+      )}
 
       {/* ─── Current & Upcoming Campaigns (mandatory) ───────────────────── */}
-      <SectionHeader icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" color="#ec4899" required />
+      <SectionHeader icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" color="#ec4899" required
+        enabled={sectEnabled.upcomingCampaigns} onToggle={toggleSection('upcomingCampaigns')} />
+      {sectEnabled.upcomingCampaigns && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <RichTextEditor value={data.upcomingCampaigns || ''}
@@ -945,9 +1007,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             placeholder="List any upcoming campaigns, launches or planned promotions" />
         </div>
       </div>
+      )}
 
       {/* ─── Operational Updates (mandatory) ─────────────────────────────── */}
-      <SectionHeader icon="bi-gear-fill" title="Operational Updates" color="#6366f1" required />
+      <SectionHeader icon="bi-gear-fill" title="Operational Updates" color="#6366f1" required
+        enabled={sectEnabled.operationalUpdates} onToggle={toggleSection('operationalUpdates')} />
+      {sectEnabled.operationalUpdates && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <RichTextEditor value={data.operationalUpdates || ''}
@@ -956,9 +1021,12 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             placeholder="Describe the workflow and operational tasks completed this period" />
         </div>
       </div>
+      )}
 
       {/* ─── Recommendations & Action Items (optional) ───────────────────── */}
-      <SectionHeader icon="bi-lightbulb-fill" title="Recommendations & Action Items" color="#f59e0b" />
+      <SectionHeader icon="bi-lightbulb-fill" title="Recommendations & Action Items" color="#f59e0b"
+        enabled={sectEnabled.recommendations} onToggle={toggleSection('recommendations')} />
+      {sectEnabled.recommendations && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           <RichTextEditor value={data.recommendations || ''}
@@ -967,6 +1035,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             placeholder="Share your recommendations and action items for next steps" />
         </div>
       </div>
+      )}
 
       {/* ─── Optional: Custom Fields (per user) ──────────────────────────── */}
       <div className="d-flex align-items-center justify-content-between mb-3 mt-4">
