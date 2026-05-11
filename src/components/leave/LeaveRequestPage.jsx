@@ -7,6 +7,7 @@ import {
   withdrawLeave,
   teamApproveLeave,
   teamRejectLeave,
+  getActiveBoss,
 } from '../../lib/leaveApi';
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -486,9 +487,10 @@ export default function LeaveRequestPage() {
   const userRole = profile?.role || '';
   const apcProfile = (userRole === 'apc' || userRole === 'ipc') ? { userName: profile?.display_name || '', ownerId: profile?.owner_id || null } : null;
   const effectiveRole = userRole === 'tl' ? 'tl' : userRole === 'ol' ? 'ol' : userRole === 'boss' ? 'boss' : (apcProfile ? 'apc' : (userRole || 'tl'));
-  const isApc = effectiveRole === 'apc';
-  const isTL  = effectiveRole === 'tl';
-  const isOL  = effectiveRole === 'ol';
+  const isApc  = effectiveRole === 'apc';
+  const isTL   = effectiveRole === 'tl';
+  const isOL   = effectiveRole === 'ol';
+  const isBoss = effectiveRole === 'boss';
   const canReviewTeam = isTL || isOL;
 
   const [activeTab,  setActiveTab]  = useState('my');
@@ -513,6 +515,15 @@ export default function LeaveRequestPage() {
   const [teamDateTo, setTeamDateTo]             = useState('');
   const [teamPendingStage, setTeamPendingStage] = useState('');
   const [teamRequesterRole, setTeamRequesterRole] = useState('');
+
+  // Active Boss profile — drives the "Forwarded to <Boss>" label
+  // shown to viewers who aren't the forwarder or the Boss themselves.
+  const [bossInfo, setBossInfo] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    getActiveBoss().then((b) => { if (!cancelled) setBossInfo(b); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const fromName = isApc
     ? (apcProfile?.userName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'APC')
@@ -732,29 +743,40 @@ export default function LeaveRequestPage() {
                     stages (TL → Boss); single stage requests show one pill. */}
                 {r.intermediateApproval && (() => {
                   const it = r.intermediateApproval;
-                  // Three possible intermediate states from buildApprovalShim:
-                  //   'approved'  → "Approved by X"   (green)
-                  //   'forwarded' → "Forwarded by X"  (green — still positive)
-                  //   'rejected'  → "Rejected by X"   (red)
-                  // Previously the code only checked === 'approved' and
-                  // rendered everything else as red "Rejected", which made
-                  // a 'forwarded' decision look like a rejection. Treat
-                  // both approve and forward as positive.
                   const isApproved  = it.status === 'approved';
                   const isForwarded = it.status === 'forwarded' || it.forwardToBoss;
                   const isPositive  = isApproved || isForwarded;
-                  // Defensive: if the request is currently pending but
-                  // the shim somehow returned a 'rejected' intermediate
-                  // (would only happen with stale data), don't render it
-                  // — the status pill already shows the real state.
+                  // Defensive: stale 'rejected' on a pending request — hide.
                   if (!isPositive && r.status?.startsWith('pending')) return null;
-                  const verb = isForwarded ? 'Forwarded' : (isApproved ? 'Approved' : 'Rejected');
                   const when = formatDateTime(it.resolvedAt);
+
+                  // Audience-aware label:
+                  //   Forwarded:
+                  //     * the forwarder themselves → "Forwarded by [forwarder]"
+                  //     * Boss (the recipient)     → "Forwarded by [forwarder]"
+                  //     * everyone else            → "Forwarded to [Boss name]"
+                  //   Approved/Rejected:
+                  //     * always "Approved by [approver]" / "Rejected by [approver]"
+                  //       — these are final decisions, the actor is the
+                  //       point of information for everyone.
+                  let label;
+                  if (isForwarded) {
+                    const iAmForwarder = currentUser?.uid && it.approverId === currentUser.uid;
+                    if (iAmForwarder || isBoss) {
+                      label = `Forwarded by ${it.approverName}`;
+                    } else {
+                      label = `Forwarded to ${bossInfo?.display_name || 'Boss'}`;
+                    }
+                  } else if (isApproved) {
+                    label = `Approved by ${it.approverName}`;
+                  } else {
+                    label = `Rejected by ${it.approverName}`;
+                  }
                   return (
                     <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
                       style={{ background: isPositive ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
                       <i className={`bi ${isPositive ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
-                      {verb} by {it.approverName}
+                      {label}
                       {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
                     </div>
                   );

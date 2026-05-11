@@ -449,6 +449,22 @@ export function subscribeLeaves(onChange) {
   return () => { stopped = true; supabase.removeChannel(ch); };
 }
 
+// Active Boss profile — used by the leave UI to label requests that
+// have been forwarded ("Forwarded to <Boss name>") for everyone except
+// the OL who did the forwarding and the Boss themselves.
+export async function getActiveBoss() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .eq('role', 'boss')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return data;
+}
+
 // User's monthly leave_quota (load from profiles.leave_quota; falls back
 // to the global default if blank).
 export async function getMyLeaveQuota(uid) {
