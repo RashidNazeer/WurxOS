@@ -29,21 +29,21 @@ export default function ClientAccessPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  // Distinct client_name values across all current links — drives the
-  // Client filter dropdown AND the datalist suggestions in the modal.
-  // Trimmed + case-folded for the dedupe so 'Kelsey' and 'kelsey ' map
-  // to one canonical entry, while the display uses the most common
-  // original casing.
+  // Distinct UMBRELLA client values across all current links. The
+  // `client` column is auto-filled by mig 160's trigger from the
+  // linked brand's client_name — so multiple Kelsey links all share
+  // client='Kelsey' even when their display labels are
+  // 'Kelsey - Bentgo', 'Kelsey - FlyWell', etc.
+  // Trim + case-fold the dedupe to merge any casing/whitespace drift.
   const clientNames = useMemo(() => {
-    const counts = new Map(); // normalized → { display, n }
+    const counts = new Map();
     for (const l of links) {
-      const raw = (l.client_name || '').trim();
+      const raw = (l.client || '').trim();
       if (!raw) continue;
       const norm = raw.toLowerCase();
       const cur = counts.get(norm);
       if (cur) {
         cur.n += 1;
-        // Prefer the most-frequently-seen casing for display
       } else {
         counts.set(norm, { display: raw, n: 1 });
       }
@@ -67,7 +67,7 @@ export default function ClientAccessPage() {
       if (filterStatus === 'active'   && !c.active) return false;
       if (filterStatus === 'disabled' &&  c.active) return false;
       if (filterClient) {
-        if ((c.client_name || '').trim().toLowerCase() !== filterClient.toLowerCase()) return false;
+        if ((c.client || '').trim().toLowerCase() !== filterClient.toLowerCase()) return false;
       }
       return true;
     });
@@ -372,23 +372,16 @@ function ClientAccessModal({ link, brands, existingClientNames = [], onClose, on
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                Client name
-                {existingClientNames.length > 0 && (
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 6 }}>
-                    (pick or type new)
-                  </span>
-                )}
+                Link name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+                  (display label, e.g. "Kelsey - Bentgo")
+                </span>
               </label>
-              {/* Datalist gives autocomplete from existing clients but
-                  still lets the user type a brand-new name. This keeps
-                  the umbrella name ('Kelsey') consistent across all
-                  her brand links so the Client filter groups them. */}
-              <input className="wx-input" placeholder="e.g. Kelsey"
-                list="client-access-name-suggestions"
+              {/* Free-text display label for THIS specific link. The
+                  umbrella client (used for filtering) is auto-derived
+                  from the linked brand(s)' client_name field — see
+                  mig 160's trigger. No separate client picker needed. */}
+              <input className="wx-input" placeholder="e.g. Kelsey - Bentgo"
                 value={clientName} onChange={e => setClientName(e.target.value)} />
-              <datalist id="client-access-name-suggestions">
-                {existingClientNames.map((n) => <option key={n} value={n} />)}
-              </datalist>
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
