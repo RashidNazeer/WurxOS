@@ -270,9 +270,16 @@ export default function WeeklyReportsPage() {
     const viewReport = currentBrand
       ? { ...detailReport, brandName: currentBrand.brandName || currentBrand.name || detailReport.brandName }
       : detailReport;
-    // Edit is allowed based on role + status
+    // Edit is allowed based on role + status:
+    //   - APC: can edit only their own drafts (before they submit).
+    //          Once submitted, ownership moved to TL.
+    //   - TL : can edit while the report is in their stage — that's
+    //          'draft' (TL drafted it themselves, hasn't submitted to
+    //          the OL queue yet) AND 'submitted' (APC submitted, TL is
+    //          reviewing). Once TL clicks Verify the report moves on
+    //          to OL and TL no longer edits.
     const canEdit = (userRole === 'apc' && rStatus === 'draft') ||
-                    (userRole === 'tl' && rStatus === 'submitted');
+                    (userRole === 'tl'  && (rStatus === 'draft' || rStatus === 'submitted'));
     const canVerify = userRole === 'tl' && rStatus === 'submitted';
     // TL can only return to APC while the report is still at the TL stage
     // (status: submitted). Once they've verified it, the report has moved on
@@ -330,6 +337,10 @@ export default function WeeklyReportsPage() {
     return (
       <WeeklyReportForm
         editReportId={view === 'edit' ? editId : null}
+        // When TL clicks "New Report" from inside a brand-detail page,
+        // selectedBrandId is set — pre-select that brand on the form so
+        // they don't have to pick it again.
+        prefillBrandId={view === 'new' ? selectedBrandId : null}
         onSaved={handleSaved}
         onCancel={() => { setView(selectedBrandId ? 'brand' : 'overview'); setEditId(null); }}
       />
@@ -478,9 +489,14 @@ export default function WeeklyReportsPage() {
                           </button>
                           <ul className="dropdown-menu dropdown-menu-end" style={{ fontSize: '0.78rem' }}>
                             <li><button className="dropdown-item" onClick={() => handleViewReport(r)}><i className="bi bi-eye me-2" />View Report</button></li>
-                            {((userRole === 'apc' && getReportStatus(r) === 'draft') || (userRole === 'tl' && getReportStatus(r) === 'submitted')) && (
-                              <li><button className="dropdown-item" onClick={() => handleEdit(r.id)}><i className="bi bi-pencil me-2" />Edit</button></li>
-                            )}
+                            {(() => {
+                              const s = getReportStatus(r);
+                              const can = (userRole === 'apc' && s === 'draft') ||
+                                          (userRole === 'tl'  && (s === 'draft' || s === 'submitted'));
+                              return can ? (
+                                <li><button className="dropdown-item" onClick={() => handleEdit(r.id)}><i className="bi bi-pencil me-2" />Edit</button></li>
+                              ) : null;
+                            })()}
                             {userRole === 'tl' && getReportStatus(r) === 'submitted' && (
                               <li><button className="dropdown-item" style={{ color: '#7c3aed' }} onClick={e => { e.stopPropagation(); handleVerify(r); }}><i className="bi bi-patch-check-fill me-2" />Verify</button></li>
                             )}

@@ -377,30 +377,47 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   // Setters for nested objects
   const setObj = (key, field, val) => setData(d => ({ ...d, [key]: { ...(d[key] || {}), [field]: val } }));
 
-  // Custom field management (saved to user's shared template)
-  const addCustomField = async () => {
+  // Custom field management — see WeeklyReportForm for the rationale
+  // behind the functional setState + persist-inside-updater pattern.
+  function nextFieldId() {
+    return `cf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  }
+  const persistDefs = async (defs) => {
+    try { await saveUserCustomFields(currentUser.uid, defs); }
+    catch (e) { console.error('saveUserCustomFields failed:', e); }
+  };
+
+  const addCustomField = () => {
     const name = window.prompt('Name for new custom field:', 'Notes');
     if (!name || !name.trim()) return;
-    const newField = { id: `cf_${Date.now()}`, name: name.trim() };
-    const updated = [...customFieldDefs, newField];
-    setCustomFieldDefs(updated);
-    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+    const trimmedName = name.trim();
+    const newField = { id: nextFieldId(), name: trimmedName };
+    setCustomFieldDefs((prev) => {
+      if (prev.some((f) => f.name.trim().toLowerCase() === trimmedName.toLowerCase())) return prev;
+      const next = [...prev, newField];
+      persistDefs(next);
+      return next;
+    });
   };
 
-  const renameCustomField = async (fieldId) => {
-    const field = customFieldDefs.find(f => f.id === fieldId);
-    const name = window.prompt('Rename field:', field?.name || '');
+  const renameCustomField = (fieldId) => {
+    const current = customFieldDefs.find((f) => f.id === fieldId);
+    const name = window.prompt('Rename field:', current?.name || '');
     if (!name || !name.trim()) return;
-    const updated = customFieldDefs.map(f => f.id === fieldId ? { ...f, name: name.trim() } : f);
-    setCustomFieldDefs(updated);
-    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+    setCustomFieldDefs((prev) => {
+      const next = prev.map((f) => (f.id === fieldId ? { ...f, name: name.trim() } : f));
+      persistDefs(next);
+      return next;
+    });
   };
 
-  const deleteCustomField = async (fieldId) => {
+  const deleteCustomField = (fieldId) => {
     if (!window.confirm('Remove this custom field from all future reports? (Existing reports keep their data)')) return;
-    const updated = customFieldDefs.filter(f => f.id !== fieldId);
-    setCustomFieldDefs(updated);
-    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+    setCustomFieldDefs((prev) => {
+      const next = prev.filter((f) => f.id !== fieldId);
+      persistDefs(next);
+      return next;
+    });
   };
 
   const setCustomFieldValue = useCallback((fieldId, val, name) => {

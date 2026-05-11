@@ -172,7 +172,11 @@ export default function MonthlyReportsPage() {
     // (status: submitted). Once verified, ownership has passed to OL —
     // see WeeklyReportsPage for the full reasoning.
     const canTlReject = isTL && rStatus === 'submitted';
-    const canTlEdit = isTL;
+    // TL can edit only while the report is still at their stage
+    // (draft OR submitted). Once Verified, ownership moved to OL and
+    // TL is read-only. Previously `canTlEdit = isTL` let TL edit even
+    // approved reports — too permissive.
+    const canTlEdit = isTL && (rStatus === 'draft' || rStatus === 'submitted');
 
     return (
       <div>

@@ -147,7 +147,7 @@ function ArraySection({ items, setItems, fields, addLabel }) {
 
 /* ── Main Form ────────────────────────────────────────────────────────────── */
 
-export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
+export default function WeeklyReportForm({ editReportId, onSaved, onCancel, prefillBrandId = null }) {
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -175,12 +175,22 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
 
   const myBrands = brands;
 
-  // Auto-select if single brand
+  // Auto-select brand:
+  //   1. If parent passed a prefillBrandId (e.g. TL clicked "New Report"
+  //      from inside a brand-detail page), pre-select that brand and
+  //      skip the brand-picker step entirely.
+  //   2. Otherwise, if the user only has ONE brand to choose from,
+  //      auto-select it (no point in showing a picker with one option).
   useEffect(() => {
-    if (!editReportId && myBrands.length === 1 && !selectedBrand) {
+    if (editReportId || selectedBrand) return;
+    if (prefillBrandId) {
+      const match = myBrands.find((b) => b.id === prefillBrandId);
+      if (match) { setSelectedBrand(match); return; }
+    }
+    if (myBrands.length === 1) {
       setSelectedBrand(myBrands[0]);
     }
-  }, [myBrands, selectedBrand, editReportId]);
+  }, [myBrands, selectedBrand, editReportId, prefillBrandId]);
 
   // Load user's custom field templates
   useEffect(() => {
@@ -354,30 +364,67 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel }) {
     }
   };
 
-  // Custom field management (saved to user's template)
-  const addCustomField = async () => {
+  // Custom field management (persisted to user's template).
+  //
+  // Earlier version captured `customFieldDefs` from the closure and
+  // wrote `[...customFieldDefs, newField]` straight back. Two problems:
+  //   1. If the user clicks Add twice quickly, the second handler reads
+  //      stale `customFieldDefs` (React hadn't committed the first
+  //      update yet) and writes only ONE of the two new fields — the
+  //      other gets lost. Same flaw on rename/delete.
+  //   2. `cf_${Date.now()}` collides if two adds happen in the same
+  //      millisecond, breaking React's key reconciliation.
+  // Fix: use the functional `setState(prev => ...)` form so we always
+  // operate on the freshest array. Persist the SAME computed array
+  // back to Firestore from inside the updater closure. Add randomness
+  // to the id so back-to-back clicks never collide.
+  function nextFieldId() {
+    return `cf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  }
+  const persistDefs = async (defs) => {
+    try { await saveUserCustomFields(currentUser.uid, defs); }
+    catch (e) { console.error('saveUserCustomFields failed:', e); }
+  };
+
+  const addCustomField = () => {
+    // Prompt OUTSIDE the state updater — StrictMode runs the updater
+    // twice in dev, which would fire the prompt twice.
     const name = window.prompt('Name for new custom field:', 'Notes');
     if (!name || !name.trim()) return;
-    const newField = { id: `cf_${Date.now()}`, name: name.trim() };
-    const updated = [...customFieldDefs, newField];
-    setCustomFieldDefs(updated);
-    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+    const trimmedName = name.trim();
+    const newField = { id: nextFieldId(), name: trimmedName };
+    setCustomFieldDefs((prev) => {
+      // Guard against duplicate names (case-insensitive). Returning the
+      // same array reference is fine — React will bail out of the render.
+      if (prev.some((f) => f.name.trim().toLowerCase() === trimmedName.toLowerCase())) {
+        return prev;
+      }
+      const next = [...prev, newField];
+      persistDefs(next);
+      return next;
+    });
   };
 
-  const renameCustomField = async (fieldId) => {
-    const field = customFieldDefs.find(f => f.id === fieldId);
-    const name = window.prompt('Rename field:', field?.name || '');
+  const renameCustomField = (fieldId) => {
+    // Prompt OUTSIDE the updater — putting it inside would fire twice
+    // under React 18 StrictMode (updaters are called twice in dev).
+    const current = customFieldDefs.find((f) => f.id === fieldId);
+    const name = window.prompt('Rename field:', current?.name || '');
     if (!name || !name.trim()) return;
-    const updated = customFieldDefs.map(f => f.id === fieldId ? { ...f, name: name.trim() } : f);
-    setCustomFieldDefs(updated);
-    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+    setCustomFieldDefs((prev) => {
+      const next = prev.map((f) => (f.id === fieldId ? { ...f, name: name.trim() } : f));
+      persistDefs(next);
+      return next;
+    });
   };
 
-  const deleteCustomField = async (fieldId) => {
+  const deleteCustomField = (fieldId) => {
     if (!window.confirm('Remove this custom field from all future reports? (Existing reports keep their data)')) return;
-    const updated = customFieldDefs.filter(f => f.id !== fieldId);
-    setCustomFieldDefs(updated);
-    try { await saveUserCustomFields(currentUser.uid, updated); } catch (e) { console.error(e); }
+    setCustomFieldDefs((prev) => {
+      const next = prev.filter((f) => f.id !== fieldId);
+      persistDefs(next);
+      return next;
+    });
   };
 
   const setCustomFieldValue = useCallback((fieldId, val, name) => {
