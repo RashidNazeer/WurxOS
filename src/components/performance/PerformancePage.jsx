@@ -294,6 +294,22 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
   const [tab, setTab] = useState('green');
   const filtered = flags.filter(f => f.type === tab);
 
+  const fmtTimestamp = (d) => {
+    if (!d) return null;
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    return dt.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    });
+  };
+  const fmtMonth = (d) => {
+    if (!d) return null;
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    return dt.toLocaleString(undefined, { year: 'numeric', month: 'long' });
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
@@ -305,6 +321,17 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
               style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
             </button>
+          </div>
+          {/* Help banner so users understand the month-scope rule —
+              a flag only affects the performance score of the month
+              it was created in. It still shows in history forever. */}
+          <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2"
+            style={{ background: 'var(--info-soft, #eff6ff)', border: '1px solid var(--info, #93c5fd)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+            <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: 'var(--info, #2563eb)' }} />
+            <span>
+              Each flag affects the performance score of <strong>only the month it was created in</strong>.
+              The flag itself stays visible in history below.
+            </span>
           </div>
           <div className="d-flex gap-1 mb-3">
             {['green', 'red'].map(t => {
@@ -324,14 +351,31 @@ function ViewFlagsModal({ user, flags, onClose, canManage, onAddFlag }) {
             <div className="d-flex flex-column gap-2 mb-3">
               {filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(f => {
                 const w = WEIGHTAGES.find(x => x.key === f.weightage) || WEIGHTAGES[0];
+                const ts = fmtTimestamp(f.createdAt);
+                const month = fmtMonth(f.createdAt);
                 return (
                   <div key={f.id} className="rounded-3 p-3" style={{ background: tab === 'green' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${tab === 'green' ? '#b7dfc4' : '#fecaca'}` }}>
-                    <div className="d-flex align-items-start justify-content-between gap-2 mb-1">
+                    <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
                       <span className="small fw-medium">{f.description}</span>
                       <span className="badge rounded-pill flex-shrink-0" style={{ background: w.bg, color: w.color, fontSize: '0.58rem' }}>{w.label}</span>
                     </div>
-                    <div className="text-muted" style={{ fontSize: '0.65rem' }}>
-                      By {f.addedByName}{f.createdAt && <span> · {new Date(f.createdAt).toLocaleDateString()}</span>}
+                    <div className="d-flex flex-column gap-1" style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                      <div className="d-flex align-items-center gap-1">
+                        <i className="bi bi-person" style={{ opacity: 0.7 }} />
+                        <span>Flagged by <strong>{f.addedByName || 'Unknown'}</strong></span>
+                      </div>
+                      {ts && (
+                        <div className="d-flex align-items-center gap-1">
+                          <i className="bi bi-clock" style={{ opacity: 0.7 }} />
+                          <span>{ts}</span>
+                        </div>
+                      )}
+                      {month && (
+                        <div className="d-flex align-items-center gap-1">
+                          <i className="bi bi-calendar3" style={{ opacity: 0.7 }} />
+                          <span>Affects <strong>{month}</strong> score</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

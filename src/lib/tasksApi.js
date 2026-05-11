@@ -21,7 +21,7 @@ export async function listTasks({
     .select(`
       *,
       brand:brand_id(id, brand_name, logo_url, owner_id),
-      assignee:assignee_id(id, display_name, email, role),
+      assignee:assignee_id(id, display_name, email, role, reports_to, current_tl:reports_to(id, display_name)),
       creator:created_by(id, display_name, role)
     `)
     .order('created_at', { ascending: false });

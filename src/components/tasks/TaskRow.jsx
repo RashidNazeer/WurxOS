@@ -240,9 +240,18 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
               {(() => {
                 const isAssignee = task.assignee_id === currentUserId;
                 const isCreator  = task.created_by  === currentUserId;
-                const creatorName  = task.creator?.display_name  || 'creator';
-                const assigneeName = task.assignee?.display_name || 'assignee';
-                const selfAssigned = task.created_by === task.assignee_id;
+                // Prefer the assignee's CURRENT TL over the task's
+                // historical creator. When an APC is reassigned to a
+                // different TL, the task's `created_by` keeps pointing
+                // at the original TL (set in mig 141), but the person
+                // who actually needs the ping is the APC's current TL.
+                // Fall back to the creator's name for tasks where the
+                // assignee has no TL (e.g., boss/OL-assigned cross-team
+                // work).
+                const currentTlName = task.assignee?.current_tl?.display_name;
+                const creatorName   = currentTlName || task.creator?.display_name || 'creator';
+                const assigneeName  = task.assignee?.display_name || 'assignee';
+                const selfAssigned  = task.created_by === task.assignee_id;
                 if (isAssignee && !isCreator) return `Notify ${creatorName}`;
                 if (isCreator  && !isAssignee) return `Notify ${assigneeName}`;
                 if (isAssignee && isCreator)   return 'Notify yourself';
