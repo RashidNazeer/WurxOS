@@ -44,6 +44,13 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide',     () => { flush(); });
 }
 
+// Suppress repeats of the same event within a short window.
+// Supabase's onAuthStateChange fires SIGNED_IN multiple times per
+// session (every focus, every cross-tab broadcast). We don't need
+// 50 identical rows in app_events — one per minute is plenty.
+const RECENT_DEDUP_MS = 60 * 1000;
+const recentSigSeen = new Map(); // signature → timestamp
+
 /**
  * Log an event. `kind` is a short tag; `detail` is any small JSON.
  * `userId` is REQUIRED (RLS gate) — pass null only if logging from
@@ -53,11 +60,35 @@ if (typeof window !== 'undefined') {
 export function logAppEvent(userId, kind, detail = {}) {
   if (!userId) return;
   try {
+    // Dedupe identical (user, kind, route) within RECENT_DEDUP_MS.
+    // We DON'T include detail in the signature so an expiresAt change
+    // (which actually means "fresh token") still gets logged once a
+    // minute. recheck_fail and session_invalid are NEVER deduped —
+    // those are the ones we actually need every instance of.
+    const importantKinds = new Set([
+      'auth.recheck_fail', 'auth.session_invalid',
+      'auth.signed_out_explicit', 'auth.SIGNED_OUT',
+    ]);
+    const route = typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : null;
+    if (!importantKinds.has(kind)) {
+      const sig = `${userId}|${kind}|${route}`;
+      const last = recentSigSeen.get(sig) || 0;
+      const now = Date.now();
+      if (now - last < RECENT_DEDUP_MS) return;
+      recentSigSeen.set(sig, now);
+      // Bound the map so it doesn't leak forever.
+      if (recentSigSeen.size > 200) {
+        const cutoff = now - RECENT_DEDUP_MS;
+        for (const [k, t] of recentSigSeen) {
+          if (t < cutoff) recentSigSeen.delete(k);
+        }
+      }
+    }
     QUEUE.push({
       user_id: userId,
       kind,
       detail: detail || {},
-      route: typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : null,
+      route,
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 240) : null,
     });
     scheduleFlush();
