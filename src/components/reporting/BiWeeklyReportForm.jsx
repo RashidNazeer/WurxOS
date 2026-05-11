@@ -138,6 +138,57 @@ function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
   );
 }
 
+// "Copy from previous report" icon button shown above each rich-text
+// editor. Disabled (with tooltip) when no previous report exists or
+// when the previous report's value for this field is visually empty.
+// Confirms before overwriting non-empty current text.
+function isHtmlEmpty(html) {
+  if (!html) return true;
+  if (typeof html !== 'string') return true;
+  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim() === '';
+}
+function FetchPreviousButton({ previousValue, currentValue, onPaste, sourceLabel }) {
+  const prevEmpty = isHtmlEmpty(previousValue);
+  const curEmpty = isHtmlEmpty(currentValue);
+  const disabled = prevEmpty;
+  const handleClick = () => {
+    if (disabled) return;
+    if (!curEmpty) {
+      const ok = window.confirm(
+        `Replace current text with the content from ${sourceLabel}?\n\nYour current text will be lost.`
+      );
+      if (!ok) return;
+    }
+    onPaste(previousValue);
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      title={
+        disabled
+          ? 'No previous report to copy from yet'
+          : `Copy from ${sourceLabel}`
+      }
+      className="btn btn-sm d-inline-flex align-items-center gap-1"
+      style={{
+        background: disabled ? 'var(--surface-2)' : 'var(--surface-1)',
+        border: '1px solid var(--border-subtle)',
+        color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
+        borderRadius: 8,
+        fontSize: '0.68rem',
+        padding: '3px 10px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <i className="bi bi-clock-history" />
+      <span>Copy from previous</span>
+    </button>
+  );
+}
+
 function ArraySection({ items, setItems, fields, addLabel }) {
   const add = () => {
     const empty = {};
@@ -1074,6 +1125,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.upcomingCampaigns && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          <div className="d-flex justify-content-end mb-2">
+            <FetchPreviousButton
+              previousValue={previousReport?.upcomingCampaigns}
+              currentValue={data.upcomingCampaigns}
+              onPaste={(v) => setData(d => ({ ...d, upcomingCampaigns: v }))}
+              sourceLabel={previousReport?.periodLabel || 'previous period'} />
+          </div>
           <RichTextEditor value={data.upcomingCampaigns || ''}
             onChange={v => setData(d => ({ ...d, upcomingCampaigns: v }))}
             minHeight={140}
@@ -1088,6 +1146,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.operationalUpdates && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          <div className="d-flex justify-content-end mb-2">
+            <FetchPreviousButton
+              previousValue={previousReport?.operationalUpdates}
+              currentValue={data.operationalUpdates}
+              onPaste={(v) => setData(d => ({ ...d, operationalUpdates: v }))}
+              sourceLabel={previousReport?.periodLabel || 'previous period'} />
+          </div>
           <RichTextEditor value={data.operationalUpdates || ''}
             onChange={v => setData(d => ({ ...d, operationalUpdates: v }))}
             minHeight={140}
@@ -1102,6 +1167,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.recommendations && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          <div className="d-flex justify-content-end mb-2">
+            <FetchPreviousButton
+              previousValue={previousReport?.recommendations}
+              currentValue={data.recommendations}
+              onPaste={(v) => setData(d => ({ ...d, recommendations: v }))}
+              sourceLabel={previousReport?.periodLabel || 'previous period'} />
+          </div>
           <RichTextEditor value={data.recommendations || ''}
             onChange={v => setData(d => ({ ...d, recommendations: v }))}
             minHeight={160}
@@ -1154,6 +1226,29 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
                     </button>
                   </div>
                 </div>
+                {(() => {
+                  const prevCustom = previousReport?.customFields || {};
+                  const byId = prevCustom[field.id];
+                  const byName = !byId
+                    ? Object.values(prevCustom).find((v) =>
+                        typeof v === 'object' && v?.name && v.name === field.name)
+                    : null;
+                  const prevEntry = byId || byName;
+                  const prevValue = prevEntry == null ? ''
+                    : (typeof prevEntry === 'string' ? prevEntry : (prevEntry.value || ''));
+                  const curEntry = data.customFields?.[field.id];
+                  const curValue = curEntry == null ? ''
+                    : (typeof curEntry === 'string' ? curEntry : (curEntry.value || ''));
+                  return (
+                    <div className="d-flex justify-content-end mb-2">
+                      <FetchPreviousButton
+                        previousValue={prevValue}
+                        currentValue={curValue}
+                        onPaste={(v) => setCustomFieldValue(field.id, v, field.name)}
+                        sourceLabel={previousReport?.periodLabel || 'previous period'} />
+                    </div>
+                  );
+                })()}
                 <RichTextEditor
                   value={(() => {
                     const v = data.customFields?.[field.id];
