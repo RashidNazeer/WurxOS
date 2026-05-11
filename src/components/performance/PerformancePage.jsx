@@ -951,8 +951,14 @@ export default function PerformancePage() {
       setLoading(false);
     }
     load();
+  // Include effectiveRole — on first render the profile may not be
+  // loaded yet, so userRole='' and effectiveRole defaults to 'apc'.
+  // Once the profile resolves and effectiveRole becomes 'ol'/'boss'/
+  // 'tl', we MUST re-run the load to fetch team data. Without this,
+  // the OL hits the page, the load runs with hasTeamTab=false, then
+  // never re-fires — Team tab shows empty until a hard refresh.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, currentUser?.uid]);
+  }, [month, currentUser?.uid, effectiveRole]);
 
   // Re-fetch flags + pending removals after a mutation (Boss direct
   // remove, OL request, Boss approve/reject). Keeps the modal + main

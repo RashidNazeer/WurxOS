@@ -7,6 +7,13 @@ const AuthContext = createContext(null);
 // Minimum gap between focus/online-triggered session rechecks.
 // Without this, rapidly switching tabs would fire one call per focus.
 const RECHECK_THROTTLE_MS = 15 * 1000;
+// Require this many CONSECUTIVE failed checks before flagging the
+// session as dead. A single null from getSession() or a single
+// refresh error can fire during normal token rotation or a brief
+// network blip — tearing the user out of an in-progress task (and
+// losing their unsaved form data) over one transient hiccup is
+// unacceptable. We only sign out when we're confident.
+const SESSION_FAIL_THRESHOLD = 3;
 
 export function AuthProvider({ children }) {
   const qc = useQueryClient();
@@ -31,6 +38,9 @@ export function AuthProvider({ children }) {
   const bootstrapped = useRef(false);
   // Throttle repeated focus/online rechecks.
   const lastRecheckRef = useRef(0);
+  // Count consecutive failures so we only flag the session dead when
+  // we're sure — see SESSION_FAIL_THRESHOLD above.
+  const failCountRef = useRef(0);
 
   const loadProfile = useCallback(async (userId) => {
     if (!userId) {
@@ -165,6 +175,19 @@ export function AuthProvider({ children }) {
     if (now - lastRecheckRef.current < RECHECK_THROTTLE_MS) return;
     lastRecheckRef.current = now;
 
+    // Count failures across checks so a single transient hiccup
+    // doesn't tear an in-progress user out of their form. Any
+    // SUCCESSFUL step resets the counter.
+    const fail = (why) => {
+      failCountRef.current += 1;
+      // eslint-disable-next-line no-console
+      console.warn(`[auth] session check failed (${failCountRef.current}/${SESSION_FAIL_THRESHOLD}): ${why}`);
+      if (failCountRef.current >= SESSION_FAIL_THRESHOLD) {
+        setSessionInvalid(true);
+      }
+    };
+    const pass = () => { failCountRef.current = 0; };
+
     try {
       // getSession() returns the cached session without contacting
       // the server, so if the access token expired while the tab
@@ -173,10 +196,10 @@ export function AuthProvider({ children }) {
       // a refresh through Supabase first; the refresh token is good
       // for ~30 days. Only escalate to "session expired" when the
       // refresh itself fails (refresh token revoked / clock skewed
-      // beyond grace).
+      // beyond grace) AND we've failed several checks in a row.
       const { data: sess } = await supabase.auth.getSession();
       if (!sess?.session) {
-        setSessionInvalid(true);
+        fail('getSession returned null');
         return;
       }
       const expiresAt = sess.session.expires_at;            // unix seconds
@@ -186,8 +209,7 @@ export function AuthProvider({ children }) {
       if (typeof expiresAt === 'number' && expiresAt - nowSec < 60) {
         const { error: refreshErr } = await supabase.auth.refreshSession();
         if (refreshErr) {
-          // Real failure (refresh token rejected). Show the modal.
-          setSessionInvalid(true);
+          fail(`refreshSession error: ${refreshErr.message || refreshErr}`);
           return;
         }
         // refreshSession() updates the client's session in place;
@@ -202,10 +224,25 @@ export function AuthProvider({ children }) {
         .select('id')
         .eq('id', session.user.id)
         .limit(1);
-      if (error) return; // transient network error — don't flag
-      if (!own || own.length === 0) setSessionInvalid(true);
-    } catch {
-      // Network blip — let the next focus/online event retry.
+      if (error) {
+        // Transient network/RLS error — don't penalize. But also
+        // don't reset the counter; let a future successful read
+        // clear it. This avoids a flapping pattern from counting
+        // as a "clean" check.
+        return;
+      }
+      if (!own || own.length === 0) {
+        fail('profile self-read returned 0 rows');
+        return;
+      }
+      // All checks passed.
+      pass();
+    } catch (err) {
+      // Network blip — let the next focus/online event retry. Don't
+      // count this as a failure; if it really is dead, the next
+      // check will report it cleanly.
+      // eslint-disable-next-line no-console
+      console.warn('[auth] recheckSession threw (ignored):', err);
     }
   }, [session?.user?.id]);
 
