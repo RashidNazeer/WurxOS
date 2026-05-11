@@ -33,7 +33,13 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
 
   const canChangeStatus = canEdit || task.assignee_id === currentUserId;
   const done = task.status === 'done';
-  const dueInfo = formatDue(task.due_date, task.status);
+  // Recurring tasks (daily/weekly/monthly) reset on their own
+  // schedule, so they intentionally don't carry a due date and can
+  // never be "overdue". The data migration cleared old values; this
+  // is the UI safety net for any that slipped through.
+  const dueInfo = task.category && task.category !== 'general'
+    ? null
+    : formatDue(task.due_date, task.status);
 
   // Close on outside click / scroll / resize
   useEffect(() => {

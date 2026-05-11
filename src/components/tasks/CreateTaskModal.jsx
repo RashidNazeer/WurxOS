@@ -462,7 +462,13 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                 <select
                   className="wx-input"
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setCategory(next);
+                    // Recurring categories never carry a due date — clear
+                    // any value the user typed before switching.
+                    if (next !== 'general') setDueDate('');
+                  }}
                   disabled={saving}
                 >
                   {CATEGORY_OPTIONS.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
@@ -497,18 +503,23 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
               </div>
             </div>
 
-            {/* Due + link */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <div>
-                <label className="wx-label">Due date <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>(optional)</span></label>
-                <input
-                  type="date"
-                  className="wx-input"
-                  value={dueDate || ''}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  disabled={saving}
-                />
-              </div>
+            {/* Due + link. Due date only applies to one-off ("general")
+                tasks — recurring categories (daily/weekly/monthly) reset
+                on their own schedule, so a due date there would just
+                make every task look overdue. */}
+            <div style={{ display: 'grid', gridTemplateColumns: category === 'general' ? '1fr 1fr' : '1fr', gap: 14 }}>
+              {category === 'general' && (
+                <div>
+                  <label className="wx-label">Due date <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>(optional)</span></label>
+                  <input
+                    type="date"
+                    className="wx-input"
+                    value={dueDate || ''}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    disabled={saving}
+                  />
+                </div>
+              )}
               <div>
                 <label className="wx-label">Link <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>(optional)</span></label>
                 <input

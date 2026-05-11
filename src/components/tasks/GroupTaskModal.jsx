@@ -233,7 +233,11 @@ export default function GroupTaskModal({ onClose, onCreated }) {
                 <select
                   className="wx-input"
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setCategory(next);
+                    if (next !== 'general') setDueDate('');
+                  }}
                   disabled={saving}
                 >
                   <option value="general">General</option>
@@ -261,11 +265,15 @@ export default function GroupTaskModal({ onClose, onCreated }) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <div>
-                <label className="wx-label">Due date</label>
-                <input type="date" className="wx-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={saving} />
-              </div>
+            {/* Due date only applies to one-off ("general") tasks —
+                recurring categories reset on their own schedule. */}
+            <div style={{ display: 'grid', gridTemplateColumns: category === 'general' ? '1fr 1fr' : '1fr', gap: 14 }}>
+              {category === 'general' && (
+                <div>
+                  <label className="wx-label">Due date</label>
+                  <input type="date" className="wx-input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={saving} />
+                </div>
+              )}
               <div>
                 <label className="wx-label">Link</label>
                 <input type="url" className="wx-input" value={link} onChange={(e) => setLink(e.target.value)} disabled={saving} placeholder="https://…" />

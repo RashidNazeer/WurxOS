@@ -81,7 +81,10 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
   const status   = STATUS_META[task.status]     || STATUS_META.todo;
   const priority = PRIORITY_META[task.priority] || PRIORITY_META.medium;
   const category = CATEGORY_META[task.category] || CATEGORY_META.general;
-  const due      = dueLabel(task.due_date, task.status);
+  // Recurring tasks never have a meaningful due — skip the chip.
+  const due = task.category && task.category !== 'general'
+    ? null
+    : dueLabel(task.due_date, task.status);
 
   const assigneeName = task.assignee?.display_name || task.assignee?.email?.split('@')[0] || '—';
   const assigneeRole = task.assignee?.role || '';
@@ -187,9 +190,14 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
                 <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Personal / general (no brand)</span>
               </Row>
             )}
-            <Row icon={CalendarIcon} label="Due date">
-              {formatDate(task.due_date)}
-            </Row>
+            {/* Recurring tasks never carry a due date — they reset on
+                their own schedule. Hide the row entirely instead of
+                showing "—". */}
+            {(!task.category || task.category === 'general') && (
+              <Row icon={CalendarIcon} label="Due date">
+                {formatDate(task.due_date)}
+              </Row>
+            )}
             {task.link && (
               <Row icon={LinkIcon} label="Link">
                 <a

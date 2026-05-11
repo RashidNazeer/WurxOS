@@ -12,7 +12,7 @@ import {
 async function fetchMyTasks(uid) {
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, title, status, priority, due_date, brand:brand_id(brand_name)')
+    .select('id, title, status, priority, due_date, category, brand:brand_id(brand_name)')
     .eq('assignee_id', uid)
     .neq('status', 'done')
     .order('due_date', { ascending: true, nullsFirst: false })
@@ -105,9 +105,12 @@ export default function RoleDashboard() {
   const myTasks = myTasksQ.data || [];
   const todayIso = new Date().toISOString().slice(0, 10);
   // Exclude completed tasks from "overdue" — a task you finished before its
-  // deadline isn't overdue, it's just done.
-  const myTasksOverdue = myTasks.filter((t) => t.due_date && t.due_date < todayIso && t.status !== 'done').length;
-  const myTasksToday   = myTasks.filter((t) => t.due_date === todayIso && t.status !== 'done').length;
+  // deadline isn't overdue, it's just done. Also exclude recurring tasks
+  // (daily/weekly/monthly): they reset on their own schedule and were
+  // never meant to carry a due date.
+  const isDeadlineTask = (t) => !t.category || t.category === 'general';
+  const myTasksOverdue = myTasks.filter((t) => isDeadlineTask(t) && t.due_date && t.due_date < todayIso && t.status !== 'done').length;
+  const myTasksToday   = myTasks.filter((t) => isDeadlineTask(t) && t.due_date === todayIso && t.status !== 'done').length;
 
   const data = {
     myTasks,
@@ -195,7 +198,7 @@ export default function RoleDashboard() {
                 </div>
               </div>
               <div style={{ fontSize: 11, color: dueColor(t.due_date), fontWeight: 600, whiteSpace: 'nowrap' }}>
-                {dueLabel(t.due_date)}
+                {(!t.category || t.category === 'general') ? dueLabel(t.due_date) : ''}
               </div>
             </div>
           ))}
