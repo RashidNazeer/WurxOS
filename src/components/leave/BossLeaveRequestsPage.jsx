@@ -202,11 +202,18 @@ export default function BossLeaveRequestsPage() {
   const [actionSaving,      setActionSaving]      = useState(false);
 
   useEffect(() => {
+    // Safety: force loading=false after 8s if subscribeLeaves never
+    // delivers (e.g., realtime channel stuck).
+    const safetyTimer = setTimeout(() => setLoading(false), 8000);
     const unsub = subscribeLeaves((rows) => {
       setRequests(rows);
       setLoading(false);
+      clearTimeout(safetyTimer);
     });
-    return () => unsub();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsub();
+    };
   }, []);
 
   // When opening Approve modal, fetch the user's REMAINING quota

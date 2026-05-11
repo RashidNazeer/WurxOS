@@ -104,7 +104,20 @@ function PageFallback() {
 
 function PublicOnly({ children }) {
   const { session, loading } = useAuth();
-  if (loading) return null;
+  // Show a real spinner instead of null while auth bootstraps —
+  // returning null leaves the user staring at a blank white page on
+  // /login or /signup until the auth call resolves, which on slow
+  // networks can look like "the app refreshed and broke."
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'grid', placeItems: 'center',
+        color: 'var(--text-muted)',
+      }}>
+        <span className="wx-spinner" style={{ color: 'var(--accent)' }} />
+      </div>
+    );
+  }
   if (session) return <Navigate to="/dashboard" replace />;
   return children;
 }

@@ -71,17 +71,25 @@ export function useBrands() {
     }
     let cancelled = false;
     setLoading(true);
+    // Safety: even if the initial fetch hangs forever (network blip
+    // that never resolves), force loading=false after 8 seconds so
+    // the page isn't stuck on a spinner.
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 8000);
     (async () => {
       try {
         const rows = await listBrandsForReporting({ role, uid });
         if (!cancelled) {
           setBrands((rows || []).map(_normBrand));
           setLoading(false);
+          clearTimeout(safetyTimer);
         }
       } catch {
         if (!cancelled) {
           setBrands([]);
           setLoading(false);
+          clearTimeout(safetyTimer);
         }
       }
     })();
@@ -100,6 +108,7 @@ export function useBrands() {
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
       supabase.removeChannel(ch);
     };
   }, [uid, role]);

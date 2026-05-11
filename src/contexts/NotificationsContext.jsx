@@ -20,7 +20,21 @@ export function NotificationsProvider({ children }) {
 
   const channelRef = useRef(null);
 
+  // CRITICAL: hold the latest items in a ref so the callbacks below
+  // can read fresh data WITHOUT depending on `items` in their useCallback
+  // dep array. The previous design recreated markRead/markVisibleRead
+  // every time items changed, which (combined with effects depending
+  // on those callbacks) caused an infinite render cascade that could
+  // tip recheckSession over its failure threshold and force sign-out.
+  // See audit Finding 1+2.
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
   // --- Initial load --------------------------------------------------------
+  // Load also lives in a ref so other effects (visibilitychange, SW
+  // messages) can call it without putting it in their dep array. The
+  // load logic itself only depends on the uid captured at call time.
+  const loadRef = useRef(null);
   const load = useCallback(async () => {
     if (!uid) return;
     setLoading(true);
@@ -37,6 +51,7 @@ export function NotificationsProvider({ children }) {
       setLoading(false);
     }
   }, [uid]);
+  useEffect(() => { loadRef.current = load; }, [load]);
 
   useEffect(() => {
     if (!uid) {
@@ -48,12 +63,8 @@ export function NotificationsProvider({ children }) {
     load();
   }, [uid, load]);
 
-  // Listen for service-worker relays. When a push arrives the SW
-  // posts a message to every open window; we refresh counts + items
-  // immediately so the bell updates before (or instead of) the
-  // Realtime WebSocket catching up. When the user clicks "Mark as
-  // read" on the popup, the SW posts a separate message and we flip
-  // the row locally.
+  // Service-worker relays (push arrivals + mark-read clicks). Deps
+  // intentionally drop `load` and `items` — both read via refs.
   useEffect(() => {
     if (!uid) return;
     if (!('serviceWorker' in navigator)) return;
@@ -61,7 +72,7 @@ export function NotificationsProvider({ children }) {
       const m = e.data;
       if (!m || typeof m !== 'object') return;
       if (m.type === 'wurxos-notification') {
-        load();
+        loadRef.current?.();
         return;
       }
       if (m.type === 'wurxos-notification-read' && m.id) {
@@ -71,7 +82,9 @@ export function NotificationsProvider({ children }) {
             : n,
         ));
         setCounts((c) => {
-          const target = items.find((n) => n.id === m.id && !n.read_at);
+          // Read items via ref so we don't have to re-bind this effect
+          // every time items changes.
+          const target = itemsRef.current.find((n) => n.id === m.id && !n.read_at);
           if (!target) return c;
           const byCategory = { ...c.byCategory };
           byCategory[target.category] = Math.max(0, (byCategory[target.category] || 0) - 1);
@@ -81,16 +94,18 @@ export function NotificationsProvider({ children }) {
     }
     navigator.serviceWorker.addEventListener('message', onMsg);
     return () => navigator.serviceWorker.removeEventListener('message', onMsg);
-  }, [uid, load, items]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
 
   // Tab-focus safety net — if realtime dropped while the tab was in
   // the background, refetch counts the moment the user comes back.
   useEffect(() => {
     if (!uid) return;
-    function onVisible() { if (document.visibilityState === 'visible') load(); }
+    function onVisible() { if (document.visibilityState === 'visible') loadRef.current?.(); }
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [uid, load]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
 
   // --- Realtime subscription ----------------------------------------------
   useEffect(() => {
@@ -138,8 +153,13 @@ export function NotificationsProvider({ children }) {
   }, [uid]);
 
   // --- Mutations -----------------------------------------------------------
+  // All read items via itemsRef.current so the callbacks have an
+  // empty effective dep set — they stay stable across renders and
+  // never re-bind effects that consume them. Failed API calls log
+  // to console; we no longer auto-call `load()` on failure because
+  // it could cascade into a recheckSession storm (audit Finding 1).
   const markRead = useCallback(async (id) => {
-    const target = items.find((n) => n.id === id);
+    const target = itemsRef.current.find((n) => n.id === id);
     if (!target || target.read_at) return;
     // Optimistic
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
@@ -148,14 +168,14 @@ export function NotificationsProvider({ children }) {
       byCategory[target.category] = Math.max(0, (byCategory[target.category] || 0) - 1);
       return { total: Math.max(0, c.total - 1), byCategory };
     });
-    try { await apiMarkRead(id); } catch (e) { console.warn(e.message); load(); }
-  }, [items, load]);
+    try { await apiMarkRead(id); } catch (e) { console.warn('[notifications] markRead failed:', e.message); }
+  }, []);
 
   const markAllRead = useCallback(async () => {
     setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: new Date().toISOString() })));
     setCounts({ total: 0, byCategory: {} });
-    try { await apiMarkAllRead(); } catch (e) { console.warn(e.message); load(); }
-  }, [load]);
+    try { await apiMarkAllRead(); } catch (e) { console.warn('[notifications] markAllRead failed:', e.message); }
+  }, []);
 
   const markCategoryRead = useCallback(async (category) => {
     setItems((prev) => prev.map((n) =>
@@ -166,12 +186,12 @@ export function NotificationsProvider({ children }) {
       const byCategory = { ...c.byCategory, [category]: 0 };
       return { total: Math.max(0, c.total - removed), byCategory };
     });
-    try { await apiMarkCategoryRead(category); } catch (e) { console.warn(e.message); load(); }
-  }, [load]);
+    try { await apiMarkCategoryRead(category); } catch (e) { console.warn('[notifications] markCategoryRead failed:', e.message); }
+  }, []);
 
   const markVisibleRead = useCallback(async (ids) => {
     if (!ids?.length) return;
-    const changed = items.filter((n) => ids.includes(n.id) && !n.read_at);
+    const changed = itemsRef.current.filter((n) => ids.includes(n.id) && !n.read_at);
     if (!changed.length) return;
     setItems((prev) => prev.map((n) =>
       ids.includes(n.id) && !n.read_at ? { ...n, read_at: new Date().toISOString() } : n,
@@ -181,8 +201,8 @@ export function NotificationsProvider({ children }) {
       changed.forEach((n) => { byCategory[n.category] = Math.max(0, (byCategory[n.category] || 0) - 1); });
       return { total: Math.max(0, c.total - changed.length), byCategory };
     });
-    try { await apiMarkManyRead(ids); } catch (e) { console.warn(e.message); load(); }
-  }, [items, load]);
+    try { await apiMarkManyRead(ids); } catch (e) { console.warn('[notifications] markManyRead failed:', e.message); }
+  }, []);
 
   return (
     <NotificationsContext.Provider

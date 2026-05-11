@@ -42,6 +42,11 @@ export function AuthProvider({ children }) {
   // Count consecutive failures so we only flag the session dead when
   // we're sure — see SESSION_FAIL_THRESHOLD above.
   const failCountRef = useRef(0);
+  // Prevent concurrent recheckSession runs from stacking failures.
+  // Multiple triggers (focus, online, startup) can fire within a few
+  // ms; without this guard, two parallel checks could each fail and
+  // double-count, hitting the threshold faster than the user expects.
+  const recheckInFlightRef = useRef(false);
 
   const loadProfile = useCallback(async (userId) => {
     if (!userId) {
@@ -182,9 +187,14 @@ export function AuthProvider({ children }) {
   //    re-login modal; the user's click in the modal calls signOut.
   const recheckSession = useCallback(async () => {
     if (!session?.user?.id) return;
+    // Don't stack concurrent rechecks — the focus/online/startup
+    // triggers can all fire within milliseconds. If one is already
+    // running, the second is redundant.
+    if (recheckInFlightRef.current) return;
     const now = Date.now();
     if (now - lastRecheckRef.current < RECHECK_THROTTLE_MS) return;
     lastRecheckRef.current = now;
+    recheckInFlightRef.current = true;
 
     // Count failures across checks so a single transient hiccup
     // doesn't tear an in-progress user out of their form. Any
@@ -260,6 +270,8 @@ export function AuthProvider({ children }) {
       // check will report it cleanly.
       // eslint-disable-next-line no-console
       console.warn('[auth] recheckSession threw (ignored):', err);
+    } finally {
+      recheckInFlightRef.current = false;
     }
   }, [session?.user?.id]);
 

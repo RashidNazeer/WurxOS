@@ -541,11 +541,18 @@ export default function LeaveRequestPage() {
   const uid = currentUser?.uid;
   useEffect(() => {
     if (!uid) return;
+    // Safety: force loading=false after 8s even if subscribeLeaves
+    // somehow never delivers the first onChange (network hang).
+    const safetyTimer = setTimeout(() => setLoading(false), 8000);
     const unsub = subscribeLeaves((rows) => {
       setAllLeaves(rows);
       setLoading(false);
+      clearTimeout(safetyTimer);
     });
-    return () => unsub();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsub();
+    };
   }, [uid]);
 
   // Quota

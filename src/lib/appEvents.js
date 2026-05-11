@@ -34,14 +34,46 @@ async function flush() {
   }
 }
 
-// Best-effort: try a synchronous beacon on page unload so the last
-// events make it before the page tears down. navigator.sendBeacon
-// can't speak the supabase-js POST shape directly, so we just flush
-// asynchronously and hope; the next tab visit will pick up where we
-// left off.
+// On page unload, the regular fetch will be aborted before completing,
+// losing the last events. navigator.sendBeacon survives the unload by
+// design — fire-and-forget POST that the browser keeps running after
+// the page is torn down. We hand it the raw PostgREST endpoint with
+// our auth header reconstructed from the existing session.
+async function flushViaBeacon() {
+  if (QUEUE.length === 0) return;
+  if (typeof navigator === 'undefined' || !navigator.sendBeacon) {
+    flush();
+    return;
+  }
+  try {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token || anonKey;
+    const batch = QUEUE.splice(0, QUEUE.length);
+    // sendBeacon doesn't let us set headers directly, so we encode
+    // them into a Blob with a special content type. PostgREST won't
+    // accept this — fall back to a fetch with keepalive: true which
+    // is the modern equivalent and DOES let us set headers.
+    fetch(`${url}/rest/v1/app_events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey,
+        'Authorization': `Bearer ${token}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(batch),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // Best-effort — diagnostic insert is non-critical.
+  }
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => { flush(); });
-  window.addEventListener('pagehide',     () => { flush(); });
+  window.addEventListener('beforeunload', () => { flushViaBeacon(); });
+  window.addEventListener('pagehide',     () => { flushViaBeacon(); });
 }
 
 // Suppress repeats of the same event within a short window.
