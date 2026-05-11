@@ -1427,10 +1427,14 @@ export async function repairWeeklyLabels() {
 // Brands this user can author reports on (APC sees assigned; TL sees owned;
 // Boss/OL/dev see all active).
 export async function listBrandsForReporting({ role, uid }) {
+  // Include client_name so the reporting UI's client filter has
+  // something to populate from. Previously we selected only the
+  // minimum columns the brand cards needed, which meant clientName
+  // came back as undefined and the filter dropdown showed nothing.
   if (['boss','ol','developer'].includes(role)) {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id')
+      .select('id, brand_name, logo_url, owner_id, client_name')
       .eq('status', 'active')
       .order('brand_name');
     if (error) throw new Error(error.message);
@@ -1439,7 +1443,7 @@ export async function listBrandsForReporting({ role, uid }) {
   if (role === 'tl') {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id')
+      .select('id, brand_name, logo_url, owner_id, client_name')
       .eq('status', 'active')
       .eq('owner_id', uid)
       .order('brand_name');
@@ -1449,7 +1453,7 @@ export async function listBrandsForReporting({ role, uid }) {
   // APC/IPC — use brand_assignments
   const { data, error } = await supabase
     .from('brand_assignments')
-    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status)')
+    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name)')
     .eq('user_id', uid);
   if (error) throw new Error(error.message);
   return (data || [])
