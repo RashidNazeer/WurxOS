@@ -377,6 +377,54 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
     return candidates[0] || null;
   }, [existingReports, selectedPeriod, editReportId]);
 
+  // Pre-fill Product Highlights from the most recent prior report that
+  // actually has products (new-report path only — never on edit). Walk
+  // back through history because the immediately previous report may
+  // itself be empty (especially right after a v1→v2 sync).
+  useEffect(() => {
+    if (editReportId) return;
+    if (!existingReports.length || !selectedPeriod) return;
+    const tsOf = (r) => r.createdAt?.toMillis ? r.createdAt.toMillis()
+      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
+      : null;
+    const ordered = [...existingReports]
+      .filter((r) => (r.periodStart || '') < selectedPeriod.startDate)
+      .sort((a, b) => {
+        const aTs = tsOf(a), bTs = tsOf(b);
+        if (aTs != null && bTs != null) return bTs - aTs;
+        return (b.periodStart || '').localeCompare(a.periodStart || '');
+      });
+    let prevProducts = [];
+    for (const r of ordered) {
+      const found = (r.productHighlights || []).filter((p) =>
+        (p.productId && p.productId.trim()) ||
+        (p.productName && p.productName.trim())
+      );
+      if (found.length > 0) { prevProducts = found; break; }
+    }
+    if (prevProducts.length === 0) return;
+    setData((d) => {
+      const current = d.productHighlights || [];
+      const userTyped = current.some((p) =>
+        (p.productId && p.productId.trim()) ||
+        (p.productName && p.productName.trim()) ||
+        p.unitsSold || p.gmv || p.newVideos || p.notes
+      );
+      if (userTyped) return d;
+      return {
+        ...d,
+        productHighlights: prevProducts.map((p) => ({
+          productId:   p.productId || '',
+          productName: p.productName || '',
+          unitsSold:   '',
+          gmv:         '',
+          newVideos:   '',
+          notes:       '',
+        })),
+      };
+    });
+  }, [existingReports, selectedPeriod, editReportId]);
+
   // APC-only submission gates: duplicate period or prior not yet OL-approved
   const isApc = userRole === 'apc';
   const duplicateForThisPeriod = useMemo(() => {

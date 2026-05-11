@@ -373,6 +373,80 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     return candidates[0] || null;
   }, [existingReports, selectedWeek, editReportId]);
 
+  // Pre-fill Product Highlights from the most recent prior report that
+  // actually has products (new-report path only — never on edit).
+  useEffect(() => {
+    console.log('[prefill] effect fired', {
+      editReportId,
+      existingReportsLen: existingReports?.length,
+      selectedWeek,
+    });
+    if (editReportId) { console.log('[prefill] skip: editReportId set'); return; }
+    if (!existingReports.length || !selectedWeek) {
+      console.log('[prefill] skip: no reports or no selectedWeek');
+      return;
+    }
+    const tsOf = (r) => r.createdAt?.toMillis ? r.createdAt.toMillis()
+      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
+      : null;
+    console.log('[prefill] all reports summary:', existingReports.map((r) => ({
+      id: r.id,
+      weekStart: r.weekStart,
+      periodStart: r.periodStart,
+      createdAt: r.createdAt?.seconds,
+      productHighlightsLen: (r.productHighlights || []).length,
+      productHighlightsSample: (r.productHighlights || []).slice(0, 2),
+    })));
+    const ordered = [...existingReports]
+      .filter((r) => (r.weekStart || '') < selectedWeek.startDate)
+      .sort((a, b) => {
+        const aTs = tsOf(a), bTs = tsOf(b);
+        if (aTs != null && bTs != null) return bTs - aTs;
+        return (b.weekStart || '').localeCompare(a.weekStart || '');
+      });
+    console.log('[prefill] selectedWeek.startDate:', selectedWeek.startDate);
+    console.log('[prefill] ordered prior reports:', ordered.length, ordered.map((r) => r.weekStart));
+    let prevProducts = [];
+    let pickedFrom = null;
+    for (const r of ordered) {
+      const found = (r.productHighlights || []).filter((p) =>
+        (p.productId && p.productId.trim()) ||
+        (p.productName && p.productName.trim())
+      );
+      console.log('[prefill] inspecting', r.weekStart, 'productHighlights:', r.productHighlights, 'filtered:', found);
+      if (found.length > 0) { prevProducts = found; pickedFrom = r.weekStart; break; }
+    }
+    console.log('[prefill] result: prevProducts =', prevProducts, 'pickedFrom =', pickedFrom);
+    if (prevProducts.length === 0) {
+      console.log('[prefill] skip: no prior report had products');
+      return;
+    }
+    setData((d) => {
+      const current = d.productHighlights || [];
+      const userTyped = current.some((p) =>
+        (p.productId && p.productId.trim()) ||
+        (p.productName && p.productName.trim()) ||
+        p.unitsSold || p.gmv || p.newVideos || p.notes
+      );
+      if (userTyped) {
+        console.log('[prefill] skip: user already typed in current row');
+        return d;
+      }
+      console.log('[prefill] APPLYING:', prevProducts.length, 'products');
+      return {
+        ...d,
+        productHighlights: prevProducts.map((p) => ({
+          productId:   p.productId || '',
+          productName: p.productName || '',
+          unitsSold:   '',
+          gmv:         '',
+          newVideos:   '',
+          notes:       '',
+        })),
+      };
+    });
+  }, [existingReports, selectedWeek, editReportId]);
+
   // Duplicate prevention applies to ALL roles — one report per (brand, week).
   // Without this, a Save Draft would merge into and overwrite an existing
   // approved report (since the doc ID is `${brandId}_${weekStart}`).
