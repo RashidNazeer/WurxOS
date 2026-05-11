@@ -187,11 +187,15 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
     }
   }, [myBrands, selectedBrand, editReportId, prefillBrandId]);
 
-  // Load user's custom field templates
+  // Load user's custom field templates once per uid — see
+  // WeeklyReportForm for why depending on the object `currentUser`
+  // breaks optimistic add/rename/delete (clobbers local state with
+  // pre-persist Firestore data).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!currentUser?.uid) return;
     getUserCustomFields(currentUser.uid).then(setCustomFieldDefs).catch(() => {});
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // When brand is selected: load anchor + reports, detect next period, advance step — all in one effect
   useEffect(() => {

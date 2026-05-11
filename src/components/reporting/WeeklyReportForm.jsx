@@ -192,11 +192,23 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     }
   }, [myBrands, selectedBrand, editReportId, prefillBrandId]);
 
-  // Load user's custom field templates
+  // Load user's custom field templates ONCE per uid.
+  // Earlier the dep was the whole `currentUser` object, which gets
+  // a fresh identity on every render (rebuilt from {user, profile}).
+  // That re-fired this effect on every render — including the one
+  // right after addCustomField/renameCustomField/deleteCustomField
+  // called setCustomFieldDefs. Firestore still held the previous
+  // value (the persist is async), so the freshly added section got
+  // clobbered back to the old list. Refresh "worked" because by then
+  // the persist had landed.
+  //
+  // Depending on the stable `uid` primitive makes this fire exactly
+  // once per user, letting our local optimistic updates stick.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!currentUser?.uid) return;
     getUserCustomFields(currentUser.uid).then(setCustomFieldDefs).catch(() => {});
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // When brand is selected: load reports, detect next week, advance step — all in one effect
   useEffect(() => {
