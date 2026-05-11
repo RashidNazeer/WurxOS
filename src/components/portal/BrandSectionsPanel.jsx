@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import RichTextEditor from '../common/RichTextEditor';
+import { sanitizeRichHtml } from '../common/RichContent';
 import {
   clientSectionAdd, clientSectionRename, clientSectionRemove, clientSectionSetValue,
 } from '../../lib/clientReportSectionsApi';
@@ -276,7 +277,7 @@ export default function BrandSectionsPanel({
                   ) : hasValue ? (
                     <div className="rich-content"
                       style={{ fontSize: '0.85rem', color: '#1e293b', lineHeight: 1.55 }}
-                      dangerouslySetInnerHTML={{ __html: value }} />
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(value) }} />
                   ) : (
                     <div className="text-muted" style={{ fontSize: '0.76rem', fontStyle: 'italic' }}>
                       {readOnly ? 'No value yet for this report.' : 'Click "Add value" to fill in for this report.'}

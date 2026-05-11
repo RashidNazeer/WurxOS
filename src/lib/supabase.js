@@ -61,9 +61,11 @@ export { supabase };
 
 // Debug helper — exposes the authenticated client on the window so
 // the Boss can call diagnostic RPCs like debug_recurring_reset() from
-// the browser console without needing a UI surface for it. Safe to
-// keep in production: it only exposes what the user's own session
-// already permits via RLS.
-if (typeof window !== 'undefined') {
+// the browser console. RLS still gates everything, BUT having the
+// authenticated client one keystroke away in production opens the
+// door to console-paste social-engineering attacks against a logged-
+// in Boss (and to anything a malicious browser extension can do).
+// Restrict to dev builds.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.__sb = supabase;
 }

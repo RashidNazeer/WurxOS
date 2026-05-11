@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { isHtml } from './RichContent';
+import { isHtml, sanitizeRichHtml } from './RichContent';
 import { setReportHighlight, getReportHighlight } from '../../lib/reportHighlightsApi';
 
 /**
@@ -10,17 +10,11 @@ import { setReportHighlight, getReportHighlight } from '../../lib/reportHighligh
  * highlighted on mouseup (or unhighlighted, if the selection overlaps
  * an existing mark). Highlights are saved to data.highlights[fieldKey]
  * on the report row so other viewers see them too.
+ *
+ * All HTML is run through the shared sanitizeRichHtml helper from
+ * RichContent — same XSS protections as anywhere else we render
+ * user-saved markup.
  */
-
-function ensureLinkAttrs(html) {
-  if (typeof html !== 'string') return html;
-  return html.replace(/<a\b([^>]*)>/gi, (_match, attrs) => {
-    let out = attrs || '';
-    if (!/\btarget\s*=/i.test(out)) out += ' target="_blank"';
-    if (!/\brel\s*=/i.test(out))    out += ' rel="noopener noreferrer"';
-    return `<a${out}>`;
-  });
-}
 
 // Compute the start/end offsets of `range` relative to the plain-text
 // content of `container`. Survives DOM mutations from browser extensions.
@@ -228,7 +222,7 @@ export default function HighlightableContent({
   const escapeForHtml = (s) => String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const renderedHtml = isHtml(displayHtml)
-    ? ensureLinkAttrs(displayHtml)
+    ? sanitizeRichHtml(displayHtml)
     : `<p>${escapeForHtml(displayHtml).replace(/\r?\n/g, '<br>')}</p>`;
 
   return (
