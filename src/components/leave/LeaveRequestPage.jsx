@@ -52,8 +52,23 @@ function formatDateTime(ts) {
   });
 }
 
+// Count working days (Mon-Fri) in an inclusive range. Sat + Sun are
+// always off so they don't count against the quota and they don't
+// inflate the day label on the request card. Server-side
+// _leave_working_days() uses the same rule.
 function countDays(start, end) {
-  return Math.max(1, Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1);
+  if (!start || !end) return 0;
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${end}T00:00:00`);
+  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return 0;
+  let count = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count += 1;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
 }
 
 function getRequestTitle(r) {

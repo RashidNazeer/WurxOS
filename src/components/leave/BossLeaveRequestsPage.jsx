@@ -19,7 +19,21 @@ const LEAVE_TYPES = { medical: 'Medical', emergency: 'Emergency', medical_emerge
 const ROLE_LABELS = { tl: 'Team Lead', ol: 'Operation Lead', apc: 'APC' };
 
 function getCatCfg(val) { return REQUEST_CATEGORIES.find(c => c.value === val) || REQUEST_CATEGORIES[0]; }
-function countDays(s, e) { return Math.max(1, Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1); }
+// Working-day count (Mon-Fri only). See LeaveRequestPage for rationale.
+function countDays(start, end) {
+  if (!start || !end) return 0;
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${end}T00:00:00`);
+  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return 0;
+  let count = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count += 1;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
 function formatDate(ts) { if (!ts) return '—'; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function formatDateTime(ts) {
   if (!ts) return '';

@@ -174,10 +174,23 @@ export async function getConsumedLeavesMonth(uid, year, month /* 1..12 */) {
   return data || { wfh: 0, medical: 0, emergency: 0 };
 }
 
+// Count working days (Mon-Fri) in an inclusive range. Sat + Sun are
+// never charged against any leave quota — they're already off. Mirrors
+// the server-side _leave_working_days() helper so client preview and
+// server-computed paid_days / unpaid_days always agree.
 export function daysBetween(startStr, endStr) {
   if (!startStr || !endStr) return 0;
-  const ms = new Date(endStr) - new Date(startStr);
-  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
+  const s = new Date(`${startStr}T00:00:00`);
+  const e = new Date(`${endStr}T00:00:00`);
+  if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return 0;
+  let count = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    const dow = cur.getDay(); // 0=Sun, 6=Sat
+    if (dow !== 0 && dow !== 6) count += 1;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
 }
 
 // Client-side preview of what the server trigger will compute so
