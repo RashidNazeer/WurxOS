@@ -374,29 +374,15 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   }, [existingReports, selectedWeek, editReportId]);
 
   // Pre-fill Product Highlights from the most recent prior report that
-  // actually has products (new-report path only — never on edit).
+  // actually has products (new-report path only — never on edit). Walk
+  // back through history because the immediately previous report may
+  // itself be empty.
   useEffect(() => {
-    console.log('[prefill] effect fired', {
-      editReportId,
-      existingReportsLen: existingReports?.length,
-      selectedWeek,
-    });
-    if (editReportId) { console.log('[prefill] skip: editReportId set'); return; }
-    if (!existingReports.length || !selectedWeek) {
-      console.log('[prefill] skip: no reports or no selectedWeek');
-      return;
-    }
+    if (editReportId) return;
+    if (!existingReports.length || !selectedWeek) return;
     const tsOf = (r) => r.createdAt?.toMillis ? r.createdAt.toMillis()
       : r.createdAt?.seconds ? r.createdAt.seconds * 1000
       : null;
-    console.log('[prefill] all reports summary:', existingReports.map((r) => ({
-      id: r.id,
-      weekStart: r.weekStart,
-      periodStart: r.periodStart,
-      createdAt: r.createdAt?.seconds,
-      productHighlightsLen: (r.productHighlights || []).length,
-      productHighlightsSample: (r.productHighlights || []).slice(0, 2),
-    })));
     const ordered = [...existingReports]
       .filter((r) => (r.weekStart || '') < selectedWeek.startDate)
       .sort((a, b) => {
@@ -404,23 +390,15 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         if (aTs != null && bTs != null) return bTs - aTs;
         return (b.weekStart || '').localeCompare(a.weekStart || '');
       });
-    console.log('[prefill] selectedWeek.startDate:', selectedWeek.startDate);
-    console.log('[prefill] ordered prior reports:', ordered.length, ordered.map((r) => r.weekStart));
     let prevProducts = [];
-    let pickedFrom = null;
     for (const r of ordered) {
       const found = (r.productHighlights || []).filter((p) =>
         (p.productId && p.productId.trim()) ||
         (p.productName && p.productName.trim())
       );
-      console.log('[prefill] inspecting', r.weekStart, 'productHighlights:', r.productHighlights, 'filtered:', found);
-      if (found.length > 0) { prevProducts = found; pickedFrom = r.weekStart; break; }
+      if (found.length > 0) { prevProducts = found; break; }
     }
-    console.log('[prefill] result: prevProducts =', prevProducts, 'pickedFrom =', pickedFrom);
-    if (prevProducts.length === 0) {
-      console.log('[prefill] skip: no prior report had products');
-      return;
-    }
+    if (prevProducts.length === 0) return;
     setData((d) => {
       const current = d.productHighlights || [];
       const userTyped = current.some((p) =>
@@ -428,11 +406,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         (p.productName && p.productName.trim()) ||
         p.unitsSold || p.gmv || p.newVideos || p.notes
       );
-      if (userTyped) {
-        console.log('[prefill] skip: user already typed in current row');
-        return d;
-      }
-      console.log('[prefill] APPLYING:', prevProducts.length, 'products');
+      if (userTyped) return d;
       return {
         ...d,
         productHighlights: prevProducts.map((p) => ({
