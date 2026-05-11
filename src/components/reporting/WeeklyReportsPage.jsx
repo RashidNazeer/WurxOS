@@ -57,6 +57,10 @@ export default function WeeklyReportsPage() {
   // Filters for overview
   const [overviewFilter, setOverviewFilter] = useState(''); // '', 'submitted', 'pending'
   const [search, setSearch] = useState('');
+  // Client filter — derived from the brand's clientName field. Empty
+  // means "all clients"; otherwise we only show brands matching that
+  // client. Hidden when no brand in scope has a client set.
+  const [filterClient, setFilterClient] = useState('');
 
   const myBrands = brands;
 
@@ -139,6 +143,17 @@ export default function WeeklyReportsPage() {
     });
   }, [myBrands, allReports]);
 
+  // Distinct client names across the brands in scope. Sorted A–Z so
+  // the dropdown is predictable.
+  const clientOptions = useMemo(() => {
+    const s = new Set();
+    brandSummaries.forEach((bs) => {
+      const c = bs.brand.clientName || bs.brand.client_name;
+      if (c && c.trim()) s.add(c.trim());
+    });
+    return [...s].sort();
+  }, [brandSummaries]);
+
   // Filter brand cards
   const filteredBrandSummaries = useMemo(() => {
     const q = search.toLowerCase();
@@ -148,9 +163,13 @@ export default function WeeklyReportsPage() {
       if (overviewFilter === 'submitted' && !s.submittedThisWeek) return false;
       if (overviewFilter === 'pending' && s.submittedThisWeek) return false;
       if (overviewFilter === 'needs_review' && !s.needsReview) return false;
+      if (filterClient) {
+        const c = s.brand.clientName || s.brand.client_name || '';
+        if (c !== filterClient) return false;
+      }
       return true;
     });
-  }, [brandSummaries, search, overviewFilter]);
+  }, [brandSummaries, search, overviewFilter, filterClient]);
 
   // Stats for header
   const stats = useMemo(() => {
@@ -632,6 +651,17 @@ export default function WeeklyReportsPage() {
             <option value="pending">Pending / Draft</option>
             {userRole === 'tl' && <option value="needs_review">Needs My Review</option>}
           </select>
+          {clientOptions.length > 0 && (
+            <select className="form-select form-select-sm" value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+              style={{ width: 200, borderRadius: 8 }}
+              title="Filter brands by client">
+              <option value="">All Clients</option>
+              {clientOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
           <span className="text-muted small">{filteredBrandSummaries.length} brand{filteredBrandSummaries.length !== 1 ? 's' : ''}</span>
         </div>
       </div>

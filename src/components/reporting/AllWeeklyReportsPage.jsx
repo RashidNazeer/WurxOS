@@ -309,7 +309,12 @@ export default function AllWeeklyReportsPage() {
   const popoverFilters = [
     { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
       options: brandOptions.map(b => ({ value: b, label: b })) },
-    ...((userRole === 'boss' || userRole === 'ol') && clientOptions.length > 0
+    // Client filter — visible whenever any brand in the current
+    // result set has a client_name set. Previously gated to boss/ol
+    // only, but TLs and PCTLs equally benefit from grouping their
+    // own brands by client. Keep the data-driven length check so we
+    // don't show an empty dropdown.
+    ...(clientOptions.length > 0
       ? [{ key: 'client', label: 'Client', value: filterClient, setValue: setFilterClient,
           options: clientOptions.map(c => ({ value: c, label: c })) }]
       : []),
