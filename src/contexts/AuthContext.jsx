@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
@@ -70,7 +70,26 @@ export function AuthProvider({ children }) {
     //    We only update session state here; the effect below reacts to it.
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
-      setSession(newSession);
+      // Drop no-op updates. Supabase fires TOKEN_REFRESHED roughly
+      // hourly with a brand-new session object whose user id is the
+      // same. Without this guard, every refresh would re-render every
+      // useAuth() consumer and re-fire any effect whose deps include
+      // `user` or `session` by reference (we have several), creating
+      // a perceived "full app reload" on navigation. Compare by the
+      // fields that actually matter: user id + access/refresh tokens.
+      setSession((prev) => {
+        if (!prev && !newSession) return prev;
+        if (
+          prev &&
+          newSession &&
+          prev.user?.id === newSession.user?.id &&
+          prev.access_token === newSession.access_token &&
+          prev.refresh_token === newSession.refresh_token
+        ) {
+          return prev;
+        }
+        return newSession;
+      });
       if (!newSession) setProfile(null);
     });
 
@@ -240,23 +259,30 @@ export function AuthProvider({ children }) {
 
   const refreshProfile = useCallback(
     () => (session?.user?.id ? loadProfile(session.user.id) : null),
-    [session, loadProfile],
+    [session?.user?.id, loadProfile],
+  );
+
+  // Memoize so consumers that compare by reference (effects with
+  // `user`/`session` in deps) don't re-fire on unrelated re-renders
+  // of this provider. The setSession dedupe above already prevents
+  // most spurious renders, but this is cheap defense-in-depth.
+  const value = useMemo(
+    () => ({
+      session,
+      user: session?.user ?? null,
+      profile,
+      loading,
+      sessionInvalid,
+      signUp,
+      signIn,
+      signOut,
+      refreshProfile,
+    }),
+    [session, profile, loading, sessionInvalid, signUp, signIn, signOut, refreshProfile],
   );
 
   return (
-    <AuthContext.Provider
-      value={{
-        session,
-        user: session?.user ?? null,
-        profile,
-        loading,
-        sessionInvalid,
-        signUp,
-        signIn,
-        signOut,
-        refreshProfile,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
       {sessionInvalid && <SessionExpiredModal onSignIn={signOut} />}
     </AuthContext.Provider>
