@@ -588,11 +588,25 @@ export default function LeaveRequestPage() {
 
   async function handleTeamApprove(forwardToBoss) {
     if (!approveTarget) return;
+    // DIAGNOSTIC — log exactly what the UI is dispatching so we can
+    // correlate click → action when the server returns 'not authorized'
+    // or the result lands as something the user didn't expect.
+    // eslint-disable-next-line no-console
+    console.log('[handleTeamApprove] click', {
+      requestId: approveTarget.id,
+      forwardToBoss,
+      derivedAction: forwardToBoss ? 'forward' : 'approve',
+      currentRequesterRole: approveTarget.requesterRole || approveTarget.requester?.role,
+      currentLevel: approveTarget.currentLevel,
+      currentStatus: approveTarget.status,
+    });
     setActionSaving(true);
     try {
       await teamApproveLeave(approveTarget.id, { forwardToBoss });
       setApproveTarget(null);
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[handleTeamApprove] failed', { requestId: approveTarget.id, forwardToBoss, error: e });
       alert('Failed to approve: ' + (e.message || 'unknown'));
     } finally { setActionSaving(false); }
   }

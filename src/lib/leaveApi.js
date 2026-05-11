@@ -125,12 +125,23 @@ export async function decideLeave(id, { action, note = '' }) {
   if (!['approve', 'reject', 'forward'].includes(action)) {
     throw new Error(`invalid action: ${action}`);
   }
+  // DIAGNOSTIC — leave-approval issue 2026-05-11. Log every decide call
+  // so we can correlate UI click → RPC dispatch when the server claims
+  // 'not authorized'. Remove after the bug is reproduced + fixed.
+  // eslint-disable-next-line no-console
+  console.log('[leave_decide] sending', { id, action, note });
   const { data, error } = await supabase.rpc('leave_decide', {
     p_request_id: id,
     p_action:     action,
     p_note:       note || null,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[leave_decide] error', { id, action, error });
+    throw new Error(error.message);
+  }
+  // eslint-disable-next-line no-console
+  console.log('[leave_decide] success', { id, action, returnedStatus: data?.status, returnedLevel: data?.current_level });
   return data;
 }
 
