@@ -253,12 +253,29 @@ function buildApprovalShim(req) {
   const ds = req.decisions || [];
   if (!ds.length) return { intermediate: null, boss: null };
 
-  // Most recent decision at level 1 or 2 (TL/OL approvals/rejections)
-  const intermediate = [...ds].reverse().find((d) => d.level === 1 || d.level === 2) || null;
+  const isPending  = req.status === 'pending';
+  const isRejected = req.status === 'rejected';
+
+  // The decisions log is append-only — even a stale rejection sticks
+  // around after the request is re-opened and re-forwarded. To keep
+  // the banner truthful, pick the most recent decision at level 1 or
+  // 2 whose action is still semantically valid for the current state:
+  //   * pending  → only 'approve'/'forward' entries are valid; a
+  //                stale 'reject' would mislead the viewer ("rejected"
+  //                next to "pending boss").
+  //   * approved → show whichever action led there ('approve'/'forward').
+  //   * rejected → the latest 'reject' IS the final decision; show it.
+  const reversed = [...ds].reverse();
+  const validForIntermediate = (d) => {
+    if (d.level !== 1 && d.level !== 2) return false;
+    if (isPending)  return d.action === 'approve' || d.action === 'forward';
+    if (isRejected) return true; // any intermediate decision is fine to surface
+    return d.action === 'approve' || d.action === 'forward';
+  };
+  const intermediate = reversed.find(validForIntermediate) || null;
+
   // Most recent decision at level 3 (Boss)
-  const boss = [...ds].reverse().find((d) => d.level === 3) || null;
-  // Paid-override pseudo-level
-  // (level === 99) — handled separately
+  const boss = reversed.find((d) => d.level === 3) || null;
 
   function shim(d, defaultRole) {
     if (!d) return null;
