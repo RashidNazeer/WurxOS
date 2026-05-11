@@ -379,7 +379,7 @@ export async function upsertDraft({ id, brandId, authorId, type, period, data })
   };
   if (id) row.id = id;
   if (id) {
-    const { data: saved, error } = await supabase.from('reports').update({
+    return _updateAndReturn(id, {
       data,
       period_number: row.period_number,
       period_start:  row.period_start,
@@ -387,19 +387,48 @@ export async function upsertDraft({ id, brandId, authorId, type, period, data })
       period_year:   row.period_year,
       period_month:  row.period_month,
       period_label:  row.period_label,
-    }).eq('id', id).select().single();
-    if (error) throw new Error(error.message);
-    return saved;
+    });
   } else {
-    // No id: try insert; if conflict (same brand/type/period_start), update that row to draft with new data
+    // No id: try insert; if conflict (same brand/type/period_start),
+    // update that row to draft with new data. Use maybeSingle so an
+    // RLS-blocked post-upsert SELECT doesn't crash with the coercion
+    // error — fall back to a direct id lookup if needed.
     const { data: saved, error } = await supabase
       .from('reports')
       .upsert(row, { onConflict: 'brand_id,type,period_start' })
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw new Error(error.message);
-    return saved;
+    if (saved) return saved;
+    const fallbackId = await _findExistingReportId(row.brand_id, row.type, row.period_start);
+    if (!fallbackId) throw new Error('draft was saved but could not be re-read — refresh and try again');
+    const fresh = await supabase.from('reports').select('*').eq('id', fallbackId).maybeSingle();
+    return fresh.data || { id: fallbackId, ...row };
   }
+}
+
+// Run an UPDATE and return the resulting row, tolerating RLS quirks
+// where `.select()` after UPDATE returns 0 rows even on success.
+// Pattern used by every status-transition RPC below — switching from
+// `.single()` to `.maybeSingle()` plus a re-fetch fallback prevents
+// the dreaded "cannot coerce result to single JSON object" error
+// when a status change moves the row outside the actor's SELECT
+// policy reach.
+async function _updateAndReturn(id, patch) {
+  const { data: saved, error } = await supabase
+    .from('reports')
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (saved) return saved;
+  // Post-update SELECT returned 0 rows (RLS edge case). The UPDATE
+  // itself succeeded — do a fresh read; if THAT also fails, return a
+  // shallow object so callers don't crash on `.id`.
+  const fresh = await supabase.from('reports').select('*').eq('id', id).maybeSingle();
+  if (fresh.data) return fresh.data;
+  return { id, ...patch };
 }
 
 export async function submitReport(id, data) {
@@ -416,47 +445,27 @@ export async function submitReport(id, data) {
     rejection_note: null,  // clear previous rejection note on resubmit
   };
   if (data != null) patch.data = data;
-
-  const { data: saved, error } = await supabase
-    .from('reports')
-    .update(patch)
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return saved;
+  return _updateAndReturn(id, patch);
 }
 
 export async function verifyReport(id) {
   const { data: auth } = await supabase.auth.getUser();
   const me = auth?.user?.id;
-  const { data: saved, error } = await supabase
-    .from('reports')
-    .update({
-      status: 'verified',
-      verified_at: new Date().toISOString(),
-      verified_by: me,
-    })
-    .eq('id', id)
-    .select().single();
-  if (error) throw new Error(error.message);
-  return saved;
+  return _updateAndReturn(id, {
+    status: 'verified',
+    verified_at: new Date().toISOString(),
+    verified_by: me,
+  });
 }
 
 export async function approveReport(id) {
   const { data: auth } = await supabase.auth.getUser();
   const me = auth?.user?.id;
-  const { data: saved, error } = await supabase
-    .from('reports')
-    .update({
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-      approved_by: me,
-    })
-    .eq('id', id)
-    .select().single();
-  if (error) throw new Error(error.message);
-  return saved;
+  return _updateAndReturn(id, {
+    status: 'approved',
+    approved_at: new Date().toISOString(),
+    approved_by: me,
+  });
 }
 
 // Reject drops the status back one stage (verified → submitted, submitted → draft)
@@ -467,18 +476,12 @@ export async function rejectReport(id, { note, toStatus }) {
   const { data: current, error: cErr } = await supabase.from('reports').select('status').eq('id', id).maybeSingle();
   if (cErr) throw new Error(cErr.message);
   const next = toStatus || (current?.status === 'verified' ? 'submitted' : 'draft');
-  const { data: saved, error } = await supabase
-    .from('reports')
-    .update({
-      status: next,
-      rejection_note: note || null,
-      rejected_at: new Date().toISOString(),
-      rejected_by: me,
-    })
-    .eq('id', id)
-    .select().single();
-  if (error) throw new Error(error.message);
-  return saved;
+  return _updateAndReturn(id, {
+    status: next,
+    rejection_note: note || null,
+    rejected_at: new Date().toISOString(),
+    rejected_by: me,
+  });
 }
 
 // Reopen (OL on approved): target = 'draft' | 'submitted' | 'verified'
@@ -488,16 +491,12 @@ export async function rejectReport(id, { note, toStatus }) {
 export async function reopenReport(id, { target = 'verified', note }) {
   const { data: auth } = await supabase.auth.getUser();
   const me = auth?.user?.id;
-  const patch = {
+  return _updateAndReturn(id, {
     status: target,
     reopened_at: new Date().toISOString(),
     reopened_by: me,
     rejection_note: target === 'verified' ? null : (note || null),
-  };
-  const { data: saved, error } = await supabase
-    .from('reports').update(patch).eq('id', id).select().single();
-  if (error) throw new Error(error.message);
-  return saved;
+  });
 }
 
 // --------------------------------------------------------------
@@ -513,20 +512,13 @@ export async function editReportDates(id, { startDate, endDate }) {
   if (endDate < startDate)    throw new Error('End date must be on or after start date.');
   const d = new Date(startDate);
   const periodLabel = `${new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-  const { data: saved, error } = await supabase
-    .from('reports')
-    .update({
-      period_start: startDate,
-      period_end:   endDate,
-      period_year:  d.getFullYear(),
-      period_month: d.getMonth(),
-      period_label: periodLabel,
-    })
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return saved;
+  return _updateAndReturn(id, {
+    period_start: startDate,
+    period_end:   endDate,
+    period_year:  d.getFullYear(),
+    period_month: d.getMonth(),
+    period_label: periodLabel,
+  });
 }
 
 // Find sibling reports for the same brand + type (excluding the
@@ -1049,23 +1041,37 @@ async function _saveReportV1({ type, brandId, weekInfo, data, uid, status = 'dra
     payload.data.sectionsEnabled = payload.sections_enabled;
   }
   if (existingId) {
-    const { data: updated, error } = await supabase
+    // Don't .single() on the returned row — RLS SELECT can return 0
+    // rows even on a successful UPDATE if the row's post-UPDATE state
+    // doesn't pass the SELECT policy (e.g., a row the APC just edited
+    // but no longer has read access to). That used to surface as
+    // "cannot coerce result to single JSON object" and crash the
+    // Save / Submit Draft action even though the write succeeded.
+    const { error } = await supabase
       .from('reports')
       .update(payload)
-      .eq('id', existingId)
-      .select()
-      .single();
+      .eq('id', existingId);
     if (error) throw new Error(error.message);
-    return updated.id;
+    return existingId;
   }
   payload.author_id = uid;
+  // For INSERT we DO need the new id back, but use maybeSingle() so
+  // an RLS-blocked SELECT returns null instead of throwing. If we get
+  // null, fall back to a direct query (which our own author can see).
   const { data: inserted, error } = await supabase
     .from('reports')
     .insert(payload)
-    .select()
-    .single();
+    .select('id')
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  return inserted.id;
+  if (inserted?.id) return inserted.id;
+  // Defensive fallback: look up the row we just inserted by its
+  // unique (brand_id, type, period_start) tuple. We just wrote it, so
+  // it has to exist; if SELECT can't see it, something's misconfigured
+  // and the user should see a real error rather than a silent failure.
+  const fallbackId = await _findExistingReportId(brandId, type, periodStart);
+  if (fallbackId) return fallbackId;
+  throw new Error('report was saved but could not be re-read — refresh and check');
 }
 
 export async function saveReport({ brandId, brandName, weekInfo, data, uid, userName, status = 'draft', extraFields = {} }) {
