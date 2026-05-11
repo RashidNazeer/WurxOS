@@ -378,6 +378,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
+  /* Respect iOS notch / status bar so the hamburger isn't tucked
+     under the system area. env() is a no-op on devices without a
+     safe-area-inset, so desktop is unaffected. */
+  padding-top: max(12px, env(safe-area-inset-top));
   background: var(--surface-1);
   border-bottom: 1px solid var(--border-subtle);
   position: sticky;
@@ -547,8 +551,34 @@
     transform: translateX(-100%);
     transition: transform var(--dur-base) var(--ease-out);
     box-shadow: var(--shadow-xl);
+    /* Respect iOS safe-area so the sidebar header (W logo + close
+       button) sits below the notch / status bar instead of behind it. */
+    padding-top: env(safe-area-inset-top);
   }
   .shell[data-mobile-open='true'] .shell-sidebar { transform: translateX(0); }
+  /* Force the drawer to render in EXPANDED mode regardless of the
+     desktop `collapsed` preference — an icons-only rail makes no sense
+     for a slide-in drawer and was the source of the "menu broken when
+     I tap it again" bug (the toggle button collapsed the drawer in
+     place instead of closing it). */
+  .shell[data-collapsed='true'] .brand-text,
+  .shell[data-collapsed='true'] .shell-nav-link .label,
+  .shell[data-collapsed='true'] .shell-nav-toggle .label,
+  .shell[data-collapsed='true'] .shell-nav-toggle .chev,
+  .shell[data-collapsed='true'] .shell-nav-section-label,
+  .shell[data-collapsed='true'] .shell-nav-sub { display: revert; }
+  .shell[data-collapsed='true'] .shell-nav-link,
+  .shell[data-collapsed='true'] .shell-nav-toggle {
+    justify-content: flex-start;
+    padding: 9px 12px;
+  }
+  .shell[data-collapsed='true'] .shell-sidebar-header {
+    padding: 18px 14px 18px 18px;
+    justify-content: flex-start;
+    gap: 10px;
+    flex-direction: row;
+  }
+  .shell[data-collapsed='true'] .shell-sidebar-footer { padding: 8px 10px 10px; }
   .shell-mobile-overlay {
     position: fixed;
     inset: 0;
@@ -563,8 +593,14 @@
   .shell-mobile-menu-btn { display: inline-flex; }
 
   /* Tighten the topbar so the hamburger + title fit alongside the
-     bell, theme toggle, and avatar without overflowing. */
-  .shell-topbar { padding: 10px 14px; min-height: 60px; gap: 8px; }
+     bell, theme toggle, and avatar without overflowing. Preserve the
+     iOS safe-area top inset so the hamburger stays below the notch. */
+  .shell-topbar {
+    padding: 10px 14px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    min-height: 60px;
+    gap: 8px;
+  }
   .shell-topbar-left { gap: 10px; flex: 1; min-width: 0; }
   .shell-topbar-right { gap: 6px; }
   .shell-topbar-title { font-size: 14.5px; }

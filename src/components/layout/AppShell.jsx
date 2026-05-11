@@ -103,6 +103,8 @@ export default function AppShell() {
         role={profile?.role}
         collapsed={collapsed}
         onToggle={toggleCollapsed}
+        mobileOpen={mobileOpen}
+        onMobileClose={closeMobile}
       />
       {mobileOpen && (
         <div

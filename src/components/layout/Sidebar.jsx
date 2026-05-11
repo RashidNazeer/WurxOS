@@ -4,7 +4,7 @@ import { getMenuForRole } from './menu';
 import { ChevronRightIcon, MenuIcon, HelpIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
 
-export default function Sidebar({ role, collapsed, onToggle }) {
+export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobileClose }) {
   const menu = getMenuForRole(role);
   const [query, setQuery] = useState('');
 
@@ -45,15 +45,32 @@ export default function Sidebar({ role, collapsed, onToggle }) {
           <div className="brand-name">WurxOS</div>
           <div className="brand-sub">v2</div>
         </div>
-        <button
-          type="button"
-          className="shell-sidebar-toggle"
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <MenuIcon width="16" height="16" />
-        </button>
+        {/* On mobile (drawer open), this button is a CLOSE button — the
+            drawer slides shut. On desktop, it toggles the collapsed rail.
+            Mixing the two in one button confused users who tapped here
+            expecting the drawer to close and instead collapsed it into
+            an icons-only rail. */}
+        {mobileOpen ? (
+          <button
+            type="button"
+            className="shell-sidebar-toggle"
+            onClick={onMobileClose}
+            aria-label="Close menu"
+            title="Close menu"
+          >
+            <XIcon width="14" height="14" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="shell-sidebar-toggle"
+            onClick={onToggle}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <MenuIcon width="16" height="16" />
+          </button>
+        )}
       </div>
 
       {/* v1-parity menu search — only rendered when expanded so the
