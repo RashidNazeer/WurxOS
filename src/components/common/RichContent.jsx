@@ -40,28 +40,39 @@ export function sanitizeRichHtml(html) {
   // Patch anchors FIRST so target/rel attrs exist when DOMPurify
   // sees them. ADD_ATTR keeps them.
   const patched = ensureLinkAttrs(html);
+  // DOMPurify strips comments by default in this config, but being
+  // explicit here means callers don't have to worry about leftover
+  // Word/Docs clipboard markers like <!--EndFragment-->.
   return DOMPurify.sanitize(patched, {
     ADD_ATTR: ['target', 'rel'],
-    // Allow data attributes used by our highlight feature so
-    // HighlightableContent can mark spans without losing them.
     ADD_DATA_URI_TAGS: [],
-  });
+  }).replace(/<!--[\s\S]*?-->/g, '');
+}
+
+// Word / Google-Docs clipboard leaves <!--StartFragment--> and
+// <!--EndFragment--> markers behind. DOMPurify strips them in HTML mode,
+// but the plain-text fallback below would render them as visible text.
+// Also catches stray <!-- ... --> from any other source.
+function stripHtmlComments(s) {
+  return typeof s === 'string' ? s.replace(/<!--[\s\S]*?-->/g, '') : s;
 }
 
 export default function RichContent({ html, style, className }) {
   if (html == null || html === '') return null;
-  if (isHtml(html)) {
+  const cleaned = stripHtmlComments(html);
+  if (!cleaned) return null;
+  if (isHtml(cleaned)) {
     return (
       <div
         className={`rich-content ${className || ''}`}
         style={style}
-        dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(html) }}
+        dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(cleaned) }}
       />
     );
   }
   return (
     <div className={className} style={{ whiteSpace: 'pre-wrap', ...(style || {}) }}>
-      {html}
+      {cleaned}
     </div>
   );
 }

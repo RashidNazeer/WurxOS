@@ -319,8 +319,13 @@ export default function RichTextEditor({
   }
 
   function sanitizePastedHtml(html) {
+    // Strip HTML comments first — Word/Google-Docs wrap the clipboard
+    // payload in <!--StartFragment-->…<!--EndFragment--> markers that
+    // otherwise survive into saved content and become visible if any
+    // future render path treats it as plain text.
+    const stripped = String(html).replace(/<!--[\s\S]*?-->/g, '');
     const tmp = document.createElement('div');
-    tmp.innerHTML = html;
+    tmp.innerHTML = stripped;
     tmp.querySelectorAll('style, meta, link, script, title, o\\:p').forEach((n) => n.remove());
     tmp.querySelectorAll('*').forEach((node) => {
       node.removeAttribute('class');
