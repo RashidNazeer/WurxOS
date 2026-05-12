@@ -823,11 +823,24 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     setSaving(true);
     try {
       const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
-      // Strip any customFields entries whose field def was deleted — otherwise the view
-      // keeps rendering them from the stored report doc.
-      const validIds = new Set(customFieldDefs.map(f => f.id));
+      // Strip user-level custom fields whose def the user has deleted —
+      // otherwise the view would keep rendering them from the stored
+      // report doc. Brand-defined sections and built-in section extras
+      // live on a different template and are preserved by their entry's
+      // own metadata (kind / source), not by membership in customFieldDefs.
+      const userFieldIds = new Set(customFieldDefs.map(f => f.id));
       const cleanedCustomFields = Object.fromEntries(
-        Object.entries(data.customFields || {}).filter(([id]) => validIds.has(id))
+        Object.entries(data.customFields || {}).filter(([id, entry]) => {
+          if (userFieldIds.has(id)) return true;
+          // Anything coming from the brand template (long_text / table /
+          // builtin_extra) is owned by the brand, not this user, so we
+          // never strip it during save.
+          if (entry && typeof entry === 'object') {
+            if (entry.source === 'brand') return true;
+            if (entry.kind === 'long_text' || entry.kind === 'table' || entry.kind === 'builtin_extra') return true;
+          }
+          return false;
+        })
       );
       const cleanedData = { ...data, customFields: cleanedCustomFields };
       const savedId = await saveReport({

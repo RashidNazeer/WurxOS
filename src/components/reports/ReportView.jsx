@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -1214,25 +1214,82 @@ export default function ReportView({ report, allReports = [], previousReport, on
         })()}
 
         {/* ─── Custom Fields (with embedded matching brand links) ──────── */}
-        {d.customFields && Object.entries(d.customFields).map(([fid, entry]) => {
-          const name  = typeof entry === 'object' ? (entry?.name || 'Custom Field') : 'Custom Field';
-          const value = typeof entry === 'object' ? entry?.value : entry;
-          const isEmpty = !value || (typeof value === 'string' && !String(value).replace(/<[^>]+>/g, '').trim());
-          const links = findByName(name);
-          if (isEmpty && !links) return null;
-          return (
-            <ContentSection key={fid} icon="🧩" color="#8b5cf6" title={name}>
-              {!isEmpty && (
-                <HighlightableContent html={value}
-                  report={report} fieldKey={`customField_${fid}`}
-                  highlighterActive={highlighterOn}
-                  highlightColor={hlColor} highlightIntensity={hlIntensity}
-                  style={{ fontSize: 14, lineHeight: 1.65, color: C.ink }} />
-              )}
-              <EmbeddedLinks section={links} accent="#8b5cf6" />
-            </ContentSection>
-          );
-        })}
+        {(() => {
+          if (!d.customFields) return null;
+          const entries = Object.entries(d.customFields);
+
+          // Group entries that came from brand-defined table sections or
+          // built-in section extras so they render as a single card with
+          // label/value rows. Everything else (legacy user-level fields
+          // and kind: 'long_text') keeps the previous one-card-per-entry
+          // behavior.
+          const groups = new Map(); // key -> { name, rows: [] }
+          const passthrough = [];
+          for (const [fid, entry] of entries) {
+            if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
+              const key = `tbl:${entry.sectionId}`;
+              if (!groups.has(key)) groups.set(key, { name: entry.sectionName || 'Section', rows: [] });
+              groups.get(key).rows.push({ fid, label: entry.name || '—', value: entry.value, type: entry.type || 'text' });
+            } else if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra' && entry.sectionKey) {
+              const key = `bx:${entry.sectionKey}`;
+              if (!groups.has(key)) groups.set(key, { name: `${entry.sectionTitle || entry.sectionKey} — Additional fields`, rows: [] });
+              groups.get(key).rows.push({ fid, label: entry.name || '—', value: entry.value, type: entry.type || 'text' });
+            } else {
+              passthrough.push([fid, entry]);
+            }
+          }
+
+          const curSym = report?.currencySymbol || report?.currency || '';
+          const renderedGroups = [...groups.entries()].map(([gkey, group]) => {
+            const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
+            if (nonEmpty.length === 0) return null;
+            return (
+              <ContentSection key={gkey} icon="🧮" color="#0ea5e9" title={group.name}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 30%) 1fr', rowGap: 6, columnGap: 16 }}>
+                  {nonEmpty.map((r) => {
+                    let display;
+                    if (r.type === 'url' && r.value) {
+                      display = <a href={String(r.value)} target="_blank" rel="noopener noreferrer">{String(r.value)}</a>;
+                    } else if (r.type === 'currency') {
+                      const n = Number(r.value);
+                      display = Number.isFinite(n) ? `${curSym}${n.toLocaleString()}` : String(r.value);
+                    } else {
+                      display = String(r.value);
+                    }
+                    return (
+                      <Fragment key={r.fid}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{r.label}</div>
+                        <div style={{ fontSize: 14, color: C.ink, wordBreak: 'break-word' }}>{display}</div>
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              </ContentSection>
+            );
+          });
+
+          const renderedCustom = passthrough.map(([fid, entry]) => {
+            const name  = typeof entry === 'object' ? (entry?.name || 'Custom Field') : 'Custom Field';
+            const value = typeof entry === 'object' ? entry?.value : entry;
+            const isEmpty = !value || (typeof value === 'string' && !String(value).replace(/<[^>]+>/g, '').trim());
+            const links = findByName(name);
+            if (isEmpty && !links) return null;
+            return (
+              <ContentSection key={fid} icon="🧩" color="#8b5cf6" title={name}>
+                {!isEmpty && (
+                  <HighlightableContent html={value}
+                    report={report} fieldKey={`customField_${fid}`}
+                    highlighterActive={highlighterOn}
+                    highlightColor={hlColor} highlightIntensity={hlIntensity}
+                    style={{ fontSize: 14, lineHeight: 1.65, color: C.ink }} />
+                )}
+                <EmbeddedLinks section={links} accent="#8b5cf6" />
+              </ContentSection>
+            );
+          });
+
+          return <>{renderedGroups}{renderedCustom}</>;
+        })()}
 
         {/* Brand resource sections that didn't match anything → standalone cards. */}
         <UnmatchedReportLinkSections sections={unmatchedLinkSections} />
