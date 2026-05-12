@@ -1287,6 +1287,10 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             }
           }
 
+          // Custom table-kind sections render as a hero-style StatCard
+          // grid (numeric/currency get prev-week + sparkline; text/URL/
+          // dropdown render as label-only tiles). This matches how the
+          // built-in section extras render so the look is consistent.
           const renderedTables = [...tableGroups.entries()].map(([groupKey, group]) => {
             customNames.push(group.name);
             const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
@@ -1296,23 +1300,21 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                 icon="bi-table"
                 color="#0ea5e9"
                 title={group.name}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 30%) 1fr', rowGap: 6, columnGap: 16 }}>
+                <div className="row g-3">
                   {nonEmpty.map((r) => {
-                    const curSym = report?.currencySymbol || report?.currency || '';
-                    let display;
-                    if (r.type === 'url' && r.value) {
-                      display = <a href={String(r.value)} target="_blank" rel="noopener noreferrer">{String(r.value)}</a>;
-                    } else if (r.type === 'currency') {
-                      const n = Number(r.value);
-                      display = Number.isFinite(n) ? `${curSym}${n.toLocaleString()}` : String(r.value);
-                    } else {
-                      display = String(r.value);
-                    }
+                    const numericType = (r.type === 'number' || r.type === 'currency');
+                    const prevRaw  = prevExtraValue(r.fieldId, r.label);
+                    const prevDisp = prevRaw == null ? null : fmtExtra(prevRaw, r.type);
                     return (
-                      <React.Fragment key={r.fieldId}>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{r.label}</div>
-                        <div style={{ fontSize: '0.88rem', color: C.ink, wordBreak: 'break-word' }}>{display}</div>
-                      </React.Fragment>
+                      <div key={r.fieldId} className="col-6 col-lg-3">
+                        <StatCard
+                          label={r.label}
+                          value={fmtExtra(r.value, r.type)}
+                          current={numericType ? num(r.value) : undefined}
+                          prevValue={numericType ? prevDisp : null}
+                          sparkData={numericType ? extraSparkFor(r.fieldId, r.label) : undefined}
+                        />
+                      </div>
                     );
                   })}
                 </div>
