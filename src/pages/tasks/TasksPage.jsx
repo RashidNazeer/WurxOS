@@ -49,6 +49,11 @@ export default function TasksPage() {
   const [tab, setTab]               = useState('all');
   const [statusFilter, setStatus]   = useState('all');
   const [search, setSearch]         = useState('');
+  const [brandFilter, setBrandFilter]       = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [dueFilter, setDueFilter]           = useState('all'); // all | overdue | today | week | none
   const [localError, setLocalError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showGroup, setShowGroup]   = useState(false);
@@ -160,20 +165,107 @@ export default function TasksPage() {
       (r.title || '').toLowerCase().includes(s) ||
       (r.description || '').toLowerCase().includes(s) ||
       (r.brand?.brand_name || '').toLowerCase().includes(s) ||
-      (r.assignee?.display_name || '').toLowerCase().includes(s),
+      (r.assignee?.display_name || '').toLowerCase().includes(s) ||
+      (r.priority || '').toLowerCase().includes(s) ||
+      (r.category || '').toLowerCase().includes(s),
     );
   }, [rows, search]);
 
-  const statusCounts = useMemo(() => {
-    const c = { all: searchFiltered.length, todo: 0, in_progress: 0, done: 0 };
-    for (const r of searchFiltered) c[r.status] = (c[r.status] || 0) + 1;
-    return c;
+  // Derive dropdown options from the current row set (post-search) so
+  // users only see options that have at least one task behind them.
+  // Sorted by label for predictability.
+  const brandOptions = useMemo(() => {
+    const m = new Map();
+    for (const r of searchFiltered) {
+      if (r.brand?.id) m.set(r.brand.id, r.brand.brand_name || '(unnamed)');
+    }
+    return [...m.entries()]
+      .map(([id, name]) => ({ value: id, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [searchFiltered]);
 
+  const assigneeOptions = useMemo(() => {
+    const m = new Map();
+    for (const r of searchFiltered) {
+      if (r.assignee?.id) m.set(r.assignee.id, r.assignee.display_name || r.assignee.email || '(unknown)');
+    }
+    return [...m.entries()]
+      .map(([id, name]) => ({ value: id, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [searchFiltered]);
+
+  const priorityOptions = useMemo(() => {
+    const set = new Set();
+    for (const r of searchFiltered) if (r.priority) set.add(r.priority);
+    // Stable ordering high→low when present.
+    const order = ['urgent', 'high', 'medium', 'low'];
+    return order
+      .filter((p) => set.has(p))
+      .map((p) => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }));
+  }, [searchFiltered]);
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set();
+    for (const r of searchFiltered) if (r.category) set.add(r.category);
+    return [...set]
+      .sort()
+      .map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }));
+  }, [searchFiltered]);
+
+  // Compute due-date buckets in PKT-anchored "today" so APC in Pakistan
+  // sees the same "overdue/today/this week" as their TL.
+  const matchesDue = useCallback((r) => {
+    if (dueFilter === 'all') return true;
+    if (!r.due_date) return dueFilter === 'none';
+    if (dueFilter === 'none') return false;
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const endToday = new Date(start); endToday.setDate(endToday.getDate() + 1);
+    const endWeek  = new Date(start); endWeek.setDate(endWeek.getDate() + 7);
+    const d = new Date(r.due_date);
+    if (dueFilter === 'overdue') return d < start;
+    if (dueFilter === 'today')   return d >= start && d < endToday;
+    if (dueFilter === 'week')    return d >= start && d < endWeek;
+    return true;
+  }, [dueFilter]);
+
+  // Apply the new filters before status so the status counts at the
+  // bottom reflect what the user is currently narrowing down.
+  const fieldFiltered = useMemo(() => {
+    return searchFiltered.filter((r) => {
+      if (brandFilter    !== 'all' && r.brand?.id    !== brandFilter)    return false;
+      if (assigneeFilter !== 'all' && r.assignee?.id !== assigneeFilter) return false;
+      if (priorityFilter !== 'all' && r.priority     !== priorityFilter) return false;
+      if (categoryFilter !== 'all' && r.category     !== categoryFilter) return false;
+      if (!matchesDue(r)) return false;
+      return true;
+    });
+  }, [searchFiltered, brandFilter, assigneeFilter, priorityFilter, categoryFilter, matchesDue]);
+
+  const statusCounts = useMemo(() => {
+    const c = { all: fieldFiltered.length, todo: 0, in_progress: 0, done: 0 };
+    for (const r of fieldFiltered) c[r.status] = (c[r.status] || 0) + 1;
+    return c;
+  }, [fieldFiltered]);
+
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return searchFiltered;
-    return searchFiltered.filter((r) => r.status === statusFilter);
-  }, [searchFiltered, statusFilter]);
+    if (statusFilter === 'all') return fieldFiltered;
+    return fieldFiltered.filter((r) => r.status === statusFilter);
+  }, [fieldFiltered, statusFilter]);
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (brandFilter    !== 'all') n++;
+    if (assigneeFilter !== 'all') n++;
+    if (priorityFilter !== 'all') n++;
+    if (categoryFilter !== 'all') n++;
+    if (dueFilter      !== 'all') n++;
+    return n;
+  }, [brandFilter, assigneeFilter, priorityFilter, categoryFilter, dueFilter]);
+
+  const clearAllFilters = useCallback(() => {
+    setBrandFilter('all'); setAssigneeFilter('all');
+    setPriorityFilter('all'); setCategoryFilter('all'); setDueFilter('all');
+  }, []);
 
   // Who can edit a task? Admin, creator, or brand owner TL.
   // (Assignee can still change STATUS via the row pill — that's a separate capability.)
@@ -256,7 +348,7 @@ export default function TasksPage() {
           <span className="wx-search-icon"><SearchIcon width="16" height="16" /></span>
           <input
             className="wx-input"
-            placeholder="Search tasks…"
+            placeholder="Search by title, brand, assignee, priority or category…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -284,6 +376,32 @@ export default function TasksPage() {
         <button className="wx-btn wx-btn-ghost" onClick={() => refetch()} disabled={isFetching} title="Refresh">
           <RefreshIcon width="15" height="15" />
         </button>
+      </div>
+
+      <div className="task-filter-row">
+        {assigneeOptions.length > 1 && (
+          <FilterSelect label="Assignee" value={assigneeFilter} onChange={setAssigneeFilter} options={assigneeOptions} />
+        )}
+        {brandOptions.length > 1 && (
+          <FilterSelect label="Brand" value={brandFilter} onChange={setBrandFilter} options={brandOptions} />
+        )}
+        {priorityOptions.length > 1 && (
+          <FilterSelect label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={priorityOptions} />
+        )}
+        {categoryOptions.length > 1 && (
+          <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={categoryOptions} />
+        )}
+        <FilterSelect label="Due" value={dueFilter} onChange={setDueFilter} options={[
+          { value: 'overdue', label: 'Overdue' },
+          { value: 'today',   label: 'Due today' },
+          { value: 'week',    label: 'Due this week' },
+          { value: 'none',    label: 'No due date' },
+        ]} />
+        {activeFilterCount > 0 && (
+          <button type="button" className="task-filter-clear" onClick={clearAllFilters}>
+            Clear {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -369,5 +487,24 @@ export default function TasksPage() {
         />
       )}
     </>
+  );
+}
+
+// Compact labelled select used in the task filter row.
+function FilterSelect({ label, value, onChange, options }) {
+  const isActive = value !== 'all';
+  return (
+    <label className={`task-filter ${isActive ? 'is-active' : ''}`}>
+      <span className="task-filter-label">{label}</span>
+      <select
+        className="task-filter-select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}>
+        <option value="all">All</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }

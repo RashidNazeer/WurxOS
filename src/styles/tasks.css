@@ -377,3 +377,64 @@
 @media (max-width: 900px) {
   .task-kanban { grid-template-columns: 1fr; }
 }
+
+/* ---------- Filter row (Assignee, Brand, Priority, Category, Due) ---------- */
+.task-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.task-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 4px 8px 4px 10px;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.task-filter:hover { border-color: var(--border-default); }
+.task-filter.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.task-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.task-filter.is-active .task-filter-label { color: var(--accent); }
+.task-filter-select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px 22px 4px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  max-width: 180px;
+  text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%2394a3b8' d='M5 6 0 0h10z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+}
+.task-filter-select:focus { outline: 0; }
+.task-filter.is-active .task-filter-select { color: var(--accent); }
+
+.task-filter-clear {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.task-filter-clear:hover { background: var(--accent-soft); }
