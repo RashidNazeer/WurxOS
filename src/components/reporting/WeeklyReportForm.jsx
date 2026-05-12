@@ -20,6 +20,8 @@ import RichTextEditor from '../shared/RichTextEditor';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import {
   getBrandSections, normalizeSection,
+  getBrandSectionExtras, addBrandSectionExtraField, removeBrandSectionExtraField,
+  addBrandSectionRich,
 } from '../../lib/brandReportSectionsApi';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
@@ -292,6 +294,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // live in data.customFields keyed by field id (table) or section id
   // (long_text), so the View can render them via the existing path.
   const [brandSectionDefs, setBrandSectionDefs] = useState([]);
+  // Per-builtin-section custom fields. Keyed by section key
+  // (overallPerformance, topCreators, ...). Persists per-brand.
+  const [brandSectionExtras, setBrandSectionExtras] = useState({});
   const [reportStatus, setReportStatus] = useState('draft');
   const [rejectionNote, setRejectionNote] = useState('');
   const [importing, setImporting] = useState(false);
@@ -338,16 +343,58 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     getUserCustomFields(currentUser.uid).then(setCustomFieldDefs).catch(() => {});
   }, [currentUser?.uid]);
 
-  // Load brand-level custom sections whenever the selected brand changes.
-  // Authors filling out the report see them right under the built-in
-  // sections. normalizeSection() upgrades pre-kind rows transparently.
+  // Load brand-level custom sections + per-built-in-section extras
+  // whenever the selected brand changes. Authors see existing fields
+  // immediately and any additions they make here persist back to the
+  // brand template so future weekly reports inherit them.
   useEffect(() => {
-    if (!selectedBrand?.id) { setBrandSectionDefs([]); return; }
+    if (!selectedBrand?.id) { setBrandSectionDefs([]); setBrandSectionExtras({}); return; }
     let cancelled = false;
-    getBrandSections(selectedBrand.id)
-      .then((list) => { if (!cancelled) setBrandSectionDefs(list.map(normalizeSection)); })
-      .catch(() => { if (!cancelled) setBrandSectionDefs([]); });
+    Promise.all([
+      getBrandSections(selectedBrand.id).catch(() => []),
+      getBrandSectionExtras(selectedBrand.id).catch(() => ({})),
+    ]).then(([list, extras]) => {
+      if (cancelled) return;
+      setBrandSectionDefs(list.map(normalizeSection));
+      setBrandSectionExtras(extras || {});
+    });
     return () => { cancelled = true; };
+  }, [selectedBrand?.id]);
+
+  // Persist a new custom field inside a built-in section to the brand
+  // template, then mirror locally so the row appears immediately.
+  const addExtraField = useCallback(async (sectionKey, field) => {
+    if (!selectedBrand?.id) return;
+    const saved = await addBrandSectionExtraField(selectedBrand.id, sectionKey, field);
+    setBrandSectionExtras((prev) => {
+      const list = Array.isArray(prev[sectionKey]) ? prev[sectionKey] : [];
+      return { ...prev, [sectionKey]: [...list, saved] };
+    });
+  }, [selectedBrand?.id]);
+
+  const removeExtraField = useCallback(async (sectionKey, fieldId) => {
+    if (!selectedBrand?.id) return;
+    await removeBrandSectionExtraField(selectedBrand.id, sectionKey, fieldId);
+    setBrandSectionExtras((prev) => {
+      const list = Array.isArray(prev[sectionKey]) ? prev[sectionKey] : [];
+      return { ...prev, [sectionKey]: list.filter((f) => f.id !== fieldId) };
+    });
+    // Also drop any value entries for this field id from the report
+    // draft so we don't leave orphans behind.
+    setData((d) => {
+      if (!d.customFields || !d.customFields[fieldId]) return d;
+      const next = { ...d.customFields };
+      delete next[fieldId];
+      return { ...d, customFields: next };
+    });
+  }, [selectedBrand?.id]);
+
+  // Add a brand new custom section (table or long-text) from inside
+  // the report form. Persists to brand template; rendered immediately.
+  const addBrandCustomSection = useCallback(async (payload) => {
+    if (!selectedBrand?.id) return;
+    const saved = await addBrandSectionRich(selectedBrand.id, payload);
+    setBrandSectionDefs((prev) => [...prev, normalizeSection(saved)]);
   }, [selectedBrand?.id]);
 
   // When brand is selected: load reports, detect next week, advance step — all in one effect
@@ -1165,6 +1212,13 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <InsightArea value={data.overallInsights} onChange={v => setData(d => ({ ...d, overallInsights: v }))}
             loading={!!aiLoading.overall || !!aiLoading.all}
             onGenerate={() => runAi('overall', generateOverallInsight, 'overallInsights')} />
+          <BuiltinExtras sectionKey="overallPerformance" sectionTitle="Overall Performance"
+            fields={brandSectionExtras.overallPerformance || []}
+            data={data} setData={setData}
+            previousReport={previousReport}
+            disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('overallPerformance', f)}
+            onRemoveField={(id) => removeExtraField('overallPerformance', id)} />
         </div>
       </div>
       )}
@@ -1187,6 +1241,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <InsightArea value={data.topCreatorsInsights} onChange={v => setData(d => ({ ...d, topCreatorsInsights: v }))}
             loading={!!aiLoading.creators || !!aiLoading.all}
             onGenerate={() => runAi('creators', generateCreatorsInsight, 'topCreatorsInsights')} />
+          <BuiltinExtras sectionKey="topCreators" sectionTitle="Top Creators"
+            fields={brandSectionExtras.topCreators || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('topCreators', f)}
+            onRemoveField={(id) => removeExtraField('topCreators', id)} />
         </div>
       </div>
       )}
@@ -1211,6 +1270,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <InsightArea value={data.topVideosInsights} onChange={v => setData(d => ({ ...d, topVideosInsights: v }))}
             loading={!!aiLoading.videos || !!aiLoading.all}
             onGenerate={() => runAi('videos', generateVideosInsight, 'topVideosInsights')} />
+          <BuiltinExtras sectionKey="topVideos" sectionTitle="Top Videos"
+            fields={brandSectionExtras.topVideos || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('topVideos', f)}
+            onRemoveField={(id) => removeExtraField('topVideos', id)} />
         </div>
       </div>
       )}
@@ -1235,6 +1299,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <InsightArea value={data.gmvMaxInsights} onChange={v => setData(d => ({ ...d, gmvMaxInsights: v }))}
             loading={!!aiLoading.gmvMax || !!aiLoading.all}
             onGenerate={() => runAi('gmvMax', generateGmvMaxInsight, 'gmvMaxInsights')} />
+          <BuiltinExtras sectionKey="gmvMax" sectionTitle="GMV Max Performance"
+            fields={brandSectionExtras.gmvMax || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('gmvMax', f)}
+            onRemoveField={(id) => removeExtraField('gmvMax', id)} />
         </div>
       </div>
       )}
@@ -1258,6 +1327,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <InsightArea value={data.productHighlightsInsights} onChange={v => setData(d => ({ ...d, productHighlightsInsights: v }))}
             loading={!!aiLoading.products || !!aiLoading.all}
             onGenerate={() => runAi('products', generateProductsInsight, 'productHighlightsInsights')} />
+          <BuiltinExtras sectionKey="productHighlights" sectionTitle="Product Highlights"
+            fields={brandSectionExtras.productHighlights || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('productHighlights', f)}
+            onRemoveField={(id) => removeExtraField('productHighlights', id)} />
         </div>
       </div>
       )}
@@ -1276,6 +1350,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <InsightArea value={data.offsiteInsights} onChange={v => setData(d => ({ ...d, offsiteInsights: v }))}
             loading={!!aiLoading.offsite || !!aiLoading.all}
             onGenerate={() => runAi('offsite', generateOffsiteInsight, 'offsiteInsights')} />
+          <BuiltinExtras sectionKey="offsitePerformance" sectionTitle="Offsite Performance"
+            fields={brandSectionExtras.offsitePerformance || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('offsitePerformance', f)}
+            onRemoveField={(id) => removeExtraField('offsitePerformance', id)} />
         </div>
       </div>
       )}
@@ -1297,6 +1376,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             onChange={v => setData(d => ({ ...d, upcomingCampaigns: v }))}
             minHeight={140}
             placeholder="List any upcoming campaigns, launches or planned promotions" />
+          <BuiltinExtras sectionKey="upcomingCampaigns" sectionTitle="Current & Upcoming Campaigns"
+            fields={brandSectionExtras.upcomingCampaigns || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('upcomingCampaigns', f)}
+            onRemoveField={(id) => removeExtraField('upcomingCampaigns', id)} />
         </div>
       </div>
       )}
@@ -1318,6 +1402,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             onChange={v => setData(d => ({ ...d, operationalUpdates: v }))}
             minHeight={140}
             placeholder="Describe the workflow and operational tasks completed this week" />
+          <BuiltinExtras sectionKey="operationalUpdates" sectionTitle="Operational Updates"
+            fields={brandSectionExtras.operationalUpdates || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('operationalUpdates', f)}
+            onRemoveField={(id) => removeExtraField('operationalUpdates', id)} />
         </div>
       </div>
       )}
@@ -1339,20 +1428,36 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             onChange={v => setData(d => ({ ...d, recommendations: v }))}
             minHeight={160}
             placeholder="Share your recommendations and action items for next steps" />
+          <BuiltinExtras sectionKey="recommendations" sectionTitle="Recommendations & Action Items"
+            fields={brandSectionExtras.recommendations || []} data={data} setData={setData}
+            previousReport={previousReport} disabled={!selectedBrand?.id}
+            onAddField={(f) => addExtraField('recommendations', f)}
+            onRemoveField={(id) => removeExtraField('recommendations', id)} />
         </div>
       </div>
       )}
 
       {/* ─── Brand Sections (custom per-brand, defined on the brand page) ── */}
-      {brandSectionDefs.length > 0 && (
+      {(brandSectionDefs.length > 0 || selectedBrand?.id) && (
         <>
           <SectionHeader icon="bi-pin-fill" title="Brand Sections" color="#0ea5e9" />
-          <BrandSectionsBlock
-            sections={brandSectionDefs}
-            data={data}
-            setData={setData}
-            previousReport={previousReport}
-          />
+          {brandSectionDefs.length > 0 && (
+            <BrandSectionsBlock
+              sections={brandSectionDefs}
+              data={data}
+              setData={setData}
+              previousReport={previousReport}
+            />
+          )}
+          {selectedBrand?.id && (
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed' }}>
+              <div className="card-body p-3">
+                <AddCustomSectionInline
+                  disabled={!selectedBrand?.id}
+                  onAdd={addBrandCustomSection} />
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1639,5 +1744,312 @@ function BrandFieldInput({ field, value, onChange }) {
   return (
     <input type="text" style={base} value={value ?? ''}
       onChange={(e) => onChange(e.target.value)} />
+  );
+}
+
+/* ── Built-in section extras ───────────────────────────────────────────────
+   Inline UI under each built-in section. Renders any persisted extra
+   fields (label + typed input + last-week hint) and an "+ Add field"
+   action that writes the new field def back to the brand template so
+   future weekly reports inherit it. */
+function BuiltinExtras({
+  sectionKey, sectionTitle, fields, data, setData, previousReport,
+  disabled, onAddField, onRemoveField,
+}) {
+  const [adding, setAdding] = useState(false);
+
+  function setValue(fieldId, fieldLabel, fieldType, v) {
+    setData((d) => ({
+      ...d,
+      customFields: {
+        ...(d.customFields || {}),
+        [fieldId]: {
+          name: fieldLabel,
+          value: v,
+          kind: 'builtin_extra',
+          sectionKey,
+          sectionTitle,
+          type: fieldType,
+          source: 'brand',
+        },
+      },
+    }));
+  }
+
+  function getPrev(fieldId, label) {
+    const prev = previousReport?.customFields || {};
+    const byId = prev[fieldId];
+    if (byId) return byId;
+    if (label) {
+      const byName = Object.values(prev).find((v) =>
+        v && typeof v === 'object' && v.name === label);
+      if (byName) return byName;
+    }
+    return null;
+  }
+
+  async function handleRemove(field) {
+    const ok = window.confirm(
+      `Remove "${field.label}" from ${sectionTitle}?\n\nIt'll disappear from this report and from future weekly reports for this brand. Existing reports keep their saved values.`
+    );
+    if (!ok) return;
+    try { await onRemoveField(field.id); }
+    catch (err) { alert(err?.message || 'Could not remove the field.'); }
+  }
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border-subtle)' }}>
+      <div className="d-flex align-items-center justify-content-between mb-2">
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase',
+          letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+          Additional fields
+        </div>
+        {!adding && (
+          <button type="button"
+            className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: 8, fontSize: '0.72rem' }}
+            disabled={disabled}
+            title={disabled ? 'Select a brand first' : ''}
+            onClick={() => setAdding(true)}>
+            <i className="bi bi-plus-circle" /> Add field
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <AddFieldInline
+          onCancel={() => setAdding(false)}
+          onSave={async (def) => {
+            try {
+              await onAddField(def);
+              setAdding(false);
+            } catch (err) {
+              alert(err?.message || 'Could not save the field.');
+            }
+          }} />
+      )}
+
+      {fields.length > 0 && (
+        <div className="d-flex flex-column gap-3 mt-2">
+          {fields.map((f) => {
+            const entry  = data.customFields?.[f.id];
+            const value  = entry?.value ?? '';
+            const prev   = getPrev(f.id, f.label);
+            const prevValue = prev?.value ?? '';
+            return (
+              <div key={f.id}>
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
+                    {f.label}
+                  </label>
+                  <div className="d-flex align-items-center gap-2">
+                    {prevValue !== '' && prevValue != null && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        Last week: <strong style={{ color: 'var(--text-secondary)' }}>{String(prevValue)}</strong>
+                        <NumericDelta cur={value} prev={prevValue} type={f.type} />
+                      </span>
+                    )}
+                    <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+                      style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                      onClick={() => handleRemove(f)}
+                      title="Remove this field">
+                      <i className="bi bi-trash3" />
+                    </button>
+                  </div>
+                </div>
+                <BrandFieldInput field={f} value={value}
+                  onChange={(v) => setValue(f.id, f.label, f.type, v)} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NumericDelta({ cur, prev, type }) {
+  if (type !== 'number') return null;
+  if (cur === '' || cur == null || prev === '' || prev == null) return null;
+  const a = Number(cur), b = Number(prev);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  const diff = a - b;
+  if (diff === 0) return null;
+  const up = diff > 0;
+  return (
+    <span style={{ marginLeft: 6, color: up ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+      {up ? '▲' : '▼'} {Math.abs(diff).toLocaleString()}
+    </span>
+  );
+}
+
+/* Inline "add a single field" form. Used by BuiltinExtras. */
+function AddFieldInline({ onCancel, onSave }) {
+  const [label, setLabel]   = useState('');
+  const [type, setType]     = useState('text');
+  const [options, setOpts]  = useState('');
+  const canSave = label.trim().length > 0 && (type !== 'dropdown' || options.trim().length > 0);
+
+  return (
+    <div style={{
+      padding: 10, marginBottom: 8,
+      background: 'var(--accent-soft)',
+      border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+      borderRadius: 10,
+    }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1.6fr', gap: 8 }}>
+        <input className="form-control form-control-sm" autoFocus
+          placeholder="Field label (e.g. Total Users)"
+          value={label} onChange={(e) => setLabel(e.target.value)} />
+        <select className="form-select form-select-sm" value={type}
+          onChange={(e) => setType(e.target.value)}>
+          <option value="text">Text</option>
+          <option value="number">Number</option>
+          <option value="url">URL</option>
+          <option value="dropdown">Dropdown</option>
+        </select>
+        {type === 'dropdown' ? (
+          <input className="form-control form-control-sm"
+            placeholder="Options, comma-separated (e.g. Green, Yellow, Red)"
+            value={options} onChange={(e) => setOpts(e.target.value)} />
+        ) : <span />}
+      </div>
+      <div className="d-flex justify-content-end gap-2 mt-2">
+        <button type="button" className="btn btn-sm btn-light" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-dark"
+          disabled={!canSave}
+          onClick={() => onSave({
+            label: label.trim(), type,
+            options: type === 'dropdown'
+              ? options.split(',').map((o) => o.trim()).filter(Boolean)
+              : [],
+          })}>
+          Save field
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* Inline "add a brand-wide custom section" form. Used at the bottom of
+   the Brand Sections block. */
+function AddCustomSectionInline({ disabled, onAdd }) {
+  const [open, setOpen]   = useState(false);
+  const [name, setName]   = useState('');
+  const [kind, setKind]   = useState('long_text');
+  const [fields, setFields] = useState([{ label: '', type: 'text', options: '' }]);
+  const [error, setError] = useState('');
+
+  function reset() {
+    setOpen(false); setName(''); setKind('long_text');
+    setFields([{ label: '', type: 'text', options: '' }]); setError('');
+  }
+
+  async function submit() {
+    setError('');
+    try {
+      const payload = {
+        name: name.trim(),
+        kind,
+        fields: kind === 'table'
+          ? fields.filter((f) => f.label.trim()).map((f) => ({
+              label: f.label.trim(), type: f.type,
+              options: f.type === 'dropdown'
+                ? f.options.split(',').map((o) => o.trim()).filter(Boolean)
+                : [],
+            }))
+          : [],
+      };
+      await onAdd(payload);
+      reset();
+    } catch (err) { setError(err?.message || 'Could not add the section.'); }
+  }
+
+  if (!open) {
+    return (
+      <button type="button"
+        className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
+        style={{ borderRadius: 8, fontSize: '0.78rem' }}
+        disabled={disabled}
+        title={disabled ? 'Select a brand first' : ''}
+        onClick={() => setOpen(true)}>
+        <i className="bi bi-plus-circle" /> Add custom section
+      </button>
+    );
+  }
+
+  const canSave = name.trim().length > 0
+    && (kind === 'long_text' || fields.some((f) => f.label.trim()));
+
+  return (
+    <div>
+      <div className="fw-bold mb-2" style={{ fontSize: '0.85rem' }}>New custom section</div>
+      {error && (
+        <div className="alert alert-danger py-2 mb-2" style={{ fontSize: '0.78rem' }}>{error}</div>
+      )}
+      <input className="form-control form-control-sm mb-2" autoFocus
+        placeholder='Section name (e.g. "Client Notes" or "Weekly Health Metrics")'
+        value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="d-flex gap-2 mb-2">
+        <KindRadio active={kind === 'long_text'} onClick={() => setKind('long_text')}
+          title="Long text" subtitle="Free-form notes / insights" />
+        <KindRadio active={kind === 'table'} onClick={() => setKind('table')}
+          title="Table" subtitle="Labelled inputs compared week to week" />
+      </div>
+      {kind === 'table' && (
+        <div className="d-flex flex-column gap-2 mb-2">
+          {fields.map((f, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1.6fr auto', gap: 6 }}>
+              <input className="form-control form-control-sm" placeholder="Field label"
+                value={f.label}
+                onChange={(e) => setFields((cur) => cur.map((x, idx) => idx === i ? { ...x, label: e.target.value } : x))} />
+              <select className="form-select form-select-sm" value={f.type}
+                onChange={(e) => setFields((cur) => cur.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))}>
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="url">URL</option>
+                <option value="dropdown">Dropdown</option>
+              </select>
+              {f.type === 'dropdown' ? (
+                <input className="form-control form-control-sm" placeholder="Comma-separated options"
+                  value={f.options}
+                  onChange={(e) => setFields((cur) => cur.map((x, idx) => idx === i ? { ...x, options: e.target.value } : x))} />
+              ) : <span />}
+              <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+                disabled={fields.length === 1}
+                onClick={() => setFields((cur) => cur.filter((_, idx) => idx !== i))}
+                style={{ padding: '2px 8px' }}>
+                <i className="bi bi-trash3" />
+              </button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-sm btn-outline-secondary align-self-start"
+            onClick={() => setFields((cur) => [...cur, { label: '', type: 'text', options: '' }])}>
+            <i className="bi bi-plus-circle" /> Add field
+          </button>
+        </div>
+      )}
+      <div className="d-flex justify-content-end gap-2">
+        <button type="button" className="btn btn-sm btn-light" onClick={reset}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-dark" disabled={!canSave} onClick={submit}>
+          Add section
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KindRadio({ active, title, subtitle, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{
+        flex: '1 1 220px', textAlign: 'left',
+        background: active ? 'var(--surface-1)' : 'transparent',
+        border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
+        borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
+      }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{title}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{subtitle}</div>
+    </button>
   );
 }

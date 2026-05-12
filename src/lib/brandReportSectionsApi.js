@@ -33,6 +33,61 @@ async function writeSections(brandId, sections) {
   if (error) throw new Error(error.message);
 }
 
+// --------------- Built-in section "extras" ---------------------------
+// Custom fields *inside* a built-in section (e.g. "Total User Count"
+// inside Overall Performance) live in the `extras` jsonb on the same
+// row. Keyed by the form's internal section key.
+
+export async function getBrandSectionExtras(brandId) {
+  if (!brandId) return {};
+  const { data, error } = await supabase
+    .from('brand_report_sections')
+    .select('extras')
+    .eq('brand_id', brandId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.extras || {};
+}
+
+async function writeExtras(brandId, extras) {
+  const { error } = await supabase
+    .from('brand_report_sections')
+    .upsert({ brand_id: brandId, extras }, { onConflict: 'brand_id' });
+  if (error) throw new Error(error.message);
+}
+
+function normalizeExtraField(f) {
+  return {
+    id: f.id || genId(),
+    label: String(f.label || '').trim(),
+    type: FIELD_TYPES.includes(f.type) ? f.type : 'text',
+    options: Array.isArray(f.options)
+      ? f.options.map((o) => String(o).trim()).filter(Boolean)
+      : [],
+  };
+}
+
+export async function addBrandSectionExtraField(brandId, sectionKey, field) {
+  if (!brandId || !sectionKey) throw new Error('Brand and section are required.');
+  const cleaned = normalizeExtraField(field);
+  if (!cleaned.label) throw new Error('Field label is required.');
+  const extras = await getBrandSectionExtras(brandId);
+  const list = Array.isArray(extras[sectionKey]) ? extras[sectionKey] : [];
+  if (list.some((f) => f.label.toLowerCase() === cleaned.label.toLowerCase())) {
+    throw new Error('A field with this label already exists in this section.');
+  }
+  const next = { ...extras, [sectionKey]: [...list, cleaned] };
+  await writeExtras(brandId, next);
+  return cleaned;
+}
+
+export async function removeBrandSectionExtraField(brandId, sectionKey, fieldId) {
+  const extras = await getBrandSectionExtras(brandId);
+  const list = Array.isArray(extras[sectionKey]) ? extras[sectionKey] : [];
+  const next = { ...extras, [sectionKey]: list.filter((f) => f.id !== fieldId) };
+  await writeExtras(brandId, next);
+}
+
 // Field types allowed inside table-kind sections.
 export const FIELD_TYPES = ['text', 'number', 'url', 'dropdown'];
 

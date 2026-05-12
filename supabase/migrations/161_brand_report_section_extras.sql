@@ -1,0 +1,31 @@
+-- ============================================================
+-- 161 — Brand Report Sections: add `extras` jsonb for per-builtin-
+-- section custom fields.
+--
+-- Context: migration 104 introduced brand_report_sections.sections
+-- jsonb to hold extra long-form sections (and now, table-kind custom
+-- sections via app code). That covered the "add a new section"
+-- case. This adds the "add new fields *inside* an existing built-in
+-- section" case — e.g. adding a "Total User Count" field inside
+-- Overall Performance — without touching the report schema.
+--
+-- extras shape:
+--   {
+--     "<builtinSectionKey>": [
+--       { "id": "...", "label": "...", "type": "text|number|url|dropdown",
+--         "options": ["..."] }
+--     ],
+--     ...
+--   }
+--
+-- builtinSectionKey matches the form's internal keys, e.g.
+-- overallPerformance, topCreators, topVideos, gmvMax,
+-- productHighlights, offsite, campaigns, operational, recommendations.
+--
+-- Field values are stored on the report row inside data.customFields
+-- keyed by field id, same path as the existing brand sections so the
+-- View renders them with the existing code path.
+-- ============================================================
+
+alter table public.brand_report_sections
+  add column if not exists extras jsonb not null default '{}'::jsonb;

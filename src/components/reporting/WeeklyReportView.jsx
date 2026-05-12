@@ -1143,17 +1143,29 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
           // Group entries that came from a brand-defined TABLE section
           // (kind: 'table' + sectionId) so they render as a single card
-          // with label/value rows, like the form. Everything else
-          // (legacy long-form custom fields and kind: 'long_text') keeps
-          // the previous one-card-per-entry behavior.
-          const tableGroups = new Map(); // sectionId -> { name, rows: [{fieldId, label, value, type}] }
+          // with label/value rows, like the form. Entries added inline
+          // as extras on a BUILT-IN section (kind: 'builtin_extra' +
+          // sectionKey) get the same treatment, grouped by section. The
+          // built-in sections themselves still render via their fixed
+          // JSX above; these are the "additional fields" rows that
+          // appear under each one in the form.
+          const tableGroups = new Map(); // key -> { name, rows: [...] }
           const passthrough = [];
           for (const [fieldId, entry] of customEntries) {
             if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
-              if (!tableGroups.has(entry.sectionId)) {
-                tableGroups.set(entry.sectionId, { name: entry.sectionName || 'Section', rows: [] });
+              const key = `tbl:${entry.sectionId}`;
+              if (!tableGroups.has(key)) {
+                tableGroups.set(key, { name: entry.sectionName || 'Section', rows: [] });
               }
-              tableGroups.get(entry.sectionId).rows.push({
+              tableGroups.get(key).rows.push({
+                fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
+              });
+            } else if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra' && entry.sectionKey) {
+              const key = `bx:${entry.sectionKey}`;
+              if (!tableGroups.has(key)) {
+                tableGroups.set(key, { name: `${entry.sectionTitle || entry.sectionKey} — Additional fields`, rows: [] });
+              }
+              tableGroups.get(key).rows.push({
                 fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
               });
             } else {
@@ -1161,12 +1173,12 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             }
           }
 
-          const renderedTables = [...tableGroups.entries()].map(([sectionId, group]) => {
+          const renderedTables = [...tableGroups.entries()].map(([groupKey, group]) => {
             customNames.push(group.name);
             const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
             if (nonEmpty.length === 0) return null;
             return (
-              <ContentSection key={`tbl_${sectionId}`}
+              <ContentSection key={groupKey}
                 icon="bi-table"
                 color="#0ea5e9"
                 title={group.name}>
