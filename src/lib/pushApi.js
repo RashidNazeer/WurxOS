@@ -1,6 +1,36 @@
 import { supabase } from './supabase';
+import { logAppEvent } from './appEvents';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
+// Map a DOMException raised by pushManager.subscribe() into something a
+// user can actually act on. Generic "push service error" reveals nothing
+// about whether it's a Windows-notifications-off case, a corp-policy
+// case, a bad VAPID key, or a network blip — different fixes for each.
+function explainPushError(err) {
+  const name = err?.name || '';
+  const msg  = String(err?.message || err || '');
+  if (name === 'NotAllowedError') {
+    return 'The browser blocked the push subscription. Open browser site settings and allow notifications, then try again.';
+  }
+  if (name === 'AbortError') {
+    return 'The push service handshake was aborted. This usually means Windows system notifications are off — open Settings → Notifications, turn them on, then try again.';
+  }
+  if (name === 'NotSupportedError') {
+    return 'This browser/profile does not support push (guest mode, private window, or an enterprise policy may be blocking it).';
+  }
+  if (name === 'InvalidStateError') {
+    return 'There is a stale push subscription. Disable it, refresh the page, then try enabling again.';
+  }
+  if (name === 'NetworkError') {
+    return 'The browser could not reach the push service. Check your internet connection (or a corporate firewall) and try again.';
+  }
+  if (/applicationServerKey is not valid/i.test(msg)) {
+    return 'The VAPID public key is invalid. Please contact Mr Rashid — this is a server config issue, not your laptop.';
+  }
+  // Fallback: surface the raw browser message so we can debug it.
+  return `Push registration failed (${name || 'error'}): ${msg}`;
+}
 
 export function pushSupported() {
   return typeof window !== 'undefined'
@@ -46,12 +76,32 @@ export async function enablePush(userId) {
   const reg = await registerSW();
   await navigator.serviceWorker.ready;
 
+  // pushManager.subscribe is the call that throws "push service error"
+  // when Windows Notifications are off or a corp policy is in the way.
+  // Wrap it so we can attach a human-friendly explanation and log the
+  // raw failure to app_events for later forensics.
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    } catch (err) {
+      // Persist the raw browser-side details so we can correlate
+      // user reports without asking them to open DevTools.
+      try {
+        logAppEvent(userId, 'push.subscribe_failed', {
+          name: err?.name || null,
+          message: String(err?.message || err).slice(0, 500),
+          user_agent: navigator.userAgent.slice(0, 300),
+        });
+      } catch {}
+      const wrapped = new Error(explainPushError(err));
+      wrapped.cause = err;
+      wrapped.code  = err?.name || null;
+      throw wrapped;
+    }
   }
 
   const raw = sub.toJSON();
