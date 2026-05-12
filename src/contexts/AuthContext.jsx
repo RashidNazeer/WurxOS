@@ -48,22 +48,45 @@ export function AuthProvider({ children }) {
   // double-count, hitting the threshold faster than the user expects.
   const recheckInFlightRef = useRef(false);
 
+  // Returns true on success, false on any failure (network, timeout, RLS
+  // error, or row not found). Callers use this to decide whether the
+  // session is actually usable — a successful auth bootstrap with a
+  // failed profile load means a half-broken app, which we'd rather
+  // surface as a "sign in again" modal than as a confusing blank UI.
   const loadProfile = useCallback(async (userId) => {
     if (!userId) {
       setProfile(null);
-      return;
+      return false;
     }
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) {
-      console.warn('[auth] loadProfile error:', error.message);
+    // 15s timeout. Pakistan-ISP slow queries finish in 2-4s; this only
+    // aborts genuinely-zombied requests (TCP connection that survived a
+    // network change). Without this the spinner can hang indefinitely.
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
+        .abortSignal(AbortSignal.timeout(15000));
+      if (error) {
+        console.warn('[auth] loadProfile error:', error.message);
+        setProfile(null);
+        return false;
+      }
+      if (!data) {
+        // Row not found — the auth user has no profile row. Treat as
+        // dead session so the user gets the re-login modal instead of
+        // a half-broken UI.
+        setProfile(null);
+        return false;
+      }
+      setProfile(data);
+      return true;
+    } catch (err) {
+      console.warn('[auth] loadProfile threw:', err?.message || err);
       setProfile(null);
-      return;
+      return false;
     }
-    setProfile(data);
     // Note: timezone is locked to Asia/Karachi at the DB level (migration
     // 095). We deliberately do NOT auto-sync from the browser — every user
     // is on Pakistan time regardless of their laptop's clock.
@@ -72,18 +95,34 @@ export function AuthProvider({ children }) {
   // 1) Initial session check — runs once.
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      bootstrapped.current = true;
-      logAppEvent(data.session?.user?.id, 'auth.bootstrap', {
-        hasSession: !!data.session,
-        expiresAt: data.session?.expires_at || null,
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+        bootstrapped.current = true;
+        logAppEvent(data.session?.user?.id, 'auth.bootstrap', {
+          hasSession: !!data.session,
+          expiresAt: data.session?.expires_at || null,
+        });
+        // If no session we can finish loading immediately;
+        // otherwise the profile effect below will finish it.
+        if (!data.session) setLoading(false);
+      })
+      .catch((err) => {
+        // getSession() can reject if the localStorage auth store throws
+        // (corrupted JSON, Safari ITP eviction, quota exceeded). Without
+        // this catch the spinner hangs forever and the user has to hard
+        // reload. Treat as logged-out: the next sign-in will rebuild
+        // clean state from scratch.
+        if (!mounted) return;
+        console.warn('[auth] getSession failed:', err?.message || err);
+        logAppEvent(null, 'auth.bootstrap_failed', {
+          message: String(err?.message || err).slice(0, 200),
+        });
+        bootstrapped.current = true;
+        setSession(null);
+        setLoading(false);
       });
-      // If no session we can finish loading immediately;
-      // otherwise the profile effect below will finish it.
-      if (!data.session) setLoading(false);
-    });
 
     // 2) Subscribe to auth changes. DO NOT call any Supabase DB method
     //    inside this callback — it will deadlock the auth listener.
@@ -141,8 +180,17 @@ export function AuthProvider({ children }) {
     }
     let cancelled = false;
     (async () => {
-      await loadProfile(uid);
-      if (!cancelled && bootstrapped.current) setLoading(false);
+      const ok = await loadProfile(uid);
+      if (cancelled) return;
+      // Always clear the loading flag — even on failure. A stuck
+      // spinner with no recovery is the worst UX; surfacing the
+      // session-expired modal lets the user act.
+      if (bootstrapped.current) setLoading(false);
+      // If we authenticated but couldn't load a profile, the session
+      // is functionally dead (RLS misconfigured, profile row missing,
+      // network zombie). Surface the re-login modal instead of leaving
+      // the user on a half-rendered app with no role/permissions.
+      if (!ok) setSessionInvalid(true);
     })();
 
     const channel = supabase
@@ -158,7 +206,12 @@ export function AuthProvider({ children }) {
             setSessionInvalid(true);
             return;
           }
-          setProfile(payload.new);
+          // Merge instead of replace. Supabase Realtime delivers only
+          // the columns that changed when REPLICA IDENTITY is not FULL;
+          // a partial UPDATE (e.g. last_seen_at) would otherwise wipe
+          // display_name, role, reports_to, etc. The full row from
+          // loadProfile is the source of truth for missing fields.
+          setProfile((prev) => (prev ? { ...prev, ...payload.new } : payload.new));
         },
       )
       .on(

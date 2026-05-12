@@ -23,24 +23,37 @@ export function lazyWithRetry(importFn) {
       // trigger its own single-shot reload.
       try { sessionStorage.removeItem('chunk-reload-pending'); } catch {}
       return mod;
-    } catch (err) {
-      const pending = (() => {
-        try { return sessionStorage.getItem('chunk-reload-pending'); }
-        catch { return null; }
-      })();
-      if (!pending) {
-        try { sessionStorage.setItem('chunk-reload-pending', '1'); } catch {}
-        // Hard reload — bypasses HTTP cache so we definitely fetch
-        // the new index.html.
-        window.location.reload();
-        // The reload kills this Promise chain, but React still wants
-        // a module shape. Return a noop component to keep types happy.
-        return { default: () => null };
+    } catch (firstErr) {
+      // Before reloading the page, retry once after a short backoff.
+      // Most chunk-load failures are transient network blips (DNS hiccup,
+      // wake-from-sleep TCP zombie, captive-portal interception) that
+      // resolve within a second. Reloading the whole app for those is
+      // jarring and unnecessary. Only if the second attempt also fails
+      // do we treat it as a real stale-deploy and reload.
+      await new Promise((r) => setTimeout(r, 500));
+      try {
+        const mod = await importFn();
+        try { sessionStorage.removeItem('chunk-reload-pending'); } catch {}
+        return mod;
+      } catch (secondErr) {
+        const pending = (() => {
+          try { return sessionStorage.getItem('chunk-reload-pending'); }
+          catch { return null; }
+        })();
+        if (!pending) {
+          try { sessionStorage.setItem('chunk-reload-pending', '1'); } catch {}
+          // Hard reload — bypasses HTTP cache so we definitely fetch
+          // the new index.html.
+          window.location.reload();
+          // The reload kills this Promise chain, but React still wants
+          // a module shape. Return a noop component to keep types happy.
+          return { default: () => null };
+        }
+        // We've already reloaded once and the import is still failing.
+        // Bubble the original error so it surfaces to the user instead
+        // of looping.
+        throw secondErr;
       }
-      // We've already reloaded once and the import is still failing.
-      // Bubble the original error so it surfaces to the user instead
-      // of looping.
-      throw err;
     }
   });
 }
