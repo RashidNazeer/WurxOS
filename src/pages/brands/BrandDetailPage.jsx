@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getBrand } from '../../lib/brandsApi';
 import { listTasks } from '../../lib/tasksApi';
 import { listReports } from '../../lib/reportsApi';
+import { listProducts } from '../../lib/productsApi';
 
 const REPORT_STATUS_TONE = {
   draft:     { fg: 'var(--text-muted)', label: 'Draft' },
@@ -98,6 +99,12 @@ export default function BrandDetailPage() {
     enabled: !!id && !!brand,
   });
 
+  const { data: products = [] } = useQuery({
+    queryKey: ['brand-products', id],
+    queryFn: () => listProducts(id),
+    enabled: !!id && !!brand,
+  });
+
   // --- Role-gated capabilities ---
   const isBossOrOL = ['boss', 'ol', 'developer'].includes(role);
   const isOwner    = brand && brand.owner_id === uid;
@@ -114,6 +121,26 @@ export default function BrandDetailPage() {
     () => tasks.filter((t) => t.status !== 'done').length, [tasks]);
   const openReportCount = useMemo(
     () => reports.filter((r) => ['draft','submitted','rejected'].includes(r.status)).length, [reports]);
+
+  const taskStats = useMemo(() => {
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday   = new Date(startOfToday); endOfToday.setDate(endOfToday.getDate() + 1);
+    let overdue = 0, dueToday = 0;
+    for (const t of tasks) {
+      if (t.status === 'done' || !t.due_date) continue;
+      const d = new Date(t.due_date);
+      if (d < startOfToday) overdue++;
+      else if (d < endOfToday) dueToday++;
+    }
+    return { overdue, dueToday };
+  }, [tasks]);
+
+  const daysSinceOnboarded = useMemo(() => {
+    if (!brand?.created_at) return null;
+    const ms = Date.now() - new Date(brand.created_at).getTime();
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    return days >= 0 ? days : null;
+  }, [brand?.created_at]);
 
   if (isLoading) {
     return <div className="wx-empty"><span className="wx-spinner" /> Loading brand…</div>;
@@ -136,109 +163,121 @@ export default function BrandDetailPage() {
 
   return (
     <>
-      {/* ---------- Layout: identity + nav on the left, content on the right ---------- */}
-      <div className="bd-layout">
-        <aside className="bd-sidebar">
-          <button type="button" className="bd-back" onClick={() => navigate('/brands')}>
-            <ChevronRightIcon width="14" height="14" style={{ transform: 'rotate(180deg)' }} />
-            All brands
-          </button>
+      {/* ---------- Top header card ---------- */}
+      <div className="bd2-page">
+        <button type="button" className="bd-back" onClick={() => navigate('/brands')}>
+          <ChevronRightIcon width="14" height="14" style={{ transform: 'rotate(180deg)' }} />
+          All brands
+        </button>
 
-          {/* Vertical identity card — avatar + name + status + meta + actions */}
-          <div className="bd-hero-v">
-            <div className="bd-hero-v-avatar">
-              <BrandAvatar brand={brand} size={56} radius={12} />
+        <div className="bd2-header">
+          <div className="bd2-header-row">
+            <div className="bd2-header-avatar">
+              <BrandAvatar brand={brand} size={64} radius={14} />
             </div>
-            <div className="bd-hero-v-name">{brand.brand_name}</div>
-            <div className="bd-hero-v-pills">
-              <span className={`bd-hero-status ${brand.status === 'active' ? 'bd-hero-status-active' : 'bd-hero-status-inactive'}`}>
-                {brand.status === 'active' ? 'Active' : 'Inactive'}
-              </span>
-              {brand.paid_collab_status && brand.paid_collab_status !== 'not_applicable' && (
-                <span className="bd-hero-status" style={{
-                  background: 'color-mix(in srgb, var(--accent) 16%, transparent)',
-                  color: 'var(--accent)',
-                }}>
-                  {paidCollabStatusLabel(brand.paid_collab_status)}
+            <div className="bd2-header-main">
+              <div className="bd2-header-title-row">
+                <h1 className="bd2-header-title">{brand.brand_name}</h1>
+                <span className={`bd-hero-status ${brand.status === 'active' ? 'bd-hero-status-active' : 'bd-hero-status-inactive'}`}>
+                  {brand.status === 'active' ? 'Active' : 'Inactive'}
                 </span>
-              )}
-            </div>
-            <div className="bd-hero-v-meta">
-              {owner && (
-                <div className="bd-hero-v-meta-item">
-                  <UsersIcon width="13" height="13" />
-                  <span>{owner.display_name}</span>
-                </div>
-              )}
-              <div className="bd-hero-v-meta-item">
-                <UsersIcon width="13" height="13" />
-                <span>{assigned.length + (owner ? 1 : 0)} {assigned.length + (owner ? 1 : 0) === 1 ? 'member' : 'members'}</span>
-              </div>
-              {brand.tier && (
-                <div className="bd-hero-v-meta-item">
-                  <ShieldIcon width="13" height="13" />
-                  <span>Tier {brand.tier}</span>
-                </div>
-              )}
-              {brand.gmv != null && (
-                <div className="bd-hero-v-meta-item">
-                  <ReportIcon width="13" height="13" />
-                  <span>GMV {formatMoney(brand.gmv)}</span>
-                </div>
-              )}
-              <div className="bd-hero-v-meta-item">
-                <ClockIcon width="13" height="13" />
-                <span>{new Date(brand.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-            </div>
-            {(canEditBrand || canSwitchApc) && (
-              <div className="bd-hero-v-actions">
-                {canEditBrand && (
-                  <button className="wx-btn wx-btn-ghost bd-hero-v-btn" onClick={() => setShowEdit(true)}>
-                    <PencilIcon width="14" height="14" /> Edit brand
-                  </button>
+                {brand.paid_collab_status && brand.paid_collab_status !== 'not_applicable' && (
+                  <span className="bd-hero-status" style={{
+                    background: 'color-mix(in srgb, var(--accent) 16%, transparent)',
+                    color: 'var(--accent)',
+                  }}>
+                    {paidCollabStatusLabel(brand.paid_collab_status)}
+                  </span>
                 )}
-                {canSwitchApc && (
-                  <button className="wx-btn wx-btn-ghost bd-hero-v-btn" onClick={() => setShowSwitchApc(true)}
-                    title="Move this brand to a different APC (the brand's TL follows the new APC)">
-                    <UsersIcon width="14" height="14" /> Switch APC
-                  </button>
+                {brand.tier && (
+                  <span className="bd-hero-status" style={{
+                    background: 'var(--surface-2)', color: 'var(--text-secondary)',
+                  }}>
+                    Tier · {brand.tier}
+                  </span>
                 )}
               </div>
-            )}
+              <div className="bd2-header-meta">
+                {brand.client_name && (
+                  <span className="bd2-header-meta-item">Client · <strong>{brand.client_name}</strong></span>
+                )}
+                {owner && (
+                  <span className="bd2-header-meta-item">Owner · <strong>{owner.display_name}</strong></span>
+                )}
+                <span className="bd2-header-meta-item">
+                  Onboarded {new Date(brand.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {daysSinceOnboarded != null && (
+                    <span style={{ color: 'var(--text-muted)' }}> · {daysSinceOnboarded} {daysSinceOnboarded === 1 ? 'day' : 'days'} ago</span>
+                  )}
+                </span>
+              </div>
+            </div>
+            <div className="bd2-header-actions">
+              {brand.status === 'active' && (canEditBrand || assigned.some((a) => a.id === uid)) && (
+                <button className="wx-btn wx-btn-ghost" onClick={() => setShowCreateTask(true)}>
+                  <PlusIcon width="14" height="14" /> New task
+                </button>
+              )}
+              {canEditBrand && (
+                <button className="wx-btn wx-btn-primary" onClick={() => setShowEdit(true)}>
+                  <PencilIcon width="14" height="14" /> Edit brand
+                </button>
+              )}
+              {canSwitchApc && (
+                <button className="wx-btn wx-btn-ghost" onClick={() => setShowSwitchApc(true)}
+                  title="Move this brand to a different APC (the brand's TL follows the new APC)">
+                  <UsersIcon width="14" height="14" /> Switch APC
+                </button>
+              )}
+            </div>
           </div>
+        </div>
 
-          <div className="bd-menu-heading">Sections</div>
-          <nav className="bd-menu">
-            {TAB_META
-              .filter((t) => {
-                if (t.key === 'activity') return showActivity;
-                if (t.key === 'settings') return showSettings;
-                return true;
-              })
-              .map(({ key, label, Icon }) => {
-                const count =
-                  key === 'tasks'     ? tasks.length
-                  : key === 'reports' ? reports.length
-                  : key === 'resources' ? resourceCount
-                  : null;
-                return (
-                  <button key={key} type="button" onClick={() => setTab(key)}
-                    className={`bd-menu-item ${tab === key ? 'is-active' : ''}`}>
-                    <Icon width="16" height="16" />
-                    <span>{label}</span>
-                    {count != null && count > 0
-                      ? <span className="bd-menu-count">{count}</span>
-                      : <span />}
-                  </button>
-                );
-              })}
-          </nav>
-        </aside>
+        {/* ---------- Horizontal tab strip ---------- */}
+        <nav className="bd2-tabs" role="tablist">
+          {TAB_META
+            .filter((t) => {
+              if (t.key === 'activity') return showActivity;
+              if (t.key === 'settings') return showSettings;
+              return true;
+            })
+            .map(({ key, label, Icon }) => {
+              const count =
+                key === 'tasks'     ? tasks.length
+                : key === 'reports' ? reports.length
+                : key === 'resources' ? resourceCount
+                : key === 'products' ? products.length
+                : null;
+              return (
+                <button key={key} type="button"
+                  role="tab" aria-selected={tab === key}
+                  onClick={() => setTab(key)}
+                  className={`bd2-tab ${tab === key ? 'is-active' : ''}`}>
+                  <Icon width="15" height="15" />
+                  <span>{label}</span>
+                  {count != null && count > 0 && (
+                    <span className="bd2-tab-count">{count}</span>
+                  )}
+                </button>
+              );
+            })}
+        </nav>
 
         <div className="bd-content">
           {tab === 'overview' && (
-            <OverviewPanel brand={brand} canEdit={canEditBrand} />
+            <OverviewPanel
+              brand={brand}
+              canEdit={canEditBrand}
+              owner={owner}
+              assigned={assigned}
+              gmv={brand.gmv}
+              productsCount={products.length}
+              openTaskCount={openTaskCount}
+              overdueCount={taskStats.overdue}
+              dueTodayCount={taskStats.dueToday}
+              reportsCount={reports.length}
+              openReportCount={openReportCount}
+            />
           )}
           {tab === 'tasks' && (
             <TasksPanel
@@ -343,65 +382,121 @@ export default function BrandDetailPage() {
 }
 
 // ============================================================
-function OverviewPanel({ brand, canEdit }) {
-  const owner = brand.owner;
-  const assigned = brand.assignedUsers || [];
+function OverviewPanel({
+  brand, canEdit, owner, assigned,
+  gmv, productsCount, openTaskCount, overdueCount, dueTodayCount,
+}) {
+  // Build the KPI tile list, skipping tiles we don't have data for.
+  const tiles = [];
+  if (gmv != null) {
+    tiles.push({
+      key: 'gmv', label: 'GMV · 30 day', value: formatMoney(gmv),
+      icon: 'bi-cash-stack', accent: '#0ea5e9',
+      foot: gmv === 0 ? 'No attributed sales yet' : null,
+    });
+  }
+  if (productsCount > 0) {
+    tiles.push({
+      key: 'products', label: 'Products live', value: productsCount,
+      icon: 'bi-box-seam', accent: '#10b981',
+    });
+  }
+  if (openTaskCount > 0 || overdueCount > 0 || dueTodayCount > 0) {
+    const foot = [];
+    if (overdueCount > 0)  foot.push(`${overdueCount} overdue`);
+    if (dueTodayCount > 0) foot.push(`${dueTodayCount} due today`);
+    tiles.push({
+      key: 'tasks', label: 'Open tasks', value: openTaskCount,
+      icon: 'bi-check2-square', accent: '#f59e0b',
+      foot: foot.join(' · ') || null,
+      footTone: overdueCount > 0 ? 'danger' : null,
+    });
+  }
+
+  const teamCount = assigned.length + (owner ? 1 : 0);
+
   return (
-    <div className="bd-grid">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="bd-card">
-          <div className="bd-card-title">About</div>
-          <dl className="bd-kv">
-            <dt>Client</dt><dd>{brand.client_name || '—'}</dd>
-            <dt>Tier</dt><dd>{brand.tier || '—'}</dd>
-            <dt>GMV (30-day)</dt><dd>{brand.gmv != null ? formatMoney(brand.gmv) : '—'}</dd>
-            <dt>Paid Collab</dt><dd>{paidCollabStatusLabel(brand.paid_collab_status)}</dd>
-            <dt>Status</dt><dd style={{ textTransform: 'capitalize' }}>{brand.status}</dd>
-            <dt>Created</dt><dd>{new Date(brand.created_at).toLocaleDateString()}</dd>
-          </dl>
-        </div>
-
-        <BrandCustomFieldsPanel brandId={brand.id} canEdit={canEdit} />
-      </div>
-
-      <div className="bd-card">
-        <div className="bd-card-title">Team ({assigned.length + (owner ? 1 : 0)})</div>
-        <div className="bd-team">
-          {owner && (
-            <div className="bd-team-row">
-              <Avatar user={owner} />
-              <div>
-                <div className="bd-team-name">{owner.display_name}</div>
-                <div className="bd-team-sub">Team Lead · owner</div>
+    <div className="bd2-overview">
+      {tiles.length > 0 && (
+        <div className="bd2-kpis">
+          {tiles.map((t) => (
+            <div key={t.key} className="bd2-kpi">
+              <div className="bd2-kpi-head">
+                <span className="bd2-kpi-icon" style={{
+                  background: `color-mix(in srgb, ${t.accent} 16%, transparent)`,
+                  color: t.accent,
+                }}>
+                  <i className={`bi ${t.icon}`} />
+                </span>
+                <span className="bd2-kpi-label">{t.label}</span>
               </div>
-              <span style={{
-                fontSize: 10.5, fontWeight: 800, padding: '2px 8px',
-                borderRadius: 999,
-                background: 'var(--accent-soft)', color: 'var(--accent)',
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-              }}>TL</span>
-            </div>
-          )}
-          {assigned.length === 0 && !owner && (
-            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              No team members assigned.
-            </div>
-          )}
-          {assigned.map((u) => (
-            <div key={u.id} className="bd-team-row">
-              <Avatar user={u} />
-              <div>
-                <div className="bd-team-name">{u.display_name}</div>
-                <div className="bd-team-sub">{u.role || 'member'}</div>
-              </div>
-              <span style={{
-                fontSize: 10.5, fontWeight: 700, padding: '2px 8px',
-                borderRadius: 999,
-                background: 'var(--surface-2)', color: 'var(--text-muted)',
-                textTransform: 'uppercase', letterSpacing: '0.05em',
-              }}>{u.role || '—'}</span>
+              <div className="bd2-kpi-value">{t.value}</div>
+              {t.foot && (
+                <div className={`bd2-kpi-foot ${t.footTone === 'danger' ? 'is-danger' : ''}`}>
+                  {t.foot}
+                </div>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      <div className="bd-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="bd-card">
+            <div className="bd-card-title">About</div>
+            <dl className="bd-kv">
+              <dt>Client</dt><dd>{brand.client_name || '—'}</dd>
+              <dt>Tier</dt><dd>{brand.tier || '—'}</dd>
+              <dt>GMV · 30 day</dt><dd>{brand.gmv != null ? formatMoney(brand.gmv) : '—'}</dd>
+              <dt>Paid Collab</dt><dd>{paidCollabStatusLabel(brand.paid_collab_status)}</dd>
+              <dt>Status</dt><dd style={{ textTransform: 'capitalize' }}>{brand.status}</dd>
+              <dt>Created</dt><dd>{new Date(brand.created_at).toLocaleDateString()}</dd>
+            </dl>
+          </div>
+
+          <BrandCustomFieldsPanel brandId={brand.id} canEdit={canEdit} />
+        </div>
+
+        <div className="bd-card">
+          <div className="bd-card-title">Team · {teamCount}</div>
+          <div className="bd-team">
+            {owner && (
+              <div className="bd-team-row">
+                <Avatar user={owner} />
+                <div>
+                  <div className="bd-team-name">{owner.display_name}</div>
+                  <div className="bd-team-sub">Team Lead · Owner</div>
+                </div>
+                <span style={{
+                  fontSize: 10.5, fontWeight: 800, padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}>TL</span>
+              </div>
+            )}
+            {assigned.length === 0 && !owner && (
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                No team members assigned.
+              </div>
+            )}
+            {assigned.map((u) => (
+              <div key={u.id} className="bd-team-row">
+                <Avatar user={u} />
+                <div>
+                  <div className="bd-team-name">{u.display_name}</div>
+                  <div className="bd-team-sub">{u.role || 'member'}</div>
+                </div>
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'var(--surface-2)', color: 'var(--text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}>{u.role || '—'}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
