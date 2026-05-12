@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  getBrandSections, addBrandSection, renameBrandSection, removeBrandSection,
+  getBrandSections, addBrandSectionRich, renameBrandSection,
+  removeBrandSection, updateBrandSectionFields, normalizeSection,
 } from '../../lib/brandReportSectionsApi';
 import {
   PlusIcon, PencilIcon, TrashIcon, AlertIcon,
@@ -9,36 +10,34 @@ import {
 
 /**
  * Brand Report Sections — management UI on the brand detail page.
- * Sections defined here auto-appear as long-form text fields in every
- * weekly / bi-weekly report for this brand. The author fills them
- * during report creation; values are stored per-report inside
- * data.customFields[sectionId].
+ * Sections defined here auto-appear in every weekly / bi-weekly report
+ * for this brand. Each section is one of two kinds:
+ *   - long_text: a free-form rich-text area (original behavior)
+ *   - table:     a fixed set of labelled inputs (text/number/url/
+ *                dropdown). Numbers automatically compare against the
+ *                previous week's value when the report form renders.
  *
- * Different from BrandReportLinksPanel: that panel is for static
- * link sets shared across reports. This panel is for free-text
- * sections whose VALUE varies per report.
+ * Values are still stored per-report in data.customFields[fieldId].
  */
 export default function BrandReportSectionsPanel({ brandId, brandName }) {
   const qc = useQueryClient();
   const [error, setError]                 = useState('');
   const [adding, setAdding]               = useState(false);
-  const [newName, setNewName]             = useState('');
+  const [editingFields, setEditingFields] = useState(null); // section id
 
-  const { data: sections = [], isPending: loading } = useQuery({
+  const { data: rawSections = [], isPending: loading } = useQuery({
     queryKey: ['brand-report-sections', brandId],
     queryFn: () => getBrandSections(brandId),
     enabled: !!brandId,
   });
+  const sections = rawSections.map(normalizeSection);
 
   function reload() { qc.invalidateQueries({ queryKey: ['brand-report-sections', brandId] }); }
 
-  async function handleAdd() {
-    const name = newName.trim();
-    if (!name) return;
+  async function handleAddRich(payload) {
     setError('');
     try {
-      await addBrandSection(brandId, name);
-      setNewName('');
+      await addBrandSectionRich(brandId, payload);
       setAdding(false);
       reload();
     } catch (err) { setError(err.message || 'Could not add section.'); }
@@ -55,11 +54,20 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
 
   async function handleRemove(section) {
     const ok = window.confirm(
-      `Remove section "${section.name}"?\n\nNew reports for this brand won't show this section anymore. Existing reports keep whatever value they already have.`
+      `Remove section "${section.name}"?\n\nNew reports for this brand won't show this section anymore. Existing reports keep whatever values they already have.`
     );
     if (!ok) return;
     try { await removeBrandSection(brandId, section.id); reload(); }
     catch (err) { setError(err.message || 'Remove failed.'); }
+  }
+
+  async function handleSaveFields(sectionId, fields) {
+    setError('');
+    try {
+      await updateBrandSectionFields(brandId, sectionId, fields);
+      setEditingFields(null);
+      reload();
+    } catch (err) { setError(err.message || 'Save failed.'); }
   }
 
   return (
@@ -69,13 +77,15 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
             Report Sections
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, maxWidth: 560 }}>
-            Add custom long-form sections (e.g. "Client Notes", "Roadmap Update") that auto-appear in every weekly and bi-weekly report for{' '}
-            <strong style={{ color: 'var(--text-secondary)' }}>{brandName}</strong>. Authors fill the value during each report.
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, maxWidth: 620 }}>
+            Custom sections that auto-appear in every weekly report for{' '}
+            <strong style={{ color: 'var(--text-secondary)' }}>{brandName}</strong>.
+            Choose a <strong>Long text</strong> section for free-form notes, or a{' '}
+            <strong>Table</strong> section to track labelled metrics (numbers, dropdowns, links) week over week.
           </div>
         </div>
         {!adding && (
-          <button className="wx-btn wx-btn-primary" onClick={() => { setAdding(true); setNewName(''); setError(''); }}>
+          <button className="wx-btn wx-btn-primary" onClick={() => { setAdding(true); setError(''); }}>
             <PlusIcon width="13" height="13" /> New section
           </button>
         )}
@@ -88,33 +98,9 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
       )}
 
       {adding && (
-        <div style={{
-          background: 'var(--accent-soft)',
-          border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-          borderRadius: 'var(--radius-md)',
-          padding: 14,
-          marginBottom: 14,
-        }}>
-          <label className="wx-label" style={{ marginBottom: 4 }}>Section name</label>
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8 }}>
-            This becomes a heading in every new report for this brand. e.g. "Client Notes", "Roadmap Update", "Risks & Blockers".
-          </div>
-          <input className="wx-input" autoFocus
-            placeholder="e.g. Client Notes"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }} />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
-            <button className="wx-btn wx-btn-ghost"
-              onClick={() => { setAdding(false); setNewName(''); }}>
-              Cancel
-            </button>
-            <button className="wx-btn wx-btn-primary"
-              onClick={handleAdd} disabled={!newName.trim()}>
-              <PlusIcon width="13" height="13" /> Add section
-            </button>
-          </div>
-        </div>
+        <NewSectionForm
+          onCancel={() => setAdding(false)}
+          onAdd={handleAddRich} />
       )}
 
       {loading ? (
@@ -128,32 +114,228 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sections.map((section) => (
             <div key={section.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
               padding: '10px 14px',
               background: 'var(--surface-2)',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
             }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', flex: 1, minWidth: 0 }}>
-                {section.name}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {section.name}
+                    </div>
+                    <KindBadge kind={section.kind} />
+                  </div>
+                  {section.kind === 'table' && (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                      {section.fields.length === 0
+                        ? 'No fields yet'
+                        : section.fields.map((f) => `${f.label} (${f.type})`).join(' · ')}
+                    </div>
+                  )}
+                </div>
+                {section.kind === 'table' && (
+                  <button className="wx-btn wx-btn-ghost"
+                    onClick={() => setEditingFields(editingFields === section.id ? null : section.id)}
+                    style={{ padding: '4px 8px', fontSize: 11.5 }} title="Edit fields">
+                    Edit fields
+                  </button>
+                )}
+                <button className="wx-btn wx-btn-ghost"
+                  onClick={() => handleRename(section)}
+                  style={{ padding: '4px 8px', fontSize: 11.5 }} title="Rename">
+                  <PencilIcon width="12" height="12" />
+                </button>
+                <button className="wx-btn wx-btn-ghost"
+                  onClick={() => handleRemove(section)}
+                  style={{ padding: '4px 8px', fontSize: 11.5, color: 'var(--danger)' }} title="Remove">
+                  <TrashIcon width="12" height="12" />
+                </button>
               </div>
-              {section.addedByName && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  added by {section.addedByName}
-                </span>
+              {editingFields === section.id && section.kind === 'table' && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>
+                  <FieldsEditor
+                    initialFields={section.fields}
+                    onCancel={() => setEditingFields(null)}
+                    onSave={(fields) => handleSaveFields(section.id, fields)} />
+                </div>
               )}
-              <button className="wx-btn wx-btn-ghost"
-                onClick={() => handleRename(section)}
-                style={{ padding: '4px 8px', fontSize: 11.5 }} title="Rename">
-                <PencilIcon width="12" height="12" />
-              </button>
-              <button className="wx-btn wx-btn-ghost"
-                onClick={() => handleRemove(section)}
-                style={{ padding: '4px 8px', fontSize: 11.5, color: 'var(--danger)' }} title="Remove">
-                <TrashIcon width="12" height="12" />
-              </button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+function KindBadge({ kind }) {
+  const isTable = kind === 'table';
+  return (
+    <span style={{
+      fontSize: 9.5, fontWeight: 800,
+      padding: '2px 7px', borderRadius: 999,
+      textTransform: 'uppercase', letterSpacing: '0.06em',
+      background: isTable ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--surface-3, var(--surface-2))',
+      color: isTable ? 'var(--accent)' : 'var(--text-muted)',
+    }}>
+      {isTable ? 'Table' : 'Long text'}
+    </span>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+function NewSectionForm({ onCancel, onAdd }) {
+  const [name, setName] = useState('');
+  const [kind, setKind] = useState('long_text');
+  const [fields, setFields] = useState([emptyField()]);
+
+  function emptyField() {
+    return { label: '', type: 'text', options: [] };
+  }
+
+  function submit() {
+    onAdd({
+      name,
+      kind,
+      fields: kind === 'table' ? fields : [],
+    });
+  }
+
+  const canSubmit = name.trim().length > 0
+    && (kind === 'long_text' || fields.some((f) => f.label.trim()));
+
+  return (
+    <div style={{
+      background: 'var(--accent-soft)',
+      border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+      borderRadius: 'var(--radius-md)',
+      padding: 14,
+      marginBottom: 14,
+    }}>
+      <label className="wx-label" style={{ marginBottom: 4 }}>Section name</label>
+      <input className="wx-input" autoFocus
+        placeholder='e.g. "Client Notes" or "Weekly Health Metrics"'
+        value={name} onChange={(e) => setName(e.target.value)} />
+
+      <label className="wx-label" style={{ marginTop: 14, marginBottom: 4 }}>Section type</label>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <KindOption
+          active={kind === 'long_text'}
+          title="Long text"
+          subtitle="Free-form notes / insights"
+          onClick={() => setKind('long_text')} />
+        <KindOption
+          active={kind === 'table'}
+          title="Table"
+          subtitle="Labelled inputs (numbers, dropdowns, etc.) compared week to week"
+          onClick={() => setKind('table')} />
+      </div>
+
+      {kind === 'table' && (
+        <div style={{ marginTop: 14 }}>
+          <label className="wx-label" style={{ marginBottom: 4 }}>Fields</label>
+          <FieldsEditor inline initialFields={fields} onChange={setFields} />
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        <button className="wx-btn wx-btn-ghost" onClick={onCancel}>Cancel</button>
+        <button className="wx-btn wx-btn-primary" onClick={submit} disabled={!canSubmit}>
+          <PlusIcon width="13" height="13" /> Add section
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KindOption({ active, title, subtitle, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{
+        flex: '1 1 220px', textAlign: 'left',
+        background: active ? 'var(--surface-1)' : 'transparent',
+        border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
+        borderRadius: 'var(--radius-md)',
+        padding: '10px 12px', cursor: 'pointer',
+      }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>
+    </button>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// FieldsEditor:
+//   - "inline" mode (used inside NewSectionForm) calls onChange on every
+//     edit and has no Save/Cancel — the outer form owns the state.
+//   - "saving" mode (used to edit fields on an existing section) keeps
+//     local state and shows Save / Cancel buttons.
+function FieldsEditor({ initialFields, onChange, onSave, onCancel, inline = false }) {
+  const [fields, setFields] = useState(() =>
+    (initialFields && initialFields.length > 0)
+      ? initialFields.map((f) => ({ ...f, options: [...(f.options || [])] }))
+      : [{ label: '', type: 'text', options: [] }]
+  );
+
+  function update(next) {
+    setFields(next);
+    if (inline && onChange) onChange(next);
+  }
+  function setField(i, patch) {
+    update(fields.map((f, idx) => idx === i ? { ...f, ...patch } : f));
+  }
+  function addRow() { update([...fields, { label: '', type: 'text', options: [] }]); }
+  function removeRow(i) { update(fields.filter((_, idx) => idx !== i)); }
+  function setOptionsText(i, text) {
+    const opts = text.split(',').map((o) => o.trim()).filter(Boolean);
+    setField(i, { options: opts });
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {fields.map((f, i) => (
+          <div key={i} style={{
+            display: 'grid',
+            gridTemplateColumns: '1.5fr 1fr 1.5fr auto',
+            gap: 8, alignItems: 'center',
+          }}>
+            <input className="wx-input" placeholder="Field label (e.g. Total Users)"
+              value={f.label} onChange={(e) => setField(i, { label: e.target.value })} />
+            <select className="wx-input" value={f.type}
+              onChange={(e) => setField(i, { type: e.target.value })}>
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="url">URL</option>
+              <option value="dropdown">Dropdown</option>
+            </select>
+            {f.type === 'dropdown' ? (
+              <input className="wx-input"
+                placeholder="Options, comma-separated (e.g. Green, Yellow, Red)"
+                value={(f.options || []).join(', ')}
+                onChange={(e) => setOptionsText(i, e.target.value)} />
+            ) : <span />}
+            <button className="wx-btn wx-btn-ghost" onClick={() => removeRow(i)}
+              disabled={fields.length === 1}
+              style={{ padding: '4px 8px', color: 'var(--danger)' }} title="Remove field">
+              <TrashIcon width="12" height="12" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button className="wx-btn wx-btn-ghost" onClick={addRow}
+        style={{ marginTop: 8, fontSize: 12 }}>
+        <PlusIcon width="12" height="12" /> Add field
+      </button>
+      {!inline && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+          <button className="wx-btn wx-btn-ghost" onClick={onCancel}>Cancel</button>
+          <button className="wx-btn wx-btn-primary" onClick={() => onSave(fields)}
+            disabled={!fields.some((f) => f.label.trim())}>
+            Save fields
+          </button>
         </div>
       )}
     </div>

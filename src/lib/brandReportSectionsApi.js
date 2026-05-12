@@ -33,16 +33,58 @@ async function writeSections(brandId, sections) {
   if (error) throw new Error(error.message);
 }
 
+// Field types allowed inside table-kind sections.
+export const FIELD_TYPES = ['text', 'number', 'url', 'dropdown'];
+
+// Normalize a section so older rows (which have no `kind`) read as
+// long-text. Field defs without an id get one. Dropdown options are
+// coerced to an array.
+export function normalizeSection(s) {
+  const kind = s.kind === 'table' ? 'table' : 'long_text';
+  const fields = Array.isArray(s.fields) ? s.fields.map((f) => ({
+    id: f.id || genId(),
+    label: String(f.label || '').trim(),
+    type: FIELD_TYPES.includes(f.type) ? f.type : 'text',
+    options: Array.isArray(f.options) ? f.options.map(String) : [],
+  })) : [];
+  return { ...s, kind, fields };
+}
+
 export async function addBrandSection(brandId, name, addedByName = '') {
-  const trimmed = (name || '').trim();
-  if (!brandId || !trimmed) throw new Error('Brand and section name are required.');
-  const sections = await getBrandSections(brandId);
-  if (sections.some((s) => (s.name || '').toLowerCase() === trimmed.toLowerCase())) {
+  return addBrandSectionRich(brandId, { name, kind: 'long_text' }, addedByName);
+}
+
+/**
+ * Add a section with full structure. `payload`:
+ *   { name, kind: 'table' | 'long_text', fields?: [{ label, type, options? }] }
+ * Returns the persisted section.
+ */
+export async function addBrandSectionRich(brandId, payload, addedByName = '') {
+  const name = (payload?.name || '').trim();
+  if (!brandId || !name) throw new Error('Brand and section name are required.');
+  const kind = payload?.kind === 'table' ? 'table' : 'long_text';
+  const fields = kind === 'table' && Array.isArray(payload.fields)
+    ? payload.fields.map((f) => ({
+        id: genId(),
+        label: String(f.label || '').trim(),
+        type: FIELD_TYPES.includes(f.type) ? f.type : 'text',
+        options: Array.isArray(f.options)
+          ? f.options.map((o) => String(o).trim()).filter(Boolean)
+          : [],
+      })).filter((f) => f.label)
+    : [];
+  if (kind === 'table' && fields.length === 0) {
+    throw new Error('A table section needs at least one field.');
+  }
+  const sections = (await getBrandSections(brandId)).map(normalizeSection);
+  if (sections.some((s) => (s.name || '').toLowerCase() === name.toLowerCase())) {
     throw new Error('A section with this name already exists for this brand.');
   }
   const section = {
     id: genId(),
-    name: trimmed,
+    name,
+    kind,
+    fields,
     addedByName: addedByName || '',
     addedAt: Date.now(),
   };
@@ -53,13 +95,36 @@ export async function addBrandSection(brandId, name, addedByName = '') {
 export async function renameBrandSection(brandId, sectionId, newName) {
   const trimmed = (newName || '').trim();
   if (!trimmed) throw new Error('Section name cannot be empty.');
-  const sections = await getBrandSections(brandId);
+  const sections = (await getBrandSections(brandId)).map(normalizeSection);
   const updated = sections.map((s) => (s.id === sectionId ? { ...s, name: trimmed } : s));
   await writeSections(brandId, updated);
 }
 
+/**
+ * Replace the field definitions on a table-kind section. Field ids of
+ * fields that survive a rename should be preserved by the caller so
+ * existing report values keep their link.
+ */
+export async function updateBrandSectionFields(brandId, sectionId, fields) {
+  const sections = (await getBrandSections(brandId)).map(normalizeSection);
+  const target = sections.find((s) => s.id === sectionId);
+  if (!target) throw new Error('Section not found.');
+  if (target.kind !== 'table') throw new Error('Only table sections have fields.');
+  const cleaned = (fields || []).map((f) => ({
+    id: f.id || genId(),
+    label: String(f.label || '').trim(),
+    type: FIELD_TYPES.includes(f.type) ? f.type : 'text',
+    options: Array.isArray(f.options)
+      ? f.options.map((o) => String(o).trim()).filter(Boolean)
+      : [],
+  })).filter((f) => f.label);
+  if (cleaned.length === 0) throw new Error('A table section needs at least one field.');
+  const updated = sections.map((s) => (s.id === sectionId ? { ...s, fields: cleaned } : s));
+  await writeSections(brandId, updated);
+}
+
 export async function removeBrandSection(brandId, sectionId) {
-  const sections = await getBrandSections(brandId);
+  const sections = (await getBrandSections(brandId)).map(normalizeSection);
   const updated = sections.filter((s) => s.id !== sectionId);
   await writeSections(brandId, updated);
 }

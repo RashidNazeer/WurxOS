@@ -1140,7 +1140,53 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         {(() => {
           const customEntries = Object.entries(report.customFields || {});
           const customNames = [];
-          const renderedCustom = customEntries.map(([fieldId, entry]) => {
+
+          // Group entries that came from a brand-defined TABLE section
+          // (kind: 'table' + sectionId) so they render as a single card
+          // with label/value rows, like the form. Everything else
+          // (legacy long-form custom fields and kind: 'long_text') keeps
+          // the previous one-card-per-entry behavior.
+          const tableGroups = new Map(); // sectionId -> { name, rows: [{fieldId, label, value, type}] }
+          const passthrough = [];
+          for (const [fieldId, entry] of customEntries) {
+            if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
+              if (!tableGroups.has(entry.sectionId)) {
+                tableGroups.set(entry.sectionId, { name: entry.sectionName || 'Section', rows: [] });
+              }
+              tableGroups.get(entry.sectionId).rows.push({
+                fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
+              });
+            } else {
+              passthrough.push([fieldId, entry]);
+            }
+          }
+
+          const renderedTables = [...tableGroups.entries()].map(([sectionId, group]) => {
+            customNames.push(group.name);
+            const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
+            if (nonEmpty.length === 0) return null;
+            return (
+              <ContentSection key={`tbl_${sectionId}`}
+                icon="bi-table"
+                color="#0ea5e9"
+                title={group.name}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 30%) 1fr', rowGap: 6, columnGap: 16 }}>
+                  {nonEmpty.map((r) => (
+                    <React.Fragment key={r.fieldId}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{r.label}</div>
+                      <div style={{ fontSize: '0.88rem', color: C.ink, wordBreak: 'break-word' }}>
+                        {r.type === 'url' && r.value
+                          ? <a href={String(r.value)} target="_blank" rel="noopener noreferrer">{String(r.value)}</a>
+                          : String(r.value)}
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </ContentSection>
+            );
+          });
+
+          const renderedCustom = passthrough.map(([fieldId, entry]) => {
             const name = typeof entry === 'object' ? entry?.name : 'Custom Field';
             const value = typeof entry === 'object' ? entry?.value : entry;
             const isEmpty = !value || (typeof value === 'string' && !value.trim()) || (isHtml(value) && !value.replace(/<[^>]+>/g, '').trim());
@@ -1171,6 +1217,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           ];
           return (
             <>
+              {renderedTables}
               {renderedCustom}
               <BrandReportLinks brandId={report.brandId} knownSectionNames={unmatchedKnown} />
             </>

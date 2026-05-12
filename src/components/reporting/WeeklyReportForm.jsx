@@ -18,6 +18,9 @@ import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
+import {
+  getBrandSections, normalizeSection,
+} from '../../lib/brandReportSectionsApi';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
@@ -283,6 +286,12 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const [detectingWeek, setDetectingWeek] = useState(false);
   const [aiLoading, setAiLoading] = useState({}); // per-section loading state
   const [customFieldDefs, setCustomFieldDefs] = useState([]); // [{id, name}]
+  // Per-brand custom sections defined on the Brand → Report Sections panel.
+  // Each section is either { kind: 'long_text', name } or
+  // { kind: 'table', name, fields: [{id,label,type,options}] }. Values
+  // live in data.customFields keyed by field id (table) or section id
+  // (long_text), so the View can render them via the existing path.
+  const [brandSectionDefs, setBrandSectionDefs] = useState([]);
   const [reportStatus, setReportStatus] = useState('draft');
   const [rejectionNote, setRejectionNote] = useState('');
   const [importing, setImporting] = useState(false);
@@ -328,6 +337,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     if (!currentUser?.uid) return;
     getUserCustomFields(currentUser.uid).then(setCustomFieldDefs).catch(() => {});
   }, [currentUser?.uid]);
+
+  // Load brand-level custom sections whenever the selected brand changes.
+  // Authors filling out the report see them right under the built-in
+  // sections. normalizeSection() upgrades pre-kind rows transparently.
+  useEffect(() => {
+    if (!selectedBrand?.id) { setBrandSectionDefs([]); return; }
+    let cancelled = false;
+    getBrandSections(selectedBrand.id)
+      .then((list) => { if (!cancelled) setBrandSectionDefs(list.map(normalizeSection)); })
+      .catch(() => { if (!cancelled) setBrandSectionDefs([]); });
+    return () => { cancelled = true; };
+  }, [selectedBrand?.id]);
 
   // When brand is selected: load reports, detect next week, advance step — all in one effect
   useEffect(() => {
@@ -1322,6 +1343,19 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       </div>
       )}
 
+      {/* ─── Brand Sections (custom per-brand, defined on the brand page) ── */}
+      {brandSectionDefs.length > 0 && (
+        <>
+          <SectionHeader icon="bi-pin-fill" title="Brand Sections" color="#0ea5e9" />
+          <BrandSectionsBlock
+            sections={brandSectionDefs}
+            data={data}
+            setData={setData}
+            previousReport={previousReport}
+          />
+        </>
+      )}
+
       {/* ─── Optional: Custom Fields (per user) ──────────────────────────── */}
       <div className="d-flex align-items-center justify-content-between mb-3 mt-4">
         <div className="d-flex align-items-center gap-2">
@@ -1433,5 +1467,177 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Brand-defined custom sections ─────────────────────────────────────────
+   Renders either a long-text card (RichTextEditor) or a table card with
+   labelled inputs. Numeric fields show a "Last week" hint when previous
+   data exists.
+
+   Storage shape inside data.customFields:
+     long_text: { [section.id]: { name, value, kind: 'long_text', source: 'brand' } }
+     table:     { [field.id]:   { name, value, kind: 'table', sectionId, sectionName, type, source: 'brand' } }
+   Both shapes coexist with the legacy user-level custom fields entries
+   (which never include `kind`). */
+function BrandSectionsBlock({ sections, data, setData, previousReport }) {
+  function setCustomEntry(id, entry) {
+    setData((d) => ({
+      ...d,
+      customFields: { ...(d.customFields || {}), [id]: entry },
+    }));
+  }
+
+  function getPrev(id, labelOrName) {
+    const prev = previousReport?.customFields || {};
+    const byId = prev[id];
+    if (byId) return byId;
+    if (labelOrName) {
+      const byName = Object.values(prev).find((v) =>
+        v && typeof v === 'object' && v.name === labelOrName);
+      if (byName) return byName;
+    }
+    return null;
+  }
+
+  return (
+    <>
+      {sections.map((section) => {
+        if (section.kind === 'table') {
+          return (
+            <div key={section.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+              <div className="card-body p-3">
+                <div className="fw-bold mb-3" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                  {section.name}
+                </div>
+                <div className="d-flex flex-column gap-3">
+                  {section.fields.map((field) => {
+                    const entry  = data.customFields?.[field.id];
+                    const value  = entry?.value ?? '';
+                    const prev   = getPrev(field.id, field.label);
+                    const prevValue = prev?.value ?? '';
+                    return (
+                      <BrandTableFieldRow
+                        key={field.id}
+                        field={field}
+                        value={value}
+                        prevValue={prevValue}
+                        onChange={(v) => setCustomEntry(field.id, {
+                          name: field.label,
+                          value: v,
+                          kind: 'table',
+                          sectionId: section.id,
+                          sectionName: section.name,
+                          type: field.type,
+                          source: 'brand',
+                        })}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        // long_text
+        const entry = data.customFields?.[section.id];
+        const value = typeof entry === 'string' ? entry : (entry?.value || '');
+        return (
+          <div key={section.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+            <div className="card-body p-3">
+              <div className="fw-bold mb-2" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                {section.name}
+              </div>
+              <RichTextEditor
+                value={value}
+                onChange={(v) => setCustomEntry(section.id, {
+                  name: section.name,
+                  value: v,
+                  kind: 'long_text',
+                  source: 'brand',
+                })}
+                minHeight={120}
+                placeholder={`Add notes for ${section.name}…`} />
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function BrandTableFieldRow({ field, value, prevValue, onChange }) {
+  const isNumber = field.type === 'number';
+  let delta = null;
+  if (isNumber && prevValue !== '' && prevValue != null && value !== '' && value != null) {
+    const a = Number(value), b = Number(prevValue);
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      const diff = a - b;
+      if (diff !== 0) delta = { diff, up: diff > 0 };
+    }
+  }
+  return (
+    <div>
+      <div className="d-flex align-items-center justify-content-between mb-1">
+        <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
+          {field.label}
+        </label>
+        {prevValue !== '' && prevValue != null && (
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            Last week: <strong style={{ color: 'var(--text-secondary)' }}>{String(prevValue)}</strong>
+            {delta && (
+              <span style={{
+                marginLeft: 6,
+                color: delta.up ? '#16a34a' : '#dc2626',
+                fontWeight: 700,
+              }}>
+                {delta.up ? '▲' : '▼'} {Math.abs(delta.diff).toLocaleString()}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+      <BrandFieldInput field={field} value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+function BrandFieldInput({ field, value, onChange }) {
+  const base = {
+    width: '100%',
+    padding: '8px 10px',
+    fontSize: '0.85rem',
+    border: '1px solid var(--border-default)',
+    borderRadius: 8,
+    background: 'var(--surface-1)',
+    color: 'var(--text-primary)',
+    outline: 'none',
+  };
+  if (field.type === 'dropdown') {
+    return (
+      <select style={base} value={value || ''} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— Select —</option>
+        {(field.options || []).map((opt) => (
+          <option key={opt} value={opt}>{opt}</option>
+        ))}
+      </select>
+    );
+  }
+  if (field.type === 'number') {
+    return (
+      <input type="number" style={base} value={value ?? ''} placeholder="0"
+        onChange={(e) => onChange(e.target.value)} />
+    );
+  }
+  if (field.type === 'url') {
+    return (
+      <input type="url" style={base} value={value ?? ''} placeholder="https://…"
+        onChange={(e) => onChange(e.target.value)} />
+    );
+  }
+  // text
+  return (
+    <input type="text" style={base} value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)} />
   );
 }
