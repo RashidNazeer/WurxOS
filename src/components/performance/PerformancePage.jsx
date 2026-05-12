@@ -768,7 +768,7 @@ function PillarBar({ pillar, score, weight, detail }) {
   const [open, setOpen] = useState(false);
   const hasDetail = !!detail;
   return (
-    <div className="rounded-3" style={{ background: '#fff', border: '1px solid #e9ecef', overflow: 'hidden' }}>
+    <div className="rounded-3" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
       <button
         type="button"
         onClick={() => hasDetail && setOpen((v) => !v)}
@@ -798,12 +798,12 @@ function PillarBar({ pillar, score, weight, detail }) {
             )}
           </div>
         </div>
-        <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || '#e9ecef', transition: 'width 0.4s' }} />
+        <div className="rounded-pill overflow-hidden" style={{ height: 6, background: 'var(--surface-2)' }}>
+          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || 'var(--border-default)', transition: 'width 0.4s' }} />
         </div>
       </button>
       {hasDetail && open && (
-        <div className="px-3 pb-3" style={{ borderTop: '1px solid #f3f4f6' }}>
+        <div className="px-3 pb-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <div className="pt-3">{detail}</div>
         </div>
       )}

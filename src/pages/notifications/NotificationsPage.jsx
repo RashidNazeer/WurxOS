@@ -6,6 +6,10 @@ import {
   CheckIcon, BellIcon, RefreshIcon, ReportIcon, MegaphoneIcon, StarIcon,
 } from '../../components/common/Icon';
 import '../../styles/notifications.css';
+// Needed for the .task-tabs / .task-tab / .task-tab-count pill styles
+// the All / Unread switcher reuses. Without this import the page
+// renders the tabs as unstyled buttons in dark mode.
+import '../../styles/tasks.css';
 
 const TABS = [
   { id: 'all',    label: 'All' },
@@ -21,11 +25,11 @@ const CATEGORY_LABEL = {
 };
 
 const CATEGORY_META = {
-  task:        { Icon: CheckIcon,     tone: 'task' },
-  report:      { Icon: ReportIcon,    tone: 'report' },
-  brand:       { Icon: StarIcon,      tone: 'brand' },
-  paid_collab: { Icon: MegaphoneIcon, tone: 'paid' },
-  system:      { Icon: BellIcon,      tone: 'system' },
+  task:        { Icon: CheckIcon,     tone: 'task',   bi: 'bi-check2-square' },
+  report:      { Icon: ReportIcon,    tone: 'report', bi: 'bi-file-earmark-text' },
+  brand:       { Icon: StarIcon,      tone: 'brand',  bi: 'bi-star-fill' },
+  paid_collab: { Icon: MegaphoneIcon, tone: 'paid',   bi: 'bi-megaphone-fill' },
+  system:      { Icon: BellIcon,      tone: 'system', bi: 'bi-bell-fill' },
 };
 
 export default function NotificationsPage() {
@@ -95,26 +99,31 @@ export default function NotificationsPage() {
           ))}
         </div>
         {categories.length > 1 && (
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => setCategoryFilter('all')}
               className={`wx-role-chip ${categoryFilter === 'all' ? 'wx-role-chip-active' : ''}`}
-              style={{ padding: '7px 14px' }}
+              style={{ padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
+              <i className="bi bi-grid-3x3-gap-fill" style={{ fontSize: '0.78rem' }} />
               All types
             </button>
-            {categories.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategoryFilter(c)}
-                className={`wx-role-chip ${categoryFilter === c ? 'wx-role-chip-active' : ''}`}
-                style={{ padding: '7px 14px' }}
-              >
-                {CATEGORY_LABEL[c] || c}
-              </button>
-            ))}
+            {categories.map((c) => {
+              const meta = CATEGORY_META[c];
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategoryFilter(c)}
+                  className={`wx-role-chip ${categoryFilter === c ? 'wx-role-chip-active' : ''}`}
+                  style={{ padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  {meta?.bi && <i className={`bi ${meta.bi}`} style={{ fontSize: '0.78rem' }} />}
+                  {CATEGORY_LABEL[c] || c}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

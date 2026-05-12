@@ -316,9 +316,12 @@ function MyPlanHero({ row, loading, month, name, role, onEdit }) {
         }}>
           <ShieldIcon width="22" height="22" style={{ color: 'var(--text-muted)' }} />
         </div>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>No incentive plan yet</div>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>No incentive plan yet</div>
         <div style={{ color: 'var(--text-muted)', fontSize: 12.5, marginTop: 4 }}>
           No plan has been set for {monthLabel(month)}.
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12.5, marginTop: 2 }}>
+          Operations Lead will update your incentives soon.
         </div>
       </div>
     );

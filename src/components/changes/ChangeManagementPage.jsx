@@ -586,9 +586,9 @@ export default function ChangeManagementPage() {
       {loading ? (
         <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16 }}>
-          <i className="bi bi-file-earmark-diff text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
-          <p className="text-muted mt-3 mb-0">{changes.length === 0 ? 'No change requests yet.' : 'No matching results.'}</p>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <i className="bi bi-file-earmark-diff text-muted" style={{ fontSize: '2.5rem', opacity: 0.55 }} />
+          <p className="mt-3 mb-0" style={{ color: 'var(--text-muted)' }}>{changes.length === 0 ? 'No change requests yet.' : 'No matching results.'}</p>
         </div>
       ) : (
         <div className="d-flex flex-column gap-2">

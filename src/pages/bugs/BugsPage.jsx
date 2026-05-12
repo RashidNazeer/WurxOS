@@ -134,13 +134,13 @@ export default function BugsPage() {
       </div>
 
       {isPending || isFetching ? (
-        <div style={{ padding: 30, textAlign: 'center', color: '#64748b' }}>
+        <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
           <span className="wx-spinner" /> Loading…
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', border: '1px dashed #e5e7eb', borderRadius: 10, background: '#fff' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: 10, background: 'var(--surface-1)' }}>
           <BugIcon width="28" height="28" />
-          <div style={{ marginTop: 8, fontWeight: 600, color: '#475569' }}>No bugs match.</div>
+          <div style={{ marginTop: 8, fontWeight: 600, color: 'var(--text-secondary)' }}>No bugs match.</div>
           <div style={{ marginTop: 2, fontSize: 13 }}>Report one with the button above.</div>
         </div>
       ) : (

@@ -991,11 +991,11 @@ export default function LeaveRequestPage() {
           {loading ? (
             <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
           ) : myFiltered.length === 0 ? (
-            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-              <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
-                <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
+            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+              <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
+                <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
               </div>
-              <p className="fw-semibold text-dark mb-1">{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'No matching requests' : 'No requests yet'}</p>
+              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'No matching requests' : 'No requests yet'}</p>
               <p className="text-muted small mb-0">{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'Try adjusting your filters.' : 'Submit your first request.'}</p>
             </div>
           ) : (

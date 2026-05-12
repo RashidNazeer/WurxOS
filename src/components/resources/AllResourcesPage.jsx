@@ -362,12 +362,12 @@ export default function AllResourcesPage() {
       ) : filtered.length === 0 ? (
         <div
           className="d-flex flex-column align-items-center justify-content-center py-5"
-          style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}
+          style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}
         >
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
-            <i className="bi bi-collection text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
+            <i className="bi bi-collection text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
             {hasFilters ? 'No resources match your filters' : 'No resources yet'}
           </p>
           <p className="text-muted small mb-0">
