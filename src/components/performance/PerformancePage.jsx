@@ -36,7 +36,7 @@ const METRICS = [
     description: 'How organized and process-driven the person is — following SOPs, keeping their work area tidy, and managing their day without constant supervision.' },
   { key: 'responseTime',      label: 'Response Time',         icon: 'bi-chat-dots',
     description: 'How quickly they reply to messages, brand requests, and team pings on Discord/chat during their working hours.' },
-  { key: 'tasksProcessing',   label: 'Tasks Processing',      icon: 'bi-list-task',
+  { key: 'tasksProcessing',   label: 'Efficiency',             icon: 'bi-list-task',
     description: 'Speed and efficiency of getting through assigned tasks — finishing what is on the plate vs. letting items pile up.' },
 ];
 
