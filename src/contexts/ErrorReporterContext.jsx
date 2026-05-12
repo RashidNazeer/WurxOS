@@ -35,6 +35,34 @@ function extractMessage(err) {
   try { return JSON.stringify(err); } catch { return 'Unknown error'; }
 }
 
+// Stale-deploy detector. After we redeploy, users who had the old
+// index.html in memory still reference content-hashed asset filenames
+// that no longer exist on the CDN. The fix is a hard reload — the
+// browser fetches the fresh index.html which points to the new
+// filenames. We do this transparently instead of showing the user a
+// scary "DM Mr Rashid" modal, since this is a transient state, not a
+// bug. sessionStorage guards against an infinite reload loop if the
+// asset is genuinely unreachable (network down, etc.).
+const STALE_DEPLOY_PATTERNS = [
+  /Unable to preload CSS/i,
+  /Failed to fetch dynamically imported module/i,
+  /Importing a module script failed/i,
+  /ChunkLoadError/i,
+  /Loading chunk \d+ failed/i,
+  /error loading dynamically imported module/i,
+];
+function isStaleDeployError(msg) {
+  return STALE_DEPLOY_PATTERNS.some((re) => re.test(msg));
+}
+function handleStaleDeploy() {
+  let alreadyReloaded = null;
+  try { alreadyReloaded = sessionStorage.getItem('chunk-reload-pending'); } catch {}
+  if (alreadyReloaded) return false; // already tried once — let the error surface
+  try { sessionStorage.setItem('chunk-reload-pending', '1'); } catch {}
+  if (typeof window !== 'undefined') window.location.reload();
+  return true;
+}
+
 function extractDetails(err) {
   const out = { message: extractMessage(err) };
   if (err?.stack) out.stack = String(err.stack);
@@ -84,11 +112,14 @@ export function ErrorReporterProvider({ children }) {
       const r = e.reason;
       const msg = extractMessage(r);
       if (/AbortError|ResizeObserver loop|cancell?ed/i.test(msg)) return;
+      // Stale-deploy: silently reload instead of showing the modal.
+      if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(r, 'unhandled_rejection');
     };
     const onError = (e) => {
       const msg = String(e?.message || '');
       if (/ResizeObserver loop|Script error/i.test(msg)) return;
+      if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(e?.error || e, 'window_error');
     };
     window.addEventListener('unhandledrejection', onRejection);

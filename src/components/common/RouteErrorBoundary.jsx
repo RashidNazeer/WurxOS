@@ -7,7 +7,23 @@ import { supabase } from '../../lib/supabase';
  * On an error we surface a friendly "Sorry — please DM Mr Rashid"
  * card (matching the global ErrorReporterContext modal) AND log the
  * full stack to app_events for later forensics.
+ *
+ * Exception: stale-deploy errors (asset filenames that no longer exist
+ * after a redeploy) get a silent one-shot reload instead of the modal,
+ * because they're transient state, not a real bug.
  */
+const STALE_DEPLOY_RE = /Unable to preload CSS|Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk \d+ failed|error loading dynamically imported module/i;
+function tryStaleDeployReload(err) {
+  const msg = String(err?.message || err || '');
+  if (!STALE_DEPLOY_RE.test(msg)) return false;
+  let alreadyReloaded = null;
+  try { alreadyReloaded = sessionStorage.getItem('chunk-reload-pending'); } catch {}
+  if (alreadyReloaded) return false;
+  try { sessionStorage.setItem('chunk-reload-pending', '1'); } catch {}
+  if (typeof window !== 'undefined') window.location.reload();
+  return true;
+}
+
 export default class RouteErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -15,10 +31,12 @@ export default class RouteErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
+    if (tryStaleDeployReload(error)) return null;
     return { error };
   }
 
   componentDidCatch(error, info) {
+    if (tryStaleDeployReload(error)) return;
     try {
       supabase.auth.getUser().then(async ({ data }) => {
         const uid = data?.user?.id;
