@@ -908,7 +908,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           <i className="bi bi-arrow-left me-1" /> {editReportId ? 'Cancel editing' : 'Back to reports'}
         </button>
       )}
-      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2"
+        style={{
+          position: 'sticky', top: 68, zIndex: 4,
+          background: 'var(--surface-2)',
+          borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px 28px', margin: '0 -28px 16px',
+        }}>
         <div>
           <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
             {editReportId ? 'Edit' : 'New'} Bi-Weekly Report

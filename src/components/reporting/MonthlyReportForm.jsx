@@ -660,7 +660,13 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
   return (
     <div>
-      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
+        style={{
+          position: 'sticky', top: 68, zIndex: 4,
+          background: 'var(--surface-2)',
+          borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px 28px', margin: '0 -28px 16px',
+        }}>
         <div>
           <button className="btn btn-sm btn-link text-muted p-0 mb-1 d-block"
             onClick={() => onCancel ? onCancel() : setStep(0)}>
