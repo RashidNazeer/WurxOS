@@ -1209,16 +1209,16 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <Field label="MTD Approved (Samples Month-to-Date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
             <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px" />
           </div>
-          <InsightArea value={data.overallInsights} onChange={v => setData(d => ({ ...d, overallInsights: v }))}
-            loading={!!aiLoading.overall || !!aiLoading.all}
-            onGenerate={() => runAi('overall', generateOverallInsight, 'overallInsights')} />
           <BuiltinExtras sectionKey="overallPerformance" sectionTitle="Overall Performance"
             fields={brandSectionExtras.overallPerformance || []}
-            data={data} setData={setData}
+            data={data} setData={setData} curSym={curSym}
             previousReport={previousReport}
             disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('overallPerformance', f)}
             onRemoveField={(id) => removeExtraField('overallPerformance', id)} />
+          <InsightArea value={data.overallInsights} onChange={v => setData(d => ({ ...d, overallInsights: v }))}
+            loading={!!aiLoading.overall || !!aiLoading.all}
+            onGenerate={() => runAi('overall', generateOverallInsight, 'overallInsights')} />
         </div>
       </div>
       )}
@@ -1238,14 +1238,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
               { key: 'notes', label: 'Notes', width: '140px' },
             ]} />
-          <InsightArea value={data.topCreatorsInsights} onChange={v => setData(d => ({ ...d, topCreatorsInsights: v }))}
-            loading={!!aiLoading.creators || !!aiLoading.all}
-            onGenerate={() => runAi('creators', generateCreatorsInsight, 'topCreatorsInsights')} />
           <BuiltinExtras sectionKey="topCreators" sectionTitle="Top Creators"
-            fields={brandSectionExtras.topCreators || []} data={data} setData={setData}
+            fields={brandSectionExtras.topCreators || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('topCreators', f)}
             onRemoveField={(id) => removeExtraField('topCreators', id)} />
+          <InsightArea value={data.topCreatorsInsights} onChange={v => setData(d => ({ ...d, topCreatorsInsights: v }))}
+            loading={!!aiLoading.creators || !!aiLoading.all}
+            onGenerate={() => runAi('creators', generateCreatorsInsight, 'topCreatorsInsights')} />
         </div>
       </div>
       )}
@@ -1267,14 +1267,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               { key: 'productClicks', label: 'Product Clicks', width: '110px', placeholder: '3.97K or 3970' },
               { key: 'notes', label: 'Notes', width: '120px' },
             ]} />
-          <InsightArea value={data.topVideosInsights} onChange={v => setData(d => ({ ...d, topVideosInsights: v }))}
-            loading={!!aiLoading.videos || !!aiLoading.all}
-            onGenerate={() => runAi('videos', generateVideosInsight, 'topVideosInsights')} />
           <BuiltinExtras sectionKey="topVideos" sectionTitle="Top Videos"
-            fields={brandSectionExtras.topVideos || []} data={data} setData={setData}
+            fields={brandSectionExtras.topVideos || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('topVideos', f)}
             onRemoveField={(id) => removeExtraField('topVideos', id)} />
+          <InsightArea value={data.topVideosInsights} onChange={v => setData(d => ({ ...d, topVideosInsights: v }))}
+            loading={!!aiLoading.videos || !!aiLoading.all}
+            onGenerate={() => runAi('videos', generateVideosInsight, 'topVideosInsights')} />
         </div>
       </div>
       )}
@@ -1296,14 +1296,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
               { key: 'notes', label: 'Notes', width: '140px' },
             ]} />
-          <InsightArea value={data.gmvMaxInsights} onChange={v => setData(d => ({ ...d, gmvMaxInsights: v }))}
-            loading={!!aiLoading.gmvMax || !!aiLoading.all}
-            onGenerate={() => runAi('gmvMax', generateGmvMaxInsight, 'gmvMaxInsights')} />
           <BuiltinExtras sectionKey="gmvMax" sectionTitle="GMV Max Performance"
-            fields={brandSectionExtras.gmvMax || []} data={data} setData={setData}
+            fields={brandSectionExtras.gmvMax || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('gmvMax', f)}
             onRemoveField={(id) => removeExtraField('gmvMax', id)} />
+          <InsightArea value={data.gmvMaxInsights} onChange={v => setData(d => ({ ...d, gmvMaxInsights: v }))}
+            loading={!!aiLoading.gmvMax || !!aiLoading.all}
+            onGenerate={() => runAi('gmvMax', generateGmvMaxInsight, 'gmvMaxInsights')} />
         </div>
       </div>
       )}
@@ -1324,14 +1324,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               { key: 'newVideos', label: 'New Videos', type: 'number', width: '90px' },
               { key: 'notes', label: 'Notes', width: '130px' },
             ]} />
-          <InsightArea value={data.productHighlightsInsights} onChange={v => setData(d => ({ ...d, productHighlightsInsights: v }))}
-            loading={!!aiLoading.products || !!aiLoading.all}
-            onGenerate={() => runAi('products', generateProductsInsight, 'productHighlightsInsights')} />
           <BuiltinExtras sectionKey="productHighlights" sectionTitle="Product Highlights"
-            fields={brandSectionExtras.productHighlights || []} data={data} setData={setData}
+            fields={brandSectionExtras.productHighlights || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('productHighlights', f)}
             onRemoveField={(id) => removeExtraField('productHighlights', id)} />
+          <InsightArea value={data.productHighlightsInsights} onChange={v => setData(d => ({ ...d, productHighlightsInsights: v }))}
+            loading={!!aiLoading.products || !!aiLoading.all}
+            onGenerate={() => runAi('products', generateProductsInsight, 'productHighlightsInsights')} />
         </div>
       </div>
       )}
@@ -1347,14 +1347,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <Field label={`TikTok Shop GMV (${curSym})`} value={data.offsitePerformance.tiktokShopGmv} onChange={v => setOffsite('tiktokShopGmv', v)} type="number" placeholder="55834.62" />
             <Field label="Off-site Effect (%)" value={data.offsitePerformance.offsiteEffect} onChange={v => setOffsite('offsiteEffect', v)} type="number" placeholder="3.09" />
           </div>
-          <InsightArea value={data.offsiteInsights} onChange={v => setData(d => ({ ...d, offsiteInsights: v }))}
-            loading={!!aiLoading.offsite || !!aiLoading.all}
-            onGenerate={() => runAi('offsite', generateOffsiteInsight, 'offsiteInsights')} />
           <BuiltinExtras sectionKey="offsitePerformance" sectionTitle="Offsite Performance"
-            fields={brandSectionExtras.offsitePerformance || []} data={data} setData={setData}
+            fields={brandSectionExtras.offsitePerformance || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('offsitePerformance', f)}
             onRemoveField={(id) => removeExtraField('offsitePerformance', id)} />
+          <InsightArea value={data.offsiteInsights} onChange={v => setData(d => ({ ...d, offsiteInsights: v }))}
+            loading={!!aiLoading.offsite || !!aiLoading.all}
+            onGenerate={() => runAi('offsite', generateOffsiteInsight, 'offsiteInsights')} />
         </div>
       </div>
       )}
@@ -1377,7 +1377,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             minHeight={140}
             placeholder="List any upcoming campaigns, launches or planned promotions" />
           <BuiltinExtras sectionKey="upcomingCampaigns" sectionTitle="Current & Upcoming Campaigns"
-            fields={brandSectionExtras.upcomingCampaigns || []} data={data} setData={setData}
+            fields={brandSectionExtras.upcomingCampaigns || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('upcomingCampaigns', f)}
             onRemoveField={(id) => removeExtraField('upcomingCampaigns', id)} />
@@ -1403,7 +1403,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             minHeight={140}
             placeholder="Describe the workflow and operational tasks completed this week" />
           <BuiltinExtras sectionKey="operationalUpdates" sectionTitle="Operational Updates"
-            fields={brandSectionExtras.operationalUpdates || []} data={data} setData={setData}
+            fields={brandSectionExtras.operationalUpdates || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('operationalUpdates', f)}
             onRemoveField={(id) => removeExtraField('operationalUpdates', id)} />
@@ -1429,7 +1429,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             minHeight={160}
             placeholder="Share your recommendations and action items for next steps" />
           <BuiltinExtras sectionKey="recommendations" sectionTitle="Recommendations & Action Items"
-            fields={brandSectionExtras.recommendations || []} data={data} setData={setData}
+            fields={brandSectionExtras.recommendations || []} data={data} setData={setData} curSym={curSym}
             previousReport={previousReport} disabled={!selectedBrand?.id}
             onAddField={(f) => addExtraField('recommendations', f)}
             onRemoveField={(id) => removeExtraField('recommendations', id)} />
@@ -1708,19 +1708,12 @@ function BrandTableFieldRow({ field, value, prevValue, onChange }) {
 }
 
 function BrandFieldInput({ field, value, onChange }) {
-  const base = {
-    width: '100%',
-    padding: '8px 10px',
-    fontSize: '0.85rem',
-    border: '1px solid var(--border-default)',
-    borderRadius: 8,
-    background: 'var(--surface-1)',
-    color: 'var(--text-primary)',
-    outline: 'none',
-  };
+  // Use bootstrap classes so inputs match the built-in Field component's
+  // height, padding, focus ring, and dark-mode styling.
   if (field.type === 'dropdown') {
     return (
-      <select style={base} value={value || ''} onChange={(e) => onChange(e.target.value)}>
+      <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+        value={value || ''} onChange={(e) => onChange(e.target.value)}>
         <option value="">— Select —</option>
         {(field.options || []).map((opt) => (
           <option key={opt} value={opt}>{opt}</option>
@@ -1728,33 +1721,40 @@ function BrandFieldInput({ field, value, onChange }) {
       </select>
     );
   }
-  if (field.type === 'number') {
+  // Numeric and currency reuse the same paste-friendly text/decimal mode
+  // as the built-in Field — type="number" would silently reject "$1,234".
+  if (field.type === 'number' || field.type === 'currency') {
     return (
-      <input type="number" style={base} value={value ?? ''} placeholder="0"
-        onChange={(e) => onChange(e.target.value)} />
+      <input type="text" inputMode="decimal"
+        className="form-control form-control-sm" style={{ borderRadius: 8 }}
+        placeholder="0" value={value ?? ''}
+        onChange={(e) => onChange(cleanNumericInput(e.target.value))} />
     );
   }
   if (field.type === 'url') {
     return (
-      <input type="url" style={base} value={value ?? ''} placeholder="https://…"
+      <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+        placeholder="https://…" value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} />
     );
   }
   // text
   return (
-    <input type="text" style={base} value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)} />
+    <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+      value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
   );
 }
 
 /* ── Built-in section extras ───────────────────────────────────────────────
-   Inline UI under each built-in section. Renders any persisted extra
-   fields (label + typed input + last-week hint) and an "+ Add field"
-   action that writes the new field def back to the brand template so
-   future weekly reports inherit it. */
+   Inline UI inside each built-in section. Each saved field renders as
+   a Field-sized cell in the same flex-wrap row as the built-in inputs,
+   so adding "Total Ad Spend" lands next to "MTD Approved" / "Total
+   Videos" instead of in a separate block below. An "+ Add field" pill
+   sits at the end of the row. Numeric and currency fields show a
+   "Last week: X ▲/▼" hint when previous data exists. */
 function BuiltinExtras({
   sectionKey, sectionTitle, fields, data, setData, previousReport,
-  disabled, onAddField, onRemoveField,
+  disabled, onAddField, onRemoveField, curSym,
 }) {
   const [adding, setAdding] = useState(false);
 
@@ -1797,71 +1797,88 @@ function BuiltinExtras({
     catch (err) { alert(err?.message || 'Could not remove the field.'); }
   }
 
+  // Nothing to show and no add-mode pending: just the "Add field" pill.
+  const hasFields = fields.length > 0;
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border-subtle)' }}>
-      <div className="d-flex align-items-center justify-content-between mb-2">
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-          Additional fields
+    <>
+      {hasFields && (
+        <div className="d-flex flex-wrap gap-2 mb-2">
+          {fields.map((f) => {
+            const entry = data.customFields?.[f.id];
+            const value = entry?.value ?? '';
+            const prev  = getPrev(f.id, f.label);
+            const prevValue = prev?.value ?? '';
+            const labelWithCurrency = f.type === 'currency' ? `${f.label} (${curSym})` : f.label;
+            return (
+              <ExtraFieldCell key={f.id}
+                field={f}
+                labelText={labelWithCurrency}
+                value={value}
+                prevValue={prevValue}
+                onChange={(v) => setValue(f.id, f.label, f.type, v)}
+                onRemove={() => handleRemove(f)} />
+            );
+          })}
         </div>
-        {!adding && (
-          <button type="button"
-            className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.72rem' }}
-            disabled={disabled}
-            title={disabled ? 'Select a brand first' : ''}
-            onClick={() => setAdding(true)}>
-            <i className="bi bi-plus-circle" /> Add field
-          </button>
-        )}
-      </div>
+      )}
 
-      {adding && (
+      {adding ? (
         <AddFieldInline
           onCancel={() => setAdding(false)}
           onSave={async (def) => {
-            try {
-              await onAddField(def);
-              setAdding(false);
-            } catch (err) {
-              alert(err?.message || 'Could not save the field.');
-            }
+            try { await onAddField(def); setAdding(false); }
+            catch (err) { alert(err?.message || 'Could not save the field.'); }
           }} />
+      ) : (
+        <button type="button"
+          className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+          style={{ borderRadius: 8, fontSize: '0.72rem', borderStyle: 'dashed' }}
+          disabled={disabled}
+          title={disabled ? 'Select a brand first' : 'Add a custom field to this section'}
+          onClick={() => setAdding(true)}>
+          <i className="bi bi-plus-circle" /> Add field
+        </button>
       )}
+    </>
+  );
+}
 
-      {fields.length > 0 && (
-        <div className="d-flex flex-column gap-3 mt-2">
-          {fields.map((f) => {
-            const entry  = data.customFields?.[f.id];
-            const value  = entry?.value ?? '';
-            const prev   = getPrev(f.id, f.label);
-            const prevValue = prev?.value ?? '';
-            return (
-              <div key={f.id}>
-                <div className="d-flex align-items-center justify-content-between mb-1">
-                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
-                    {f.label}
-                  </label>
-                  <div className="d-flex align-items-center gap-2">
-                    {prevValue !== '' && prevValue != null && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        Last week: <strong style={{ color: 'var(--text-secondary)' }}>{String(prevValue)}</strong>
-                        <NumericDelta cur={value} prev={prevValue} type={f.type} />
-                      </span>
-                    )}
-                    <button type="button" className="btn btn-sm btn-light border-0 text-danger"
-                      style={{ padding: '2px 8px', fontSize: '0.68rem' }}
-                      onClick={() => handleRemove(f)}
-                      title="Remove this field">
-                      <i className="bi bi-trash3" />
-                    </button>
-                  </div>
-                </div>
-                <BrandFieldInput field={f} value={value}
-                  onChange={(v) => setValue(f.id, f.label, f.type, v)} />
-              </div>
-            );
-          })}
+/* A single Field-shaped cell that also surfaces the "Last week" hint
+   and a small remove button on hover. Sizing matches the built-in
+   Field component (flex: 1 1 140px; min-width: 100px) so extras pack
+   tightly into the same row as Orders / Samples Approved / etc. */
+function ExtraFieldCell({ field, labelText, value, prevValue, onChange, onRemove }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ flex: '1 1 140px', minWidth: 120, position: 'relative' }}>
+      <div className="d-flex align-items-center justify-content-between mb-1" style={{ gap: 6 }}>
+        <label className="form-label mb-0" style={{
+          fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {labelText}
+        </label>
+        <button type="button"
+          onClick={onRemove}
+          title="Remove this field"
+          style={{
+            background: 'transparent', border: 0, padding: 0,
+            color: 'var(--text-muted)', cursor: 'pointer',
+            fontSize: '0.7rem', lineHeight: 1,
+            opacity: hover ? 1 : 0,
+            transition: 'opacity 120ms',
+          }}>
+          <i className="bi bi-x-lg" />
+        </button>
+      </div>
+      <BrandFieldInput field={field} value={value} onChange={onChange} />
+      {prevValue !== '' && prevValue != null && (
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 2 }}>
+          Last week: <strong style={{ color: 'var(--text-secondary)' }}>{String(prevValue)}</strong>
+          <NumericDelta cur={value} prev={prevValue} type={field.type} />
         </div>
       )}
     </div>
@@ -1869,7 +1886,7 @@ function BuiltinExtras({
 }
 
 function NumericDelta({ cur, prev, type }) {
-  if (type !== 'number') return null;
+  if (type !== 'number' && type !== 'currency') return null;
   if (cur === '' || cur == null || prev === '' || prev == null) return null;
   const a = Number(cur), b = Number(prev);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
@@ -1905,6 +1922,7 @@ function AddFieldInline({ onCancel, onSave }) {
           onChange={(e) => setType(e.target.value)}>
           <option value="text">Text</option>
           <option value="number">Number</option>
+          <option value="currency">Currency</option>
           <option value="url">URL</option>
           <option value="dropdown">Dropdown</option>
         </select>
@@ -2007,6 +2025,7 @@ function AddCustomSectionInline({ disabled, onAdd }) {
                 onChange={(e) => setFields((cur) => cur.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))}>
                 <option value="text">Text</option>
                 <option value="number">Number</option>
+                <option value="currency">Currency</option>
                 <option value="url">URL</option>
                 <option value="dropdown">Dropdown</option>
               </select>

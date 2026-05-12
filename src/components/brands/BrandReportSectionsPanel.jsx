@@ -308,6 +308,7 @@ function FieldsEditor({ initialFields, onChange, onSave, onCancel, inline = fals
               onChange={(e) => setField(i, { type: e.target.value })}>
               <option value="text">Text</option>
               <option value="number">Number</option>
+              <option value="currency">Currency</option>
               <option value="url">URL</option>
               <option value="dropdown">Dropdown</option>
             </select>

@@ -89,7 +89,7 @@ export async function removeBrandSectionExtraField(brandId, sectionKey, fieldId)
 }
 
 // Field types allowed inside table-kind sections.
-export const FIELD_TYPES = ['text', 'number', 'url', 'dropdown'];
+export const FIELD_TYPES = ['text', 'number', 'currency', 'url', 'dropdown'];
 
 // Normalize a section so older rows (which have no `kind`) read as
 // long-text. Field defs without an id get one. Dropdown options are

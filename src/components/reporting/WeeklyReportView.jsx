@@ -1183,16 +1183,24 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                 color="#0ea5e9"
                 title={group.name}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 30%) 1fr', rowGap: 6, columnGap: 16 }}>
-                  {nonEmpty.map((r) => (
-                    <React.Fragment key={r.fieldId}>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{r.label}</div>
-                      <div style={{ fontSize: '0.88rem', color: C.ink, wordBreak: 'break-word' }}>
-                        {r.type === 'url' && r.value
-                          ? <a href={String(r.value)} target="_blank" rel="noopener noreferrer">{String(r.value)}</a>
-                          : String(r.value)}
-                      </div>
-                    </React.Fragment>
-                  ))}
+                  {nonEmpty.map((r) => {
+                    const curSym = report?.currencySymbol || report?.currency || '';
+                    let display;
+                    if (r.type === 'url' && r.value) {
+                      display = <a href={String(r.value)} target="_blank" rel="noopener noreferrer">{String(r.value)}</a>;
+                    } else if (r.type === 'currency') {
+                      const n = Number(r.value);
+                      display = Number.isFinite(n) ? `${curSym}${n.toLocaleString()}` : String(r.value);
+                    } else {
+                      display = String(r.value);
+                    }
+                    return (
+                      <React.Fragment key={r.fieldId}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{r.label}</div>
+                        <div style={{ fontSize: '0.88rem', color: C.ink, wordBreak: 'break-word' }}>{display}</div>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </ContentSection>
             );
