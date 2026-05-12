@@ -52,14 +52,19 @@ function MetricInfoTip({ text }) {
       aria-label={text}
       style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'help', outline: 'none' }}>
       <i className="bi bi-info-circle" style={{ color: '#94a3b8', fontSize: '0.72rem' }} />
+      {/* Anchor the tooltip's left edge to the icon and let it grow to
+          the right. A previous centered-and-translateX layout overflowed
+          left when the icon was near a panel/viewport edge, getting
+          clipped. Left-anchored + min(viewport-aware width) keeps the
+          full text on-screen regardless of where the icon sits. */}
       <span className="wx-metric-tip" role="tooltip"
         style={{
-          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
-          transform: 'translateX(-50%)',
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
           background: '#0f172a', color: '#fff',
           padding: '8px 10px', borderRadius: 8,
           fontSize: '0.72rem', lineHeight: 1.45, fontWeight: 400,
-          width: 240, textAlign: 'left',
+          width: 'max-content', maxWidth: 'min(320px, calc(100vw - 32px))',
+          textAlign: 'left',
           boxShadow: '0 8px 24px rgba(15,23,42,0.25)',
           opacity: 0, visibility: 'hidden',
           transition: 'opacity 0.12s ease',

@@ -61,13 +61,20 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
     };
   }, [menuOpen]);
 
-  // Position the fixed-position menu under the pill
+  // Position the fixed-position menu under the pill — but flip above
+  // when there isn't enough room below (last task in a long list).
   useLayoutEffect(() => {
     if (!menuOpen || !pillRef.current) return;
     const r = pillRef.current.getBoundingClientRect();
     const menuWidth = 180;
+    const menuHeight = 140; // 3 items × ~36px + padding/border
+    const gap = 6;
     const left = Math.min(window.innerWidth - menuWidth - 8, r.right - menuWidth);
-    setMenuPos({ top: r.bottom + 6, left: Math.max(8, left), width: menuWidth });
+    const spaceBelow = window.innerHeight - r.bottom;
+    const top = spaceBelow >= menuHeight + gap
+      ? r.bottom + gap
+      : Math.max(8, r.top - menuHeight - gap);
+    setMenuPos({ top, left: Math.max(8, left), width: menuWidth });
   }, [menuOpen]);
 
   async function setStatus(newStatus, { notify = false } = {}) {
