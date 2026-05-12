@@ -1231,6 +1231,10 @@ export default function ReportView({ report, allReports = [], previousReport, on
               if (!groups.has(key)) groups.set(key, { name: entry.sectionName || 'Section', rows: [] });
               groups.get(key).rows.push({ fid, label: entry.name || '—', value: entry.value, type: entry.type || 'text' });
             } else if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra' && entry.sectionKey) {
+              // Built-in extras render inline within their parent
+              // section in the new WeeklyReportView. The legacy view
+              // doesn't have that hero-grid layout, so fall through to
+              // a generic label/value card here.
               const key = `bx:${entry.sectionKey}`;
               if (!groups.has(key)) groups.set(key, { name: `${entry.sectionTitle || entry.sectionKey} — Additional fields`, rows: [] });
               groups.get(key).rows.push({ fid, label: entry.name || '—', value: entry.value, type: entry.type || 'text' });

@@ -631,6 +631,111 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
   const sparkFor = (key) => trendData.map(d => ({ v: d[key] }));
 
+  // ─── Built-in section extras ─────────────────────────────────────────
+  // Group this report's customFields entries by their sectionKey so we
+  // can render them inline alongside the section's built-in stat tiles.
+  // Only includes entries with kind: 'builtin_extra'. Empty values are
+  // kept here and filtered at render time so the "Last week ▲ +18"
+  // delta can still appear when current is empty but previous existed.
+  const extrasBySection = useMemo(() => {
+    const out = {};
+    for (const [fid, entry] of Object.entries(report?.customFields || {})) {
+      if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra' && entry.sectionKey) {
+        (out[entry.sectionKey] ||= []).push({
+          fieldId: fid,
+          label: entry.name || '—',
+          value: entry.value,
+          type: entry.type || 'text',
+        });
+      }
+    }
+    return out;
+  }, [report?.customFields]);
+
+  // Build a sparkline for an extra field by walking allReports for the
+  // brand, looking up the value by field id first then label fallback.
+  // Returns the same shape sparkFor uses ([{ v: number }, ...]).
+  const extraSparkFor = (fieldId, label) => {
+    if (!allReports || !report) return [];
+    return [...allReports]
+      .filter(r => r.brandId === report.brandId)
+      .sort((a, b) => (a.weekStart || '').localeCompare(b.weekStart || ''))
+      .slice(-8)
+      .map(r => {
+        const cf = r.customFields || {};
+        let entry = cf[fieldId];
+        if (!entry && label) {
+          entry = Object.values(cf).find(e =>
+            e && typeof e === 'object' && e.name === label);
+        }
+        const v = entry?.value;
+        const n = v == null || v === '' ? 0 : Number(v);
+        return { v: Number.isFinite(n) ? n : 0 };
+      });
+  };
+
+  // Previous report's value for the same extra field, for prev-week
+  // comparison on the StatCard. Returns a number or null.
+  const prevExtraValue = (fieldId, label) => {
+    if (!previousReport) return null;
+    const cf = previousReport.customFields || {};
+    let entry = cf[fieldId];
+    if (!entry && label) {
+      entry = Object.values(cf).find(e =>
+        e && typeof e === 'object' && e.name === label);
+    }
+    if (!entry || entry.value === '' || entry.value == null) return null;
+    return entry.value;
+  };
+
+  // Format an extra's display value based on its type. Currency uses the
+  // report's currency symbol so it lines up with the built-in money tiles.
+  const fmtExtra = (val, type) => {
+    if (val === '' || val == null) return '—';
+    if (type === 'currency') {
+      const n = Number(val);
+      if (Number.isFinite(n)) return `${fmt$(n, report?.currency || DEFAULT_CURRENCY)}`;
+      return String(val);
+    }
+    if (type === 'number') {
+      const n = Number(val);
+      if (Number.isFinite(n)) return n.toLocaleString();
+      return String(val);
+    }
+    return String(val);
+  };
+
+  // Render the row of StatCards for one section's extras. Numeric and
+  // currency types render as full StatCards (with prev-week comparison +
+  // sparkline). Text / URL / dropdown render as a more compact tile
+  // with just label + value since deltas don't apply.
+  const renderExtraStatCards = (sectionKey) => {
+    const list = extrasBySection[sectionKey];
+    if (!list || list.length === 0) return null;
+    const nonEmpty = list.filter(f => f.value !== '' && f.value != null);
+    if (nonEmpty.length === 0) return null;
+    return (
+      <div className="row g-3 mb-3">
+        {nonEmpty.map((f) => {
+          const numericType = (f.type === 'number' || f.type === 'currency');
+          const prevRaw  = prevExtraValue(f.fieldId, f.label);
+          const prevDisp = prevRaw == null ? null : fmtExtra(prevRaw, f.type);
+          return (
+            <div key={f.fieldId} className="col-6 col-lg-3">
+              <StatCard
+                label={f.label}
+                value={fmtExtra(f.value, f.type)}
+                current={numericType ? num(f.value) : undefined}
+                prevValue={numericType ? prevDisp : null}
+                sparkData={numericType ? extraSparkFor(f.fieldId, f.label) : undefined}
+              />
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (!report) return null;
 
   const currency = report.currency || DEFAULT_CURRENCY;
@@ -882,6 +987,11 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           </div>
         </div>
 
+        {/* Custom extras for Overall Performance — appended into the
+            same hero grid so added fields like "Total Ad Spend" sit
+            beside Samples Approved, Videos Posted, etc. */}
+        {renderExtraStatCards('overallPerformance')}
+
         <InsightBox text={report.overallInsights} report={report} fieldKey="overallInsights"
           highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
 
@@ -908,6 +1018,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                     <CreatorRow key={i} creator={c} rank={i + 1} totalGmv={totalCreatorGmv} currency={currency} />
                   ))}
                 </div>
+                {renderExtraStatCards('topCreators')}
                 <InsightBox text={report.topCreatorsInsights} report={report} fieldKey="topCreatorsInsights"
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
@@ -928,6 +1039,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                       currency={currency} />
                   ))}
                 </div>
+                {renderExtraStatCards('productHighlights')}
                 <InsightBox text={report.productHighlightsInsights} report={report} fieldKey="productHighlightsInsights"
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
@@ -951,6 +1063,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                 ))}
               </div>
             </div>
+            {renderExtraStatCards('topVideos')}
             <InsightBox text={report.topVideosInsights} report={report} fieldKey="topVideosInsights"
               highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
           </>
@@ -1012,6 +1125,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                     );
                   })}
                 </div>
+                {renderExtraStatCards('gmvMax')}
                 <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
@@ -1055,6 +1169,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                     </div>
                   </div>
                 </div>
+                {renderExtraStatCards('offsitePerformance')}
                 <InsightBox text={report.offsiteInsights} report={report} fieldKey="offsiteInsights"
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
@@ -1081,6 +1196,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                   style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
               )}
+              {renderExtraStatCards('upcomingCampaigns')}
               <EmbeddedLinks section={links} accent="#ec4899" />
             </ContentSection>
           );
@@ -1101,6 +1217,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                   style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
               )}
+              {renderExtraStatCards('operationalUpdates')}
               <EmbeddedLinks section={links} accent="#6366f1" />
             </ContentSection>
           );
@@ -1131,6 +1248,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                     style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
                 </div>
               )}
+              {renderExtraStatCards('recommendations')}
               <EmbeddedLinks section={links} accent={C.amber} />
             </ContentSection>
           );
@@ -1161,13 +1279,9 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                 fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
               });
             } else if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra' && entry.sectionKey) {
-              const key = `bx:${entry.sectionKey}`;
-              if (!tableGroups.has(key)) {
-                tableGroups.set(key, { name: `${entry.sectionTitle || entry.sectionKey} — Additional fields`, rows: [] });
-              }
-              tableGroups.get(key).rows.push({
-                fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
-              });
+              // Built-in extras render inline within their parent
+              // section's StatCard grid (see renderExtraStatCards
+              // above). Skip them here to avoid duplicate cards.
             } else {
               passthrough.push([fieldId, entry]);
             }
