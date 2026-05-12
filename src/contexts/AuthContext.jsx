@@ -348,7 +348,12 @@ export function AuthProvider({ children }) {
     lastLoadedUidRef.current = null;
     setProfile(null);
     setSessionInvalid(false);
-    await supabase.auth.signOut();
+    // scope: 'local' kills the refresh token in THIS browser only.
+    // Default (global) revokes every refresh token for this user,
+    // which logs them out of all other devices too — surprising
+    // behavior when a user is signed in on their phone and laptop
+    // and signs out of one expecting the other to keep working.
+    await supabase.auth.signOut({ scope: 'local' });
   }, [qc, session?.user?.id]);
 
   const refreshProfile = useCallback(
