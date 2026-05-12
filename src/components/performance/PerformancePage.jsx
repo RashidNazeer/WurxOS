@@ -26,13 +26,51 @@ function getMonthLabel(ym) {
 }
 
 const METRICS = [
-  { key: 'dailyTasksQuality', label: 'Daily Tasks Quality',  icon: 'bi-check2-all' },
-  { key: 'reporting',         label: 'Reporting',             icon: 'bi-file-earmark-text' },
-  { key: 'punctuality',       label: 'Punctuality',           icon: 'bi-clock' },
-  { key: 'overallWorkflow',   label: 'Overall Workflow',      icon: 'bi-diagram-3' },
-  { key: 'responseTime',      label: 'Response Time',         icon: 'bi-chat-dots' },
-  { key: 'tasksProcessing',   label: 'Tasks Processing',      icon: 'bi-list-task' },
+  { key: 'dailyTasksQuality', label: 'Daily Tasks Quality',  icon: 'bi-check2-all',
+    description: 'How well daily tasks are completed — accuracy, attention to detail, and whether the output actually meets the brief without needing rework.' },
+  { key: 'reporting',         label: 'Reporting',             icon: 'bi-file-earmark-text',
+    description: 'Quality and timeliness of weekly, bi-weekly, and monthly reports — submitted on time, complete sections, useful insights vs. filler.' },
+  { key: 'punctuality',       label: 'Punctuality',           icon: 'bi-clock',
+    description: 'Clocking in on shift time consistently and not leaving early — reflects reliability beyond just being present.' },
+  { key: 'overallWorkflow',   label: 'Overall Workflow',      icon: 'bi-diagram-3',
+    description: 'How organized and process-driven the person is — following SOPs, keeping their work area tidy, and managing their day without constant supervision.' },
+  { key: 'responseTime',      label: 'Response Time',         icon: 'bi-chat-dots',
+    description: 'How quickly they reply to messages, brand requests, and team pings on Discord/chat during their working hours.' },
+  { key: 'tasksProcessing',   label: 'Tasks Processing',      icon: 'bi-list-task',
+    description: 'Speed and efficiency of getting through assigned tasks — finishing what is on the plate vs. letting items pile up.' },
 ];
+
+// Small hover-tooltip beside each metric label. Pure CSS — the tip is
+// always in the DOM but invisible until the wrapper is hovered/focused.
+// We render the icon as a button so keyboard users can focus it and
+// read the description, and so :focus-within shows the tip on touch
+// devices that fire focus on tap.
+function MetricInfoTip({ text }) {
+  if (!text) return null;
+  return (
+    <span className="wx-metric-tip-wrap" tabIndex={0}
+      aria-label={text}
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'help', outline: 'none' }}>
+      <i className="bi bi-info-circle" style={{ color: '#94a3b8', fontSize: '0.72rem' }} />
+      <span className="wx-metric-tip" role="tooltip"
+        style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#0f172a', color: '#fff',
+          padding: '8px 10px', borderRadius: 8,
+          fontSize: '0.72rem', lineHeight: 1.45, fontWeight: 400,
+          width: 240, textAlign: 'left',
+          boxShadow: '0 8px 24px rgba(15,23,42,0.25)',
+          opacity: 0, visibility: 'hidden',
+          transition: 'opacity 0.12s ease',
+          pointerEvents: 'none', zIndex: 1080,
+          whiteSpace: 'normal',
+        }}>
+        {text}
+      </span>
+    </span>
+  );
+}
 
 const PILLARS = [
   { key: 'performance', label: 'Performance Tracking', icon: 'bi-bar-chart-fill', color: '#0d6efd' },
@@ -192,6 +230,7 @@ function RateModal({ user, existing, month, onClose, onSaved }) {
                     <div className="d-flex align-items-center gap-2">
                       <i className={`bi ${m.icon} text-muted`} style={{ fontSize: '0.85rem' }} />
                       <span className="small fw-medium">{m.label}</span>
+                      <MetricInfoTip text={m.description} />
                     </div>
                     <span className="badge rounded-pill" style={{ background: ml.bg, color: ml.color, fontSize: '0.58rem' }}>{val}/100</span>
                   </div>
@@ -799,7 +838,10 @@ function PillarDetail({ pillarKey, ctx }) {
             <div key={m.key} className="d-flex align-items-center gap-2"
               style={{ fontSize: '0.75rem' }}>
               <i className={`bi ${m.icon}`} style={{ color: '#6c757d', fontSize: '0.78rem', flex: '0 0 14px' }} />
-              <span style={{ flex: 1, color: '#374151' }}>{m.label}</span>
+              <span style={{ flex: 1, color: '#374151', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {m.label}
+                <MetricInfoTip text={m.description} />
+              </span>
               <div className="rounded-pill" style={{ flex: '0 0 90px', height: 5, background: '#e9ecef', overflow: 'hidden' }}>
                 <div className="h-100 rounded-pill" style={{ width: `${v}%`, background: lvl.color }} />
               </div>

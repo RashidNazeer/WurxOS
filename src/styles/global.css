@@ -782,3 +782,13 @@ input[type="checkbox"] {
     font-size: 12.5px !important;
   }
 }
+
+/* Hover-tooltip used beside metric labels on the Performance page.
+   The tooltip lives inside .wx-metric-tip-wrap and is shown when the
+   wrapper is hovered or focused (covers keyboard + touch). */
+.wx-metric-tip-wrap:hover .wx-metric-tip,
+.wx-metric-tip-wrap:focus .wx-metric-tip,
+.wx-metric-tip-wrap:focus-within .wx-metric-tip {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
