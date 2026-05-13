@@ -614,6 +614,24 @@ export default function LeaveRequestPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Company holidays that overlap visible request ranges. Used by the
+  // card breakdown so an approver can see "calendar 9 - weekend 2 -
+  // holiday 1 = 6 actual leave days" before deciding. One fetch covers
+  // a wide window around today so cards for upcoming + recent requests
+  // all hit the same in-memory list.
+  const [companyHolidays, setCompanyHolidays] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+    const to   = new Date(today.getFullYear(), today.getMonth() + 6, 0);
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    listHolidaysInRange(ymd(from), ymd(to))
+      .then((rows) => { if (!cancelled) setCompanyHolidays(rows); })
+      .catch(() => { if (!cancelled) setCompanyHolidays([]); });
+    return () => { cancelled = true; };
+  }, []);
+
   const fromName = isApc
     ? (apcProfile?.userName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'APC')
     : (currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User');
@@ -808,6 +826,15 @@ export default function LeaveRequestPage() {
     const stCfg = getStCfg(r.status);
     const title = getRequestTitle(r);
     const days = countDays(r.startDate, r.endDate);
+    // Same breakdown the new-request form preview shows. Tells the
+    // approver at a glance how many of the calendar days are weekend /
+    // holiday vs. actual leave being granted.
+    const overlapping = (companyHolidays || []).filter((h) =>
+      h.startDate && h.endDate && r.startDate && r.endDate
+      && h.startDate <= r.endDate && h.endDate >= r.startDate,
+    );
+    const breakdown = analyzeLeaveRange(r.startDate, r.endDate, overlapping);
+    const hasReduction = breakdown.weekendDays > 0 || breakdown.holidayDays > 0;
 
     return (
       <div key={r.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${catCfg.color}` }}>
@@ -839,6 +866,37 @@ export default function LeaveRequestPage() {
                 <div className="text-muted" style={{ fontSize: '0.72rem' }}>
                   <i className="bi bi-calendar3 me-1" />{r.startDate} — {r.endDate} · {days} day{days > 1 ? 's' : ''}
                 </div>
+                {hasReduction && (
+                  <div
+                    className="d-inline-flex flex-wrap align-items-center gap-1 mt-1 rounded-2 px-2 py-1"
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.66rem', color: '#475569' }}
+                  >
+                    <span>
+                      <strong style={{ color: '#0f172a' }}>{breakdown.actualDays}</strong> actual
+                    </span>
+                    {breakdown.weekendDays > 0 && (
+                      <>
+                        <span style={{ color: '#cbd5e1' }}>·</span>
+                        <span>
+                          <strong>{breakdown.weekendDays}</strong> weekend
+                        </span>
+                      </>
+                    )}
+                    {breakdown.holidayDays > 0 && (
+                      <>
+                        <span style={{ color: '#cbd5e1' }}>·</span>
+                        <span style={{ color: '#a855f7' }}>
+                          <strong>{breakdown.holidayDays}</strong> holiday
+                          {breakdown.holidayLabels.length > 0 && (
+                            <span style={{ marginLeft: 3, opacity: 0.8 }}>
+                              ({breakdown.holidayLabels.join(', ')})
+                            </span>
+                          )}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
                 <p className="text-muted small mb-1 mt-1">{r.reason}</p>
 
                 {/* Approval audit trail — shows TL/OL stage and Boss stage,
