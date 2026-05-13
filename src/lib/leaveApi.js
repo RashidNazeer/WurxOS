@@ -333,8 +333,12 @@ function mapStatusToV1(status, current_level, requester_role) {
   if (status === 'pending') {
     const r = requester_role || 'apc';
     if (r === 'apc' || r === 'ipc') {
+      // APC/IPC chain (per mig 169): APC → TL → Boss. OL is not in
+      // the chain. Forward from TL bumps current_level straight to 3.
+      // A level 2 row would only exist for an in-flight request from
+      // before mig 169 ran; treat it as pending_boss too so OL never
+      // sees Approve/Reject for an APC's leave.
       if (current_level === 1) return 'pending_tl';
-      if (current_level === 2) return 'pending_ol';
       return 'pending_boss';
     }
     if (r === 'tl' || r === 'pctl') {
