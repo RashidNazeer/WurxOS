@@ -163,6 +163,59 @@ function Section({ title, color, icon, items, setItems, addLabel }) {
   );
 }
 
+// ── Brand context chip (used in the banner) ─────────────────────────────────
+// Shows brand name + tier + status so the OL can spot premium brands at a
+// glance and design tier-appropriate incentives. Tier styling matches the
+// chips used on the Brands page.
+const TIER_STYLE = {
+  gold:     { bg: '#fef3c7', fg: '#92400e', border: '#fcd34d', label: 'Gold' },
+  silver:   { bg: '#e2e8f0', fg: '#334155', border: '#cbd5e1', label: 'Silver' },
+  bronze:   { bg: '#fed7aa', fg: '#9a3412', border: '#fb923c', label: 'Bronze' },
+  platinum: { bg: '#e0e7ff', fg: '#3730a3', border: '#a5b4fc', label: 'Platinum' },
+};
+function BrandContextChip({ brand }) {
+  const tier = brand.tier ? TIER_STYLE[String(brand.tier).toLowerCase()] : null;
+  const inactive = brand.status && String(brand.status).toLowerCase() !== 'active';
+  return (
+    <span
+      className="d-inline-flex align-items-center gap-2 rounded-pill"
+      title={brand.notes || undefined}
+      style={{
+        background: '#fff',
+        border: '1px solid #e2e8f0',
+        padding: '4px 10px',
+        fontSize: '0.72rem',
+        color: '#0f172a',
+        fontWeight: 600,
+        opacity: inactive ? 0.65 : 1,
+      }}
+    >
+      <span>{brand.name}</span>
+      {tier && (
+        <span
+          className="rounded-pill"
+          style={{
+            background: tier.bg,
+            color: tier.fg,
+            border: `1px solid ${tier.border}`,
+            padding: '1px 7px',
+            fontSize: '0.62rem',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+          }}
+        >
+          {tier.label}
+        </span>
+      )}
+      {inactive && (
+        <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 500 }}>
+          · {brand.status}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ── Main IncentiveForm ────────────────────────────────────────────────────────
 export default function IncentiveForm() {
   const { apcId, userId } = useParams();
@@ -386,17 +439,30 @@ export default function IncentiveForm() {
             <div style={{ fontSize: '0.75rem', opacity: 0.75 }}>
               {ROLE_LABELS[targetRole] || targetRole} · {getMonthLabel(currentMonth)}
             </div>
-            {brands.length > 0 && (
-              <div className="d-flex flex-wrap gap-1 mt-1">
-                {brands.map(b => (
-                  <span key={b.id || b.name} className="badge" style={{ background: 'rgba(255,255,255,0.18)', fontSize: '0.65rem' }}>
-                    {b.name}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Brand context panel — surfaces the brands this user manages, with
+            tier so the author can design tier-aware incentives without
+            having to switch tabs. Hidden when the user owns no brands
+            (e.g. an IPC who hasn't been assigned anything yet). */}
+        {brands.length > 0 && (
+          <div className="rounded-3 mb-3 p-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="fw-semibold" style={{ fontSize: '0.78rem', color: '#0f172a' }}>
+                <i className="bi bi-shop me-1" />
+                Brands {targetUser?.displayName?.split(' ')[0] || 'they'} manage
+                <span className="text-muted ms-1" style={{ fontWeight: 400 }}>· {brands.length}</span>
+              </span>
+              <span className="text-muted" style={{ fontSize: '0.68rem' }}>Use this context when designing goals</span>
+            </div>
+            <div className="d-flex flex-wrap gap-2">
+              {brands.map((b) => (
+                <BrandContextChip key={b.id || b.name} brand={b} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (

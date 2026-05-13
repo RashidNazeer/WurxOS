@@ -279,6 +279,32 @@ export async function listUsersByRoles(roles) {
     if (e2) throw new Error(e2.message);
     ownerById = new Map((owners || []).map((o) => [o.id, o.display_name]));
   }
+
+  // Brand assignments — single batched query keyed by user_id, joined to
+  // brands so the incentive UI can show what brands each team member is
+  // running (with tier so the OL can design tier-aware incentives).
+  const userIds = (data || []).map((p) => p.id);
+  let brandsByUser = new Map();
+  if (userIds.length) {
+    const { data: links, error: e3 } = await supabase
+      .from('brand_assignments')
+      .select('user_id, brand:brand_id(id, name, tier, status, notes)')
+      .in('user_id', userIds);
+    if (e3) throw new Error(e3.message);
+    (links || []).forEach((row) => {
+      if (!row.brand) return;
+      const list = brandsByUser.get(row.user_id) || [];
+      list.push({
+        id:     row.brand.id,
+        name:   row.brand.name,
+        tier:   row.brand.tier   || null,
+        status: row.brand.status || null,
+        notes:  row.brand.notes  || null,
+      });
+      brandsByUser.set(row.user_id, list);
+    });
+  }
+
   return (data || []).map((p) => ({
     id:              p.id,
     displayName:     p.display_name || p.email || '—',
@@ -288,7 +314,7 @@ export async function listUsersByRoles(roles) {
     email:           p.email,
     ownerId:         p.reports_to || null,
     ownerName:       p.reports_to ? (ownerById.get(p.reports_to) || '') : '',
-    assignedBrands:  [],   // brand_assignments would need a separate fetch; not used by Boss/OL plan grid
+    assignedBrands:  brandsByUser.get(p.id) || [],
   }));
 }
 

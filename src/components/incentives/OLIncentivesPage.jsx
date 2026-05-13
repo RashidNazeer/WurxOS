@@ -35,6 +35,46 @@ function itemSuffix(item) {
   return '';
 }
 
+// Per-brand chip rendered in user cards. Shows name + a small tier dot
+// (gold/silver/bronze/platinum) so the OL can spot tier mix at a glance
+// when designing incentives. Inactive brands fade.
+const _TIER_COLORS = {
+  gold:     '#eab308',
+  silver:   '#94a3b8',
+  bronze:   '#b45309',
+  platinum: '#6366f1',
+};
+function BrandTierChip({ brand }) {
+  const tierKey = brand.tier ? String(brand.tier).toLowerCase() : null;
+  const tierColor = tierKey ? _TIER_COLORS[tierKey] : null;
+  const inactive = brand.status && String(brand.status).toLowerCase() !== 'active';
+  return (
+    <span
+      className="badge d-inline-flex align-items-center gap-1"
+      title={[
+        brand.tier ? `Tier: ${brand.tier}` : null,
+        brand.status ? `Status: ${brand.status}` : null,
+        brand.notes || null,
+      ].filter(Boolean).join('\n')}
+      style={{
+        background: '#f3f4f6',
+        color: '#495057',
+        fontSize: '0.6rem',
+        fontWeight: 500,
+        opacity: inactive ? 0.55 : 1,
+      }}
+    >
+      {tierColor && (
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: tierColor, flexShrink: 0,
+        }} />
+      )}
+      {brand.name}
+    </span>
+  );
+}
+
 // ── Edit Row (own progress) ───────────────────────────────────────────────────
 function EditRow({ item, cat, onChange }) {
   const achieved = item.achievedValue ?? '';
@@ -865,7 +905,7 @@ export default function OLIncentivesPage() {
               {list.map(user => {
                 const rec = records[user.id];
                 const hasData = Boolean(rec);
-                const brands = (user.assignedBrands || []).map(b => b.name);
+                const brands = user.assignedBrands || [];
                 const totalItems = hasData ? (rec.incentives || []).length + (rec.bonuses || []).length : 0;
                 const completedItems = hasData ? (rec.incentives || []).filter(i => i.completed).length + (rec.bonuses || []).filter(b => b.completed).length : 0;
                 const breakdown = hasData ? calcBreakdown(rec) : null;
@@ -900,10 +940,9 @@ export default function OLIncentivesPage() {
 
                         {brands.length > 0 && (
                           <div className="d-flex flex-wrap gap-1 mb-2">
-                            {brands.slice(0, 3).map((b, i) => (
-                              <span key={i} className="badge" style={{ background: '#f3f4f6', color: '#495057', fontSize: '0.6rem', fontWeight: 500 }}>{b}</span>
+                            {brands.map((b) => (
+                              <BrandTierChip key={b.id || b.name} brand={b} />
                             ))}
-                            {brands.length > 3 && <span className="badge" style={{ background: '#f3f4f6', color: '#9ca3af', fontSize: '0.6rem' }}>+{brands.length - 3}</span>}
                           </div>
                         )}
 
