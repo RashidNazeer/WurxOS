@@ -40,6 +40,7 @@ function _normalize(r) {
     return {
       requestedClockIn:  field === 'clock_in'  ? e.requested_value : undefined,
       requestedClockOut: field === 'clock_out' ? e.requested_value : undefined,
+      requestedBreaks:   field === 'breaks'    ? (e.requested_breaks || []) : undefined,
       reason: e.reason,
       status: e.status,
       requestedAt: e.created_at,
@@ -80,6 +81,7 @@ function _normalize(r) {
     autoClockOutNote:     r.auto_clock_out_note || '',
     editClockInRequest:   edit('clock_in'),
     editClockOutRequest:  edit('clock_out'),
+    editBreaksRequest:    edit('breaks'),
   };
 }
 function _normalizeAll(rows) { return (rows || []).map(_normalize); }
@@ -90,7 +92,7 @@ const SELECT_WITH_USER =
 // Same, plus pending edit requests for the row (so editClockInRequest /
 // editClockOutRequest get populated automatically).
 const SELECT_WITH_USER_AND_EDITS =
-  SELECT_WITH_USER + ', attendance_edit_requests(id, field, requested_value, reason, status, decided_by, decided_at, decision_note, created_at)';
+  SELECT_WITH_USER + ', attendance_edit_requests(id, field, requested_value, requested_breaks, reason, status, decided_by, decided_at, decision_note, created_at)';
 
 // ────────────────────────────────────────────────────────────
 // Time helpers — match v1 exactly (clamp at 16h MAX_SHIFT,
@@ -592,6 +594,40 @@ export async function requestAttendanceEdit({ attendanceId, field, requestedValu
   return data;
 }
 
+// Submit a break-edit request — APC asks their TL to apply a new
+// breaks array to the attendance row. The new array fully replaces
+// the existing one on approve. Each entry is { start, end } ISO
+// strings; an open in-progress break can be sent with end=null and
+// will be ignored by total_break_ms but stored in the row.
+//
+// Mig 168 added field='breaks' and a requested_breaks jsonb column.
+export async function requestBreakEdit({ attendanceId, breaks, reason }) {
+  const payload = Array.isArray(breaks)
+    ? breaks.map((b) => ({
+        start: b.start ? new Date(b.start).toISOString() : null,
+        end:   b.end   ? new Date(b.end).toISOString()   : null,
+      }))
+    : [];
+  const { data, error } = await supabase.rpc('att_request_break_edit', {
+    p_attendance_id: attendanceId,
+    p_breaks:        payload,
+    p_reason:        reason || '',
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Decide a pending break edit (TL / OL / Boss). Same approve/reject
+// flow as clock_in/clock_out. The applied breaks array fully
+// replaces the row's existing breaks; total_break_ms + total_work_ms
+// get recomputed server-side.
+export async function approveBreakEdit(attendanceId) {
+  return _decideEdit(attendanceId, 'breaks', true, null);
+}
+export async function rejectBreakEdit(attendanceId, rejectionReason) {
+  return _decideEdit(attendanceId, 'breaks', false, rejectionReason || '');
+}
+
 async function _decideEdit(attendanceId, field, approve, note = null) {
   // Look up the latest pending edit-request for (attendance, field)
   // and decide it. v1's UI passes (attendanceId, approverId) so we
@@ -680,7 +716,7 @@ export async function listMyEditRequests(uid) {
 export async function listPendingEditRequests() {
   const { data, error } = await supabase
     .from('attendance_edit_requests')
-    .select('*, user:user_id(display_name, email, role), attendance:attendance_id(date, clock_in, clock_out)')
+    .select('*, user:user_id(display_name, email, role), attendance:attendance_id(date, clock_in, clock_out, breaks)')
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
