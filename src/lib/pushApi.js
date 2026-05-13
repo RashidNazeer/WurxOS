@@ -14,7 +14,19 @@ function explainPushError(err) {
     return 'The browser blocked the push subscription. Open browser site settings and allow notifications, then try again.';
   }
   if (name === 'AbortError') {
-    return 'The push service handshake was aborted. This usually means Windows system notifications are off — open Settings → Notifications, turn them on, then try again.';
+    // AbortError is the catch-all the browser uses when the push
+    // service handshake never completes — could be the OS, the
+    // network, or the push provider flaking. Don't blame the user's
+    // OS by default; list the likely causes in order of how often
+    // they fix it. Reload first because transient handshake aborts
+    // resolve on retry maybe half the time in practice.
+    return (
+      'The push service handshake was aborted. Try this in order: '
+      + '(1) reload the page and click Enable again — handshakes often succeed on retry; '
+      + '(2) confirm browser notifications are allowed for this site (lock icon → Notifications → Allow); '
+      + '(3) on Windows, check Settings → Notifications & actions is on and Focus Assist isn\'t blocking; '
+      + '(4) if you\'re on a corporate network, a firewall may be blocking the push service (fcm.googleapis.com on Chrome, push.services.mozilla.com on Firefox).'
+    );
   }
   if (name === 'NotSupportedError') {
     return 'This browser/profile does not support push (guest mode, private window, or an enterprise policy may be blocking it).';
