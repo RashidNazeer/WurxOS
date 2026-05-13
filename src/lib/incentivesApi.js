@@ -283,12 +283,14 @@ export async function listUsersByRoles(roles) {
   // Brand assignments — single batched query keyed by user_id, joined to
   // brands so the incentive UI can show what brands each team member is
   // running (with tier so the OL can design tier-aware incentives).
+  // Column is `brand_name` in the schema (mig 004) — we surface it as
+  // `name` for the UI which expects that field.
   const userIds = (data || []).map((p) => p.id);
   let brandsByUser = new Map();
   if (userIds.length) {
     const { data: links, error: e3 } = await supabase
       .from('brand_assignments')
-      .select('user_id, brand:brand_id(id, name, tier, status, notes)')
+      .select('user_id, brand:brand_id(id, brand_name, tier, status, client_name)')
       .in('user_id', userIds);
     if (e3) throw new Error(e3.message);
     (links || []).forEach((row) => {
@@ -296,10 +298,10 @@ export async function listUsersByRoles(roles) {
       const list = brandsByUser.get(row.user_id) || [];
       list.push({
         id:     row.brand.id,
-        name:   row.brand.name,
-        tier:   row.brand.tier   || null,
-        status: row.brand.status || null,
-        notes:  row.brand.notes  || null,
+        name:   row.brand.brand_name,
+        tier:   row.brand.tier        || null,
+        status: row.brand.status      || null,
+        notes:  row.brand.client_name || null,
       });
       brandsByUser.set(row.user_id, list);
     });
