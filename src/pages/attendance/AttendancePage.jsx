@@ -531,12 +531,26 @@ export default function AttendancePage() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>{e.user?.display_name}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {e.user?.role} · wants to change <strong style={{ color: 'var(--text-secondary)' }}>{e.field === 'clock_in' ? 'clock-in' : 'clock-out'}</strong> for {e.attendance?.date}
+                  {e.user?.role} · wants to change{' '}
+                  <strong style={{ color: 'var(--text-secondary)' }}>
+                    {e.field === 'clock_in' ? 'clock-in' : e.field === 'clock_out' ? 'clock-out' : 'breaks'}
+                  </strong>
+                  {' '}for {e.attendance?.date}
                 </div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>
-                  {e.attendance?.[e.field] && <>from <strong>{fmtTime(e.attendance[e.field])}</strong> → </>}
-                  <strong style={{ color: 'var(--accent)' }}>{fmtTime(e.requested_value)}</strong>
-                </div>
+                {/* Clock-in / Clock-out diff (single timestamp) */}
+                {e.field !== 'breaks' && (
+                  <div style={{ fontSize: 12, marginTop: 4 }}>
+                    {e.attendance?.[e.field] && <>from <strong>{fmtTime(e.attendance[e.field])}</strong> → </>}
+                    <strong style={{ color: 'var(--accent)' }}>{fmtTime(e.requested_value)}</strong>
+                  </div>
+                )}
+                {/* Breaks diff — show old vs new arrays side-by-side */}
+                {e.field === 'breaks' && (
+                  <BreaksDiff
+                    oldBreaks={e.attendance?.breaks || []}
+                    newBreaks={e.requested_breaks || []}
+                  />
+                )}
                 {e.reason && (
                   <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 6, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 8, fontStyle: 'italic' }}>
                     "{e.reason}"
@@ -1327,6 +1341,38 @@ function deriveHistoryStatus(r) {
     if (mins > 9 * 60 + 15) return 'late';
   }
   return 'on-time';
+}
+
+function BreaksDiff({ oldBreaks, newBreaks }) {
+  const fmt = (b) => {
+    const s = b?.start ? fmtTime(b.start) : '—';
+    const e = b?.end   ? fmtTime(b.end)   : 'open';
+    return `${s} → ${e}`;
+  };
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+      <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '6px 10px' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Current</div>
+        {oldBreaks.length === 0 ? (
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>(no breaks)</div>
+        ) : (
+          oldBreaks.map((b, i) => (
+            <div key={i} style={{ fontSize: 11.5 }}>{fmt(b)}</div>
+          ))
+        )}
+      </div>
+      <div style={{ background: 'color-mix(in srgb, var(--accent-soft) 60%, transparent)', borderRadius: 8, padding: '6px 10px' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Proposed</div>
+        {newBreaks.length === 0 ? (
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>(no breaks)</div>
+        ) : (
+          newBreaks.map((b, i) => (
+            <div key={i} style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-primary)' }}>{fmt(b)}</div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Avatar({ user, sm = false }) {

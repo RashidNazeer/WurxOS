@@ -5,6 +5,7 @@ import {
   requestClockOut, onActiveRecord,
   calcTimes, fmtDuration, fmtDurationLive, fmtTime,
   requestEditClockIn, editClockInDirect,
+  requestBreakEdit,
   getUnacknowledgedAutoCloses, acknowledgeAutoClose,
   requestEditClockOut, editClockOutDirect, getEffectiveStatus,
   getUserHistory,
@@ -246,6 +247,12 @@ export default function ClockWidget() {
   const [showEditClockIn, setShowEditClockIn] = useState(false);
   const [editTime, setEditTime] = useState('');
   const [editReason, setEditReason] = useState('');
+  // Break edit state (mig 168 — APC requests break correction, TL approves)
+  const [showEditBreaks, setShowEditBreaks]   = useState(false);
+  const [breakRows, setBreakRows]             = useState([]);
+  const [breakReason, setBreakReason]         = useState('');
+  const [breakSaving, setBreakSaving]         = useState(false);
+  const [breakError, setBreakError]           = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -557,6 +564,67 @@ export default function ClockWidget() {
     setEditSaving(false);
   }
 
+  async function handleSubmitEditBreaks() {
+    setBreakError('');
+    if (!record?.id) { setBreakError('No active attendance row.'); return; }
+
+    // Validate each break row. Every row must have a start; if it has
+    // an end, end must be after start. An open break (no end) is OK —
+    // mirrors what the realtime tracker stores during a live break.
+    const parsed = [];
+    for (let i = 0; i < breakRows.length; i++) {
+      const r = breakRows[i];
+      if (!r.start) {
+        setBreakError(`Break ${i + 1}: start time is required.`);
+        return;
+      }
+      const startD = fromPktLocalInput(r.start);
+      if (!startD || isNaN(startD.getTime())) {
+        setBreakError(`Break ${i + 1}: invalid start time.`);
+        return;
+      }
+      let endD = null;
+      if (r.end) {
+        endD = fromPktLocalInput(r.end);
+        if (!endD || isNaN(endD.getTime())) {
+          setBreakError(`Break ${i + 1}: invalid end time.`);
+          return;
+        }
+        if (endD.getTime() <= startD.getTime()) {
+          setBreakError(`Break ${i + 1}: end must be after start.`);
+          return;
+        }
+      }
+      parsed.push({
+        start: startD.toISOString(),
+        end:   endD ? endD.toISOString() : null,
+      });
+    }
+    if (isApcOrIpc && !breakReason.trim()) {
+      setBreakError('Please add a short reason.');
+      return;
+    }
+
+    setBreakSaving(true);
+    try {
+      // Both APC/IPC and managers use the request flow (mig 168 — no
+      // direct-edit path yet; the manager can approve their own
+      // request which will apply immediately).
+      await requestBreakEdit({
+        attendanceId: record.id,
+        breaks: parsed,
+        reason: breakReason.trim() || (isApcOrIpc ? '' : 'manager direct edit'),
+      });
+      setShowEditBreaks(false);
+      setBreakRows([]);
+      setBreakReason('');
+      refetchRecord();
+    } catch (err) {
+      setBreakError(err.message || 'Failed to submit break edit.');
+    }
+    setBreakSaving(false);
+  }
+
   async function handleRequestClockOut() {
     setAction('clockout');
     try {
@@ -837,9 +905,25 @@ export default function ClockWidget() {
                         </button>
                       </div>
                       <div className="col-sm-4">
-                        <button className="att-secondary-btn" disabled
-                          title="Lunch break (not yet implemented)">
-                          <span role="img" aria-label="lunch">🍱</span> Lunch
+                        <button
+                          className="att-secondary-btn"
+                          onClick={() => {
+                            // Seed the editor with the row's current breaks
+                            // (each entry already carries ISO start/end). For
+                            // an in-progress break, end is null — we show it
+                            // but the user can fill it in.
+                            const current = (record?.breaks || []).map((b) => ({
+                              start: b.start ? toPktLocalInput(new Date(b.start.toDate ? b.start.toDate() : b.start)) : '',
+                              end:   b.end   ? toPktLocalInput(new Date(b.end.toDate   ? b.end.toDate()   : b.end))   : '',
+                            }));
+                            setBreakRows(current);
+                            setBreakReason('');
+                            setBreakError('');
+                            setShowEditBreaks(true);
+                          }}
+                          disabled={!!action || !record?.id}
+                        >
+                          <i className="bi bi-cup-hot" /> Edit breaks
                         </button>
                       </div>
                       <div className="col-sm-4">
@@ -881,6 +965,20 @@ export default function ClockWidget() {
                       return (
                         <div className="mt-3" style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 600 }}>
                           <i className="bi bi-x-circle-fill me-1" />Last edit request rejected
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Break-edit pending / rejected banner (mig 168). */}
+                  {(() => {
+                    const breakReq = record?.editBreaksRequest;
+                    if (breakReq && breakReq.status === 'pending') {
+                      return (
+                        <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                          <div className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, color: '#f59e0b' }} />
+                          <span style={{ fontSize: '0.74rem', color: '#92400e', fontWeight: 600, flex: 1 }}>Break edit request waiting for approval</span>
                         </div>
                       );
                     }
@@ -1036,6 +1134,124 @@ export default function ClockWidget() {
                   disabled={editSaving}
                 >
                   {editSaving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-send" />}
+                  {isApcOrIpc ? 'Send Request' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit-breaks modal (mig 168 — request flow for APC/IPC, manager
+          self-approval for everyone else). */}
+      {showEditBreaks && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1071, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => !breakSaving && setShowEditBreaks(false)} />
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="card-body p-4">
+              <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
+                <i className="bi bi-cup-hot" style={{ color: '#f59e0b' }} />
+                {isApcOrIpc ? 'Request Break Edit' : 'Edit Breaks'}
+              </h6>
+              <p className="text-muted small mb-3" style={{ fontSize: '0.76rem' }}>
+                {isApcOrIpc
+                  ? 'Adjust your break times for this shift. Your team lead will review the change.'
+                  : 'Adjust break times for this shift. Totals will recalculate on save.'}
+              </p>
+
+              {breakRows.length === 0 && (
+                <div className="rounded-3 p-3 mb-3 text-center" style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.78rem' }}>
+                  No breaks yet. Add one below.
+                </div>
+              )}
+
+              {breakRows.map((row, idx) => (
+                <div key={idx} className="rounded-3 p-2 mb-2" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                  <div className="d-flex align-items-center justify-content-between mb-1">
+                    <span className="fw-semibold" style={{ fontSize: '0.72rem', color: '#92400e' }}>
+                      Break {idx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm p-0"
+                      style={{ color: '#dc2626', fontSize: '0.72rem' }}
+                      onClick={() => setBreakRows(breakRows.filter((_, i) => i !== idx))}
+                    >
+                      <i className="bi bi-trash" /> Remove
+                    </button>
+                  </div>
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <label className="form-label small mb-1" style={{ fontSize: '0.66rem', color: '#92400e', fontWeight: 600 }}>Start</label>
+                      <input
+                        type="datetime-local"
+                        className="form-control form-control-sm"
+                        value={row.start}
+                        onChange={(e) => {
+                          const copy = [...breakRows];
+                          copy[idx] = { ...copy[idx], start: e.target.value };
+                          setBreakRows(copy);
+                        }}
+                      />
+                    </div>
+                    <div className="col-6">
+                      <label className="form-label small mb-1" style={{ fontSize: '0.66rem', color: '#92400e', fontWeight: 600 }}>End</label>
+                      <input
+                        type="datetime-local"
+                        className="form-control form-control-sm"
+                        value={row.end}
+                        onChange={(e) => {
+                          const copy = [...breakRows];
+                          copy[idx] = { ...copy[idx], end: e.target.value };
+                          setBreakRows(copy);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary w-100 mb-3"
+                style={{ fontSize: '0.74rem' }}
+                onClick={() => {
+                  // Default the new row's start to "now" in PKT so the
+                  // user only has to adjust if they need a past time.
+                  const nowStr = toPktLocalInput(new Date());
+                  setBreakRows([...breakRows, { start: nowStr, end: '' }]);
+                }}
+              >
+                <i className="bi bi-plus-lg me-1" /> Add break
+              </button>
+
+              {isApcOrIpc && (
+                <div className="mb-3">
+                  <label className="form-label small fw-semibold" style={{ fontSize: '0.74rem' }}>Reason</label>
+                  <textarea
+                    className="form-control form-control-sm"
+                    rows={2}
+                    value={breakReason}
+                    onChange={(e) => setBreakReason(e.target.value)}
+                    placeholder="e.g. forgot to end break at lunch, system glitch during call…"
+                  />
+                </div>
+              )}
+
+              {breakError && (
+                <div className="small mb-2" style={{ color: '#dc2626', fontWeight: 500 }}>
+                  <i className="bi bi-exclamation-triangle-fill me-1" />{breakError}
+                </div>
+              )}
+
+              <div className="d-flex gap-2 justify-content-end">
+                <button className="btn btn-sm btn-outline-secondary px-3" onClick={() => setShowEditBreaks(false)} disabled={breakSaving}>Cancel</button>
+                <button
+                  className="btn btn-sm btn-primary px-4 d-inline-flex align-items-center gap-1"
+                  onClick={handleSubmitEditBreaks}
+                  disabled={breakSaving}
+                >
+                  {breakSaving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-send" />}
                   {isApcOrIpc ? 'Send Request' : 'Save'}
                 </button>
               </div>
