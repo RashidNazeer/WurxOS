@@ -17,19 +17,31 @@ const TABS = [
 ];
 
 const CATEGORY_LABEL = {
-  task:        'Tasks',
-  brand:       'Brands',
-  report:      'Reports',
-  paid_collab: 'Paid Collab',
-  system:      'System',
+  task:           'Tasks',
+  brand:          'Brands',
+  report:         'Reports',
+  paid_collab:    'Paid Collab',
+  leave:          'Leave',
+  resource:       'Resources',
+  performance:    'Performance',
+  knowledge_base: 'Knowledge Base',
+  attendance:     'Attendance',
+  tier:           'Tier',
+  system:         'System',
 };
 
 const CATEGORY_META = {
-  task:        { Icon: CheckIcon,     tone: 'task',   bi: 'bi-check2-square' },
-  report:      { Icon: ReportIcon,    tone: 'report', bi: 'bi-file-earmark-text' },
-  brand:       { Icon: StarIcon,      tone: 'brand',  bi: 'bi-star-fill' },
-  paid_collab: { Icon: MegaphoneIcon, tone: 'paid',   bi: 'bi-megaphone-fill' },
-  system:      { Icon: BellIcon,      tone: 'system', bi: 'bi-bell-fill' },
+  task:           { Icon: CheckIcon,     tone: 'task',   bi: 'bi-check2-square' },
+  report:         { Icon: ReportIcon,    tone: 'report', bi: 'bi-file-earmark-text' },
+  brand:          { Icon: StarIcon,      tone: 'brand',  bi: 'bi-shop' },
+  paid_collab:    { Icon: MegaphoneIcon, tone: 'paid',   bi: 'bi-megaphone-fill' },
+  leave:          { Icon: BellIcon,      tone: 'system', bi: 'bi-house-door-fill' },
+  resource:       { Icon: BellIcon,      tone: 'system', bi: 'bi-bookmark-fill' },
+  performance:    { Icon: StarIcon,      tone: 'brand',  bi: 'bi-bar-chart-fill' },
+  knowledge_base: { Icon: BellIcon,      tone: 'system', bi: 'bi-book-fill' },
+  attendance:     { Icon: BellIcon,      tone: 'system', bi: 'bi-clock-fill' },
+  tier:           { Icon: StarIcon,      tone: 'brand',  bi: 'bi-award-fill' },
+  system:         { Icon: BellIcon,      tone: 'system', bi: 'bi-bell-fill' },
 };
 
 export default function NotificationsPage() {
@@ -82,7 +94,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
         <div className="task-tabs">
           {TABS.map((t) => (
             <button
@@ -99,28 +111,28 @@ export default function NotificationsPage() {
           ))}
         </div>
         {categories.length > 1 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="task-tabs">
             <button
               type="button"
               onClick={() => setCategoryFilter('all')}
-              className={`wx-role-chip ${categoryFilter === 'all' ? 'wx-role-chip-active' : ''}`}
-              style={{ padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              className={`task-tab ${categoryFilter === 'all' ? 'task-tab-active' : ''}`}
             >
               <i className="bi bi-grid-3x3-gap-fill" style={{ fontSize: '0.78rem' }} />
               All types
             </button>
             {categories.map((c) => {
               const meta = CATEGORY_META[c];
+              const count = items.filter((n) => n.category === c).length;
               return (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setCategoryFilter(c)}
-                  className={`wx-role-chip ${categoryFilter === c ? 'wx-role-chip-active' : ''}`}
-                  style={{ padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  className={`task-tab ${categoryFilter === c ? 'task-tab-active' : ''}`}
                 >
                   {meta?.bi && <i className={`bi ${meta.bi}`} style={{ fontSize: '0.78rem' }} />}
-                  {CATEGORY_LABEL[c] || c}
+                  {CATEGORY_LABEL[c] || c.replace(/_/g, ' ')}
+                  <span className="task-tab-count">{count}</span>
                 </button>
               );
             })}

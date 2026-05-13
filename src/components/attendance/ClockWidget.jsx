@@ -12,6 +12,7 @@ import {
   checkApcDailyTasks, setAutoClockOut as apiSetAutoClockOut,
   setAutoClockOutNote as apiSetAutoClockOutNote,
 } from '../../lib/attendanceApi';
+import { getNowDate } from '../../lib/serverTime';
 
 const LOCATIONS = [
   { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: '#2563eb' },
@@ -241,7 +242,7 @@ export default function ClockWidget() {
   const [showClockOut, setShowClockOut] = useState(false);
   const [clockOutNote, setClockOutNote] = useState('');
   const [taskError, setTaskError] = useState('');
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState(() => getNowDate());
   const [showEditClockIn, setShowEditClockIn] = useState(false);
   const [editTime, setEditTime] = useState('');
   const [editReason, setEditReason] = useState('');
@@ -377,7 +378,7 @@ export default function ClockWidget() {
 
   // Tick every second for the live clock + work timer
   useEffect(() => {
-    const i = setInterval(() => setNow(new Date()), 1000);
+    const i = setInterval(() => setNow(getNowDate()), 1000);
     return () => clearInterval(i);
   }, []);
 
@@ -1083,7 +1084,7 @@ export default function ClockWidget() {
 /* ── Helpers used in the new layout ──────────────────────────────────────── */
 
 function greetingPrefix() {
-  const h = new Date().getHours();
+  const h = getNowDate().getHours();
   if (h < 5)  return 'Hello';
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';

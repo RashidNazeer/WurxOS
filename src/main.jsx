@@ -10,6 +10,12 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/global.css';
 import { registerServiceWorker } from './lib/pwa';
+import { syncServerTime } from './lib/serverTime';
+
+// Sync once at boot so the attendance live-elapsed timer stays correct on
+// laptops with a wrong system clock. Re-sync hourly to absorb long-session drift.
+syncServerTime();
+setInterval(syncServerTime, 60 * 60 * 1000);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -17,6 +17,7 @@
 // ============================================================
 
 import { supabase } from './supabase';
+import { getNow } from './serverTime';
 
 // ────────────────────────────────────────────────────────────
 // Row shape adapter
@@ -112,9 +113,12 @@ export function calcTimes(record) {
   if (!clockInRaw) return { totalWorkMs: 0, totalBreakMs: 0, requestTimeMs: 0 };
 
   const clockInMs   = _ms(clockInRaw);
+  // Use server-anchored time so users with wrong system clocks still see a
+  // correct running elapsed (otherwise nowMs < clockInMs → session clamps to 0).
+  const nowMs       = getNow();
   const actualEndMs = (record.clockOut ?? record.clock_out)
     ? _ms(record.clockOut ?? record.clock_out)
-    : Date.now();
+    : nowMs;
   const maxEndMs    = clockInMs + MAX_SHIFT_MS;
   const endMs       = Math.min(actualEndMs, maxEndMs);
 
@@ -122,7 +126,7 @@ export function calcTimes(record) {
   (record.breaks || []).forEach((b) => {
     const bStart = _ms(b.start);
     if (bStart === null || bStart >= endMs) return;
-    const bEndRaw = b.end ? _ms(b.end) : Date.now();
+    const bEndRaw = b.end ? _ms(b.end) : nowMs;
     const bEnd = Math.min(bEndRaw, endMs);
     totalBreakMs += Math.max(0, bEnd - bStart);
   });
@@ -133,7 +137,7 @@ export function calcTimes(record) {
     const rStart  = _ms(reqRaw);
     const apprRaw = record.approvalAt ?? record.approval_at;
     const rEndRaw = apprRaw ? _ms(apprRaw)
-      : ((record.status === 'pending-approval') ? Date.now() : null);
+      : ((record.status === 'pending-approval') ? nowMs : null);
     if (rEndRaw !== null) {
       const overlapStart = Math.max(rStart, clockInMs);
       const overlapEnd   = Math.min(rEndRaw, endMs);
