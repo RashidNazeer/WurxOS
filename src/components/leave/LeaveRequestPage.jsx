@@ -9,6 +9,7 @@ import {
   teamRejectLeave,
   getActiveBoss,
 } from '../../lib/leaveApi';
+import { listHolidaysInRange, analyzeLeaveRange } from '../../lib/holidaysApi';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -238,6 +239,27 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
   const [reason,      setReason]      = useState('');
   const [error,       setError]       = useState('');
   const [pendingData, setPendingData] = useState(null);
+  const [holidaysInRange, setHolidaysInRange] = useState([]);
+
+  // Fetch any company holidays that overlap the selected range so the
+  // preview can show "X days include Eid Holidays" without the user
+  // having to know which dates are blocked.
+  useEffect(() => {
+    let cancelled = false;
+    if (!startDate || !endDate || endDate < startDate) {
+      setHolidaysInRange([]);
+      return undefined;
+    }
+    listHolidaysInRange(startDate, endDate)
+      .then((rows) => { if (!cancelled) setHolidaysInRange(rows); })
+      .catch(() => { if (!cancelled) setHolidaysInRange([]); });
+    return () => { cancelled = true; };
+  }, [startDate, endDate]);
+
+  const rangeBreakdown = useMemo(() => {
+    if (!startDate || !endDate || endDate < startDate) return null;
+    return analyzeLeaveRange(startDate, endDate, holidaysInRange);
+  }, [startDate, endDate, holidaysInRange]);
 
   function validate() {
     if (category === 'other' && !otherTitle.trim()) return 'Please specify what you need.';
@@ -369,6 +391,58 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                   <input type="date" className="form-control form-control-sm" value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </div>
               </div>
+
+              {rangeBreakdown && rangeBreakdown.calendarDays > 0 && (
+                <div className="mb-3 rounded-3 p-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="fw-semibold" style={{ fontSize: '0.78rem', color: '#0f172a' }}>
+                      <i className="bi bi-calendar-week me-1" />
+                      Range breakdown
+                    </span>
+                    <span className="rounded-pill px-2 py-1" style={{
+                      fontSize: '0.72rem', fontWeight: 700,
+                      background: rangeBreakdown.actualDays > 0 ? '#fef3c7' : '#dcfce7',
+                      color:      rangeBreakdown.actualDays > 0 ? '#92400e' : '#166534',
+                    }}>
+                      {rangeBreakdown.actualDays} actual day{rangeBreakdown.actualDays === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className="d-flex flex-column gap-1" style={{ fontSize: '0.72rem', color: '#475569' }}>
+                    <div className="d-flex justify-content-between">
+                      <span>Calendar days</span>
+                      <strong>{rangeBreakdown.calendarDays}</strong>
+                    </div>
+                    {rangeBreakdown.weekendDays > 0 && (
+                      <div className="d-flex justify-content-between">
+                        <span>Weekends (Sat / Sun)</span>
+                        <span style={{ color: '#64748b' }}>− {rangeBreakdown.weekendDays}</span>
+                      </div>
+                    )}
+                    {rangeBreakdown.holidayDays > 0 && (
+                      <div className="d-flex justify-content-between">
+                        <span>
+                          Company holidays
+                          {rangeBreakdown.holidayLabels.length > 0 && (
+                            <span style={{ color: '#a855f7', marginLeft: 4 }}>
+                              ({rangeBreakdown.holidayLabels.join(', ')})
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ color: '#a855f7' }}>− {rangeBreakdown.holidayDays}</span>
+                      </div>
+                    )}
+                    <div className="d-flex justify-content-between pt-1 mt-1" style={{ borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a' }}>
+                      <span>Charged to your quota</span>
+                      <span>{rangeBreakdown.actualDays}</span>
+                    </div>
+                  </div>
+                  {(rangeBreakdown.weekendDays > 0 || rangeBreakdown.holidayDays > 0) && (
+                    <div className="text-muted mt-2" style={{ fontSize: '0.68rem' }}>
+                      Weekends and company holidays don't count against your leave quota.
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mb-4">
                 <label className="form-label small fw-semibold">Reason <span className="text-danger">*</span></label>

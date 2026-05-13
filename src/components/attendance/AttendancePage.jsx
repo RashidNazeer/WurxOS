@@ -17,7 +17,9 @@ import {
   listApprovedLeaveDatesForMonth, fetchRosterMonth,
   listExpectedMembers, getLeaveQuotaDefault, setLeaveQuotaDefault,
   scanLeaveQuotaConflicts,
+  expandLeaveWeekdays,
 } from '../../lib/attendanceApi';
+import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 
 const ROLE_OPTIONS = [
   { key: 'tl',   label: 'Team Lead' },
@@ -652,6 +654,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
   const [records, setRecords] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
   const [leaves, setLeaves] = useState([]);
+  const [holidaySet, setHolidaySet] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
@@ -667,14 +670,16 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     async function load() {
       setLoading(true);
       try {
-        const [{ records: rec, leaves: lv }, adjList] = await Promise.all([
+        const [{ records: rec, leaves: lv }, adjList, hSet] = await Promise.all([
           fetchRosterMonth(month),
           getAdjustmentsForMonth(month),
+          listHolidayDatesForMonth(month).catch(() => new Set()),
         ]);
         if (cancelled) return;
         setRecords(rec);
         setAdjustments(adjList);
         setLeaves(lv);
+        setHolidaySet(hSet);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('roster load failed', err);
@@ -722,36 +727,32 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
       const presentDateSet = new Set();
       userRecords.forEach(r => { if (r.date && r.clockIn) presentDateSet.add(r.date); });
 
-      // Set of every approved leave date this month — full count, even
-      // when it overlaps a clock-in. The card's "Leaves" tile reflects
-      // approved leave usage; the modal calendar paints these blue with
-      // a small overlap marker on days that are also a clock-in. The
-      // coverage percentage uses the union of present ∪ leave so the
-      // overlap doesn't double-count.
+      // Set of every approved leave date this month — Mon-Fri only,
+      // weekend/holiday dates inside the range excluded so a Fri+Mon
+      // leave is 2 days not 4, and a leave overlapping Eid doesn't
+      // double-charge. Used for the per-row "Leaves" tile and as part
+      // of the coverage union.
       const leaveDateSet = new Set();
       userLeaves.forEach(l => {
-        if (!l.startDate || !l.endDate) return;
-        const a = new Date(l.startDate + 'T00:00:00').getTime();
-        const b = new Date(l.endDate + 'T00:00:00').getTime();
-        for (let t = a; t <= b; t += 86400000) {
-          const d = new Date(t);
-          const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-          if (ds < monthBounds.start || ds > monthBounds.end) continue;
-          leaveDateSet.add(ds);
-        }
+        const days = expandLeaveWeekdays(
+          l.startDate, l.endDate,
+          { mStart: monthBounds.start, mEnd: monthBounds.end, holidaySet },
+        );
+        days.forEach((d) => leaveDateSet.add(d));
       });
       const leaveDays = leaveDateSet.size;
       // Days where leave overlaps with a clock-in (informational; calendar
       // shows them with a small blue dot on the green tile).
       const leaveOverlapCount = [...leaveDateSet].filter(d => presentDateSet.has(d)).length;
 
-      // Coverage = union of (effective present days, leave days) — no
-      // double-counting when a leave overlaps a clock-in.
+      // Coverage = union of (effective present days, leave days, holidays)
+      // — no double-counting when a leave overlaps a clock-in, and holidays
+      // give credit even when the user didn't clock in.
       const presentForCoverage = new Set([
         ...presentDateSet,
         ...userAdj.map(a => a.date).filter(Boolean),
       ]);
-      const coverageSet = new Set([...presentForCoverage, ...leaveDateSet]);
+      const coverageSet = new Set([...presentForCoverage, ...leaveDateSet, ...holidaySet]);
       const covered = coverageSet.size;
       let health = 'green';
       if (covered < workingDaysInMonth - 5) health = 'red';
@@ -778,7 +779,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     }
     if (filterRole) filtered = filtered.filter(r => (r.user.role || '').toLowerCase() === filterRole);
     return filtered.sort((a, b) => (a.user.name || '').localeCompare(b.user.name || ''));
-  }, [expectedMembers, records, adjustments, leaves, workingDaysInMonth, search, filterRole]);
+  }, [expectedMembers, records, adjustments, leaves, holidaySet, monthBounds, workingDaysInMonth, search, filterRole]);
 
   function canEdit(targetUser) {
     if (isBoss) return true;

@@ -901,6 +901,41 @@ export async function bulkMarkMissedAsPresent(arg) {
 // ────────────────────────────────────────────────────────────
 // Roster maths — unchanged from v1 (pure JS)
 // ────────────────────────────────────────────────────────────
+
+// True if `ds` (YYYY-MM-DD) is a Sat/Sun in the local calendar. Used
+// to ensure weekend dates never count for or against attendance.
+export function isWeekendDate(ds) {
+  if (!ds) return false;
+  const [y, m, d] = ds.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  return dow === 0 || dow === 6;
+}
+
+// Expand a leave range into a Set of YYYY-MM-DD strings, skipping
+// Sat/Sun and any date present in `holidaySet` (a Set of YYYY-MM-DD
+// holiday dates). Optionally clip to [mStart, mEnd]. Use this anywhere
+// you previously expanded a leave range by adding every calendar day —
+// a Fri+Mon leave is 2 days, not 4, and a leave that overlaps a
+// company holiday should not double-count those days either.
+export function expandLeaveWeekdays(startDate, endDate, { mStart, mEnd, holidaySet } = {}) {
+  const out = new Set();
+  if (!startDate || !endDate) return out;
+  const pad = (n) => String(n).padStart(2, '0');
+  const a = new Date(startDate + 'T00:00:00').getTime();
+  const b = new Date(endDate   + 'T00:00:00').getTime();
+  for (let t = a; t <= b; t += 86400000) {
+    const d = new Date(t);
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) continue;
+    const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    if (mStart && ds < mStart) continue;
+    if (mEnd   && ds > mEnd)   continue;
+    if (holidaySet && holidaySet.has(ds)) continue;
+    out.add(ds);
+  }
+  return out;
+}
+
 export function missedWeekdayDatesFor(userId, monthStr, monthRecords, monthAdjusts, monthLeaves) {
   const [y, m] = monthStr.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
@@ -943,18 +978,29 @@ export function missedWeekdayDatesFor(userId, monthStr, monthRecords, monthAdjus
 export function computeMonthlyDays(userId, monthRecords, monthAdjusts) {
   const userRecords = (monthRecords || []).filter((r) => (r.userId || r.user_id) === userId);
   const userAdjusts = (monthAdjusts || []).filter((a) => (a.userId || a.user_id) === userId);
+  // Weekend clock-ins / adjustments are ignored for performance scoring —
+  // Sat/Sun are not working days, so they cannot compensate for missed
+  // weekdays (which would otherwise let someone hit 100% by working two
+  // Saturdays while skipping two Mon-Fri).
   const actualDateSet = new Set();
   userRecords.forEach((r) => {
     if (!r.date) return;
+    if (isWeekendDate(r.date)) return;
     if (r.clockIn || r.clock_in) actualDateSet.add(r.date);
   });
   const effectiveSet = new Set(actualDateSet);
-  userAdjusts.forEach((a) => { if (a.date) effectiveSet.add(a.date); });
+  userAdjusts.forEach((a) => {
+    if (!a.date || isWeekendDate(a.date)) return;
+    effectiveSet.add(a.date);
+  });
   return { actualDays: actualDateSet.size, effectiveDays: effectiveSet.size, adjustments: userAdjusts };
 }
 
 // Same shape as v1's; preserved for the v2 widget.
-export function summarizeMonth({ rows, adjustments, leaveDates, monthStr, today = new Date() }) {
+// Optional `holidayDates` is a Set of YYYY-MM-DD strings inside the month;
+// holiday weekdays count as accounted (present-equivalent) so users get
+// credit for company-wide off days without needing a clock-in.
+export function summarizeMonth({ rows, adjustments, leaveDates, holidayDates, monthStr, today = new Date() }) {
   const [y, m] = monthStr.split('-').map(Number);
   const monthStart = new Date(y, m - 1, 1);
   const monthEnd   = new Date(y, m, 0);
@@ -965,19 +1011,29 @@ export function summarizeMonth({ rows, adjustments, leaveDates, monthStr, today 
     if (dow !== 0 && dow !== 6) workingDays++;
   }
 
+  // Weekend clock-ins are ignored — see computeMonthlyDays for rationale.
   const presentDates = new Set();
   let totalWorkMs = 0;
   (rows || []).forEach((r) => {
     if (!r.date) return;
     const ds = String(r.date);
     if (ds.slice(0, 7) !== monthStr) return;
+    if (isWeekendDate(ds)) {
+      // Hours worked stat still totals every row so the "Hours worked this
+      // month" tile reflects actual time. Only the present-day count skips.
+      totalWorkMs += r.total_work_ms || r.totalWorkMs || 0;
+      return;
+    }
     if (r.clock_in || r.clockIn) presentDates.add(ds);
     totalWorkMs += r.total_work_ms || r.totalWorkMs || 0;
   });
 
-  const adjustedDates = new Set((adjustments || []).map((a) => a.date));
-  const leaveSet = leaveDates instanceof Set ? leaveDates : new Set(leaveDates || []);
-  const accountedDates = new Set([...presentDates, ...adjustedDates, ...leaveSet]);
+  const adjustedDates = new Set(
+    (adjustments || []).map((a) => a.date).filter((d) => d && !isWeekendDate(d)),
+  );
+  const leaveSet   = leaveDates   instanceof Set ? leaveDates   : new Set(leaveDates   || []);
+  const holidaySet = holidayDates instanceof Set ? holidayDates : new Set(holidayDates || []);
+  const accountedDates = new Set([...presentDates, ...adjustedDates, ...leaveSet, ...holidaySet]);
 
   const todayMid = new Date(today); todayMid.setHours(0, 0, 0, 0);
   let missed = 0;
@@ -991,6 +1047,7 @@ export function summarizeMonth({ rows, adjustments, leaveDates, monthStr, today 
     workingDays,
     presentDays:   presentDates.size,
     leaveDays:     leaveSet.size,
+    holidayDays:   holidaySet.size,
     adjustedDays:  adjustedDates.size,
     accountedDays: accountedDates.size,
     missedDays:    missed,
@@ -998,6 +1055,7 @@ export function summarizeMonth({ rows, adjustments, leaveDates, monthStr, today 
     presentDates,
     adjustedDates,
     leaveDates:    leaveSet,
+    holidayDates:  holidaySet,
   };
 }
 

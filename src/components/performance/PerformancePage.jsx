@@ -12,6 +12,8 @@ import {
   // Attendance helpers (re-exported from attendanceApi for parity)
   fetchRosterMonth, computeMonthlyDays, getAdjustmentsForMonth,
 } from '../../lib/performanceApi';
+import { expandLeaveWeekdays } from '../../lib/attendanceApi';
+import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -911,17 +913,18 @@ function PillarDetail({ pillarKey, ctx }) {
   }
 
   if (pillarKey === 'attendance') {
-    const effective = myAttendanceDays.effective || 0;
-    const leaveDays = myAttendanceDays.leaveDays || 0;
-    const covered   = effective + leaveDays;
-    const wd        = workingDays;
-    const pct       = wd > 0 ? Math.round((covered / wd) * 100) : 100;
-    const missed    = Math.max(0, wd - covered);
+    const effective   = myAttendanceDays.effective || 0;
+    const leaveDays   = myAttendanceDays.leaveDays || 0;
+    const holidayDays = myAttendanceDays.holidayDays || 0;
+    const covered     = effective + leaveDays + holidayDays;
+    const wd          = workingDays;
+    const pct         = wd > 0 ? Math.round((covered / wd) * 100) : 100;
+    const missed      = Math.max(0, wd - covered);
     return (
       <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
         <div className="text-muted" style={{ fontSize: '0.68rem' }}>
           Score = covered days / working days (Mon–Fri). Approved
-          medical / emergency leaves count toward "covered".
+          medical / emergency leaves and company holidays both count toward "covered".
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
           style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
@@ -938,6 +941,13 @@ function PillarDetail({ pillarKey, ctx }) {
           <span>Approved leave days</span>
           <strong>{leaveDays}</strong>
         </div>
+        {holidayDays > 0 && (
+          <div className="d-flex justify-content-between rounded-2 p-2"
+            style={{ background: '#fdf4ff', border: '1px solid #e9d5ff' }}>
+            <span>Company holidays</span>
+            <strong>{holidayDays}</strong>
+          </div>
+        )}
         {missed > 0 && (
           <div className="d-flex justify-content-between rounded-2 p-2"
             style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
@@ -1022,7 +1032,7 @@ export default function PerformancePage() {
   const [myRecord, setMyRecord]       = useState(null);
   const [myFlags, setMyFlags]         = useState([]);
   const [myWarnings, setMyWarnings]   = useState(0);
-  const [myAttendanceDays, setMyAttendanceDays] = useState({ actual: 0, effective: 0, leaveDays: 0 });
+  const [myAttendanceDays, setMyAttendanceDays] = useState({ actual: 0, effective: 0, leaveDays: 0, holidayDays: 0 });
   const [myIncRecord, setMyIncRecord] = useState(null);
   // myLeaveCount removed — now using myAttendanceDays from attendance collection
 
@@ -1096,23 +1106,28 @@ export default function PerformancePage() {
         // medical/emergency only, intersected with month).
         const { leaves: myLeavesAll } = await fetchRosterMonth(month);
         const myLeaves = myLeavesAll.filter((l) => l.requestedBy === currentUser.uid);
-        const myLeaveDates = new Set();
-        const padN = (n) => String(n).padStart(2, '0');
         const [yLm, mLm] = month.split('-').map(Number);
         const lastDay = new Date(yLm, mLm, 0).getDate();
         const mStartDate = `${yLm}-${String(mLm).padStart(2, '0')}-01`;
         const mEndDate = `${yLm}-${String(mLm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        // Company holidays inside the month (Mon-Fri only). Used as both the
+        // "exclude from leave count" set and the "counts as covered" set.
+        const myHolidaySet = await listHolidayDatesForMonth(month).catch(() => new Set());
+        const myLeaveDates = new Set();
         myLeaves.forEach((l) => {
-          const a = new Date((l.startDate || l.start_date) + 'T00:00:00').getTime();
-          const b = new Date((l.endDate || l.end_date) + 'T00:00:00').getTime();
-          for (let t = a; t <= b; t += 86400000) {
-            const d = new Date(t);
-            const ds = `${d.getFullYear()}-${padN(d.getMonth() + 1)}-${padN(d.getDate())}`;
-            if (ds < mStartDate || ds > mEndDate) continue;
-            myLeaveDates.add(ds);
-          }
+          const days = expandLeaveWeekdays(
+            l.startDate || l.start_date,
+            l.endDate   || l.end_date,
+            { mStart: mStartDate, mEnd: mEndDate, holidaySet: myHolidaySet },
+          );
+          days.forEach((d) => myLeaveDates.add(d));
         });
-        setMyAttendanceDays({ actual: myActual, effective: myEffective, leaveDays: myLeaveDates.size });
+        setMyAttendanceDays({
+          actual: myActual,
+          effective: myEffective,
+          leaveDays: myLeaveDates.size,
+          holidayDays: myHolidaySet.size,
+        });
       }
 
       // Team data.
@@ -1153,25 +1168,26 @@ export default function PerformancePage() {
         const mStart = `${yr}-${String(mo).padStart(2, '0')}-01`;
         const mEnd   = `${yr}-${String(mo).padStart(2, '0')}-${String(mLastDay).padStart(2, '0')}`;
 
-        const pad = (n) => String(n).padStart(2, '0');
+        const teamHolidaySet = await listHolidayDatesForMonth(month).catch(() => new Set());
+
         userIds.forEach((uid) => {
           const { actualDays, effectiveDays } = computeMonthlyDays(uid, monthRecords, adjList);
           const userLeaves = monthLeaves.filter((l) => l.requestedBy === uid);
           const leaveDates = new Set();
           userLeaves.forEach((l) => {
-            const startD = l.startDate || l.start_date;
-            const endD   = l.endDate   || l.end_date;
-            if (!startD || !endD) return;
-            const a = new Date(startD + 'T00:00:00').getTime();
-            const b = new Date(endD   + 'T00:00:00').getTime();
-            for (let t = a; t <= b; t += 86400000) {
-              const d = new Date(t);
-              const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-              if (ds < mStart || ds > mEnd) continue;
-              leaveDates.add(ds);
-            }
+            const days = expandLeaveWeekdays(
+              l.startDate || l.start_date,
+              l.endDate   || l.end_date,
+              { mStart, mEnd, holidaySet: teamHolidaySet },
+            );
+            days.forEach((d) => leaveDates.add(d));
           });
-          attMap[uid] = { actualDays, effectiveDays, leaveDays: leaveDates.size };
+          attMap[uid] = {
+            actualDays,
+            effectiveDays,
+            leaveDays: leaveDates.size,
+            holidayDays: teamHolidaySet.size,
+          };
         });
 
         setTeamRecords(recMap);
@@ -1260,9 +1276,11 @@ export default function PerformancePage() {
       const rec = teamRecords[u.id];
       const perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
-      const attData = teamAttendance[u.id] || { actualDays: 0, effectiveDays: 0, leaveDays: 0 };
+      const attData = teamAttendance[u.id] || { actualDays: 0, effectiveDays: 0, leaveDays: 0, holidayDays: 0 };
       const wd = workingDaysInMonth(month);
-      const covered = (attData.effectiveDays || 0) + (attData.leaveDays || 0);
+      // Holidays count as covered alongside present + leave so users get
+      // credit for company-wide off days (Eid, etc.) without a clock-in.
+      const covered = (attData.effectiveDays || 0) + (attData.leaveDays || 0) + (attData.holidayDays || 0);
       const attScore = calcAttendanceScore(covered, wd);
       const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
       const pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
@@ -1285,7 +1303,7 @@ export default function PerformancePage() {
   const myPerfScore = myRecord ? calcMetricsAvg(myRecord.metrics) : null;
   const myIncScore  = calcIncentiveScore(myIncRecord);
   const myAttScore  = calcAttendanceScore(
-    (myAttendanceDays.effective || 0) + (myAttendanceDays.leaveDays || 0),
+    (myAttendanceDays.effective || 0) + (myAttendanceDays.leaveDays || 0) + (myAttendanceDays.holidayDays || 0),
     workingDaysInMonth(month),
   );
   const myFlagScore = calcFlagsScore(myFlags, month);

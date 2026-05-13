@@ -1,0 +1,4 @@
+-- Placeholder for migration version 164 already applied on remote.
+-- The SQL for this version was authored on a previous machine and is
+-- not in this repo. Recorded here so `supabase db push` recognises the
+-- remote version and doesn't refuse to push subsequent migrations.

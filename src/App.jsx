@@ -47,6 +47,7 @@ const ClientAccessPage      = lazy(() => import('./pages/clientAccess/ClientAcce
 // v2's bespoke single-roster page.
 const TeamManagementPage    = lazy(() => import('./components/teamManagement/TeamManagementPage'));
 const TeamHierarchyPage     = lazy(() => import('./pages/teamManagement/TeamHierarchyPage'));
+const HolidaysPage          = lazy(() => import('./pages/holidays/HolidaysPage'));
 const LeavePage             = lazy(() => import('./components/leave/LeaveRouter'));
 const LeaveApprovalsPage    = lazy(() => import('./components/leave/LeaveRouter'));
 const BrandAnalyticsPage    = lazy(() => import('./pages/analytics/BrandAnalyticsPage'));
@@ -301,6 +302,14 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss','ol','developer']}>
                     <TeamHierarchyPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/holidays"
+                element={
+                  <RoleGuard allow={['boss']}>
+                    <HolidaysPage />
                   </RoleGuard>
                 }
               />

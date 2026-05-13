@@ -1,7 +1,7 @@
 import {
   HomeIcon, UsersIcon, ShieldIcon, StoreIcon, ChecklistIcon, SettingsIcon, BellIcon, ReportIcon,
   MegaphoneIcon, ClockIcon, BookmarkIcon, StarIcon, RefreshIcon, DiagramIcon,
-  BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon,
+  BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon,
 } from '../common/Icon';
 
 // Each role gets its own menu. Structure mirrors v1 layouts:
@@ -35,6 +35,7 @@ const NOTIFS_ITEM   = { label: 'Notifications', icon: BellIcon,      to: '/notif
 const SETTINGS_ITEM = { label: 'Settings',      icon: SettingsIcon,  to: '/settings' };
 const CHANGES_ITEM  = { label: 'Changes', icon: ArrowLeftRightIcon, to: '/changes', category: 'change' };
 const ATTENDANCE_ITEM = { label: 'Attendance', icon: ClockIcon, to: '/attendance' };
+const HOLIDAYS_ITEM   = { label: 'Holidays',   icon: CalendarIcon, to: '/holidays' };
 const RESOURCES_ITEM  = { label: 'Resources',  icon: BookmarkIcon, to: '/resources' };
 const PERFORMANCE_ITEM = { label: 'Performance', icon: StarIcon, to: '/performance' };
 const INCENTIVES_ITEM = { label: 'Incentives',  icon: ReportIcon, to: '/incentives' };
@@ -165,6 +166,7 @@ export const MENUS = {
     { label: 'Resource Planner', icon: DiagramIcon, to: '/boss/resource-planner' },
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
+    HOLIDAYS_ITEM,
     PERFORMANCE_ITEM,
     BROADCASTS_ITEM,
     REMINDERS_ITEM,

@@ -10,6 +10,7 @@ import {
   forceCloseSession,
   listAdjustmentsForUserMonth, summarizeMonth,
 } from '../../lib/attendanceApi';
+import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 import {
   AlertIcon, RefreshIcon, CheckIcon, XIcon, ArrowRightIcon, ClockIcon, PencilIcon,
 } from '../../components/common/Icon';
@@ -1393,8 +1394,19 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
     staleTime: 60_000,
   });
 
+  // Company-wide holiday dates inside this month (Mon-Fri only).
+  // Holiday dates count as covered without requiring a clock-in.
+  const { data: holidayDates = new Set() } = useQuery({
+    queryKey: ['attendance', 'monthly-holidays', monthStr],
+    queryFn: () => listHolidayDatesForMonth(monthStr),
+    staleTime: 5 * 60_000,
+  });
+
   const stats = useMemo(() => {
-    // Expand approved-leave ranges into a Set of weekday dates inside the month.
+    // Expand approved-leave ranges into a Set of weekday dates inside the
+    // month. Holiday dates are skipped because they're already covered by
+    // the holiday set passed below — a leave that overlaps Eid shouldn't
+    // also show up as a leave day.
     const leaveDates = new Set();
     leaves.forEach((lv) => {
       if (!lv.start_date || !lv.end_date) return;
@@ -1404,7 +1416,7 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
         const dow = cur.getDay();
         if (dow !== 0 && dow !== 6) {
           const ds = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
-          if (ds >= startStr && ds <= endStr) leaveDates.add(ds);
+          if (ds >= startStr && ds <= endStr && !holidayDates.has(ds)) leaveDates.add(ds);
         }
         cur.setDate(cur.getDate() + 1);
       }
@@ -1414,6 +1426,7 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
       rows: history || [],
       adjustments,
       leaveDates,
+      holidayDates,
       monthStr,
       today: now,
     });
@@ -1422,7 +1435,7 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
       monthLabel: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [history, leaves, adjustments, monthStr]);
+  }, [history, leaves, adjustments, holidayDates, monthStr]);
 
   const pct = stats.workingDays > 0
     ? Math.round((stats.accountedDays / stats.workingDays) * 100)
@@ -1431,11 +1444,18 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
   const hrs  = Math.floor(stats.totalWorkMs / 3600000);
   const mins = Math.floor((stats.totalWorkMs % 3600000) / 60000);
 
-  // Stacked bar: present takes its slice, then leave takes only the
-  // dedup-leftover slice so a day with both doesn't render twice.
-  const presentPct = (stats.presentDays / Math.max(1, stats.workingDays)) * 100;
-  const leaveOnlyPct = (Math.max(0, stats.accountedDays - stats.presentDays)
-                       / Math.max(1, stats.workingDays)) * 100;
+  // Stacked bar: present takes its slice, then leave takes its slice
+  // (excluding overlap), then holidays take whatever else is in the
+  // accounted set. The three bands together never exceed 100%.
+  const wd = Math.max(1, stats.workingDays);
+  const presentPct = (stats.presentDays / wd) * 100;
+  const leaveOnlyDays = Math.max(0, [...stats.leaveDates].filter((d) => !stats.presentDates.has(d)).length);
+  const leaveOnlyPct = (leaveOnlyDays / wd) * 100;
+  const holidayOnlyDays = Math.max(
+    0,
+    stats.accountedDays - stats.presentDays - leaveOnlyDays,
+  );
+  const holidayOnlyPct = (holidayOnlyDays / wd) * 100;
 
   return (
     <div className="wx-card" style={{ padding: 16, marginBottom: 12 }}>
@@ -1461,6 +1481,9 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 10 }}>
         <MonthTile dot="var(--success)" label="Days present"  value={stats.presentDays} sub="clocked in" />
         <MonthTile dot="var(--info)"    label="Days on leave" value={stats.leaveDays}   sub="approved" />
+        {stats.holidayDays > 0 ? (
+          <MonthTile dot="#a855f7" label="Holidays" value={stats.holidayDays} sub="counts as present" />
+        ) : null}
         {stats.adjustedDays > 0 ? (
           <MonthTile dot="var(--warning)" label="Manager-adjusted" value={stats.adjustedDays} sub="counts as present" />
         ) : null}
@@ -1474,8 +1497,12 @@ function MonthlyAttendanceWidget({ uid, history, displayName }) {
             style={{ width: `${presentPct}%`, background: 'var(--success)' }} />
         )}
         {leaveOnlyPct > 0 && (
-          <div title={`Approved leave: ${Math.round(leaveOnlyPct / 100 * stats.workingDays)} days`}
+          <div title={`Approved leave: ${leaveOnlyDays} days`}
             style={{ width: `${leaveOnlyPct}%`, background: 'var(--info)' }} />
+        )}
+        {holidayOnlyPct > 0 && (
+          <div title={`Company holidays: ${holidayOnlyDays} days`}
+            style={{ width: `${holidayOnlyPct}%`, background: '#a855f7' }} />
         )}
       </div>
     </div>
