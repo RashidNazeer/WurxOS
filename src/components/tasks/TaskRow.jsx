@@ -88,6 +88,23 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
       // Preserve joined relations (brand/assignee/creator) — the update
       // response only returns raw columns.
       onChanged?.({ ...task, ...(updated || { status: newStatus }) });
+    } catch (err) {
+      // The mig 171 freeze trigger raises a clear message when the
+      // task's brand is inactive. Surface that as a friendly alert
+      // (or local notice) instead of letting it bubble to the global
+      // error reporter as a scary "report to developer" modal. The
+      // UI usually disables the buttons for frozen tasks, but a
+      // stale cached row (before the brand status was joined) can
+      // slip through.
+      const msg = String(err?.message || '');
+      if (/brand is inactive|inactive brand/i.test(msg)) {
+        // Patch the local row's brand status so the UI disables
+        // controls without waiting for a refetch.
+        onChanged?.({ ...task, brand: { ...(task.brand || {}), status: 'inactive' } });
+        alert("This task's brand is inactive — the task is frozen until the brand is reactivated.");
+        return;
+      }
+      throw err;
     } finally {
       setBusy(false);
       setMenuOpen(false);
