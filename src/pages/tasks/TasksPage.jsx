@@ -21,6 +21,10 @@ const BASE_TABS = [
   { id: 'all',      label: 'All' },
   { id: 'assigned', label: 'Assigned to me' },
   { id: 'personal', label: 'Personal' },
+  // Tasks attached to a brand that is currently inactive. They are
+  // frozen — no status changes, no deletes, no auto-reset until the
+  // brand is reactivated. See migration 171.
+  { id: 'inactive', label: 'Inactive' },
 ];
 
 const STATUS_FILTERS = ['all', 'todo', 'in_progress', 'done'];
@@ -128,40 +132,83 @@ export default function TasksPage() {
 
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
+  // Filter out tasks attached to inactive brands — they're frozen
+  // server-side (mig 171) and including them in a bulk action would
+  // make the whole batch fail. Better to silently skip + tell the user
+  // how many were skipped so they can reactivate the brand if needed.
+  function partitionFrozen(ids) {
+    const frozen = [];
+    const active = [];
+    const rowsById = new Map(rows.map((r) => [r.id, r]));
+    for (const id of ids) {
+      const r = rowsById.get(id);
+      if (r?.brand?.status === 'inactive') frozen.push(id);
+      else active.push(id);
+    }
+    return { active, frozen };
+  }
+
   async function bulkSetStatus(newStatus) {
     if (selected.size === 0) return;
     setBulkBusy(true); setLocalError('');
     try {
-      const ids = Array.from(selected);
-      const { error } = await supabase.from('tasks').update({ status: newStatus }).in('id', ids);
+      const { active, frozen } = partitionFrozen(Array.from(selected));
+      if (active.length === 0) {
+        setLocalError('All selected tasks belong to inactive brands and are frozen.');
+        return;
+      }
+      const { error } = await supabase.from('tasks').update({ status: newStatus }).in('id', active);
       if (error) throw error;
+      const activeSet = new Set(active);
       qc.setQueriesData({ queryKey: ['tasks'] }, (old = []) =>
-        old.map((r) => (selected.has(r.id) ? { ...r, status: newStatus } : r)));
+        old.map((r) => (activeSet.has(r.id) ? { ...r, status: newStatus } : r)));
       clearSelection();
+      if (frozen.length > 0) {
+        setLocalError(`${frozen.length} frozen task(s) skipped (brand inactive).`);
+      }
     } catch (e) { setLocalError(e.message); }
     finally { setBulkBusy(false); }
   }
 
   async function bulkDelete() {
     if (selected.size === 0) return;
-    if (!confirm(`Delete ${selected.size} task(s)? This cannot be undone.`)) return;
+    const { active, frozen } = partitionFrozen(Array.from(selected));
+    if (active.length === 0) {
+      setLocalError('All selected tasks belong to inactive brands and are frozen.');
+      return;
+    }
+    if (!confirm(`Delete ${active.length} task(s)? This cannot be undone.${frozen.length ? ` (${frozen.length} frozen task(s) will be skipped.)` : ''}`)) return;
     setBulkBusy(true); setLocalError('');
     try {
-      const ids = Array.from(selected);
-      const { error } = await supabase.from('tasks').delete().in('id', ids);
+      const { error } = await supabase.from('tasks').delete().in('id', active);
       if (error) throw error;
+      const activeSet = new Set(active);
       qc.setQueriesData({ queryKey: ['tasks'] }, (old = []) =>
-        old.filter((r) => !selected.has(r.id)));
+        old.filter((r) => !activeSet.has(r.id)));
       clearSelection();
+      if (frozen.length > 0) {
+        setLocalError(`${frozen.length} frozen task(s) skipped (brand inactive).`);
+      }
     } catch (e) { setLocalError(e.message); }
     finally { setBulkBusy(false); }
   }
 
-  // Apply search first so status counts are search-aware
+  // Apply the brand-active gate first. Tasks attached to a brand whose
+  // status='inactive' (mig 171) live in the dedicated 'inactive' tab
+  // only; every other tab filters them out so the active task buckets
+  // stay clean. Personal tasks (no brand) are unaffected.
+  const tabFiltered = useMemo(() => {
+    if (tab === 'inactive') {
+      return rows.filter((r) => r.brand?.status === 'inactive');
+    }
+    return rows.filter((r) => r.brand?.status !== 'inactive');
+  }, [rows, tab]);
+
+  // Apply search next so status counts are search-aware
   const searchFiltered = useMemo(() => {
     const s = search.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) =>
+    if (!s) return tabFiltered;
+    return tabFiltered.filter((r) =>
       (r.title || '').toLowerCase().includes(s) ||
       (r.description || '').toLowerCase().includes(s) ||
       (r.brand?.brand_name || '').toLowerCase().includes(s) ||
@@ -169,7 +216,7 @@ export default function TasksPage() {
       (r.priority || '').toLowerCase().includes(s) ||
       (r.category || '').toLowerCase().includes(s),
     );
-  }, [rows, search]);
+  }, [tabFiltered, search]);
 
   // Derive dropdown options from the current row set (post-search) so
   // users only see options that have at least one task behind them.

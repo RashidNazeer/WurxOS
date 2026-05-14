@@ -20,7 +20,7 @@ export async function listTasks({
     .from('tasks')
     .select(`
       *,
-      brand:brand_id(id, brand_name, logo_url, owner_id),
+      brand:brand_id(id, brand_name, logo_url, owner_id, status),
       assignee:assignee_id(id, display_name, email, role, reports_to, current_tl:reports_to(id, display_name)),
       creator:created_by(id, display_name, role)
     `)
