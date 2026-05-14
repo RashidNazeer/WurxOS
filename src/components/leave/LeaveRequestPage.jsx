@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   subscribeLeaves,
@@ -597,6 +597,21 @@ export default function LeaveRequestPage() {
   const [approveTarget, setApproveTarget]       = useState(null);
   const [rejectTarget,  setRejectTarget]        = useState(null);
   const [actionSaving,  setActionSaving]        = useState(false);
+  // Race-proof in-flight guard. React batches setState so two clicks
+  // on the Approve button fired in the same tick can both call the
+  // RPC before `actionSaving=true` takes effect. The ref is set
+  // synchronously so the second click bails immediately.
+  const submittingRef = useRef(false);
+  // Errors from the leave_decide RPC that mean "the action you wanted
+  // already happened" — usually because realtime + a double-click
+  // raced. Treat them as silent success: close the modal, refresh.
+  function isAlreadyResolvedError(msg) {
+    if (!msg) return false;
+    const s = String(msg);
+    return /request already decided/i.test(s)
+      || /not authorized to decide this request/i.test(s)
+      || /already at top of approval chain/i.test(s);
+  }
   const [teamFilter, setTeamFilter]             = useState('pending');
   const [teamSearch, setTeamSearch]             = useState('');
   const [teamFilterCategory, setTeamFilterCategory] = useState('');
@@ -709,18 +724,27 @@ export default function LeaveRequestPage() {
       `Your quota will be restored. This cannot be undone.`
     );
     if (!ok) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setActionSaving(true);
     try {
       await withdrawLeave(req.id);
     } catch (e) {
-      alert('Failed to withdraw: ' + (e.message || 'unknown error'));
+      if (isAlreadyResolvedError(e.message)) {
+        // Already withdrawn / decided — quietly succeed.
+      } else {
+        alert('Failed to withdraw: ' + (e.message || 'unknown error'));
+      }
     } finally {
+      submittingRef.current = false;
       setActionSaving(false);
     }
   }
 
   async function handleTeamApprove(forwardToBoss) {
     if (!approveTarget) return;
+    if (submittingRef.current) return; // race-proof against double-click
+    submittingRef.current = true;
     // DIAGNOSTIC — log exactly what the UI is dispatching so we can
     // correlate click → action when the server returns 'not authorized'
     // or the result lands as something the user didn't expect.
@@ -740,19 +764,37 @@ export default function LeaveRequestPage() {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('[handleTeamApprove] failed', { requestId: approveTarget.id, forwardToBoss, error: e });
-      alert('Failed to approve: ' + (e.message || 'unknown'));
-    } finally { setActionSaving(false); }
+      if (isAlreadyResolvedError(e.message)) {
+        // First click already succeeded; realtime will refresh the
+        // list. Close the modal silently instead of scaring the user.
+        setApproveTarget(null);
+      } else {
+        alert('Failed to approve: ' + (e.message || 'unknown'));
+      }
+    } finally {
+      submittingRef.current = false;
+      setActionSaving(false);
+    }
   }
 
   async function handleTeamReject(reason) {
     if (!rejectTarget) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setActionSaving(true);
     try {
       await teamRejectLeave(rejectTarget.id, reason);
       setRejectTarget(null);
     } catch (e) {
-      alert('Failed to reject: ' + (e.message || 'unknown'));
-    } finally { setActionSaving(false); }
+      if (isAlreadyResolvedError(e.message)) {
+        setRejectTarget(null);
+      } else {
+        alert('Failed to reject: ' + (e.message || 'unknown'));
+      }
+    } finally {
+      submittingRef.current = false;
+      setActionSaving(false);
+    }
   }
 
   function applyFilters(list, { statusFilter, searchVal, catFilter, fromDate, toDate, isPendingCheck, pendingStage, requesterRoleFilter }) {
