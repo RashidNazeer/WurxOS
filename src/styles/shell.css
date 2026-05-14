@@ -66,13 +66,20 @@
   height: 34px;
   flex: 0 0 34px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  background: var(--surface-2);
   display: grid;
   place-items: center;
   color: var(--on-accent);
   font-weight: 800;
   font-size: 15px;
   box-shadow: 0 4px 10px -4px var(--accent-ring);
+  overflow: hidden;
+}
+.shell-sidebar-header .brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 .shell-sidebar-header .brand-text {
   overflow: hidden;
