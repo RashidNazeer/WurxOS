@@ -2081,8 +2081,14 @@ export default function AttendancePage() {
                                       sees this button: the pg_cron job at 8h
                                       handles forgotten clock-outs automatically.
                                       Server gate (att_force_close in mig 126)
-                                      also rejects OL even if a stale UI tries. */}
-                                  {!missing && isBoss && eff && eff !== 'clocked-out' && (
+                                      also rejects OL even if a stale UI tries.
+                                      Hidden when the shift is already closed
+                                      (clocked-out, auto-closed, or any row that
+                                      already has a clock_out timestamp). A
+                                      "Close" button on an already-closed shift
+                                      doesn't do anything useful and confuses
+                                      the manager. */}
+                                  {!missing && isBoss && eff && eff !== 'clocked-out' && eff !== 'auto-closed' && !r.clockOut && (
                                     <button className="btn btn-sm btn-outline-danger rounded-pill px-2" style={{ fontSize: '0.65rem' }}
                                       title="Close this user's session"
                                       onClick={() => setForceCloseTarget(r)}>
