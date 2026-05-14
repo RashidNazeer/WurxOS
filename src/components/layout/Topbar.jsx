@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { roleLabel } from '../../lib/roles';
 import ThemeToggle from '../common/ThemeToggle';
 import NotificationBell from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
-import { ChevronDownIcon, LogoutIcon, UserIcon, InstallIcon, MenuIcon } from '../common/Icon';
+import { ChevronDownIcon, LogoutIcon, UserIcon, SettingsIcon, InstallIcon, MenuIcon } from '../common/Icon';
 import { canInstall, onInstallAvailable, promptInstall, isStandalone } from '../../lib/pwa';
 
 export default function Topbar({ title, subtitle, onMobileMenu }) {
   const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [installable, setInstallable] = useState(canInstall());
   const ref = useRef(null);
@@ -83,9 +85,12 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
                 </div>
               </div>
               <div className="shell-user-menu-divider" />
-              <button className="shell-user-menu-item" disabled>
-                <UserIcon width="16" height="16" />
-                Profile (coming soon)
+              <button
+                className="shell-user-menu-item"
+                onClick={() => { setMenuOpen(false); navigate('/settings'); }}
+              >
+                <SettingsIcon width="16" height="16" />
+                Account &amp; settings
               </button>
               {installable && !standalone && (
                 <>

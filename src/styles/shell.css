@@ -441,15 +441,18 @@
 }
 .shell-user-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .shell-user-avatar {
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: var(--on-accent);
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
+  flex: 0 0 40px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
 }
 .shell-user-meta { text-align: left; line-height: 1.15; }
 .shell-user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
