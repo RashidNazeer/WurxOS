@@ -121,9 +121,18 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
             <div className="d-flex align-items-center gap-2 mb-1">
               <i className={`bi ${catCfg.icon}`} style={{ color: catCfg.color }} />
               <span className="fw-semibold small">{getRequestTitle(request)}</span>
-              {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
-              {request.unpaidDays > 0 && !request.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>Unpaid ({request.unpaidDays}d)</span>}
-              {(!request.unpaidDays || request.unpaidDays === 0) && <span className="badge bg-success" style={{ fontSize: '0.6rem' }}>Paid</span>}
+              {request.bossOverrideToPaid ? (
+                <>
+                  <span className="badge bg-success" style={{ fontSize: '0.6rem' }}>Paid</span>
+                  <span className="badge" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.6rem' }}>Boss Override</span>
+                </>
+              ) : (
+                <>
+                  {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
+                  {request.unpaidDays > 0 && !request.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>Unpaid ({request.unpaidDays}d)</span>}
+                  {(!request.unpaidDays || request.unpaidDays === 0) && <span className="badge bg-success" style={{ fontSize: '0.6rem' }}>Paid</span>}
+                </>
+              )}
             </div>
             <div className="text-muted small">{request.startDate} — {request.endDate} · {days} day{days > 1 ? 's' : ''}</div>
             <div className="text-muted small mt-1">{request.reason}</div>
@@ -331,6 +340,10 @@ export default function BossLeaveRequestsPage() {
     const map = {};
     requests.forEach(r => {
       if (r.status === 'rejected' || r.status === 'withdrawn') return;
+      // Skip Boss-overridden requests — these have unpaid_days > 0 in
+      // the DB but Boss flipped paid_override=true, so they're
+      // effectively paid and should not count toward the deduction.
+      if (r.bossOverrideToPaid) return;
       const ud = r.unpaidDays || 0;
       if (ud <= 0) return;
       const reqStart = new Date(r.startDate + 'T00:00:00');
@@ -492,9 +505,19 @@ export default function BossLeaveRequestsPage() {
                             <i className={`bi ${catCfg.icon} me-1`} style={{ fontSize: '0.56rem' }} />{catCfg.label}
                           </span>
                           {r.requesterRole && <span className="text-muted" style={{ fontSize: '0.66rem' }}>{ROLE_LABELS[r.requesterRole] || r.requesterRole}</span>}
-                          {r.unpaidDays > 0 && r.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>}
-                          {r.unpaidDays > 0 && !r.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>Unpaid</span>}
-                          {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>Paid</span>}
+                          {r.bossOverrideToPaid ? (
+                            // Boss-overridden requests are effectively paid;
+                            // suppress the original Unpaid badge so the row
+                            // doesn't read as "Unpaid + Override to Paid"
+                            // (confusing — looks contradictory).
+                            <span className="badge" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>Paid</span>
+                          ) : (
+                            <>
+                              {r.unpaidDays > 0 && r.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>}
+                              {r.unpaidDays > 0 && !r.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>}
+                              {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>Paid</span>}
+                            </>
+                          )}
                           {r.bossOverrideToPaid && <span className="badge" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.58rem' }}>Boss Override to Paid</span>}
                         </div>
                         <div className="fw-medium small mb-1">{title}</div>
