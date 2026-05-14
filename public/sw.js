@@ -14,10 +14,10 @@
  */
 
 const SNOOZE_MINUTES = 10;
-const CACHE_VERSION  = 'wurxos-v1';
+const CACHE_VERSION  = 'wurxos-v2-branding';
 const SHELL_CACHE    = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE    = `${CACHE_VERSION}-assets`;
-const SHELL_URLS     = ['/', '/logo.svg', '/manifest.webmanifest'];
+const SHELL_URLS     = ['/', '/Logo.png', '/favicon.ico', '/logo.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
@@ -86,8 +86,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'WurxOS';
   const options = {
     body:  data.body || '',
-    icon:  '/logo.svg',
-    badge: '/logo.svg',
+    icon:  '/Logo.png',
+    badge: '/Logo.png',
     tag:   data.id || ((data.tag || 'wurxos') + '-' + Date.now()),
     requireInteraction: true,
     renotify: true,

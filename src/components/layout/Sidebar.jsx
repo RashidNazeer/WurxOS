@@ -40,10 +40,12 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
   return (
     <aside className="shell-sidebar">
       <div className="shell-sidebar-header">
-        <div className="brand-mark">W</div>
+        <div className="brand-mark">
+          <img src="/Logo.png" alt="WurxOS" />
+        </div>
         <div className="brand-text">
           <div className="brand-name">WurxOS</div>
-          <div className="brand-sub">v2</div>
+          <div className="brand-sub">by Wurx Media</div>
         </div>
         {/* On mobile (drawer open), this button is a CLOSE button — the
             drawer slides shut. On desktop, it toggles the collapsed rail.
@@ -119,7 +121,7 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
       <div className="shell-sidebar-footer">
         <div className="shell-sidebar-footer-brand">
           <span className="shell-sidebar-footer-dot" />
-          <span>WurxOS · v2</span>
+          <span>WurxOS · v2 · by Wurx Media</span>
         </div>
         <button
           type="button"
