@@ -629,26 +629,39 @@ export async function rejectBreakEdit(attendanceId, rejectionReason) {
 }
 
 async function _decideEdit(attendanceId, field, approve, note = null) {
-  // Look up the latest pending edit-request for (attendance, field)
-  // and decide it. v1's UI passes (attendanceId, approverId) so we
-  // resolve the editId here.
-  const { data: pending, error: pErr } = await supabase
+  // Look up the latest edit-request for (attendance, field). Used to
+  // resolve the editId for v1-style callers that pass attendanceId.
+  //
+  // Idempotency: if the latest request is already decided, return it
+  // as a no-op success. A double-click would otherwise hit either
+  // "No pending edit request" here or "already decided" server-side —
+  // both are benign once the first click went through, and the user
+  // doesn't want to see them as a failed action.
+  const { data: latest, error: pErr } = await supabase
     .from('attendance_edit_requests')
-    .select('id')
+    .select('id, status, field')
     .eq('attendance_id', attendanceId)
     .eq('field', field)
-    .eq('status', 'pending')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (pErr) throw new Error(pErr.message);
-  if (!pending) throw new Error('No pending edit request for this attendance row.');
+  if (!latest) throw new Error('No edit request found for this attendance row.');
+  if (latest.status !== 'pending') {
+    // Already approved or rejected — treat as success.
+    return latest;
+  }
   const { data, error } = await supabase.rpc('att_decide_edit', {
-    p_edit_id: pending.id,
+    p_edit_id: latest.id,
     p_approve: !!approve,
     p_note:    note,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Server can also race and say "already decided" if another tab
+    // beat us. Same idempotent treatment.
+    if (/already decided/i.test(error.message)) return latest;
+    throw new Error(error.message);
+  }
   return data;
 }
 
@@ -666,13 +679,25 @@ export async function rejectEditClockOut(attendanceId, _approverId, rejectionRea
 }
 
 // Decide-by-edit-request-id — for v2 callers that already hold the id.
+// Idempotent: "already decided" is treated as a successful no-op so a
+// double-click doesn't surface an error to the manager.
 export async function decideAttendanceEdit({ editId, approve, note = null }) {
   const { data, error } = await supabase.rpc('att_decide_edit', {
     p_edit_id: editId,
     p_approve: !!approve,
     p_note:    note,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/already decided/i.test(error.message)) {
+      const { data: existing } = await supabase
+        .from('attendance_edit_requests')
+        .select('id, status, field, decided_by, decided_at')
+        .eq('id', editId)
+        .maybeSingle();
+      return existing || { id: editId, status: approve ? 'approved' : 'rejected' };
+    }
+    throw new Error(error.message);
+  }
   return data;
 }
 
