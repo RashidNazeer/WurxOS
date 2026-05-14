@@ -110,15 +110,30 @@ export function ErrorReporterProvider({ children }) {
       // ResizeObserver loops, etc.). Filter conservatively — better
       // a false positive than missing a real bug.
       const r = e.reason;
-      const msg = extractMessage(r);
-      if (/AbortError|ResizeObserver loop|cancell?ed/i.test(msg)) return;
+      const msg  = extractMessage(r);
+      const name = String(r?.name || '');
+      // AbortError covers two common benign rejections:
+      //   1. Cancelled fetches (TanStack Query/AbortController teardown)
+      //   2. Supabase Auth cross-tab lock coordination — when a new
+      //      tab opens it calls navigator.locks.request with
+      //      `steal: true` to take over auth state; the older tabs
+      //      see "Lock broken by another request with the 'steal'
+      //      option." with name=AbortError, code=20. This is the
+      //      auth client working as designed — older tabs' refresh
+      //      requests fail loudly so the new tab can take over.
+      // Match on err.name first because err.message varies; fall
+      // back to message text for older browsers that don't set name.
+      if (name === 'AbortError') return;
+      if (/AbortError|ResizeObserver loop|cancell?ed|Lock broken/i.test(msg)) return;
       // Stale-deploy: silently reload instead of showing the modal.
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(r, 'unhandled_rejection');
     };
     const onError = (e) => {
-      const msg = String(e?.message || '');
-      if (/ResizeObserver loop|Script error/i.test(msg)) return;
+      const msg  = String(e?.message || '');
+      const name = String(e?.error?.name || '');
+      if (name === 'AbortError') return;
+      if (/ResizeObserver loop|Script error|Lock broken/i.test(msg)) return;
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(e?.error || e, 'window_error');
     };
