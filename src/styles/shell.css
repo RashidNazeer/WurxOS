@@ -118,13 +118,53 @@
 .shell-sidebar-footer {
   margin-top: auto;
   flex-shrink: 0;
-  padding: 8px 10px 10px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  padding: 10px 10px 12px;
   border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+/* Branded footer card — replaces the single-line status text with a
+   small "made by Wurx Media" tile. Subtle accent gradient + logo
+   thumbnail makes the bottom of the sidebar feel finished instead of
+   trailing off into plain text. */
+.shell-sidebar-footer-card {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 9%, transparent),
+      color-mix(in srgb, var(--accent) 2%, transparent)
+    );
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-subtle));
+}
+.shell-sidebar-footer-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.shell-sidebar-footer-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.shell-sidebar-footer-text {
+  min-width: 0;
+  line-height: 1.25;
+}
+.shell-sidebar-footer-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
 }
 
 /* User mini card at the top of the footer — avatar + name + role.
@@ -188,14 +228,18 @@
 }
 .shell-sidebar-footer-btn svg { opacity: 0.85; }
 
-.shell-sidebar-footer-brand {
-  display: flex;
+.shell-sidebar-footer-sub {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 10.5px;
   font-weight: 600;
   color: var(--text-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 .shell-sidebar-footer-dot {
@@ -204,17 +248,28 @@
   background: var(--success);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent);
   flex: 0 0 auto;
+  animation: footer-dot-pulse 3s ease-in-out infinite;
+}
+@keyframes footer-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent); }
+  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 28%, transparent); }
 }
 
-/* Collapsed sidebar — hide labels, center the icons */
-.shell[data-collapsed='true'] .shell-sidebar-footer {
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 6px 10px;
-  gap: 6px;
+/* Collapsed sidebar — show just the logo tile, hide text */
+.shell[data-collapsed='true'] .shell-sidebar-footer-card {
+  grid-template-columns: 1fr;
+  padding: 6px;
+  justify-items: center;
+  background: transparent;
+  border: none;
 }
-.shell[data-collapsed='true'] .shell-sidebar-footer-brand {
+.shell[data-collapsed='true'] .shell-sidebar-footer-text,
+.shell[data-collapsed='true'] .shell-sidebar-footer-btn {
   display: none;
+}
+.shell[data-collapsed='true'] .shell-sidebar-footer-logo {
+  width: 32px;
+  height: 32px;
 }
 
 .shell-nav-section-label {

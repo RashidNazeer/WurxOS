@@ -119,19 +119,27 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
       </nav>
 
       <div className="shell-sidebar-footer">
-        <div className="shell-sidebar-footer-brand">
-          <span className="shell-sidebar-footer-dot" />
-          <span>WurxOS · v2 · by Wurx Media</span>
+        <div className="shell-sidebar-footer-card">
+          <div className="shell-sidebar-footer-logo">
+            <img src="/Logo.png" alt="Wurx Media" />
+          </div>
+          <div className="shell-sidebar-footer-text">
+            <div className="shell-sidebar-footer-title">Wurx Media</div>
+            <div className="shell-sidebar-footer-sub">
+              <span className="shell-sidebar-footer-dot" />
+              WurxOS · v2 · Operational
+            </div>
+          </div>
+          <button
+            type="button"
+            className="shell-sidebar-footer-btn"
+            onClick={openShortcuts}
+            title="Keyboard shortcuts"
+            aria-label="Keyboard shortcuts"
+          >
+            <HelpIcon width="14" height="14" />
+          </button>
         </div>
-        <button
-          type="button"
-          className="shell-sidebar-footer-btn"
-          onClick={openShortcuts}
-          title="Keyboard shortcuts"
-          aria-label="Keyboard shortcuts"
-        >
-          <HelpIcon width="14" height="14" />
-        </button>
       </div>
     </aside>
   );
