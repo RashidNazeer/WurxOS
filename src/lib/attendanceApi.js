@@ -1303,14 +1303,23 @@ export async function scanLeaveQuotaConflicts(newQuota) {
 // ────────────────────────────────────────────────────────────
 export async function checkApcDailyTasks(uid) {
   // Daily tasks assigned to me, not done/completed.
+  // brand.status is pulled so we can filter out frozen tasks — those
+  // belong to inactive brands (mig 171) and can't be moved to done
+  // without reactivating the brand, so they shouldn't block clock-out.
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, brand_id, status, brand:brand_id(brand_name)')
+    .select('id, brand_id, status, brand:brand_id(brand_name, status)')
     .eq('assignee_id', uid)
     .eq('category', 'daily')
     .not('status', 'in', '(done,completed)');
   if (error) throw new Error(error.message);
-  const incomplete = data || [];
+  const incomplete = (data || []).filter((t) => {
+    // Personal tasks (no brand_id) always count.
+    if (!t.brand_id) return true;
+    // Brand-scoped: only count if brand is active. Tasks on inactive
+    // brands are frozen and can't be completed by the user.
+    return t.brand?.status === 'active';
+  });
   if (incomplete.length === 0) return { ok: true };
   // Surface the brand of the FIRST incomplete task — same UX as v1.
   const first = incomplete[0];

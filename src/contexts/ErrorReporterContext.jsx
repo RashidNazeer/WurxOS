@@ -125,6 +125,12 @@ export function ErrorReporterProvider({ children }) {
       // back to message text for older browsers that don't set name.
       if (name === 'AbortError') return;
       if (/AbortError|ResizeObserver loop|cancell?ed|Lock broken/i.test(msg)) return;
+      // Inactive-brand task freeze (mig 171) — local handlers in
+      // TaskRow / TaskKanban / TasksPage already show a friendly
+      // notice. If one slips through, don't escalate to the
+      // "report to developer" modal; the user knows their brand
+      // is inactive.
+      if (/brand is inactive|inactive brand/i.test(msg)) return;
       // Stale-deploy: silently reload instead of showing the modal.
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(r, 'unhandled_rejection');
@@ -134,6 +140,7 @@ export function ErrorReporterProvider({ children }) {
       const name = String(e?.error?.name || '');
       if (name === 'AbortError') return;
       if (/ResizeObserver loop|Script error|Lock broken/i.test(msg)) return;
+      if (/brand is inactive|inactive brand/i.test(msg)) return;
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(e?.error || e, 'window_error');
     };

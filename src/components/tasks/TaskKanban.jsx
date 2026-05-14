@@ -37,9 +37,16 @@ export default function TaskKanban({ rows, canEditRow, currentUserId, onEdit, on
     try {
       const updated = await updateTask(id, { status: targetStatus });
       onLocalPatch?.({ ...row, ...(updated || { status: targetStatus }) });
-    } catch (_) {
-      // Revert on failure
+    } catch (err) {
+      // Revert on failure.
       onLocalPatch?.(row);
+      // mig 171 freeze trigger: surface a friendly message + mark
+      // the row as inactive locally so further drags are no-ops.
+      const msg = String(err?.message || '');
+      if (/brand is inactive|inactive brand/i.test(msg)) {
+        onLocalPatch?.({ ...row, brand: { ...(row.brand || {}), status: 'inactive' } });
+        alert("This task's brand is inactive — the task is frozen until the brand is reactivated.");
+      }
     }
   }
 
