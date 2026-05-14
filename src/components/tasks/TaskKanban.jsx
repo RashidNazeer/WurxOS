@@ -26,6 +26,9 @@ export default function TaskKanban({ rows, canEditRow, currentUserId, onEdit, on
     const row = rows.find((r) => r.id === id);
     if (!row || row.status === targetStatus) return;
 
+    // Brand-inactive tasks are frozen — drag-and-drop is a no-op. The
+    // server-side trigger (mig 171) would reject the update anyway.
+    if (row.brand?.status === 'inactive') return;
     const canChange = canEditRow(row) || row.assignee_id === currentUserId;
     if (!canChange) return;
 

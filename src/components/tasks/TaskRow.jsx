@@ -31,7 +31,10 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
     && task.created_by === task.assignee_id
     && task.assignee_id === currentUserId;
 
-  const canChangeStatus = canEdit || task.assignee_id === currentUserId;
+  // Frozen if the task's brand is inactive (mig 171). When frozen, no
+  // status changes, no deletes — only reactivating the brand unlocks.
+  const brandInactive = task.brand?.status === 'inactive';
+  const canChangeStatus = !brandInactive && (canEdit || task.assignee_id === currentUserId);
   const done = task.status === 'done';
   // Recurring tasks (daily/weekly/monthly) reset on their own
   // schedule, so they intentionally don't carry a due date and can
@@ -273,8 +276,10 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
         )}
       </div>
 
-      {/* Edit button (creator / admin / brand owner) */}
-      {canEdit ? (
+      {/* Edit button (creator / admin / brand owner). Hidden when the
+          task's brand is inactive — the row is read-only until the brand
+          is reactivated (mig 171 blocks server-side too). */}
+      {canEdit && !brandInactive ? (
         <button
           className="wx-btn wx-btn-ghost"
           onClick={onEdit}
@@ -282,6 +287,25 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
         >
           <PencilIcon width="13" height="13" /> Edit
         </button>
+      ) : brandInactive ? (
+        <span
+          className="task-chip"
+          title="This brand is inactive — task is frozen until reactivated"
+          style={{
+            background: '#f3f4f6',
+            color: '#6b7280',
+            border: '1px solid #d1d5db',
+            fontSize: 11,
+            fontWeight: 600,
+            padding: '4px 10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <i className="bi bi-snow" /> Frozen
+        </span>
       ) : (
         <span />
       )}

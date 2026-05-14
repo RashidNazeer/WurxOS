@@ -81,6 +81,9 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
   const status   = STATUS_META[task.status]     || STATUS_META.todo;
   const priority = PRIORITY_META[task.priority] || PRIORITY_META.medium;
   const category = CATEGORY_META[task.category] || CATEGORY_META.general;
+  // Frozen if attached to an inactive brand (mig 171). Hides Edit and
+  // shows an inline banner so the reader knows why writes are blocked.
+  const brandInactive = task.brand?.status === 'inactive';
   // Recurring tasks never have a meaningful due — skip the chip.
   const due = task.category && task.category !== 'general'
     ? null
@@ -107,7 +110,7 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {canEdit && (
+            {canEdit && !brandInactive && (
               <button
                 type="button"
                 className="wx-btn wx-btn-ghost"
@@ -125,6 +128,29 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
         </div>
 
         <div className="wx-modal-body" style={{ paddingBottom: 8 }}>
+          {brandInactive && (
+            <div
+              style={{
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                color: '#374151',
+                borderRadius: 8,
+                padding: '10px 12px',
+                marginBottom: 14,
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <i className="bi bi-snow" style={{ fontSize: 16, color: '#6b7280' }} />
+              <span>
+                <strong>Frozen</strong> — this task's brand
+                {task.brand?.brand_name ? ` (${task.brand.brand_name})` : ''} is currently
+                inactive. Status, due date, and deletion are locked until the brand is reactivated.
+              </span>
+            </div>
+          )}
           {/* Status / priority / category / due — chips */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
             <span style={{ ...chipBase, color: status.fg }}>
