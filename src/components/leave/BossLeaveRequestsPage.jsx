@@ -334,9 +334,11 @@ export default function BossLeaveRequestsPage() {
   const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const unpaidSummary = useMemo(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // All unpaid (non-overridden, non-rejected, non-withdrawn) requests
+    // — not month-scoped. A request from a prior month that wasn't
+    // overridden is still pending deduction. Per-user aggregation
+    // with a month-by-month breakdown so the payroll-runner can see
+    // both the total and which periods the days come from.
     const map = {};
     requests.forEach(r => {
       if (r.status === 'rejected' || r.status === 'withdrawn') return;
@@ -346,11 +348,11 @@ export default function BossLeaveRequestsPage() {
       if (r.bossOverrideToPaid) return;
       const ud = r.unpaidDays || 0;
       if (ud <= 0) return;
-      const reqStart = new Date(r.startDate + 'T00:00:00');
-      if (reqStart < monthStart || reqStart > monthEnd) return;
       const key = r.requestedBy;
-      if (!map[key]) map[key] = { name: r.requesterName, email: r.requesterEmail, role: r.requesterRole, days: 0 };
+      if (!map[key]) map[key] = { name: r.requesterName, email: r.requesterEmail, role: r.requesterRole, days: 0, byMonth: {} };
       map[key].days += ud;
+      const ym = (r.startDate || '').slice(0, 7); // 'YYYY-MM'
+      if (ym) map[key].byMonth[ym] = (map[key].byMonth[ym] || 0) + ud;
     });
     return Object.values(map).sort((a, b) => b.days - a.days);
   }, [requests]);
@@ -431,18 +433,42 @@ export default function BossLeaveRequestsPage() {
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-2">
               <i className="bi bi-exclamation-triangle text-warning" />
-              <span className="fw-semibold small">Unpaid Leave Summary — {currentMonthLabel} (for salary deduction)</span>
+              <span className="fw-semibold small">Unpaid Leave Summary — pending salary deduction</span>
             </div>
             <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
-              <thead><tr style={{ color: '#9ca3af' }}><th>Employee</th><th>Role</th><th>Unpaid Days</th></tr></thead>
+              <thead>
+                <tr style={{ color: '#9ca3af' }}>
+                  <th>Employee</th>
+                  <th>Role</th>
+                  <th>Unpaid Days</th>
+                  <th>Breakdown</th>
+                </tr>
+              </thead>
               <tbody>
-                {unpaidSummary.map((u, i) => (
-                  <tr key={i}>
-                    <td><span className="fw-medium">{u.name}</span> <span className="text-muted">· {u.email}</span></td>
-                    <td>{ROLE_LABELS[u.role] || u.role}</td>
-                    <td><span className="badge bg-warning text-dark">{u.days} day{u.days > 1 ? 's' : ''}</span></td>
-                  </tr>
-                ))}
+                {unpaidSummary.map((u, i) => {
+                  const months = Object.entries(u.byMonth || {})
+                    .sort(([a], [b]) => b.localeCompare(a));
+                  return (
+                    <tr key={i}>
+                      <td><span className="fw-medium">{u.name}</span> <span className="text-muted">· {u.email}</span></td>
+                      <td>{ROLE_LABELS[u.role] || u.role}</td>
+                      <td><span className="badge bg-warning text-dark">{u.days} day{u.days > 1 ? 's' : ''}</span></td>
+                      <td>
+                        <div className="d-flex flex-wrap gap-1" style={{ fontSize: '0.7rem' }}>
+                          {months.map(([ym, d]) => {
+                            const [yy, mm] = ym.split('-').map(Number);
+                            const label = new Date(yy, mm - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                            return (
+                              <span key={ym} className="badge" style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', fontWeight: 500 }}>
+                                {label}: {d}d
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
