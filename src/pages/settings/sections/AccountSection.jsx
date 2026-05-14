@@ -7,6 +7,7 @@ import {
   UserIcon, AlertIcon, CheckIcon, LockIcon, EyeIcon, EyeOffIcon, XIcon,
 } from '../../../components/common/Icon';
 import SectionShell from './SectionShell';
+import AvatarEditorModal from '../../../components/account/AvatarEditorModal';
 
 export default function AccountSection() {
   const { user, profile, refreshProfile } = useAuth();
@@ -20,29 +21,46 @@ export default function AccountSection() {
   const [savingPw, setSavingPw]   = useState(false);
 
   const [uploading, setUploading] = useState(false);
+  // Holds the raw file the user picked. When set, the AvatarEditorModal
+  // opens so they can drag/zoom to position the photo inside a circle
+  // before it's uploaded. The modal returns a 512×512 PNG blob.
+  const [editingFile, setEditingFile] = useState(null);
 
   const [error, setError]         = useState('');
   const [success, setSuccess]     = useState('');
 
-  async function onAvatarPick(e) {
+  function onAvatarPick(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { setError('Avatar must be ≤ 2 MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Photo must be ≤ 5 MB before editing. Pick a smaller source image.');
+      e.target.value = '';
+      return;
+    }
+    setError('');
+    setEditingFile(file);
+    e.target.value = '';
+  }
+
+  async function uploadEditedAvatar({ blob }) {
     setError(''); setUploading(true);
     try {
-      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'png';
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      const up = await supabase.storage.from('avatars').upload(path, file, {
-        cacheControl: '3600', contentType: file.type || 'image/*', upsert: true,
+      const path = `${user.id}/${Date.now()}.png`;
+      const up = await supabase.storage.from('avatars').upload(path, blob, {
+        cacheControl: '3600', contentType: 'image/png', upsert: true,
       });
       if (up.error) throw up.error;
       const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
       await updateUserProfile(user.id, { avatar_url: pub.publicUrl });
       await refreshProfile();
       setSuccess('Avatar updated.');
+      setEditingFile(null);
       setTimeout(() => setSuccess(''), 2500);
-    } catch (err) { setError(err.message || 'Upload failed.'); }
-    finally { setUploading(false); e.target.value = ''; }
+    } catch (err) {
+      setError(err.message || 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function removeAvatar() {
@@ -122,7 +140,7 @@ export default function AccountSection() {
         <div className="settings-row">
           <div>
             <div className="settings-row-label-title">Profile photo</div>
-            <div className="settings-row-label-sub">Square PNG/JPG up to 2 MB. Used in the topbar and task cards.</div>
+            <div className="settings-row-label-sub">PNG / JPG up to 5 MB. After picking, drag and zoom to frame the photo inside a circle.</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {profile?.avatar_url ? (
@@ -256,6 +274,15 @@ export default function AccountSection() {
           </div>
         </form>
       </SectionShell>
+
+      {editingFile && (
+        <AvatarEditorModal
+          file={editingFile}
+          saving={uploading}
+          onCancel={() => { if (!uploading) setEditingFile(null); }}
+          onSave={uploadEditedAvatar}
+        />
+      )}
     </>
   );
 }
