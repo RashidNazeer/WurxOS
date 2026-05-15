@@ -375,6 +375,41 @@
 .notif-row-icon-paid   { background: rgba(16, 185, 129, 0.18);   color: #10b981; }
 .notif-row-icon-system { background: var(--surface-3);           color: var(--text-muted); }
 
+/* Actor avatar variant — the person's DP with a small category
+   badge, used on rows whose notification has an actor. */
+.notif-row-avatar {
+  position: relative;
+  width: 40px; height: 40px;
+  flex: 0 0 40px;
+}
+.notif-row-avatar-photo {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+.notif-row-avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
+.notif-row-avatar-cat {
+  position: absolute;
+  right: -2px; bottom: -2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface-1);
+  color: #fff;
+}
+.notif-row-avatar-cat-task   { background: var(--accent); }
+.notif-row-avatar-cat-report { background: #818cf8; }
+.notif-row-avatar-cat-brand  { background: #eab308; }
+.notif-row-avatar-cat-paid   { background: #10b981; }
+.notif-row-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
+
 .notif-row-content { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .notif-row-title {
   font-weight: 700;
