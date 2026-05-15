@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getMenuForRole } from './menu';
-import { ChevronRightIcon, MenuIcon, HelpIcon, SearchIcon, XIcon } from '../common/Icon';
+import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
 
 export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobileClose }) {
@@ -137,7 +137,7 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
             title="Keyboard shortcuts"
             aria-label="Keyboard shortcuts"
           >
-            <HelpIcon width="14" height="14" />
+            <i className="bi bi-keyboard" aria-hidden="true" />
           </button>
         </div>
       </div>
