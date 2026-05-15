@@ -177,6 +177,23 @@ function curve(x1, y1, x2, y2) {
 
 // ── Card components ────────────────────────────────────────────────────
 
+// Renders the user's real profile photo when available, otherwise the
+// role-coloured initials box.
+function AvatarBox({ src, name, size, fontSize, background, color = '#fff' }) {
+  if (src) {
+    return (
+      <img src={src} alt={name || ''} className="rounded-3 flex-shrink-0"
+        style={{ width: size, height: size, objectFit: 'cover', display: 'block' }} />
+    );
+  }
+  return (
+    <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+      style={{ width: size, height: size, background, color, fontSize }}>
+      {initialsOf(name)}
+    </div>
+  );
+}
+
 function BossCard({ nodeRef, user }) {
   const c = ROLE_COLORS.boss;
   return (
@@ -187,10 +204,8 @@ function BossCard({ nodeRef, user }) {
         boxShadow: '0 10px 30px rgba(15,23,42,0.35)',
         minWidth: 220,
       }}>
-      <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-        style={{ width: 38, height: 38, background: '#fff', color: c.solid, fontSize: '0.8rem' }}>
-        {initialsOf(user.displayName || user.email)}
-      </div>
+      <AvatarBox src={user.avatar_url} name={user.displayName || user.email}
+        size={38} fontSize="0.8rem" background="#fff" color={c.solid} />
       <div className="min-w-0">
         <div className="fw-bold text-truncate" style={{ fontSize: '0.92rem' }}>{user.displayName || user.email}</div>
         <div className="d-inline-block rounded-pill px-2"
@@ -207,10 +222,8 @@ function OLCard({ nodeRef, user, reportCount }) {
   return (
     <div ref={nodeRef} className="node-pop d-inline-flex align-items-center gap-2 rounded-3 px-3 py-2"
       style={{ background: c.light, border: `1px solid ${c.solid}30`, boxShadow: '0 4px 14px rgba(124,58,237,0.18)', minWidth: 220 }}>
-      <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-        style={{ width: 38, height: 38, background: `linear-gradient(135deg, ${c.solid}, #5b21b6)`, fontSize: '0.78rem' }}>
-        {initialsOf(user.displayName || user.email)}
-      </div>
+      <AvatarBox src={user.avatar_url} name={user.displayName || user.email}
+        size={38} fontSize="0.78rem" background={`linear-gradient(135deg, ${c.solid}, #5b21b6)`} />
       <div className="min-w-0">
         <div className="fw-bold text-truncate" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{user.displayName || user.email}</div>
         <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.6rem' }}>
@@ -233,10 +246,8 @@ function TeamCard({ nodeRef, tl, onClickTl, onClickMember, onClickBrand }) {
       <button type="button" onClick={onClickTl}
         className="d-flex align-items-center gap-2 p-3 text-start border-0 w-100"
         style={{ background: c.light, borderBottom: `1px solid ${c.solid}25`, cursor: 'pointer' }}>
-        <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-          style={{ width: 36, height: 36, background: `linear-gradient(135deg, ${c.solid}, ${c.text})`, fontSize: '0.72rem' }}>
-          {initialsOf(tl.displayName || tl.email)}
-        </div>
+        <AvatarBox src={tl.avatar_url} name={tl.displayName || tl.email}
+          size={36} fontSize="0.72rem" background={`linear-gradient(135deg, ${c.solid}, ${c.text})`} />
         <div className="flex-grow-1 min-w-0">
           <div className="fw-semibold text-truncate" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{tl.displayName || tl.email}</div>
           <span className="rounded-pill px-2" style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: '#fff' }}>
@@ -289,10 +300,8 @@ function MemberRow({ m, onClickMember, onClickBrand }) {
       <button type="button" onClick={onClickMember}
         className="d-flex align-items-center gap-2 border-0 w-100 text-start"
         style={{ background: 'transparent', cursor: 'pointer' }}>
-        <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-          style={{ width: 28, height: 28, background: `linear-gradient(135deg, ${c.solid}, ${c.text})`, fontSize: '0.62rem' }}>
-          {initialsOf(m.userName || m.email)}
-        </div>
+        <AvatarBox src={m.avatar_url} name={m.userName || m.email}
+          size={28} fontSize="0.62rem" background={`linear-gradient(135deg, ${c.solid}, ${c.text})`} />
         <div className="flex-grow-1 min-w-0">
           <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: '#0f172a' }}>{m.userName || m.email}</div>
           <span className="rounded-pill px-2" style={{ fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: '#fff' }}>

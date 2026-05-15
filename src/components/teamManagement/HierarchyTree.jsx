@@ -94,7 +94,13 @@ function RoleBadge({ role }) {
   );
 }
 
-function Avatar({ name, size = 26, role }) {
+function Avatar({ name, size = 26, role, src }) {
+  if (src) {
+    return (
+      <img src={src} alt={name || ''} className="rounded-3 flex-shrink-0"
+        style={{ width: size, height: size, objectFit: 'cover', display: 'block' }} />
+    );
+  }
   const c = ROLE_COLORS[role] || { solid: '#3b82f6', text: '#1e3a8a' };
   return (
     <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
@@ -119,7 +125,7 @@ function BossNode({ user, open, onToggle, reportsCount, brandsCount, children })
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
-        <Avatar name={user.displayName || user.email} size={32} role="boss" />
+        <Avatar name={user.displayName || user.email} size={32} role="boss" src={user.avatar_url} />
         <span className="fw-bold" style={{ fontSize: '0.92rem', color: '#0f172a' }}>{user.displayName || user.email}</span>
         <RoleBadge role="boss" />
         <MetaRight>
@@ -142,7 +148,7 @@ function OLNode({ user, open, onToggle, reportCount, children }) {
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
-        <Avatar name={user.displayName || user.email} size={28} role="ol" />
+        <Avatar name={user.displayName || user.email} size={28} role="ol" src={user.avatar_url} />
         <span className="fw-semibold" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{user.displayName || user.email}</span>
         <RoleBadge role="ol" />
         <MetaRight>
@@ -163,7 +169,7 @@ function TLNode({ tl, open, onToggle, onSelect, isOpen, onMemberToggle }) {
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
-        <Avatar name={tl.displayName || tl.email} size={28} role={tl.role === 'pctl' ? 'pctl' : 'tl'} />
+        <Avatar name={tl.displayName || tl.email} size={28} role={tl.role === 'pctl' ? 'pctl' : 'tl'} src={tl.avatar_url} />
         <button type="button"
           onClick={() => onSelect({ type: 'tl', tl })}
           className="border-0 bg-transparent p-0 fw-semibold text-start"
@@ -213,7 +219,7 @@ function MemberNode({ m, tl, open, onToggle, onSelect }) {
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
-        <Avatar name={m.userName || m.email} size={26} role={role} />
+        <Avatar name={m.userName || m.email} size={26} role={role} src={m.avatar_url} />
         <button type="button"
           onClick={() => onSelect({ type: 'member', member: m, tl })}
           className="border-0 bg-transparent p-0 fw-semibold text-start"

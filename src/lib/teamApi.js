@@ -113,6 +113,7 @@ export async function fetchHierarchy() {
         userName: p.display_name,
         email: p.email,
         userType: p.role,
+        avatar_url: p.avatar_url,
         ownerId: p.reports_to,
         ownerName: owner?.display_name || '',
         assignedBrands,
