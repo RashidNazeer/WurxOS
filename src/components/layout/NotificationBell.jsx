@@ -194,7 +194,7 @@ function NotifItem({ n, onClick }) {
         {n.actor?.avatar_url
           ? <img src={n.actor.avatar_url} alt="" />
           : <span>{initialsOf(n.actor?.display_name) || '·'}</span>}
-        <span className={`notif-avatar-cat notif-avatar-cat-${n.category}`}>
+        <span className={`notif-avatar-cat notif-avatar-cat-${CATEGORY_META[n.category] ? n.category : 'system'}`}>
           <Icon width="9" height="9" />
         </span>
       </div>

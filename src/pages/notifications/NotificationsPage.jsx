@@ -44,6 +44,11 @@ const CATEGORY_META = {
   system:         { Icon: BellIcon,      tone: 'system', bi: 'bi-bell-fill' },
 };
 
+function initialsOf(name) {
+  if (!name) return '';
+  return String(name).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
+}
+
 export default function NotificationsPage() {
   const { items, counts, reload, markRead, markAllRead } = useNotifications();
   const navigate = useNavigate();
@@ -171,9 +176,25 @@ export default function NotificationsPage() {
                 className={`notif-row ${n.read_at ? '' : 'notif-row-unread'}`}
                 onClick={() => handleClick(n)}
               >
-                <div className={`notif-row-icon notif-row-icon-${meta.tone}`}>
-                  <Icon width="18" height="18" />
-                </div>
+                {n.actor ? (
+                  <div className="notif-row-avatar">
+                    <div className="notif-row-avatar-photo">
+                      {n.actor.avatar_url
+                        ? <img src={n.actor.avatar_url} alt={n.actor.display_name || ''} />
+                        : <span>{initialsOf(n.actor.display_name) || '·'}</span>}
+                    </div>
+                    <span
+                      className={`notif-row-avatar-cat notif-row-avatar-cat-${meta.tone}`}
+                      title={CATEGORY_LABEL[n.category] || n.category}
+                    >
+                      <Icon width="10" height="10" />
+                    </span>
+                  </div>
+                ) : (
+                  <div className={`notif-row-icon notif-row-icon-${meta.tone}`}>
+                    <Icon width="18" height="18" />
+                  </div>
+                )}
                 <div className="notif-row-content">
                   <div className="notif-row-title">{n.title}</div>
                   {n.body && <div className="notif-row-body">{n.body}</div>}
