@@ -259,7 +259,10 @@ export function getEffectiveStatus(record) {
 // Active record (cross-midnight safe)
 // ────────────────────────────────────────────────────────────
 export async function getActiveRecord(uid) {
-  const { data, error } = await supabase
+  // 1. Any genuinely OPEN shift (clock_out null). Covers cross-midnight:
+  //    a shift started yesterday evening that's still running at 1am
+  //    needs to surface so the user can clock out of it.
+  const { data: open, error: e1 } = await supabase
     .from('attendance')
     .select(SELECT_WITH_USER_AND_EDITS)
     .eq('user_id', uid)
@@ -268,8 +271,25 @@ export async function getActiveRecord(uid) {
     .order('clock_in', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  return _normalize(data);
+  if (e1) throw new Error(e1.message);
+  if (open) return _normalize(open);
+
+  // 2. No open shift — return TODAY's shift-day row even if it's
+  //    clocked out. The widget needs the clocked-out record so it can
+  //    show the accurate "last clock-in" stats and offer the
+  //    "Resume shift" recovery (mig 173). Shift day rolls at 3pm PKT;
+  //    `date` on the row is already the shift day (set by att_clock_in).
+  const shiftDay = new Date(getNow() - 10 * 3600000).toISOString().slice(0, 10);
+  const { data: todayRow, error: e2 } = await supabase
+    .from('attendance')
+    .select(SELECT_WITH_USER_AND_EDITS)
+    .eq('user_id', uid)
+    .eq('date', shiftDay)
+    .order('clock_in', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (e2) throw new Error(e2.message);
+  return _normalize(todayRow);
 }
 
 // Drop-in for v1's onActiveRecord(uid, callback). Returns an
