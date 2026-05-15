@@ -211,10 +211,20 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
 export default function BossLeaveRequestsPage() {
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
+  // Salary-deduction view is Boss-only. Developer accounts see this
+  // page for support but shouldn't see payroll-sensitive information.
+  const isBossOnly = (profile?.role || '').toLowerCase() === 'boss';
   const [requests, setRequests] = useState([]);
   const [loading, setLoading]   = useState(true);
 
   const [activeTab,      setActiveTab]      = useState('pending');
+  // Month-scoped view for the Unpaid tab. Default to current month;
+  // the Boss can step backwards (e.g., to process April deductions
+  // mid-May). Stored as 'YYYY-MM'.
+  const [unpaidMonth,    setUnpaidMonth]    = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [search,         setSearch]         = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
@@ -334,28 +344,43 @@ export default function BossLeaveRequestsPage() {
   const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const unpaidSummary = useMemo(() => {
-    // All unpaid (non-overridden, non-rejected, non-withdrawn) requests
-    // — not month-scoped. A request from a prior month that wasn't
-    // overridden is still pending deduction. Per-user aggregation
-    // with a month-by-month breakdown so the payroll-runner can see
-    // both the total and which periods the days come from.
+    // Per-user unpaid-day totals for the selected unpaidMonth.
+    // Skips Boss-overridden requests (effectively paid via paid_override)
+    // and any rejected/withdrawn rows. Month is matched against
+    // r.startDate's YYYY-MM prefix.
     const map = {};
     requests.forEach(r => {
       if (r.status === 'rejected' || r.status === 'withdrawn') return;
-      // Skip Boss-overridden requests — these have unpaid_days > 0 in
-      // the DB but Boss flipped paid_override=true, so they're
-      // effectively paid and should not count toward the deduction.
       if (r.bossOverrideToPaid) return;
       const ud = r.unpaidDays || 0;
       if (ud <= 0) return;
+      if (!r.startDate || r.startDate.slice(0, 7) !== unpaidMonth) return;
       const key = r.requestedBy;
-      if (!map[key]) map[key] = { name: r.requesterName, email: r.requesterEmail, role: r.requesterRole, days: 0, byMonth: {} };
+      if (!map[key]) map[key] = { name: r.requesterName, email: r.requesterEmail, role: r.requesterRole, days: 0 };
       map[key].days += ud;
-      const ym = (r.startDate || '').slice(0, 7); // 'YYYY-MM'
-      if (ym) map[key].byMonth[ym] = (map[key].byMonth[ym] || 0) + ud;
     });
     return Object.values(map).sort((a, b) => b.days - a.days);
-  }, [requests]);
+  }, [requests, unpaidMonth]);
+
+  // Friendly label for the selected month — used in the header and
+  // the navigator. Stable across re-renders.
+  const unpaidMonthLabel = useMemo(() => {
+    const [y, m] = unpaidMonth.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, [unpaidMonth]);
+
+  // Step the unpaidMonth by ±1. We allow stepping into future months
+  // too — payroll can preview them — but disable Next when it's
+  // already 12 months ahead of today so it doesn't run wild.
+  function stepUnpaidMonth(delta) {
+    const [y, m] = unpaidMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setUnpaidMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const isCurrentMonth = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === unpaidMonth;
+  }, [unpaidMonth]);
 
   const filtered = useMemo(() => {
     return requests.filter(r => {
@@ -363,7 +388,13 @@ export default function BossLeaveRequestsPage() {
       if (activeTab === 'approved' && r.status !== 'approved') return false;
       if (activeTab === 'rejected' && r.status !== 'rejected') return false;
       if (activeTab === 'all') { /* show everything */ }
-      if (activeTab === 'unpaid' && (!(r.unpaidDays > 0) || r.status === 'rejected')) return false;
+      if (activeTab === 'unpaid') {
+        // Unpaid tab is scoped to the selected month + excludes
+        // Boss-overridden requests (effectively paid).
+        if (!(r.unpaidDays > 0) || r.status === 'rejected') return false;
+        if (r.bossOverrideToPaid) return false;
+        if (!r.startDate || r.startDate.slice(0, 7) !== unpaidMonth) return false;
+      }
       if (filterCategory && r.category !== filterCategory) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -371,7 +402,7 @@ export default function BossLeaveRequestsPage() {
       }
       return true;
     });
-  }, [requests, activeTab, filterCategory, search]);
+  }, [requests, activeTab, filterCategory, search, unpaidMonth]);
 
   function generateReport() {
     const rows = [['Name', 'Email', 'Role', 'Category', 'Leave Type', 'Start', 'End', 'Days', 'Paid Days', 'Unpaid Days', 'Reason', 'Status', 'Approved By', 'Reject Reason', 'Submitted']];
@@ -414,7 +445,9 @@ export default function BossLeaveRequestsPage() {
           { key: 'pending',  label: 'Pending',  count: stats.pending,  color: '#6610f2', bg: '#f0ebff' },
           { key: 'approved', label: 'Approved', count: stats.approved, color: '#198754', bg: '#e6f4ea' },
           { key: 'rejected', label: 'Rejected', count: stats.rejected, color: '#dc3545', bg: '#fff0f0' },
-          { key: 'unpaid',   label: 'Unpaid',   count: unpaidSummary.reduce((s, u) => s + u.days, 0), color: '#fd7e14', bg: '#fff3e0' },
+          // Unpaid tab is Boss-only — payroll-sensitive view that the
+          // Developer support role shouldn't see.
+          ...(isBossOnly ? [{ key: 'unpaid',   label: 'Unpaid',   count: unpaidSummary.reduce((s, u) => s + u.days, 0), color: '#fd7e14', bg: '#fff3e0' }] : []),
           { key: 'all',      label: 'All',      count: stats.all,      color: '#495057', bg: '#f3f4f6' },
         ].map(tab => (
           <button key={tab.key} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2 border-0"
@@ -428,49 +461,75 @@ export default function BossLeaveRequestsPage() {
         ))}
       </div>
 
-      {activeTab === 'unpaid' && unpaidSummary.length > 0 && (
+      {activeTab === 'unpaid' && isBossOnly && (
         <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, borderLeft: '4px solid #fd7e14' }}>
           <div className="card-body p-3">
-            <div className="d-flex align-items-center gap-2 mb-2">
-              <i className="bi bi-exclamation-triangle text-warning" />
-              <span className="fw-semibold small">Unpaid Leave Summary — pending salary deduction</span>
+            <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+              <div className="d-flex align-items-center gap-2">
+                <i className="bi bi-exclamation-triangle text-warning" />
+                <span className="fw-semibold small">Unpaid Leave Summary — {unpaidMonthLabel} (for salary deduction)</span>
+              </div>
+              {/* Month navigator. Prev always enabled; Next disabled
+                  while viewing the current month so payroll can't
+                  drift into the future by accident (still allowed via
+                  the Reset/Today button if needed later). */}
+              <div className="d-inline-flex align-items-center gap-1">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary px-2"
+                  style={{ borderRadius: 8, fontSize: '0.72rem' }}
+                  onClick={() => stepUnpaidMonth(-1)}
+                  title="Previous month"
+                >
+                  <i className="bi bi-chevron-left" />
+                </button>
+                <span className="px-2 fw-semibold" style={{ fontSize: '0.78rem', minWidth: 130, textAlign: 'center', color: '#0f172a' }}>
+                  {unpaidMonthLabel}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary px-2"
+                  style={{ borderRadius: 8, fontSize: '0.72rem' }}
+                  onClick={() => stepUnpaidMonth(1)}
+                  disabled={isCurrentMonth}
+                  title={isCurrentMonth ? 'Already at the current month' : 'Next month'}
+                >
+                  <i className="bi bi-chevron-right" />
+                </button>
+                {!isCurrentMonth && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary ms-1 px-2"
+                    style={{ borderRadius: 8, fontSize: '0.72rem' }}
+                    onClick={() => {
+                      const d = new Date();
+                      setUnpaidMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+                    }}
+                    title="Jump back to the current month"
+                  >
+                    Today
+                  </button>
+                )}
+              </div>
             </div>
-            <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
-              <thead>
-                <tr style={{ color: '#9ca3af' }}>
-                  <th>Employee</th>
-                  <th>Role</th>
-                  <th>Unpaid Days</th>
-                  <th>Breakdown</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unpaidSummary.map((u, i) => {
-                  const months = Object.entries(u.byMonth || {})
-                    .sort(([a], [b]) => b.localeCompare(a));
-                  return (
+            {unpaidSummary.length === 0 ? (
+              <div className="text-muted small py-2" style={{ fontSize: '0.78rem' }}>
+                No unpaid leave deductions for {unpaidMonthLabel}.
+              </div>
+            ) : (
+              <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
+                <thead><tr style={{ color: '#9ca3af' }}><th>Employee</th><th>Role</th><th>Unpaid Days</th></tr></thead>
+                <tbody>
+                  {unpaidSummary.map((u, i) => (
                     <tr key={i}>
                       <td><span className="fw-medium">{u.name}</span> <span className="text-muted">· {u.email}</span></td>
                       <td>{ROLE_LABELS[u.role] || u.role}</td>
                       <td><span className="badge bg-warning text-dark">{u.days} day{u.days > 1 ? 's' : ''}</span></td>
-                      <td>
-                        <div className="d-flex flex-wrap gap-1" style={{ fontSize: '0.7rem' }}>
-                          {months.map(([ym, d]) => {
-                            const [yy, mm] = ym.split('-').map(Number);
-                            const label = new Date(yy, mm - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-                            return (
-                              <span key={ym} className="badge" style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', fontWeight: 500 }}>
-                                {label}: {d}d
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
