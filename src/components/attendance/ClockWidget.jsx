@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   clockIn, clockOut, startBreak, endBreak,
-  requestClockOut, onActiveRecord,
+  requestClockOut, onActiveRecord, resumeShift,
   calcTimes, fmtDuration, fmtDurationLive, fmtTime,
   requestEditClockIn, editClockInDirect,
   requestBreakEdit,
@@ -13,7 +13,7 @@ import {
   checkApcDailyTasks, setAutoClockOut as apiSetAutoClockOut,
   setAutoClockOutNote as apiSetAutoClockOutNote,
 } from '../../lib/attendanceApi';
-import { getNowDate } from '../../lib/serverTime';
+import { getNow, getNowDate } from '../../lib/serverTime';
 
 const LOCATIONS = [
   { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: '#2563eb' },
@@ -509,6 +509,18 @@ export default function ClockWidget() {
     setAction('');
   }
 
+  async function handleResumeShift() {
+    setAction('resume');
+    setTaskError('');
+    try {
+      await resumeShift();
+      refetchRecord();
+    } catch (err) {
+      setTaskError(err.message || 'Could not resume the shift.');
+    }
+    setAction('');
+  }
+
   async function handleSubmitEditClockIn() {
     setEditError('');
     if (!editTime) { setEditError('Please pick a time.'); return; }
@@ -668,6 +680,18 @@ export default function ClockWidget() {
   }
 
   const isClockedOut = !record || record.status === 'clocked-out';
+
+  // Resume an accidental clock-out. Allowed while the closed shift is
+  // still TODAY's shift day (3pm-PKT rollover, mirrors _shift_day in
+  // mig 154) and it was a manual clock-out — not an 11h auto-close.
+  // Covers both the manager case (status 'clocked-out') and the APC
+  // case (status 'pending-approval', clock-out awaiting TL approval).
+  const _shiftDayToday = new Date(getNow() - 10 * 3600 * 1000).toISOString().slice(0, 10);
+  const canResumeShift = !!record
+    && record.date === _shiftDayToday
+    && (record.status === 'clocked-out' || record.status === 'pending-approval')
+    && !record.autoClosed
+    && !!record.clockIn;
 
   // Auth not resolved yet — render nothing rather than crash.
   if (!currentUser) return null;
@@ -892,6 +916,29 @@ export default function ClockWidget() {
                         <i className="bi bi-arrow-right" />
                       </button>
                     )
+                  )}
+
+                  {/* Accidental clock-out recovery. Reopens today's
+                      shift so no worked time is lost (mig 173). */}
+                  {canResumeShift && (
+                    <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2"
+                      style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <i className="bi bi-arrow-counterclockwise" style={{ color: '#16a34a', fontSize: '0.9rem' }} />
+                      <span style={{ fontSize: '0.73rem', color: '#166534', fontWeight: 600, flex: 1 }}>
+                        Clocked out by mistake? Resume your shift — your time won't be lost.
+                      </span>
+                      <button
+                        className="btn btn-sm btn-success d-inline-flex align-items-center gap-1 flex-shrink-0"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={handleResumeShift}
+                        disabled={!!action}
+                      >
+                        {action === 'resume'
+                          ? <span className="spinner-border spinner-border-sm" />
+                          : <i className="bi bi-play-fill" />}
+                        Resume
+                      </button>
+                    </div>
                   )}
 
                   {/* ── Secondary action row (breaks / edit) ── */}

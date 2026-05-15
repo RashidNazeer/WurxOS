@@ -704,6 +704,11 @@ export async function decideAttendanceEdit({ editId, approve, note = null }) {
 // Direct edits (TL/OL/Boss). The SECURITY DEFINER decide path
 // requires a request row, so we synthesise one and immediately
 // approve. This keeps the audit trail consistent.
+//
+// p_silent: true on both RPCs — a manager direct-edit needs no
+// approval, so neither the "edit requested" notification up the
+// chain nor the "edit approved" self-notification should fire
+// (mig 173).
 async function _directEdit(attendanceId, field, ms) {
   const iso = new Date(ms).toISOString();
   const { data: req, error: e1 } = await supabase.rpc('att_request_edit', {
@@ -711,13 +716,23 @@ async function _directEdit(attendanceId, field, ms) {
     p_field:         field,
     p_requested:     iso,
     p_reason:        'manager direct edit',
+    p_silent:        true,
   });
   if (e1) throw new Error(e1.message);
   const editId = req?.id ?? req?.[0]?.id ?? null;
   if (!editId) throw new Error('Could not create edit request for direct edit.');
   const { data, error } = await supabase.rpc('att_decide_edit', {
-    p_edit_id: editId, p_approve: true, p_note: null,
+    p_edit_id: editId, p_approve: true, p_note: null, p_silent: true,
   });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Undo an accidental clock-out — reopens today's shift as if the
+// clock-out never happened (mig 173 att_resume_shift). Bounded to
+// the current shift day server-side.
+export async function resumeShift() {
+  const { data, error } = await supabase.rpc('att_resume_shift');
   if (error) throw new Error(error.message);
   return data;
 }
