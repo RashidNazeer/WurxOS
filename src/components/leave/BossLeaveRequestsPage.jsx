@@ -206,6 +206,59 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
   );
 }
 
+// ── Export Modal ──────────────────────────────────────────────────────────────
+
+function ExportModal({ defaultMonth, onConfirm, onCancel }) {
+  const [scope, setScope] = useState('month');   // 'month' | 'all'
+  const [month, setMonth] = useState(defaultMonth);
+  const monthLabel = (() => {
+    if (!month) return '';
+    const [y, m] = month.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  })();
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 14 }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-start gap-3 mb-3">
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#f0f1f5' }}>
+              <i className="bi bi-download" style={{ fontSize: '1rem', color: '#495057' }} />
+            </div>
+            <div>
+              <p className="fw-semibold mb-0 small">Export Leave Requests</p>
+              <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>Choose which month to export.</p>
+            </div>
+          </div>
+
+          <div className="mb-2">
+            <label className="d-flex align-items-center gap-2 mb-2" style={{ cursor: 'pointer' }}>
+              <input type="radio" name="exp-scope" checked={scope === 'month'} onChange={() => setScope('month')} />
+              <span className="small fw-semibold">A specific month</span>
+            </label>
+            <input type="month" className="form-control form-control-sm"
+              style={{ borderRadius: 8 }} value={month}
+              onChange={e => { setMonth(e.target.value); setScope('month'); }} />
+          </div>
+          <label className="d-flex align-items-center gap-2 mb-3" style={{ cursor: 'pointer' }}>
+            <input type="radio" name="exp-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
+            <span className="small fw-semibold">All months (everything on record)</span>
+          </label>
+
+          <div className="d-flex gap-2 justify-content-end">
+            <button className="btn btn-sm btn-outline-secondary px-3" onClick={onCancel}>Cancel</button>
+            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1"
+              disabled={scope === 'month' && !month}
+              onClick={() => onConfirm(scope === 'all' ? null : month)}>
+              <i className="bi bi-download" /> Export {scope === 'all' ? 'all' : monthLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function BossLeaveRequestsPage() {
@@ -218,15 +271,16 @@ export default function BossLeaveRequestsPage() {
   const [loading, setLoading]   = useState(true);
 
   const [activeTab,      setActiveTab]      = useState('pending');
-  // Month-scoped view for the Unpaid tab. Default to current month;
-  // the Boss can step backwards (e.g., to process April deductions
-  // mid-May). Stored as 'YYYY-MM'.
-  const [unpaidMonth,    setUnpaidMonth]    = useState(() => {
+  // Every tab is scoped to a single month (default: current). The Boss
+  // can step backwards/forwards through months; CSV export prompts for
+  // its own month independently. Stored as 'YYYY-MM'.
+  const [viewMonth,      setViewMonth]      = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [search,         setSearch]         = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [exportOpen,     setExportOpen]     = useState(false);
 
   const [rejectTarget,      setRejectTarget]      = useState(null);
   const [approveTarget,     setApproveTarget]     = useState(null);
@@ -334,66 +388,69 @@ export default function BossLeaveRequestsPage() {
     } finally { setActionSaving(false); }
   }
 
-  const stats = useMemo(() => ({
-    pending:  requests.filter(r => r.status === 'pending_boss').length,
-    approved: requests.filter(r => r.status === 'approved').length,
-    rejected: requests.filter(r => r.status === 'rejected').length,
-    all:      requests.length,
-  }), [requests]);
+  // Every tab is scoped to viewMonth, matched on the leave's start date
+  // (the month the leave falls in — consistent with payroll deduction).
+  const monthRequests = useMemo(
+    () => requests.filter(r => r.startDate && r.startDate.slice(0, 7) === viewMonth),
+    [requests, viewMonth],
+  );
 
-  const currentMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const stats = useMemo(() => ({
+    pending:  monthRequests.filter(r => r.status === 'pending_boss').length,
+    approved: monthRequests.filter(r => r.status === 'approved').length,
+    rejected: monthRequests.filter(r => r.status === 'rejected').length,
+    all:      monthRequests.length,
+  }), [monthRequests]);
 
   const unpaidSummary = useMemo(() => {
-    // Per-user unpaid-day totals for the selected unpaidMonth.
-    // Skips Boss-overridden requests (effectively paid via paid_override)
-    // and any rejected/withdrawn rows. Month is matched against
-    // r.startDate's YYYY-MM prefix.
+    // Per-user unpaid-day totals for the selected month. Skips
+    // Boss-overridden requests (effectively paid via paid_override)
+    // and any rejected/withdrawn rows.
     const map = {};
-    requests.forEach(r => {
+    monthRequests.forEach(r => {
       if (r.status === 'rejected' || r.status === 'withdrawn') return;
       if (r.bossOverrideToPaid) return;
       const ud = r.unpaidDays || 0;
       if (ud <= 0) return;
-      if (!r.startDate || r.startDate.slice(0, 7) !== unpaidMonth) return;
       const key = r.requestedBy;
       if (!map[key]) map[key] = { name: r.requesterName, email: r.requesterEmail, role: r.requesterRole, days: 0 };
       map[key].days += ud;
     });
     return Object.values(map).sort((a, b) => b.days - a.days);
-  }, [requests, unpaidMonth]);
+  }, [monthRequests]);
 
-  // Friendly label for the selected month — used in the header and
-  // the navigator. Stable across re-renders.
-  const unpaidMonthLabel = useMemo(() => {
-    const [y, m] = unpaidMonth.split('-').map(Number);
+  // Friendly label for the selected month — used in the navigator.
+  const viewMonthLabel = useMemo(() => {
+    const [y, m] = viewMonth.split('-').map(Number);
     return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  }, [unpaidMonth]);
+  }, [viewMonth]);
 
-  // Step the unpaidMonth by ±1. We allow stepping into future months
-  // too — payroll can preview them — but disable Next when it's
-  // already 12 months ahead of today so it doesn't run wild.
-  function stepUnpaidMonth(delta) {
-    const [y, m] = unpaidMonth.split('-').map(Number);
+  // Step viewMonth by ±1. Next is disabled once the current month is
+  // reached so the view can't drift into the future by accident.
+  function stepMonth(delta) {
+    const [y, m] = viewMonth.split('-').map(Number);
     const d = new Date(y, m - 1 + delta, 1);
-    setUnpaidMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  function resetMonth() {
+    const d = new Date();
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
   const isCurrentMonth = useMemo(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === unpaidMonth;
-  }, [unpaidMonth]);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === viewMonth;
+  }, [viewMonth]);
 
   const filtered = useMemo(() => {
-    return requests.filter(r => {
+    return monthRequests.filter(r => {
       if (activeTab === 'pending' && r.status !== 'pending_boss') return false;
       if (activeTab === 'approved' && r.status !== 'approved') return false;
       if (activeTab === 'rejected' && r.status !== 'rejected') return false;
       if (activeTab === 'all') { /* show everything */ }
       if (activeTab === 'unpaid') {
-        // Unpaid tab is scoped to the selected month + excludes
-        // Boss-overridden requests (effectively paid).
+        // Unpaid tab excludes Boss-overridden requests (effectively paid).
         if (!(r.unpaidDays > 0) || r.status === 'rejected') return false;
         if (r.bossOverrideToPaid) return false;
-        if (!r.startDate || r.startDate.slice(0, 7) !== unpaidMonth) return false;
       }
       if (filterCategory && r.category !== filterCategory) return false;
       if (search) {
@@ -402,11 +459,16 @@ export default function BossLeaveRequestsPage() {
       }
       return true;
     });
-  }, [requests, activeTab, filterCategory, search, unpaidMonth]);
+  }, [monthRequests, activeTab, filterCategory, search]);
 
-  function generateReport() {
+  // Build + download the CSV. monthFilter is 'YYYY-MM' for a single
+  // month, or null to export every request on record.
+  function generateReport(monthFilter) {
+    const src = monthFilter
+      ? requests.filter(r => r.startDate && r.startDate.slice(0, 7) === monthFilter)
+      : requests;
     const rows = [['Name', 'Email', 'Role', 'Category', 'Leave Type', 'Start', 'End', 'Days', 'Paid Days', 'Unpaid Days', 'Reason', 'Status', 'Approved By', 'Reject Reason', 'Submitted']];
-    requests.forEach(r => {
+    src.forEach(r => {
       const days = countDays(r.startDate, r.endDate);
       const approvedBy = r.intermediateApproval?.approverName ? `${r.intermediateApproval.approverName}${r.bossApproval ? ' + Boss' : ''}` : (r.bossApproval ? 'Boss' : '');
       const rejectReason = r.bossApproval?.rejectReason || r.intermediateApproval?.rejectReason || '';
@@ -421,7 +483,7 @@ export default function BossLeaveRequestsPage() {
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `leave-requests-${new Date().toISOString().slice(0, 10)}.csv`;
+    const a = document.createElement('a'); a.href = url; a.download = `leave-requests-${monthFilter || 'all-time'}.csv`;
     a.click(); URL.revokeObjectURL(url);
   }
 
@@ -435,7 +497,7 @@ export default function BossLeaveRequestsPage() {
           </h5>
           <p className="text-muted small mb-0">Review, approve, and track all employee requests · Quotas reset monthly</p>
         </div>
-        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={generateReport} disabled={requests.length === 0}>
+        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={() => setExportOpen(true)} disabled={requests.length === 0}>
           <i className="bi bi-download" style={{ fontSize: '0.72rem' }} /> Export CSV
         </button>
       </div>
@@ -461,60 +523,42 @@ export default function BossLeaveRequestsPage() {
         ))}
       </div>
 
+      {/* Month scope — applies to every tab. Defaults to the current
+          month; the Boss can step to any earlier month. */}
+      <div className="d-flex align-items-center justify-content-center gap-2 mb-4">
+        <button type="button" className="btn btn-sm btn-outline-secondary px-2"
+          style={{ borderRadius: 8 }} onClick={() => stepMonth(-1)} title="Previous month">
+          <i className="bi bi-chevron-left" />
+        </button>
+        <span className="d-inline-flex align-items-center justify-content-center gap-2 fw-semibold px-3 py-1 rounded-2"
+          style={{ background: '#f3f4f6', fontSize: '0.82rem', minWidth: 190, color: '#1a1a2e' }}>
+          <i className="bi bi-calendar3" style={{ fontSize: '0.78rem' }} />
+          {viewMonthLabel}
+        </span>
+        <button type="button" className="btn btn-sm btn-outline-secondary px-2"
+          style={{ borderRadius: 8 }} onClick={() => stepMonth(1)} disabled={isCurrentMonth}
+          title={isCurrentMonth ? 'Already at the current month' : 'Next month'}>
+          <i className="bi bi-chevron-right" />
+        </button>
+        {!isCurrentMonth && (
+          <button type="button" className="btn btn-sm btn-outline-primary px-2"
+            style={{ borderRadius: 8, fontSize: '0.74rem' }} onClick={resetMonth}
+            title="Jump back to the current month">
+            Today
+          </button>
+        )}
+      </div>
+
       {activeTab === 'unpaid' && isBossOnly && (
         <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, borderLeft: '4px solid #fd7e14' }}>
           <div className="card-body p-3">
-            <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-              <div className="d-flex align-items-center gap-2">
-                <i className="bi bi-exclamation-triangle text-warning" />
-                <span className="fw-semibold small">Unpaid Leave Summary — {unpaidMonthLabel} (for salary deduction)</span>
-              </div>
-              {/* Month navigator. Prev always enabled; Next disabled
-                  while viewing the current month so payroll can't
-                  drift into the future by accident (still allowed via
-                  the Reset/Today button if needed later). */}
-              <div className="d-inline-flex align-items-center gap-1">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary px-2"
-                  style={{ borderRadius: 8, fontSize: '0.72rem' }}
-                  onClick={() => stepUnpaidMonth(-1)}
-                  title="Previous month"
-                >
-                  <i className="bi bi-chevron-left" />
-                </button>
-                <span className="px-2 fw-semibold" style={{ fontSize: '0.78rem', minWidth: 130, textAlign: 'center', color: '#0f172a' }}>
-                  {unpaidMonthLabel}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary px-2"
-                  style={{ borderRadius: 8, fontSize: '0.72rem' }}
-                  onClick={() => stepUnpaidMonth(1)}
-                  disabled={isCurrentMonth}
-                  title={isCurrentMonth ? 'Already at the current month' : 'Next month'}
-                >
-                  <i className="bi bi-chevron-right" />
-                </button>
-                {!isCurrentMonth && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary ms-1 px-2"
-                    style={{ borderRadius: 8, fontSize: '0.72rem' }}
-                    onClick={() => {
-                      const d = new Date();
-                      setUnpaidMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-                    }}
-                    title="Jump back to the current month"
-                  >
-                    Today
-                  </button>
-                )}
-              </div>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <i className="bi bi-exclamation-triangle text-warning" />
+              <span className="fw-semibold small">Unpaid Leave Summary — {viewMonthLabel} (for salary deduction)</span>
             </div>
             {unpaidSummary.length === 0 ? (
               <div className="text-muted small py-2" style={{ fontSize: '0.78rem' }}>
-                No unpaid leave deductions for {unpaidMonthLabel}.
+                No unpaid leave deductions for {viewMonthLabel}.
               </div>
             ) : (
               <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
@@ -563,8 +607,8 @@ export default function BossLeaveRequestsPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
             <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No {activeTab === 'all' ? '' : activeTab} requests</p>
-          <p className="text-muted small mb-0">{activeTab === 'pending' ? 'All caught up!' : 'Nothing here yet.'}</p>
+          <p className="fw-semibold text-dark mb-1">No {activeTab === 'all' ? '' : activeTab} requests for {viewMonthLabel}</p>
+          <p className="text-muted small mb-0">{activeTab === 'pending' ? 'All caught up!' : 'Try another month from the navigator above.'}</p>
         </div>
       ) : (
         <div className="d-flex flex-column gap-3">
@@ -684,6 +728,13 @@ export default function BossLeaveRequestsPage() {
 
       <ApproveModal request={approveTarget} onConfirm={handleApprove} onCancel={() => setApproveTarget(null)} saving={actionSaving} userQuota={approveQuota} paidOverrideCount={paidOverrideCount} />
       <RejectModal request={rejectTarget} onConfirm={handleReject} onCancel={() => setRejectTarget(null)} saving={actionSaving} />
+      {exportOpen && (
+        <ExportModal
+          defaultMonth={viewMonth}
+          onCancel={() => setExportOpen(false)}
+          onConfirm={(m) => { generateReport(m); setExportOpen(false); }}
+        />
+      )}
     </div>
   );
 }
