@@ -10,6 +10,7 @@ import {
   getActiveBoss,
 } from '../../lib/leaveApi';
 import { listHolidaysInRange, analyzeLeaveRange } from '../../lib/holidaysApi';
+import MonthNavigator, { currentMonthStr, monthLabel, stepMonthStr } from './MonthNavigator';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -589,6 +590,8 @@ export default function LeaveRequestPage() {
   const canReviewTeam = isTL || isOL;
 
   const [activeTab,  setActiveTab]  = useState('my');
+  // Month scope shared by the My + Team tabs (default: current month).
+  const [viewMonth,  setViewMonth]  = useState(currentMonthStr);
   const [allLeaves, setAllLeaves]   = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showModal, setShowModal]   = useState(false);
@@ -699,6 +702,19 @@ export default function LeaveRequestPage() {
     if (!canReviewTeam) return [];
     return allLeaves.filter(r => r.requestedBy !== currentUser?.uid);
   }, [allLeaves, canReviewTeam, currentUser]);
+
+  // Month-scoped views — both tabs only show requests whose leave
+  // start date falls in the selected month.
+  const viewMonthLabel = monthLabel(viewMonth);
+  const isCurrentMonth = viewMonth === currentMonthStr();
+  const monthMyRequests = useMemo(
+    () => myRequests.filter(r => r.startDate && r.startDate.slice(0, 7) === viewMonth),
+    [myRequests, viewMonth],
+  );
+  const monthTeamRequests = useMemo(
+    () => teamRequests.filter(r => r.startDate && r.startDate.slice(0, 7) === viewMonth),
+    [teamRequests, viewMonth],
+  );
 
   const remainingQuota = useMemo(() => computeRemainingQuota(leaveQuota, myRequests), [leaveQuota, myRequests]);
 
@@ -839,35 +855,35 @@ export default function LeaveRequestPage() {
   }
 
   const myFiltered = useMemo(() =>
-    applyFilters(myRequests, { statusFilter: filterStatus, searchVal: search, catFilter: filterCategory, fromDate: dateFrom, toDate: dateTo, isPendingCheck: true }),
+    applyFilters(monthMyRequests, { statusFilter: filterStatus, searchVal: search, catFilter: filterCategory, fromDate: dateFrom, toDate: dateTo, isPendingCheck: true }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [myRequests, filterStatus, search, filterCategory, dateFrom, dateTo]
+    [monthMyRequests, filterStatus, search, filterCategory, dateFrom, dateTo]
   );
 
   const teamFiltered = useMemo(() =>
-    applyFilters(teamRequests, {
+    applyFilters(monthTeamRequests, {
       statusFilter: teamFilter, searchVal: teamSearch, catFilter: teamFilterCategory,
       fromDate: teamDateFrom, toDate: teamDateTo, isPendingCheck: false,
       pendingStage: teamPendingStage, requesterRoleFilter: teamRequesterRole,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [teamRequests, teamFilter, teamSearch, teamFilterCategory, teamDateFrom, teamDateTo, teamPendingStage, teamRequesterRole]
+    [monthTeamRequests, teamFilter, teamSearch, teamFilterCategory, teamDateFrom, teamDateTo, teamPendingStage, teamRequesterRole]
   );
 
   const myStats = useMemo(() => ({
-    total: myRequests.length,
-    pending: myRequests.filter(r => r.status.startsWith('pending')).length,
-    approved: myRequests.filter(r => r.status === 'approved').length,
-    rejected: myRequests.filter(r => r.status === 'rejected').length,
-  }), [myRequests]);
+    total: monthMyRequests.length,
+    pending: monthMyRequests.filter(r => r.status.startsWith('pending')).length,
+    approved: monthMyRequests.filter(r => r.status === 'approved').length,
+    rejected: monthMyRequests.filter(r => r.status === 'rejected').length,
+  }), [monthMyRequests]);
 
   // Count only requests waiting at THIS user's level. TL acts on
   // pending_tl; OL acts on pending_ol. Requests already forwarded to
   // Boss (pending_boss) shouldn't inflate the OL's queue badge.
   const teamPendingCount = useMemo(() => {
-    if (isOL) return teamRequests.filter(r => r.status === 'pending_ol').length;
-    return teamRequests.filter(r => r.status === 'pending_tl').length;
-  }, [teamRequests, isOL]);
+    if (isOL) return monthTeamRequests.filter(r => r.status === 'pending_ol').length;
+    return monthTeamRequests.filter(r => r.status === 'pending_tl').length;
+  }, [monthTeamRequests, isOL]);
 
   function renderRequestCard(r, showActions = false) {
     const catCfg = getCatCfg(r.category);
@@ -1076,7 +1092,7 @@ export default function LeaveRequestPage() {
 
   return (
     <div style={{ padding: '32px 32px 48px' }}>
-      <div className="d-flex align-items-start justify-content-between mb-4">
+      <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
             <i className="bi bi-file-earmark-text" style={{ fontSize: '1.15rem' }} />
@@ -1084,9 +1100,18 @@ export default function LeaveRequestPage() {
           </h5>
           <p className="text-muted small mb-0">Submit and manage leave, WFH, and other requests</p>
         </div>
-        <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setShowModal(true)}>
-          <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} /> New Request
-        </button>
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          <MonthNavigator
+            label={viewMonthLabel}
+            isCurrent={isCurrentMonth}
+            onPrev={() => setViewMonth(m => stepMonthStr(m, -1))}
+            onNext={() => setViewMonth(m => stepMonthStr(m, 1))}
+            onReset={() => setViewMonth(currentMonthStr())}
+          />
+          <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setShowModal(true)}>
+            <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} /> New Request
+          </button>
+        </div>
       </div>
 
       {canReviewTeam && (
@@ -1184,8 +1209,8 @@ export default function LeaveRequestPage() {
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
               </div>
-              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'No matching requests' : 'No requests yet'}</p>
-              <p className="text-muted small mb-0">{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'Try adjusting your filters.' : 'Submit your first request.'}</p>
+              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'No matching requests' : `No requests for ${viewMonthLabel}`}</p>
+              <p className="text-muted small mb-0">{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'Try adjusting your filters.' : 'Try another month, or submit a new request.'}</p>
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">{myFiltered.map(r => renderRequestCard(r, false))}</div>
@@ -1268,8 +1293,8 @@ export default function LeaveRequestPage() {
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
               </div>
-              <p className="fw-semibold text-dark mb-1">No {teamFilter} team requests</p>
-              <p className="text-muted small mb-0">{(teamSearch || teamFilterCategory || teamDateFrom || teamDateTo) ? 'Try adjusting your filters.' : ''}</p>
+              <p className="fw-semibold text-dark mb-1">No {teamFilter} team requests for {viewMonthLabel}</p>
+              <p className="text-muted small mb-0">{(teamSearch || teamFilterCategory || teamDateFrom || teamDateTo) ? 'Try adjusting your filters.' : 'Try another month from the navigator above.'}</p>
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">{teamFiltered.map(r => renderRequestCard(r, true))}</div>

@@ -7,6 +7,7 @@ import {
   bossPaidOverride,
 } from '../../lib/leaveApi';
 import { supabase } from '../../lib/supabase';
+import MonthNavigator from './MonthNavigator';
 
 const REQUEST_CATEGORIES = [
   { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: '#dc3545', bg: '#fff0f0' },
@@ -502,7 +503,7 @@ export default function BossLeaveRequestsPage() {
         </button>
       </div>
 
-      <div className="d-flex gap-2 mb-4 flex-wrap">
+      <div className="d-flex gap-2 mb-4 flex-wrap align-items-center">
         {[
           { key: 'pending',  label: 'Pending',  count: stats.pending,  color: '#6610f2', bg: '#f0ebff' },
           { key: 'approved', label: 'Approved', count: stats.approved, color: '#198754', bg: '#e6f4ea' },
@@ -521,32 +522,17 @@ export default function BossLeaveRequestsPage() {
             </span>
           </button>
         ))}
-      </div>
-
-      {/* Month scope — applies to every tab. Defaults to the current
-          month; the Boss can step to any earlier month. */}
-      <div className="d-flex align-items-center justify-content-center gap-2 mb-4">
-        <button type="button" className="btn btn-sm btn-outline-secondary px-2"
-          style={{ borderRadius: 8 }} onClick={() => stepMonth(-1)} title="Previous month">
-          <i className="bi bi-chevron-left" />
-        </button>
-        <span className="d-inline-flex align-items-center justify-content-center gap-2 fw-semibold px-3 py-1 rounded-2"
-          style={{ background: '#f3f4f6', fontSize: '0.82rem', minWidth: 190, color: '#1a1a2e' }}>
-          <i className="bi bi-calendar3" style={{ fontSize: '0.78rem' }} />
-          {viewMonthLabel}
-        </span>
-        <button type="button" className="btn btn-sm btn-outline-secondary px-2"
-          style={{ borderRadius: 8 }} onClick={() => stepMonth(1)} disabled={isCurrentMonth}
-          title={isCurrentMonth ? 'Already at the current month' : 'Next month'}>
-          <i className="bi bi-chevron-right" />
-        </button>
-        {!isCurrentMonth && (
-          <button type="button" className="btn btn-sm btn-outline-primary px-2"
-            style={{ borderRadius: 8, fontSize: '0.74rem' }} onClick={resetMonth}
-            title="Jump back to the current month">
-            Today
-          </button>
-        )}
+        {/* Month scope — anchored to the right of the tab row, applies
+            to every tab. Defaults to the current month. */}
+        <div className="ms-auto">
+          <MonthNavigator
+            label={viewMonthLabel}
+            isCurrent={isCurrentMonth}
+            onPrev={() => stepMonth(-1)}
+            onNext={() => stepMonth(1)}
+            onReset={resetMonth}
+          />
+        </div>
       </div>
 
       {activeTab === 'unpaid' && isBossOnly && (
