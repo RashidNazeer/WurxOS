@@ -211,20 +211,22 @@
 }
 .shell-sidebar-footer-btn {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
   color: var(--text-muted);
-  border-radius: 6px;
+  border-radius: 50%;
+  font-size: 12px;
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
 }
 .shell-sidebar-footer-btn:hover {
   background: var(--surface-2);
   color: var(--text-primary);
+  border-color: var(--accent);
 }
 .shell-sidebar-footer-btn svg { opacity: 0.85; }
 
