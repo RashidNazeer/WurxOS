@@ -27,6 +27,7 @@ const CATEGORY_LABEL = {
   knowledge_base: 'Knowledge Base',
   attendance:     'Attendance',
   tier:           'Tier',
+  agenda:         'Agenda Meetings',
   system:         'System',
 };
 
@@ -41,6 +42,7 @@ const CATEGORY_META = {
   knowledge_base: { Icon: BellIcon,      tone: 'system', bi: 'bi-book-fill' },
   attendance:     { Icon: BellIcon,      tone: 'system', bi: 'bi-clock-fill' },
   tier:           { Icon: StarIcon,      tone: 'brand',  bi: 'bi-award-fill' },
+  agenda:         { Icon: CheckIcon,     tone: 'task',   bi: 'bi-calendar-week' },
   system:         { Icon: BellIcon,      tone: 'system', bi: 'bi-bell-fill' },
 };
 

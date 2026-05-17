@@ -141,6 +141,29 @@ const EMPLOYEES_GROUP = {
   ],
 };
 
+// --- Weekly Agenda Meetings group ----------------------------------
+// Phase 1 submenus only (Prior/Ongoing/Upcoming Meetings come later).
+// Settings is OL/Boss-managed, so the basic variant omits it for TL/APC.
+const AGENDA_GROUP_FULL = {
+  label: 'Agenda Meetings',
+  icon: CalendarIcon,
+  category: 'agenda',
+  children: [
+    { label: 'Tasks',     to: '/agenda/tasks' },
+    { label: 'Resources', to: '/agenda/resources' },
+    { label: 'Settings',  to: '/agenda/settings' },
+  ],
+};
+const AGENDA_GROUP_BASIC = {
+  label: 'Agenda Meetings',
+  icon: CalendarIcon,
+  category: 'agenda',
+  children: [
+    { label: 'Tasks',     to: '/agenda/tasks' },
+    { label: 'Resources', to: '/agenda/resources' },
+  ],
+};
+
 // ============================================================
 // MENUS
 // ============================================================
@@ -163,6 +186,7 @@ export const MENUS = {
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,
     RESOURCES_ITEM,
+    AGENDA_GROUP_FULL,
     { label: 'Resource Planner', icon: DiagramIcon, to: '/boss/resource-planner' },
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
@@ -193,6 +217,7 @@ export const MENUS = {
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,
     RESOURCES_ITEM,
+    AGENDA_GROUP_FULL,
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
     PERFORMANCE_ITEM,
@@ -218,6 +243,7 @@ export const MENUS = {
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,
     RESOURCES_ITEM,
+    AGENDA_GROUP_BASIC,
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
     PERFORMANCE_ITEM,
@@ -253,6 +279,7 @@ export const MENUS = {
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,
     RESOURCES_ITEM,
+    AGENDA_GROUP_BASIC,
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
     PERFORMANCE_ITEM,

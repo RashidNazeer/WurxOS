@@ -89,6 +89,9 @@ const SuggestionsPage       = lazy(() => import('./pages/suggestions/Suggestions
 // v1 verbatim port — boss gets BossChangeManagementPage, others get
 // the submitter-side ChangeManagementPage. Routed via the role router.
 const ChangesPage           = lazy(() => import('./components/changes/ChangeManagementRouter'));
+const AgendaTasksPage       = lazy(() => import('./pages/agenda/AgendaTasksPage'));
+const AgendaResourcesPage   = lazy(() => import('./pages/agenda/AgendaResourcesPage'));
+const AgendaSettingsPage    = lazy(() => import('./pages/agenda/AgendaSettingsPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -199,6 +202,33 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer']}>
                     <BrandDetailPage />
+                  </RoleGuard>
+                }
+              />
+
+              {/* Weekly Agenda Meetings — Boss / OL / TL / APC.
+                  Settings is OL/Boss/Developer only. */}
+              <Route
+                path="/agenda/tasks"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                    <AgendaTasksPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/agenda/resources"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                    <AgendaResourcesPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/agenda/settings"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                    <AgendaSettingsPage />
                   </RoleGuard>
                 }
               />
