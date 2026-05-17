@@ -265,6 +265,7 @@
 .notif-avatar-cat-leave  { background: #06b6d4;        color: #fff; }
 .notif-avatar-cat-resource { background: #ec4899;      color: #fff; }
 .notif-avatar-cat-performance { background: #f59e0b;   color: #fff; }
+.notif-avatar-cat-agenda { background: #6366f1;        color: #fff; }
 .notif-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-item-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }

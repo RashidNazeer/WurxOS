@@ -18,6 +18,7 @@ const CATEGORY_META = {
   leave:        { label: 'Leave',        icon: HomeIcon },
   resource:     { label: 'Resources',    icon: BookmarkIcon },
   performance:  { label: 'Performance',  icon: StarIcon },
+  agenda:       { label: 'Agenda',       icon: ChecklistIcon },
   system:       { label: 'System',       icon: MessageIcon },
 };
 const CATEGORY_ORDER = Object.keys(CATEGORY_META);
