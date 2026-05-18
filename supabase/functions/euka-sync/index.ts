@@ -86,35 +86,54 @@ async function mcp(method: string, params?: unknown, isNotification = false): Pr
   return reply.result;
 }
 
-// The metrics question. The set is small (~28 numbers) so we ask
-// for the JSON inline and explicitly forbid saving to a sandbox
-// file — Euka's sandbox is ephemeral and gone before we could read
-// it back. read_sandbox_file is kept only as a fallback.
-const METRICS_QUESTION =
-  'Return ONLY a compact minified JSON object and nothing else — no prose, no explanation, '
-  + 'no markdown code fences. DO NOT save it to a file; put the JSON directly in your reply. '
-  + 'Exact shape: {"d7":{...},"d30":{...},"top":{"creator_name":string,"creator_gmv":number,'
-  + '"product_name":string,"product_gmv":number}}. d7 = last 7 days, d30 = last 30 days; each '
-  + 'has numeric keys (plain numbers, no symbols/commas, null if unavailable): gmv, video_gmv, '
-  + 'units, orders, aov, active_creators, videos_posted, video_views, ad_spend, roas, '
-  + 'sample_requests, outreach_messages, collab_invites. "top" = the single best creator and '
-  + 'best product over the last 30 days.';
+// The metrics question. We ONLY ask for the tiles that Euka's MCP
+// reports accurately (verified against the Performance Overview
+// dashboard to within ~2%): the affiliate / creator-driven and
+// Euka-attribution metrics. Total GMV / Orders / AOV are NOT asked
+// for — Euka's API has no all-channels revenue data, so those come
+// back ~15-30% low and are deliberately excluded.
+//
+// One window per query_store_data call: asking for two date ranges
+// at once makes the LLM approximate and it returns video_views / EMV
+// up to ~8x low. A single pinned window stays within ~2%.
+function buildWindowQuestion(start: string, end: string, withTop: boolean): string {
+  return 'You are reading this store\'s TikTok Shop Performance Overview dashboard for the date '
+    + 'range ' + start + ' to ' + end + ' inclusive. Report the headline tile values EXACTLY as '
+    + 'that dashboard shows them for that range — do NOT recompute from raw data or estimate, '
+    + 'use the dashboard\'s own aggregated numbers. DO NOT save anything to a file; put the JSON '
+    + 'directly in your reply. Return ONLY a compact minified JSON object, no prose, no markdown '
+    + 'fences, with these numeric keys (plain numbers — no currency symbols, no commas, no '
+    + 'K-suffixes; null if unavailable): affiliate_gmv, value_driven, earned_media_value, '
+    + 'videos_posted, video_views, video_conversion_rate, samples_shipped'
+    + (withTop
+      ? ', top. affiliate_gmv = the Affiliate GMV tile; '
+      : '. affiliate_gmv = the Affiliate GMV tile; ')
+    + 'value_driven = the Total Value Driven by Euka tile; earned_media_value = the EMV tile; '
+    + 'video_conversion_rate = the Video Conversion Rate tile as a decimal fraction (0.03 for '
+    + '3%).'
+    + (withTop
+      ? ' "top" is an object {"creator_name":string,"creator_gmv":number,"product_name":string,'
+        + '"product_gmv":number} — the single best creator and best product by affiliate GMV '
+        + 'over this range.'
+      : '');
+}
 
 function num(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-// Extract a metrics object from arbitrary text. Returns null unless
-// the parsed object actually looks like our shape (has d7 or d30) —
-// this guards against storing a stray {...} (e.g. an error blob).
-function tryParseMetrics(text: string): any | null {
+// Extract a JSON object from arbitrary text. Returns null unless the
+// parsed object carries at least one expected metric key — this
+// guards against storing a stray {...} (e.g. an error blob).
+function tryParseObj(text: string): any | null {
   if (!text) return null;
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try {
     const o = JSON.parse(m[0]);
-    if (o && typeof o === 'object' && (o.d7 || o.d30)) return o;
+    if (o && typeof o === 'object'
+      && ('affiliate_gmv' in o || 'video_views' in o || 'value_driven' in o)) return o;
   } catch { /* not JSON */ }
   return null;
 }
@@ -133,12 +152,12 @@ function resolveSandboxPath(result: any): string | null {
   return m ? m[1] : null;
 }
 
-// Pull the metrics JSON for one store. Inline reply first; if Euka
-// still saved a file, fall back to read_sandbox_file.
-async function fetchStoreMetrics(storeId: string): Promise<any> {
+// Run one query_store_data call and parse its window object. Inline
+// reply first; if Euka still saved a file, fall back to the sandbox.
+async function queryWindow(storeId: string, question: string): Promise<any> {
   const r = await mcp('tools/call', {
     name: 'query_store_data',
-    arguments: { storeId, question: METRICS_QUESTION },
+    arguments: { storeId, question },
   });
 
   const sc = r?.structuredContent || {};
@@ -146,10 +165,10 @@ async function fetchStoreMetrics(storeId: string): Promise<any> {
     ?? (r?.content || []).map((c: any) => c.text || '').join('\n');
 
   // 1. Inline JSON in the reply (the expected path).
-  let metrics = tryParseMetrics(summary);
+  let obj = tryParseObj(summary);
 
   // 2. Fallback — Euka saved it to a sandbox file anyway.
-  if (!metrics) {
+  if (!obj) {
     const path = resolveSandboxPath(r);
     if (path) {
       const f = await mcp('tools/call', { name: 'read_sandbox_file', arguments: { path } });
@@ -158,13 +177,31 @@ async function fetchStoreMetrics(storeId: string): Promise<any> {
         const fileText = typeof fsc.content === 'string'
           ? fsc.content
           : (f?.content || []).map((c: any) => c.text || '').join('\n');
-        metrics = tryParseMetrics(fileText);
+        obj = tryParseObj(fileText);
       }
     }
   }
 
-  if (!metrics) throw new Error('no metrics JSON in Euka response');
-  return { metrics, summary };
+  if (!obj) throw new Error('no metrics JSON in Euka response');
+  return { obj, summary };
+}
+
+// Pull the full metric set for one store — one query_store_data call
+// per window (accuracy degrades badly if both are asked at once).
+async function fetchStoreMetrics(
+  storeId: string,
+  win7: { start: string; end: string },
+  win30: { start: string; end: string },
+): Promise<any> {
+  const r7  = await queryWindow(storeId, buildWindowQuestion(win7.start, win7.end, false));
+  const r30 = await queryWindow(storeId, buildWindowQuestion(win30.start, win30.end, true));
+
+  const top = r30.obj.top && typeof r30.obj.top === 'object' ? r30.obj.top : null;
+  const d30 = { ...r30.obj };
+  delete d30.top;
+
+  const metrics = { d7: r7.obj, d30, top };
+  return { metrics, summary: `7d: ${r7.summary}\n\n30d: ${r30.summary}` };
 }
 
 Deno.serve(async (req) => {
@@ -193,6 +230,14 @@ Deno.serve(async (req) => {
     });
     await mcp('notifications/initialized', undefined, true);
 
+    // ── Date windows — pinned so Euka reads the same dashboard
+    //    presets our UI labels (7 / 30 calendar days ending today).
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const today = new Date();
+    const back = (n: number) => { const d = new Date(today); d.setUTCDate(d.getUTCDate() - n); return d; };
+    const win7  = { start: iso(back(6)),  end: iso(today) };
+    const win30 = { start: iso(back(29)), end: iso(today) };
+
     // ── Stores ───────────────────────────────────────────────────
     const storesRes = await mcp('tools/call', { name: 'list_accessible_stores', arguments: {} });
     const stores: any[] = storesRes?.structuredContent?.result
@@ -210,7 +255,7 @@ Deno.serve(async (req) => {
       const storeName = s.storeName || s.parentBrand?.brandName || 'Store';
 
       try {
-        const { metrics, summary } = await fetchStoreMetrics(storeId);
+        const { metrics, summary } = await fetchStoreMetrics(storeId, win7, win30);
         const d7  = metrics?.d7  || {};
         const d30 = metrics?.d30 || {};
 
@@ -230,13 +275,16 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Legacy gmv_ columns now hold Affiliate GMV (the only GMV
+        // Euka reports accurately); units/orders are left null since
+        // Euka's API has no reliable all-channels figure for them.
         await admin.from('euka_shop_metrics').insert({
           euka_store_id: storeId,
           store_name: storeName,
           region: s.region || null,
           brand_id: brandId,
-          gmv_7d: num(d7.gmv),   units_7d: num(d7.units),   orders_7d: num(d7.orders),
-          gmv_30d: num(d30.gmv), units_30d: num(d30.units), orders_30d: num(d30.orders),
+          gmv_7d: num(d7.affiliate_gmv),   units_7d: null, orders_7d: null,
+          gmv_30d: num(d30.affiliate_gmv), units_30d: null, orders_30d: null,
           metrics,
           raw: { parsed: metrics, summary },
         });

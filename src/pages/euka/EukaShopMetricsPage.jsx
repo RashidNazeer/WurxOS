@@ -5,8 +5,10 @@ import {
   listLinkableBrands, linkEukaStore,
 } from '../../lib/eukaApi';
 
-// TikTok Shop Metrics — the full per-store metric set synced from
-// Euka (sales, creators & content, ads, outreach, top performers).
+// TikTok Shop Metrics — per-store affiliate / creator-driven metrics
+// synced from Euka. Only the tiles Euka's API reports accurately are
+// shown; all-channels Total GMV / Orders / AOV are deliberately not
+// included (Euka's API has no data source for them).
 // Snapshots are written by the euka-sync edge function.
 
 function money(n) {
@@ -16,8 +18,10 @@ function money(n) {
 function intf(n) {
   return n == null ? '—' : Number(n).toLocaleString('en-US');
 }
-function ratio(n) {
-  return n == null ? '—' : `${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}x`;
+function pct(n) {
+  if (n == null) return '—';
+  const v = Number(n);
+  return `${(v > 1 ? v : v * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 }
 // Calendar window the metrics cover, ending at the sync date.
 function dateRange(iso, days) {
@@ -37,39 +41,25 @@ function relTime(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-// Metric groups — each entry is [key, label, formatter].
+// Metric groups — each entry is [key, label, formatter]. Only the
+// metrics Euka's MCP reports accurately (verified against the
+// Performance Overview dashboard to within ~2%) are listed.
 const GROUPS = [
   {
-    label: 'Sales', icon: 'bi-cash-stack',
+    label: 'Affiliate sales (creator-driven)', icon: 'bi-cash-stack',
     metrics: [
-      ['gmv', 'GMV', money],
-      ['video_gmv', 'Video GMV', money],
-      ['units', 'Units sold', intf],
-      ['orders', 'Orders', intf],
-      ['aov', 'Avg order value', money],
+      ['affiliate_gmv', 'Affiliate GMV', money],
+      ['value_driven', 'Value driven by Euka', money],
+      ['earned_media_value', 'Earned media value', money],
     ],
   },
   {
-    label: 'Creators & content', icon: 'bi-camera-video',
+    label: 'Content & engagement', icon: 'bi-camera-video',
     metrics: [
-      ['active_creators', 'Active creators', intf],
       ['videos_posted', 'Videos posted', intf],
       ['video_views', 'Video views', intf],
-    ],
-  },
-  {
-    label: 'Ads (GMV Max)', icon: 'bi-megaphone',
-    metrics: [
-      ['ad_spend', 'Ad spend', money],
-      ['roas', 'ROAS', ratio],
-    ],
-  },
-  {
-    label: 'Outreach', icon: 'bi-send',
-    metrics: [
-      ['sample_requests', 'Sample requests', intf],
-      ['outreach_messages', 'Outreach messages', intf],
-      ['collab_invites', 'Collab invites', intf],
+      ['video_conversion_rate', 'Video conv. rate', pct],
+      ['samples_shipped', 'Samples shipped', intf],
     ],
   },
 ];
@@ -140,7 +130,7 @@ export default function EukaShopMetricsPage() {
             TikTok Shop Metrics
           </h5>
           <p className="text-muted small mb-0">
-            Per-store sales, creators, ads and outreach — synced from Euka
+            Per-store affiliate / creator-driven metrics — synced from Euka
             {lastSynced ? ` · updated ${relTime(lastSynced)}` : ''}.
           </p>
         </div>
@@ -156,6 +146,18 @@ export default function EukaShopMetricsPage() {
       </div>
 
       {flash && <div className="alert alert-info py-2 small">{flash}</div>}
+
+      {rows.length > 0 && (
+        <div className="d-flex align-items-start gap-2 rounded-3 px-3 py-2 mb-3"
+          style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.72rem' }}>
+          <i className="bi bi-info-circle mt-1" />
+          <span style={{ color: 'var(--text-secondary)' }}>
+            These are <strong>affiliate / creator-driven</strong> figures from Euka. All-channels
+            Total GMV, Orders and AOV are not shown — Euka’s API has no data source for them, so
+            only metrics it reports accurately are displayed. Creator data can lag 1–2 days.
+          </span>
+        </div>
+      )}
 
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
@@ -258,7 +260,7 @@ export default function EukaShopMetricsPage() {
                           <div className="mb-1">
                             <div className="text-muted mb-1 d-flex align-items-center gap-1"
                               style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                              <i className="bi bi-trophy" />Top performers · 30 days
+                              <i className="bi bi-trophy" />Top affiliate performers · 30 days
                             </div>
                             <div className="row g-2">
                               <TopItem icon="bi-person-badge" label="Top creator"
