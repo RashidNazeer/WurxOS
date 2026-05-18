@@ -305,6 +305,11 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, busy, o
               style={{ borderRadius: 8 }} disabled={busy} onClick={onStop}>
               {busy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-stop-fill" /> Stop Presenting</>}
             </button>
+          ) : done ? (
+            <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 8 }} disabled>
+              <i className="bi bi-check2-circle" /> Presented
+            </button>
           ) : (
             <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
               style={{ borderRadius: 8 }} disabled={busy || someoneElse} onClick={onStart}>
