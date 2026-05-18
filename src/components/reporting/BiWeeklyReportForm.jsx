@@ -910,17 +910,17 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       )}
       <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2"
         style={{
-          position: 'sticky', top: 68, zIndex: 4,
+          position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
           background: 'var(--surface-2)',
           borderBottom: '1px solid var(--border-subtle)',
           padding: '12px 28px', margin: '0 -28px 16px',
         }}>
-        <div>
-          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+        <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
             {editReportId ? 'Edit' : 'New'} Bi-Weekly Report
           </h5>
           <p className="text-muted small mb-0 d-flex align-items-center gap-2 flex-wrap">
-            <span>{brandLabel} — {selectedPeriod?.label}</span>
+            <span style={{ overflowWrap: 'anywhere' }}>{brandLabel} — {selectedPeriod?.label}</span>
             {editReportId && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                 style={{ borderRadius: 6, fontSize: '0.65rem', padding: '1px 8px' }}

@@ -13,6 +13,10 @@
   min-height: 100vh;
   background: var(--surface-0);
   transition: grid-template-columns var(--dur-base) var(--ease-out);
+  /* Topbar height — consumed by in-page sticky headers so they pin
+     flush under the topbar. Kept in sync with .shell-topbar's
+     min-height (overridden to 60px on mobile below). */
+  --topbar-h: 68px;
 }
 .shell[data-collapsed='true'] { --sidebar-w: 68px; }
 
@@ -560,7 +564,12 @@
 .shell-content {
   grid-area: content;
   padding: 24px 28px 48px;
-  overflow-x: hidden;
+  /* `clip` (not `hidden`) — contains horizontal overflow WITHOUT
+     turning this element into a scroll container. `overflow-x:
+     hidden` would coerce overflow-y to `auto`, which makes every
+     `position: sticky` header inside the page stick relative to
+     this box instead of the viewport — so they'd scroll away. */
+  overflow-x: clip;
 }
 /* Fill the available width — dashboards feel cramped with a 1200px
    cap on wide monitors. Pages can still self-constrain if they want. */
@@ -609,6 +618,9 @@
   .shell {
     grid-template-columns: 1fr;
     grid-template-areas: 'topbar' 'content';
+    /* Topbar shrinks to 60px on mobile (see .shell-topbar below) —
+       keep the sticky-header offset in sync. */
+    --topbar-h: 60px;
   }
   .shell-sidebar {
     position: fixed;

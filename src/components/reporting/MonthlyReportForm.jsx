@@ -662,17 +662,17 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
         style={{
-          position: 'sticky', top: 68, zIndex: 4,
+          position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
           background: 'var(--surface-2)',
           borderBottom: '1px solid var(--border-subtle)',
           padding: '12px 28px', margin: '0 -28px 16px',
         }}>
-        <div>
+        <div style={{ minWidth: 0, flex: '1 1 auto' }}>
           <button className="btn btn-sm btn-link text-muted p-0 mb-1 d-block"
             onClick={() => onCancel ? onCancel() : setStep(0)}>
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
-          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+          <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
             {brandName} — {selectedMonth?.label}
           </h5>
           <div className="d-flex align-items-center gap-2 flex-wrap">
