@@ -4,7 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
   listAgendaTasks, markAttendance, startPresenting, stopPresenting,
-  startMeeting, finishMeeting, subscribeAgendaMeetings, subscribeAgendaRoom,
+  startMeeting, finishMeeting, getAgendaSettings,
+  subscribeAgendaMeetings, subscribeAgendaRoom,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 
@@ -48,6 +49,7 @@ export default function AgendaOngoingPage() {
   const [myTasks, setMyTasks]         = useState([]);
   const [weekUpcoming, setWeekUpcoming] = useState([]);
   const [allTeams, setAllTeams]       = useState([]);
+  const [meetLink, setMeetLink]       = useState('');
   const [justFinished, setJustFinished] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [busy, setBusy]               = useState('');
@@ -55,12 +57,14 @@ export default function AgendaOngoingPage() {
 
   async function refresh() {
     try {
-      const [ongoing, upcoming, teams] = await Promise.all([
+      const [ongoing, upcoming, teams, settings] = await Promise.all([
         listAgendaMeetings({ status: 'ongoing' }),
         listAgendaMeetings({ status: 'upcoming' }),
         listAgendaTeams(),
+        getAgendaSettings(),
       ]);
       setAllTeams(teams);
+      setMeetLink(settings?.google_meet_link || '');
       const wk = mondayStr();
       setWeekUpcoming((upcoming || []).filter((m) => m.week_start === wk));
       const m = ongoing[0] || null;
@@ -238,6 +242,29 @@ export default function AgendaOngoingPage() {
               ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
               : <><i className="bi bi-check2-circle" /> Finish Meeting</>}
           </button>
+        )}
+      </div>
+
+      {/* Join meeting — live for everyone in the active team's room */}
+      <div className="mb-3">
+        {meetLink ? (
+          <a href={meetLink} target="_blank" rel="noreferrer"
+            className="btn btn-success w-100 d-inline-flex align-items-center justify-content-center gap-2"
+            style={{ borderRadius: 12, fontWeight: 700, fontSize: '0.95rem', padding: '12px 16px' }}>
+            <i className="bi bi-camera-video-fill" style={{ fontSize: '1.1rem' }} />
+            Join Meeting Now
+            <span className="rounded-pill px-2 d-inline-flex align-items-center gap-1"
+              style={{ background: 'rgba(255,255,255,0.25)', fontSize: '0.6rem', fontWeight: 800 }}>
+              <span className="rounded-circle" style={{ width: 6, height: 6, background: '#fff', display: 'inline-block' }} />
+              LIVE
+            </span>
+          </a>
+        ) : (
+          <div className="rounded-3 p-2 text-center text-muted"
+            style={{ background: '#f1f5f9', border: '1px dashed #cbd5e1', fontSize: '0.78rem' }}>
+            <i className="bi bi-camera-video-off me-1" />
+            No Google Meet link set — an OL can add one in Settings → General.
+          </div>
         )}
       </div>
 
