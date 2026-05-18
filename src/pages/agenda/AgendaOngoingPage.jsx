@@ -1,28 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  listAgendaMeetings, listAgendaTeams, finishMeeting, subscribeAgendaMeetings,
+  listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
+  listAgendaTasks, markAttendance, startPresenting, stopPresenting, finishMeeting,
+  subscribeAgendaMeetings, subscribeAgendaRoom,
 } from '../../lib/agendaApi';
+import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 
-// Weekly Agenda Meetings — Ongoing. Lists meetings that have been
-// started; OL finishes them here. Detailed in-meeting behaviour
-// (ratings, remarks) arrives in the next phase.
+// Weekly Agenda Meetings — Ongoing (the live meeting room).
+// Realtime: attendance, presenter state and meeting status all sync
+// for every participant with no manual refresh.
 
-function fmtDate(dateStr) {
-  if (!dateStr) return '';
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US',
-    { weekday: 'short', month: 'short', day: 'numeric' });
-}
-function fmtTime(t) {
-  if (!t) return '';
-  const [h, m] = t.split(':');
-  let hh = Number(h); const ap = hh >= 12 ? 'PM' : 'AM'; hh = hh % 12 || 12;
-  return `${hh}:${m} ${ap}`;
-}
-function fmtSince(iso) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
+const STATUS_LABEL = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
 
 export default function AgendaOngoingPage() {
   const { user, profile } = useAuth();
@@ -30,133 +20,325 @@ export default function AgendaOngoingPage() {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
-  const myTeamTlId = isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null);
+  const uid = user?.id;
 
-  const [meetings, setMeetings] = useState([]);
-  const [teams, setTeams]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [busyId, setBusyId]     = useState(null);
+  const [meeting, setMeeting]         = useState(null);
+  const [team, setTeam]               = useState(null);   // { tl, apcs }
+  const [attendance, setAttendance]   = useState([]);
+  const [presentations, setPresentations] = useState([]);
+  const [myTasks, setMyTasks]         = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [busy, setBusy]               = useState('');
 
-  function reload() {
-    listAgendaMeetings({ status: 'ongoing' }).then(setMeetings).catch(() => {});
+  async function refresh() {
+    try {
+      const ongoing = await listAgendaMeetings({ status: 'ongoing' });
+      const m = ongoing[0] || null;
+      if (!m) {
+        setMeeting(null); setTeam(null); setAttendance([]); setPresentations([]);
+        return;
+      }
+      const [teams, att, pres] = await Promise.all([
+        listAgendaTeams(), listMeetingAttendance(m.id), listPresentations(m.id),
+      ]);
+      setMeeting(m);
+      setTeam(teams.find((t) => t.tl.id === m.tl_id) || null);
+      setAttendance(att);
+      setPresentations(pres);
+    } catch { /* keep last good state */ }
   }
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([listAgendaMeetings({ status: 'ongoing' }), listAgendaTeams()])
-      .then(([m, t]) => { if (!cancelled) { setMeetings(m || []); setTeams(t || []); } })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    const unsub = subscribeAgendaMeetings(reload);
-    return () => { cancelled = true; unsub(); };
+    refresh().finally(() => setLoading(false));
+    const unsub = subscribeAgendaMeetings(refresh);   // catches start/finish
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const teamsById = useMemo(() => {
-    const m = new Map();
-    teams.forEach((t) => m.set(t.tl.id, t));
-    return m;
-  }, [teams]);
+  useEffect(() => {
+    if (!meeting?.id) return undefined;
+    const unsub = subscribeAgendaRoom(meeting.id, refresh);  // attendance + presenter
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meeting?.id]);
 
-  const visible = useMemo(
-    () => (myTeamTlId ? meetings.filter((m) => m.tl_id === myTeamTlId) : meetings),
-    [meetings, myTeamTlId],
+  useEffect(() => {
+    if (!isApc || !meeting) { setMyTasks([]); return; }
+    listAgendaTasks({ assigneeMe: true }).then(setMyTasks).catch(() => setMyTasks([]));
+  }, [isApc, meeting?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const apcs = team?.apcs || [];
+  const attMap  = useMemo(() => {
+    const m = {}; attendance.forEach((a) => { m[a.apc_id] = a.status; }); return m;
+  }, [attendance]);
+  const presMap = useMemo(() => {
+    const m = {}; presentations.forEach((p) => { m[p.apc_id] = p; }); return m;
+  }, [presentations]);
+  const activePresentation = useMemo(
+    () => presentations.find((p) => p.status === 'presenting') || null,
+    [presentations],
   );
+  const presentCount = attendance.filter((a) => a.status === 'present').length;
+  const absentCount  = attendance.filter((a) => a.status === 'absent').length;
 
-  async function handleFinish(id) {
-    if (!window.confirm('Finish this team meeting?')) return;
-    setBusyId(id);
-    try {
-      await finishMeeting(id);
-      reload();
-    } catch (e) {
-      alert('Failed to finish: ' + (e.message || 'unknown'));
-    } finally {
-      setBusyId(null);
-    }
+  async function handleMark(apcId, status) {
+    setBusy(`att-${apcId}`);
+    try { await markAttendance(meeting.id, apcId, status); await refresh(); }
+    catch (e) { alert('Failed: ' + (e.message || 'unknown')); }
+    finally { setBusy(''); }
+  }
+  async function handleStart() {
+    setBusy('present');
+    try { await startPresenting(meeting.id); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to start presenting'); }
+    finally { setBusy(''); }
+  }
+  async function handleStop(apcId) {
+    setBusy('present');
+    try { await stopPresenting(meeting.id, apcId); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to stop presenting'); }
+    finally { setBusy(''); }
+  }
+  async function handleFinish() {
+    if (!window.confirm('Finish this meeting? This ends the session for everyone.')) return;
+    setBusy('finish');
+    try { await finishMeeting(meeting.id); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to finish meeting'); }
+    finally { setBusy(''); }
   }
 
-  return (
-    <div style={{ padding: '32px 32px 48px' }}>
-      <div className="mb-4">
-        <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
-          <i className="bi bi-broadcast" style={{ fontSize: '1.15rem' }} />
-          Ongoing Meetings
-        </h5>
-        <p className="text-muted small mb-0">Team meetings currently in progress.</p>
+  if (loading) {
+    return (
+      <div style={{ padding: '32px' }}>
+        <div className="d-flex align-items-center gap-2 text-muted">
+          <span className="spinner-border spinner-border-sm" /> Loading…
+        </div>
       </div>
+    );
+  }
 
-      {loading ? (
-        <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
-      ) : visible.length === 0 ? (
+  if (!meeting) {
+    return (
+      <div style={{ padding: '32px 32px 48px' }}>
+        <div className="mb-4">
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+            <i className="bi bi-broadcast" style={{ fontSize: '1.15rem' }} />
+            Ongoing Meetings
+          </h5>
+        </div>
         <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
             <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No meetings in progress</p>
-          <p className="text-muted small mb-0">Start a meeting from Upcoming Meetings.</p>
+          <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
+          <p className="text-muted small mb-2">
+            {isOL ? 'Start a team meeting from Upcoming Meetings.' : 'You’ll see your team’s meeting here the moment it starts.'}
+          </p>
+          {isOL && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
         </div>
-      ) : (
-        <div className="row g-3">
-          {visible.map((m) => {
-            const team = teamsById.get(m.tl_id);
-            const apcs = team?.apcs || [];
-            return (
-              <div key={m.id} className="col-12 col-md-6 col-xl-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, borderLeft: '4px solid #0d6efd' }}>
-                  <div className="card-body p-3 d-flex flex-column">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
-                        style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.62rem', fontWeight: 800 }}>
-                        <span className="rounded-circle" style={{ width: 6, height: 6, background: '#0d6efd', display: 'inline-block' }} />
-                        LIVE
-                      </span>
-                      <span className="text-muted" style={{ fontSize: '0.68rem' }}>
-                        Started {fmtSince(m.started_at)}
-                      </span>
-                    </div>
+      </div>
+    );
+  }
 
-                    <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#1a1a2e' }}>
-                      {team?.tl?.display_name || m.tl?.display_name || 'Team'}
-                    </div>
-                    <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                      <i className="bi bi-calendar3 me-1" />{fmtDate(m.meeting_date)}
-                      {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)}
-                    </div>
+  const teamName = team?.tl?.display_name || meeting.tl?.display_name || 'Team';
 
-                    {apcs.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                          APCs presenting
-                        </div>
-                        <div className="d-flex flex-wrap gap-1">
-                          {apcs.map((a) => (
-                            <span key={a.id} className="rounded-pill px-2" style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.66rem', fontWeight: 600 }}>
-                              {a.display_name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+  return (
+    <div style={{ padding: '32px 32px 48px' }}>
+      {/* Header */}
+      <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
+              style={{ background: '#fef2f2', color: '#dc2626', fontSize: '0.62rem', fontWeight: 800 }}>
+              <span className="rounded-circle" style={{ width: 6, height: 6, background: '#dc2626', display: 'inline-block' }} />
+              LIVE
+            </span>
+            <h5 className="fw-bold mb-0" style={{ color: '#1a1a2e' }}>{teamName} — Agenda Meeting</h5>
+          </div>
+          <p className="text-muted small mb-0">
+            {apcs.length} APC{apcs.length === 1 ? '' : 's'} · {presentCount} present · {absentCount} absent
+          </p>
+        </div>
+        {isOL && (
+          <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: 8, fontSize: '0.8rem' }}
+            onClick={handleFinish} disabled={busy === 'finish'}>
+            {busy === 'finish'
+              ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
+              : <><i className="bi bi-check2-circle" /> Finish Meeting</>}
+          </button>
+        )}
+      </div>
+
+      {/* Attendance strip */}
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <span className="fw-semibold small d-flex align-items-center gap-2">
+              <i className="bi bi-people-fill text-primary" />Attendance
+            </span>
+            <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+              {isTL ? 'Tap a name to mark Present / Absent' : 'Marked by the Team Lead'}
+            </span>
+          </div>
+          {apcs.length === 0 ? (
+            <div className="text-muted small">No APCs on this team.</div>
+          ) : (
+            <div className="d-flex flex-wrap gap-2">
+              {apcs.map((a) => {
+                const st = attMap[a.id];
+                const bg = st === 'present' ? '#e6f4ea' : st === 'absent' ? '#fff0f0' : '#f8fafc';
+                const bd = st === 'present' ? '#b7dfc4' : st === 'absent' ? '#f5c0c0' : '#e2e8f0';
+                return (
+                  <div key={a.id} className="rounded-2 px-2 py-1 d-flex align-items-center gap-2"
+                    style={{ background: bg, border: `1px solid ${bd}` }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1a1a2e' }}>{a.display_name}</span>
+                    {st && (
+                      <span style={{ fontSize: '0.64rem', fontWeight: 700, color: st === 'present' ? '#198754' : '#dc3545' }}>
+                        {st === 'present' ? 'Present' : 'Absent'}
+                      </span>
                     )}
-
-                    <div style={{ flexGrow: 1 }} />
-
-                    {isOL && (
-                      <button className="btn btn-sm btn-outline-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
-                        style={{ borderRadius: 8, fontSize: '0.74rem' }}
-                        disabled={busyId === m.id}
-                        onClick={() => handleFinish(m.id)}>
-                        {busyId === m.id
-                          ? <span className="spinner-border spinner-border-sm" />
-                          : <><i className="bi bi-check2-circle" /> Finish Meeting</>}
-                      </button>
+                    {isTL && (
+                      <span className="d-inline-flex gap-1">
+                        <button className="btn btn-sm p-0 px-1" title="Present"
+                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'present' ? '#198754' : '#fff', color: st === 'present' ? '#fff' : '#198754', border: '1px solid #198754' }}
+                          disabled={busy === `att-${a.id}`}
+                          onClick={() => handleMark(a.id, 'present')}>
+                          <i className="bi bi-check-lg" />
+                        </button>
+                        <button className="btn btn-sm p-0 px-1" title="Absent"
+                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'absent' ? '#dc3545' : '#fff', color: st === 'absent' ? '#fff' : '#dc3545', border: '1px solid #dc3545' }}
+                          disabled={busy === `att-${a.id}`}
+                          onClick={() => handleMark(a.id, 'absent')}>
+                          <i className="bi bi-x-lg" />
+                        </button>
+                      </span>
                     )}
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Currently presenting banner */}
+      <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
+        style={{
+          background: activePresentation ? 'linear-gradient(135deg,#4f46e5,#6366f1)' : '#f1f5f9',
+          color: activePresentation ? '#fff' : '#64748b',
+        }}>
+        <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+          style={{ width: 44, height: 44, background: activePresentation ? 'rgba(255,255,255,0.2)' : '#e2e8f0' }}>
+          <i className={`bi ${activePresentation ? 'bi-easel2-fill' : 'bi-easel2'}`} style={{ fontSize: '1.2rem' }} />
+        </div>
+        <div>
+          <div style={{ fontSize: '0.66rem', fontWeight: 800, letterSpacing: '0.08em', opacity: 0.8 }}>
+            CURRENTLY PRESENTING
+          </div>
+          <div className="fw-bold" style={{ fontSize: '1.05rem' }}>
+            {activePresentation ? (activePresentation.apc?.display_name || 'APC') : 'No one is presenting yet'}
+          </div>
+        </div>
+        {activePresentation && (
+          <span className="ms-auto rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
+            style={{ background: 'rgba(255,255,255,0.2)', fontSize: '0.62rem', fontWeight: 800 }}>
+            <span className="rounded-circle" style={{ width: 6, height: 6, background: '#fff', display: 'inline-block' }} />
+            LIVE
+          </span>
+        )}
+      </div>
+
+      {/* APC presenting controls */}
+      {isApc && (
+        <APCControls
+          meeting={meeting}
+          uid={uid}
+          myPresentation={presMap[uid]}
+          activePresentation={activePresentation}
+          busy={busy === 'present'}
+          onStart={handleStart}
+          onStop={() => handleStop(uid)}
+          myTasks={myTasks}
+        />
+      )}
+
+      {/* OL evaluation interface */}
+      {isOL && (
+        <OngoingEvaluation meeting={meeting} activePresentation={activePresentation} />
+      )}
+
+      {/* TL — presenter / OL actions overview */}
+      {isTL && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+          <div className="card-body p-3 text-muted small">
+            <i className="bi bi-info-circle me-1" />
+            Mark attendance above. The OL is running the presentation review.
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ── APC controls ────────────────────────────────────────────────────────
+function APCControls({ meeting, uid, myPresentation, activePresentation, busy, onStart, onStop, myTasks }) {
+  const iAmPresenting   = activePresentation?.apc_id === uid;
+  const someoneElse     = activePresentation && activePresentation.apc_id !== uid;
+  const done            = myPresentation?.status === 'done' && !iAmPresenting;
+
+  return (
+    <>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+          <div>
+            <div className="fw-semibold" style={{ fontSize: '0.86rem' }}>Your presentation</div>
+            <div className="text-muted" style={{ fontSize: '0.74rem' }}>
+              {iAmPresenting ? 'You are presenting now — the OL is reviewing your tasks.'
+                : someoneElse ? `Locked — ${activePresentation.apc?.display_name || 'another APC'} is presenting.`
+                : done ? 'You have finished presenting.'
+                : 'When you are ready, start your presentation.'}
+            </div>
+          </div>
+          {iAmPresenting ? (
+            <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 8 }} disabled={busy} onClick={onStop}>
+              {busy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-stop-fill" /> Stop Presenting</>}
+            </button>
+          ) : (
+            <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 8 }} disabled={busy || someoneElse} onClick={onStart}>
+              {someoneElse ? <><i className="bi bi-lock-fill" /> Locked</>
+                : busy ? <span className="spinner-border spinner-border-sm" />
+                : <><i className="bi bi-play-fill" /> Start Presenting</>}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {myTasks.length > 0 && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+          <div className="card-body p-3">
+            <div className="fw-semibold small mb-2"><i className="bi bi-list-check me-1 text-primary" />Your agenda tasks</div>
+            <div className="d-flex flex-column gap-2">
+              {myTasks.map((t) => (
+                <div key={t.id} className="rounded-2 p-2 d-flex align-items-center justify-content-between gap-2"
+                  style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                  <div className="min-w-0">
+                    <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem' }}>{t.title}</div>
+                    {t.brand?.brand_name && (
+                      <div className="text-muted" style={{ fontSize: '0.66rem' }}><i className="bi bi-shop me-1" />{t.brand.brand_name}</div>
+                    )}
+                  </div>
+                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>
+                    {STATUS_LABEL[t.status] || t.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

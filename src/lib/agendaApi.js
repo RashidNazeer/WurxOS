@@ -395,3 +395,117 @@ export function subscribeAgendaMeetings(onChange) {
     .subscribe();
   return () => supabase.removeChannel(ch);
 }
+
+// --------------------------------------------------------------
+// Ongoing meeting room (phase 3)
+// --------------------------------------------------------------
+
+// Attendance ---------------------------------------------------
+export async function listMeetingAttendance(meetingId) {
+  const { data, error } = await supabase
+    .from('agenda_meeting_attendance')
+    .select('*')
+    .eq('meeting_id', meetingId);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// TL only — mark an APC present/absent (status null clears it).
+export async function markAttendance(meetingId, apcId, status) {
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('agenda_meeting_attendance')
+    .upsert(
+      { meeting_id: meetingId, apc_id: apcId, status,
+        marked_by: auth?.user?.id || null, marked_at: new Date().toISOString() },
+      { onConflict: 'meeting_id,apc_id' },
+    )
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Presentations ------------------------------------------------
+export async function listPresentations(meetingId) {
+  const { data, error } = await supabase
+    .from('agenda_presentations')
+    .select('*, apc:apc_id(id, display_name, email, avatar_url)')
+    .eq('meeting_id', meetingId);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function startPresenting(meetingId) {
+  const { data, error } = await supabase.rpc('agenda_start_presenting', { p_meeting: meetingId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function stopPresenting(meetingId, apcId) {
+  const { data, error } = await supabase.rpc('agenda_stop_presenting', { p_meeting: meetingId, p_apc: apcId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// OL — the per-APC overall rating + summary on the presentation row.
+export async function updatePresentationReview(presentationId, { rating, summary }) {
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('agenda_presentations')
+    .update({ overall_rating: rating ?? null, overall_summary: summary ?? null, reviewed_by: auth?.user?.id || null })
+    .eq('id', presentationId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Task reviews (OL) --------------------------------------------
+export async function listTaskReviews(meetingId) {
+  const { data, error } = await supabase
+    .from('agenda_task_reviews')
+    .select('*')
+    .eq('meeting_id', meetingId);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function saveTaskReview(meetingId, apcId, taskId, { rating, notes }) {
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('agenda_task_reviews')
+    .upsert(
+      { meeting_id: meetingId, apc_id: apcId, task_id: taskId,
+        rating: rating ?? null, notes: notes ?? null, reviewed_by: auth?.user?.id || null },
+      { onConflict: 'meeting_id,task_id' },
+    )
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// OL — TL remark, stored on the meeting row.
+export async function updateTlRemark(meetingId, { rating, remark }) {
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('agenda_meetings')
+    .update({ tl_rating: rating ?? null, tl_remark: remark ?? null, tl_reviewed_by: auth?.user?.id || null })
+    .eq('id', meetingId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Realtime — every table the live room depends on, scoped to one meeting.
+export function subscribeAgendaRoom(meetingId, onChange) {
+  const ch = supabase
+    .channel(`agenda-room-${meetingId}-${Math.random().toString(36).slice(2, 6)}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_meetings', filter: `id=eq.${meetingId}` }, () => onChange())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_presentations', filter: `meeting_id=eq.${meetingId}` }, () => onChange())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_meeting_attendance', filter: `meeting_id=eq.${meetingId}` }, () => onChange())
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
