@@ -66,9 +66,12 @@ export async function exportReportToPdf(node, { title = 'Report' } = {}) {
 
   // Render the report DOM to a canvas. The .no-print filter drops
   // screen-only controls; cacheBust avoids stale cached images.
+  // An opaque white backgroundColor guarantees no transparent
+  // pixels (which would turn black once embedded as JPEG).
   const canvas = await htmlToImage.toCanvas(node, {
     pixelRatio,
     cacheBust: true,
+    backgroundColor: '#ffffff',
     filter: (el) => !(el.classList && el.classList.contains('no-print')),
   });
 
@@ -80,9 +83,12 @@ export async function exportReportToPdf(node, { title = 'Report' } = {}) {
     unit: 'px',
     format: [pdfW, pdfH],
     orientation: 'portrait',
-    compress: true,
   });
-  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
+  // Embed as JPEG, not PNG: jsPDF stores a JPEG verbatim (DCTDecode),
+  // whereas its PNG path re-decodes the image and corrupts large
+  // captures into rainbow scanline garbage. Quality 0.95 keeps text
+  // and charts crisp at the 2x capture scale.
+  pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW, pdfH);
 
   const safe = String(title).replace(/[\\/:*?"<>|]/g, '_').slice(0, 120).trim();
   pdf.save(`${safe || 'Report'}.pdf`);
