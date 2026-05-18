@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   emptyBiWeeklyReport, getBiWeeklyPeriodsFromAnchor,
@@ -273,6 +274,9 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   }, [editReportId, draftKey.uid, draftKey.brandId, draftKey.periodStart]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!!editReportId);
+  // Unsaved-changes guard — see WeeklyReportForm for the rationale.
+  const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(dirty);
   const [detectingPeriod, setDetectingPeriod] = useState(false);
   const [aiLoading, setAiLoading] = useState({}); // per-section loading state
   const [customFieldDefs, setCustomFieldDefs] = useState([]); // [{id, name}]
@@ -720,6 +724,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       });
       // Successful save — drop the local auto-save backup.
       clearLocalDraft();
+      setDirty(false); // changes are persisted — release the guard
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,
@@ -911,7 +916,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   }));
 
   return (
-    <div>
+    <div onInput={() => setDirty(true)}>
       {onCancel && (
         <button className="btn btn-sm btn-link text-muted p-0 mb-2" onClick={onCancel}>
           <i className="bi bi-arrow-left me-1" /> {editReportId ? 'Cancel editing' : 'Back to reports'}

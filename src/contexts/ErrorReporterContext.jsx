@@ -20,6 +20,7 @@ import {
 } from 'react';
 import { useAuth } from './AuthContext';
 import { logAppEvent } from '../lib/appEvents';
+import { requestAppReload } from '../lib/appUpdate';
 
 const ErrorReporterContext = createContext(null);
 
@@ -37,12 +38,11 @@ function extractMessage(err) {
 
 // Stale-deploy detector. After we redeploy, users who had the old
 // index.html in memory still reference content-hashed asset filenames
-// that no longer exist on the CDN. The fix is a hard reload — the
-// browser fetches the fresh index.html which points to the new
-// filenames. We do this transparently instead of showing the user a
-// scary "DM Mr Rashid" modal, since this is a transient state, not a
-// bug. sessionStorage guards against an infinite reload loop if the
-// asset is genuinely unreachable (network down, etc.).
+// that no longer exist on the CDN. The recovery is handled by the
+// app-update coordinator (requestAppReload): it reloads only when the
+// user has no unsaved work, otherwise raises the non-blocking "update
+// available" banner. This is a transient state, not a bug, so we
+// never escalate it to the scary "DM Mr Rashid" modal.
 const STALE_DEPLOY_PATTERNS = [
   /Unable to preload CSS/i,
   /Failed to fetch dynamically imported module/i,
@@ -55,11 +55,9 @@ function isStaleDeployError(msg) {
   return STALE_DEPLOY_PATTERNS.some((re) => re.test(msg));
 }
 function handleStaleDeploy() {
-  let alreadyReloaded = null;
-  try { alreadyReloaded = sessionStorage.getItem('chunk-reload-pending'); } catch {}
-  if (alreadyReloaded) return false; // already tried once — let the error surface
-  try { sessionStorage.setItem('chunk-reload-pending', '1'); } catch {}
-  if (typeof window !== 'undefined') window.location.reload();
+  // Coordinator decides whether to reload now or defer to the banner.
+  // Either way the stale-deploy error is handled — never surface it.
+  requestAppReload('stale-deploy');
   return true;
 }
 

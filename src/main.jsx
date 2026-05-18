@@ -10,6 +10,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/global.css';
 import { registerServiceWorker } from './lib/pwa';
+import { startUpdatePolling } from './lib/appUpdate';
 import { syncServerTime } from './lib/serverTime';
 
 // Sync once at boot so the attendance live-elapsed timer stays correct on
@@ -24,3 +25,7 @@ createRoot(document.getElementById('root')).render(
 );
 
 registerServiceWorker();
+
+// Poll for new deployments so users see the calm "update available"
+// banner before they ever hit a stale chunk (production only).
+startUpdatePolling();

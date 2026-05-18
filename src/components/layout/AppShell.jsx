@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import KeyboardShortcuts from './KeyboardShortcuts';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
+import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
 import '../../styles/shell.css';
 
 // Suspense fallback for lazy-loaded route chunks. Keeps the shell
@@ -134,6 +135,9 @@ export default function AppShell() {
         </div>
       </main>
       <KeyboardShortcuts />
+      {/* Non-blocking "new version available" banner. Never reloads
+          on its own — the user reloads when their work is safe. */}
+      <UpdateAvailableBanner />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import React from 'react';
 import { logAppEvent } from '../../lib/appEvents';
 import { supabase } from '../../lib/supabase';
+import { requestAppReload } from '../../lib/appUpdate';
+import ChunkReloadNotice from './ChunkReloadNotice';
 
 /**
  * Catches React render errors inside the AppShell's route outlet.
@@ -8,20 +10,15 @@ import { supabase } from '../../lib/supabase';
  * card (matching the global ErrorReporterContext modal) AND log the
  * full stack to app_events for later forensics.
  *
- * Exception: stale-deploy errors (asset filenames that no longer exist
- * after a redeploy) get a silent one-shot reload instead of the modal,
- * because they're transient state, not a real bug.
+ * Exception: stale-deploy errors (asset filenames that no longer
+ * exist after a redeploy) are routed through the app-update
+ * coordinator — it reloads only when the user has no unsaved work,
+ * otherwise it shows the update banner and we render a calm refresh
+ * notice. They're transient state, not a real bug.
  */
 const STALE_DEPLOY_RE = /Unable to preload CSS|Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk \d+ failed|error loading dynamically imported module/i;
-function tryStaleDeployReload(err) {
-  const msg = String(err?.message || err || '');
-  if (!STALE_DEPLOY_RE.test(msg)) return false;
-  let alreadyReloaded = null;
-  try { alreadyReloaded = sessionStorage.getItem('chunk-reload-pending'); } catch {}
-  if (alreadyReloaded) return false;
-  try { sessionStorage.setItem('chunk-reload-pending', '1'); } catch {}
-  if (typeof window !== 'undefined') window.location.reload();
-  return true;
+function isStaleDeploy(err) {
+  return STALE_DEPLOY_RE.test(String(err?.message || err || ''));
 }
 
 export default class RouteErrorBoundary extends React.Component {
@@ -31,12 +28,16 @@ export default class RouteErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    if (tryStaleDeployReload(error)) return null;
+    if (isStaleDeploy(error)) {
+      // Coordinator reloads if safe; otherwise we render the notice.
+      return requestAppReload('route-error') ? null : { staleDeploy: true };
+    }
     return { error };
   }
 
   componentDidCatch(error, info) {
-    if (tryStaleDeployReload(error)) return;
+    // Stale-deploy errors are transient, not bugs — don't log them.
+    if (isStaleDeploy(error)) return;
     try {
       supabase.auth.getUser().then(async ({ data }) => {
         const uid = data?.user?.id;
@@ -62,8 +63,8 @@ export default class RouteErrorBoundary extends React.Component {
   }
 
   componentDidUpdate(prevProps) {
-    if (this.state.error && prevProps.routeKey !== this.props.routeKey) {
-      this.setState({ error: null, copied: false });
+    if ((this.state.error || this.state.staleDeploy) && prevProps.routeKey !== this.props.routeKey) {
+      this.setState({ error: null, staleDeploy: false, copied: false });
     }
   }
 
@@ -93,6 +94,9 @@ export default class RouteErrorBoundary extends React.Component {
   };
 
   render() {
+    // Stale deploy + unsaved work → calm refresh notice, not the
+    // crash modal and not an auto-reload.
+    if (this.state.staleDeploy) return <ChunkReloadNotice />;
     if (!this.state.error) return this.props.children;
     const { error, copied, userFirst } = this.state;
     const detailsText = this.buildDetailsText();

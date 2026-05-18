@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   emptyMonthlyReport, makeMonthInfo, detectNextMonth, getFirstTimeMonthOptions,
@@ -165,6 +166,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const [data, setData] = useState(emptyMonthlyReport());
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!!editReportId);
+  // Unsaved-changes guard — see WeeklyReportForm for the rationale.
+  const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(dirty);
   const [detecting, setDetecting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [reportStatus, setReportStatus] = useState('draft');
@@ -520,6 +524,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         status,
         extraFields: extra,
       });
+      setDirty(false); // changes are persisted — release the guard
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,
@@ -659,7 +664,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const sCfg = REPORT_STATUSES[reportStatus] || REPORT_STATUSES.draft;
 
   return (
-    <div>
+    <div onInput={() => setDirty(true)}>
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
         style={{
           position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
