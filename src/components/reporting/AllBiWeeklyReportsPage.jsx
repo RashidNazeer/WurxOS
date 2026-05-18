@@ -7,6 +7,7 @@ import {
 } from '../../utils/biWeeklyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import BiWeeklyReportForm from './BiWeeklyReportForm';
+import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import EditReportDatesModal from './EditReportDatesModal';
@@ -62,6 +63,9 @@ export default function AllBiWeeklyReportsPage() {
 
   const [viewReport, setViewReport] = useState(null);
   const [editReportId, setEditReportId] = useState(null);
+  // Report-view actions (highlighter / exports) lifted into the
+  // sticky bar's "Other options" menu.
+  const [reportActions, setReportActions] = useState(null);
   const [editDatesReport, setEditDatesReport] = useState(null);
 
   const loadReports = async () => {
@@ -522,6 +526,9 @@ export default function AllBiWeeklyReportsPage() {
                 <i className="bi bi-trash3" /> Delete
               </button>
             )}
+            {/* Highlighter / Export PDF / Export Word — lifted from the
+                report view so they stay reachable while scrolling. */}
+            <ReportActionsMenu actions={reportActions} />
           </div>
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
@@ -534,7 +541,8 @@ export default function AllBiWeeklyReportsPage() {
             </div>
           </div>
         )}
-        <WeeklyReportView report={viewReportCompat} previousReport={prevCompat} allReports={brandReportsCompat} />
+        <WeeklyReportView report={viewReportCompat} previousReport={prevCompat} allReports={brandReportsCompat}
+          onActions={setReportActions} />
 
         {editDatesReport && (
           <EditReportDatesModal

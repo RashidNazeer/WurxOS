@@ -612,7 +612,7 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
 }
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
-export default function WeeklyReportView({ report, previousReport, allReports, clientView = false }) {
+export default function WeeklyReportView({ report, previousReport, allReports, clientView = false, onActions }) {
   const printRef = useRef();
   const { profile } = useAuth();
   const userRole = profile?.role || '';
@@ -872,10 +872,30 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     }
   };
 
+  // Hand the report-bar actions up to the parent list page so they
+  // can live in the sticky "Other options" menu. When onActions is
+  // supplied, this view skips rendering its own action bar.
+  React.useEffect(() => {
+    if (!onActions || clientView) return;
+    onActions({
+      highlighterActive,
+      onToggleHighlighter: () => setHighlighterActive((v) => !v),
+      onExportPdf: handleExport,
+      pdfBusy,
+      onExportWord: handleExportWord,
+      docxBusy,
+      canCopyInsights: userRole === 'tl',
+      onCopyInsights: handleCopyInsights,
+      copyDone: copyState === 'done',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onActions, clientView, highlighterActive, pdfBusy, docxBusy, copyState, userRole]);
+
   return (
     <div>
-      {/* ─── Action bar (above the canvas) — hidden in clientView ─────────── */}
-      {!clientView && (
+      {/* ─── Action bar (above the canvas) — hidden in clientView, and
+              when onActions lifts these into the sticky bar ──────────── */}
+      {!clientView && !onActions && (
         <div className="d-flex justify-content-end gap-2 mb-3 flex-wrap">
           {highlighterActive && (
             <HighlighterPicker
@@ -936,6 +956,17 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
               ? (<><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Exporting…</>)
               : (<><i className="bi bi-file-earmark-pdf" /> Export PDF</>)}
           </button>
+        </div>
+      )}
+
+      {/* Highlighter colour picker — shown when highlighting is on
+          and the action buttons live in the parent's sticky menu. */}
+      {!clientView && onActions && highlighterActive && (
+        <div className="d-flex justify-content-end mb-2">
+          <HighlighterPicker
+            color={highlightColor} onColorChange={setHighlightColor}
+            intensity={highlightIntensity} onIntensityChange={setHighlightIntensity}
+          />
         </div>
       )}
 
