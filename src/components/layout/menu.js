@@ -149,9 +149,11 @@ const AGENDA_GROUP_FULL = {
   icon: CalendarIcon,
   category: 'agenda',
   children: [
-    { label: 'Tasks',     to: '/agenda/tasks' },
-    { label: 'Resources', to: '/agenda/resources' },
-    { label: 'Settings',  to: '/agenda/settings' },
+    { label: 'Upcoming Meetings', to: '/agenda/upcoming' },
+    { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
+    { label: 'Tasks',             to: '/agenda/tasks' },
+    { label: 'Resources',         to: '/agenda/resources' },
+    { label: 'Settings',          to: '/agenda/settings' },
   ],
 };
 const AGENDA_GROUP_BASIC = {
@@ -159,8 +161,10 @@ const AGENDA_GROUP_BASIC = {
   icon: CalendarIcon,
   category: 'agenda',
   children: [
-    { label: 'Tasks',     to: '/agenda/tasks' },
-    { label: 'Resources', to: '/agenda/resources' },
+    { label: 'Upcoming Meetings', to: '/agenda/upcoming' },
+    { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
+    { label: 'Tasks',             to: '/agenda/tasks' },
+    { label: 'Resources',         to: '/agenda/resources' },
   ],
 };
 
