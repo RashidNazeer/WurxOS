@@ -249,6 +249,11 @@ export default function AgendaOngoingPage() {
         )}
       </div>
 
+      {/* Presentation progress — OL sees who has presented / who is pending */}
+      {isOL && apcs.length > 0 && (
+        <PresentationProgress apcs={apcs} presMap={presMap} />
+      )}
+
       {/* APC presenting controls */}
       {isApc && (
         <APCControls
@@ -277,6 +282,47 @@ export default function AgendaOngoingPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Presentation progress (OL) ──────────────────────────────────────────
+function PresentationProgress({ apcs, presMap }) {
+  const META = {
+    done:       { label: 'Presented',  color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle-fill' },
+    presenting: { label: 'Presenting', color: '#4f46e5', bg: '#eef2ff', icon: 'bi-easel2-fill' },
+    pending:    { label: 'Pending',    color: '#64748b', bg: '#f1f5f9', icon: 'bi-hourglass-split' },
+  };
+  const statusOf = (a) => presMap[a.id]?.status || 'pending';
+  const doneCount    = apcs.filter((a) => statusOf(a) === 'done').length;
+  const pendingCount = apcs.filter((a) => statusOf(a) === 'pending').length;
+
+  return (
+    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card-body p-3">
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <span className="fw-semibold small d-flex align-items-center gap-2">
+            <i className="bi bi-list-ol text-primary" />Presentation progress
+          </span>
+          <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+            {doneCount} presented · {pendingCount} pending
+          </span>
+        </div>
+        <div className="d-flex flex-wrap gap-2">
+          {apcs.map((a) => {
+            const m = META[statusOf(a)];
+            return (
+              <div key={a.id} className="rounded-2 px-2 py-1 d-flex align-items-center gap-2"
+                style={{ background: m.bg, border: `1px solid ${m.color}30` }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1a1a2e' }}>{a.display_name}</span>
+                <span className="d-inline-flex align-items-center gap-1" style={{ fontSize: '0.62rem', fontWeight: 700, color: m.color }}>
+                  <i className={`bi ${m.icon}`} />{m.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
