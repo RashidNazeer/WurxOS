@@ -11,9 +11,9 @@ import AgendaResetScheduleModal from '../../components/agenda/AgendaResetSchedul
 // fully separate from the main /tasks module.
 
 const STATUS = {
-  todo:        { label: 'To Do',       color: '#fd7e14', bg: '#fff3e0' },
-  in_progress: { label: 'In Progress', color: '#0d6efd', bg: '#e8f0fe' },
-  completed:   { label: 'Completed',   color: '#198754', bg: '#e6f4ea' },
+  todo:        { label: 'To Do',       color: 'var(--warning)', bg: 'var(--warning-soft)' },
+  in_progress: { label: 'In Progress', color: 'var(--info)',    bg: 'var(--info-soft)' },
+  completed:   { label: 'Completed',   color: 'var(--success)', bg: 'var(--success-soft)' },
 };
 const STATUS_ORDER = ['todo', 'in_progress', 'completed'];
 
@@ -106,7 +106,7 @@ export default function AgendaTasksPage() {
     <div style={{ padding: '32px 32px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-list-check" style={{ fontSize: '1.15rem' }} />
             Agenda Tasks
           </h5>
@@ -132,7 +132,7 @@ export default function AgendaTasksPage() {
 
       {isApc && resetHint && (
         <div className="rounded-2 px-3 py-2 mb-3 d-inline-flex align-items-center gap-2"
-          style={{ background: '#eef2ff', border: '1px solid #c7d2fe', fontSize: '0.76rem' }}>
+          style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)', fontSize: '0.76rem' }}>
           <i className="bi bi-arrow-repeat text-primary" />{resetHint}.
         </div>
       )}
@@ -145,14 +145,14 @@ export default function AgendaTasksPage() {
               <button key={key} type="button"
                 className="d-flex align-items-center gap-2 px-3 py-1 rounded-2 border-0"
                 style={{
-                  background: statusFilter === key ? '#1a1a2e' : '#f0f1f5',
-                  color: statusFilter === key ? '#fff' : '#475569',
+                  background: statusFilter === key ? 'var(--accent)' : 'var(--surface-2)',
+                  color: statusFilter === key ? 'var(--on-accent)' : 'var(--text-secondary)',
                   fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer',
                 }}
                 onClick={() => setStatusFilter(key)}>
                 {label}
                 <span className="rounded-pill px-2" style={{
-                  background: statusFilter === key ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                  background: statusFilter === key ? 'color-mix(in srgb, var(--on-accent) 22%, transparent)' : 'var(--surface-3)',
                   fontSize: '0.66rem', fontWeight: 700,
                 }}>{n}</span>
               </button>
@@ -177,7 +177,7 @@ export default function AgendaTasksPage() {
 
       {focusedApc && (
         <div className="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-1 mb-3"
-          style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: '0.76rem' }}>
+          style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)', fontSize: '0.76rem' }}>
           <i className="bi bi-person-badge text-primary" />
           Viewing <strong>{focusedApc.display_name}</strong>’s agenda tasks
           <button className="btn btn-sm p-0 ms-1" style={{ fontSize: '0.72rem' }}
@@ -189,8 +189,8 @@ export default function AgendaTasksPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : filtered.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-list-check text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
           <p className="fw-semibold text-dark mb-1">No agenda tasks</p>
@@ -266,13 +266,13 @@ function TaskCard({ task, uid, isManager, isOLBoss, onChanged }) {
       <div className="card-body p-3">
         <div className="d-flex align-items-start justify-content-between gap-3 flex-wrap">
           <div className="flex-grow-1 min-w-0" style={{ minWidth: 220 }}>
-            <div className="fw-semibold" style={{ fontSize: '0.9rem', color: '#1a1a2e' }}>{task.title}</div>
+            <div className="fw-semibold" style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{task.title}</div>
             {task.details && (
               <p className="text-muted mb-1 mt-1" style={{ fontSize: '0.78rem' }}>{task.details}</p>
             )}
             <div className="d-flex align-items-center gap-2 flex-wrap mt-1" style={{ fontSize: '0.7rem' }}>
               {task.brand?.brand_name && (
-                <span className="badge rounded-pill" style={{ background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>
+                <span className="badge rounded-pill" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                   <i className="bi bi-shop me-1" />{task.brand.brand_name}
                 </span>
               )}
@@ -280,7 +280,7 @@ function TaskCard({ task, uid, isManager, isOLBoss, onChanged }) {
                 <span className="text-muted"><i className="bi bi-person me-1" />{task.assignee.display_name}</span>
               )}
               {due && (
-                <span style={{ color: overdue ? '#dc3545' : '#64748b', fontWeight: overdue ? 700 : 400 }}>
+                <span style={{ color: overdue ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: overdue ? 700 : 400 }}>
                   <i className="bi bi-calendar3 me-1" />Due {due}
                 </span>
               )}
@@ -305,7 +305,7 @@ function TaskCard({ task, uid, isManager, isOLBoss, onChanged }) {
                     style={{
                       fontSize: '0.68rem', fontWeight: 600,
                       background: active ? meta.color : meta.bg,
-                      color: active ? '#fff' : meta.color,
+                      color: active ? 'var(--surface-1)' : meta.color,
                       cursor: canEdit ? 'pointer' : 'default',
                       opacity: canEdit ? 1 : 0.7,
                     }}>

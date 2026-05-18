@@ -16,20 +16,20 @@ export default function AgendaSettingsPage() {
   return (
     <div style={{ padding: '32px 32px 48px', maxWidth: 760 }}>
       <div className="mb-4">
-        <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+        <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <i className="bi bi-calendar-week" style={{ fontSize: '1.15rem' }} />
           Agenda Meeting Settings
         </h5>
         <p className="text-muted small mb-0">Configure the weekly agenda meeting. Only Operation Leads manage this.</p>
       </div>
 
-      <div className="d-flex gap-1 p-1 rounded-3 mb-4" style={{ background: '#f0f1f5', width: 'fit-content' }}>
+      <div className="d-flex gap-1 p-1 rounded-3 mb-4" style={{ background: 'var(--surface-2)', width: 'fit-content' }}>
         {TABS.map((t) => (
           <button key={t.key} type="button"
             className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{
-              background: tab === t.key ? '#1a1a2e' : 'transparent',
-              color: tab === t.key ? '#fff' : '#64748b',
+              background: tab === t.key ? 'var(--accent)' : 'transparent',
+              color: tab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)',
               border: 'none', borderRadius: 8, padding: '6px 14px',
               fontSize: '0.78rem', fontWeight: 700,
             }}

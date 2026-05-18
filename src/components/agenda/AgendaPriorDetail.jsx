@@ -10,11 +10,11 @@ import {
 //   OL  → everything + a presentation timeline
 
 const RATING_META = {
-  excellent:         { label: 'Excellent',         color: '#198754' },
-  well_explained:    { label: 'Well Explained',    color: '#0d6efd' },
-  satisfied:         { label: 'Satisfied',         color: '#16a34a' },
-  needs_improvement: { label: 'Needs Improvement', color: '#fd7e14' },
-  incomplete:        { label: 'Incomplete',        color: '#dc3545' },
+  excellent:         { label: 'Excellent',         color: 'var(--success)' },
+  well_explained:    { label: 'Well Explained',    color: 'var(--info)' },
+  satisfied:         { label: 'Satisfied',         color: 'var(--accent)' },
+  needs_improvement: { label: 'Needs Improvement', color: 'var(--warning)' },
+  incomplete:        { label: 'Incomplete',        color: 'var(--danger)' },
 };
 const STATUS_LABEL = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
 
@@ -22,7 +22,7 @@ function RatingChip({ value }) {
   const m = RATING_META[value];
   if (!m) return <span className="text-muted" style={{ fontSize: '0.7rem' }}>No rating</span>;
   return (
-    <span className="rounded-pill px-2 py-1" style={{ background: m.color, color: '#fff', fontSize: '0.62rem', fontWeight: 700 }}>
+    <span className="rounded-pill px-2 py-1" style={{ background: m.color, color: 'var(--surface-1)', fontSize: '0.62rem', fontWeight: 700 }}>
       {m.label}
     </span>
   );
@@ -129,8 +129,8 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
         <div className="card-body p-3">
           <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-            <h5 className="fw-bold mb-0" style={{ color: '#1a1a2e' }}>{teamName} — Agenda Meeting</h5>
-            <span className="rounded-pill px-2 py-1" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem', fontWeight: 800 }}>
+            <h5 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{teamName} — Agenda Meeting</h5>
+            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.62rem', fontWeight: 800 }}>
               <i className="bi bi-check-circle-fill me-1" />Completed
             </span>
           </div>
@@ -159,13 +159,17 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
                 <div className="d-flex flex-wrap gap-2">
                   {roster.map((a) => {
                     const st = attByApc[a.id]?.status;
-                    const bg = st === 'present' ? '#e6f4ea' : st === 'absent' ? '#fff0f0' : '#f8fafc';
-                    const bd = st === 'present' ? '#b7dfc4' : st === 'absent' ? '#f5c0c0' : '#e2e8f0';
-                    const col = st === 'present' ? '#198754' : st === 'absent' ? '#dc3545' : '#94a3b8';
+                    const bg = st === 'present' ? 'var(--success-soft)' : st === 'absent' ? 'var(--danger-soft)' : 'var(--surface-2)';
+                    const bd = st === 'present'
+                      ? 'color-mix(in srgb, var(--success) 35%, transparent)'
+                      : st === 'absent'
+                        ? 'color-mix(in srgb, var(--danger) 35%, transparent)'
+                        : 'var(--border-subtle)';
+                    const col = st === 'present' ? 'var(--success)' : st === 'absent' ? 'var(--danger)' : 'var(--text-muted)';
                     return (
                       <div key={a.id} className="rounded-2 px-2 py-1 d-flex align-items-center gap-2"
                         style={{ background: bg, border: `1px solid ${bd}` }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1a1a2e' }}>{a.display_name}</span>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{a.display_name}</span>
                         <span style={{ fontSize: '0.62rem', fontWeight: 700, color: col }}>
                           {st === 'present' ? 'Present' : st === 'absent' ? 'Absent' : 'Not marked'}
                         </span>
@@ -200,7 +204,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
 
           {/* TL remarks — OL / TL */}
           {!isApc && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderLeft: '4px solid #16a34a' }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderLeft: '4px solid var(--success)' }}>
               <div className="card-body p-3">
                 <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
                   <i className="bi bi-person-badge text-success" />Team Lead remarks — {teamName}
@@ -208,7 +212,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
                 {meeting.tl_rating || meeting.tl_remark ? (
                   <>
                     {meeting.tl_rating && <RatingChip value={meeting.tl_rating} />}
-                    {meeting.tl_remark && <p className="mb-0 mt-2" style={{ fontSize: '0.82rem', color: '#1a1a2e' }}>{meeting.tl_remark}</p>}
+                    {meeting.tl_remark && <p className="mb-0 mt-2" style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{meeting.tl_remark}</p>}
                   </>
                 ) : (
                   <span className="text-muted" style={{ fontSize: '0.78rem' }}>No remarks recorded for the Team Lead.</span>
@@ -230,7 +234,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
                     .map((p, i) => (
                       <div key={p.id} className="d-flex align-items-center gap-2" style={{ fontSize: '0.78rem' }}>
                         <span className="rounded-circle d-inline-flex align-items-center justify-content-center"
-                          style={{ width: 20, height: 20, background: '#eef2ff', color: '#4f46e5', fontSize: '0.62rem', fontWeight: 800 }}>{i + 1}</span>
+                          style={{ width: 20, height: 20, background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: '0.62rem', fontWeight: 800 }}>{i + 1}</span>
                         <span className="fw-semibold">{p.apc?.display_name || 'APC'}</span>
                         <span className="text-muted">{fmtClock(p.started_at)} – {fmtClock(p.ended_at)}</span>
                       </div>
@@ -251,7 +255,7 @@ function Info({ icon, label, value }) {
       <div className="text-muted" style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
         <i className={`bi ${icon} me-1`} />{label}
       </div>
-      <div style={{ color: '#1a1a2e' }}>{value}</div>
+      <div style={{ color: 'var(--text-primary)' }}>{value}</div>
     </div>
   );
 }
@@ -268,17 +272,18 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, defaultOpen, 
         className="card-body p-3 border-0 w-100 text-start d-flex align-items-center gap-2"
         style={{ background: 'transparent', cursor: collapsible ? 'pointer' : 'default' }}>
         {collapsible && <i className={`bi bi-chevron-${open ? 'down' : 'right'} text-muted`} style={{ fontSize: '0.72rem' }} />}
-        <span className="fw-semibold" style={{ fontSize: '0.88rem', color: '#1a1a2e' }}>{apc.display_name}</span>
+        <span className="fw-semibold" style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{apc.display_name}</span>
         <span className="rounded-pill px-2" style={{
-          background: presented ? '#e6f4ea' : '#f1f5f9', color: presented ? '#198754' : '#64748b',
+          background: presented ? 'var(--success-soft)' : 'var(--surface-2)',
+          color: presented ? 'var(--success)' : 'var(--text-secondary)',
           fontSize: '0.6rem', fontWeight: 700,
         }}>
           {presented ? `Presented${order ? ` · #${order}` : ''}` : 'Did not present'}
         </span>
         {attStatus && (
           <span className="rounded-pill px-2" style={{
-            background: attStatus === 'present' ? '#e6f4ea' : '#fff0f0',
-            color: attStatus === 'present' ? '#198754' : '#dc3545', fontSize: '0.6rem', fontWeight: 700,
+            background: attStatus === 'present' ? 'var(--success-soft)' : 'var(--danger-soft)',
+            color: attStatus === 'present' ? 'var(--success)' : 'var(--danger)', fontSize: '0.6rem', fontWeight: 700,
           }}>
             {attStatus === 'present' ? 'Present' : 'Absent'}
           </span>
@@ -290,7 +295,7 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, defaultOpen, 
       {open && (
         <div className="px-3 pb-3">
           {/* Overall summary */}
-          <div className="rounded-2 p-2 mb-2" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+          <div className="rounded-2 p-2 mb-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
               Overall summary
             </div>
@@ -298,7 +303,7 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, defaultOpen, 
               <>
                 {presentation.overall_rating && <RatingChip value={presentation.overall_rating} />}
                 {presentation.overall_summary && (
-                  <p className="mb-0 mt-1" style={{ fontSize: '0.8rem', color: '#1a1a2e' }}>{presentation.overall_summary}</p>
+                  <p className="mb-0 mt-1" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{presentation.overall_summary}</p>
                 )}
                 {(presentation.reviewer?.display_name || presentation.updated_at) && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.66rem' }}>
@@ -321,18 +326,18 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, defaultOpen, 
           ) : (
             <div className="d-flex flex-column gap-2">
               {reviews.map((r) => (
-                <div key={r.id} className="rounded-2 p-2" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+                <div key={r.id} className="rounded-2 p-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
                   <div className="d-flex align-items-start justify-content-between gap-2">
                     <div className="min-w-0">
-                      <div className="fw-semibold" style={{ fontSize: '0.82rem', color: '#1a1a2e' }}>{r.task?.title || 'Task'}</div>
+                      <div className="fw-semibold" style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{r.task?.title || 'Task'}</div>
                       <div className="d-flex align-items-center gap-2 flex-wrap mt-1" style={{ fontSize: '0.68rem' }}>
                         {r.task?.status && (
-                          <span className="rounded-pill px-2" style={{ background: '#f1f5f9', color: '#475569', fontWeight: 700 }}>
+                          <span className="rounded-pill px-2" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontWeight: 700 }}>
                             {STATUS_LABEL[r.task.status] || r.task.status}
                           </span>
                         )}
                         {r.task?.brand?.brand_name && (
-                          <span className="badge rounded-pill" style={{ background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                             <i className="bi bi-shop me-1" />{r.task.brand.brand_name}
                           </span>
                         )}
@@ -343,7 +348,7 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, defaultOpen, 
                     {r.rating && <div className="flex-shrink-0"><RatingChip value={r.rating} /></div>}
                   </div>
                   {r.notes && (
-                    <p className="mb-0 mt-2 pt-2" style={{ fontSize: '0.78rem', color: '#475569', borderTop: '1px dashed #e2e8f0' }}>{r.notes}</p>
+                    <p className="mb-0 mt-2 pt-2" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', borderTop: '1px dashed var(--border-subtle)' }}>{r.notes}</p>
                   )}
                   {(r.reviewer?.display_name || r.updated_at) && (
                     <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>

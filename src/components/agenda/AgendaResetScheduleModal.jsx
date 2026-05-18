@@ -128,7 +128,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                 </div>
               )}
 
-              <div className="rounded-2 p-2 mb-3" style={{ background: '#eef2ff', border: '1px solid #c7d2fe' }}>
+              <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' }}>
                 <span className="small" style={{ fontSize: '0.76rem' }}>
                   <i className="bi bi-arrow-repeat me-1 text-primary" />{formatAgendaResetHint(sched)}.
                 </span>

@@ -102,7 +102,7 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
           {lockedAssignee ? (
             <div className="mb-3">
               <label className="form-label small fw-semibold">APC</label>
-              <div className="rounded-2 px-3 py-2" style={{ background: '#f0f1f5', fontSize: '0.84rem' }}>
+              <div className="rounded-2 px-3 py-2" style={{ background: 'var(--surface-2)', fontSize: '0.84rem' }}>
                 <i className="bi bi-person-fill me-1 text-muted" />{assigneeName}
               </div>
             </div>

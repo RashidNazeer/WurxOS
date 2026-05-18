@@ -164,7 +164,7 @@ export default function AgendaSchedulesTab() {
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#eef2ff' }}>
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--accent-soft)' }}>
                   <i className="bi bi-calendar-week text-primary" style={{ fontSize: '1rem' }} />
                 </div>
                 <div>

@@ -164,7 +164,7 @@ export default function AgendaUpcomingPage() {
     <div style={{ padding: '32px 32px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-calendar3-week" style={{ fontSize: '1.15rem' }} />
             Upcoming Meetings
           </h5>
@@ -189,7 +189,7 @@ export default function AgendaUpcomingPage() {
       )}
       {isOL && configuredCount < totalTeams && (
         <div className="rounded-2 px-3 py-2 mb-3 d-inline-flex align-items-center gap-2"
-          style={{ background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '0.76rem' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.76rem' }}>
           <i className="bi bi-exclamation-triangle text-warning" />
           {configuredCount} of {totalTeams} teams have a meeting schedule. Unconfigured teams are skipped — set them in Settings → Schedules.
         </div>
@@ -237,26 +237,25 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
   else if (card.isCurrent) state = allDone ? 'done' : 'current';
 
   const live = state === 'current';
-  const greyed = state === 'past' || state === 'future' || state === 'done';
 
   const BADGE = {
-    current: { label: 'Current Week', bg: '#eef2ff', color: '#4f46e5', icon: 'bi-star-fill' },
-    done:    { label: 'Completed',    bg: '#e6f4ea', color: '#198754', icon: 'bi-check-circle-fill' },
-    past:    { label: 'Past',         bg: '#f1f5f9', color: '#64748b', icon: 'bi-clock-history' },
-    future:  { label: 'Upcoming',     bg: '#f1f5f9', color: '#64748b', icon: 'bi-lock-fill' },
+    current: { label: 'Current Week', bg: 'var(--accent-soft)',  color: 'var(--accent)',         icon: 'bi-star-fill' },
+    done:    { label: 'Completed',    bg: 'var(--success-soft)', color: 'var(--success)',        icon: 'bi-check-circle-fill' },
+    past:    { label: 'Past',         bg: 'var(--surface-2)',    color: 'var(--text-secondary)', icon: 'bi-clock-history' },
+    future:  { label: 'Upcoming',     bg: 'var(--surface-2)',    color: 'var(--text-secondary)', icon: 'bi-lock-fill' },
   }[state];
 
   return (
     <div className="card h-100" style={{
       borderRadius: 14,
-      border: live ? '2px solid #6366f1' : '1px solid #e2e8f0',
-      boxShadow: live ? '0 8px 28px rgba(99,102,241,0.18)' : '0 1px 3px rgba(15,23,42,0.06)',
-      background: greyed ? '#fafbfc' : '#fff',
+      border: live ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
+      boxShadow: live ? '0 8px 28px var(--accent-ring)' : 'var(--shadow-sm)',
+      background: 'var(--surface-1)',
       opacity: state === 'future' || state === 'past' ? 0.82 : 1,
     }}>
       <div className="card-body p-3 d-flex flex-column">
         <div className="d-flex align-items-center justify-content-between mb-1">
-          <span className="fw-bold" style={{ fontSize: '0.74rem', letterSpacing: '0.06em', color: '#94a3b8', textTransform: 'uppercase' }}>
+          <span className="fw-bold" style={{ fontSize: '0.74rem', letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
             Week {card.index}
           </span>
           <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
@@ -264,7 +263,7 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
             <i className={`bi ${BADGE.icon}`} style={{ fontSize: '0.6rem' }} />{BADGE.label}
           </span>
         </div>
-        <div className="fw-bold mb-2" style={{ fontSize: '1rem', color: '#1a1a2e' }}>
+        <div className="fw-bold mb-2" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
           <i className="bi bi-calendar-event me-1 text-muted" style={{ fontSize: '0.82rem' }} />
           {fmtDate(card.anchor)}
         </div>
@@ -283,10 +282,10 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
             const waitDate    = isUpcoming && !anyOngoing && today < r.meetingDate && !weekProgressed;
             const blockedBusy = isUpcoming && anyOngoing;
             return (
-              <div key={r.tlId} className="rounded-2 p-2" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+              <div key={r.tlId} className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                 <div className="d-flex align-items-center justify-content-between gap-2">
                   <div className="min-w-0">
-                    <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: '#1a1a2e' }}>{r.tlName}</div>
+                    <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{r.tlName}</div>
                     <div className="text-muted" style={{ fontSize: '0.66rem' }}>
                       <i className="bi bi-people me-1" />{r.apcs.length} APC{r.apcs.length === 1 ? '' : 's'}
                       {' · '}<i className="bi bi-clock me-1" />{fmtTime(r.meetingTime)}
@@ -335,11 +334,11 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
 
 function StatusDot({ status }) {
   const M = {
-    not_notified: { label: 'Not notified', color: '#94a3b8' },
-    upcoming:     { label: 'Scheduled',    color: '#fd7e14' },
-    ongoing:      { label: 'In progress',  color: '#0d6efd' },
-    completed:    { label: 'Completed',    color: '#198754' },
-  }[status] || { label: status, color: '#94a3b8' };
+    not_notified: { label: 'Not notified', color: 'var(--text-muted)' },
+    upcoming:     { label: 'Scheduled',    color: 'var(--warning)' },
+    ongoing:      { label: 'In progress',  color: 'var(--info)' },
+    completed:    { label: 'Completed',    color: 'var(--success)' },
+  }[status] || { label: status, color: 'var(--text-muted)' };
   return (
     <span className="d-inline-flex align-items-center gap-1 flex-shrink-0" style={{ fontSize: '0.62rem', fontWeight: 700, color: M.color }}>
       <span className="rounded-circle" style={{ width: 7, height: 7, background: M.color, display: 'inline-block' }} />

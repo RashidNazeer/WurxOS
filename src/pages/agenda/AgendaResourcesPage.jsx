@@ -9,10 +9,10 @@ import AgendaResourceModal from '../../components/agenda/AgendaResourceModal';
 // general) library of links/files used in agenda meetings.
 
 const TYPE_META = {
-  link:  { icon: 'bi-link-45deg',     color: '#0d6efd', label: 'Link' },
-  file:  { icon: 'bi-file-earmark',   color: '#6610f2', label: 'File' },
-  image: { icon: 'bi-image',          color: '#198754', label: 'Image' },
-  video: { icon: 'bi-camera-video',   color: '#dc3545', label: 'Video' },
+  link:  { icon: 'bi-link-45deg',     color: 'var(--info)',    label: 'Link' },
+  file:  { icon: 'bi-file-earmark',   color: 'var(--accent)',  label: 'File' },
+  image: { icon: 'bi-image',          color: 'var(--success)', label: 'Image' },
+  video: { icon: 'bi-camera-video',   color: 'var(--danger)',  label: 'Video' },
 };
 
 export default function AgendaResourcesPage() {
@@ -64,7 +64,7 @@ export default function AgendaResourcesPage() {
     <div style={{ padding: '32px 32px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-folder2-open" style={{ fontSize: '1.15rem' }} />
             Agenda Resources
           </h5>
@@ -94,8 +94,8 @@ export default function AgendaResourcesPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : filtered.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-folder2-open text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
           <p className="fw-semibold text-dark mb-1">No resources yet</p>
@@ -112,7 +112,7 @@ export default function AgendaResourcesPage() {
                   <div className="card-body p-3">
                     <div className="d-flex align-items-start gap-2">
                       <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                        style={{ width: 38, height: 38, background: `${m.color}15`, color: m.color }}>
+                        style={{ width: 38, height: 38, background: `color-mix(in srgb, ${m.color} 14%, transparent)`, color: m.color }}>
                         <i className={`bi ${m.icon}`} style={{ fontSize: '1rem' }} />
                       </div>
                       <div className="flex-grow-1 min-w-0">
@@ -126,7 +126,7 @@ export default function AgendaResourcesPage() {
                     )}
                     <div className="d-flex align-items-center gap-2 mt-2 flex-wrap" style={{ fontSize: '0.66rem' }}>
                       {r.brand?.brand_name && (
-                        <span className="badge rounded-pill" style={{ background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>
+                        <span className="badge rounded-pill" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                           <i className="bi bi-shop me-1" />{r.brand.brand_name}
                         </span>
                       )}

@@ -80,7 +80,7 @@ export default function AgendaPriorPage() {
     <div style={{ padding: '32px 32px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-clock-history" style={{ fontSize: '1.15rem' }} />
             Prior Meetings
           </h5>
@@ -98,8 +98,8 @@ export default function AgendaPriorPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : weeks.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-clock-history text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
           <p className="fw-semibold text-dark mb-1">No completed meetings in {viewMonthLabel}</p>
@@ -110,7 +110,7 @@ export default function AgendaPriorPage() {
           {weeks.map((w) => (
             <div key={w.weekStart}>
               <div className="d-flex align-items-center gap-2 mb-2">
-                <span className="fw-bold" style={{ fontSize: '0.74rem', letterSpacing: '0.06em', color: '#94a3b8', textTransform: 'uppercase' }}>
+                <span className="fw-bold" style={{ fontSize: '0.74rem', letterSpacing: '0.06em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                   Week {w.index}
                 </span>
                 <span className="text-muted" style={{ fontSize: '0.72rem' }}>· week of {fmtDate(w.weekStart)}</span>
@@ -124,10 +124,10 @@ export default function AgendaPriorPage() {
                       style={{ borderRadius: 12, cursor: 'pointer' }}>
                       <div className="card-body p-3">
                         <div className="d-flex align-items-center justify-content-between mb-1">
-                          <span className="fw-bold" style={{ fontSize: '0.92rem', color: '#1a1a2e' }}>
+                          <span className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
                             {m.tl?.display_name || 'Team'}
                           </span>
-                          <span className="rounded-pill px-2 py-1" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.6rem', fontWeight: 800 }}>
+                          <span className="rounded-pill px-2 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.6rem', fontWeight: 800 }}>
                             <i className="bi bi-check-circle-fill me-1" />Completed
                           </span>
                         </div>
@@ -135,7 +135,7 @@ export default function AgendaPriorPage() {
                           <i className="bi bi-calendar3 me-1" />{fmtDate(m.meeting_date)}
                           {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)}
                         </div>
-                        <div className="d-inline-flex align-items-center gap-1 mt-2" style={{ fontSize: '0.72rem', color: '#4f46e5', fontWeight: 600 }}>
+                        <div className="d-inline-flex align-items-center gap-1 mt-2" style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600 }}>
                           View record <i className="bi bi-arrow-right" />
                         </div>
                       </div>

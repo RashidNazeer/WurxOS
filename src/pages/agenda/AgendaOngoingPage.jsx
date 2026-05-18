@@ -176,7 +176,7 @@ export default function AgendaOngoingPage() {
     return (
       <div style={{ padding: '32px 32px 48px' }}>
         <div className="mb-4">
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-broadcast" style={{ fontSize: '1.15rem' }} />
             Ongoing Meetings
           </h5>
@@ -184,10 +184,10 @@ export default function AgendaOngoingPage() {
 
         {justFinished && (
           <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
-            style={{ background: '#e6f4ea', border: '1px solid #b7dfc4' }}>
+            style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
             <i className="bi bi-check2-circle text-success" style={{ fontSize: '1.3rem' }} />
             <div>
-              <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#166534' }}>Meeting finished</div>
+              <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--success)' }}>Meeting finished</div>
               <div className="text-muted" style={{ fontSize: '0.78rem' }}>
                 {showNextUp ? 'Start the next team right here — no need to leave this page.'
                   : 'All scheduled meetings for this week are done.'}
@@ -200,8 +200,8 @@ export default function AgendaOngoingPage() {
           <NextUpPanel meetings={weekUpcoming} teamsById={teamsById}
             busy={busy} onStart={handleStartMeeting} />
         ) : (
-          <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-            <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+          <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+            <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
               <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
             </div>
             <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
@@ -224,11 +224,11 @@ export default function AgendaOngoingPage() {
         <div>
           <div className="d-flex align-items-center gap-2 mb-1">
             <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
-              style={{ background: '#fef2f2', color: '#dc2626', fontSize: '0.62rem', fontWeight: 800 }}>
-              <span className="rounded-circle" style={{ width: 6, height: 6, background: '#dc2626', display: 'inline-block' }} />
+              style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.62rem', fontWeight: 800 }}>
+              <span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--danger)', display: 'inline-block' }} />
               LIVE
             </span>
-            <h5 className="fw-bold mb-0" style={{ color: '#1a1a2e' }}>{teamName} — Agenda Meeting</h5>
+            <h5 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{teamName} — Agenda Meeting</h5>
           </div>
           <p className="text-muted small mb-0">
             {apcs.length} APC{apcs.length === 1 ? '' : 's'} · {presentCount} present · {absentCount} absent
@@ -254,14 +254,14 @@ export default function AgendaOngoingPage() {
             <i className="bi bi-camera-video-fill" style={{ fontSize: '1.1rem' }} />
             Join Meeting Now
             <span className="rounded-pill px-2 d-inline-flex align-items-center gap-1"
-              style={{ background: 'rgba(255,255,255,0.25)', fontSize: '0.6rem', fontWeight: 800 }}>
-              <span className="rounded-circle" style={{ width: 6, height: 6, background: '#fff', display: 'inline-block' }} />
+              style={{ background: 'color-mix(in srgb, currentColor 22%, transparent)', fontSize: '0.6rem', fontWeight: 800 }}>
+              <span className="rounded-circle" style={{ width: 6, height: 6, background: 'currentColor', display: 'inline-block' }} />
               LIVE
             </span>
           </a>
         ) : (
           <div className="rounded-3 p-2 text-center text-muted"
-            style={{ background: '#f1f5f9', border: '1px dashed #cbd5e1', fontSize: '0.78rem' }}>
+            style={{ background: 'var(--surface-2)', border: '1px dashed var(--border-default)', fontSize: '0.78rem' }}>
             <i className="bi bi-camera-video-off me-1" />
             No Google Meet link set — an OL can add one in Settings → General.
           </div>
@@ -285,27 +285,31 @@ export default function AgendaOngoingPage() {
             <div className="d-flex flex-wrap gap-2">
               {apcs.map((a) => {
                 const st = attMap[a.id];
-                const bg = st === 'present' ? '#e6f4ea' : st === 'absent' ? '#fff0f0' : '#f8fafc';
-                const bd = st === 'present' ? '#b7dfc4' : st === 'absent' ? '#f5c0c0' : '#e2e8f0';
+                const bg = st === 'present' ? 'var(--success-soft)' : st === 'absent' ? 'var(--danger-soft)' : 'var(--surface-2)';
+                const bd = st === 'present'
+                  ? 'color-mix(in srgb, var(--success) 35%, transparent)'
+                  : st === 'absent'
+                    ? 'color-mix(in srgb, var(--danger) 35%, transparent)'
+                    : 'var(--border-subtle)';
                 return (
                   <div key={a.id} className="rounded-2 px-2 py-1 d-flex align-items-center gap-2"
                     style={{ background: bg, border: `1px solid ${bd}` }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1a1a2e' }}>{a.display_name}</span>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{a.display_name}</span>
                     {st && (
-                      <span style={{ fontSize: '0.64rem', fontWeight: 700, color: st === 'present' ? '#198754' : '#dc3545' }}>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 700, color: st === 'present' ? 'var(--success)' : 'var(--danger)' }}>
                         {st === 'present' ? 'Present' : 'Absent'}
                       </span>
                     )}
                     {isTL && (
                       <span className="d-inline-flex gap-1">
                         <button className="btn btn-sm p-0 px-1" title="Present"
-                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'present' ? '#198754' : '#fff', color: st === 'present' ? '#fff' : '#198754', border: '1px solid #198754' }}
+                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'present' ? 'var(--success)' : 'var(--surface-1)', color: st === 'present' ? 'var(--surface-1)' : 'var(--success)', border: '1px solid var(--success)' }}
                           disabled={busy === `att-${a.id}`}
                           onClick={() => handleMark(a.id, 'present')}>
                           <i className="bi bi-check-lg" />
                         </button>
                         <button className="btn btn-sm p-0 px-1" title="Absent"
-                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'absent' ? '#dc3545' : '#fff', color: st === 'absent' ? '#fff' : '#dc3545', border: '1px solid #dc3545' }}
+                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'absent' ? 'var(--danger)' : 'var(--surface-1)', color: st === 'absent' ? 'var(--surface-1)' : 'var(--danger)', border: '1px solid var(--danger)' }}
                           disabled={busy === `att-${a.id}`}
                           onClick={() => handleMark(a.id, 'absent')}>
                           <i className="bi bi-x-lg" />
@@ -323,11 +327,11 @@ export default function AgendaOngoingPage() {
       {/* Currently presenting banner */}
       <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
         style={{
-          background: activePresentation ? 'linear-gradient(135deg,#4f46e5,#6366f1)' : '#f1f5f9',
-          color: activePresentation ? '#fff' : '#64748b',
+          background: activePresentation ? 'var(--accent)' : 'var(--surface-2)',
+          color: activePresentation ? 'var(--on-accent)' : 'var(--text-secondary)',
         }}>
         <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-          style={{ width: 44, height: 44, background: activePresentation ? 'rgba(255,255,255,0.2)' : '#e2e8f0' }}>
+          style={{ width: 44, height: 44, background: activePresentation ? 'color-mix(in srgb, var(--on-accent) 18%, transparent)' : 'var(--surface-3)' }}>
           <i className={`bi ${activePresentation ? 'bi-easel2-fill' : 'bi-easel2'}`} style={{ fontSize: '1.2rem' }} />
         </div>
         <div>
@@ -340,8 +344,8 @@ export default function AgendaOngoingPage() {
         </div>
         {activePresentation && (
           <span className="ms-auto rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
-            style={{ background: 'rgba(255,255,255,0.2)', fontSize: '0.62rem', fontWeight: 800 }}>
-            <span className="rounded-circle" style={{ width: 6, height: 6, background: '#fff', display: 'inline-block' }} />
+            style={{ background: 'color-mix(in srgb, var(--on-accent) 18%, transparent)', fontSize: '0.62rem', fontWeight: 800 }}>
+            <span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--on-accent)', display: 'inline-block' }} />
             LIVE
           </span>
         )}
@@ -384,11 +388,11 @@ export default function AgendaOngoingPage() {
       {/* Finish-meeting guard — present APCs who never presented */}
       {finishModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff3e0' }}>
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
                   <i className="bi bi-exclamation-triangle text-warning" style={{ fontSize: '1rem' }} />
                 </div>
                 <div>
@@ -400,12 +404,12 @@ export default function AgendaOngoingPage() {
               </div>
               <div className="d-flex flex-wrap gap-1 mb-3">
                 {pendingPresent.map((a) => (
-                  <span key={a.id} className="rounded-pill px-2 py-1" style={{ background: '#fff3e0', color: '#9a3412', fontSize: '0.72rem', fontWeight: 600 }}>
+                  <span key={a.id} className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.72rem', fontWeight: 600 }}>
                     {a.display_name}
                   </span>
                 ))}
               </div>
-              <div className="rounded-2 p-2 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.76rem', color: '#475569' }}>
+              <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                 <i className="bi bi-info-circle me-1" />
                 Finishing now will mark them as <strong>Presented</strong> with no review or remarks.
               </div>
@@ -444,15 +448,15 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
           return (
             <div key={m.id} className="col-12 col-md-6 col-xl-4">
               <div className="card border-0 shadow-sm h-100"
-                style={{ borderRadius: 14, border: isNext ? '2px solid #6366f1' : '1px solid #e2e8f0' }}>
+                style={{ borderRadius: 14, border: isNext ? '2px solid var(--accent)' : '1px solid var(--border-subtle)' }}>
                 <div className="card-body p-3 d-flex flex-column">
                   {isNext && (
                     <span className="rounded-pill px-2 py-1 mb-2 align-self-start"
-                      style={{ background: '#eef2ff', color: '#4f46e5', fontSize: '0.6rem', fontWeight: 800 }}>
+                      style={{ background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: '0.6rem', fontWeight: 800 }}>
                       NEXT
                     </span>
                   )}
-                  <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#1a1a2e' }}>
+                  <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                     {team?.tl?.display_name || m.tl?.display_name || 'Team'}
                   </div>
                   <div className="text-muted" style={{ fontSize: '0.72rem' }}>
@@ -487,9 +491,9 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
 // ── Presentation progress (OL) ──────────────────────────────────────────
 function PresentationProgress({ apcs, presMap }) {
   const META = {
-    done:       { label: 'Presented',  color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle-fill' },
-    presenting: { label: 'Presenting', color: '#4f46e5', bg: '#eef2ff', icon: 'bi-easel2-fill' },
-    pending:    { label: 'Pending',    color: '#64748b', bg: '#f1f5f9', icon: 'bi-hourglass-split' },
+    done:       { label: 'Presented',  color: 'var(--success)',        bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
+    presenting: { label: 'Presenting', color: 'var(--accent)',         bg: 'var(--accent-soft)',  icon: 'bi-easel2-fill' },
+    pending:    { label: 'Pending',    color: 'var(--text-secondary)', bg: 'var(--surface-2)',    icon: 'bi-hourglass-split' },
   };
   const statusOf = (a) => presMap[a.id]?.status || 'pending';
   const doneCount    = apcs.filter((a) => statusOf(a) === 'done').length;
@@ -511,8 +515,8 @@ function PresentationProgress({ apcs, presMap }) {
             const m = META[statusOf(a)];
             return (
               <div key={a.id} className="rounded-2 px-2 py-1 d-flex align-items-center gap-2"
-                style={{ background: m.bg, border: `1px solid ${m.color}30` }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1a1a2e' }}>{a.display_name}</span>
+                style={{ background: m.bg, border: `1px solid color-mix(in srgb, ${m.color} 30%, transparent)` }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{a.display_name}</span>
                 <span className="d-inline-flex align-items-center gap-1" style={{ fontSize: '0.62rem', fontWeight: 700, color: m.color }}>
                   <i className={`bi ${m.icon}`} />{m.label}
                 </span>
@@ -572,7 +576,7 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, busy, o
             <div className="d-flex flex-column gap-2">
               {myTasks.map((t) => (
                 <div key={t.id} className="rounded-2 p-2 d-flex align-items-center justify-content-between gap-2"
-                  style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div className="min-w-0">
                     <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem' }}>{t.title}</div>
                     <div className="d-flex align-items-center gap-2 flex-wrap" style={{ fontSize: '0.66rem' }}>
@@ -586,7 +590,7 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, busy, o
                       )}
                     </div>
                   </div>
-                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>
+                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: 'var(--surface-3)', color: 'var(--text-secondary)', fontSize: '0.62rem', fontWeight: 700 }}>
                     {STATUS_LABEL[t.status] || t.status}
                   </span>
                 </div>
