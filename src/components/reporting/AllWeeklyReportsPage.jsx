@@ -522,7 +522,15 @@ export default function AllWeeklyReportsPage() {
     const canDelete = userRole === 'boss' || userRole === 'ol';
     return (
       <div>
-        <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        {/* Sticky action bar — stays pinned while reviewing a long
+            report so the OL never has to scroll back up for actions. */}
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2"
+          style={{
+            position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 10,
+            background: 'var(--surface-0)',
+            borderBottom: '1px solid var(--border-subtle)',
+            padding: '12px 28px', margin: '0 -28px 12px',
+          }}>
           <button className="btn btn-sm btn-link text-muted p-0" onClick={() => setViewReport(null)}>
             <i className="bi bi-arrow-left me-1" /> Back to all reports
           </button>
