@@ -19,6 +19,15 @@ function intf(n) {
 function ratio(n) {
   return n == null ? '—' : `${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}x`;
 }
+// Calendar window the metrics cover, ending at the sync date.
+function dateRange(iso, days) {
+  if (!iso) return '';
+  const end = new Date(iso);
+  const start = new Date(end.getTime() - (days - 1) * 86400000);
+  const opt = { month: 'short', day: 'numeric' };
+  const sameYear = start.getFullYear() === end.getFullYear();
+  return `${start.toLocaleDateString('en-US', opt)} – ${end.toLocaleDateString('en-US', { ...opt, year: sameYear ? undefined : 'numeric' })}, ${end.getFullYear()}`;
+}
 function relTime(iso) {
   if (!iso) return '';
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -218,6 +227,13 @@ export default function EukaShopMetricsPage() {
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Period the figures cover */}
+                    <div className="text-muted mb-2 d-flex align-items-center gap-1" style={{ fontSize: '0.68rem' }}>
+                      <i className="bi bi-calendar3" />
+                      {period === '7d' ? 'Last 7 days' : 'Last 30 days'} ·{' '}
+                      {dateRange(r.synced_at, period === '7d' ? 7 : 30)}
                     </div>
 
                     {/* Metric groups */}
