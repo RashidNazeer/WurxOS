@@ -167,6 +167,7 @@ export default function EukaShopMetricsPage() {
           {rows.map((r) => {
             const period = win[r.euka_store_id] || '30d';
             const m = r.metrics || {};
+            const hasMetrics = !!(m.d7 || m.d30);
             const data = period === '7d' ? (m.d7 || {}) : (m.d30 || {});
             const top = m.top || {};
             return (
@@ -220,7 +221,7 @@ export default function EukaShopMetricsPage() {
                     </div>
 
                     {/* Metric groups */}
-                    {r.metrics ? (
+                    {hasMetrics ? (
                       <>
                         {GROUPS.map((g) => (
                           <div key={g.label} className="mb-2">

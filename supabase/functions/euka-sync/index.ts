@@ -86,20 +86,37 @@ async function mcp(method: string, params?: unknown, isNotification = false): Pr
   return reply.result;
 }
 
-// The comprehensive question — Euka saves the result to a sandbox
-// file as pure JSON; the summary is just a pointer to that file.
+// The metrics question. The set is small (~28 numbers) so we ask
+// for the JSON inline and explicitly forbid saving to a sandbox
+// file — Euka's sandbox is ephemeral and gone before we could read
+// it back. read_sandbox_file is kept only as a fallback.
 const METRICS_QUESTION =
-  'Compute a metrics object and SAVE IT to a sandbox file as pure JSON. Exact shape: '
-  + '{"d7":{...},"d30":{...},"top":{"creator_name":string,"creator_gmv":number,'
+  'Return ONLY a compact minified JSON object and nothing else — no prose, no explanation, '
+  + 'no markdown code fences. DO NOT save it to a file; put the JSON directly in your reply. '
+  + 'Exact shape: {"d7":{...},"d30":{...},"top":{"creator_name":string,"creator_gmv":number,'
   + '"product_name":string,"product_gmv":number}}. d7 = last 7 days, d30 = last 30 days; each '
   + 'has numeric keys (plain numbers, no symbols/commas, null if unavailable): gmv, video_gmv, '
   + 'units, orders, aov, active_creators, videos_posted, video_views, ad_spend, roas, '
-  + 'sample_requests, outreach_messages, collab_invites. The saved file must contain ONLY the '
-  + 'JSON object, nothing else.';
+  + 'sample_requests, outreach_messages, collab_invites. "top" = the single best creator and '
+  + 'best product over the last 30 days.';
 
 function num(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+// Extract a metrics object from arbitrary text. Returns null unless
+// the parsed object actually looks like our shape (has d7 or d30) —
+// this guards against storing a stray {...} (e.g. an error blob).
+function tryParseMetrics(text: string): any | null {
+  if (!text) return null;
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try {
+    const o = JSON.parse(m[0]);
+    if (o && typeof o === 'object' && (o.d7 || o.d30)) return o;
+  } catch { /* not JSON */ }
+  return null;
 }
 
 // Resolve the sandbox path the query_store_data result points to.
@@ -116,33 +133,38 @@ function resolveSandboxPath(result: any): string | null {
   return m ? m[1] : null;
 }
 
-// Pull the metrics JSON for one store via the sandbox-file flow.
+// Pull the metrics JSON for one store. Inline reply first; if Euka
+// still saved a file, fall back to read_sandbox_file.
 async function fetchStoreMetrics(storeId: string): Promise<any> {
   const r = await mcp('tools/call', {
     name: 'query_store_data',
     arguments: { storeId, question: METRICS_QUESTION },
   });
 
-  // The result may be inline JSON (small answers) or a saved file.
   const sc = r?.structuredContent || {};
   const summary: string = sc.summary
     ?? (r?.content || []).map((c: any) => c.text || '').join('\n');
 
-  const path = resolveSandboxPath(r);
-  let jsonText = '';
-  if (path) {
-    const f = await mcp('tools/call', { name: 'read_sandbox_file', arguments: { path } });
-    const fsc = f?.structuredContent || {};
-    jsonText = typeof fsc.content === 'string'
-      ? fsc.content
-      : (f?.content || []).map((c: any) => c.text || '').join('\n');
-  } else {
-    jsonText = summary || '';
+  // 1. Inline JSON in the reply (the expected path).
+  let metrics = tryParseMetrics(summary);
+
+  // 2. Fallback — Euka saved it to a sandbox file anyway.
+  if (!metrics) {
+    const path = resolveSandboxPath(r);
+    if (path) {
+      const f = await mcp('tools/call', { name: 'read_sandbox_file', arguments: { path } });
+      const fsc = f?.structuredContent || {};
+      if (fsc.success !== false) {
+        const fileText = typeof fsc.content === 'string'
+          ? fsc.content
+          : (f?.content || []).map((c: any) => c.text || '').join('\n');
+        metrics = tryParseMetrics(fileText);
+      }
+    }
   }
 
-  const jm = jsonText.match(/\{[\s\S]*\}/);
-  if (!jm) throw new Error('no JSON in Euka response');
-  return { metrics: JSON.parse(jm[0]), summary };
+  if (!metrics) throw new Error('no metrics JSON in Euka response');
+  return { metrics, summary };
 }
 
 Deno.serve(async (req) => {
