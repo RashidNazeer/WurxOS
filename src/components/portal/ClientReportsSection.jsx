@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import WeeklyReportView from '../reporting/WeeklyReportView';
 import MonthlyReportView from '../reporting/MonthlyReportView';
 import BrandSectionsPanel from './BrandSectionsPanel';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { exportReportToPdf } from '../../utils/exportReportPdf';
 
 /**
  * Public reports viewer for the client portal — exact match to v1's
@@ -147,6 +148,49 @@ export default function ClientReportsSection({
 
   const [filterBrand, setFilterBrand] = useState('');
   const [viewReport, setViewReport] = useState(null);
+
+  // ── Export-from-card support ───────────────────────────────────────
+  // Exporting a report straight from its list card: we render the full
+  // report view into an off-screen container, let charts + fonts
+  // settle, capture it to a single-page PDF, then tear it down. Same
+  // export the in-app views use, so the client gets an identical PDF.
+  const offscreenRef = useRef(null);
+  const [pendingExport, setPendingExport] = useState(null);
+
+  function handleCardExport(report, brandReports) {
+    if (pendingExport) return; // one export at a time
+    const prev = findPreviousReport(brandReports, report);
+    setPendingExport({ report, prev, brandReports });
+  }
+
+  useEffect(() => {
+    if (!pendingExport) return undefined;
+    let cancelled = false;
+    // Give the off-screen report time to mount its Recharts charts
+    // and load fonts before the capture.
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      try {
+        const node = offscreenRef.current
+          && offscreenRef.current.querySelector('.report-canvas');
+        if (node) {
+          const r = pendingExport.report;
+          const label = r.weekLabel || r.periodLabel || r.monthLabel || '';
+          const typeLabel = r.type === 'monthly' ? 'Monthly'
+            : r.type === 'biweekly' ? 'Bi-Weekly' : 'Weekly';
+          await exportReportToPdf(node, {
+            title: `${typeLabel} Report - ${r.brandName || 'Brand'} - ${label}`.trim(),
+          });
+        }
+      } catch (err) {
+        console.error('[client-export] failed:', err);
+        alert('Failed to export the PDF. Please try again.');
+      } finally {
+        if (!cancelled) setPendingExport(null);
+      }
+    }, 1100);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [pendingExport]);
 
   const inType = useMemo(
     () => adapted.filter(r => r.type === activeType),
@@ -361,6 +405,18 @@ export default function ClientReportsSection({
                             {activeType === 'biweekly' ? 'period' : activeType === 'monthly' ? 'month' : 'week'}
                           </div>
                         )}
+                        {/* Export this report straight from the card. */}
+                        <button
+                          type="button"
+                          className="btn btn-sm w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
+                          style={{ borderRadius: 9, fontSize: '0.72rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+                          onClick={(e) => { e.stopPropagation(); handleCardExport(r, brandReports); }}
+                          disabled={!!pendingExport}
+                          title="Download this report as a single-page PDF">
+                          {pendingExport && pendingExport.report.id === r.id
+                            ? (<><span className="spinner-border spinner-border-sm" style={{ width: 11, height: 11 }} /> Exporting…</>)
+                            : (<><i className="bi bi-file-earmark-pdf" /> Export PDF</>)}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -369,6 +425,21 @@ export default function ClientReportsSection({
             </div>
           </div>
         ))
+      )}
+
+      {/* Off-screen full report render — captured to a single-page
+          PDF when the client exports straight from a list card.
+          Positioned off-screen (not hidden) so it lays out fully. */}
+      {pendingExport && (
+        <div ref={offscreenRef} aria-hidden="true"
+          style={{ position: 'fixed', left: '-100000px', top: 0, width: 1120, pointerEvents: 'none' }}>
+          {pendingExport.report.type === 'monthly' ? (
+            <MonthlyReportView report={pendingExport.report} previousReport={pendingExport.prev} clientView />
+          ) : (
+            <WeeklyReportView report={pendingExport.report} previousReport={pendingExport.prev}
+              allReports={pendingExport.brandReports} clientView />
+          )}
+        </div>
       )}
     </div>
   );

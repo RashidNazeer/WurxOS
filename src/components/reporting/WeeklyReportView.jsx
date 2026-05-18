@@ -904,6 +904,20 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         </div>
       )}
 
+      {/* Client-portal export bar — clients only get the PDF export. */}
+      {clientView && (
+        <div className="d-flex justify-content-end mb-3">
+          <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+            onClick={handleExport} disabled={pdfBusy}
+            title="Download this report as a single-page PDF">
+            {pdfBusy
+              ? (<><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Exporting…</>)
+              : (<><i className="bi bi-file-earmark-pdf" /> Export PDF</>)}
+          </button>
+        </div>
+      )}
+
       {/* ─── Canvas (printable) ─────────────────────────────────────────── */}
       <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 18, border: `1px solid ${C.line}` }}>
 
