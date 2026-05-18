@@ -297,3 +297,93 @@ export function formatAgendaResetHint(schedule) {
   if (c === 'monthly') return `Your agenda tasks reset monthly on day ${schedule.monthly?.dayOfMonth || 1} at ${schedule.monthly?.time || '00:00'}`;
   return `Your agenda tasks reset weekly on ${DOW_NAMES[schedule.weekly?.dayOfWeek ?? 1]} at ${schedule.weekly?.time || '00:00'}`;
 }
+
+// --------------------------------------------------------------
+// Teams + meeting schedules (phase 2)
+// --------------------------------------------------------------
+
+// All active TL-teams with the APCs reporting to each.
+export async function listAgendaTeams() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, email, role, reports_to, avatar_url')
+    .in('role', ['tl', 'apc'])
+    .eq('is_active', true)
+    .is('deleted_at', null);
+  if (error) throw new Error(error.message);
+  const people = data || [];
+  const tls  = people.filter((p) => p.role === 'tl');
+  const apcs = people.filter((p) => p.role === 'apc');
+  return tls
+    .map((tl) => ({ tl, apcs: apcs.filter((a) => a.reports_to === tl.id) }))
+    .sort((a, b) => (a.tl.display_name || '').localeCompare(b.tl.display_name || ''));
+}
+
+export async function getAgendaTeamSchedules() {
+  const { data, error } = await supabase.from('agenda_team_schedules').select('*');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime) {
+  const { data: auth } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('agenda_team_schedules')
+    .upsert(
+      { tl_id: tlId, meeting_day: meetingDay, meeting_time: meetingTime,
+        updated_by: auth?.user?.id || null, updated_at: new Date().toISOString() },
+      { onConflict: 'tl_id' },
+    )
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteAgendaTeamSchedule(tlId) {
+  const { error } = await supabase.from('agenda_team_schedules').delete().eq('tl_id', tlId);
+  if (error) throw new Error(error.message);
+}
+
+// --------------------------------------------------------------
+// Meetings (phase 2)
+// --------------------------------------------------------------
+export async function listAgendaMeetings({ status = null } = {}) {
+  let q = supabase
+    .from('agenda_meetings')
+    .select('*, tl:tl_id(id, display_name, email, avatar_url)')
+    .order('meeting_date', { ascending: true });
+  if (status) q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// OL only — materialise + notify the given week's meetings (week start
+// must be a Monday).
+export async function notifyWeek(weekStart) {
+  const { data, error } = await supabase.rpc('agenda_notify_week', { p_week_start: weekStart });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function startMeeting(id) {
+  const { data, error } = await supabase.rpc('agenda_start_meeting', { p_meeting: id });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function finishMeeting(id) {
+  const { data, error } = await supabase.rpc('agenda_finish_meeting', { p_meeting: id });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export function subscribeAgendaMeetings(onChange) {
+  const ch = supabase
+    .channel(`agenda-meetings-${Math.random().toString(36).slice(2, 8)}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_meetings' },
+      () => onChange())
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}

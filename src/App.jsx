@@ -92,6 +92,8 @@ const ChangesPage           = lazy(() => import('./components/changes/ChangeMana
 const AgendaTasksPage       = lazy(() => import('./pages/agenda/AgendaTasksPage'));
 const AgendaResourcesPage   = lazy(() => import('./pages/agenda/AgendaResourcesPage'));
 const AgendaSettingsPage    = lazy(() => import('./pages/agenda/AgendaSettingsPage'));
+const AgendaUpcomingPage    = lazy(() => import('./pages/agenda/AgendaUpcomingPage'));
+const AgendaOngoingPage     = lazy(() => import('./pages/agenda/AgendaOngoingPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -208,6 +210,22 @@ export default function App() {
 
               {/* Weekly Agenda Meetings — Boss / OL / TL / APC.
                   Settings is OL/Boss/Developer only. */}
+              <Route
+                path="/agenda/upcoming"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                    <AgendaUpcomingPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/agenda/ongoing"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                    <AgendaOngoingPage />
+                  </RoleGuard>
+                }
+              />
               <Route
                 path="/agenda/tasks"
                 element={
