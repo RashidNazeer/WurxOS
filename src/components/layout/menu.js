@@ -151,6 +151,7 @@ const AGENDA_GROUP_FULL = {
   children: [
     { label: 'Upcoming Meetings', to: '/agenda/upcoming' },
     { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
+    { label: 'Prior Meetings',    to: '/agenda/prior' },
     { label: 'Tasks',             to: '/agenda/tasks' },
     { label: 'Resources',         to: '/agenda/resources' },
     { label: 'Settings',          to: '/agenda/settings' },
@@ -163,6 +164,7 @@ const AGENDA_GROUP_BASIC = {
   children: [
     { label: 'Upcoming Meetings', to: '/agenda/upcoming' },
     { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
+    { label: 'Prior Meetings',    to: '/agenda/prior' },
     { label: 'Tasks',             to: '/agenda/tasks' },
     { label: 'Resources',         to: '/agenda/resources' },
   ],

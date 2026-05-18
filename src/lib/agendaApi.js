@@ -404,7 +404,7 @@ export function subscribeAgendaMeetings(onChange) {
 export async function listMeetingAttendance(meetingId) {
   const { data, error } = await supabase
     .from('agenda_meeting_attendance')
-    .select('*')
+    .select('*, apc:apc_id(id, display_name, avatar_url)')
     .eq('meeting_id', meetingId);
   if (error) throw new Error(error.message);
   return data || [];
@@ -430,7 +430,7 @@ export async function markAttendance(meetingId, apcId, status) {
 export async function listPresentations(meetingId) {
   const { data, error } = await supabase
     .from('agenda_presentations')
-    .select('*, apc:apc_id(id, display_name, email, avatar_url)')
+    .select('*, apc:apc_id(id, display_name, email, avatar_url), reviewer:reviewed_by(id, display_name)')
     .eq('meeting_id', meetingId);
   if (error) throw new Error(error.message);
   return data || [];
@@ -465,7 +465,7 @@ export async function updatePresentationReview(presentationId, { rating, summary
 export async function listTaskReviews(meetingId) {
   const { data, error } = await supabase
     .from('agenda_task_reviews')
-    .select('*')
+    .select('*, task:task_id(id, title, details, due_date, status, link, brand:brand_id(brand_name)), reviewer:reviewed_by(id, display_name)')
     .eq('meeting_id', meetingId);
   if (error) throw new Error(error.message);
   return data || [];
