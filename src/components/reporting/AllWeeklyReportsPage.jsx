@@ -507,7 +507,12 @@ export default function AllWeeklyReportsPage() {
     const brandReports = reports.filter(r => r.brandId === viewReport.brandId);
     const prev = findPreviousReport(brandReports, viewReport);
     const rStatus = getReportStatus(viewReport);
-    const canEdit = userRole === 'ol' && rStatus !== 'approved';
+    // OL can edit any non-approved report. A TL can also open the
+    // editor for their team's submitted/verified reports — needed so
+    // they can manage (toggle / delete) the custom sections their
+    // APCs created. The list is already scoped to the TL's team.
+    const canEdit = (userRole === 'ol' && rStatus !== 'approved')
+      || (userRole === 'tl' && (rStatus === 'submitted' || rStatus === 'verified'));
     const canEditDates = userRole === 'ol' || userRole === 'boss';
     const canSubmitAsApc = userRole === 'ol' && rStatus === 'draft';
     const canVerifyAsTl = userRole === 'ol' && rStatus === 'submitted';

@@ -22,13 +22,17 @@ import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import {
   getBrandSections, normalizeSection,
   getBrandSectionExtras, addBrandSectionExtraField, removeBrandSectionExtraField,
-  addBrandSectionRich,
+  addBrandSectionRich, removeBrandSection,
 } from '../../lib/brandReportSectionsApi';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
-function SectionHeader({ icon, title, color, required, enabled = true, onToggle }) {
+// `onDelete`, when provided, renders a trash button — used ONLY for
+// APC-created custom sections. Built-in/default sections never pass
+// it, so they can never be deleted.
+function SectionHeader({ icon, title, color, required, enabled = true, onToggle, onDelete }) {
   const togglable = typeof onToggle === 'function';
+  const deletable = typeof onDelete === 'function';
   return (
     <div className="d-flex align-items-center gap-2 mb-3 mt-4">
       <div className="rounded-2 d-flex align-items-center justify-content-center"
@@ -58,17 +62,31 @@ function SectionHeader({ icon, title, color, required, enabled = true, onToggle 
           HIDDEN
         </span>
       )}
-      {togglable && (
-        <div className="form-check form-switch mb-0 ms-auto" style={{ paddingLeft: '2.4em' }}>
-          <input
-            className="form-check-input"
-            type="checkbox"
-            role="switch"
-            checked={!!enabled}
-            onChange={(e) => onToggle(e.target.checked)}
-            title={enabled ? 'Hide this section in the report' : 'Show this section in the report'}
-            style={{ cursor: 'pointer' }}
-          />
+      {(togglable || deletable) && (
+        <div className="d-flex align-items-center gap-2 ms-auto">
+          {deletable && (
+            <button
+              type="button"
+              className="btn btn-sm btn-light border-0 text-danger"
+              style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+              onClick={onDelete}
+              title="Delete this custom section">
+              <i className="bi bi-trash3" />
+            </button>
+          )}
+          {togglable && (
+            <div className="form-check form-switch mb-0" style={{ paddingLeft: '2.4em' }}>
+              <input
+                className="form-check-input"
+                type="checkbox"
+                role="switch"
+                checked={!!enabled}
+                onChange={(e) => onToggle(e.target.checked)}
+                title={enabled ? 'Hide this section in the report' : 'Show this section in the report'}
+                style={{ cursor: 'pointer' }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -402,6 +420,42 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     if (!selectedBrand?.id) return;
     const saved = await addBrandSectionRich(selectedBrand.id, payload);
     setBrandSectionDefs((prev) => [...prev, normalizeSection(saved)]);
+  }, [selectedBrand?.id]);
+
+  // Permanently delete an APC-created custom section. Removes the
+  // brand-level definition (it stops appearing on future reports)
+  // and strips this report's entries for it so nothing orphaned is
+  // saved back. Other already-saved reports keep their data.
+  const deleteBrandCustomSection = useCallback(async (section) => {
+    if (!selectedBrand?.id || !section?.id) return;
+    const ok = window.confirm(
+      `Delete the custom section "${section.name}"?\n\n`
+      + 'It will be removed from this brand and won\'t appear on future '
+      + 'reports. Reports already saved keep whatever they had.',
+    );
+    if (!ok) return;
+    try {
+      await removeBrandSection(selectedBrand.id, section.id);
+    } catch (err) {
+      alert('Failed to delete the section: ' + (err?.message || 'unknown error'));
+      return;
+    }
+    setBrandSectionDefs((prev) => prev.filter((s) => s.id !== section.id));
+    // Drop this section's value entries + its visibility flag from
+    // the current draft so no orphaned data is saved.
+    setData((d) => {
+      const nextFields = { ...(d.customFields || {}) };
+      let changed = false;
+      for (const [k, v] of Object.entries(nextFields)) {
+        if (k === section.id || (v && typeof v === 'object' && v.sectionId === section.id)) {
+          delete nextFields[k];
+          changed = true;
+        }
+      }
+      const nextEnabled = { ...(d.sectionsEnabled || {}) };
+      if (section.id in nextEnabled) { delete nextEnabled[section.id]; changed = true; }
+      return changed ? { ...d, customFields: nextFields, sectionsEnabled: nextEnabled } : d;
+    });
   }, [selectedBrand?.id]);
 
   // When brand is selected: load reports, detect next week, advance step — all in one effect
@@ -1468,6 +1522,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               data={data}
               setData={setData}
               previousReport={previousReport}
+              sectEnabled={sectEnabled}
+              toggleSection={toggleSection}
+              onDelete={deleteBrandCustomSection}
             />
           )}
           {selectedBrand?.id && (
@@ -1606,7 +1663,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
      table:     { [field.id]:   { name, value, kind: 'table', sectionId, sectionName, type, source: 'brand' } }
    Both shapes coexist with the legacy user-level custom fields entries
    (which never include `kind`). */
-function BrandSectionsBlock({ sections, data, setData, previousReport }) {
+function BrandSectionsBlock({ sections, data, setData, previousReport, sectEnabled, toggleSection, onDelete }) {
   function setCustomEntry(id, entry) {
     setData((d) => ({
       ...d,
@@ -1629,39 +1686,54 @@ function BrandSectionsBlock({ sections, data, setData, previousReport }) {
   return (
     <>
       {sections.map((section) => {
+        // Custom sections respect the per-report visibility toggle,
+        // exactly like built-in sections. Never-toggled → visible.
+        const enabled = sectEnabled?.[section.id] !== false;
+        const header = (
+          <SectionHeader
+            icon={section.kind === 'table' ? 'bi-table' : 'bi-card-text'}
+            title={section.name}
+            color="#0ea5e9"
+            enabled={enabled}
+            onToggle={toggleSection(section.id)}
+            onDelete={() => onDelete(section)}
+          />
+        );
         if (section.kind === 'table') {
           return (
-            <div key={section.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3">
-                <div className="fw-bold mb-3" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                  {section.name}
-                </div>
-                <div className="d-flex flex-column gap-3">
-                  {section.fields.map((field) => {
-                    const entry  = data.customFields?.[field.id];
-                    const value  = entry?.value ?? '';
-                    const prev   = getPrev(field.id, field.label);
-                    const prevValue = prev?.value ?? '';
-                    return (
-                      <BrandTableFieldRow
-                        key={field.id}
-                        field={field}
-                        value={value}
-                        prevValue={prevValue}
-                        onChange={(v) => setCustomEntry(field.id, {
-                          name: field.label,
-                          value: v,
-                          kind: 'table',
-                          sectionId: section.id,
-                          sectionName: section.name,
-                          type: field.type,
-                          source: 'brand',
-                        })}
-                      />
-                    );
-                  })}
+            <div key={section.id}>
+              {header}
+              {enabled && (
+              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+                <div className="card-body p-3">
+                  <div className="d-flex flex-column gap-3">
+                    {section.fields.map((field) => {
+                      const entry  = data.customFields?.[field.id];
+                      const value  = entry?.value ?? '';
+                      const prev   = getPrev(field.id, field.label);
+                      const prevValue = prev?.value ?? '';
+                      return (
+                        <BrandTableFieldRow
+                          key={field.id}
+                          field={field}
+                          value={value}
+                          prevValue={prevValue}
+                          onChange={(v) => setCustomEntry(field.id, {
+                            name: field.label,
+                            value: v,
+                            kind: 'table',
+                            sectionId: section.id,
+                            sectionName: section.name,
+                            type: field.type,
+                            source: 'brand',
+                          })}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
+              )}
             </div>
           );
         }
@@ -1669,22 +1741,24 @@ function BrandSectionsBlock({ sections, data, setData, previousReport }) {
         const entry = data.customFields?.[section.id];
         const value = typeof entry === 'string' ? entry : (entry?.value || '');
         return (
-          <div key={section.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-            <div className="card-body p-3">
-              <div className="fw-bold mb-2" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                {section.name}
+          <div key={section.id}>
+            {header}
+            {enabled && (
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+              <div className="card-body p-3">
+                <RichTextEditor
+                  value={value}
+                  onChange={(v) => setCustomEntry(section.id, {
+                    name: section.name,
+                    value: v,
+                    kind: 'long_text',
+                    source: 'brand',
+                  })}
+                  minHeight={120}
+                  placeholder={`Add notes for ${section.name}…`} />
               </div>
-              <RichTextEditor
-                value={value}
-                onChange={(v) => setCustomEntry(section.id, {
-                  name: section.name,
-                  value: v,
-                  kind: 'long_text',
-                  source: 'brand',
-                })}
-                minHeight={120}
-                placeholder={`Add notes for ${section.name}…`} />
             </div>
+            )}
           </div>
         );
       })}

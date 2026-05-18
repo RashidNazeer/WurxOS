@@ -1273,7 +1273,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
               const key = `tbl:${entry.sectionId}`;
               if (!tableGroups.has(key)) {
-                tableGroups.set(key, { name: entry.sectionName || 'Section', rows: [] });
+                tableGroups.set(key, { name: entry.sectionName || 'Section', sectionId: entry.sectionId, rows: [] });
               }
               tableGroups.get(key).rows.push({
                 fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
@@ -1293,6 +1293,9 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           // built-in section extras render so the look is consistent.
           const renderedTables = [...tableGroups.entries()].map(([groupKey, group]) => {
             customNames.push(group.name);
+            // Custom sections respect the per-report visibility toggle,
+            // just like built-in sections. Toggle OFF → hidden here.
+            if (sectEnabled[group.sectionId] === false) return null;
             const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
             if (nonEmpty.length === 0) return null;
             return (
@@ -1323,6 +1326,9 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           });
 
           const renderedCustom = passthrough.map(([fieldId, entry]) => {
+            // Brand long-text custom sections respect the visibility toggle.
+            if (entry && typeof entry === 'object' && entry.kind === 'long_text'
+              && sectEnabled[fieldId] === false) return null;
             const name = typeof entry === 'object' ? entry?.name : 'Custom Field';
             const value = typeof entry === 'object' ? entry?.value : entry;
             const isEmpty = !value || (typeof value === 'string' && !value.trim()) || (isHtml(value) && !value.replace(/<[^>]+>/g, '').trim());
