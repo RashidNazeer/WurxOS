@@ -611,8 +611,17 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
 
     if (en.topCreators && !(data.topCreators || []).some(c => c.name && c.name.trim()))
       missing.push('Top Creators (at least 1 with name)');
-    if (en.topVideos && !(data.topVideos || []).some(v => v.creatorName && v.creatorName.trim()))
-      missing.push('Top Videos (at least 1 with creator name)');
+    if (en.topVideos) {
+      if (!(data.topVideos || []).some(v => v.creatorName && v.creatorName.trim()))
+        missing.push('Top Videos (at least 1 with creator name)');
+      // Every video row with a creator name must also have a (valid-looking) video link.
+      (data.topVideos || []).forEach((v, i) => {
+        const hasName = v.creatorName && v.creatorName.trim();
+        const link = (v.videoLink || '').trim();
+        if (hasName && !link) missing.push(`Top Videos row ${i + 1}: Video Link is required`);
+        else if (hasName && !/^https?:\/\//i.test(link)) missing.push(`Top Videos row ${i + 1}: Video Link must start with http:// or https://`);
+      });
+    }
     if (en.gmvMax && !(data.gmvMax || []).some(g => g.campaign && g.campaign.trim()))
       missing.push('GMV Max (at least 1 with campaign)');
     if (en.productHighlights && !(data.productHighlights || []).some(p => p.productName && p.productName.trim()))
@@ -1077,6 +1086,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             addLabel="Add Video"
             fields={[
               { key: 'creatorName', label: 'Creator', width: '140px' },
+              { key: 'videoLink', label: 'Video Link *', type: 'url', width: '220px', placeholder: 'https://www.tiktok.com/@user/video/...' },
               { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
               { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
               { key: 'views', label: 'Views', type: 'number', width: '90px' },
