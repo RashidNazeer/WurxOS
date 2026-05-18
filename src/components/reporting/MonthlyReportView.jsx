@@ -279,7 +279,25 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
           <div style={{ height: '100%', width: `${Math.min(100, sharePct)}%`, background: C.amber, borderRadius: 999 }} />
         </div>
       </div>
-      <div style={{ width: 90, textAlign: 'right', fontSize: '0.86rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
+      <div style={{ width: 90, textAlign: 'center', fontSize: '0.86rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
+    </div>
+  );
+}
+
+// Column headers for the Top Creators table — widths mirror
+// CreatorRow exactly so the labels line up over their data.
+function CreatorHeader() {
+  const cell = {
+    fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.04em',
+    textTransform: 'uppercase', color: C.muted,
+  };
+  return (
+    <div className="d-flex align-items-center gap-3 px-3 py-2" style={{ borderTop: `1px solid ${C.line}` }}>
+      <div style={{ width: 22, flexShrink: 0 }} />
+      <div style={{ width: 32, flexShrink: 0 }} />
+      <div className="flex-grow-1" style={{ ...cell, minWidth: 0 }}>Creator</div>
+      <div style={{ width: 140, ...cell }}>GMV Share</div>
+      <div style={{ width: 90, textAlign: 'center', ...cell }}>GMV</div>
     </div>
   );
 }
@@ -1087,6 +1105,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                       eyebrow={`Ranked by GMV · ${sortedCreators.length} creators`}
                     />
                   </div>
+                  <CreatorHeader />
                   {sortedCreators.map((c, i) => (
                     <CreatorRow key={i} creator={c} rank={i + 1} totalGmv={totalCreatorGmv} currency={currency} />
                   ))}
