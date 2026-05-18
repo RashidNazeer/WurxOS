@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  listAgendaMeetings, listAgendaTeams, getAgendaTeamSchedules, getAgendaSettings,
+  listAgendaMeetings, listAgendaTeams, getAgendaTeamSchedules,
   notifyWeek, startMeeting, subscribeAgendaMeetings,
 } from '../../lib/agendaApi';
 
@@ -48,7 +48,6 @@ export default function AgendaUpcomingPage() {
   const [meetings, setMeetings]   = useState([]);
   const [teams, setTeams]         = useState([]);
   const [schedules, setSchedules] = useState([]);
-  const [defaultDay, setDefaultDay] = useState('tuesday');
   const [loading, setLoading]     = useState(true);
   const [notifying, setNotifying] = useState(false);
   const [busyId, setBusyId]       = useState(null);
@@ -60,11 +59,10 @@ export default function AgendaUpcomingPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listAgendaMeetings(), listAgendaTeams(), getAgendaTeamSchedules(), getAgendaSettings()])
-      .then(([m, t, s, st]) => {
+    Promise.all([listAgendaMeetings(), listAgendaTeams(), getAgendaTeamSchedules()])
+      .then(([m, t, s]) => {
         if (cancelled) return;
         setMeetings(m || []); setTeams(t || []); setSchedules(s || []);
-        setDefaultDay(st?.meeting_day || 'tuesday');
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -81,23 +79,30 @@ export default function AgendaUpcomingPage() {
     return m;
   }, [teams]);
 
-  // Week cards = each occurrence of the default meeting day in the
-  // current calendar month.
+  // Week cards = the weeks of the current month that contain at least
+  // one team's scheduled meeting day. Derived purely from the team
+  // schedules (no separate "default day" setting).
   const cards = useMemo(() => {
     const now = new Date();
     const y = now.getFullYear(); const mo = now.getMonth();
-    const targetDow = DAY_INDEX[defaultDay] ?? 2;
-    const anchors = [];
-    const d = new Date(y, mo, 1);
-    while (d.getMonth() === mo) {
-      if (d.getDay() === targetDow) anchors.push(ymd(d));
-      d.setDate(d.getDate() + 1);
-    }
-    return anchors.map((anchor, i) => {
-      const weekStart = ymd(mondayOf(new Date(`${anchor}T00:00:00`)));
+    const weekMap = new Map(); // weekStart -> earliest meeting date that week
+    schedules.forEach((s) => {
+      const dow = DAY_INDEX[s.meeting_day];
+      if (dow == null) return;
+      const d = new Date(y, mo, 1);
+      while (d.getMonth() === mo) {
+        if (d.getDay() === dow) {
+          const ws = ymd(mondayOf(d));
+          const ds = ymd(d);
+          if (!weekMap.has(ws) || ds < weekMap.get(ws)) weekMap.set(ws, ds);
+        }
+        d.setDate(d.getDate() + 1);
+      }
+    });
+    const weekStarts = Array.from(weekMap.keys()).sort();
+    return weekStarts.map((weekStart, i) => {
       const isCurrent = weekStart === currentWeekStart;
       const isPast    = weekStart < currentWeekStart;
-      // Per-team meeting rows for this week.
       const rows = schedules.map((s) => {
         const team = teamsById.get(s.tl_id);
         const mDate = addDays(weekStart, DAY_OFFSET[s.meeting_day] ?? 1);
@@ -111,9 +116,9 @@ export default function AgendaUpcomingPage() {
           meeting,
         };
       }).sort((a, b) => a.tlName.localeCompare(b.tlName));
-      return { index: i + 1, anchor, weekStart, isCurrent, isPast, rows };
+      return { index: i + 1, anchor: weekMap.get(weekStart), weekStart, isCurrent, isPast, rows };
     });
-  }, [defaultDay, schedules, meetings, teamsById, currentWeekStart]);
+  }, [schedules, meetings, teamsById, currentWeekStart]);
 
   async function handleNotify() {
     setNotifying(true); setFlash('');

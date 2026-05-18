@@ -367,6 +367,14 @@ export async function notifyWeek(weekStart) {
   return data;
 }
 
+// OL only — apply the latest schedules to a week's still-upcoming
+// meetings (silent; used when the OL edits schedules mid-week).
+export async function resyncWeek(weekStart) {
+  const { data, error } = await supabase.rpc('agenda_resync_week', { p_week_start: weekStart });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function startMeeting(id) {
   const { data, error } = await supabase.rpc('agenda_start_meeting', { p_meeting: id });
   if (error) throw new Error(error.message);

@@ -5,12 +5,6 @@ import AgendaSchedulesTab from '../../components/agenda/AgendaSchedulesTab';
 // Weekly Agenda Meetings — settings (OL / Boss only).
 // Tabbed: General (Meet link + default day) · Schedules (per-team slot).
 
-const DAYS = [
-  ['monday', 'Monday'], ['tuesday', 'Tuesday'], ['wednesday', 'Wednesday'],
-  ['thursday', 'Thursday'], ['friday', 'Friday'], ['saturday', 'Saturday'],
-  ['sunday', 'Sunday'],
-];
-
 const TABS = [
   { key: 'general',   label: 'General',   icon: 'bi-sliders' },
   { key: 'schedules', label: 'Schedules', icon: 'bi-calendar2-week' },
@@ -56,7 +50,6 @@ function GeneralTab() {
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [meetLink, setMeetLink]   = useState('');
-  const [meetingDay, setMeetingDay] = useState('tuesday');
   const [error, setError]         = useState('');
   const [savedTick, setSavedTick] = useState(false);
 
@@ -66,7 +59,6 @@ function GeneralTab() {
       .then((s) => {
         if (cancelled) return;
         setMeetLink(s.google_meet_link || '');
-        setMeetingDay(s.meeting_day || 'tuesday');
       })
       .catch((e) => { if (!cancelled) setError(e.message || 'Failed to load settings.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -77,7 +69,7 @@ function GeneralTab() {
     setSaving(true);
     setError('');
     try {
-      await updateAgendaSettings({ googleMeetLink: meetLink, meetingDay });
+      await updateAgendaSettings({ googleMeetLink: meetLink });
       setSavedTick(true);
       setTimeout(() => setSavedTick(false), 2500);
     } catch (e) {
@@ -109,18 +101,9 @@ function GeneralTab() {
             </div>
           </div>
 
-          <div className="mb-4">
-            <label className="form-label small fw-semibold d-flex align-items-center gap-2">
-              <i className="bi bi-calendar-event text-primary" />
-              Default Meeting Day
-            </label>
-            <select className="form-select" style={{ borderRadius: 8, maxWidth: 240 }}
-              value={meetingDay} onChange={(e) => setMeetingDay(e.target.value)}>
-              {DAYS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-            <div className="text-muted mt-1" style={{ fontSize: '0.74rem' }}>
-              The default agenda meeting day — pre-fills new team schedules and anchors the week cards.
-            </div>
+          <div className="text-muted mb-4" style={{ fontSize: '0.74rem' }}>
+            <i className="bi bi-info-circle me-1" />
+            Each team’s meeting day &amp; time is set per-team under the Schedules tab.
           </div>
 
           <div className="d-flex align-items-center gap-2">
