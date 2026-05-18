@@ -6,6 +6,12 @@
 // Triggered every 3h by pg_cron, or on demand from the Shop
 // Metrics dashboard ("Sync now").
 //
+// The comprehensive question makes Euka SAVE the metrics JSON to a
+// sandbox file rather than return it inline; we resolve that path
+// and fetch it with read_sandbox_file. The full metric set is
+// stored in the `metrics` jsonb column ({ d7, d30, top }); the
+// gmv_/units_/orders_ columns stay populated for easy querying.
+//
 // Self-rate-limited: a sync runs at most once per 10 minutes, so
 // a duplicate trigger is a harmless no-op. Returns only counts —
 // never the metric values — so the endpoint leaks nothing.
@@ -80,17 +86,63 @@ async function mcp(method: string, params?: unknown, isNotification = false): Pr
   return reply.result;
 }
 
+// The comprehensive question — Euka saves the result to a sandbox
+// file as pure JSON; the summary is just a pointer to that file.
 const METRICS_QUESTION =
-  'Return ONLY a compact minified JSON object and nothing else — no prose, no explanation, '
-  + 'no markdown code fences. Use exactly these keys with plain numeric values (no currency '
-  + 'symbols, no commas, no quotes around numbers): gmv_7d, units_7d, orders_7d, gmv_30d, '
-  + 'units_30d, orders_30d. gmv = total GMV in USD across all channels; units = total units '
-  + 'sold; orders = total orders. The _7d keys cover the last 7 days; the _30d keys cover the '
-  + 'last 30 days.';
+  'Compute a metrics object and SAVE IT to a sandbox file as pure JSON. Exact shape: '
+  + '{"d7":{...},"d30":{...},"top":{"creator_name":string,"creator_gmv":number,'
+  + '"product_name":string,"product_gmv":number}}. d7 = last 7 days, d30 = last 30 days; each '
+  + 'has numeric keys (plain numbers, no symbols/commas, null if unavailable): gmv, video_gmv, '
+  + 'units, orders, aov, active_creators, videos_posted, video_views, ad_spend, roas, '
+  + 'sample_requests, outreach_messages, collab_invites. The saved file must contain ONLY the '
+  + 'JSON object, nothing else.';
 
 function num(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+// Resolve the sandbox path the query_store_data result points to.
+function resolveSandboxPath(result: any): string | null {
+  const sc = result?.structuredContent || {};
+  if (Array.isArray(sc.artifacts) && sc.artifacts.length) {
+    const a = sc.artifacts[0];
+    const p = typeof a === 'string' ? a : (a?.path || a?.file || a?.name || null);
+    if (p) return p;
+  }
+  const summary: string = sc.summary
+    ?? (result?.content || []).map((c: any) => c.text || '').join('\n');
+  const m = summary && summary.match(/(exports\/[\w./-]+\.json)/);
+  return m ? m[1] : null;
+}
+
+// Pull the metrics JSON for one store via the sandbox-file flow.
+async function fetchStoreMetrics(storeId: string): Promise<any> {
+  const r = await mcp('tools/call', {
+    name: 'query_store_data',
+    arguments: { storeId, question: METRICS_QUESTION },
+  });
+
+  // The result may be inline JSON (small answers) or a saved file.
+  const sc = r?.structuredContent || {};
+  const summary: string = sc.summary
+    ?? (r?.content || []).map((c: any) => c.text || '').join('\n');
+
+  const path = resolveSandboxPath(r);
+  let jsonText = '';
+  if (path) {
+    const f = await mcp('tools/call', { name: 'read_sandbox_file', arguments: { path } });
+    const fsc = f?.structuredContent || {};
+    jsonText = typeof fsc.content === 'string'
+      ? fsc.content
+      : (f?.content || []).map((c: any) => c.text || '').join('\n');
+  } else {
+    jsonText = summary || '';
+  }
+
+  const jm = jsonText.match(/\{[\s\S]*\}/);
+  if (!jm) throw new Error('no JSON in Euka response');
+  return { metrics: JSON.parse(jm[0]), summary };
 }
 
 Deno.serve(async (req) => {
@@ -115,7 +167,7 @@ Deno.serve(async (req) => {
     sessionId = null; idCounter = 0;
     await mcp('initialize', {
       protocolVersion: '2025-06-18', capabilities: {},
-      clientInfo: { name: 'wurxos-euka-sync', version: '1.0.0' },
+      clientInfo: { name: 'wurxos-euka-sync', version: '2.0.0' },
     });
     await mcp('notifications/initialized', undefined, true);
 
@@ -136,14 +188,9 @@ Deno.serve(async (req) => {
       const storeName = s.storeName || s.parentBrand?.brandName || 'Store';
 
       try {
-        const r = await mcp('tools/call', {
-          name: 'query_store_data',
-          arguments: { storeId, question: METRICS_QUESTION },
-        });
-        const summary: string = r?.structuredContent?.summary
-          ?? (r?.content || []).map((c: any) => c.text || '').join('\n');
-        const jm = summary && summary.match(/\{[\s\S]*\}/);
-        const m = jm ? JSON.parse(jm[0]) : {};
+        const { metrics, summary } = await fetchStoreMetrics(storeId);
+        const d7  = metrics?.d7  || {};
+        const d30 = metrics?.d30 || {};
 
         // Resolve the WurxOS brand: explicit mapping first, then name.
         let brandId: string | null = null;
@@ -166,9 +213,10 @@ Deno.serve(async (req) => {
           store_name: storeName,
           region: s.region || null,
           brand_id: brandId,
-          gmv_7d: num(m.gmv_7d), units_7d: num(m.units_7d), orders_7d: num(m.orders_7d),
-          gmv_30d: num(m.gmv_30d), units_30d: num(m.units_30d), orders_30d: num(m.orders_30d),
-          raw: { parsed: m, summary },
+          gmv_7d: num(d7.gmv),   units_7d: num(d7.units),   orders_7d: num(d7.orders),
+          gmv_30d: num(d30.gmv), units_30d: num(d30.units), orders_30d: num(d30.orders),
+          metrics,
+          raw: { parsed: metrics, summary },
         });
         synced += 1;
         names.push(storeName);

@@ -5,8 +5,9 @@ import {
   listLinkableBrands, linkEukaStore,
 } from '../../lib/eukaApi';
 
-// TikTok Shop Metrics — per-store GMV / units / orders synced from
-// Euka. Snapshots are written by the euka-sync edge function.
+// TikTok Shop Metrics — the full per-store metric set synced from
+// Euka (sales, creators & content, ads, outreach, top performers).
+// Snapshots are written by the euka-sync edge function.
 
 function money(n) {
   if (n == null) return '—';
@@ -14,6 +15,9 @@ function money(n) {
 }
 function intf(n) {
   return n == null ? '—' : Number(n).toLocaleString('en-US');
+}
+function ratio(n) {
+  return n == null ? '—' : `${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}x`;
 }
 function relTime(iso) {
   if (!iso) return '';
@@ -23,6 +27,43 @@ function relTime(iso) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
+
+// Metric groups — each entry is [key, label, formatter].
+const GROUPS = [
+  {
+    label: 'Sales', icon: 'bi-cash-stack',
+    metrics: [
+      ['gmv', 'GMV', money],
+      ['video_gmv', 'Video GMV', money],
+      ['units', 'Units sold', intf],
+      ['orders', 'Orders', intf],
+      ['aov', 'Avg order value', money],
+    ],
+  },
+  {
+    label: 'Creators & content', icon: 'bi-camera-video',
+    metrics: [
+      ['active_creators', 'Active creators', intf],
+      ['videos_posted', 'Videos posted', intf],
+      ['video_views', 'Video views', intf],
+    ],
+  },
+  {
+    label: 'Ads (GMV Max)', icon: 'bi-megaphone',
+    metrics: [
+      ['ad_spend', 'Ad spend', money],
+      ['roas', 'ROAS', ratio],
+    ],
+  },
+  {
+    label: 'Outreach', icon: 'bi-send',
+    metrics: [
+      ['sample_requests', 'Sample requests', intf],
+      ['outreach_messages', 'Outreach messages', intf],
+      ['collab_invites', 'Collab invites', intf],
+    ],
+  },
+];
 
 export default function EukaShopMetricsPage() {
   const { profile } = useAuth();
@@ -35,6 +76,7 @@ export default function EukaShopMetricsPage() {
   const [syncing, setSyncing] = useState(false);
   const [flash, setFlash]     = useState('');
   const [rawOpen, setRawOpen] = useState({});
+  const [win, setWin]         = useState({});   // per-store '7d' | '30d'
 
   function reload() {
     listEukaMetrics().then((r) => setRows(r || [])).catch(() => {}).finally(() => setLoading(false));
@@ -89,7 +131,7 @@ export default function EukaShopMetricsPage() {
             TikTok Shop Metrics
           </h5>
           <p className="text-muted small mb-0">
-            Per-store GMV, units and orders — synced from Euka
+            Per-store sales, creators, ads and outreach — synced from Euka
             {lastSynced ? ` · updated ${relTime(lastSynced)}` : ''}.
           </p>
         </div>
@@ -122,93 +164,155 @@ export default function EukaShopMetricsPage() {
         </div>
       ) : (
         <div className="row g-3">
-          {rows.map((r) => (
-            <div key={r.euka_store_id} className="col-12 col-xl-6">
-              <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14 }}>
-                <div className="card-body p-3">
-                  {/* Header */}
-                  <div className="d-flex align-items-start justify-content-between gap-2 mb-3">
-                    <div className="min-w-0">
-                      <div className="fw-bold d-flex align-items-center gap-2" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
-                        <i className="bi bi-shop text-primary" />{r.store_name || 'Store'}
-                        {r.region && (
-                          <span className="rounded-pill px-2" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.6rem', fontWeight: 700 }}>
-                            {r.region}
-                          </span>
-                        )}
+          {rows.map((r) => {
+            const period = win[r.euka_store_id] || '30d';
+            const m = r.metrics || {};
+            const data = period === '7d' ? (m.d7 || {}) : (m.d30 || {});
+            const top = m.top || {};
+            return (
+              <div key={r.euka_store_id} className="col-12 col-xl-6">
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14 }}>
+                  <div className="card-body p-3">
+                    {/* Header */}
+                    <div className="d-flex align-items-start justify-content-between gap-2 mb-3">
+                      <div className="min-w-0">
+                        <div className="fw-bold d-flex align-items-center gap-2" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
+                          <i className="bi bi-shop text-primary" />{r.store_name || 'Store'}
+                          {r.region && (
+                            <span className="rounded-pill px-2" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.6rem', fontWeight: 700 }}>
+                              {r.region}
+                            </span>
+                          )}
+                        </div>
+                        {r.brand?.brand_name ? (
+                          <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>
+                            <i className="bi bi-link-45deg me-1" />Linked to brand: <strong>{r.brand.brand_name}</strong>
+                          </div>
+                        ) : isOL ? (
+                          <div className="d-flex align-items-center gap-1 mt-1">
+                            <span className="text-muted" style={{ fontSize: '0.72rem' }}>Not linked to a brand:</span>
+                            <select className="form-select form-select-sm" style={{ borderRadius: 6, width: 'auto', fontSize: '0.72rem', padding: '1px 22px 1px 6px' }}
+                              defaultValue=""
+                              onChange={(e) => handleLink(r.euka_store_id, e.target.value)}>
+                              <option value="">Link brand…</option>
+                              {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
+                            </select>
+                          </div>
+                        ) : null}
                       </div>
-                      {r.brand?.brand_name ? (
-                        <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>
-                          <i className="bi bi-link-45deg me-1" />Linked to brand: <strong>{r.brand.brand_name}</strong>
-                        </div>
-                      ) : isOL ? (
-                        <div className="d-flex align-items-center gap-1 mt-1">
-                          <span className="text-muted" style={{ fontSize: '0.72rem' }}>Not linked to a brand:</span>
-                          <select className="form-select form-select-sm" style={{ borderRadius: 6, width: 'auto', fontSize: '0.72rem', padding: '1px 22px 1px 6px' }}
-                            defaultValue=""
-                            onChange={(e) => handleLink(r.euka_store_id, e.target.value)}>
-                            <option value="">Link brand…</option>
-                            {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-                          </select>
-                        </div>
-                      ) : null}
+
+                      {/* 7d / 30d toggle */}
+                      <div className="btn-group btn-group-sm" role="group">
+                        {['7d', '30d'].map((p) => (
+                          <button key={p} type="button"
+                            className="btn"
+                            style={{
+                              fontSize: '0.68rem', fontWeight: 700, padding: '2px 10px',
+                              background: period === p ? 'var(--accent)' : 'var(--surface-2)',
+                              color: period === p ? 'var(--on-accent)' : 'var(--text-secondary)',
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                            onClick={() => setWin((w) => ({ ...w, [r.euka_store_id]: p }))}>
+                            {p === '7d' ? 'Last 7 days' : 'Last 30 days'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Metric windows */}
-                  <div className="row g-2">
-                    <Window label="Last 7 days" gmv={r.gmv_7d} units={r.units_7d} orders={r.orders_7d} />
-                    <Window label="Last 30 days" gmv={r.gmv_30d} units={r.units_30d} orders={r.orders_30d} />
-                  </div>
+                    {/* Metric groups */}
+                    {r.metrics ? (
+                      <>
+                        {GROUPS.map((g) => (
+                          <div key={g.label} className="mb-2">
+                            <div className="text-muted mb-1 d-flex align-items-center gap-1"
+                              style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                              <i className={`bi ${g.icon}`} />{g.label}
+                            </div>
+                            <div className="row g-2">
+                              {g.metrics.map(([key, label, fmt]) => (
+                                <Metric key={key} label={label} value={fmt(data[key])} />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
 
-                  {/* Footer */}
-                  <div className="d-flex align-items-center justify-content-between mt-3 pt-2"
-                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                    <span className="text-muted" style={{ fontSize: '0.68rem' }}>
-                      <i className="bi bi-clock-history me-1" />Synced {relTime(r.synced_at)} · via Euka
-                    </span>
-                    {r.raw?.summary && (
-                      <button className="btn btn-sm p-0 text-muted" style={{ fontSize: '0.68rem' }}
-                        onClick={() => setRawOpen((o) => ({ ...o, [r.euka_store_id]: !o[r.euka_store_id] }))}>
-                        {rawOpen[r.euka_store_id] ? 'Hide source' : 'Source'}
-                      </button>
+                        {/* Top performers (last 30 days) */}
+                        {(top.creator_name || top.product_name) && (
+                          <div className="mb-1">
+                            <div className="text-muted mb-1 d-flex align-items-center gap-1"
+                              style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                              <i className="bi bi-trophy" />Top performers · 30 days
+                            </div>
+                            <div className="row g-2">
+                              <TopItem icon="bi-person-badge" label="Top creator"
+                                name={top.creator_name} value={money(top.creator_gmv)} />
+                              <TopItem icon="bi-box-seam" label="Top product"
+                                name={top.product_name} value={money(top.product_gmv)} />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      // Legacy snapshot — no metrics jsonb yet.
+                      <div className="row g-2">
+                        <Metric label="GMV" value={money(period === '7d' ? r.gmv_7d : r.gmv_30d)} />
+                        <Metric label="Units sold" value={intf(period === '7d' ? r.units_7d : r.units_30d)} />
+                        <Metric label="Orders" value={intf(period === '7d' ? r.orders_7d : r.orders_30d)} />
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="d-flex align-items-center justify-content-between mt-3 pt-2"
+                      style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      <span className="text-muted" style={{ fontSize: '0.68rem' }}>
+                        <i className="bi bi-clock-history me-1" />Synced {relTime(r.synced_at)} · via Euka
+                      </span>
+                      {r.raw?.summary && (
+                        <button className="btn btn-sm p-0 text-muted" style={{ fontSize: '0.68rem' }}
+                          onClick={() => setRawOpen((o) => ({ ...o, [r.euka_store_id]: !o[r.euka_store_id] }))}>
+                          {rawOpen[r.euka_store_id] ? 'Hide source' : 'Source'}
+                        </button>
+                      )}
+                    </div>
+                    {rawOpen[r.euka_store_id] && (
+                      <pre className="rounded-2 p-2 mt-2 mb-0" style={{
+                        background: 'var(--surface-2)', color: 'var(--text-secondary)',
+                        fontSize: '0.66rem', whiteSpace: 'pre-wrap', maxHeight: 160, overflowY: 'auto',
+                      }}>{r.raw.summary}</pre>
                     )}
                   </div>
-                  {rawOpen[r.euka_store_id] && (
-                    <pre className="rounded-2 p-2 mt-2 mb-0" style={{
-                      background: 'var(--surface-2)', color: 'var(--text-secondary)',
-                      fontSize: '0.66rem', whiteSpace: 'pre-wrap', maxHeight: 160, overflowY: 'auto',
-                    }}>{r.raw.summary}</pre>
-                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function Window({ label, gmv, units, orders }) {
+function Metric({ label, value }) {
+  return (
+    <div className="col-6 col-md-4">
+      <div className="rounded-3 p-2 h-100" style={{ background: 'var(--surface-2)' }}>
+        <div className="fw-bold" style={{ fontSize: '1rem', color: 'var(--text-primary)', lineHeight: 1.2 }}>{value}</div>
+        <div className="text-muted" style={{ fontSize: '0.6rem' }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function TopItem({ icon, label, name, value }) {
   return (
     <div className="col-6">
-      <div className="rounded-3 p-3 h-100" style={{ background: 'var(--surface-2)' }}>
-        <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-          {label}
+      <div className="rounded-3 p-2 h-100" style={{ background: 'var(--surface-2)' }}>
+        <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: '0.6rem' }}>
+          <i className={`bi ${icon}`} />{label}
         </div>
-        <div className="fw-bold" style={{ fontSize: '1.35rem', color: 'var(--accent)', lineHeight: 1.1 }}>{money(gmv)}</div>
-        <div className="text-muted" style={{ fontSize: '0.6rem' }}>GMV</div>
-        <div className="d-flex gap-3 mt-2">
-          <div>
-            <div className="fw-semibold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>{intf(units)}</div>
-            <div className="text-muted" style={{ fontSize: '0.6rem' }}>Units</div>
-          </div>
-          <div>
-            <div className="fw-semibold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>{intf(orders)}</div>
-            <div className="text-muted" style={{ fontSize: '0.6rem' }}>Orders</div>
-          </div>
+        <div className="fw-semibold text-truncate" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }} title={name || ''}>
+          {name || '—'}
         </div>
+        <div className="fw-bold" style={{ fontSize: '0.9rem', color: 'var(--accent)' }}>{value}</div>
       </div>
     </div>
   );
