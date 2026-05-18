@@ -12,6 +12,7 @@ import HighlighterPicker, { useHighlightStyle } from '../common/HighlighterPicke
 import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandReportLinks';
 import { useAuth } from '../../contexts/AuthContext';
 import BrandSectionsPanel from '../portal/BrandSectionsPanel';
+import { exportReportToPdf } from '../../utils/exportReportPdf';
 
 /* ─── Editorial palette ───────────────────────────────────────────────────
  *   Every entry is a CSS variable so the entire view re-themes when
@@ -803,27 +804,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     }
   };
 
+  // Structured PDF export — renders the real report DOM with the
+  // app's real stylesheets so the PDF matches the dashboard. See
+  // utils/exportReportPdf.js for the rationale.
   const handleExport = () => {
-    const el = printRef.current;
-    if (!el) return;
-    const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><title>${report.brandName} - ${report.weekLabel}</title>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; color: #0f172a; font-size: 13px; }
-        .rich-content p { margin: 0 0 0.5rem 0; }
-        .rich-content ul, .rich-content ol { padding-left: 1.4rem; margin: 0.25rem 0 0.6rem; }
-        .rich-content li { margin: 0.15rem 0; }
-        .rich-content a { color: #2563eb; text-decoration: underline; }
-        .rich-content strong, .rich-content b { font-weight: 700; }
-        .rich-content em, .rich-content i { font-style: italic; }
-        .no-print { display: none !important; }
-        @media print { body { padding: 16px; } .no-print { display: none !important; } }
-      </style></head><body>`);
-    win.document.write(el.innerHTML);
-    win.document.write('</body></html>');
-    win.document.close();
-    setTimeout(() => { win.print(); }, 500);
+    exportReportToPdf(printRef.current, {
+      title: `Weekly Report — ${report.brandName || 'Brand'} — ${report.weekLabel || ''}`.trim(),
+    });
   };
 
   // Word (.docx) export. Lazy-import the docx builder so the ~150KB
