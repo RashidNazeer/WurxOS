@@ -804,13 +804,21 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     }
   };
 
-  // Structured PDF export — renders the real report DOM with the
-  // app's real stylesheets so the PDF matches the dashboard. See
-  // utils/exportReportPdf.js for the rationale.
-  const handleExport = () => {
-    exportReportToPdf(printRef.current, {
-      title: `Weekly Report — ${report.brandName || 'Brand'} — ${report.weekLabel || ''}`.trim(),
-    });
+  // Single continuous-page PDF export — see utils/exportReportPdf.js.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const handleExport = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await exportReportToPdf(printRef.current, {
+        title: `Weekly Report - ${report.brandName || 'Brand'} - ${report.weekLabel || ''}`.trim(),
+      });
+    } catch (err) {
+      console.error('[export-pdf] failed:', err);
+      alert('Failed to export the PDF. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   // Word (.docx) export. Lazy-import the docx builder so the ~150KB
@@ -878,8 +886,11 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           )}
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
-            onClick={handleExport}>
-            <i className="bi bi-file-earmark-pdf" /> Export PDF
+            onClick={handleExport} disabled={pdfBusy}
+            title="Download the report as a single-page PDF">
+            {pdfBusy
+              ? (<><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Exporting…</>)
+              : (<><i className="bi bi-file-earmark-pdf" /> Export PDF</>)}
           </button>
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}

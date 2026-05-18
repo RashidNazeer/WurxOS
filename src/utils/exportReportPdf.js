@@ -1,168 +1,89 @@
 // ============================================================
-// Professional PDF export for report dashboards.
+// Report PDF export — single continuous page.
 //
-// Why a print window (structured rendering) and NOT a screenshot:
-//   The old export copied the report's innerHTML into a blank
-//   window with none of the app's CSS, so every card / grid / flex
-//   layout collapsed into stretched rows. A screenshot approach
-//   (html2canvas) would fix layout but rasterises everything —
-//   blurry text and charts, huge files, no selectable text.
+// Architecture (rewritten):
+//   Earlier versions handed the report to the browser's print
+//   engine. The print engine ALWAYS paginates — it sliced cards,
+//   charts and sections across A4 page boundaries, and the
+//   "one giant @page size" trick proved unreliable across browsers.
 //
-//   This exporter renders the REAL report DOM into a print window
-//   with the app's REAL stylesheets, then opens the print dialog
-//   ("Save as PDF"). True vector output: crisp text + charts
-//   (Recharts SVG renders natively), correct cards / grids /
-//   spacing, small file, matches the dashboard.
+//   This version removes the browser print engine entirely:
+//     1. The live report DOM is rendered to a single raster image
+//        with html-to-image. html-to-image uses an SVG <foreignObject>,
+//        i.e. the REAL browser renderer — so every modern CSS feature
+//        (color-mix, gradients, fl/grid) and the Recharts SVG charts
+//        render exactly as on the dashboard. Captured at 2x device
+//        pixels so text and charts stay sharp.
+//     2. jsPDF builds a PDF with ONE page whose dimensions equal the
+//        whole report. The image is placed on that single page.
 //
-// Pagination — single continuous page:
-//   This PDF is for digital viewing/sharing, not physical printing.
-//   So instead of slicing the report into A4 pages (which cuts
-//   cards and sections in half at page boundaries), we measure the
-//   rendered report and set the @page size to ONE page exactly as
-//   tall as the content. The result is a single continuous page
-//   that scrolls smoothly in any PDF viewer — nothing is ever split.
+//   Result: a true single continuous page — it is structurally
+//   impossible for a section / card / chart / table to be split,
+//   because there are no page boundaries. It opens as one long
+//   scrollable page in any PDF viewer and downloads directly (no
+//   print dialog).
 //
-//   Reports taller than the PDF page ceiling (~200in) fall back to
-//   A4 landscape with break-inside rules that keep cards/charts
-//   whole — a rare case for an extremely long report.
+//   Charts capture at their real on-dashboard size, so they keep
+//   correct scaling / aspect ratio with no overflow.
 //
-//   The page is forced to LIGHT theme for a clean document.
+//   The export reflects whatever theme the app is in (light/dark) —
+//   most users are on light; a light document is the clean default.
 // ============================================================
 
-// PDF pages cannot exceed ~200 inches (the PDF spec ceiling). At
-// 96dpi that's ~19200px — stay just under it.
-const MAX_PAGE_PX = 19000;
-
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
-  ));
-}
+// Keep the raster within the browser's ~16384px canvas limit even
+// for very long reports — pixelRatio scales down past this.
+const MAX_CANVAS_PX = 14000;
 
 /**
- * Export a report view to PDF via the browser print dialog.
+ * Export a report view to a single-page PDF and download it.
  *
  * @param {HTMLElement} node  The report canvas element (printRef.current).
  * @param {object}      opts
- * @param {string}      opts.title  Document title / PDF filename hint.
+ * @param {string}      opts.title  Document title / PDF filename.
  */
-export function exportReportToPdf(node, { title = 'Report' } = {}) {
+export async function exportReportToPdf(node, { title = 'Report' } = {}) {
   if (!node) return;
 
-  // 1. Clone EVERY stylesheet the app currently uses (Bootstrap,
-  //    bootstrap-icons, design tokens, global + component CSS) so
-  //    the export renders with identical layout to the dashboard.
-  const styleTags = [];
-  document.querySelectorAll('link[rel="stylesheet"], style').forEach((el) => {
-    styleTags.push(el.outerHTML);
-  });
+  // Lazy-load the heavy libs only when the user actually exports.
+  const [htmlToImage, jspdf] = await Promise.all([
+    import('html-to-image'),
+    import('jspdf'),
+  ]);
+  const JsPDF = jspdf.jsPDF || jspdf.default;
 
-  // 2. Snapshot the report canvas. Inline var(--token) references
-  //    resolve against the light-theme tokens below.
-  const reportHtml = node.outerHTML;
-
-  // 3. Print-only stylesheet — light theme, clean canvas chrome.
-  //    Note: no @page rule here — it is added dynamically once we
-  //    have measured the content (see the inline script below).
-  const printCss = `
-    html { color-scheme: light; }
-    body {
-      margin: 0;
-      background: #ffffff;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    /* Fixed-width document column so the export is deterministic
-       regardless of the exporting user's screen size. */
-    .wx-export-shell {
-      width: 1000px;
-      margin: 0 auto;
-      padding: 24px;
-      background: #ffffff;
-    }
-    /* The in-app canvas has a tinted background, border and rounded
-       corners for the screen — strip them for a clean white page. */
-    .wx-export-shell .report-canvas {
-      background: #ffffff !important;
-      border: none !important;
-      border-radius: 0 !important;
-      padding: 0 !important;
-    }
-    /* Drop screen-only controls (action buttons, popovers, etc.). */
-    .no-print, .no-print * { display: none !important; }
-    .wx-export-shell img,
-    .wx-export-shell svg { max-width: 100%; }
-    .wx-export-shell table { width: 100%; }
-    /* Page-break safety — only relevant for the rare multi-page
-       fallback (a report too tall for one PDF page). Keeps cards,
-       chart blocks and headings from being cut in half. */
-    .wx-export-shell .card,
-    .wx-export-shell .recharts-responsive-container {
-      break-inside: avoid;
-    }
-    .wx-export-shell h1, .wx-export-shell h2, .wx-export-shell h3,
-    .wx-export-shell h4, .wx-export-shell h5, .wx-export-shell h6 {
-      break-after: avoid;
-    }
-    /* Safety-net default page — overridden by the measured size. */
-    @page { size: A4 landscape; margin: 12mm; }
-  `;
-
-  const win = window.open('', '_blank', 'width=1180,height=900');
-  if (!win) {
-    alert('Please allow pop-ups for this site to export the PDF.');
-    return;
+  // Make sure web fonts are ready so the first capture isn't missing
+  // glyphs / icons.
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch { /* ignore */ }
   }
 
-  // data-theme=light forces light design tokens; data-bs-theme keeps
-  // Bootstrap components light too.
-  win.document.open();
-  win.document.write(`<!DOCTYPE html>
-<html lang="en" data-theme="light" data-bs-theme="light">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${esc(title)}</title>
-  ${styleTags.join('\n  ')}
-  <style>${printCss}</style>
-</head>
-<body>
-  <div class="wx-export-shell">${reportHtml}</div>
-  <script>
-    (function () {
-      var MAX = ${MAX_PAGE_PX};
-      // Size the PDF to a SINGLE continuous page exactly as tall as
-      // the report, so nothing is ever split across pages. If the
-      // report is taller than the PDF ceiling, keep the safety-net
-      // A4 page (break-inside rules keep blocks intact).
-      function setPageSize() {
-        var shell = document.querySelector('.wx-export-shell');
-        if (!shell) return;
-        var w = Math.ceil(shell.scrollWidth);
-        var h = Math.ceil(shell.scrollHeight) + 4;
-        if (h > MAX) return; // too tall — fall back to the A4 default
-        var st = document.createElement('style');
-        st.textContent = '@page { size: ' + w + 'px ' + h + 'px; margin: 0; }';
-        document.head.appendChild(st);
-      }
-      function go() {
-        var fontsReady = (document.fonts && document.fonts.ready)
-          ? document.fonts.ready : Promise.resolve();
-        fontsReady.then(function () {
-          // Let linked CSS + charts settle, measure, then print.
-          setTimeout(function () {
-            setPageSize();
-            window.focus();
-            window.print();
-          }, 300);
-        });
-      }
-      if (document.readyState === 'complete') go();
-      else window.addEventListener('load', go);
-      window.onafterprint = function () { window.close(); };
-    })();
-  </script>
-</body>
-</html>`);
-  win.document.close();
+  const cssW = Math.ceil(node.scrollWidth);
+  const cssH = Math.ceil(node.scrollHeight);
+
+  // 2x for sharpness, scaled down on tall reports so the raster
+  // stays under the browser's canvas-size limit.
+  const pixelRatio = Math.min(2, MAX_CANVAS_PX / Math.max(cssW, cssH, 1));
+
+  // Render the report DOM to a canvas. The .no-print filter drops
+  // screen-only controls; cacheBust avoids stale cached images.
+  const canvas = await htmlToImage.toCanvas(node, {
+    pixelRatio,
+    cacheBust: true,
+    filter: (el) => !(el.classList && el.classList.contains('no-print')),
+  });
+
+  // One PDF page sized exactly to the whole report — page
+  // dimensions in CSS px (canvas px divided back by pixelRatio).
+  const pdfW = Math.max(1, Math.round(canvas.width / pixelRatio));
+  const pdfH = Math.max(1, Math.round(canvas.height / pixelRatio));
+  const pdf = new JsPDF({
+    unit: 'px',
+    format: [pdfW, pdfH],
+    orientation: 'portrait',
+    compress: true,
+  });
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
+
+  const safe = String(title).replace(/[\\/:*?"<>|]/g, '_').slice(0, 120).trim();
+  pdf.save(`${safe || 'Report'}.pdf`);
 }

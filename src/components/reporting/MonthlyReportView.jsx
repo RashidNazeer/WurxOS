@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer,
@@ -890,13 +890,21 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
     }
   };
 
-  // Structured PDF export — renders the real report DOM with the
-  // app's real stylesheets so the PDF matches the dashboard. See
-  // utils/exportReportPdf.js for the rationale.
-  const handleExport = () => {
-    exportReportToPdf(printRef.current, {
-      title: `Monthly Report — ${report.brandName || 'Brand'} — ${report.monthLabel || ''}`.trim(),
-    });
+  // Single continuous-page PDF export — see utils/exportReportPdf.js.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const handleExport = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await exportReportToPdf(printRef.current, {
+        title: `Monthly Report - ${report.brandName || 'Brand'} - ${report.monthLabel || ''}`.trim(),
+      });
+    } catch (err) {
+      console.error('[export-pdf] failed:', err);
+      alert('Failed to export the PDF. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
   };
 
   return (
@@ -934,8 +942,11 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           )}
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
-            onClick={handleExport}>
-            <i className="bi bi-file-earmark-pdf" /> Export PDF
+            onClick={handleExport} disabled={pdfBusy}
+            title="Download the report as a single-page PDF">
+            {pdfBusy
+              ? (<><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Exporting…</>)
+              : (<><i className="bi bi-file-earmark-pdf" /> Export PDF</>)}
           </button>
         </div>
       )}
