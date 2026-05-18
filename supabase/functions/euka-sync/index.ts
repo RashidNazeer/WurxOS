@@ -93,9 +93,13 @@ async function mcp(method: string, params?: unknown, isNotification = false): Pr
 // for — Euka's API has no all-channels revenue data, so those come
 // back ~15-30% low and are deliberately excluded.
 //
+// View-based metrics (video_views, conversion rate) are excluded —
+// query_store_data miscounts them ~8x even per-window, so only the
+// aggregate tiles it reads reliably are requested.
+//
 // One window per query_store_data call: asking for two date ranges
-// at once makes the LLM approximate and it returns video_views / EMV
-// up to ~8x low. A single pinned window stays within ~2%.
+// at once makes the LLM approximate even harder. A single pinned
+// window keeps the aggregate tiles within ~2% of the dashboard.
 function buildWindowQuestion(start: string, end: string, withTop: boolean): string {
   return 'You are reading this store\'s TikTok Shop Performance Overview dashboard for the date '
     + 'range ' + start + ' to ' + end + ' inclusive. Report the headline tile values EXACTLY as '
@@ -104,13 +108,12 @@ function buildWindowQuestion(start: string, end: string, withTop: boolean): stri
     + 'directly in your reply. Return ONLY a compact minified JSON object, no prose, no markdown '
     + 'fences, with these numeric keys (plain numbers — no currency symbols, no commas, no '
     + 'K-suffixes; null if unavailable): affiliate_gmv, value_driven, earned_media_value, '
-    + 'videos_posted, video_views, video_conversion_rate, samples_shipped'
+    + 'videos_posted, samples_shipped'
     + (withTop
       ? ', top. affiliate_gmv = the Affiliate GMV tile; '
       : '. affiliate_gmv = the Affiliate GMV tile; ')
     + 'value_driven = the Total Value Driven by Euka tile; earned_media_value = the EMV tile; '
-    + 'video_conversion_rate = the Video Conversion Rate tile as a decimal fraction (0.03 for '
-    + '3%).'
+    + 'videos_posted = the Videos Posted tile; samples_shipped = the Samples Shipped tile.'
     + (withTop
       ? ' "top" is an object {"creator_name":string,"creator_gmv":number,"product_name":string,'
         + '"product_gmv":number} — the single best creator and best product by affiliate GMV '

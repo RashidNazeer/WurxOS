@@ -18,11 +18,6 @@ function money(n) {
 function intf(n) {
   return n == null ? '—' : Number(n).toLocaleString('en-US');
 }
-function pct(n) {
-  if (n == null) return '—';
-  const v = Number(n);
-  return `${(v > 1 ? v : v * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
-}
 // Calendar window the metrics cover, ending at the sync date.
 function dateRange(iso, days) {
   if (!iso) return '';
@@ -54,11 +49,9 @@ const GROUPS = [
     ],
   },
   {
-    label: 'Content & engagement', icon: 'bi-camera-video',
+    label: 'Creator activity', icon: 'bi-camera-video',
     metrics: [
       ['videos_posted', 'Videos posted', intf],
-      ['video_views', 'Video views', intf],
-      ['video_conversion_rate', 'Video conv. rate', pct],
       ['samples_shipped', 'Samples shipped', intf],
     ],
   },
