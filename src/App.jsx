@@ -239,7 +239,7 @@ export default function App() {
               <Route
                 path="/shop-metrics"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                  <RoleGuard allow={['boss']}>
                     <EukaShopMetricsPage />
                   </RoleGuard>
                 }
