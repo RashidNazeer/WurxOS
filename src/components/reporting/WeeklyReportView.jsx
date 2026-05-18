@@ -241,14 +241,14 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
           <div style={{ fontSize: '0.7rem', color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{creator.notes}</div>
         )}
       </div>
-      <div style={{ width: 60, textAlign: 'right', fontSize: '0.82rem', color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmtN(creator.videosPosted)}</div>
-      <div style={{ width: 70, textAlign: 'right', fontSize: '0.82rem', color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmtN(creator.itemsSold)}</div>
+      <div style={{ width: 60, textAlign: 'center', fontSize: '0.82rem', color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmtN(creator.videosPosted)}</div>
+      <div style={{ width: 70, textAlign: 'center', fontSize: '0.82rem', color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmtN(creator.itemsSold)}</div>
       <div style={{ width: 110 }}>
         <div style={{ height: 6, background: C.line, borderRadius: 999, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${Math.min(100, sharePct)}%`, background: C.amber, borderRadius: 999 }} />
         </div>
       </div>
-      <div style={{ width: 90, textAlign: 'right', fontSize: '0.86rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
+      <div style={{ width: 90, textAlign: 'center', fontSize: '0.86rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
     </div>
   );
 }
@@ -266,10 +266,10 @@ function CreatorHeader() {
       <div style={{ width: 22, flexShrink: 0 }} />
       <div style={{ width: 32, flexShrink: 0 }} />
       <div className="flex-grow-1" style={{ ...cell, minWidth: 0 }}>Creator</div>
-      <div style={{ width: 60, textAlign: 'right', ...cell }}>Videos</div>
-      <div style={{ width: 70, textAlign: 'right', ...cell }}>Units Sold</div>
+      <div style={{ width: 60, textAlign: 'center', ...cell }}>Videos</div>
+      <div style={{ width: 70, textAlign: 'center', ...cell }}>Units Sold</div>
       <div style={{ width: 110, ...cell }}>GMV Share</div>
-      <div style={{ width: 90, textAlign: 'right', ...cell }}>GMV</div>
+      <div style={{ width: 90, textAlign: 'center', ...cell }}>GMV</div>
     </div>
   );
 }
