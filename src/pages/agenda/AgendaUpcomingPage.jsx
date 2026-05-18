@@ -72,6 +72,7 @@ export default function AgendaUpcomingPage() {
 
   const today = ymd(new Date());
   const currentWeekStart = ymd(mondayOf(new Date()));
+  const anyOngoing = meetings.some((m) => m.status === 'ongoing');
 
   const teamsById = useMemo(() => {
     const m = new Map();
@@ -206,6 +207,7 @@ export default function AgendaUpcomingPage() {
                 myTeamTlId={myTeamTlId}
                 today={today}
                 busyId={busyId}
+                anyOngoing={anyOngoing}
                 onStart={handleStart}
               />
             </div>
@@ -217,13 +219,18 @@ export default function AgendaUpcomingPage() {
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, myTeamTlId, today, busyId, onStart }) {
+function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }) {
   const rows = myTeamTlId
     ? card.rows.filter((r) => r.tlId === myTeamTlId)
     : card.rows;
 
   const notifiedRows = card.rows.filter((r) => r.meeting);
   const allDone = notifiedRows.length > 0 && notifiedRows.every((r) => r.meeting.status === 'completed');
+  // Once any meeting in the week has started or finished, the week is
+  // "in progress" — the remaining meetings no longer wait for their date.
+  const weekProgressed = card.rows.some(
+    (r) => r.meeting && (r.meeting.status === 'completed' || r.meeting.status === 'ongoing'),
+  );
 
   let state = 'future';
   if (card.isPast) state = 'past';
@@ -269,8 +276,12 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, onStart }) {
             </div>
           ) : rows.map((r) => {
             const mStatus = r.meeting?.status || 'not_notified';
-            const canStart = live && isOL && mStatus === 'upcoming' && today >= r.meetingDate;
-            const tooEarly = live && isOL && mStatus === 'upcoming' && today < r.meetingDate;
+            const isUpcoming = live && isOL && mStatus === 'upcoming' && !!r.meeting;
+            // Only the first meeting of the week waits for its date;
+            // after one is under way the rest can start any time.
+            const canStart    = isUpcoming && !anyOngoing && (today >= r.meetingDate || weekProgressed);
+            const waitDate    = isUpcoming && !anyOngoing && today < r.meetingDate && !weekProgressed;
+            const blockedBusy = isUpcoming && anyOngoing;
             return (
               <div key={r.tlId} className="rounded-2 p-2" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
                 <div className="d-flex align-items-center justify-content-between gap-2">
@@ -298,9 +309,14 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, onStart }) {
                       : <><i className="bi bi-play-fill" /> Start Meeting</>}
                   </button>
                 )}
-                {tooEarly && (
+                {waitDate && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
                     <i className="bi bi-hourglass-split me-1" />Can start on {fmtDate(r.meetingDate, false)}
+                  </div>
+                )}
+                {blockedBusy && (
+                  <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
+                    <i className="bi bi-lock-fill me-1" />Finish the ongoing meeting first
                   </div>
                 )}
                 {live && isOL && mStatus === 'not_notified' && (
