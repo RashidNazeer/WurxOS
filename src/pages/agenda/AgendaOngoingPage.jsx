@@ -326,9 +326,16 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, busy, o
                   style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
                   <div className="min-w-0">
                     <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem' }}>{t.title}</div>
-                    {t.brand?.brand_name && (
-                      <div className="text-muted" style={{ fontSize: '0.66rem' }}><i className="bi bi-shop me-1" />{t.brand.brand_name}</div>
-                    )}
+                    <div className="d-flex align-items-center gap-2 flex-wrap" style={{ fontSize: '0.66rem' }}>
+                      {t.brand?.brand_name && (
+                        <span className="text-muted"><i className="bi bi-shop me-1" />{t.brand.brand_name}</span>
+                      )}
+                      {t.link && (
+                        <a href={t.link} target="_blank" rel="noreferrer">
+                          <i className="bi bi-link-45deg" />View document
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <span className="rounded-pill px-2 flex-shrink-0" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>
                     {STATUS_LABEL[t.status] || t.status}
