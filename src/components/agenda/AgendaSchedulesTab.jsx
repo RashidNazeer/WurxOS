@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  listAgendaTeams, getAgendaTeamSchedules, getAgendaSettings,
+  listAgendaTeams, getAgendaTeamSchedules,
   upsertAgendaTeamSchedule, deleteAgendaTeamSchedule,
+  listAgendaMeetings, resyncWeek,
 } from '../../lib/agendaApi';
 
 // Schedules settings — OL sets each team's recurring meeting day + time.
@@ -14,23 +15,31 @@ const DAYS = [
   ['sunday', 'Sunday'],
 ];
 
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function currentWeekMonday() {
+  const x = new Date(); x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return ymd(x);
+}
+
 export default function AgendaSchedulesTab() {
-  const [teams, setTeams]   = useState([]);
-  const [draft, setDraft]   = useState({});   // tlId -> { day, time }
+  const [teams, setTeams]       = useState([]);
+  const [draft, setDraft]       = useState({});      // tlId -> { day, time }
   const [original, setOriginal] = useState({});
-  const [defaultDay, setDefaultDay] = useState('tuesday');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState('');
   const [savedTick, setSavedTick] = useState(false);
+  const [askApply, setAskApply] = useState(false);   // confirm modal open
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listAgendaTeams(), getAgendaTeamSchedules(), getAgendaSettings()])
-      .then(([tm, sched, settings]) => {
+    Promise.all([listAgendaTeams(), getAgendaTeamSchedules()])
+      .then(([tm, sched]) => {
         if (cancelled) return;
         setTeams(tm || []);
-        setDefaultDay(settings?.meeting_day || 'tuesday');
         const map = {};
         (sched || []).forEach((s) => { map[s.tl_id] = { day: s.meeting_day, time: (s.meeting_time || '').slice(0, 5) }; });
         const init = {};
@@ -47,24 +56,31 @@ export default function AgendaSchedulesTab() {
     setDraft((d) => ({ ...d, [tlId]: { ...d[tlId], ...part } }));
   }
 
-  const dirty = useMemo(
-    () => JSON.stringify(draft) !== JSON.stringify(original),
-    [draft, original],
-  );
+  const changedTeamIds = useMemo(() => {
+    return teams
+      .map(({ tl }) => tl.id)
+      .filter((id) => JSON.stringify(draft[id]) !== JSON.stringify(original[id]));
+  }, [teams, draft, original]);
 
-  async function handleSave() {
+  const dirty = changedTeamIds.length > 0;
+
+  // Persist schedule rows; optionally re-sync this week's meetings.
+  async function doSave(applyToCurrentWeek) {
+    setAskApply(false);
     setSaving(true);
     setError('');
     try {
-      for (const { tl } of teams) {
-        const cur = draft[tl.id] || { day: '', time: '' };
-        const was = original[tl.id] || { day: '', time: '' };
-        if (cur.day === was.day && cur.time === was.time) continue;
+      for (const tlId of changedTeamIds) {
+        const cur = draft[tlId] || { day: '', time: '' };
+        const was = original[tlId] || { day: '', time: '' };
         if (cur.day) {
-          await upsertAgendaTeamSchedule(tl.id, cur.day, cur.time || '15:00');
+          await upsertAgendaTeamSchedule(tlId, cur.day, cur.time || '15:00');
         } else if (was.day) {
-          await deleteAgendaTeamSchedule(tl.id);
+          await deleteAgendaTeamSchedule(tlId);
         }
+      }
+      if (applyToCurrentWeek) {
+        await resyncWeek(currentWeekMonday());
       }
       setOriginal(JSON.parse(JSON.stringify(draft)));
       setSavedTick(true);
@@ -74,6 +90,24 @@ export default function AgendaSchedulesTab() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // On save: if any changed team already has a meeting scheduled for
+  // THIS week, ask whether to apply the change to it too.
+  async function handleSaveClick() {
+    if (!dirty) return;
+    try {
+      const wk = currentWeekMonday();
+      const upcoming = await listAgendaMeetings({ status: 'upcoming' });
+      const affected = (upcoming || []).filter(
+        (m) => m.week_start === wk && changedTeamIds.includes(m.tl_id),
+      );
+      if (affected.length > 0) {
+        setAskApply(true);
+        return;
+      }
+    } catch { /* fall through to a plain save */ }
+    doSave(false);
   }
 
   if (loading) {
@@ -109,12 +143,6 @@ export default function AgendaSchedulesTab() {
                   <input type="time" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
                     value={d.time} disabled={!d.day}
                     onChange={(e) => set(tl.id, { time: e.target.value })} />
-                  {!d.day && (
-                    <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.72rem' }}
-                      onClick={() => set(tl.id, { day: defaultDay, time: d.time || '15:00' })}>
-                      Use default ({defaultDay})
-                    </button>
-                  )}
                 </div>
               </div>
             );
@@ -124,11 +152,41 @@ export default function AgendaSchedulesTab() {
 
       <div className="d-flex align-items-center gap-2 mt-3">
         <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
-          onClick={handleSave} disabled={saving || !dirty}>
+          onClick={handleSaveClick} disabled={saving || !dirty}>
           {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save schedules</>}
         </button>
         {savedTick && <span className="text-success small d-inline-flex align-items-center gap-1"><i className="bi bi-check-circle-fill" /> Saved</span>}
       </div>
+
+      {askApply && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setAskApply(false)} />
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+            <div className="card-body p-4">
+              <div className="d-flex align-items-start gap-3 mb-3">
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#eef2ff' }}>
+                  <i className="bi bi-calendar-week text-primary" style={{ fontSize: '1rem' }} />
+                </div>
+                <div>
+                  <p className="fw-semibold mb-0 small">Apply to this week?</p>
+                  <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
+                    This week’s meetings have already been scheduled. Should the new day/time apply to them as well, or only to upcoming weeks?
+                  </p>
+                </div>
+              </div>
+              <div className="d-flex gap-2 justify-content-end flex-wrap">
+                <button className="btn btn-sm btn-outline-secondary px-3" onClick={() => setAskApply(false)} disabled={saving}>Cancel</button>
+                <button className="btn btn-sm btn-outline-primary px-3" onClick={() => doSave(false)} disabled={saving}>
+                  Only upcoming weeks
+                </button>
+                <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={() => doSave(true)} disabled={saving}>
+                  <i className="bi bi-check-lg" /> Apply to this week too
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
