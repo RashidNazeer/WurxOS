@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import WeeklyReportView from '../reporting/WeeklyReportView';
 import MonthlyReportView from '../reporting/MonthlyReportView';
 import BrandSectionsPanel from './BrandSectionsPanel';
+import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 
 /**
  * Public reports viewer for the client portal — exact match to v1's
@@ -18,7 +19,30 @@ import BrandSectionsPanel from './BrandSectionsPanel';
  * every approved report. We match that here.
  */
 
-function num(v) { const n = parseFloat(v); return Number.isNaN(n) ? 0 : n; }
+// Tolerant numeric parse — strips currency symbols, thousands
+// separators and stray characters before parsing, so a value stored
+// as "£4,398.45" or "4,398.45" reads correctly instead of as 4 or 0.
+function num(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (v == null) return 0;
+  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  return Number.isNaN(n) ? 0 : n;
+}
+
+// Headline metrics for a report card. Weekly / bi-weekly keep them
+// in `overallPerformance`; monthly keeps them in `totalSales` /
+// `keyMetrics` / `kpis`. Reading only `overallPerformance` is what
+// made monthly cards show 0 / 0. ROI is only tracked on weekly /
+// bi-weekly reports.
+function reportMetrics(r) {
+  const op = (r && r.overallPerformance) || {};
+  const gmv = num(op.gmv) || num(r?.totalSales?.monthGmv) || num(r?.keyMetrics?.gmv);
+  const orders = num(op.orders) || num(r?.keyMetrics?.orders) || num(r?.kpis?.totalOrders);
+  const roiRaw = op.roi;
+  const hasRoi = roiRaw != null && roiRaw !== ''
+    && !Number.isNaN(parseFloat(String(roiRaw).replace(/[^0-9.-]/g, '')));
+  return { gmv, orders, roi: num(roiRaw), hasRoi };
+}
 
 // Convert a row from get_client_access (snake_case, flattened) into the
 // v1-style shape that WeeklyReportView / MonthlyReportView expect.
@@ -288,11 +312,12 @@ export default function ClientReportsSection({
             <div className="row g-3">
               {brandReports.map(r => {
                 const prev = findPreviousReport(brandReports, r);
-                const perf = r.overallPerformance || {};
-                const prevPerf = prev?.overallPerformance || {};
-                const gmvChange = num(prevPerf.gmv)
-                  ? (((num(perf.gmv) - num(prevPerf.gmv)) / num(prevPerf.gmv)) * 100)
+                const m = reportMetrics(r);
+                const prevM = prev ? reportMetrics(prev) : null;
+                const gmvChange = prevM && prevM.gmv
+                  ? (((m.gmv - prevM.gmv) / prevM.gmv) * 100)
                   : null;
+                const sym = currencySymbol(r.currency || DEFAULT_CURRENCY);
                 const label = r.weekLabel || r.periodLabel || r.monthLabel || '—';
                 return (
                   <div key={r.id} className="col-md-6 col-lg-4">
@@ -310,19 +335,19 @@ export default function ClientReportsSection({
                           <div>
                             <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>GMV</div>
                             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
-                              ${Number(num(perf.gmv)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              {sym}{Number(m.gmv).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
                           </div>
                           <div>
                             <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>ORDERS</div>
                             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
-                              {Number(num(perf.orders)).toLocaleString()}
+                              {Number(m.orders).toLocaleString()}
                             </div>
                           </div>
                           <div>
                             <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>ROI</div>
                             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
-                              {num(perf.roi).toFixed(2)}
+                              {m.hasRoi ? m.roi.toFixed(2) : '—'}
                             </div>
                           </div>
                         </div>
