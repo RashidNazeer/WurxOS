@@ -51,6 +51,7 @@ export default function AgendaOngoingPage() {
   const [justFinished, setJustFinished] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [busy, setBusy]               = useState('');
+  const [finishModalOpen, setFinishModalOpen] = useState(false);
 
   async function refresh() {
     try {
@@ -109,6 +110,12 @@ export default function AgendaOngoingPage() {
   );
   const presentCount = attendance.filter((a) => a.status === 'present').length;
   const absentCount  = attendance.filter((a) => a.status === 'absent').length;
+  // Present APCs who have not presented — flagged before finishing.
+  const pendingPresent = useMemo(
+    () => apcs.filter((a) => attMap[a.id] === 'present'
+      && (!presMap[a.id] || presMap[a.id].status === 'pending')),
+    [apcs, attMap, presMap],
+  );
 
   async function handleMark(apcId, status) {
     setBusy(`att-${apcId}`);
@@ -128,8 +135,14 @@ export default function AgendaOngoingPage() {
     catch (e) { alert(e.message || 'Failed to stop presenting'); }
     finally { setBusy(''); }
   }
-  async function handleFinish() {
+  function handleFinishClick() {
+    // If any present APC never presented, confirm via the modal first.
+    if (pendingPresent.length > 0) { setFinishModalOpen(true); return; }
     if (!window.confirm('Finish this meeting? This ends the session for everyone.')) return;
+    doFinish();
+  }
+  async function doFinish() {
+    setFinishModalOpen(false);
     setBusy('finish');
     try { await finishMeeting(meeting.id); setJustFinished(true); await refresh(); }
     catch (e) { alert(e.message || 'Failed to finish meeting'); }
@@ -220,7 +233,7 @@ export default function AgendaOngoingPage() {
         {isOL && (
           <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 8, fontSize: '0.8rem' }}
-            onClick={handleFinish} disabled={busy === 'finish'}>
+            onClick={handleFinishClick} disabled={busy === 'finish'}>
             {busy === 'finish'
               ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
               : <><i className="bi bi-check2-circle" /> Finish Meeting</>}
@@ -337,6 +350,49 @@ export default function AgendaOngoingPage() {
           <div className="card-body p-3 text-muted small">
             <i className="bi bi-info-circle me-1" />
             Mark attendance above. The OL is running the presentation review.
+          </div>
+        </div>
+      )}
+
+      {/* Finish-meeting guard — present APCs who never presented */}
+      {finishModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+            <div className="card-body p-4">
+              <div className="d-flex align-items-start gap-3 mb-3">
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff3e0' }}>
+                  <i className="bi bi-exclamation-triangle text-warning" style={{ fontSize: '1rem' }} />
+                </div>
+                <div>
+                  <p className="fw-semibold mb-0 small">Finish meeting?</p>
+                  <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
+                    These present APCs have not presented yet:
+                  </p>
+                </div>
+              </div>
+              <div className="d-flex flex-wrap gap-1 mb-3">
+                {pendingPresent.map((a) => (
+                  <span key={a.id} className="rounded-pill px-2 py-1" style={{ background: '#fff3e0', color: '#9a3412', fontSize: '0.72rem', fontWeight: 600 }}>
+                    {a.display_name}
+                  </span>
+                ))}
+              </div>
+              <div className="rounded-2 p-2 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.76rem', color: '#475569' }}>
+                <i className="bi bi-info-circle me-1" />
+                Finishing now will mark them as <strong>Presented</strong> with no review or remarks.
+              </div>
+              <div className="d-flex gap-2 justify-content-end">
+                <button className="btn btn-sm btn-outline-secondary px-3" onClick={() => setFinishModalOpen(false)} disabled={busy === 'finish'}>
+                  Cancel
+                </button>
+                <button className="btn btn-sm btn-success px-3 d-inline-flex align-items-center gap-1" onClick={doFinish} disabled={busy === 'finish'}>
+                  {busy === 'finish'
+                    ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
+                    : <><i className="bi bi-check2-circle" /> Finish meeting anyway</>}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
