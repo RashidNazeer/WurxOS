@@ -37,20 +37,14 @@ function relTime(iso) {
 }
 
 // Metric groups — each entry is [key, label, formatter]. Only the
-// metrics Euka's MCP reports accurately (verified against the
-// Performance Overview dashboard to within ~2%) are listed.
+// metrics Euka's MCP returns consistently and accurately (bit-
+// identical across repeated pulls, matching the Performance
+// Overview dashboard) are listed.
 const GROUPS = [
   {
-    label: 'Affiliate sales (creator-driven)', icon: 'bi-cash-stack',
+    label: 'Affiliate performance (creator-driven)', icon: 'bi-cash-stack',
     metrics: [
       ['affiliate_gmv', 'Affiliate GMV', money],
-      ['value_driven', 'Value driven by Euka', money],
-      ['earned_media_value', 'Earned media value', money],
-    ],
-  },
-  {
-    label: 'Creator activity', icon: 'bi-camera-video',
-    metrics: [
       ['videos_posted', 'Videos posted', intf],
       ['samples_shipped', 'Samples shipped', intf],
     ],
@@ -145,9 +139,11 @@ export default function EukaShopMetricsPage() {
           style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.72rem' }}>
           <i className="bi bi-info-circle mt-1" />
           <span style={{ color: 'var(--text-secondary)' }}>
-            These are <strong>affiliate / creator-driven</strong> figures from Euka. All-channels
-            Total GMV, Orders and AOV are not shown — Euka’s API has no data source for them, so
-            only metrics it reports accurately are displayed. Creator data can lag 1–2 days.
+            These are <strong>affiliate / creator-driven</strong> figures from Euka — only the
+            metrics Euka’s API returns consistently and accurately are shown. All-channels Total
+            GMV / Orders / AOV, and Euka’s computed attribution metrics (Value Driven, EMV, video
+            views), are omitted because the API reports them unreliably. Creator data can lag
+            1–2 days.
           </span>
         </div>
       )}

@@ -86,20 +86,21 @@ async function mcp(method: string, params?: unknown, isNotification = false): Pr
   return reply.result;
 }
 
-// The metrics question. We ONLY ask for the tiles that Euka's MCP
-// reports accurately (verified against the Performance Overview
-// dashboard to within ~2%): the affiliate / creator-driven and
-// Euka-attribution metrics. Total GMV / Orders / AOV are NOT asked
-// for — Euka's API has no all-channels revenue data, so those come
-// back ~15-30% low and are deliberately excluded.
+// The metrics question. query_store_data is an LLM and answers
+// non-deterministically, so we ONLY ask for the metrics that came
+// back bit-identical across repeated pulls and matched the Euka
+// Performance Overview dashboard: Affiliate GMV, Videos Posted,
+// Samples Shipped (all sourced straight from the affiliate table).
 //
-// View-based metrics (video_views, conversion rate) are excluded —
-// query_store_data miscounts them ~8x even per-window, so only the
-// aggregate tiles it reads reliably are requested.
+// Deliberately NOT asked for, because query_store_data returns them
+// inconsistently (a different value each run):
+//   • Total GMV / Orders / AOV — no all-channels data source at all
+//   • Value Driven by Euka / EMV — computed attribution, flips run
+//     to run (e.g. EMV 1383 vs 162)
+//   • video_views / conversion rate — miscounted ~8x
 //
 // One window per query_store_data call: asking for two date ranges
-// at once makes the LLM approximate even harder. A single pinned
-// window keeps the aggregate tiles within ~2% of the dashboard.
+// at once degrades accuracy further.
 function buildWindowQuestion(start: string, end: string, withTop: boolean): string {
   return 'You are reading this store\'s TikTok Shop Performance Overview dashboard for the date '
     + 'range ' + start + ' to ' + end + ' inclusive. Report the headline tile values EXACTLY as '
@@ -107,13 +108,10 @@ function buildWindowQuestion(start: string, end: string, withTop: boolean): stri
     + 'use the dashboard\'s own aggregated numbers. DO NOT save anything to a file; put the JSON '
     + 'directly in your reply. Return ONLY a compact minified JSON object, no prose, no markdown '
     + 'fences, with these numeric keys (plain numbers — no currency symbols, no commas, no '
-    + 'K-suffixes; null if unavailable): affiliate_gmv, value_driven, earned_media_value, '
-    + 'videos_posted, samples_shipped'
-    + (withTop
-      ? ', top. affiliate_gmv = the Affiliate GMV tile; '
-      : '. affiliate_gmv = the Affiliate GMV tile; ')
-    + 'value_driven = the Total Value Driven by Euka tile; earned_media_value = the EMV tile; '
-    + 'videos_posted = the Videos Posted tile; samples_shipped = the Samples Shipped tile.'
+    + 'K-suffixes; null if unavailable): affiliate_gmv, videos_posted, samples_shipped'
+    + (withTop ? ', top. ' : '. ')
+    + 'affiliate_gmv = the Affiliate GMV tile; videos_posted = the Videos Posted tile; '
+    + 'samples_shipped = the Samples Shipped tile.'
     + (withTop
       ? ' "top" is an object {"creator_name":string,"creator_gmv":number,"product_name":string,'
         + '"product_gmv":number} — the single best creator and best product by affiliate GMV '
@@ -136,7 +134,7 @@ function tryParseObj(text: string): any | null {
   try {
     const o = JSON.parse(m[0]);
     if (o && typeof o === 'object'
-      && ('affiliate_gmv' in o || 'video_views' in o || 'value_driven' in o)) return o;
+      && ('affiliate_gmv' in o || 'videos_posted' in o || 'samples_shipped' in o)) return o;
   } catch { /* not JSON */ }
   return null;
 }
