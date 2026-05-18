@@ -1063,7 +1063,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           </h5>
           <p className="text-muted small mb-0 d-flex align-items-center gap-2 flex-wrap">
             <span style={{ overflowWrap: 'anywhere' }}>{brandLabel} — {selectedWeek?.label}</span>
-            {editReportId && (
+            {editReportId && userRole === 'ol' && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                 style={{ borderRadius: 6, fontSize: '0.65rem', padding: '1px 8px' }}
                 onClick={handleChangeWeek} title="Move this report to a different week">
