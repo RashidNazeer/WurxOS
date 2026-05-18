@@ -95,6 +95,7 @@ const AgendaSettingsPage    = lazy(() => import('./pages/agenda/AgendaSettingsPa
 const AgendaUpcomingPage    = lazy(() => import('./pages/agenda/AgendaUpcomingPage'));
 const AgendaOngoingPage     = lazy(() => import('./pages/agenda/AgendaOngoingPage'));
 const AgendaPriorPage       = lazy(() => import('./pages/agenda/AgendaPriorPage'));
+const EukaShopMetricsPage   = lazy(() => import('./pages/euka/EukaShopMetricsPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -232,6 +233,14 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
                     <AgendaPriorPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/shop-metrics"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                    <EukaShopMetricsPage />
                   </RoleGuard>
                 }
               />
