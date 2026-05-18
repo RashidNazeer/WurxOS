@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
-  listAgendaTasks, markAttendance, startPresenting, stopPresenting, finishMeeting,
-  subscribeAgendaMeetings, subscribeAgendaRoom,
+  listAgendaTasks, markAttendance, startPresenting, stopPresenting,
+  startMeeting, finishMeeting, subscribeAgendaMeetings, subscribeAgendaRoom,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 
@@ -13,6 +13,25 @@ import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 // for every participant with no manual refresh.
 
 const STATUS_LABEL = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function mondayStr() {
+  const x = new Date(); x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return ymd(x);
+}
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function fmtTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':');
+  let hh = Number(h); const ap = hh >= 12 ? 'PM' : 'AM'; hh = hh % 12 || 12;
+  return `${hh}:${m} ${ap}`;
+}
 
 export default function AgendaOngoingPage() {
   const { user, profile } = useAuth();
@@ -27,19 +46,29 @@ export default function AgendaOngoingPage() {
   const [attendance, setAttendance]   = useState([]);
   const [presentations, setPresentations] = useState([]);
   const [myTasks, setMyTasks]         = useState([]);
+  const [weekUpcoming, setWeekUpcoming] = useState([]);
+  const [allTeams, setAllTeams]       = useState([]);
+  const [justFinished, setJustFinished] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [busy, setBusy]               = useState('');
 
   async function refresh() {
     try {
-      const ongoing = await listAgendaMeetings({ status: 'ongoing' });
+      const [ongoing, upcoming, teams] = await Promise.all([
+        listAgendaMeetings({ status: 'ongoing' }),
+        listAgendaMeetings({ status: 'upcoming' }),
+        listAgendaTeams(),
+      ]);
+      setAllTeams(teams);
+      const wk = mondayStr();
+      setWeekUpcoming((upcoming || []).filter((m) => m.week_start === wk));
       const m = ongoing[0] || null;
       if (!m) {
         setMeeting(null); setTeam(null); setAttendance([]); setPresentations([]);
         return;
       }
-      const [teams, att, pres] = await Promise.all([
-        listAgendaTeams(), listMeetingAttendance(m.id), listPresentations(m.id),
+      const [att, pres] = await Promise.all([
+        listMeetingAttendance(m.id), listPresentations(m.id),
       ]);
       setMeeting(m);
       setTeam(teams.find((t) => t.tl.id === m.tl_id) || null);
@@ -102,8 +131,14 @@ export default function AgendaOngoingPage() {
   async function handleFinish() {
     if (!window.confirm('Finish this meeting? This ends the session for everyone.')) return;
     setBusy('finish');
-    try { await finishMeeting(meeting.id); await refresh(); }
+    try { await finishMeeting(meeting.id); setJustFinished(true); await refresh(); }
     catch (e) { alert(e.message || 'Failed to finish meeting'); }
+    finally { setBusy(''); }
+  }
+  async function handleStartMeeting(meetingId) {
+    setBusy(`start-${meetingId}`);
+    try { setJustFinished(false); await startMeeting(meetingId); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to start meeting'); }
     finally { setBusy(''); }
   }
 
@@ -118,6 +153,9 @@ export default function AgendaOngoingPage() {
   }
 
   if (!meeting) {
+    const teamsById = {};
+    allTeams.forEach((t) => { teamsById[t.tl.id] = t; });
+    const showNextUp = isOL && weekUpcoming.length > 0;
     return (
       <div style={{ padding: '32px 32px 48px' }}>
         <div className="mb-4">
@@ -126,16 +164,36 @@ export default function AgendaOngoingPage() {
             Ongoing Meetings
           </h5>
         </div>
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
-            <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
+
+        {justFinished && (
+          <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
+            style={{ background: '#e6f4ea', border: '1px solid #b7dfc4' }}>
+            <i className="bi bi-check2-circle text-success" style={{ fontSize: '1.3rem' }} />
+            <div>
+              <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#166534' }}>Meeting finished</div>
+              <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                {showNextUp ? 'Start the next team right here — no need to leave this page.'
+                  : 'All scheduled meetings for this week are done.'}
+              </div>
+            </div>
           </div>
-          <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
-          <p className="text-muted small mb-2">
-            {isOL ? 'Start a team meeting from Upcoming Meetings.' : 'You’ll see your team’s meeting here the moment it starts.'}
-          </p>
-          {isOL && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
-        </div>
+        )}
+
+        {showNextUp ? (
+          <NextUpPanel meetings={weekUpcoming} teamsById={teamsById}
+            busy={busy} onStart={handleStartMeeting} />
+        ) : (
+          <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
+            <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+              <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
+            </div>
+            <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
+            <p className="text-muted small mb-2">
+              {isOL ? 'No more meetings scheduled for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
+            </p>
+            {isOL && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
+          </div>
+        )}
       </div>
     );
   }
@@ -283,6 +341,63 @@ export default function AgendaOngoingPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Next-up panel (OL, shown after finishing) ───────────────────────────
+function NextUpPanel({ meetings, teamsById, busy, onStart }) {
+  const sorted = [...meetings].sort((a, b) =>
+    `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`));
+  return (
+    <>
+      <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
+        <i className="bi bi-arrow-right-circle text-primary" />Next up this week
+      </div>
+      <div className="row g-3">
+        {sorted.map((m, i) => {
+          const team = teamsById[m.tl_id];
+          const apcs = team?.apcs || [];
+          const isNext = i === 0;
+          return (
+            <div key={m.id} className="col-12 col-md-6 col-xl-4">
+              <div className="card border-0 shadow-sm h-100"
+                style={{ borderRadius: 14, border: isNext ? '2px solid #6366f1' : '1px solid #e2e8f0' }}>
+                <div className="card-body p-3 d-flex flex-column">
+                  {isNext && (
+                    <span className="rounded-pill px-2 py-1 mb-2 align-self-start"
+                      style={{ background: '#eef2ff', color: '#4f46e5', fontSize: '0.6rem', fontWeight: 800 }}>
+                      NEXT
+                    </span>
+                  )}
+                  <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#1a1a2e' }}>
+                    {team?.tl?.display_name || m.tl?.display_name || 'Team'}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                    <i className="bi bi-people me-1" />{apcs.length} APC{apcs.length === 1 ? '' : 's'}
+                    {' · '}<i className="bi bi-calendar3 me-1" />{fmtDate(m.meeting_date)}
+                    {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)}
+                  </div>
+                  {apcs.length > 0 && (
+                    <div className="text-muted mt-1" style={{ fontSize: '0.66rem' }}>
+                      {apcs.map((a) => a.display_name).filter(Boolean).join(', ')}
+                    </div>
+                  )}
+                  <div style={{ flexGrow: 1 }} />
+                  <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                    disabled={busy === `start-${m.id}`}
+                    onClick={() => onStart(m.id)}>
+                    {busy === `start-${m.id}`
+                      ? <span className="spinner-border spinner-border-sm" />
+                      : <><i className="bi bi-play-fill" /> Start Meeting</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
