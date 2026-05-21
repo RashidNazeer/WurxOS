@@ -28,6 +28,7 @@ const LEAVE_TYPES = [
 
 const STATUS_CFG = {
   pending_tl:   { label: 'Pending TL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
+  pending_pctl: { label: 'Pending PCTL', color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
   pending_ol:   { label: 'Pending OL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
   pending_boss: { label: 'Pending Boss', color: '#6610f2', bg: '#f0ebff', icon: 'bi-hourglass-split' },
   approved:     { label: 'Approved',     color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle-fill' },
@@ -582,12 +583,20 @@ export default function LeaveRequestPage() {
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
   const apcProfile = (userRole === 'apc' || userRole === 'ipc') ? { userName: profile?.display_name || '', ownerId: profile?.owner_id || null } : null;
-  const effectiveRole = userRole === 'tl' ? 'tl' : userRole === 'ol' ? 'ol' : userRole === 'boss' ? 'boss' : (apcProfile ? 'apc' : (userRole || 'tl'));
+  const effectiveRole = userRole === 'tl' ? 'tl'
+    : userRole === 'pctl' ? 'pctl'
+    : userRole === 'ol' ? 'ol'
+    : userRole === 'boss' ? 'boss'
+    : (apcProfile ? 'apc' : (userRole || 'tl'));
   const isApc  = effectiveRole === 'apc';
   const isTL   = effectiveRole === 'tl';
+  const isPCTL = effectiveRole === 'pctl';
   const isOL   = effectiveRole === 'ol';
   const isBoss = effectiveRole === 'boss';
-  const canReviewTeam = isTL || isOL;
+  // PCTL reviews their IPC team's leave the same way a TL reviews
+  // their APC team's. Without this flag PCTL would never see the
+  // Team tab or get an Approve button on an IPC's pending request.
+  const canReviewTeam = isTL || isPCTL || isOL;
 
   const [activeTab,  setActiveTab]  = useState('my');
   // Month scope shared by the My + Team tabs (default: current month).
@@ -828,7 +837,7 @@ export default function LeaveRequestPage() {
           if (isOL) {
             if (!r.status.startsWith('pending')) return false;
           } else {
-            const ps = 'pending_tl';
+            const ps = isPCTL ? 'pending_pctl' : 'pending_tl';
             if (r.status !== ps) return false;
           }
         } else if (statusFilter === 'approved') {
@@ -881,9 +890,10 @@ export default function LeaveRequestPage() {
   // pending_tl; OL acts on pending_ol. Requests already forwarded to
   // Boss (pending_boss) shouldn't inflate the OL's queue badge.
   const teamPendingCount = useMemo(() => {
-    if (isOL) return monthTeamRequests.filter(r => r.status === 'pending_ol').length;
+    if (isOL)   return monthTeamRequests.filter(r => r.status === 'pending_ol').length;
+    if (isPCTL) return monthTeamRequests.filter(r => r.status === 'pending_pctl').length;
     return monthTeamRequests.filter(r => r.status === 'pending_tl').length;
-  }, [monthTeamRequests, isOL]);
+  }, [monthTeamRequests, isOL, isPCTL]);
 
   function renderRequestCard(r, showActions = false) {
     const catCfg = getCatCfg(r.category);
@@ -1062,6 +1072,7 @@ export default function LeaveRequestPage() {
                 // the OL was previously able to click Approve on requests
                 // already forwarded to Boss and get "not authorized".
                 (isTL && r.status === 'pending_tl') ||
+                (isPCTL && r.status === 'pending_pctl') ||
                 (isOL && r.status === 'pending_ol')
               ) && (
                 <div className="d-flex gap-1">

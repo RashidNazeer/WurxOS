@@ -50,6 +50,7 @@ function getRequestTitle(r) {
 
 const STATUS_CFG = {
   pending_tl:   { label: 'Pending TL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
+  pending_pctl: { label: 'Pending PCTL', color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
   pending_ol:   { label: 'Pending OL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
   pending_boss: { label: 'Pending You',  color: '#6610f2', bg: '#f0ebff', icon: 'bi-hourglass-split' },
   approved:     { label: 'Approved',     color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle-fill' },

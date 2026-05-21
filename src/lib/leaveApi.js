@@ -332,13 +332,17 @@ function mapTypeToCategory(type) {
 function mapStatusToV1(status, current_level, requester_role) {
   if (status === 'pending') {
     const r = requester_role || 'apc';
-    if (r === 'apc' || r === 'ipc') {
-      // APC/IPC chain (per mig 169): APC → TL → Boss. OL is not in
-      // the chain. Forward from TL bumps current_level straight to 3.
-      // A level 2 row would only exist for an in-flight request from
-      // before mig 169 ran; treat it as pending_boss too so OL never
-      // sees Approve/Reject for an APC's leave.
+    if (r === 'apc') {
+      // APC chain (per mig 169): APC → TL → Boss. OL is not in the
+      // chain. Forward from TL bumps current_level straight to 3.
       if (current_level === 1) return 'pending_tl';
+      return 'pending_boss';
+    }
+    if (r === 'ipc') {
+      // IPC chain: IPC → PCTL → Boss (PCTL is the IPC's reports_to).
+      // Use a distinct status label so the UI shows "Pending PCTL"
+      // and the PCTL's Team tab/Approve button targets it correctly.
+      if (current_level === 1) return 'pending_pctl';
       return 'pending_boss';
     }
     if (r === 'tl' || r === 'pctl') {
