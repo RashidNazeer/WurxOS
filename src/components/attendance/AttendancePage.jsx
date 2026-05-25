@@ -147,15 +147,19 @@ function MyMonthlyAttendance({ userId, displayName }) {
         const startStr = `${year}-${pad(month + 1)}-01`;
         const endStr   = `${year}-${pad(month + 1)}-${pad(monthEnd.getDate())}`;
 
-        // Total days in the month (28/30/31). Every day must be
-        // "covered" — weekends/holidays/approved-leaves are auto-
-        // credited so only weekdays the user was expected to clock
-        // in on and didn't drag the score down.
-        const workingDays = monthEnd.getDate();
-        // Set of all weekend (Sat/Sun) dates in the month — joins the
-        // coverage set so the user gets automatic credit for them.
+        // Days elapsed in the month — this is the denominator.
+        // Current month: today (inclusive). Past month: full month.
+        // Using elapsed days (not the full month) prevents the score
+        // from claiming credit for tomorrow's weekend / a future
+        // holiday / a future approved-leave day before they happen.
+        const isCurrentMonth = (now.getFullYear() === year && now.getMonth() === month);
+        const cutoffDate = isCurrentMonth ? new Date(year, month, now.getDate()) : monthEnd;
+        const cutoffYmd  = `${cutoffDate.getFullYear()}-${pad(cutoffDate.getMonth() + 1)}-${pad(cutoffDate.getDate())}`;
+        const workingDays = cutoffDate.getDate();
+        // Past-only weekend set — only Sat/Sun dates that have
+        // already elapsed get the auto-credit.
         const weekendDates = new Set();
-        for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+        for (let d = new Date(monthStart); d <= cutoffDate; d.setDate(d.getDate() + 1)) {
           const dow = d.getDay();
           if (dow === 0 || dow === 6) {
             weekendDates.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
@@ -179,21 +183,22 @@ function MyMonthlyAttendance({ userId, displayName }) {
           adjustments = (await getAdjustmentsForMonth(monthStrKey)).filter(a => a.userId === userId);
         } catch { /* non-fatal — fall back to actual */ }
 
-        // Company holidays in the month — same Set the Performance
-        // tab uses. Holidays count toward "covered" so an Eid week
-        // doesn't drag the user's percentage down.
-        let holidaySet = new Set();
-        try { holidaySet = await listHolidayDatesForMonth(monthStrKey); }
+        // Company holidays in the month — clipped to past so a
+        // future holiday doesn't pre-credit the score today.
+        let holidaySetAll = new Set();
+        try { holidaySetAll = await listHolidayDatesForMonth(monthStrKey); }
         catch { /* non-fatal */ }
+        const holidaySet = new Set([...holidaySetAll].filter(d => d <= cutoffYmd));
 
         // Approved leaves overlapping this month, expanded day-by-
-        // day (Mon-Fri only). WFH is excluded (remote work is not an
-        // absence); holidays are excluded too so they don't double-
-        // count against the separate holiday tally below.
-        let leaveDates = new Set();
+        // day (Mon-Fri only). WFH is excluded (remote work is not
+        // an absence); holidays are excluded so they don't double-
+        // count against the separate holiday tally. Past-only too.
+        let leaveDatesAll = new Set();
         try {
-          leaveDates = await listApprovedLeaveDatesForMonth(userId, monthStrKey, { holidaySet });
+          leaveDatesAll = await listApprovedLeaveDatesForMonth(userId, monthStrKey, { holidaySet: holidaySetAll });
         } catch { /* non-fatal */ }
+        const leaveDates = new Set([...leaveDatesAll].filter(d => d <= cutoffYmd));
 
         // Effective present days = union of actual present dates and any
         // dates manually marked by Boss/OL. Same math as the Roster tab.
@@ -745,6 +750,19 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     }
     return out;
   }, [month]);
+  // Inclusive cutoff "YYYY-MM-DD" — every credit-set in the rows
+  // memo is filtered against this so future holidays / leaves can't
+  // pre-credit a user's coverage before the day actually happens.
+  const cutoffYmd = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    if (today.getFullYear() === y && today.getMonth() + 1 === m) {
+      return `${y}-${pad(m)}-${pad(today.getDate())}`;
+    }
+    return `${y}-${pad(m)}-${pad(lastDay)}`;
+  }, [month]);
 
   // Month bounds for clipping leave ranges that extend past the month edges.
   const monthBounds = useMemo(() => {
@@ -781,7 +799,11 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
         );
         days.forEach((d) => leaveDateSet.add(d));
       });
-      const leaveDays = leaveDateSet.size;
+      // Clip leaves and holidays to days that have actually
+      // elapsed — future credits don't inflate the score.
+      const pastLeaveSet = new Set([...leaveDateSet].filter((d) => d <= cutoffYmd));
+      const pastHolidaySet = new Set([...holidaySet].filter((d) => d <= cutoffYmd));
+      const leaveDays = pastLeaveSet.size;
       // Days where leave overlaps with a clock-in (informational; calendar
       // shows them with a small blue dot on the green tile).
       const leaveOverlapCount = [...leaveDateSet].filter(d => presentDateSet.has(d)).length;
@@ -794,7 +816,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
         ...userAdj.map(a => a.date).filter(Boolean),
       ]);
       const coverageSet = new Set([
-        ...presentForCoverage, ...leaveDateSet, ...holidaySet, ...weekendDatesInMonth,
+        ...presentForCoverage, ...pastLeaveSet, ...pastHolidaySet, ...weekendDatesInMonth,
       ]);
       const covered = coverageSet.size;
       let health = 'green';
@@ -822,7 +844,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     }
     if (filterRole) filtered = filtered.filter(r => (r.user.role || '').toLowerCase() === filterRole);
     return filtered.sort((a, b) => (a.user.name || '').localeCompare(b.user.name || ''));
-  }, [expectedMembers, records, adjustments, leaves, holidaySet, weekendDatesInMonth, monthBounds, workingDaysInMonth, search, filterRole]);
+  }, [expectedMembers, records, adjustments, leaves, holidaySet, weekendDatesInMonth, cutoffYmd, monthBounds, workingDaysInMonth, search, filterRole]);
 
   function canEdit(targetUser) {
     if (isBoss) return true;

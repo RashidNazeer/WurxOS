@@ -126,20 +126,46 @@ function calcAttendanceScore(coveredDays, workingDays) {
 }
 
 /**
- * Total calendar days for a month string "YYYY-MM" (28/30/31).
- * The attendance score uses this as the denominator: every day of
- * the month must be "covered" by either a clock-in, an approved
- * leave, a company holiday, or a weekend — only weekdays the user
- * was expected to work and didn't drag the score down.
+ * Days elapsed in the month — the attendance-score denominator.
+ *   • Current month → today's day-of-month (inclusive).
+ *   • Past months   → the full month's last day.
+ *   • Future months → 0 (nothing has happened).
  *
- * (Kept the function name `workingDaysInMonth` so all downstream
- *  variable names like `workingDays` still read sensibly; the
- *  semantics changed from Mon-Fri to total calendar days.)
+ * Using elapsed days (not full month) prevents the score from
+ * claiming credit for future weekends / holidays / leaves before
+ * they have actually occurred.
  */
 function workingDaysInMonth(monthStr) {
   if (!monthStr) return 0;
   const [y, m] = monthStr.split('-').map(Number);
+  const today = new Date();
+  const firstOfMonth = new Date(y, m - 1, 1);
+  if (today < firstOfMonth) return 0;
+  if (today.getFullYear() === y && today.getMonth() + 1 === m) return today.getDate();
   return new Date(y, m, 0).getDate();
+}
+
+/** "YYYY-MM-DD" string for the inclusive end of the elapsed window. */
+function cutoffYmdForMonth(monthStr) {
+  if (!monthStr) return '0000-01-01';
+  const [y, m] = monthStr.split('-').map(Number);
+  const today = new Date();
+  const firstOfMonth = new Date(y, m - 1, 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  if (today < firstOfMonth) return '0000-01-01';
+  if (today.getFullYear() === y && today.getMonth() + 1 === m) {
+    return `${y}-${pad(m)}-${pad(today.getDate())}`;
+  }
+  const lastDay = new Date(y, m, 0).getDate();
+  return `${y}-${pad(m)}-${pad(lastDay)}`;
+}
+
+/** Keep only dates on or before the cutoff (inclusive). */
+function clipDateSet(set, cutoffYmd) {
+  const out = new Set();
+  if (!cutoffYmd || !set) return out;
+  for (const d of set) if (d <= cutoffYmd) out.add(d);
+  return out;
 }
 
 /** Count of Sat + Sun in a month — auto-credited toward "covered". */
@@ -1165,19 +1191,28 @@ export default function PerformancePage() {
           );
           days.forEach((d) => myLeaveDates.add(d));
         });
+        // Clip every credit-set to days that have actually elapsed.
+        // For the current month, that's today inclusive; for past
+        // months the whole month is elapsed; for future months
+        // nothing has elapsed. This prevents the score from
+        // claiming credit for tomorrow's weekend / next week's
+        // holiday / a future approved-leave day.
+        const cutoffYmd = cutoffYmdForMonth(month);
+        const myWeekendSet = clipDateSet(weekendDateSetInMonth(month), cutoffYmd);
+        const myHolidayClipped = clipDateSet(myHolidaySet, cutoffYmd);
+        const myLeaveClipped   = clipDateSet(myLeaveDates, cutoffYmd);
         // Set-union of every "covered" date — clock-ins, approved
         // leaves, holidays, weekends. Counts each date once so a
-        // clock-in on a holiday (or any other overlap) doesn't get
-        // counted twice and inflate the score.
-        const myWeekendSet = weekendDateSetInMonth(month);
+        // clock-in on a holiday (or any other overlap) is not
+        // counted twice and cannot inflate the score.
         const myCoveredSet = new Set([
-          ...myEffectiveSet, ...myLeaveDates, ...myHolidaySet, ...myWeekendSet,
+          ...myEffectiveSet, ...myLeaveClipped, ...myHolidayClipped, ...myWeekendSet,
         ]);
         setMyAttendanceDays({
           actual: myActual,
           effective: myEffective,
-          leaveDays: myLeaveDates.size,
-          holidayDays: myHolidaySet.size,
+          leaveDays: myLeaveClipped.size,
+          holidayDays: myHolidayClipped.size,
           weekendDays: myWeekendSet.size,
           coveredDays: myCoveredSet.size,
         });
@@ -1223,7 +1258,12 @@ export default function PerformancePage() {
 
         const teamHolidaySet = await listHolidayDatesForMonth(month).catch(() => new Set());
 
-        const teamWeekendSet = weekendDateSetInMonth(month);
+        // Clip credit-sets to days that have elapsed in `month`, so
+        // future weekends / holidays / leaves don't pre-credit the
+        // score during the current month.
+        const teamCutoffYmd = cutoffYmdForMonth(month);
+        const teamWeekendSet = clipDateSet(weekendDateSetInMonth(month), teamCutoffYmd);
+        const teamHolidayClipped = clipDateSet(teamHolidaySet, teamCutoffYmd);
         userIds.forEach((uid) => {
           const { actualDays, effectiveDays, effectiveSet } =
             computeMonthlyDays(uid, monthRecords, adjList);
@@ -1237,16 +1277,17 @@ export default function PerformancePage() {
             );
             days.forEach((d) => leaveDates.add(d));
           });
+          const leaveClipped = clipDateSet(leaveDates, teamCutoffYmd);
           // Set-union dedupes overlaps (e.g. clock-in on a holiday)
           // so a missed weekday cannot be hidden by double-counting.
           const coveredSet = new Set([
-            ...effectiveSet, ...leaveDates, ...teamHolidaySet, ...teamWeekendSet,
+            ...effectiveSet, ...leaveClipped, ...teamHolidayClipped, ...teamWeekendSet,
           ]);
           attMap[uid] = {
             actualDays,
             effectiveDays,
-            leaveDays: leaveDates.size,
-            holidayDays: teamHolidaySet.size,
+            leaveDays: leaveClipped.size,
+            holidayDays: teamHolidayClipped.size,
             weekendDays: teamWeekendSet.size,
             coveredDays: coveredSet.size,
           };
