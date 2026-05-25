@@ -1041,7 +1041,8 @@ export function missedWeekdayDatesFor(userId, monthStr, monthRecords, monthAdjus
   const userAdjusts = (monthAdjusts || []).filter((a) => (a.userId || a.user_id) === userId);
   const userLeaves  = (monthLeaves  || []).filter(
     (l) => (l.requestedBy || l.requester_id) === userId &&
-           (l.category === 'leave' || ['medical', 'emergency'].includes(l.type)),
+           (l.category === 'leave'
+             || ['medical', 'emergency', 'half_leave', 'other'].includes(l.type)),
   );
 
   const presentSet = new Set();
@@ -1156,8 +1157,15 @@ export function summarizeMonth({ rows, adjustments, leaveDates, holidayDates, mo
 }
 
 // Approved-leave dates for one user inside a month, expanded
-// day-by-day (weekends excluded). WFH excluded.
-export async function listApprovedLeaveDatesForMonth(userId, monthStr) {
+// day-by-day (weekends excluded). WFH excluded — remote work is
+// not an absence. Every other approved leave type (medical,
+// emergency, half_leave, other) counts; the original code dropped
+// "other" / "half_leave" silently, which made approved wedding /
+// bereavement leaves disappear from the attendance numbers.
+// Optionally pass `holidaySet` so company-holiday dates are
+// removed too, preventing double-counting against a separate
+// holiday tally on the calling side.
+export async function listApprovedLeaveDatesForMonth(userId, monthStr, { holidaySet } = {}) {
   const [y, m] = monthStr.split('-').map(Number);
   const start = `${y}-${String(m).padStart(2, '0')}-01`;
   const last  = new Date(y, m, 0).getDate();
@@ -1167,7 +1175,7 @@ export async function listApprovedLeaveDatesForMonth(userId, monthStr) {
     .select('start_date, end_date')
     .eq('requester_id', userId)
     .eq('status', 'approved')
-    .in('type', ['medical', 'emergency'])
+    .in('type', ['medical', 'emergency', 'half_leave', 'other'])
     .lte('start_date', end)
     .gte('end_date',   start);
   if (error) throw new Error(error.message);
@@ -1179,7 +1187,7 @@ export async function listApprovedLeaveDatesForMonth(userId, monthStr) {
       const dow = cur.getDay();
       if (dow !== 0 && dow !== 6) {
         const ds = _ymd(cur);
-        if (ds >= start && ds <= end) out.add(ds);
+        if (ds >= start && ds <= end && !(holidaySet && holidaySet.has(ds))) out.add(ds);
       }
       cur.setDate(cur.getDate() + 1);
     }
@@ -1208,7 +1216,9 @@ export async function fetchRosterMonth(monthStr) {
     supabase.from('leave_requests')
       .select('id, requester_id, type, status, start_date, end_date')
       .eq('status', 'approved')
-      .in('type', ['medical', 'emergency'])
+      // Every non-WFH approved leave counts toward "covered" days.
+      // Previously this dropped "other" / "half_leave" entries.
+      .in('type', ['medical', 'emergency', 'half_leave', 'other'])
       .lte('start_date', end).gte('end_date', start),
   ]);
   if (attQ.error)   throw new Error(attQ.error.message);

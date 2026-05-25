@@ -923,8 +923,10 @@ function PillarDetail({ pillarKey, ctx }) {
     return (
       <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
         <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-          Score = covered days / working days (Mon–Fri). Approved
-          medical / emergency leaves and company holidays both count toward "covered".
+          Score = covered days / working days (Mon–Fri). Any
+          approved leave (medical, emergency, other) and every
+          company holiday counts toward &ldquo;covered&rdquo;. WFH days are
+          treated as present, not leave.
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
           style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>

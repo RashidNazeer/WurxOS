@@ -171,17 +171,34 @@ function MyMonthlyAttendance({ userId, displayName }) {
           adjustments = (await getAdjustmentsForMonth(monthStrKey)).filter(a => a.userId === userId);
         } catch { /* non-fatal — fall back to actual */ }
 
-        // Approved leaves overlapping this month — v2 helper does
-        // the day-by-day expansion (Mon-Fri only, WFH excluded) and
-        // returns a Set of YYYY-MM-DD strings.
+        // Company holidays in the month — same Set the Performance
+        // tab uses. Holidays count toward "covered" so an Eid week
+        // doesn't drag the user's percentage down.
+        let holidaySet = new Set();
+        try { holidaySet = await listHolidayDatesForMonth(monthStrKey); }
+        catch { /* non-fatal */ }
+
+        // Approved leaves overlapping this month, expanded day-by-
+        // day (Mon-Fri only). WFH is excluded (remote work is not an
+        // absence); holidays are excluded too so they don't double-
+        // count against the separate holiday tally below.
         let leaveDates = new Set();
         try {
-          leaveDates = await listApprovedLeaveDatesForMonth(userId, monthStrKey);
+          leaveDates = await listApprovedLeaveDatesForMonth(userId, monthStrKey, { holidaySet });
         } catch { /* non-fatal */ }
 
-        // Combine present + leave (dedupe — a day with leave AND clock-in counts once)
-        const accountedDates = new Set([...presentDates, ...leaveDates]);
-        // "Missed" = past working days neither attended nor on leave
+        // Effective present days = union of actual present dates and any
+        // dates manually marked by Boss/OL. Same math as the Roster tab.
+        const effectiveSet = new Set(presentDates);
+        adjustments.forEach(a => { if (a.date) effectiveSet.add(a.date); });
+        const effectivePresent = effectiveSet.size;
+
+        // A weekday is "covered" if the user clocked in, was on
+        // approved leave, OR it was a company holiday. This matches
+        // the Performance tab's attendance score exactly so the two
+        // views never disagree.
+        const accountedDates = new Set([...effectiveSet, ...leaveDates, ...holidaySet]);
+        // "Missed" = past weekdays that aren't covered.
         const today = new Date(); today.setHours(0, 0, 0, 0);
         let missed = 0;
         for (let d = new Date(monthStart); d <= monthEnd && d < today; d.setDate(d.getDate() + 1)) {
@@ -191,12 +208,6 @@ function MyMonthlyAttendance({ userId, displayName }) {
           if (!accountedDates.has(ds)) missed++;
         }
 
-        // Effective present days = union of actual present dates and any
-        // dates manually marked by Boss/OL. Same math as the Roster tab.
-        const effectiveSet = new Set(presentDates);
-        adjustments.forEach(a => { if (a.date) effectiveSet.add(a.date); });
-        const effectivePresent = effectiveSet.size;
-
         if (!cancelled) {
           setStats({
             workingDays,
@@ -204,7 +215,8 @@ function MyMonthlyAttendance({ userId, displayName }) {
             actualPresentDays: presentDates.size,
             hasOverride: adjustments.length > 0,
             leaveDays: leaveDates.size,
-            accountedDays: effectivePresent + leaveDates.size,
+            holidayDays: holidaySet.size,
+            accountedDays: effectivePresent + leaveDates.size + holidaySet.size,
             missedDays: missed,
             totalWorkMs,
             monthLabel: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
@@ -242,6 +254,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
           </div>
           <div className="text-muted" style={{ fontSize: '0.72rem' }}>
             {displayName ? displayName + ' · ' : ''}{stats.workingDays} working days this month (Mon–Fri)
+            {stats.holidayDays > 0 && <> · {stats.holidayDays} company holiday{stats.holidayDays === 1 ? '' : 's'}</>}
           </div>
         </div>
         <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
@@ -269,13 +282,16 @@ function MyMonthlyAttendance({ userId, displayName }) {
           <div title={`Present: ${stats.presentDays} days`}
             style={{ width: `${(stats.presentDays / stats.workingDays) * 100}%`, background: '#16a34a' }} />
         )}
-        {stats.leaveDays > 0 && (() => {
-          // Only count leave days that aren't already counted as present (dedupe)
-          const onlyLeave = Math.max(0, stats.accountedDays - stats.presentDays);
-          if (onlyLeave === 0) return null;
+        {(() => {
+          // Leave + holidays that aren't already covered by a clock-in.
+          const onlyOff = Math.max(0, stats.accountedDays - stats.presentDays);
+          if (onlyOff === 0) return null;
+          const label = stats.holidayDays > 0
+            ? `Approved leave + company holidays: ${onlyOff} days`
+            : `Approved leave: ${onlyOff} days`;
           return (
-            <div title={`Approved leave: ${onlyLeave} days`}
-              style={{ width: `${(onlyLeave / stats.workingDays) * 100}%`, background: '#3b82f6' }} />
+            <div title={label}
+              style={{ width: `${(onlyOff / stats.workingDays) * 100}%`, background: '#3b82f6' }} />
           );
         })()}
       </div>
