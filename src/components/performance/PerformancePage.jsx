@@ -235,6 +235,7 @@ function canRate(viewer, target) {
   if (viewer === 'boss' && target === 'ol') return true;
   if (viewer === 'ol' && (target === 'tl' || target === 'apc')) return true;
   if (viewer === 'tl' && target === 'apc') return true;
+  if (viewer === 'pctl' && (target === 'ipc' || target === 'apc')) return true;
   return false;
 }
 
