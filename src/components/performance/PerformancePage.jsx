@@ -1369,11 +1369,13 @@ export default function PerformancePage() {
     if (isBoss) t.push({ key: 'ols', label: 'Operation Leads', icon: 'bi-person-workspace' });
     if (isBoss || effectiveRole === 'ol') t.push({ key: 'tls', label: 'Team Leads', icon: 'bi-person-badge' });
     if (isBoss || effectiveRole === 'ol' || effectiveRole === 'tl') t.push({ key: 'apcs', label: 'APCs', icon: 'bi-person-lines-fill' });
+    // PCTL's team is their IPCs (listEvaluableUsers tags them with
+    // _tab='apcs', so we reuse that key and just relabel the tab).
+    if (effectiveRole === 'pctl') t.push({ key: 'apcs', label: 'IPCs', icon: 'bi-person-lines-fill' });
     return t;
   }, [isBoss, effectiveRole]);
 
   const filteredTeam = useMemo(() => {
-    const tabRoleMap = { ols: 'ol', tls: 'tl', apcs: 'apc' };
     let list = teamUsers.filter(u => u._tab === teamSubTab).map(u => {
       const name = u.displayName || u.userName || u.email || '—';
       const rec = teamRecords[u.id];
@@ -1392,7 +1394,10 @@ export default function PerformancePage() {
       const gCount = (teamFlags[u.id] || []).filter(f => f.type === 'green').length;
       const rCount = (teamFlags[u.id] || []).filter(f => f.type === 'red').length;
       const wCount = teamWarnings[u.id] || 0;
-      const canEdit = canRate(effectiveRole, tabRoleMap[teamSubTab]);
+      // Check against the user's own role rather than the tab name,
+      // so the "apcs" tab — which holds both APCs (TL view) and IPCs
+      // (PCTL view) — gates each row by who can actually rate it.
+      const canEdit = canRate(effectiveRole, u.role || u.userRole || 'apc');
       return { ...u, name, rec, perfScore, incScore, attScore, flagScore, pillarScores, composite, gCount, rCount, wCount, canEdit, attData, workingDays: wd };
     });
     if (search) { const s = search.toLowerCase(); list = list.filter(u => u.name.toLowerCase().includes(s)); }

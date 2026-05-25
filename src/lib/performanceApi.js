@@ -251,6 +251,9 @@ export function canRate(viewer, target) {
   if (viewer === 'boss' && target === 'ol') return true;
   if (viewer === 'ol' && (target === 'tl' || target === 'apc')) return true;
   if (viewer === 'tl' && target === 'apc') return true;
+  // PCTL is the IPCs direct manager (profiles.reports_to), so they
+  // rate / flag IPCs the same way a TL rates / flags APCs.
+  if (viewer === 'pctl' && target === 'ipc') return true;
   return false;
 }
 
