@@ -1083,10 +1083,13 @@ export default function PerformancePage() {
     displayName: profile?.display_name || '',
   } : null;
   const userRole = profile?.role || '';
-  // PCTL is treated like TL by the page (same can-rate rules apply
-  // because PCTL also evaluates IPCs reporting to them).
-  const normalisedRole = userRole === 'pctl' ? 'tl' : userRole === 'developer' ? 'boss' : userRole;
-  const effectiveRole = ['boss','ol','tl','apc','ipc'].includes(normalisedRole)
+  // Keep PCTL distinct from TL: PCTL evaluates IPCs (canRate gates
+  // pctl -> ipc), TL evaluates APCs. Conflating them broke the
+  // permission check and hid every Rate / Flag button for PCTLs.
+  // Developer maps to Boss (full visibility); IPC maps to APC (no
+  // team tab — IPCs don't manage anyone).
+  const normalisedRole = userRole === 'developer' ? 'boss' : userRole;
+  const effectiveRole = ['boss','ol','tl','pctl','apc','ipc'].includes(normalisedRole)
     ? (normalisedRole === 'ipc' ? 'apc' : normalisedRole)
     : 'apc';
   const isBoss = effectiveRole === 'boss';
