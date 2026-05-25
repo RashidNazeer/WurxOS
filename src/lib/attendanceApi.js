@@ -1090,7 +1090,15 @@ export function computeMonthlyDays(userId, monthRecords, monthAdjusts) {
     if (!a.date || isWeekendDate(a.date)) return;
     effectiveSet.add(a.date);
   });
-  return { actualDays: actualDateSet.size, effectiveDays: effectiveSet.size, adjustments: userAdjusts };
+  // Return the underlying Set too — callers that need to dedupe
+  // overlaps with leave/holiday/weekend sets (e.g. a clock-in on
+  // an Eid day) must do set-union, not integer sum.
+  return {
+    actualDays: actualDateSet.size,
+    effectiveDays: effectiveSet.size,
+    effectiveSet,
+    adjustments: userAdjusts,
+  };
 }
 
 // Same shape as v1's; preserved for the v2 widget.

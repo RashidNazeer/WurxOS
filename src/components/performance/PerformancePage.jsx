@@ -155,6 +155,20 @@ function weekendDaysInMonth(monthStr) {
   return n;
 }
 
+/** Set of every Sat/Sun YYYY-MM-DD in a month — joins the coverage union. */
+function weekendDateSetInMonth(monthStr) {
+  const out = new Set();
+  if (!monthStr) return out;
+  const [y, m] = monthStr.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const pad = (n) => String(n).padStart(2, '0');
+  for (let d = 1; d <= last; d++) {
+    const dow = new Date(y, m - 1, d).getDay();
+    if (dow === 0 || dow === 6) out.add(`${y}-${pad(m)}-${pad(d)}`);
+  }
+  return out;
+}
+
 // Flag scoring: base 80, every green flag adds 10, every red flag
 // subtracts 20. The per-flag weightage (low/medium/high/critical) is a
 // visual label only — severity does not affect the score so a TL marking
@@ -933,8 +947,11 @@ function PillarDetail({ pillarKey, ctx }) {
     const effective   = myAttendanceDays.effective || 0;
     const leaveDays   = myAttendanceDays.leaveDays || 0;
     const holidayDays = myAttendanceDays.holidayDays || 0;
-    const weekendDays = weekendDaysInMonth(month);
-    const covered     = effective + leaveDays + holidayDays + weekendDays;
+    const weekendDays = myAttendanceDays.weekendDays || weekendDaysInMonth(month);
+    // Set-union covered — a clock-in that also falls on a holiday
+    // or weekend is counted once, so the score can never be padded
+    // beyond reality.
+    const covered     = myAttendanceDays.coveredDays || 0;
     const wd          = workingDays;
     const pct         = wd > 0 ? Math.round((covered / wd) * 100) : 100;
     const missed      = Math.max(0, wd - covered);
@@ -1125,7 +1142,7 @@ export default function PerformancePage() {
         // not added here); compute leave days inline from fetchRosterMonth
         // which already returns leaves filtered to medical/emergency only.
         const myMonth = monthRecords.filter((r) => r.user_id === currentUser.uid || r.userId === currentUser.uid);
-        const { actualDays: myActual, effectiveDays: myEffective } =
+        const { actualDays: myActual, effectiveDays: myEffective, effectiveSet: myEffectiveSet } =
           computeMonthlyDays(currentUser.uid, myMonth, myAdjList);
 
         // For leave days, use the rosterMonth.leaves payload (already
@@ -1148,11 +1165,21 @@ export default function PerformancePage() {
           );
           days.forEach((d) => myLeaveDates.add(d));
         });
+        // Set-union of every "covered" date — clock-ins, approved
+        // leaves, holidays, weekends. Counts each date once so a
+        // clock-in on a holiday (or any other overlap) doesn't get
+        // counted twice and inflate the score.
+        const myWeekendSet = weekendDateSetInMonth(month);
+        const myCoveredSet = new Set([
+          ...myEffectiveSet, ...myLeaveDates, ...myHolidaySet, ...myWeekendSet,
+        ]);
         setMyAttendanceDays({
           actual: myActual,
           effective: myEffective,
           leaveDays: myLeaveDates.size,
           holidayDays: myHolidaySet.size,
+          weekendDays: myWeekendSet.size,
+          coveredDays: myCoveredSet.size,
         });
       }
 
@@ -1196,8 +1223,10 @@ export default function PerformancePage() {
 
         const teamHolidaySet = await listHolidayDatesForMonth(month).catch(() => new Set());
 
+        const teamWeekendSet = weekendDateSetInMonth(month);
         userIds.forEach((uid) => {
-          const { actualDays, effectiveDays } = computeMonthlyDays(uid, monthRecords, adjList);
+          const { actualDays, effectiveDays, effectiveSet } =
+            computeMonthlyDays(uid, monthRecords, adjList);
           const userLeaves = monthLeaves.filter((l) => l.requestedBy === uid);
           const leaveDates = new Set();
           userLeaves.forEach((l) => {
@@ -1208,11 +1237,18 @@ export default function PerformancePage() {
             );
             days.forEach((d) => leaveDates.add(d));
           });
+          // Set-union dedupes overlaps (e.g. clock-in on a holiday)
+          // so a missed weekday cannot be hidden by double-counting.
+          const coveredSet = new Set([
+            ...effectiveSet, ...leaveDates, ...teamHolidaySet, ...teamWeekendSet,
+          ]);
           attMap[uid] = {
             actualDays,
             effectiveDays,
             leaveDays: leaveDates.size,
             holidayDays: teamHolidaySet.size,
+            weekendDays: teamWeekendSet.size,
+            coveredDays: coveredSet.size,
           };
         });
 
@@ -1304,15 +1340,10 @@ export default function PerformancePage() {
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attData = teamAttendance[u.id] || { actualDays: 0, effectiveDays: 0, leaveDays: 0, holidayDays: 0 };
       const wd = workingDaysInMonth(month);
-      const weekendDays = weekendDaysInMonth(month);
-      // Every day of the month must be covered. Weekends, company
-      // holidays and approved leaves are auto-credited; only
-      // weekdays the user was expected to work and didn't drag the
-      // score down.
-      const covered = (attData.effectiveDays || 0)
-        + (attData.leaveDays || 0)
-        + (attData.holidayDays || 0)
-        + weekendDays;
+      // attData.coveredDays is the set-union (clock-ins ∪ leaves ∪
+      // holidays ∪ weekends), so an overlap (e.g. clock-in on a
+      // holiday) is counted once — no inflated score.
+      const covered = attData.coveredDays || 0;
       const attScore = calcAttendanceScore(covered, wd);
       const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
       const pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
@@ -1335,10 +1366,7 @@ export default function PerformancePage() {
   const myPerfScore = myRecord ? calcMetricsAvg(myRecord.metrics) : null;
   const myIncScore  = calcIncentiveScore(myIncRecord);
   const myAttScore  = calcAttendanceScore(
-    (myAttendanceDays.effective || 0)
-      + (myAttendanceDays.leaveDays || 0)
-      + (myAttendanceDays.holidayDays || 0)
-      + weekendDaysInMonth(month),
+    myAttendanceDays.coveredDays || 0,
     workingDaysInMonth(month),
   );
   const myFlagScore = calcFlagsScore(myFlags, month);
@@ -1669,9 +1697,11 @@ export default function PerformancePage() {
                             const adj = isAtt && u.attData ? (u.attData.effectiveDays - u.attData.actualDays) : 0;
                             const leaveD = isAtt && u.attData ? (u.attData.leaveDays || 0) : 0;
                             const holD = isAtt && u.attData ? (u.attData.holidayDays || 0) : 0;
-                            const weekendD = isAtt ? weekendDaysInMonth(month) : 0;
-                            const coveredD = isAtt && u.attData
-                              ? (u.attData.effectiveDays + leaveD + holD + weekendD) : 0;
+                            const weekendD = isAtt && u.attData ? (u.attData.weekendDays || 0) : 0;
+                            // Use the deduped set-union count so an
+                            // overlap (e.g. clock-in on a holiday)
+                            // isn't double-counted in the tooltip.
+                            const coveredD = isAtt && u.attData ? (u.attData.coveredDays || 0) : 0;
                             return (
                               <div key={p.key}>
                                 <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.68rem' }}>
