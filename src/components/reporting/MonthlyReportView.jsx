@@ -5,6 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import { num, pctChange, resolveSectionsEnabled } from '../../utils/monthlyReportingService';
+import { formatPctChange } from '../../utils/formatPctChange';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichContent, { isHtml } from '../common/RichContent';
 import HighlightableContent from '../common/HighlightableContent';
@@ -129,12 +130,6 @@ function DeltaPill({ pct, size = 'sm' }) {
   if (pct === null || pct === undefined || !isFinite(pct)) return null;
   const up = pct >= 0;
   const fontSize = size === 'sm' ? '0.66rem' : '0.74rem';
-  // Cap displayed magnitude at 100% so a near-zero previous value
-  // doesn't render a thousands-of-percent blow-up. The trailing "+"
-  // tells the reader the actual growth is even larger.
-  const abs = Math.abs(pct);
-  const capped = abs > 100;
-  const shown = capped ? '100' : abs.toFixed(1);
   return (
     <span
       className="d-inline-flex align-items-center gap-1"
@@ -144,7 +139,7 @@ function DeltaPill({ pct, size = 'sm' }) {
         background: up ? C.greenSoft : C.redSoft,
         padding: '2px 8px', borderRadius: 999, lineHeight: 1.2,
       }}>
-      {up ? '▲' : '▼'} {shown}%{capped ? '+' : ''}
+      {up ? '▲' : '▼'} {formatPctChange(pct, { withSign: false })}
     </span>
   );
 }

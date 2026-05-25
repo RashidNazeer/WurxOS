@@ -3,6 +3,7 @@ import WeeklyReportView from '../reporting/WeeklyReportView';
 import MonthlyReportView from '../reporting/MonthlyReportView';
 import BrandSectionsPanel from './BrandSectionsPanel';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { formatPctChange } from '../../utils/formatPctChange';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
 
 /**
@@ -401,7 +402,7 @@ export default function ClientReportsSection({
                             color: gmvChange >= 0 ? '#16a34a' : '#dc2626',
                           }}>
                             <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
-                            {gmvChange >= 0 ? '+' : ''}{gmvChange.toFixed(1)}% vs prev{' '}
+                            {formatPctChange(gmvChange)} vs prev{' '}
                             {activeType === 'biweekly' ? 'period' : activeType === 'monthly' ? 'month' : 'week'}
                           </div>
                         )}

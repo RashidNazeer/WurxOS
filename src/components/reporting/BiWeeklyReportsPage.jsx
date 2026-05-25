@@ -7,6 +7,7 @@ import {
   REPORT_STATUSES, getReportStatus, updateReportStatus,
 } from '../../utils/biWeeklyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { formatPctChange } from '../../utils/formatPctChange';
 import BiWeeklyReportForm from './BiWeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
@@ -527,7 +528,7 @@ export default function BiWeeklyReportsPage() {
                       {gmvChange !== null && (
                         <div style={{ fontSize: '0.68rem', color: gmvChange >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
                           <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
-                          {gmvChange >= 0 ? '+' : ''}{gmvChange.toFixed(1)}% GMV vs prev period
+                          {formatPctChange(gmvChange)} GMV vs prev period
                         </div>
                       )}
                     </div>

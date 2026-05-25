@@ -9,6 +9,7 @@ import {
   verifyReport, approveReport, rejectReport, reopenReport,
   reportPermissions, STATUS_LABEL, STATUS_COLOR,
 } from '../../lib/reportsApi';
+import { formatPctChange } from '../../utils/formatPctChange';
 import {
   AlertIcon, CheckIcon, RefreshIcon, ChevronRightIcon,
   PencilIcon, XIcon, CopyIcon, CalendarIcon,
@@ -152,7 +153,7 @@ function DeltaPill({ pct, size = 'sm' }) {
       background: up ? C.greenSoft : C.redSoft,
       padding: '2px 8px', borderRadius: 999, lineHeight: 1.2,
     }}>
-      {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%
+      {up ? '▲' : '▼'} {formatPctChange(pct, { withSign: false })}
     </span>
   );
 }

@@ -7,6 +7,7 @@ import {
   REPORT_STATUSES, getReportStatus, updateReportStatus, deleteReport,
 } from '../../utils/reportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { formatPctChange } from '../../utils/formatPctChange';
 import WeeklyReportForm from './WeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
@@ -683,7 +684,7 @@ export default function AllWeeklyReportsPage() {
                     style={{ background: monthStats.gmvTrend >= 0 ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)',
                              color: monthStats.gmvTrend >= 0 ? '#86efac' : '#fca5a5', fontSize: '0.66rem', fontWeight: 600 }}>
                     <i className={`bi bi-arrow-${monthStats.gmvTrend >= 0 ? 'up' : 'down'}-right`} />
-                    {monthStats.gmvTrend >= 0 ? '+' : ''}{monthStats.gmvTrend.toFixed(1)}%
+                    {formatPctChange(monthStats.gmvTrend)}
                   </span>
                 )}
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
@@ -1001,7 +1002,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
           <div className="d-flex justify-content-between gap-2">
             <CardStat label="GMV" value={sym + gmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               note={gmvChange != null
-                ? `${gmvChange >= 0 ? '+' : ''}${gmvChange.toFixed(1)}%`
+                ? formatPctChange(gmvChange)
                 : null}
               noteColor={gmvChange != null ? (gmvChange >= 0 ? '#16a34a' : '#dc2626') : '#94a3b8'} />
             <CardStat label="ORDERS" value={orders.toLocaleString()} note={aov > 0 ? `${sym}${aov.toFixed(0)} AOV` : null} />
@@ -1022,7 +1023,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             <span className="d-inline-flex align-items-center gap-1 fw-bold" style={{ fontSize: '0.72rem',
                 color: gmvChange >= 0 ? '#16a34a' : '#dc2626' }}>
               <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-right`} />
-              {gmvChange >= 0 ? '+' : ''}{gmvChange.toFixed(1)}%
+              {formatPctChange(gmvChange)}
             </span>
           </div>
         )}

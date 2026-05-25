@@ -14,6 +14,7 @@ import { generateMonthlyKeyWinsInsight } from '../../utils/aiInsights';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parseMonthlyPdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { formatPctChange } from '../../utils/formatPctChange';
 import RichTextEditor from '../shared/RichTextEditor';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
@@ -118,7 +119,7 @@ function ComparisonChip({ thisVal, lastVal, format = 'num' }) {
       Last: <strong>{fmt(p)}</strong>
       {pct != null && (
         <span style={{ color, marginLeft: 6, fontWeight: 600 }}>
-          {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+          {formatPctChange(pct)}
         </span>
       )}
     </div>

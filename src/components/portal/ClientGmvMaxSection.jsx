@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { GMV_MAX_FIELDS, formatGmvField, monthLabel, CAMPAIGN_STATUSES } from '../../lib/gmvMaxApi';
+import { formatPctChange } from '../../utils/formatPctChange';
 
 /* Wurx theme tokens — pure black + warm peach + cream. */
 const WURX = {
@@ -90,7 +91,7 @@ function MetricTile({ field, value, prevValue, dark }) {
           fontSize: 10.5, fontWeight: 700,
           backdropFilter: dark ? 'blur(8px)' : 'none',
         }}>
-          {delta.up ? '↗' : '↘'} {delta.up ? '+' : ''}{delta.pct.toFixed(1)}%
+          {delta.up ? '↗' : '↘'} {delta.up ? '+' : ''}{formatPctChange(delta.pct, { withSign: false })}
         </div>
       )}
     </div>
