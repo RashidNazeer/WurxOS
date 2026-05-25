@@ -125,15 +125,32 @@ function calcAttendanceScore(coveredDays, workingDays) {
   return Math.min(100, Math.round((coveredDays / workingDays) * 100));
 }
 
-/** Mon-Fri count for a month string "YYYY-MM". */
+/**
+ * Total calendar days for a month string "YYYY-MM" (28/30/31).
+ * The attendance score uses this as the denominator: every day of
+ * the month must be "covered" by either a clock-in, an approved
+ * leave, a company holiday, or a weekend — only weekdays the user
+ * was expected to work and didn't drag the score down.
+ *
+ * (Kept the function name `workingDaysInMonth` so all downstream
+ *  variable names like `workingDays` still read sensibly; the
+ *  semantics changed from Mon-Fri to total calendar days.)
+ */
 function workingDaysInMonth(monthStr) {
+  if (!monthStr) return 0;
+  const [y, m] = monthStr.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+/** Count of Sat + Sun in a month — auto-credited toward "covered". */
+function weekendDaysInMonth(monthStr) {
   if (!monthStr) return 0;
   const [y, m] = monthStr.split('-').map(Number);
   const last = new Date(y, m, 0).getDate();
   let n = 0;
   for (let d = 1; d <= last; d++) {
     const dow = new Date(y, m - 1, d).getDay();
-    if (dow !== 0 && dow !== 6) n++;
+    if (dow === 0 || dow === 6) n++;
   }
   return n;
 }
@@ -916,27 +933,34 @@ function PillarDetail({ pillarKey, ctx }) {
     const effective   = myAttendanceDays.effective || 0;
     const leaveDays   = myAttendanceDays.leaveDays || 0;
     const holidayDays = myAttendanceDays.holidayDays || 0;
-    const covered     = effective + leaveDays + holidayDays;
+    const weekendDays = weekendDaysInMonth(month);
+    const covered     = effective + leaveDays + holidayDays + weekendDays;
     const wd          = workingDays;
     const pct         = wd > 0 ? Math.round((covered / wd) * 100) : 100;
     const missed      = Math.max(0, wd - covered);
     return (
       <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
         <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-          Score = covered days / working days (Mon–Fri). Any
-          approved leave (medical, emergency, other) and every
-          company holiday counts toward &ldquo;covered&rdquo;. WFH days are
-          treated as present, not leave.
+          Score = covered days / total days in the month. Weekends,
+          company holidays and any approved leave (medical,
+          emergency, other) are auto-credited &mdash; only weekdays
+          you were expected to work but didn&apos;t clock in count
+          against the score. WFH days are treated as present.
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
           style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
-          <span>Working days this month</span>
+          <span>Days this month</span>
           <strong>{wd}</strong>
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
           style={{ background: '#f0fdf4', border: '1px solid #b7dfc4' }}>
           <span>Days present (real clock-ins + adjustments)</span>
           <strong>{effective}</strong>
+        </div>
+        <div className="d-flex justify-content-between rounded-2 p-2"
+          style={{ background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+          <span>Weekends</span>
+          <strong>{weekendDays}</strong>
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
           style={{ background: '#eff6ff', border: '1px solid #93c5fd' }}>
@@ -1280,9 +1304,15 @@ export default function PerformancePage() {
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attData = teamAttendance[u.id] || { actualDays: 0, effectiveDays: 0, leaveDays: 0, holidayDays: 0 };
       const wd = workingDaysInMonth(month);
-      // Holidays count as covered alongside present + leave so users get
-      // credit for company-wide off days (Eid, etc.) without a clock-in.
-      const covered = (attData.effectiveDays || 0) + (attData.leaveDays || 0) + (attData.holidayDays || 0);
+      const weekendDays = weekendDaysInMonth(month);
+      // Every day of the month must be covered. Weekends, company
+      // holidays and approved leaves are auto-credited; only
+      // weekdays the user was expected to work and didn't drag the
+      // score down.
+      const covered = (attData.effectiveDays || 0)
+        + (attData.leaveDays || 0)
+        + (attData.holidayDays || 0)
+        + weekendDays;
       const attScore = calcAttendanceScore(covered, wd);
       const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
       const pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
@@ -1305,7 +1335,10 @@ export default function PerformancePage() {
   const myPerfScore = myRecord ? calcMetricsAvg(myRecord.metrics) : null;
   const myIncScore  = calcIncentiveScore(myIncRecord);
   const myAttScore  = calcAttendanceScore(
-    (myAttendanceDays.effective || 0) + (myAttendanceDays.leaveDays || 0) + (myAttendanceDays.holidayDays || 0),
+    (myAttendanceDays.effective || 0)
+      + (myAttendanceDays.leaveDays || 0)
+      + (myAttendanceDays.holidayDays || 0)
+      + weekendDaysInMonth(month),
     workingDaysInMonth(month),
   );
   const myFlagScore = calcFlagsScore(myFlags, month);
@@ -1635,7 +1668,10 @@ export default function PerformancePage() {
                             const isAtt = p.key === 'attendance';
                             const adj = isAtt && u.attData ? (u.attData.effectiveDays - u.attData.actualDays) : 0;
                             const leaveD = isAtt && u.attData ? (u.attData.leaveDays || 0) : 0;
-                            const coveredD = isAtt && u.attData ? (u.attData.effectiveDays + leaveD) : 0;
+                            const holD = isAtt && u.attData ? (u.attData.holidayDays || 0) : 0;
+                            const weekendD = isAtt ? weekendDaysInMonth(month) : 0;
+                            const coveredD = isAtt && u.attData
+                              ? (u.attData.effectiveDays + leaveD + holD + weekendD) : 0;
                             return (
                               <div key={p.key}>
                                 <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.68rem' }}>
@@ -1643,8 +1679,8 @@ export default function PerformancePage() {
                                     <i className={`bi ${p.icon}`} style={{ color: p.color, fontSize: '0.7rem' }} />{p.label}
                                     {isAtt && u.attData && (
                                       <span className="text-muted" style={{ fontSize: '0.6rem' }}
-                                        title={`${u.attData.actualDays} clocked-in${adj > 0 ? ` + ${adj} manager-adjusted` : ''}${leaveD > 0 ? ` + ${leaveD} approved leave` : ''} = ${coveredD} of ${u.workingDays} working days`}>
-                                        · {coveredD}/{u.workingDays} wd
+                                        title={`${u.attData.actualDays} clocked-in${adj > 0 ? ` + ${adj} manager-adjusted` : ''}${leaveD > 0 ? ` + ${leaveD} approved leave` : ''}${holD > 0 ? ` + ${holD} holiday` : ''} + ${weekendD} weekend = ${coveredD} of ${u.workingDays} days`}>
+                                        · {coveredD}/{u.workingDays} days
                                         {adj > 0 && <span style={{ color: '#92400e' }}> (+{adj} adj)</span>}
                                         {leaveD > 0 && <span style={{ color: '#1d4ed8' }}> (+{leaveD} leave)</span>}
                                       </span>

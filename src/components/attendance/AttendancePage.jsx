@@ -147,11 +147,19 @@ function MyMonthlyAttendance({ userId, displayName }) {
         const startStr = `${year}-${pad(month + 1)}-01`;
         const endStr   = `${year}-${pad(month + 1)}-${pad(monthEnd.getDate())}`;
 
-        // Working days in the month (Mon-Fri)
-        let workingDays = 0;
+        // Total days in the month (28/30/31). Every day must be
+        // "covered" — weekends/holidays/approved-leaves are auto-
+        // credited so only weekdays the user was expected to clock
+        // in on and didn't drag the score down.
+        const workingDays = monthEnd.getDate();
+        // Set of all weekend (Sat/Sun) dates in the month — joins the
+        // coverage set so the user gets automatic credit for them.
+        const weekendDates = new Set();
         for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
           const dow = d.getDay();
-          if (dow !== 0 && dow !== 6) workingDays++;
+          if (dow === 0 || dow === 6) {
+            weekendDates.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+          }
         }
 
         // Attendance for this user
@@ -193,17 +201,20 @@ function MyMonthlyAttendance({ userId, displayName }) {
         adjustments.forEach(a => { if (a.date) effectiveSet.add(a.date); });
         const effectivePresent = effectiveSet.size;
 
-        // A weekday is "covered" if the user clocked in, was on
-        // approved leave, OR it was a company holiday. This matches
-        // the Performance tab's attendance score exactly so the two
-        // views never disagree.
-        const accountedDates = new Set([...effectiveSet, ...leaveDates, ...holidaySet]);
-        // "Missed" = past weekdays that aren't covered.
+        // A day is "covered" if the user clocked in, was on approved
+        // leave, it was a company holiday, OR it was a weekend.
+        // Set-union (not a sum) so a day that falls into more than
+        // one bucket is counted once. This matches the Performance
+        // attendance score so the two views never disagree.
+        const accountedDates = new Set([
+          ...effectiveSet, ...leaveDates, ...holidaySet, ...weekendDates,
+        ]);
+        // "Missed" = past days that aren't covered — weekends and
+        // holidays are always covered so a missed day can only be a
+        // weekday the user was expected to clock in on and didn't.
         const today = new Date(); today.setHours(0, 0, 0, 0);
         let missed = 0;
         for (let d = new Date(monthStart); d <= monthEnd && d < today; d.setDate(d.getDate() + 1)) {
-          const dow = d.getDay();
-          if (dow === 0 || dow === 6) continue;
           const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
           if (!accountedDates.has(ds)) missed++;
         }
@@ -216,7 +227,8 @@ function MyMonthlyAttendance({ userId, displayName }) {
             hasOverride: adjustments.length > 0,
             leaveDays: leaveDates.size,
             holidayDays: holidaySet.size,
-            accountedDays: effectivePresent + leaveDates.size + holidaySet.size,
+            weekendDays: weekendDates.size,
+            accountedDays: accountedDates.size,
             missedDays: missed,
             totalWorkMs,
             monthLabel: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
@@ -253,7 +265,8 @@ function MyMonthlyAttendance({ userId, displayName }) {
             My attendance · {stats.monthLabel}
           </div>
           <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-            {displayName ? displayName + ' · ' : ''}{stats.workingDays} working days this month (Mon–Fri)
+            {displayName ? displayName + ' · ' : ''}{stats.workingDays} days this month
+            {stats.weekendDays > 0 && <> · {stats.weekendDays} weekend{stats.weekendDays === 1 ? '' : ' days'}</>}
             {stats.holidayDays > 0 && <> · {stats.holidayDays} company holiday{stats.holidayDays === 1 ? '' : 's'}</>}
           </div>
         </div>
@@ -272,7 +285,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
             ? `actual ${stats.actualPresentDays} · manager-adjusted`
             : 'clocked in'} />
         <MyAttTile dot="#3b82f6" label="Days on leave" value={stats.leaveDays}    sub="approved" />
-        <MyAttTile dot="#dc2626" label="Days missed"   value={stats.missedDays}   sub="past working days" />
+        <MyAttTile dot="#dc2626" label="Days missed"   value={stats.missedDays}   sub="past weekdays not covered" />
         <MyAttTile dot="#0f172a" label="Hours worked"  value={`${hrsTotal}h ${minsTotal}m`} sub="this month" prominent />
       </div>
 
@@ -707,18 +720,30 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     return () => { cancelled = true; };
   }, [month, reloadKey]);
 
-  // Working days (Mon-Fri) up to today (or month end if past)
+  // Total days in month up to today (or month end if past). Every
+  // day must be "covered" — weekends, holidays and approved leaves
+  // are auto-credited so only weekdays the user was expected to
+  // clock in on and didn't pull the score down.
   const workingDaysInMonth = useMemo(() => {
     const [y, m] = month.split('-').map(Number);
     const lastDay = new Date(y, m, 0).getDate();
     const today = new Date();
+    return (today.getFullYear() === y && today.getMonth() + 1 === m) ? today.getDate() : lastDay;
+  }, [month]);
+  // Set of weekend (Sat/Sun) YYYY-MM-DD strings up to the same
+  // cutoff — joined into the coverage set below.
+  const weekendDatesInMonth = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const today = new Date();
     const cutoff = (today.getFullYear() === y && today.getMonth() + 1 === m) ? today.getDate() : lastDay;
-    let count = 0;
+    const pad = (n) => String(n).padStart(2, '0');
+    const out = new Set();
     for (let d = 1; d <= cutoff; d++) {
       const dow = new Date(y, m - 1, d).getDay();
-      if (dow !== 0 && dow !== 6) count++;
+      if (dow === 0 || dow === 6) out.add(`${y}-${pad(m)}-${pad(d)}`);
     }
-    return count;
+    return out;
   }, [month]);
 
   // Month bounds for clipping leave ranges that extend past the month edges.
@@ -768,7 +793,9 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
         ...presentDateSet,
         ...userAdj.map(a => a.date).filter(Boolean),
       ]);
-      const coverageSet = new Set([...presentForCoverage, ...leaveDateSet, ...holidaySet]);
+      const coverageSet = new Set([
+        ...presentForCoverage, ...leaveDateSet, ...holidaySet, ...weekendDatesInMonth,
+      ]);
       const covered = coverageSet.size;
       let health = 'green';
       if (covered < workingDaysInMonth - 5) health = 'red';
@@ -795,7 +822,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     }
     if (filterRole) filtered = filtered.filter(r => (r.user.role || '').toLowerCase() === filterRole);
     return filtered.sort((a, b) => (a.user.name || '').localeCompare(b.user.name || ''));
-  }, [expectedMembers, records, adjustments, leaves, holidaySet, monthBounds, workingDaysInMonth, search, filterRole]);
+  }, [expectedMembers, records, adjustments, leaves, holidaySet, weekendDatesInMonth, monthBounds, workingDaysInMonth, search, filterRole]);
 
   function canEdit(targetUser) {
     if (isBoss) return true;
