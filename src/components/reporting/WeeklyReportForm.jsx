@@ -495,6 +495,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
   // First-time anchor date picker (replaces hardcoded week options)
   const [weekStartInput, setWeekStartInput] = useState('');
+  // Starting week number for the first-time anchor. Defaults to 1
+  // (fresh brand). Brands that were tracked outside the app before
+  // launch (Google Docs etc.) can start at any number — e.g. enter 7
+  // here and the next report will pick up at week 8 automatically.
+  const [startWeekNumInput, setStartWeekNumInput] = useState(1);
 
   // Load report for editing
   useEffect(() => {
@@ -547,7 +552,8 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
   const handleSetWeeklyAnchor = () => {
     if (!weekStartInput) return;
-    const w = makeWeekFromStart(weekStartInput, 1);
+    const num = Math.max(1, Math.floor(Number(startWeekNumInput) || 1));
+    const w = makeWeekFromStart(weekStartInput, num);
     setSelectedWeek(w);
     setStep(2);
   };
@@ -1047,38 +1053,59 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     return (
       <div>
         <button className="btn btn-sm btn-link text-muted p-0 mb-3"
-          onClick={() => { setStep(0); setSelectedBrand(null); setWeekStartInput(''); }}>
+          onClick={() => { setStep(0); setSelectedBrand(null); setWeekStartInput(''); setStartWeekNumInput(1); }}>
           <i className="bi bi-arrow-left me-1" /> Back to brands
         </button>
         <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
           {selectedBrand?.name || selectedBrand?.brandName} — Set Weekly Anchor
         </h5>
         <p className="text-muted small mb-4">
-          This is the first weekly report for this brand. Select the start date of your first 7-day reporting week.
-          All future weekly reports will automatically follow from this date.
+          This is the first weekly report for this brand. Pick the starting date and
+          which week number you&apos;re on — all future reports follow from here.
         </p>
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 420 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 460 }}>
           <div className="card-body p-4">
-            <label className="form-label fw-semibold" style={{ fontSize: '0.8rem', color: '#374151' }}>
-              <i className="bi bi-calendar-week me-1 text-primary" /> Starting Date of Week 1
-            </label>
-            <input
-              type="date"
-              className="form-control mb-3"
-              value={weekStartInput}
-              onChange={e => setWeekStartInput(e.target.value)}
-              style={{ borderRadius: 8, fontSize: '0.85rem' }}
-            />
+            <div className="row g-2">
+              <div className="col-7">
+                <label className="form-label fw-semibold" style={{ fontSize: '0.78rem', color: '#374151' }}>
+                  <i className="bi bi-calendar-week me-1 text-primary" /> Starting date
+                </label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={weekStartInput}
+                  onChange={e => setWeekStartInput(e.target.value)}
+                  style={{ borderRadius: 8, fontSize: '0.85rem' }}
+                />
+              </div>
+              <div className="col-5">
+                <label className="form-label fw-semibold" style={{ fontSize: '0.78rem', color: '#374151' }}>
+                  <i className="bi bi-hash me-1 text-primary" />Week #
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  className="form-control"
+                  value={startWeekNumInput}
+                  onChange={e => setStartWeekNumInput(e.target.value)}
+                  style={{ borderRadius: 8, fontSize: '0.85rem' }}
+                />
+              </div>
+            </div>
+            <div className="text-muted small mt-2 mb-3" style={{ fontSize: '0.7rem' }}>
+              Use <strong>1</strong> for a brand new chain. If you&apos;ve been reporting outside the app
+              (e.g. Google Docs) and you&apos;re currently on week 7, enter <strong>7</strong> — the next report will pick up at week 8.
+            </div>
             {weekStartInput && (
               <div className="rounded-3 p-3 mb-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
                 <div className="fw-semibold" style={{ fontSize: '0.8rem', color: '#0369a1' }}>
-                  <i className="bi bi-calendar-check me-1" /> Week 1 Preview
+                  <i className="bi bi-calendar-check me-1" /> Week {Math.max(1, Math.floor(Number(startWeekNumInput) || 1))} Preview
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#0c4a6e', marginTop: 4 }}>
                   {startDisplay} — {previewEnd}
                 </div>
                 <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
-                  Week 2 will start 7 days later, and so on automatically.
+                  Week {Math.max(1, Math.floor(Number(startWeekNumInput) || 1)) + 1} will start 7 days later, and so on automatically.
                 </div>
               </div>
             )}
