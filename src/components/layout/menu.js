@@ -139,6 +139,7 @@ const EMPLOYEES_GROUP = {
     { label: 'APCs',            to: '/boss/manage/apcs' },
     { label: 'IPCs',            to: '/boss/manage/ipcs' },
     { label: 'Developers',      to: '/boss/manage/developers' },
+    { label: 'Salaries',        to: '/boss/salaries' },
   ],
 };
 

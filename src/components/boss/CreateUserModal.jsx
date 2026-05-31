@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { createUser, generatePassword } from '../../lib/adminApi';
+import { setUserHireDate } from '../../lib/salariesApi';
 import { getRoleExtras, roleLabel } from '../../lib/roles';
 import RoleExtraFields, { ResponsibilityTags } from './RoleExtraFields';
 import {
   XIcon, MailIcon, LockIcon, UserIcon, EyeIcon, EyeOffIcon,
-  RefreshIcon, CopyIcon, AlertIcon, CheckIcon,
+  RefreshIcon, CopyIcon, AlertIcon, CheckIcon, CalendarIcon,
 } from '../common/Icon';
 
 export default function CreateUserModal({ role, title, onClose, onCreated, lockedReportsTo = null }) {
@@ -17,6 +18,7 @@ export default function CreateUserModal({ role, title, onClose, onCreated, locke
   const [reportsTo, setReportsTo]         = useState(lockedReportsTo || '');
   const [permissions, setPermissions]     = useState({});
   const [responsibilities, setResponsibilities] = useState([]);
+  const [hireDate, setHireDate]       = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');
   const [copied, setCopied]           = useState(false);
@@ -46,6 +48,15 @@ export default function CreateUserModal({ role, title, onClose, onCreated, locke
         permissions: lockedReportsTo ? {} : (extras.permissions.length ? permissions : {}),
         responsibilities,
       });
+      // Capture hire date right at creation so Salary Management has
+      // it from day one. If the user skipped the date field we just
+      // leave start_date NULL — they can fill it in later from the
+      // Salaries page or the Edit user modal.
+      const newUid = result?.profile?.id || result?.user?.id || result?.id;
+      if (hireDate && newUid) {
+        try { await setUserHireDate(newUid, hireDate); }
+        catch (e) { console.warn('hire date set failed:', e?.message); }
+      }
       setCreated(result);
     } catch (err) {
       setError(err.message || 'Failed to create user.');
@@ -212,6 +223,22 @@ export default function CreateUserModal({ role, title, onClose, onCreated, locke
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
                 You'll share this password with the user. They can change it after signing in.
+              </div>
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              <label className="wx-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CalendarIcon width="13" height="13" /> Hire date
+              </label>
+              <input
+                type="date"
+                className="wx-input"
+                value={hireDate}
+                onChange={(e) => setHireDate(e.target.value)}
+                disabled={saving}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Defaults to today. Drives anniversary detection and years-completed counts.
               </div>
             </div>
 

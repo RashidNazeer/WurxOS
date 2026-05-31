@@ -84,6 +84,7 @@ const NotificationsPage     = lazy(() => import('./pages/notifications/Notificat
 const ReportsPage           = lazy(() => import('./pages/reports/ReportsPage'));
 const ReportPage            = lazy(() => import('./pages/reports/ReportPage'));
 const ResourcePlannerPage   = lazy(() => import('./pages/resourcePlanner/ResourcePlannerPage'));
+const BossSalariesPage      = lazy(() => import('./pages/boss/salaries/BossSalariesPage'));
 const BugsPage              = lazy(() => import('./pages/bugs/BugsPage'));
 const SuggestionsPage       = lazy(() => import('./pages/suggestions/SuggestionsPage'));
 // v1 verbatim port — boss gets BossChangeManagementPage, others get
@@ -479,6 +480,12 @@ export default function App() {
               <Route
                 path="/boss/resource-planner"
                 element={<RoleGuard allow={['boss', 'developer']}><ResourcePlannerPage /></RoleGuard>}
+              />
+
+              {/* Salary Management — Boss only (no developer access; per spec) */}
+              <Route
+                path="/boss/salaries"
+                element={<RoleGuard allow="boss"><BossSalariesPage /></RoleGuard>}
               />
 
               {/* Bugs — everyone authenticated (RLS filters rows per role) */}
