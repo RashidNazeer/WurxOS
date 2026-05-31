@@ -12,7 +12,7 @@ import {
   // Attendance helpers (re-exported from attendanceApi for parity)
   fetchRosterMonth, computeMonthlyDays, getAdjustmentsForMonth,
 } from '../../lib/performanceApi';
-import { expandLeaveWeekdays, effectiveMonthWindow } from '../../lib/attendanceApi';
+import { expandLeaveWeekdays } from '../../lib/attendanceApi';
 import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1200,15 +1200,11 @@ export default function PerformancePage() {
         // months the whole month is elapsed; for future months
         // nothing has elapsed. This prevents the score from
         // claiming credit for tomorrow's weekend / next week's
-        // holiday / a future approved-leave day. Also clip to the
-        // viewer's hire start_date so pre-hire days aren't credited.
+        // holiday / a future approved-leave day.
         const cutoffYmd = cutoffYmdForMonth(month);
-        const myWindow = effectiveMonthWindow(month, profile?.start_date || null);
-        const myLowerYmd = myWindow.startYmd;
-        const inMyRange = (d) => d <= cutoffYmd && (!myLowerYmd || d >= myLowerYmd);
-        const myWeekendSet = myWindow.weekendSet;
-        const myHolidayClipped = new Set([...myHolidaySet].filter(inMyRange));
-        const myLeaveClipped   = new Set([...myLeaveDates].filter(inMyRange));
+        const myWeekendSet = clipDateSet(weekendDateSetInMonth(month), cutoffYmd);
+        const myHolidayClipped = clipDateSet(myHolidaySet, cutoffYmd);
+        const myLeaveClipped   = clipDateSet(myLeaveDates, cutoffYmd);
         // Set-union of every "covered" date — clock-ins, approved
         // leaves, holidays, weekends. Counts each date once so a
         // clock-in on a holiday (or any other overlap) is not
@@ -1223,7 +1219,6 @@ export default function PerformancePage() {
           holidayDays: myHolidayClipped.size,
           weekendDays: myWeekendSet.size,
           coveredDays: myCoveredSet.size,
-          workingDays: myWindow.workingDays,
         });
       }
 
@@ -1269,16 +1264,11 @@ export default function PerformancePage() {
 
         // Clip credit-sets to days that have elapsed in `month`, so
         // future weekends / holidays / leaves don't pre-credit the
-        // score during the current month. Also clip per-user to
-        // their hire start_date so pre-hire days don't count.
+        // score during the current month.
         const teamCutoffYmd = cutoffYmdForMonth(month);
-        users.forEach((u) => {
-          const uid = u.id;
-          const userWin = effectiveMonthWindow(month, u.startDate || null);
-          const userLowerYmd = userWin.startYmd;
-          const inUserRange = (d) => d <= teamCutoffYmd && (!userLowerYmd || d >= userLowerYmd);
-          const userWeekendSet = userWin.weekendSet;
-          const userHolidayClipped = new Set([...teamHolidaySet].filter(inUserRange));
+        const teamWeekendSet = clipDateSet(weekendDateSetInMonth(month), teamCutoffYmd);
+        const teamHolidayClipped = clipDateSet(teamHolidaySet, teamCutoffYmd);
+        userIds.forEach((uid) => {
           const { actualDays, effectiveDays, effectiveSet } =
             computeMonthlyDays(uid, monthRecords, adjList);
           const userLeaves = monthLeaves.filter((l) => l.requestedBy === uid);
@@ -1291,20 +1281,19 @@ export default function PerformancePage() {
             );
             days.forEach((d) => leaveDates.add(d));
           });
-          const leaveClipped = new Set([...leaveDates].filter(inUserRange));
+          const leaveClipped = clipDateSet(leaveDates, teamCutoffYmd);
           // Set-union dedupes overlaps (e.g. clock-in on a holiday)
           // so a missed weekday cannot be hidden by double-counting.
           const coveredSet = new Set([
-            ...effectiveSet, ...leaveClipped, ...userHolidayClipped, ...userWeekendSet,
+            ...effectiveSet, ...leaveClipped, ...teamHolidayClipped, ...teamWeekendSet,
           ]);
           attMap[uid] = {
             actualDays,
             effectiveDays,
             leaveDays: leaveClipped.size,
-            holidayDays: userHolidayClipped.size,
-            weekendDays: userWeekendSet.size,
+            holidayDays: teamHolidayClipped.size,
+            weekendDays: teamWeekendSet.size,
             coveredDays: coveredSet.size,
-            workingDays: userWin.workingDays,
           };
         });
 
@@ -1397,7 +1386,7 @@ export default function PerformancePage() {
       const perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attData = teamAttendance[u.id] || { actualDays: 0, effectiveDays: 0, leaveDays: 0, holidayDays: 0 };
-      const wd = attData.workingDays != null ? attData.workingDays : workingDaysInMonth(month);
+      const wd = workingDaysInMonth(month);
       // attData.coveredDays is the set-union (clock-ins ∪ leaves ∪
       // holidays ∪ weekends), so an overlap (e.g. clock-in on a
       // holiday) is counted once — no inflated score.
@@ -1428,7 +1417,7 @@ export default function PerformancePage() {
   const myIncScore  = calcIncentiveScore(myIncRecord);
   const myAttScore  = calcAttendanceScore(
     myAttendanceDays.coveredDays || 0,
-    myAttendanceDays.workingDays != null ? myAttendanceDays.workingDays : workingDaysInMonth(month),
+    workingDaysInMonth(month),
   );
   const myFlagScore = calcFlagsScore(myFlags, month);
   const myPillarScores = { performance: myPerfScore, incentives: myIncScore, attendance: myAttScore, flags: myFlagScore };
@@ -1577,7 +1566,7 @@ export default function PerformancePage() {
                       myAttendanceDays,
                       myFlags,
                       month,
-                      workingDays: myAttendanceDays.workingDays != null ? myAttendanceDays.workingDays : workingDaysInMonth(month),
+                      workingDays: workingDaysInMonth(month),
                     }}
                   />
                 }

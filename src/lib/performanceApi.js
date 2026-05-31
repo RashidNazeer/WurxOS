@@ -555,7 +555,7 @@ export async function saveV1Weights(weights) {
 export async function listEvaluableUsers({ uid, viewerRole }) {
   let q = supabase
     .from('profiles')
-    .select('id, display_name, email, role, reports_to, start_date')
+    .select('id, display_name, email, role, reports_to')
     .is('deleted_at', null)
     .eq('is_active', true);
   if (viewerRole === 'boss' || viewerRole === 'developer') {
@@ -577,7 +577,6 @@ export async function listEvaluableUsers({ uid, viewerRole }) {
     role:         p.role,
     email:        p.email,
     reportsTo:    p.reports_to,
-    startDate:    p.start_date || null,
     _tab:         (p.role === 'ol') ? 'ols'
                  : (p.role === 'tl' || p.role === 'pctl') ? 'tls'
                  : 'apcs',
