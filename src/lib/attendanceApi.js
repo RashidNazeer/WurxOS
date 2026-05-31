@@ -1032,6 +1032,47 @@ export function expandLeaveWeekdays(startDate, endDate, { mStart, mEnd, holidayS
   return out;
 }
 
+// Effective month window for a user, clipped to their hire start_date.
+// Returns:
+//   workingDays   — inclusive days from max(monthStart, hireStart) to min(today, monthEnd)
+//   startYmd      — the clipped lower bound (YYYY-MM-DD)
+//   endYmd        — the clipped upper bound (YYYY-MM-DD)
+//   weekendSet    — Sat/Sun YYYY-MM-DD strings inside [startYmd, endYmd]
+// If hireStartDate is after the month ends, workingDays is 0.
+export function effectiveMonthWindow(monthStr, hireStartDate) {
+  if (!monthStr) {
+    return { workingDays: 0, startYmd: '', endYmd: '', weekendSet: new Set() };
+  }
+  const [y, m] = monthStr.split('-').map(Number);
+  const pad = (n) => String(n).padStart(2, '0');
+  const monthStartYmd = `${y}-${pad(m)}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const monthEndYmd  = `${y}-${pad(m)}-${pad(lastDay)}`;
+  const today = new Date();
+  const isCurrentMonth = (today.getFullYear() === y && today.getMonth() + 1 === m);
+  const todayYmd = isCurrentMonth
+    ? `${y}-${pad(m)}-${pad(today.getDate())}`
+    : monthEndYmd;
+  let startYmd = monthStartYmd;
+  if (hireStartDate && typeof hireStartDate === 'string' && hireStartDate > monthStartYmd) {
+    startYmd = hireStartDate;
+  }
+  if (startYmd > todayYmd || startYmd > monthEndYmd) {
+    return { workingDays: 0, startYmd, endYmd: startYmd, weekendSet: new Set() };
+  }
+  const startDt = new Date(startYmd + 'T00:00:00');
+  const endDt   = new Date(todayYmd + 'T00:00:00');
+  const workingDays = Math.floor((endDt - startDt) / 86400000) + 1;
+  const weekendSet = new Set();
+  for (let d = new Date(startDt); d <= endDt; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) {
+      weekendSet.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    }
+  }
+  return { workingDays, startYmd, endYmd: todayYmd, weekendSet };
+}
+
 export function missedWeekdayDatesFor(userId, monthStr, monthRecords, monthAdjusts, monthLeaves) {
   const [y, m] = monthStr.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
@@ -1260,7 +1301,7 @@ export async function fetchRosterMonth(monthStr) {
 export async function listExpectedMembers({ uid, isBoss, isOL, isTL }) {
   let q = supabase
     .from('profiles')
-    .select('id, display_name, email, role, is_active, reports_to')
+    .select('id, display_name, email, role, is_active, reports_to, start_date')
     .is('deleted_at', null)
     .eq('is_active', true)
     .in('role', ['tl', 'pctl', 'ol', 'apc', 'ipc']);
@@ -1272,6 +1313,7 @@ export async function listExpectedMembers({ uid, isBoss, isOL, isTL }) {
     name:  p.display_name || p.email || '(unnamed)',
     role:  p.role || 'apc',
     email: p.email || '',
+    startDate: p.start_date || null,
   }));
 }
 

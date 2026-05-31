@@ -18,6 +18,7 @@ import {
   listExpectedMembers, getLeaveQuotaDefault, setLeaveQuotaDefault,
   scanLeaveQuotaConflicts,
   expandLeaveWeekdays,
+  effectiveMonthWindow,
 } from '../../lib/attendanceApi';
 import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 
@@ -128,7 +129,7 @@ function BreakDetailsModal({ record, onClose }) {
 }
 
 // ── Personal monthly attendance summary ────────────────────────────────────
-function MyMonthlyAttendance({ userId, displayName }) {
+function MyMonthlyAttendance({ userId, displayName, hireStartDate }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -141,7 +142,6 @@ function MyMonthlyAttendance({ userId, displayName }) {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth(); // 0-based
-        const monthStart = new Date(year, month, 1);
         const monthEnd   = new Date(year, month + 1, 0);
         const pad = n => String(n).padStart(2, '0');
         const startStr = `${year}-${pad(month + 1)}-01`;
@@ -149,22 +149,15 @@ function MyMonthlyAttendance({ userId, displayName }) {
 
         // Days elapsed in the month — this is the denominator.
         // Current month: today (inclusive). Past month: full month.
-        // Using elapsed days (not the full month) prevents the score
-        // from claiming credit for tomorrow's weekend / a future
-        // holiday / a future approved-leave day before they happen.
-        const isCurrentMonth = (now.getFullYear() === year && now.getMonth() === month);
-        const cutoffDate = isCurrentMonth ? new Date(year, month, now.getDate()) : monthEnd;
-        const cutoffYmd  = `${cutoffDate.getFullYear()}-${pad(cutoffDate.getMonth() + 1)}-${pad(cutoffDate.getDate())}`;
-        const workingDays = cutoffDate.getDate();
-        // Past-only weekend set — only Sat/Sun dates that have
-        // already elapsed get the auto-credit.
-        const weekendDates = new Set();
-        for (let d = new Date(monthStart); d <= cutoffDate; d.setDate(d.getDate() + 1)) {
-          const dow = d.getDay();
-          if (dow === 0 || dow === 6) {
-            weekendDates.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }
-        }
+        // Clipped to the user's hire date so pre-hire days (before
+        // they joined) don't count against them.
+        const monthKey = `${year}-${pad(month + 1)}`;
+        const win = effectiveMonthWindow(monthKey, hireStartDate || null);
+        const cutoffYmd  = win.endYmd;
+        const workingDays = win.workingDays;
+        const lowerBoundYmd = win.startYmd;
+        const weekendDates = win.weekendSet;
+        const lowerBoundDate = lowerBoundYmd ? new Date(lowerBoundYmd + 'T00:00:00') : new Date(year, month, 1);
 
         // Attendance for this user
         const history = await getUserHistory(userId, startStr, endStr);
@@ -188,7 +181,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
         let holidaySetAll = new Set();
         try { holidaySetAll = await listHolidayDatesForMonth(monthStrKey); }
         catch { /* non-fatal */ }
-        const holidaySet = new Set([...holidaySetAll].filter(d => d <= cutoffYmd));
+        const holidaySet = new Set([...holidaySetAll].filter(d => d <= cutoffYmd && (!lowerBoundYmd || d >= lowerBoundYmd)));
 
         // Approved leaves overlapping this month, expanded day-by-
         // day (Mon-Fri only). WFH is excluded (remote work is not
@@ -198,7 +191,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
         try {
           leaveDatesAll = await listApprovedLeaveDatesForMonth(userId, monthStrKey, { holidaySet: holidaySetAll });
         } catch { /* non-fatal */ }
-        const leaveDates = new Set([...leaveDatesAll].filter(d => d <= cutoffYmd));
+        const leaveDates = new Set([...leaveDatesAll].filter(d => d <= cutoffYmd && (!lowerBoundYmd || d >= lowerBoundYmd)));
 
         // Effective present days = union of actual present dates and any
         // dates manually marked by Boss/OL. Same math as the Roster tab.
@@ -219,7 +212,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
         // weekday the user was expected to clock in on and didn't.
         const today = new Date(); today.setHours(0, 0, 0, 0);
         let missed = 0;
-        for (let d = new Date(monthStart); d <= monthEnd && d < today; d.setDate(d.getDate() + 1)) {
+        for (let d = new Date(lowerBoundDate); d <= monthEnd && d < today; d.setDate(d.getDate() + 1)) {
           const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
           if (!accountedDates.has(ds)) missed++;
         }
@@ -799,10 +792,20 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
         );
         days.forEach((d) => leaveDateSet.add(d));
       });
+      // Per-user effective window — clipped to the user's hire date
+      // so pre-hire days are excluded from both the denominator and
+      // any auto-credits (weekends/holidays/leaves before hire).
+      const userWindow = effectiveMonthWindow(month, u.startDate || null);
+      const userWorkingDays = userWindow.workingDays;
+      const userWeekendSet = userWindow.weekendSet;
+      const userLowerYmd = userWindow.startYmd;
+      const inRange = (d) => d <= cutoffYmd && (!userLowerYmd || d >= userLowerYmd);
+
       // Clip leaves and holidays to days that have actually
-      // elapsed — future credits don't inflate the score.
-      const pastLeaveSet = new Set([...leaveDateSet].filter((d) => d <= cutoffYmd));
-      const pastHolidaySet = new Set([...holidaySet].filter((d) => d <= cutoffYmd));
+      // elapsed — future credits don't inflate the score. Also clip
+      // to the user's hire-date lower bound.
+      const pastLeaveSet = new Set([...leaveDateSet].filter(inRange));
+      const pastHolidaySet = new Set([...holidaySet].filter(inRange));
       const leaveDays = pastLeaveSet.size;
       // Days where leave overlaps with a clock-in (informational; calendar
       // shows them with a small blue dot on the green tile).
@@ -816,12 +819,12 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
         ...userAdj.map(a => a.date).filter(Boolean),
       ]);
       const coverageSet = new Set([
-        ...presentForCoverage, ...pastLeaveSet, ...pastHolidaySet, ...weekendDatesInMonth,
+        ...presentForCoverage, ...pastLeaveSet, ...pastHolidaySet, ...userWeekendSet,
       ]);
       const covered = coverageSet.size;
       let health = 'green';
-      if (covered < workingDaysInMonth - 5) health = 'red';
-      else if (covered < workingDaysInMonth - 2) health = 'yellow';
+      if (covered < userWorkingDays - 5) health = 'red';
+      else if (covered < userWorkingDays - 2) health = 'yellow';
       return {
         user: u,
         actualDays,
@@ -829,6 +832,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
         leaveDays,
         leaveOverlapCount,
         coveredDays: covered,
+        workingDays: userWorkingDays,
         totalHoursMs,
         adjustments: userAdj,
         health,
@@ -1013,7 +1017,9 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
 
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted" style={{ fontSize: '0.66rem' }}>
-                        {workingDaysInMonth > 0 ? `${Math.round((r.coveredDays / workingDaysInMonth) * 100)}% of ${workingDaysInMonth} wd` : ''}
+                        {(r.workingDays || workingDaysInMonth) > 0
+                          ? `${Math.round((r.coveredDays / (r.workingDays || workingDaysInMonth)) * 100)}% of ${r.workingDays || workingDaysInMonth} wd`
+                          : ''}
                       </span>
                       {editable ? (
                         <button className="btn btn-sm btn-outline-primary rounded-pill px-3" style={{ fontSize: '0.7rem' }}
@@ -1913,7 +1919,7 @@ export default function AttendancePage() {
         {!isBoss && tab === 'today' && (
           <div className="col-12 d-flex justify-content-center">
             <div style={{ width: '100%', maxWidth: 1100 }}>
-            <MyMonthlyAttendance userId={currentUser.uid} displayName={currentUser.displayName} />
+            <MyMonthlyAttendance userId={currentUser.uid} displayName={currentUser.displayName} hireStartDate={profile?.start_date || null} />
             <ClockWidget />
 
             {/* Pending approvals for TL */}
