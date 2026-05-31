@@ -1,0 +1,542 @@
+[
+  {
+    "sheetName": "Samran ali",
+    "sheetDate": "12/8/2025",
+    "parsedDate": "2025-12-08",
+    "candidates": [
+      {
+        "uid": "c0fd1182-dff8-5027-b218-7ddfa54bf365",
+        "name": "Haider Ali",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "5d463224-4e07-5e52-841a-f7dfb4dc3fb7",
+        "name": "Ali Waseem",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "7ab9eeb2-0398-577d-b25e-d57075ac817c",
+        "name": "Ali Hamza",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Nadeem Hassan",
+    "sheetDate": "2/9/2026",
+    "parsedDate": "2026-02-09",
+    "candidates": [
+      {
+        "uid": "5bdb63a9-af56-5342-a20a-25fa5dada47c",
+        "name": "Mian Hassan",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      },
+      {
+        "uid": "b98c7e87-5c3e-4dd2-a2b8-33df9b96cb5f",
+        "name": "Test IPC",
+        "role": "ipc",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Umar Ilyas",
+    "sheetDate": "2/9/2026",
+    "parsedDate": "2026-02-09",
+    "candidates": [
+      {
+        "uid": "5d15f70d-cf9f-5a4f-a936-1153d1b352e8",
+        "name": "Umar Ilyas",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.67"
+      },
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.25"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "MUHAMMAD IBRAHIM",
+    "sheetDate": "2/9/2026",
+    "parsedDate": "2026-02-09",
+    "candidates": [
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+        "name": "Muhammad Mohid",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.33"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Mohammad Haseeb",
+    "sheetDate": "4/29/2025",
+    "parsedDate": "2025-04-29",
+    "candidates": [
+      {
+        "uid": "20f4156e-397a-52d7-8003-d00686630b32",
+        "name": "Haseeb",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.50"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      },
+      {
+        "uid": "b98c7e87-5c3e-4dd2-a2b8-33df9b96cb5f",
+        "name": "Test IPC",
+        "role": "ipc",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Azan Jahangir",
+    "sheetDate": "2/1/2025",
+    "parsedDate": "2025-02-01",
+    "candidates": [
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+        "name": "Muhammad Mohid",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.25"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Asad",
+    "sheetDate": "9/9/2024",
+    "parsedDate": "2024-09-09",
+    "candidates": [
+      {
+        "uid": "e60fb1f8-6cc1-5228-b00d-6d6ffdf440e1",
+        "name": "Muhammad Asad Aman",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.67"
+      },
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.33"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "ABDUL RAFAY",
+    "sheetDate": "12/1/2025",
+    "parsedDate": "2025-12-01",
+    "candidates": [
+      {
+        "uid": "f7ee4fd4-d422-5329-a658-fdc7a530b812",
+        "name": "Abdul Subhan",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      },
+      {
+        "uid": "b98c7e87-5c3e-4dd2-a2b8-33df9b96cb5f",
+        "name": "Test IPC",
+        "role": "ipc",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Mehroze Maqsood",
+    "sheetDate": "8/13/2025",
+    "parsedDate": "2025-08-13",
+    "candidates": [
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+        "name": "Muhammad Mohid",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.25"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Fahad Bin Tariq",
+    "sheetDate": "7/1/2025",
+    "parsedDate": "2025-07-01",
+    "candidates": [
+      {
+        "uid": "2afc6ad4-312c-5f8b-af3e-9c786a856bf0",
+        "name": "Umair Tariq",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "f9c7bfb1-cf20-505d-afec-d4a459354216",
+        "name": "Muhammd Fahad",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.25"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Rashid Nazeer",
+    "sheetDate": "2/10/2025",
+    "parsedDate": "2025-02-10",
+    "candidates": [
+      {
+        "uid": "87f3419d-5c90-537e-b41e-e4097330d670",
+        "name": "Rashid Nazeer",
+        "role": "developer",
+        "currentStart": null,
+        "score": "1.00"
+      },
+      {
+        "uid": "3582f4f1-e018-507d-af98-8ae206320c5e",
+        "name": "Rashid Nazeer",
+        "role": "apc",
+        "currentStart": null,
+        "score": "1.00"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "top two close"
+  },
+  {
+    "sheetName": "Maida",
+    "sheetDate": "2/9/2026",
+    "parsedDate": "2026-02-09",
+    "candidates": [
+      {
+        "uid": "52569db0-55e6-532b-9055-a8c00064e1de",
+        "name": "Maida Hashmi",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.50"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      },
+      {
+        "uid": "b98c7e87-5c3e-4dd2-a2b8-33df9b96cb5f",
+        "name": "Test IPC",
+        "role": "ipc",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Arslan Sabir",
+    "sheetDate": "11/1/2023",
+    "parsedDate": "2023-11-01",
+    "candidates": [
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      },
+      {
+        "uid": "b98c7e87-5c3e-4dd2-a2b8-33df9b96cb5f",
+        "name": "Test IPC",
+        "role": "ipc",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Abrahim Muhammad",
+    "sheetDate": "8/7/2025",
+    "parsedDate": "2025-08-07",
+    "candidates": [
+      {
+        "uid": "2552ed49-6c77-56ab-99c6-6a5ea005b1ea",
+        "name": "Abrahim",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.50"
+      },
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.33"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Mohid Saeed",
+    "sheetDate": "11/4/2024",
+    "parsedDate": "2024-11-04",
+    "candidates": [
+      {
+        "uid": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+        "name": "Muhammad Mohid",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.67"
+      },
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.25"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Romail Hafeez",
+    "sheetDate": "6/23/2025",
+    "parsedDate": "2025-06-23",
+    "candidates": [
+      {
+        "uid": "76cea800-34f9-5fcc-8489-0bfe405534ff",
+        "name": "Romail",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.50"
+      },
+      {
+        "uid": "b99fa1b8-5e73-44d2-8277-31d7b2cbf2d7",
+        "name": "Test PCTL",
+        "role": "pctl",
+        "currentStart": null,
+        "score": "0.00"
+      },
+      {
+        "uid": "b98c7e87-5c3e-4dd2-a2b8-33df9b96cb5f",
+        "name": "Test IPC",
+        "role": "ipc",
+        "currentStart": null,
+        "score": "0.00"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Muhammad Jihad Yasir",
+    "sheetDate": "10/1/2025",
+    "parsedDate": "2025-10-01",
+    "candidates": [
+      {
+        "uid": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+        "name": "Muhammad Azam",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+        "name": "Muhammad Arslan",
+        "role": "ol",
+        "currentStart": null,
+        "score": "0.25"
+      },
+      {
+        "uid": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+        "name": "Muhammad Mohid",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.25"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  },
+  {
+    "sheetName": "Raees Ali",
+    "sheetDate": "9/7/2024",
+    "parsedDate": "2024-09-07",
+    "candidates": [
+      {
+        "uid": "c0fd1182-dff8-5027-b218-7ddfa54bf365",
+        "name": "Haider Ali",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "5d463224-4e07-5e52-841a-f7dfb4dc3fb7",
+        "name": "Ali Waseem",
+        "role": "apc",
+        "currentStart": null,
+        "score": "0.33"
+      },
+      {
+        "uid": "7ab9eeb2-0398-577d-b25e-d57075ac817c",
+        "name": "Ali Hamza",
+        "role": "tl",
+        "currentStart": null,
+        "score": "0.33"
+      }
+    ],
+    "uid": null,
+    "note": "low confidence"
+  }
+]
