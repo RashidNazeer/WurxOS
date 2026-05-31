@@ -8,6 +8,7 @@ import {
   ChecklistIcon, StoreIcon, ReportIcon, UsersIcon, MegaphoneIcon, AlertIcon,
   HomeIcon, CheckIcon, BellIcon,
 } from '../../components/common/Icon';
+import AnniversaryBanner from '../../components/common/AnniversaryBanner';
 
 async function fetchMyTasks(uid) {
   const { data, error } = await supabase
@@ -154,6 +155,8 @@ export default function RoleDashboard() {
         <h1 className="page-title">{greeting}{profile?.display_name ? `, ${profile.display_name}` : ''}</h1>
         <p className="page-subtitle">Here's your snapshot for today.</p>
       </div>
+
+      <AnniversaryBanner />
 
       {err && (
         <div className="wx-alert wx-alert-danger" style={{ marginBottom: 14 }}>

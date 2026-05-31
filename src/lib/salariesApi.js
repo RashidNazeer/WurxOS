@@ -79,19 +79,31 @@ export async function listAllHistory({ limit = 200 } = {}) {
 
 // Self-read: am I owed an anniversary banner? Returns the year to
 // celebrate (1, 2, …) or null if there's nothing to show.
+//
+// Per product decision: do NOT show retroactive celebrations for
+// anniversaries that completed BEFORE SALARY_FEATURE_LAUNCH_DATE.
+// The current "year completed" is only worth celebrating if THIS
+// year's anniversary date falls on or after the launch date.
 export async function pendingAnniversaryFor(userId, hireStartDate) {
   if (!userId || !hireStartDate) return null;
   const today = new Date();
   const hire  = new Date(hireStartDate + 'T00:00:00');
   if (Number.isNaN(hire.getTime())) return null;
 
-  // years completed = full years where today >= anniversary of this year
   let years = today.getFullYear() - hire.getFullYear();
   const passedThisYear =
     today.getMonth() > hire.getMonth() ||
     (today.getMonth() === hire.getMonth() && today.getDate() >= hire.getDate());
   if (!passedThisYear) years -= 1;
   if (years < 1) return null;
+
+  // Anniversary date for the current completed year.
+  const annivThisYear = new Date(hire);
+  annivThisYear.setFullYear(hire.getFullYear() + years);
+  const annivYmd = annivThisYear.toISOString().slice(0, 10);
+  if (annivYmd < SALARY_FEATURE_LAUNCH_DATE) {
+    return null;  // historical anniversary — never retroactively celebrated
+  }
 
   const { data, error } = await supabase
     .from('anniversary_celebrations')
@@ -102,6 +114,38 @@ export async function pendingAnniversaryFor(userId, hireStartDate) {
 
   const lastShown = data?.last_year_shown ?? 0;
   return years > lastShown ? years : null;
+}
+
+// Pending Reviews — Boss view. An employee is pending a salary
+// review whenever their years_completed > the number of
+// annual_increment rows recorded for them. Surfaces both:
+//   • people whose anniversary already passed before launch but
+//     never got an annual review, and
+//   • people whose anniversary just hit this year.
+export function computePendingReviews({ profiles = [], compRows = [], historyRows = [] }) {
+  const compByUid = new Map();
+  compRows.forEach((c) => c.userId && compByUid.set(c.userId, c));
+  const annualByUid = new Map();
+  historyRows.forEach((h) => {
+    if (h.changeReason !== 'annual_increment' || !h.userId) return;
+    annualByUid.set(h.userId, (annualByUid.get(h.userId) || 0) + 1);
+  });
+  return profiles
+    .filter((p) => p.is_active && !p.deleted_at && p.role !== 'boss' && p.start_date)
+    .map((p) => {
+      const years = yearsCompletedSince(p.start_date);
+      const reviews = annualByUid.get(p.id) || 0;
+      const overdue = years - reviews;
+      return {
+        user: p,
+        years,
+        annualReviews: reviews,
+        overdueYears: overdue,
+        comp: compByUid.get(p.id) || null,
+      };
+    })
+    .filter((r) => r.years >= 1 && r.overdueYears >= 1)
+    .sort((a, b) => b.overdueYears - a.overdueYears || (a.user.display_name || '').localeCompare(b.user.display_name || ''));
 }
 
 // ── Writes (Boss-only at the RPC layer) ───────────────────────
@@ -195,6 +239,18 @@ export function formatPKR(amount) {
   if (amount == null || Number.isNaN(Number(amount))) return '—';
   return 'PKR ' + Number(amount).toLocaleString('en-PK', { maximumFractionDigits: 0 });
 }
+
+// Date the Salary Management feature went live in production. Used
+// to gate the employee-side anniversary celebration banner: only
+// anniversaries that fall on or after this date trigger a celebration.
+// Past anniversaries (year-1, year-2 etc. that completed before the
+// feature shipped) are NOT shown retroactively to the employee, per
+// product decision 2026-05-31.
+//
+// Boss-side surfaces (Pending Reviews tab, daily anniversary cron)
+// ignore this date — Boss sees every employee with ≥1 year completed
+// regardless of when the anniversary happened.
+export const SALARY_FEATURE_LAUNCH_DATE = '2026-05-31';
 
 // Years completed since a YYYY-MM-DD hire date, anchored to today.
 // Returns 0 if hire is in the future or null.

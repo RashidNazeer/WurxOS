@@ -34,6 +34,7 @@ const TEAM_MGMT_ITEM      = { label: 'Team Management', icon: UsersIcon, to: '/t
 const TEAM_HIERARCHY_ITEM = { label: 'Team Hierarchy', icon: DiagramIcon, to: '/team-hierarchy' };
 const NOTIFS_ITEM   = { label: 'Notifications', icon: BellIcon,      to: '/notifications' };
 const SETTINGS_ITEM = { label: 'Settings',      icon: SettingsIcon,  to: '/settings' };
+const MY_COMPENSATION_ITEM = { label: 'My Compensation', icon: StarIcon, to: '/me/compensation', category: 'salary' };
 const CHANGES_ITEM  = { label: 'Changes', icon: ArrowLeftRightIcon, to: '/changes', category: 'change' };
 const ATTENDANCE_ITEM = { label: 'Attendance', icon: ClockIcon, to: '/attendance' };
 const HOLIDAYS_ITEM   = { label: 'Holidays',   icon: CalendarIcon, to: '/holidays' };
@@ -241,6 +242,7 @@ export const MENUS = {
     REPORTS_GROUP,
     REQUESTS_GROUP_OL,
     CHAT_ITEM,
+    MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],
@@ -263,6 +265,7 @@ export const MENUS = {
     REPORTS_GROUP,
     REQUESTS_GROUP_APPROVER,
     CHAT_ITEM,
+    MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],
@@ -278,6 +281,7 @@ export const MENUS = {
     REPORTS_GROUP,
     REQUESTS_GROUP_APPROVER,
     CHAT_ITEM,
+    MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],
@@ -299,6 +303,7 @@ export const MENUS = {
     REPORTS_GROUP,
     REQUESTS_GROUP_APPLIER,
     CHAT_ITEM,
+    MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],
@@ -314,6 +319,7 @@ export const MENUS = {
     CHANGES_ITEM,
     REQUESTS_GROUP_APPLIER,
     CHAT_ITEM,
+    MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],
@@ -324,6 +330,7 @@ export const MENUS = {
   developer: [
     { label: 'Bug Reports', icon: BugIcon, to: '/bugs', category: 'bug' },
     { label: 'Suggestions', icon: LightbulbIcon, to: '/suggestions', category: 'suggestion' },
+    MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],

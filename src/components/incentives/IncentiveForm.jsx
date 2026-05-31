@@ -497,7 +497,11 @@ export default function IncentiveForm() {
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* Basic Salary */}
+        {/* Basic Salary — READ-ONLY since the Salary Management
+            feature owns this field. Edits happen at /boss/salaries.
+            The value rendered here is whatever the editor last loaded
+            (carried over from prior month's plan) — it remains the
+            per-month snapshot the incentive math reads from. */}
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-3">
@@ -508,17 +512,30 @@ export default function IncentiveForm() {
                 <i className="bi bi-wallet2" style={{ color: '#6c757d', fontSize: '0.85rem' }} />
               </div>
               <span className="fw-semibold small">Basic / Fixed Salary</span>
+              <span className="badge ms-auto" style={{
+                background: 'var(--accent-soft)', color: 'var(--accent)',
+                fontWeight: 700, fontSize: '0.65rem', padding: '3px 8px',
+              }}>
+                <i className="bi bi-lock-fill me-1" /> Boss-managed
+              </span>
             </div>
             <div className="input-group input-group-sm" style={{ maxWidth: 220 }}>
               <input
                 type="number"
                 className="form-control"
-                placeholder="e.g. 60000"
+                placeholder="—"
                 min="0"
                 value={basicSalary}
-                onChange={e => setBasicSalary(e.target.value)}
+                readOnly
+                disabled
+                style={{ background: 'var(--surface-2)', cursor: 'not-allowed' }}
               />
               <span className="input-group-text">PKR</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
+              Fixed salary is managed under <strong>Boss → Salaries</strong>. The amount
+              shown here is the snapshot for this month's incentive plan and updates
+              automatically when a new salary is set.
             </div>
           </div>
         </div>
