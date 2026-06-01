@@ -54,6 +54,33 @@ const STALE_DEPLOY_PATTERNS = [
 function isStaleDeployError(msg) {
   return STALE_DEPLOY_PATTERNS.some((re) => re.test(msg));
 }
+
+// Browser-extension noise. MetaMask, Phantom, other wallet extensions
+// inject scripts into every page; some of them throw rejections on
+// load (e.g. "Failed to connect to MetaMask") that the page can't
+// handle and that the user can't act on. Same goes for password
+// managers, screenshot tools, ad blockers, etc.
+//
+// We detect them two ways:
+//   (a) stack frame from chrome-extension:// / moz-extension:// /
+//       safari-web-extension:// — extension origin = not our code
+//   (b) message matches a known wallet/extension pattern — fallback
+//       when no stack is captured (cross-origin script errors)
+const EXTENSION_STACK_PATTERN = /(chrome|moz|safari-web)-extension:\/\//i;
+const EXTENSION_MSG_PATTERNS = [
+  /Failed to connect to MetaMask/i,
+  /MetaMask.*RPC/i,
+  /window\.ethereum/i,
+  /No Ethereum provider/i,
+  /Phantom.*not found/i,
+  /tronWeb/i,
+];
+function isExtensionNoise(err) {
+  const msg = extractMessage(err);
+  const stack = String(err?.stack || '');
+  if (EXTENSION_STACK_PATTERN.test(stack)) return true;
+  return EXTENSION_MSG_PATTERNS.some((re) => re.test(msg));
+}
 function handleStaleDeploy() {
   // Coordinator decides whether to reload now or defer to the banner.
   // Either way the stale-deploy error is handled — never surface it.
@@ -129,6 +156,9 @@ export function ErrorReporterProvider({ children }) {
       // "report to developer" modal; the user knows their brand
       // is inactive.
       if (/brand is inactive|inactive brand/i.test(msg)) return;
+      // Browser-extension noise (MetaMask, wallets, etc.) — not our
+      // code, user can't act on it.
+      if (isExtensionNoise(r)) return;
       // Stale-deploy: silently reload instead of showing the modal.
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(r, 'unhandled_rejection');
@@ -139,6 +169,7 @@ export function ErrorReporterProvider({ children }) {
       if (name === 'AbortError') return;
       if (/ResizeObserver loop|Script error|Lock broken/i.test(msg)) return;
       if (/brand is inactive|inactive brand/i.test(msg)) return;
+      if (isExtensionNoise(e?.error || e)) return;
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(e?.error || e, 'window_error');
     };
