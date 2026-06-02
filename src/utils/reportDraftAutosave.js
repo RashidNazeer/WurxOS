@@ -34,7 +34,13 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 
-const AUTOSAVE_INTERVAL_MS = 30 * 1000;
+// Auto-save cadence. 5s gives a much tighter safety net than the
+// original 30s — worst-case data loss for an APC who crashes mid-
+// sentence drops accordingly. localStorage writes of a typical
+// report payload (10-50KB JSON) run in well under 1ms, so the
+// extra writes are imperceptible. Adjusted 2026-06-02 at user
+// request — see "Pending fixes -IMP.md" for the trade-off notes.
+const AUTOSAVE_INTERVAL_MS = 5 * 1000;
 const KEY_PREFIX = 'wurxos.report-draft.';
 
 function buildKey(type, uid, brandId, periodStart, editId) {
