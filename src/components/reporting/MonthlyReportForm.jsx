@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   emptyMonthlyReport, makeMonthInfo, detectNextMonth, getFirstTimeMonthOptions,
@@ -170,6 +171,37 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   // Unsaved-changes guard — see WeeklyReportForm for the rationale.
   const [dirty, setDirty] = useState(false);
   useUnsavedGuard(dirty);
+
+  // Auto-save to localStorage every 30s — same pattern as the
+  // weekly / bi-weekly forms. Monthly was missing autosave entirely
+  // before this; an APC editing a monthly report had ZERO safety
+  // net if the editor got remounted. Now enabled for both new and
+  // edit modes, with editReportId in the key to keep drafts of
+  // different reports isolated.
+  const periodStartForKey = selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month).padStart(2,'0')}-01` : null;
+  const draftKey = {
+    type: 'monthly',
+    uid: currentUser?.uid,
+    brandId: selectedBrand?.id,
+    periodStart: periodStartForKey,
+    editId: editReportId || null,
+  };
+  const { clear: clearLocalDraft } = useReportAutosave({
+    ...draftKey,
+    data,
+  });
+  const restoredKeyRef = useRef('');
+  useEffect(() => {
+    if (!draftKey.uid || !draftKey.brandId || !draftKey.periodStart) return;
+    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}|${draftKey.editId || ''}`;
+    if (restoredKeyRef.current === k) return;
+    restoredKeyRef.current = k;
+    const saved = loadDraft(draftKey);
+    if (saved?.data) {
+      setData((d) => ({ ...d, ...saved.data }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey.uid, draftKey.brandId, draftKey.periodStart, draftKey.editId]);
   const [detecting, setDetecting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [reportStatus, setReportStatus] = useState('draft');
@@ -226,42 +258,52 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     getMonthlyReportsForBrand(selectedBrand.id).then(setExistingReports);
   }, [selectedBrand, editReportId]);
 
-  // Load report for editing
+  // Load report for editing. Deps are [editReportId] only — see the
+  // long-form comment in WeeklyReportForm.jsx for the brands-realtime
+  // wipe rationale. Same fix applied here.
   useEffect(() => {
     if (!editReportId) return;
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      const r = await getMonthlyReport(editReportId);
-      if (r) {
-        const brand = brands.find(b => b.id === r.brandId);
-        setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
-        setSelectedMonth(makeMonthInfo(r.year, r.month));
-        const empty = emptyMonthlyReport();
-        setData({
-          currency: r.currency || empty.currency,
-          sectionsEnabled: resolveSectionsEnabled(r.sectionsEnabled),
-          totalSales: r.totalSales || empty.totalSales,
-          keyMetrics: r.keyMetrics || empty.keyMetrics,
-          kpis: r.kpis || empty.kpis,
-          gmvBreakdown: r.gmvBreakdown || empty.gmvBreakdown,
-          topCreators: r.topCreators?.length ? r.topCreators : empty.topCreators,
-          topVideos:   r.topVideos?.length   ? r.topVideos   : empty.topVideos,
-          videoPerformance: r.videoPerformance || empty.videoPerformance,
-          creatorsPerformance: r.creatorsPerformance || empty.creatorsPerformance,
-          productAnalytics: r.productAnalytics?.length ? r.productAnalytics : empty.productAnalytics,
-          gmvMax: r.gmvMax?.length ? r.gmvMax : empty.gmvMax,
-          customers: r.customers || empty.customers,
-          keyWinsInsights: r.keyWinsInsights || '',
-          campaignsText: r.campaignsText || '',
-          recommendations: r.recommendations || '',
-          customFields: r.customFields || {},
-        });
-        setReportStatus(r.status || 'draft');
-        setRejectionNote(r.rejectionNote || '');
+      try {
+        const r = await getMonthlyReport(editReportId);
+        if (cancelled) return;
+        if (r) {
+          const brand = brands.find(b => b.id === r.brandId);
+          setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
+          setSelectedMonth(makeMonthInfo(r.year, r.month));
+          const empty = emptyMonthlyReport();
+          setData({
+            currency: r.currency || empty.currency,
+            sectionsEnabled: resolveSectionsEnabled(r.sectionsEnabled),
+            totalSales: r.totalSales || empty.totalSales,
+            keyMetrics: r.keyMetrics || empty.keyMetrics,
+            kpis: r.kpis || empty.kpis,
+            gmvBreakdown: r.gmvBreakdown || empty.gmvBreakdown,
+            topCreators: r.topCreators?.length ? r.topCreators : empty.topCreators,
+            topVideos:   r.topVideos?.length   ? r.topVideos   : empty.topVideos,
+            videoPerformance: r.videoPerformance || empty.videoPerformance,
+            creatorsPerformance: r.creatorsPerformance || empty.creatorsPerformance,
+            productAnalytics: r.productAnalytics?.length ? r.productAnalytics : empty.productAnalytics,
+            gmvMax: r.gmvMax?.length ? r.gmvMax : empty.gmvMax,
+            customers: r.customers || empty.customers,
+            keyWinsInsights: r.keyWinsInsights || '',
+            campaignsText: r.campaignsText || '',
+            recommendations: r.recommendations || '',
+            customFields: r.customFields || {},
+          });
+          setReportStatus(r.status || 'draft');
+          setRejectionNote(r.rejectionNote || '');
+        }
+      } catch (e) {
+        console.warn('Failed to load monthly report for editing:', e?.message || e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
-  }, [editReportId, brands]);
+    return () => { cancelled = true; };
+  }, [editReportId]);
 
   // Previous report = the one created before this one. Stable across OL month edits.
   const previousReport = useMemo(() => {
@@ -526,6 +568,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         extraFields: extra,
       });
       setDirty(false); // changes are persisted — release the guard
+      clearLocalDraft();  // discard the localStorage safety-net for this report
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,

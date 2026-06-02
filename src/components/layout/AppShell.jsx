@@ -6,6 +6,7 @@ import Topbar from './Topbar';
 import KeyboardShortcuts from './KeyboardShortcuts';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
+import { hasUnsavedWork } from '../../lib/appUpdate';
 import '../../styles/shell.css';
 
 // Suspense fallback for lazy-loaded route chunks. Keeps the shell
@@ -68,11 +69,23 @@ export default function AppShell() {
   // When the user clicks "Open" on a push popup, the SW posts a
   // {type:'wurxos-nav', link} message. Handle it via React Router
   // so no full-page reload happens.
+  //
+  // GUARD: if any form has unsaved work, confirm before navigating
+  // away. The autosave hook covers data-loss, but the better UX is
+  // to keep the editor mounted so the user doesn't even have to
+  // come back and restore. Inspired by the bug where an APC's
+  // mid-edit push-notification click destroyed their report.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     function onMessage(e) {
       const m = e.data;
       if (m && m.type === 'wurxos-nav' && typeof m.link === 'string') {
+        if (hasUnsavedWork()) {
+          const ok = window.confirm(
+            "You have unsaved changes in a form. Leave anyway?\n\nYour draft is auto-saved locally and will reappear when you return."
+          );
+          if (!ok) return;
+        }
         navigate(m.link);
       }
     }

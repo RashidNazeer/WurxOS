@@ -246,24 +246,23 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   const [existingReports, setExistingReports] = useState([]);
   const [data, setData] = useState(emptyBiWeeklyReport());
 
-  // Auto-save in-progress new reports to localStorage every 30s.
+  // Auto-save to localStorage every 30s for both new and edit modes.
   // Same pattern as WeeklyReportForm — see that file for rationale.
   const draftKey = {
     type: 'biweekly',
     uid: currentUser?.uid,
     brandId: selectedBrand?.id,
     periodStart: selectedPeriod?.startDate,
+    editId: editReportId || null,
   };
   const { clear: clearLocalDraft } = useReportAutosave({
     ...draftKey,
     data,
-    enabled: !editReportId,
   });
   const restoredKeyRef = useRef('');
   useEffect(() => {
-    if (editReportId) return;
     if (!draftKey.uid || !draftKey.brandId || !draftKey.periodStart) return;
-    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}`;
+    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}|${draftKey.editId || ''}`;
     if (restoredKeyRef.current === k) return;
     restoredKeyRef.current = k;
     const saved = loadDraft(draftKey);
@@ -271,7 +270,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       setData((d) => ({ ...d, ...saved.data }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editReportId, draftKey.uid, draftKey.brandId, draftKey.periodStart]);
+  }, [draftKey.uid, draftKey.brandId, draftKey.periodStart, draftKey.editId]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!!editReportId);
   // Unsaved-changes guard — see WeeklyReportForm for the rationale.
@@ -383,44 +382,54 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
     getBiWeeklyReportsForBrand(selectedBrand.id).then(setExistingReports);
   }, [selectedBrand, editReportId]);
 
-  // Load report for editing
+  // Load report for editing. Deps are [editReportId] only — see the
+  // long-form comment in WeeklyReportForm.jsx for the brands-realtime
+  // wipe rationale. Same fix applied here.
   useEffect(() => {
     if (!editReportId) return;
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      const r = await getBiWeeklyReport(editReportId);
-      if (r) {
-        const brand = brands.find(b => b.id === r.brandId);
-        setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
-        setSelectedPeriod({ period: r.period, startDate: r.periodStart, endDate: r.periodEnd, label: r.periodLabel, year: r.year, month: r.month });
-        setData({
-          overallPerformance: r.overallPerformance || emptyBiWeeklyReport().overallPerformance,
-          overallNotes: r.overallNotes || {},
-          overallInsights: r.overallInsights || '',
-          topCreators: r.topCreators || emptyBiWeeklyReport().topCreators,
-          topCreatorsInsights: r.topCreatorsInsights || '',
-          topVideos: r.topVideos || emptyBiWeeklyReport().topVideos,
-          topVideosInsights: r.topVideosInsights || '',
-          gmvMax: r.gmvMax || emptyBiWeeklyReport().gmvMax,
-          gmvMaxInsights: r.gmvMaxInsights || '',
-          productHighlights: r.productHighlights || emptyBiWeeklyReport().productHighlights,
-          productHighlightsInsights: r.productHighlightsInsights || '',
-          offsitePerformance: r.offsitePerformance || emptyBiWeeklyReport().offsitePerformance,
-          offsiteInsights: r.offsiteInsights || '',
-          upcomingCampaigns: r.upcomingCampaigns || '',
-          operationalUpdates: r.operationalUpdates || '',
-          recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
-          actionItems: '',
-          customFields: r.customFields || {},
-          sectionsEnabled: resolveWeeklySectionsEnabled(r.sectionsEnabled),
-        });
-        setReportStatus(r.status || 'approved');
-        setRejectionNote(r.rejectionNote || '');
-        setStep(2);
+      try {
+        const r = await getBiWeeklyReport(editReportId);
+        if (cancelled) return;
+        if (r) {
+          const brand = brands.find(b => b.id === r.brandId);
+          setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
+          setSelectedPeriod({ period: r.period, startDate: r.periodStart, endDate: r.periodEnd, label: r.periodLabel, year: r.year, month: r.month });
+          setData({
+            overallPerformance: r.overallPerformance || emptyBiWeeklyReport().overallPerformance,
+            overallNotes: r.overallNotes || {},
+            overallInsights: r.overallInsights || '',
+            topCreators: r.topCreators || emptyBiWeeklyReport().topCreators,
+            topCreatorsInsights: r.topCreatorsInsights || '',
+            topVideos: r.topVideos || emptyBiWeeklyReport().topVideos,
+            topVideosInsights: r.topVideosInsights || '',
+            gmvMax: r.gmvMax || emptyBiWeeklyReport().gmvMax,
+            gmvMaxInsights: r.gmvMaxInsights || '',
+            productHighlights: r.productHighlights || emptyBiWeeklyReport().productHighlights,
+            productHighlightsInsights: r.productHighlightsInsights || '',
+            offsitePerformance: r.offsitePerformance || emptyBiWeeklyReport().offsitePerformance,
+            offsiteInsights: r.offsiteInsights || '',
+            upcomingCampaigns: r.upcomingCampaigns || '',
+            operationalUpdates: r.operationalUpdates || '',
+            recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
+            actionItems: '',
+            customFields: r.customFields || {},
+            sectionsEnabled: resolveWeeklySectionsEnabled(r.sectionsEnabled),
+          });
+          setReportStatus(r.status || 'approved');
+          setRejectionNote(r.rejectionNote || '');
+          setStep(2);
+        }
+      } catch (e) {
+        console.warn('Failed to load bi-weekly report for editing:', e?.message || e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
-  }, [editReportId, brands]);
+    return () => { cancelled = true; };
+  }, [editReportId]);
 
   const handleBrandSelect = (brand) => {
     setSelectedBrand(brand);
