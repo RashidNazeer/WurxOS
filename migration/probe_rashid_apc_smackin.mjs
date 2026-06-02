@@ -1,94 +1,72 @@
-// One-off correction: rewrite Rashid Nazeer (developer)'s salary
-// history to reflect reality. Per chat 2026-05-31.
-//
-// Goal final state:
-//   comp.basic_salary       = 100,000
-//   comp.effective_from     = 2026-04-01
-//   comp.last_change_reason = 'promotion'
-//   salary_history          = 2 rows:
-//     1) initial_seed 50K eff 2025-02-10
-//     2) promotion 50K → 100K eff 2026-04-01
-//
-// Existing 2 history rows (typos from earlier testing) are deleted.
-// audit_log captures the override fact.
-//
-// Bypasses the sh_insert_block and sh_delete_block RLS via the
-// service-role connection.
+// Part A — Mushammir cleanup:
+//   1. Reassign 5 APCs' reports_to to the TL who now owns their brand
+//   2. Reassign Mushammir's 2 orphaned brands to Boss
+// Run AFTER migration 190 is applied.
 
 import { sb } from './lib/supabase.js';
 
-const RASHID_DEV = '87f3419d-5c90-537e-b41e-e4097330d670';
+const MUSHAMMIR = '15f3cb0e-39f5-5eea-97e5-8b87d1040db0';
+const BOSS_UID  = '205800a5-6baf-5bed-bec7-322ae135dda9';  // Usman Qamar
 
-// 1. Snapshot current state (in case we need to undo).
-const { data: histBefore } = await sb.from('salary_history').select('*').eq('user_id', RASHID_DEV);
-const { data: compBefore } = await sb.from('employee_compensation').select('*').eq('user_id', RASHID_DEV).single();
-console.log(`Before:  comp=${compBefore?.basic_salary}  history rows=${histBefore?.length}`);
+// 1. APC reassignments — derived from earlier probe
+const APC_MOVES = [
+  // { apc_id, apc_name, new_tl_id, new_tl_name, brand }
+  { uid: '7deb55a6-3fcf-5151-915d-12d89398859f', name: 'Ibrahim Baloch', toUid: 'a3cbbb8e-d671-5c81-8379-c34f2166a83f', toName: 'Muhammad Azam',  brand: 'JoyMode (owner Mustafa Jan)' },
+  { uid: '27f2a01e-6816-5309-bed5-b05065a00007', name: 'Hareem Asim',    toUid: 'a3cbbb8e-d671-5c81-8379-c34f2166a83f', toName: 'Muhammad Azam',  brand: 'Kenashii' },
+  { uid: '87cbdb86-c22a-5c17-9574-73fcb764b79e', name: 'Farakh Farooq',  toUid: '7ab9eeb2-0398-577d-b25e-d57075ac817c', toName: 'Ali Hamza',      brand: 'Squish Energy' },
+  { uid: '52569db0-55e6-532b-9055-a8c00064e1de', name: 'Maida Hashmi',   toUid: 'a3cbbb8e-d671-5c81-8379-c34f2166a83f', toName: 'Muhammad Azam',  brand: 'FlyWell' },
+  { uid: '44c1ec2b-5cd6-5d31-8760-9948aa067d97', name: 'Ali Ahmad',      toUid: 'a3cbbb8e-d671-5c81-8379-c34f2166a83f', toName: 'Muhammad Azam',  brand: 'Transformation Body' },
+];
 
-// 2. Delete the existing (typo) history rows.
-const del = await sb.from('salary_history').delete().eq('user_id', RASHID_DEV);
-if (del.error) { console.error('history delete failed:', del.error); process.exit(1); }
-console.log('  ✓ deleted typo history rows');
+// Look up Mustafa Jan's uid (he was a different uid than Muhammad Azam — fix above)
+const { data: mustafa } = await sb
+  .from('profiles').select('id').ilike('display_name', 'Mustafa Jan').single();
+const MUSTAFA = mustafa.id;
+// Repoint JoyMode/Kenashii/FlyWell to Mustafa (per probe — those brands' owner is Mustafa Jan)
+APC_MOVES[0].toUid = MUSTAFA; APC_MOVES[0].toName = 'Mustafa Jan';
+APC_MOVES[1].toUid = MUSTAFA; APC_MOVES[1].toName = 'Mustafa Jan';
+APC_MOVES[3].toUid = MUSTAFA; APC_MOVES[3].toName = 'Mustafa Jan';
 
-// 3. Update the comp row to the correct current state.
-const compUpdate = await sb.from('employee_compensation').update({
-  basic_salary:       100000,
-  effective_from:     '2026-04-01',
-  last_change_reason: 'promotion',
-  last_changed_by:    null,
-  updated_at:         new Date().toISOString(),
-}).eq('user_id', RASHID_DEV);
-if (compUpdate.error) { console.error('comp update failed:', compUpdate.error); process.exit(1); }
-console.log('  ✓ updated employee_compensation');
-
-// 4. Insert the real history.
-const ins = await sb.from('salary_history').insert([
-  {
-    user_id:         RASHID_DEV,
-    effective_from:  '2025-02-10',
-    previous_amount: null,
-    new_amount:      50000,
-    increment_pct:   null,
-    change_reason:   'initial_seed',
-    boss_notes:      'Starting salary at hire.',
-    changed_by:      null,
-  },
-  {
-    user_id:         RASHID_DEV,
-    effective_from:  '2026-04-01',
-    previous_amount: 50000,
-    new_amount:      100000,
-    increment_pct:   100,
-    change_reason:   'promotion',
-    boss_notes:      'Promotion effective April; first payout on May 1.',
-    changed_by:      null,
-  },
-]);
-if (ins.error) { console.error('history insert failed:', ins.error); process.exit(1); }
-console.log('  ✓ inserted real history (2 rows)');
-
-// 5. Record the override fact in audit_log.
-const audit = await sb.from('audit_log').insert({
-  actor_id:    null,
-  action:      'salary.history_rewritten',
-  entity_type: 'employee_compensation',
-  entity_id:   RASHID_DEV,
-  before:      { history: histBefore, comp: compBefore },
-  after:       {
-    history: [
-      { effective_from: '2025-02-10', reason: 'initial_seed', new: 50000 },
-      { effective_from: '2026-04-01', reason: 'promotion',    prev: 50000, new: 100000 },
-    ],
-    comp: { basic_salary: 100000, effective_from: '2026-04-01', reason: 'promotion' },
-  },
-});
-if (audit.error) { console.warn('audit insert failed (non-fatal):', audit.error.message); }
-else console.log('  ✓ audit_log entry recorded');
-
-// 6. Verify
-const { data: comp2 } = await sb.from('employee_compensation').select('basic_salary, effective_from, last_change_reason').eq('user_id', RASHID_DEV).single();
-const { data: hist2 } = await sb.from('salary_history').select('*').eq('user_id', RASHID_DEV).order('effective_from');
-console.log(`\nAfter:  comp.basic_salary=${comp2.basic_salary}  effective_from=${comp2.effective_from}  reason=${comp2.last_change_reason}`);
-console.log('History:');
-for (const h of hist2 || []) {
-  console.log(`  ${h.effective_from}  ${h.change_reason.padEnd(18)} ${h.previous_amount ?? '—'} → ${h.new_amount}${h.increment_pct != null ? ` (${h.increment_pct}%)` : ''}`);
+console.log('Part A1 — Reassigning APC reports_to:');
+for (const m of APC_MOVES) {
+  // Direct profile UPDATE (service-role bypasses RLS but not the auth check
+  // inside team_move_apc_to_tl). Mirror what team_move_apc_to_tl does: update
+  // profiles.reports_to + write an audit_log row.
+  const { error: upErr } = await sb
+    .from('profiles')
+    .update({ reports_to: m.toUid, updated_at: new Date().toISOString() })
+    .eq('id', m.uid);
+  if (upErr) { console.error(`  ✗ ${m.name}: ${upErr.message}`); continue; }
+  await sb.from('audit_log').insert({
+    actor_id: null,
+    action: 'team.move_apc.cleanup',
+    entity_type: 'profiles',
+    entity_id: m.uid,
+    before: { reports_to: MUSHAMMIR },
+    after:  { reports_to: m.toUid, reason: 'orphaned after Mushammir Qamar deletion', context: m.brand },
+  });
+  console.log(`  ✓ ${m.name.padEnd(18)} → ${m.toName.padEnd(16)} (${m.brand})`);
 }
+
+// 2. Reassign Mushammir's 2 orphaned brands to Boss
+console.log('\nPart A2 — Reassigning orphaned brands via admin_reassign_orphaned_brands:');
+const { data: count, error: rErr } = await sb.rpc('admin_reassign_orphaned_brands', {
+  p_orphan: MUSHAMMIR,
+  p_new_owner: BOSS_UID,
+});
+if (rErr) console.error(`  ✗ ${rErr.message}`);
+else console.log(`  ✓ ${count} brand(s) reassigned to Boss`);
+
+// 3. Verify
+console.log('\nVerifying...');
+const { data: stillReporting } = await sb
+  .from('profiles').select('display_name, role')
+  .eq('reports_to', MUSHAMMIR).is('deleted_at', null).eq('is_active', true);
+console.log(`  Subordinates still pointing at Mushammir: ${stillReporting?.length || 0}`);
+for (const s of stillReporting || []) console.log(`    ${s.display_name} (${s.role})`);
+
+const { data: stillOwned } = await sb
+  .from('brands').select('brand_name, status, owner_id')
+  .eq('owner_id', MUSHAMMIR);
+console.log(`  Brands still owned by Mushammir: ${stillOwned?.length || 0}`);
+for (const b of stillOwned || []) console.log(`    ${b.brand_name} (${b.status})`);
