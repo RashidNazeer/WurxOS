@@ -159,6 +159,13 @@ export function ErrorReporterProvider({ children }) {
       // Browser-extension noise (MetaMask, wallets, etc.) — not our
       // code, user can't act on it.
       if (isExtensionNoise(r)) return;
+      // Transient network failures. "TypeError: Failed to fetch"
+      // (Chromium), "NetworkError" (Firefox), "Load failed" (Safari)
+      // all mean "the request did not reach a server". Pakistan-ISP
+      // blips, Wi-Fi handoffs, VPN reconnects, mobile-radio sleep —
+      // none of these are app bugs and the user can't act on them.
+      // A page refresh always recovers. Don't escalate to the modal.
+      if (/Failed to fetch|NetworkError when attempting|Load failed|network request failed|net::ERR_/i.test(msg)) return;
       // Stale-deploy: silently reload instead of showing the modal.
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(r, 'unhandled_rejection');
@@ -170,6 +177,7 @@ export function ErrorReporterProvider({ children }) {
       if (/ResizeObserver loop|Script error|Lock broken/i.test(msg)) return;
       if (/brand is inactive|inactive brand/i.test(msg)) return;
       if (isExtensionNoise(e?.error || e)) return;
+      if (/Failed to fetch|NetworkError when attempting|Load failed|network request failed|net::ERR_/i.test(msg)) return;
       if (isStaleDeployError(msg) && handleStaleDeploy()) return;
       reportError(e?.error || e, 'window_error');
     };
