@@ -1,33 +1,61 @@
-// Complete the APC Rashid deletion: my Jun 2 script soft-deleted the
-// profile but skipped admin.auth.admin.deleteUser. Without that step
-// the user can still sign in with the apc credentials and reach a
-// zombie state (profile.deleted_at set, but session valid).
 import { sb } from './lib/supabase.js';
 
+const DEV = '87f3419d-5c90-537e-b41e-e4097330d670';
 const APC = '3582f4f1-e018-507d-af98-8ae206320c5e';
 
-// 1. Confirm pre-state
-const { data: pre } = await sb.auth.admin.getUserById(APC);
-console.log('Pre:', { email: pre.user?.email, deleted_at: pre.user?.deleted_at || '(active)' });
+async function retry(fn, label, maxTries = 3) {
+  for (let i = 1; i <= maxTries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      console.warn(`  ${label}: try ${i} failed — ${e.message}`);
+      if (i === maxTries) throw e;
+      await new Promise(r => setTimeout(r, 800 * i));
+    }
+  }
+}
 
-// 2. Soft-delete the auth user (shouldSoftDelete=true → keeps the row,
-//    sets deleted_at, blocks sign-in)
-const { error: delErr } = await sb.auth.admin.deleteUser(APC, true);
-if (delErr) { console.error('deleteUser failed:', delErr); process.exit(1); }
-console.log('  ✓ auth.users.deleted_at set');
+// Insert Jun 1 + Jun 2 present rows (zero-hour, status=clocked-out) for the dev account
+const datesToCreate = ['2026-06-01', '2026-06-02'];
+for (const date of datesToCreate) {
+  const { data: existing } = await sb
+    .from('attendance').select('id').eq('user_id', DEV).eq('date', date).maybeSingle();
+  if (existing) { console.log(`  ${date}: already exists, skip`); continue; }
+  const t = `${date}T11:00:00+00:00`;
+  await retry(async () => {
+    const { error } = await sb.from('attendance').insert({
+      user_id: DEV, date,
+      clock_in: t, clock_out: t,
+      status: 'clocked-out',
+      breaks: [], total_work_ms: 0, total_break_ms: 0,
+      auto_closed: false,
+      legacy_id: `att:manualpresent_${DEV}_${date}`,
+      location: 'bahria',
+      created_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+  }, `attendance insert ${date}`);
+  console.log(`  ${date}: ✓ inserted present`);
+}
 
-// 3. Force-logout any open session by bumping profile updated_at
-//    so the AuthContext realtime UPDATE listener (which checks
-//    deleted_at/is_active on every UPDATE payload) fires and triggers
-//    sessionInvalid → SessionExpiredModal in the active tab.
-const { error: tErr } = await sb
-  .from('profiles')
-  .update({ updated_at: new Date().toISOString() })
-  .eq('id', APC);
-if (tErr) console.warn('profile touch warning:', tErr.message);
-else console.log('  ✓ profile UPDATE fired (forces logout of active session)');
+// Clean up the "active" leftovers on the deleted APC uid. Historical
+// attendance/audit_log are kept (records of completed work). Only the
+// active chat_members membership needs to go — same gate the Edge
+// Function uses for normal deletions.
+console.log('\nCleaning APC leftovers:');
+const cleanupTables = ['chat_members'];
+for (const t of cleanupTables) {
+  try {
+    const { error } = await sb.from(t).delete().eq('user_id', APC);
+    console.log(`  ${t}: ${error ? '✗ ' + error.message : '✓ wiped'}`);
+  } catch (e) { console.log(`  ${t}: threw ${e.message}`); }
+}
 
-// 4. Confirm post-state
-const { data: post } = await sb.auth.admin.getUserById(APC);
-console.log('Post:', { email: post.user?.email, deleted_at: post.user?.deleted_at || '(active)' });
-console.log(`\nCan log in? ${post.user?.deleted_at ? 'NO — properly soft-deleted' : 'YES — something failed'}`);
+// Verify state
+const { data: post } = await sb
+  .from('attendance').select('date, status, total_work_ms')
+  .eq('user_id', DEV).gte('date', '2026-06-01').order('date');
+console.log('\nDeveloper Rashid June attendance:');
+for (const r of post || []) console.log(`  ${r.date}  ${r.status}  hours=${(r.total_work_ms || 0) / 3600000}`);
+
+const { count: chatLeft } = await sb.from('chat_members').select('*', { count: 'exact', head: true }).eq('user_id', APC);
+console.log(`\nAPC chat memberships remaining: ${chatLeft}`);

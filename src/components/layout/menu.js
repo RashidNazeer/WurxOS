@@ -324,12 +324,15 @@ export const MENUS = {
     SETTINGS_ITEM,
   ],
   // Developer role is intentionally minimal — v1 parity (DevLayout.js).
-  // Their job is to triage bugs + suggestions; no brands, no tasks,
-  // no HR features. DashboardRouter in App.jsx redirects /dashboard
-  // to /bugs for this role so they land on triage.
+  // Their job is to triage bugs + suggestions; no brands, no tasks.
+  // Attendance + My Compensation are HR surfaces — the developer still
+  // clocks in and gets paid like anyone else. DashboardRouter in
+  // App.jsx redirects /dashboard to /bugs for this role so they land
+  // on triage by default.
   developer: [
     { label: 'Bug Reports', icon: BugIcon, to: '/bugs', category: 'bug' },
     { label: 'Suggestions', icon: LightbulbIcon, to: '/suggestions', category: 'suggestion' },
+    ATTENDANCE_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
