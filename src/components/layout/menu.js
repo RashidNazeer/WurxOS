@@ -333,6 +333,7 @@ export const MENUS = {
     { label: 'Bug Reports', icon: BugIcon, to: '/bugs', category: 'bug' },
     { label: 'Suggestions', icon: LightbulbIcon, to: '/suggestions', category: 'suggestion' },
     ATTENDANCE_ITEM,
+    { label: 'Leave', icon: CalendarIcon, to: '/leave', category: 'leave' },
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
