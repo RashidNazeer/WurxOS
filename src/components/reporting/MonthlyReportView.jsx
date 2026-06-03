@@ -507,8 +507,8 @@ function HierarchicalGmvDonut({ parents, total, currencySym = '$', size = 180, t
           );
         })}
         <text x={cx} y={cy - 4} textAnchor="middle" style={{ fontSize: 11, fill: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total GMV</text>
-        <text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 16, fill: C.ink, fontWeight: 700 }}>
-          {currencySym}{Number(total).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        <text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 15, fill: C.ink, fontWeight: 700 }}>
+          {currencySym}{Number(total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </text>
       </svg>
       <div className="flex-grow-1" style={{ minWidth: 240 }}>
