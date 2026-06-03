@@ -96,6 +96,21 @@ export function AuthProvider({ children }) {
         setProfile(null);
         return false;
       }
+      // Defense in depth: refuse to bootstrap a session for a profile
+      // that's already soft-deleted or inactive. The realtime UPDATE
+      // listener catches deletions that happen DURING a session, but
+      // if a user's profile is already deleted at sign-in time and
+      // their auth.users row somehow isn't (e.g. a partial admin
+      // cleanup left the auth-side intact), they'd reach a zombie
+      // state with profile.deleted_at set but no SessionExpiredModal.
+      // Surface the modal up front. Refresh path doesn't trip this —
+      // an established session that suddenly sees deleted_at via a
+      // refresh poll goes through the realtime UPDATE path instead.
+      if (!isRefresh && (data.deleted_at || data.is_active === false)) {
+        console.warn('[auth] profile is soft-deleted or inactive — rejecting bootstrap');
+        setProfile(null);
+        return false;
+      }
       setProfile(data);
       return true;
     } catch (err) {
