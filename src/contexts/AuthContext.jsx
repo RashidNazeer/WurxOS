@@ -49,18 +49,30 @@ export function AuthProvider({ children }) {
   const recheckInFlightRef = useRef(false);
 
   // Returns true on success, false on any failure (network, timeout, RLS
-  // error, or row not found). Callers use this to decide whether the
-  // session is actually usable — a successful auth bootstrap with a
-  // failed profile load means a half-broken app, which we'd rather
-  // surface as a "sign in again" modal than as a confusing blank UI.
-  const loadProfile = useCallback(async (userId) => {
+  // error, or row not found).
+  //
+  // The `isRefresh` opt is critical. On INITIAL load we want to null the
+  // profile + surface the re-login modal if loading fails (a half-broken
+  // app is worse than a clear "sign in again"). But on REFRESH calls
+  // (tab focus / online event), nulling the profile is exactly the bug:
+  // Topbar shows "—", RoleGuard sees no role and Navigates to /login,
+  // PublicOnly bounces back to /dashboard, and the user is stuck on a
+  // broken UI until they manually reload. Haider Ali reported this on
+  // 2026-06-03 — after fighting it across several rounds of partial
+  // fixes, the right answer is: on a refresh, preserve the last-known
+  // profile; the next refresh will sort it out, and the realtime UPDATE
+  // / DELETE subscription elsewhere in this file already handles real
+  // deletions cleanly via setSessionInvalid.
+  //
+  // 15s timeout. Pakistan-ISP slow queries finish in 2-4s; this only
+  // aborts genuinely-zombied requests (TCP connection that survived a
+  // network change). Without this the spinner can hang indefinitely.
+  const loadProfile = useCallback(async (userId, opts = {}) => {
+    const isRefresh = !!opts.isRefresh;
     if (!userId) {
       setProfile(null);
       return false;
     }
-    // 15s timeout. Pakistan-ISP slow queries finish in 2-4s; this only
-    // aborts genuinely-zombied requests (TCP connection that survived a
-    // network change). Without this the spinner can hang indefinitely.
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -70,13 +82,17 @@ export function AuthProvider({ children }) {
         .abortSignal(AbortSignal.timeout(15000));
       if (error) {
         console.warn('[auth] loadProfile error:', error.message);
+        if (isRefresh) return false;       // keep existing profile
         setProfile(null);
         return false;
       }
       if (!data) {
-        // Row not found — the auth user has no profile row. Treat as
-        // dead session so the user gets the re-login modal instead of
-        // a half-broken UI.
+        // Row not found. On initial load this means the auth user has
+        // no profile row → half-broken session, surface the re-login
+        // modal. On a refresh it is most likely a momentary RLS /
+        // replica lag, NOT a real deletion (the realtime subscription
+        // below handles real deletions). Preserve profile.
+        if (isRefresh) return false;
         setProfile(null);
         return false;
       }
@@ -84,6 +100,7 @@ export function AuthProvider({ children }) {
       return true;
     } catch (err) {
       console.warn('[auth] loadProfile threw:', err?.message || err);
+      if (isRefresh) return false;          // keep existing profile
       setProfile(null);
       return false;
     }
@@ -180,16 +197,28 @@ export function AuthProvider({ children }) {
     }
     let cancelled = false;
     (async () => {
-      const ok = await loadProfile(uid);
+      // Single retry on the initial profile load. Haider Ali reported
+      // 2026-06-03 that he had to reload the app 3 times before the
+      // UI rendered cleanly — Pakistan-ISP transient failures were
+      // tearing down the first load. A 1s retry catches most of those
+      // without making real failures (deleted row, dead session) feel
+      // sluggish.
+      let ok = await loadProfile(uid);
       if (cancelled) return;
+      if (!ok) {
+        await new Promise((r) => setTimeout(r, 1000));
+        if (cancelled) return;
+        ok = await loadProfile(uid);
+        if (cancelled) return;
+      }
       // Always clear the loading flag — even on failure. A stuck
       // spinner with no recovery is the worst UX; surfacing the
       // session-expired modal lets the user act.
       if (bootstrapped.current) setLoading(false);
-      // If we authenticated but couldn't load a profile, the session
-      // is functionally dead (RLS misconfigured, profile row missing,
-      // network zombie). Surface the re-login modal instead of leaving
-      // the user on a half-rendered app with no role/permissions.
+      // If we authenticated but couldn't load a profile after two
+      // tries, the session is functionally dead (RLS misconfigured,
+      // profile row missing, network zombie). Surface the re-login
+      // modal instead of leaving the user on a half-rendered app.
       if (!ok) setSessionInvalid(true);
     })();
 
@@ -350,7 +379,10 @@ export function AuthProvider({ children }) {
       const now = Date.now();
       if (now - lastProfileRefresh < 60 * 1000) return;
       lastProfileRefresh = now;
-      loadProfile(uid).catch(() => {});
+      // isRefresh: true → if this fails (Pakistan ISP blip, etc.) we
+      // preserve the existing profile rather than nulling it. See the
+      // long-form comment at loadProfile().
+      loadProfile(uid, { isRefresh: true }).catch(() => {});
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
