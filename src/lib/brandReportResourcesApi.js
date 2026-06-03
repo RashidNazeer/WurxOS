@@ -14,6 +14,31 @@ function genId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Which report types each section applies to. Default for NEW sections
+// is weekly-only (matches the current real-world usage on 2026-06-03);
+// users can extend to bi-weekly / monthly via the toggle chips in the
+// brand panel. Sections that pre-date this feature (no appliesTo field)
+// are treated as applying to all three — preserves the old behavior so
+// nothing silently disappears from existing reports.
+export const REPORT_TYPES = ['weekly', 'biweekly', 'monthly'];
+const NEW_SECTION_DEFAULT_APPLIES_TO = ['weekly'];
+
+function _normalizeApplies(appliesTo) {
+  if (!Array.isArray(appliesTo)) return null;
+  const valid = appliesTo.filter((t) => REPORT_TYPES.includes(t));
+  return valid.length ? valid : null;
+}
+
+// True if a section should render in the given report type.
+// Missing/empty appliesTo → treat as legacy all-three.
+export function sectionAppliesTo(section, reportType) {
+  if (!section) return false;
+  if (!REPORT_TYPES.includes(reportType)) return true;
+  const arr = _normalizeApplies(section.appliesTo);
+  if (!arr) return true;        // legacy → all
+  return arr.includes(reportType);
+}
+
 // Fetch the section list for a brand. Returns [] when the brand has none.
 export async function getBrandReportResources(brandId) {
   if (!brandId) return [];
@@ -34,17 +59,30 @@ async function writeSections(brandId, sections) {
   if (error) throw new Error(error.message);
 }
 
-// Add a new named section. Throws on duplicate name.
-export async function addReportSection(brandId, name) {
+// Add a new named section. Throws on duplicate name. `appliesTo`
+// optional — defaults to weekly only.
+export async function addReportSection(brandId, name, appliesTo) {
   const trimmed = (name || '').trim();
   if (!brandId || !trimmed) throw new Error('Brand and section name are required.');
   const sections = await getBrandReportResources(brandId);
   if (sections.some((s) => (s.name || '').toLowerCase() === trimmed.toLowerCase())) {
     throw new Error('A section with this name already exists for this brand.');
   }
-  const section = { id: genId('rs'), name: trimmed, links: [], addedAt: Date.now() };
+  const applies = _normalizeApplies(appliesTo) || NEW_SECTION_DEFAULT_APPLIES_TO.slice();
+  const section = { id: genId('rs'), name: trimmed, links: [], appliesTo: applies, addedAt: Date.now() };
   await writeSections(brandId, [...sections, section]);
   return section;
+}
+
+// Update which report types a section appears in. Must include at
+// least one valid type, otherwise we'd silently hide the section
+// everywhere.
+export async function setReportSectionApplies(brandId, sectionId, appliesTo) {
+  const applies = _normalizeApplies(appliesTo);
+  if (!applies) throw new Error('Pick at least one report type.');
+  const sections = await getBrandReportResources(brandId);
+  const updated = sections.map((s) => (s.id === sectionId ? { ...s, appliesTo: applies } : s));
+  await writeSections(brandId, updated);
 }
 
 export async function renameReportSection(brandId, sectionId, newName) {

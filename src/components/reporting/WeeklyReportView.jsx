@@ -613,7 +613,7 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
 }
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
-export default function WeeklyReportView({ report, previousReport, allReports, clientView = false, onActions }) {
+export default function WeeklyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'weekly' }) {
   const printRef = useRef();
   const { profile } = useAuth();
   const userRole = profile?.role || '';
@@ -623,7 +623,10 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           intensity: highlightIntensity, setIntensity: setHighlightIntensity } = useHighlightStyle();
 
   // Brand-level Report Links (auto-embed when name matches a section).
-  const { findByName: findReportLinks } = useBrandReportLinks(report?.brandId);
+  // reportType filters out sections that don't apply to THIS report
+  // kind. Default 'weekly' covers the most common caller path; the
+  // BiWeekly pages explicitly pass reportType='biweekly'.
+  const { findByName: findReportLinks } = useBrandReportLinks(report?.brandId, reportType);
 
   // Last 8 weeks of metrics for sparklines and the Trends panel.
   const trendData = useMemo(() => {
@@ -1427,7 +1430,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             <>
               {renderedTables}
               {renderedCustom}
-              <BrandReportLinks brandId={report.brandId} knownSectionNames={unmatchedKnown} />
+              <BrandReportLinks brandId={report.brandId} knownSectionNames={unmatchedKnown} reportType={reportType} />
             </>
           );
         })()}

@@ -344,7 +344,7 @@ export default function BiWeeklyReportsPage() {
             </div>
           </div>
         )}
-        <WeeklyReportView report={reportForView} previousReport={prev} allReports={sourceList} />
+        <WeeklyReportView report={reportForView} previousReport={prev} allReports={sourceList} reportType="biweekly" />
       </div>
     );
   }

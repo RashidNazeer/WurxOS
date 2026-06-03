@@ -793,7 +793,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
 }
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
-export default function MonthlyReportView({ report, previousReport, allReports, clientView = false, onActions }) {
+export default function MonthlyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'monthly' }) {
   const printRef = useRef();
   // v2 auth shim → v1 shape (v1 destructures `userRole` directly; v2's
   // useAuth returns `{ user, profile }` so we derive role from profile).
@@ -804,7 +804,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
   const { color: highlightColor, setColor: setHighlightColor,
           intensity: highlightIntensity, setIntensity: setHighlightIntensity } = useHighlightStyle();
 
-  const { findByName: findReportLinks } = useBrandReportLinks(report?.brandId);
+  const { findByName: findReportLinks } = useBrandReportLinks(report?.brandId, reportType);
 
   // Last 12 months of metrics for sparklines and the Trends panel.
   const trendData = useMemo(() => {
@@ -1348,7 +1348,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           return (
             <>
               {renderedCustom}
-              <BrandReportLinks brandId={report.brandId} knownSectionNames={known} />
+              <BrandReportLinks brandId={report.brandId} knownSectionNames={known} reportType={reportType} />
             </>
           );
         })()}
