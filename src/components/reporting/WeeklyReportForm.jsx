@@ -14,6 +14,7 @@ import {
   generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
   generateAllInsights,
 } from '../../utils/aiInsights';
+import { findPreviousReport } from '../../lib/reportsApi';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
@@ -602,28 +603,21 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   }, []);
 
   // Previous report = the one created *before* this one for the same brand.
-  // We sort by createdAt (descending) so OL date-edits don't reshuffle history.
-  // Legacy reports without createdAt fall back to weekStart for ordering.
+  // Previous report = the closest earlier week for this brand. Routed
+  // through findPreviousReport (lib/reportsApi.js) so the Edit screen
+  // agrees with the View screen — both compare by weekStart, not by
+  // createdAt. createdAt-based ordering produced visible mismatches:
+  // a report created out-of-order (OL backfill, fixed week edit) made
+  // Edit pick a different "previous" than the View, so the two showed
+  // contradictory WoW deltas to the same user on the same report.
   const previousReport = useMemo(() => {
     if (!existingReports.length || !selectedWeek) return null;
-    const tsOf = r => r.createdAt?.toMillis ? r.createdAt.toMillis()
-      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
-      : null;
-    const current = editReportId ? existingReports.find(r => r.id === editReportId) : null;
-    const currentTs = current ? tsOf(current) : Date.now();
-    const candidates = existingReports.filter(r => {
-      if (current && r.id === current.id) return false;
-      const ts = tsOf(r);
-      if (ts != null && currentTs != null) return ts < currentTs;
-      return (r.weekStart || '') < selectedWeek.startDate;
-    });
-    candidates.sort((a, b) => {
-      const aTs = tsOf(a), bTs = tsOf(b);
-      if (aTs != null && bTs != null) return bTs - aTs;
-      return (b.weekStart || '').localeCompare(a.weekStart || '');
-    });
-    return candidates[0] || null;
-  }, [existingReports, selectedWeek, editReportId]);
+    const current = editReportId
+      ? existingReports.find(r => r.id === editReportId)
+      : { id: '__pending__', brandId: selectedBrand?.id, weekStart: selectedWeek.startDate };
+    if (!current) return null;
+    return findPreviousReport(existingReports, current);
+  }, [existingReports, selectedWeek, editReportId, selectedBrand?.id]);
 
   // Pre-fill Product Highlights from the most recent prior report that
   // actually has products (new-report path only — never on edit). Walk

@@ -15,6 +15,7 @@ import {
   generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
   generateAllInsights,
 } from '../../utils/aiInsights';
+import { findPreviousReport } from '../../lib/reportsApi';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
@@ -447,27 +448,19 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
     setData(d => ({ ...d, offsitePerformance: { ...d.offsitePerformance, [key]: val } }));
   }, []);
 
-  // Previous report = the one created before this one. Stable across OL date edits.
+  // Previous report = the closest earlier bi-weekly period for this
+  // brand. Routed through findPreviousReport so Edit agrees with View —
+  // both compare by periodStart, not by createdAt. createdAt-based
+  // ordering produced visible mismatches when reports were created
+  // out-of-order (OL backfills, period edits).
   const previousReport = useMemo(() => {
     if (!existingReports.length || !selectedPeriod) return null;
-    const tsOf = r => r.createdAt?.toMillis ? r.createdAt.toMillis()
-      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
-      : null;
-    const current = editReportId ? existingReports.find(r => r.id === editReportId) : null;
-    const currentTs = current ? tsOf(current) : Date.now();
-    const candidates = existingReports.filter(r => {
-      if (current && r.id === current.id) return false;
-      const ts = tsOf(r);
-      if (ts != null && currentTs != null) return ts < currentTs;
-      return (r.periodStart || '') < selectedPeriod.startDate;
-    });
-    candidates.sort((a, b) => {
-      const aTs = tsOf(a), bTs = tsOf(b);
-      if (aTs != null && bTs != null) return bTs - aTs;
-      return (b.periodStart || '').localeCompare(a.periodStart || '');
-    });
-    return candidates[0] || null;
-  }, [existingReports, selectedPeriod, editReportId]);
+    const current = editReportId
+      ? existingReports.find(r => r.id === editReportId)
+      : { id: '__pending__', brandId: selectedBrand?.id, periodStart: selectedPeriod.startDate };
+    if (!current) return null;
+    return findPreviousReport(existingReports, current);
+  }, [existingReports, selectedPeriod, editReportId, selectedBrand?.id]);
 
   // Pre-fill Product Highlights from the most recent prior report that
   // actually has products (new-report path only — never on edit). Walk

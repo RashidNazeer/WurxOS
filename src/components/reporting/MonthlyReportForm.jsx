@@ -11,6 +11,7 @@ import {
   MONTHLY_SECTIONS, resolveSectionsEnabled,
   cleanNumericInput,
 } from '../../utils/monthlyReportingService';
+import { findPreviousMonthlyReport } from '../../lib/reportsApi';
 import { generateMonthlyKeyWinsInsight } from '../../utils/aiInsights';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parseMonthlyPdfToReport } from '../../utils/pdfReportParser';
@@ -305,27 +306,21 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     return () => { cancelled = true; };
   }, [editReportId]);
 
-  // Previous report = the one created before this one. Stable across OL month edits.
+  // Previous report = the closest earlier calendar month for this brand.
+  // Routed through findPreviousMonthlyReport so the Edit screen agrees
+  // with the View screen — both now compare by monthKey, never by
+  // createdAt. (createdAt ordering produced visible inconsistencies:
+  // a report created out-of-order, e.g. an OL backfill, could pick a
+  // different "previous" than what the View showed → user saw
+  // contradictory MoM deltas.)
   const previousReport = useMemo(() => {
     if (!existingReports.length || !selectedMonth) return null;
-    const tsOf = r => r.createdAt?.toMillis ? r.createdAt.toMillis()
-      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
-      : null;
-    const current = editReportId ? existingReports.find(r => r.id === editReportId) : null;
-    const currentTs = current ? tsOf(current) : Date.now();
-    const candidates = existingReports.filter(r => {
-      if (current && r.id === current.id) return false;
-      const ts = tsOf(r);
-      if (ts != null && currentTs != null) return ts < currentTs;
-      return (r.monthKey || '') < selectedMonth.monthKey;
-    });
-    candidates.sort((a, b) => {
-      const aTs = tsOf(a), bTs = tsOf(b);
-      if (aTs != null && bTs != null) return bTs - aTs;
-      return (b.monthKey || '').localeCompare(a.monthKey || '');
-    });
-    return candidates[0] || null;
-  }, [existingReports, selectedMonth, editReportId]);
+    const current = editReportId
+      ? existingReports.find(r => r.id === editReportId)
+      : { id: '__pending__', brandId: selectedBrand?.id, monthKey: selectedMonth.monthKey };
+    if (!current) return null;
+    return findPreviousMonthlyReport(existingReports, current);
+  }, [existingReports, selectedMonth, editReportId, selectedBrand?.id]);
 
   // APC-only submission gates: duplicate month or prior not yet OL-approved
   const isApc = userRole === 'apc';
