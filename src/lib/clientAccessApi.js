@@ -13,6 +13,7 @@ import { supabase } from './supabase';
 export const SHARE_TYPE_OPTIONS = [
   { id: 'weekly',     label: 'Weekly Reports',     icon: 'bi-file-earmark-bar-graph' },
   { id: 'biweekly',   label: 'Bi-Weekly Reports',  icon: 'bi-calendar2-week-fill' },
+  { id: 'monthly',    label: 'Monthly Reports',    icon: 'bi-calendar3' },
   { id: 'paidCollab', label: 'Paid Collab',        icon: 'bi-handshake' },
   { id: 'gmvMax',     label: 'GMV Max Reporting',  icon: 'bi-bar-chart-line-fill' },
 ];
@@ -20,6 +21,7 @@ export const SHARE_TYPE_OPTIONS = [
 export const SHARE_TYPE_COLORS = {
   weekly:     { bg: '#fef3c7', fg: '#92400e' },
   biweekly:   { bg: '#e0f2fe', fg: '#075985' },
+  monthly:    { bg: '#ede9fe', fg: '#5b21b6' },
   paidCollab: { bg: '#fef2f2', fg: '#9f1239' },
   gmvMax:     { bg: '#cffafe', fg: '#0e7490' },
 };
