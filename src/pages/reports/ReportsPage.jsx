@@ -43,9 +43,10 @@ export default function ReportsPage() {
     queryKey: ['reports', type, viewYear, viewMonth],
     queryFn: () => listReports({ type, year: viewYear, month: viewMonth }),
   });
+  const canViewAllBrands = profile?.permissions?.canViewAllBrands === true;
   const { data: brands = [], error: brandsError } = useQuery({
-    queryKey: ['reports', 'brands', role, user?.id],
-    queryFn: () => listBrandsForReporting({ role, uid: user.id }),
+    queryKey: ['reports', 'brands', role, user?.id, canViewAllBrands],
+    queryFn: () => listBrandsForReporting({ role, uid: user.id, permissions: profile?.permissions }),
     enabled: !!role && !!user?.id,
   });
   const error = rowsError?.message || brandsError?.message || '';

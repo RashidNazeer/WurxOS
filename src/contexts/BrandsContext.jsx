@@ -50,6 +50,11 @@ export function useBrands() {
   const { user, profile } = useAuth();
   const uid = user?.id;
   const role = profile?.role;
+  // Per-user 'canViewAllBrands' override (mig 192) — when true, a
+  // TL/PCTL/APC sees the same brand list a Boss/OL would. Used for
+  // special-case accounts (Abdul Subhan as of 2026-06-04). Profile
+  // changes propagate via AuthContext's realtime UPDATE listener.
+  const permissions = profile?.permissions || {};
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   // Per-hook unique channel suffix. Multiple useBrands() consumers can
@@ -79,7 +84,7 @@ export function useBrands() {
     }, 8000);
     (async () => {
       try {
-        const rows = await listBrandsForReporting({ role, uid });
+        const rows = await listBrandsForReporting({ role, uid, permissions });
         if (!cancelled) {
           setBrands((rows || []).map(_normBrand));
           setLoading(false);
@@ -100,7 +105,7 @@ export function useBrands() {
       .channel(`brands-ctx-${uid}-${instanceIdRef.current}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, async () => {
         try {
-          const rows = await listBrandsForReporting({ role, uid });
+          const rows = await listBrandsForReporting({ role, uid, permissions });
           if (!cancelled) setBrands((rows || []).map(_normBrand));
         } catch { /* ignore */ }
       })
@@ -111,7 +116,9 @@ export function useBrands() {
       clearTimeout(safetyTimer);
       supabase.removeChannel(ch);
     };
-  }, [uid, role]);
+  // canViewAllBrands flipping should re-fetch with the broader query.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, role, permissions?.canViewAllBrands]);
 
   return useMemo(() => {
     const byId = new Map(brands.map((b) => [b.id, b]));

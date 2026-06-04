@@ -1,28 +1,38 @@
+// Grant Abdul Subhan (TL) the canViewAllBrands permission so he sees
+// every active brand the same way Boss/OL would. Special-case per
+// 2026-06-04 instruction.
 import { sb } from './lib/supabase.js';
 
-// Fetch all client_access links + show share_types and a probe of
-// what the RPC actually returns to the portal for each one.
-const { data: links } = await sb
-  .from('client_access')
-  .select('id, token, client_name, label, share_types, brand_ids, created_at')
-  .order('created_at', { ascending: false });
+const { data: subhan } = await sb
+  .from('profiles')
+  .select('id, display_name, role, permissions')
+  .ilike('display_name', '%abdul%subhan%')
+  .single();
 
-console.log(`${(links || []).length} client_access link(s)\n`);
+if (!subhan) { console.error('Abdul Subhan not found'); process.exit(1); }
+console.log(`Found: ${subhan.display_name} (${subhan.role})`);
+console.log(`Current permissions: ${JSON.stringify(subhan.permissions || {})}`);
 
-for (const l of links || []) {
-  console.log(`══ ${l.client_name || l.label || '(unnamed)'} ══`);
-  console.log(`  share_types: ${JSON.stringify(l.share_types)}`);
-  console.log(`  brand_ids:   ${l.brand_ids?.length || 0}`);
+const next = { ...(subhan.permissions || {}), canViewAllBrands: true };
+const { error } = await sb
+  .from('profiles')
+  .update({ permissions: next, updated_at: new Date().toISOString() })
+  .eq('id', subhan.id);
+if (error) { console.error(error); process.exit(1); }
+console.log(`Updated permissions: ${JSON.stringify(next)}`);
 
-  // Probe — what does the RPC actually return?
-  const { data: probe, error } = await sb.rpc('get_client_access', { p_token: l.token });
-  if (error) { console.log(`  RPC error: ${error.message}`); continue; }
-  const reports = probe?.reports || [];
-  const byType = reports.reduce((acc, r) => {
-    acc[r.type] = (acc[r.type] || 0) + 1;
-    return acc;
-  }, {});
-  console.log(`  reports returned by RPC: ${reports.length}`);
-  for (const [t, n] of Object.entries(byType)) console.log(`    ${t}: ${n}`);
-  console.log('');
+// Verify the RLS function gives Subhan visibility into a sample brand
+// he doesn't own (sanity check: pick any active brand).
+const { data: sample } = await sb
+  .from('brands')
+  .select('id, brand_name, owner_id')
+  .eq('status', 'active')
+  .neq('owner_id', subhan.id)
+  .limit(1)
+  .single();
+if (sample) {
+  const { data: canSee } = await sb.rpc('can_view_brand', {
+    b_owner: sample.owner_id, b_id: sample.id, uid: subhan.id,
+  });
+  console.log(`\nCan Subhan now see "${sample.brand_name}" (owned by someone else)?  ${canSee ? '✓ YES' : '✗ NO'}`);
 }

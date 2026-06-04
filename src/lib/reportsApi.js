@@ -1426,12 +1426,19 @@ export async function repairWeeklyLabels() {
 // ---------------------------------------------------------------------
 // Brands this user can author reports on (APC sees assigned; TL sees owned;
 // Boss/OL/dev see all active).
-export async function listBrandsForReporting({ role, uid }) {
+export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   // Include client_name so the reporting UI's client filter has
   // something to populate from. Previously we selected only the
   // minimum columns the brand cards needed, which meant clientName
   // came back as undefined and the filter dropdown showed nothing.
-  if (['boss','ol','developer'].includes(role)) {
+  //
+  // canViewAllBrands (mig 192) is a per-user override that grants
+  // the same brand visibility as Boss/OL/Developer to any role.
+  // Used for special-case TL/PCTL accounts that need org-wide
+  // visibility (e.g. Abdul Subhan).
+  const canViewAll = ['boss','ol','developer'].includes(role)
+    || permissions?.canViewAllBrands === true;
+  if (canViewAll) {
     const { data, error } = await supabase
       .from('brands')
       .select('id, brand_name, logo_url, owner_id, client_name')
