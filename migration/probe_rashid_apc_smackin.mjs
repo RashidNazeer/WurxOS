@@ -1,36 +1,42 @@
+// Mark Muhammd Fahad (OL) present for June 2 and June 3 with 8h work each.
+// Uses 09:00–17:00 Asia/Karachi (04:00–12:00 UTC) so the timestamps look
+// natural in his timezone.
 import { sb } from './lib/supabase.js';
 
-const CAMP_ID = 'c0d3c661-1e37-55f0-ab32-f82f95f953c6';
+const UID = 'f9c7bfb1-cf20-505d-afec-d4a459354216';
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 
-const { data: c } = await sb
-  .from('campaigns')
-  .select('*, brand:brand_id(brand_name, owner_id, owner:owner_id(display_name, role)), addedBy:added_by(display_name, role)')
-  .eq('id', CAMP_ID)
-  .maybeSingle();
+const DATES = ['2026-06-02', '2026-06-03'];
 
-if (!c) { console.error('Campaign not found'); process.exit(1); }
-console.log(`Campaign: ${c.title || c.id}`);
-console.log(`  brand: ${c.brand?.brand_name}  brand_owner: ${c.brand?.owner?.display_name} (${c.brand?.owner?.role})`);
-console.log(`  added_by: ${c.addedBy?.display_name} (${c.addedBy?.role})  uid=${c.added_by}`);
-console.log(`  owner_id (campaign): ${c.owner_id}`);
-console.log(`  status: ${c.status}`);
-console.log(`  created_at: ${c.created_at}`);
-console.log(`  brand_id: ${c.brand_id}`);
+for (const date of DATES) {
+  const { data: existing } = await sb
+    .from('attendance').select('id').eq('user_id', UID).eq('date', date).maybeSingle();
+  if (existing) { console.log(`  ${date}: already exists, skip`); continue; }
 
-console.log('\nWho CAN currently update this campaign:');
-console.log(`  - ${c.added_by} (the user who added it)`);
-console.log(`  - Boss`);
-console.log(`  - any active OL or Developer`);
-console.log(`  - the brand's owner_id ${c.brand?.owner_id}`);
+  // 09:00 PKT = 04:00 UTC; 17:00 PKT = 12:00 UTC. 8h flat.
+  const clockIn  = `${date}T04:00:00+00:00`;
+  const clockOut = `${date}T12:00:00+00:00`;
 
-// Look at brand_assignments for this brand to see who else works on it
-const { data: assigns } = await sb
-  .from('brand_assignments')
-  .select('user_id, profile:user_id(display_name, role, is_active, deleted_at)')
-  .eq('brand_id', c.brand_id);
-console.log(`\nBrand has ${(assigns || []).length} assignment(s):`);
-for (const a of assigns || []) {
-  if (a.profile?.deleted_at) continue;
-  console.log(`  ${a.user_id}  ${a.profile?.display_name} (${a.profile?.role}) active=${a.profile?.is_active}`);
-  console.log(`    → can SELECT yes (per cmp_select), but can UPDATE? ${a.profile?.role === 'tl' && a.user_id === c.brand?.owner_id ? 'yes (TL owner)' : 'NO'}`);
+  const { error } = await sb.from('attendance').insert({
+    user_id: UID,
+    date,
+    clock_in: clockIn,
+    clock_out: clockOut,
+    status: 'clocked-out',
+    breaks: [],
+    total_work_ms: EIGHT_HOURS_MS,
+    total_break_ms: 0,
+    auto_closed: false,
+    legacy_id: `att:manualpresent_${UID}_${date}`,
+    location: 'bahria',
+    created_at: new Date().toISOString(),
+  });
+  console.log(`  ${date}: ${error ? '✗ ' + error.message : '✓ inserted present (8h)'}`);
 }
+
+// Verify
+const { data: post } = await sb
+  .from('attendance').select('date, status, total_work_ms')
+  .eq('user_id', UID).gte('date', '2026-06-01').order('date');
+console.log('\nFahad June attendance now:');
+for (const r of post || []) console.log(`  ${r.date}  ${r.status}  ${((r.total_work_ms || 0) / 3600000).toFixed(2)}h`);

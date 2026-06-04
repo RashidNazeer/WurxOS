@@ -564,6 +564,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       });
       setDirty(false); // changes are persisted — release the guard
       clearLocalDraft();  // discard the localStorage safety-net for this report
+      setReportStatus(status); // mirror the saved status into the pill so it
+                               // doesn't show the stale loaded value (e.g.
+                               // 'approved' lingering after Save-as-Draft).
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,

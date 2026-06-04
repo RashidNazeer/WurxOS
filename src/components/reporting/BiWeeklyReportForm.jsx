@@ -727,6 +727,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       // Successful save — drop the local auto-save backup.
       clearLocalDraft();
       setDirty(false); // changes are persisted — release the guard
+      setReportStatus(status); // keep the form's status pill in sync
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,

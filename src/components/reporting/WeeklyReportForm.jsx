@@ -950,6 +950,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       // server now has the canonical copy.
       clearLocalDraft();
       setDirty(false); // changes are persisted — release the guard
+      setReportStatus(status); // keep the form's status pill in sync
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,
