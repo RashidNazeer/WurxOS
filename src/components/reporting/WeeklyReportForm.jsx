@@ -402,7 +402,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       getBrandSectionExtras(selectedBrand.id).catch(() => ({})),
     ]).then(([list, extras]) => {
       if (cancelled) return;
-      setBrandSectionDefs(list.map(normalizeSection));
+      // Exclude client-portal sections (addedBy:'client'). They share the
+      // brand_report_sections array but belong in the read-only Client
+      // Sections panel, not the editable author "Brand Sections" fields.
+      setBrandSectionDefs(list.filter((s) => s?.addedBy !== 'client').map(normalizeSection));
       setBrandSectionExtras(extras || {});
     });
     return () => { cancelled = true; };

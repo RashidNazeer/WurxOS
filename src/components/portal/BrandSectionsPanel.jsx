@@ -49,7 +49,14 @@ export default function BrandSectionsPanel({
 }) {
   const [fetchedSections, setFetchedSections] = useState([]);
   const [fetchedValues, setFetchedValues]     = useState([]);
-  const sections      = selfFetch ? fetchedSections : (sectionsProp || []);
+  // brand_report_sections.sections is a single array shared with the
+  // author-side "Brand Sections" (addBrandSectionRich). Only the CLIENT-added
+  // entries belong in this panel — author sections render in the report body /
+  // form. The portal RPC stamps client adds with addedBy:'client'; author
+  // adds never carry it. Without this filter, author sections show up here
+  // mislabeled as "Client Sections" (and a client could rename/remove them).
+  const allSections   = selfFetch ? fetchedSections : (sectionsProp || []);
+  const sections      = allSections.filter((s) => s?.addedBy === 'client');
   const sectionValues = selfFetch ? fetchedValues   : (valuesProp || []);
 
   const [adding, setAdding] = useState(false);
