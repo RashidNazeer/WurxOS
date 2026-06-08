@@ -104,6 +104,20 @@ export function useReportAutosave({ type, uid, brandId, periodStart, editId, dat
     return () => clearInterval(id);
   }, [type, uid, brandId, periodStart, editId, enabled]);
 
+  // Save-on-change. Why: the 5s interval alone misses the early
+  // window — if the editor unmounts in <5s only the empty mount
+  // snapshot is in localStorage and the user sees "no saved as draft"
+  // on next visit. A debounce wouldn't help because an unmount that
+  // happens between keystrokes also cancels the pending timer. So we
+  // just save on every `data` ref change. localStorage writes for a
+  // 10-50KB report payload run in <1ms — even fast typing produces no
+  // observable lag.
+  useEffect(() => {
+    if (enabled === false) return;
+    if (!uid || !brandId || !periodStart) return;
+    saveDraft({ type, uid, brandId, periodStart, editId, data: dataRef.current });
+  }, [data, type, uid, brandId, periodStart, editId, enabled]);
+
   const clear = useCallback(() => {
     clearDraft({ type, uid, brandId, periodStart, editId });
   }, [type, uid, brandId, periodStart, editId]);

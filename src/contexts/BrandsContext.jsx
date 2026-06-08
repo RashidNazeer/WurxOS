@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { useAuth } from './AuthContext';
 import { listBrandsForReporting } from '../lib/reportsApi';
 import { supabase } from '../lib/supabase';
+import { hasUnsavedWork } from '../lib/appUpdate';
 
 /**
  * v1 verbatim-port shim — v1 components import `useBrands()` to get the
@@ -70,6 +71,18 @@ export function useBrands() {
 
   useEffect(() => {
     if (!uid || !role) {
+      // If a dirty editor is mounted, this is probably a transient
+      // auth flutter — keep the existing brand list around for 2s
+      // before clearing. Same rationale as ProtectedRoute/RoleGuard
+      // grace: don't yank state out from under an active edit on the
+      // basis of one auth event that may reverse milliseconds later.
+      if (hasUnsavedWork()) {
+        const t = setTimeout(() => {
+          setBrands([]);
+          setLoading(true);
+        }, 2000);
+        return () => clearTimeout(t);
+      }
       setBrands([]);
       setLoading(true);
       return undefined;

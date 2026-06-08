@@ -315,6 +315,23 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // in-progress report data can't be silently lost.
   const [dirty, setDirty] = useState(false);
   useUnsavedGuard(dirty);
+  // P5 — reference-equality dirty tracking. The onInput={() => setDirty(true)}
+  // catch-all in the form body only fires on native input bubbles, so
+  // PDF Import, AI Generate, RichTextEditor onChange, date pickers and
+  // section toggles all bypass it. Here we capture the data baseline
+  // once loading completes and flip dirty=true whenever the `data`
+  // ref changes from that baseline — covering every setData path with
+  // no deep-equality cost (ref compare is O(1)).
+  const initialDataRef = useRef(null);
+  useEffect(() => {
+    if (loading) return;
+    if (initialDataRef.current === null) initialDataRef.current = data;
+  }, [loading, data]);
+  useEffect(() => {
+    if (initialDataRef.current === null) return;
+    if (data === initialDataRef.current) return;
+    setDirty(true);
+  }, [data]);
   const [detectingWeek, setDetectingWeek] = useState(false);
   const [aiLoading, setAiLoading] = useState({}); // per-section loading state
   const [customFieldDefs, setCustomFieldDefs] = useState([]); // [{id, name}]

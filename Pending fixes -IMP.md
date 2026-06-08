@@ -25,9 +25,23 @@ Three of the four originally-identified mechanisms are now fixed.
 - `WeeklyReportForm.jsx` / `BiWeeklyReportForm.jsx` / `MonthlyReportForm.jsx` load-effects
 - Removed `brands` from dep list; wrapped `getReport` in try/catch; cleanup-flag added
 
-### ✅ DONE — P4: Universal autosave (shipped 2026-06-02, tightened 2026-06-02)
+### ✅ DONE — P4: Universal autosave (shipped 2026-06-02, tightened 2026-06-02, 2026-06-08)
 - `useReportAutosave` always-on for new + edit; `editId` in key; **interval now 5s** (was 30s)
 - MonthlyReportForm autosave added (was missing entirely)
+- **2026-06-08: save-on-change added.** Ali Waseem reported "page came back, no
+  reload, no saved draft" — the gap was: mount fires `saveDraft(empty template)`,
+  next interval doesn't fire for 5 seconds, so a form that unmounts in <5s only
+  has an empty snapshot in localStorage. Fix: every `data` ref change now calls
+  `saveDraft` directly (no debounce — a debounce timer cancels on unmount and
+  re-creates the same gap). localStorage writes for a 10-50KB report payload
+  run in <1ms.
+
+### ✅ DONE — KeyboardShortcuts removed (2026-06-08)
+- The global `g`-then-`r`/`d`/etc. chord handler (and `?` help overlay) was
+  removed entirely along with the sidebar footer keyboard-icon button. Closed
+  the last in-app `navigate()` path that could accidentally yank a user off a
+  dirty editor. Will be re-added later as a separate feature with proper
+  dirty-form guards if/when navigation shortcuts are wanted again.
 
 ### ✅ DONE — P3 minimal: SW nav guard (shipped 2026-06-02)
 - AppShell `wurxos-nav` handler now calls `hasUnsavedWork()` and confirms before navigating
@@ -42,50 +56,44 @@ Three of the four originally-identified mechanisms are now fixed.
 
 ---
 
-### ⏸ STILL PENDING — P5: Deep-equality dirty tracking
+### ✅ DONE — P5: Reference-equality dirty tracking (shipped 2026-06-08)
+- All 3 forms now snapshot the `data` ref once loading completes and flip
+  `dirty=true` on any subsequent `data` ref change. Catches PDF Import, AI
+  Generate, RichTextEditor onChange, date pickers, section toggles — every
+  setData path. No deep-equality cost (ref compare is O(1)).
+- Files: [WeeklyReportForm.jsx](src/components/reporting/WeeklyReportForm.jsx),
+  [BiWeeklyReportForm.jsx](src/components/reporting/BiWeeklyReportForm.jsx),
+  [MonthlyReportForm.jsx](src/components/reporting/MonthlyReportForm.jsx).
 
-**Where:** [src/components/reporting/WeeklyReportForm.jsx](src/components/reporting/WeeklyReportForm.jsx)
-(and equivalents in BiWeekly/Monthly forms).
+### ✅ DONE — Auth/route grace windows for unsaved work (shipped 2026-06-08)
+- **Root finding:** Ali Waseem's recurring "page came back, no reload" was
+  almost certainly the auth-redirect cascade. A transient Supabase SIGNED_OUT
+  event (multi-tab signout, refresh-token flutter, BroadcastChannel sync)
+  would null session/profile → ProtectedRoute or RoleGuard Navigate to /login
+  → AppShell unmounts → editor lost. Even a 100ms flutter destroyed work.
+- **Fix:** All three of the unmount paths now honor a 2-second grace window
+  when `hasUnsavedWork()` returns true:
+  - [ProtectedRoute.jsx](src/components/auth/ProtectedRoute.jsx) — hold tree
+    when session=null and a dirty form is mounted.
+  - [RoleGuard.jsx](src/components/auth/RoleGuard.jsx) — hold tree when
+    profile=null and a dirty form is mounted.
+  - [AuthContext.jsx](src/contexts/AuthContext.jsx) — `onAuthStateChange`
+    no longer calls `setProfile(null)` on transient `!newSession` events
+    if a dirty form is mounted. The recheckSession 3-strike threshold will
+    still catch a real sign-out and surface SessionExpiredModal.
+  - [BrandsContext.jsx](src/contexts/BrandsContext.jsx) — defers
+    `setBrands([])` by 2s when uid/role briefly null and a dirty form is
+    mounted.
+- **Trade-off:** During those 2 seconds a genuinely signed-out user sees
+  stale UI. Any DB call they trigger fails with 401. Acceptable — the data
+  safety win is much larger than the cosmetic cost, and the grace window is
+  SCOPED to `hasUnsavedWork()` so non-edit pages still redirect instantly.
 
-**What happens:**
-```jsx
-<div onInput={() => setDirty(true)}>
-```
-`setDirty(true)` fires on native browser `input` events. It does **NOT** fire for:
-- Programmatic `setData(...)` (e.g. PDF Import, AI Generate-All)
-- `RichTextEditor` `onChange` callbacks (rich-text libs often use
-  `beforeinput`/`compositionend` instead of bubbling `input`)
-- Date pickers / `<select>` (they fire `change`, not `input`)
-- Section toggle switches
+### ⏸ STILL PENDING — (none for the report editor as of 2026-06-08)
 
-**Impact:** A user who opens the form and immediately hits "Import from PDF"
-has a fully-populated form whose `dirty` flag is still `false`. The
-`useUnsavedGuard` doesn't register it as dirty, so the appUpdate coordinator
-would happily reload them away if a stale deploy is detected.
-
-**Mitigation already in place:** Autosave runs every 5s regardless of the
-dirty flag, so even programmatic mutations get persisted to localStorage
-within seconds. A reload would still destroy the editor view, but the user's
-draft would be restored on remount via the autosave restore path. So this is
-no longer catastrophic — it's UX polish (the unsaved-changes confirm dialog
-won't show when it should).
-
-**Why we still haven't shipped:** Deep-equality on a large nested `data`
-object every render is expensive — especially on the Monthly report which is
-the largest. We deferred until we either see the bug recur with data loss
-(which would mean autosave isn't catching it) or have a clean approach
-(per-section dirty flags instead of per-form deep-equality).
-
-**The proposed fix when we revisit:**
-- Capture the initial `data` snapshot when the editor mounts
-- Compute `dirty = !structuredEqual(data, initialSnapshot)` via a stable
-  deep-compare, debounced to once per second
-- Or: derive `dirty` from per-section flags maintained at the section level —
-  each section sets its own dirty on any state change
-
-**Confirmation tells:** if a user reports the autosave catching their work but
-the unsaved-changes confirm dialog NOT firing when they try to leave, that's
-P5. If autosave isn't catching the work either, that's a different bug.
+All known mechanisms that could destroy editor state without a user click
+on Save/Cancel are now mitigated. If the symptom recurs, that's a new
+mechanism — investigate from scratch.
 
 ---
 

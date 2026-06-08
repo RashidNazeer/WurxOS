@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, us
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { logAppEvent } from '../lib/appEvents';
+import { hasUnsavedWork } from '../lib/appUpdate';
 
 const AuthContext = createContext(null);
 
@@ -187,7 +188,24 @@ export function AuthProvider({ children }) {
         }
         return newSession;
       });
-      if (!newSession) setProfile(null);
+      // If session disappeared and a dirty form is open, DON'T null
+      // profile immediately. Multi-tab signout, refresh-token flutter,
+      // and BroadcastChannel sync events can all fire a transient
+      // SIGNED_OUT — without this guard, profile=null cascades into
+      // RoleGuard's Navigate-to-/login and the editor is destroyed.
+      // recheckSession's 3-strike threshold will catch a real sign-out
+      // and surface SessionExpiredModal; until then, keep the user
+      // mounted on whatever they were doing.
+      if (!newSession) {
+        if (hasUnsavedWork()) {
+          logAppEvent(null, 'auth.profile_null_deferred', {
+            event,
+            reason: 'unsaved-work',
+          });
+        } else {
+          setProfile(null);
+        }
+      }
     });
 
     return () => {

@@ -172,6 +172,19 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   // Unsaved-changes guard — see WeeklyReportForm for the rationale.
   const [dirty, setDirty] = useState(false);
   useUnsavedGuard(dirty);
+  // P5 — reference-equality dirty tracking. See WeeklyReportForm for
+  // the full comment. Captures `data` once loading completes and
+  // flips dirty=true on any subsequent `data` ref change.
+  const initialDataRef = useRef(null);
+  useEffect(() => {
+    if (loading) return;
+    if (initialDataRef.current === null) initialDataRef.current = data;
+  }, [loading, data]);
+  useEffect(() => {
+    if (initialDataRef.current === null) return;
+    if (data === initialDataRef.current) return;
+    setDirty(true);
+  }, [data]);
 
   // Auto-save to localStorage every 30s — same pattern as the
   // weekly / bi-weekly forms. Monthly was missing autosave entirely
