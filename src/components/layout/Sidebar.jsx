@@ -29,14 +29,6 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
       .filter(Boolean);
   }, [menu, q]);
 
-  // Open the keyboard-shortcuts overlay by synthesizing the '?' key
-  // press that KeyboardShortcuts.jsx listens for — no need to lift
-  // its state or share context.
-  const openShortcuts = () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
-  };
-
   return (
     <aside className="shell-sidebar">
       <div className="shell-sidebar-header">
@@ -130,15 +122,6 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
               WurxOS · v2 · Operational
             </div>
           </div>
-          <button
-            type="button"
-            className="shell-sidebar-footer-btn"
-            onClick={openShortcuts}
-            title="Keyboard shortcuts"
-            aria-label="Keyboard shortcuts"
-          >
-            <i className="bi bi-keyboard" aria-hidden="true" />
-          </button>
         </div>
       </div>
     </aside>

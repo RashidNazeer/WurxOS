@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import KeyboardShortcuts from './KeyboardShortcuts';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
 import { hasUnsavedWork } from '../../lib/appUpdate';
@@ -147,7 +146,6 @@ export default function AppShell() {
           </RouteErrorBoundary>
         </div>
       </main>
-      <KeyboardShortcuts />
       {/* Non-blocking "new version available" banner. Never reloads
           on its own — the user reloads when their work is safe. */}
       <UpdateAvailableBanner />
