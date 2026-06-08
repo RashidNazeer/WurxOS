@@ -218,10 +218,10 @@ function MyMonthlyAttendance({ userId, displayName }) {
         // holidays are always covered so a missed day can only be a
         // weekday the user was expected to clock in on and didn't.
         const today = new Date(); today.setHours(0, 0, 0, 0);
-        let missed = 0;
+        const missedList = [];
         for (let d = new Date(monthStart); d <= monthEnd && d < today; d.setDate(d.getDate() + 1)) {
           const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-          if (!accountedDates.has(ds)) missed++;
+          if (!accountedDates.has(ds)) missedList.push(ds);
         }
 
         if (!cancelled) {
@@ -234,7 +234,12 @@ function MyMonthlyAttendance({ userId, displayName }) {
             holidayDays: holidaySet.size,
             weekendDays: weekendDates.size,
             accountedDays: accountedDates.size,
-            missedDays: missed,
+            missedDays: missedList.length,
+            // Surface the actual dates so the UI can show WHICH days were
+            // missed, not just the count. Reported 2026-06-08: a user
+            // could see "1 day missed" but had to scroll the History view
+            // to find the date.
+            missedDates: missedList,
             totalWorkMs,
             monthLabel: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
           });
@@ -293,6 +298,35 @@ function MyMonthlyAttendance({ userId, displayName }) {
         <MyAttTile dot="#dc2626" label="Days missed"   value={stats.missedDays}   sub="past weekdays not covered" />
         <MyAttTile dot="#0f172a" label="Hours worked"  value={`${hrsTotal}h ${minsTotal}m`} sub="this month" prominent />
       </div>
+
+      {/* Which days were missed — chip strip below the tiles. Only
+          renders when there's something to show; clicking a chip
+          deep-links into History (handled by the parent). */}
+      {stats.missedDates && stats.missedDates.length > 0 && (
+        <div className="d-flex flex-wrap align-items-center gap-2 mt-1 mb-2">
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            Missed:
+          </span>
+          {stats.missedDates.map((ds) => {
+            const d = new Date(ds + 'T00:00:00');
+            const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+            return (
+              <span key={ds}
+                title={ds}
+                style={{
+                  fontSize: 11, fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: '#fef2f2',
+                  color: '#b91c1c',
+                  border: '1px solid #fecaca',
+                }}>
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Stacked progress bar */}
       <div className="rounded-pill d-flex overflow-hidden" style={{ height: 10, background: '#f1f5f9' }}>
