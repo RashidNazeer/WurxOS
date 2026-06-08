@@ -29,6 +29,11 @@ portals — everything an agency needs.
 ## Working with this codebase — non-obvious things
 
 ### Branches & deploys
+- **Repo:** the GitHub remote is `RashidNazeer/WurxOS` (private) = `origin`;
+  all commits push there. The "WurxOS-V2" name is only the local folder /
+  internal project name (this is the v2 rewrite) — there is **no** separate
+  "v2" repo on GitHub. A fresh clone lands on `main`; active work lives on
+  feature branches, so check `git branch -r` after cloning.
 - Read **`.claude/memory/git-workflow.md`** for the full policy.
 - TL;DR: atomic commits to `main` by default; branch only when a change spans
   multiple commits OR is risky. Merge with `--no-ff`. NEVER `reset --hard` on
@@ -135,9 +140,12 @@ bug. The DB is usually right and the UI is usually stale.
 
 ## Pending work — open items
 
-See `Pending fixes -IMP.md` at the repo root. Two P-items deferred from the
-report-editor investigation (P2 + P5) live there with full root-cause notes.
-Read it before re-investigating any "editor refreshes / state lost" symptom.
+See `Pending fixes -IMP.md` at the repo root — the running log of investigated
+issues. As of **2026-06-08** the report-editor state-loss campaign is
+**complete**: P1–P5 done, plus the auth/route grace windows, with **no open
+items**. Read that file before re-investigating any "editor refreshes / state
+lost" symptom — every known mechanism is already mapped there, so a recurrence
+means a brand-new mechanism, not one of the known ones.
 
 ---
 
