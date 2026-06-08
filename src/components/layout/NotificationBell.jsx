@@ -19,6 +19,8 @@ const CATEGORY_META = {
   resource:     { label: 'Resources',    icon: BookmarkIcon },
   performance:  { label: 'Performance',  icon: StarIcon },
   agenda:       { label: 'Agenda',       icon: ChecklistIcon },
+  salary:       { label: 'Salary',       icon: StarIcon },
+  hr:           { label: 'HR',           icon: ChecklistIcon },
   system:       { label: 'System',       icon: MessageIcon },
 };
 const CATEGORY_ORDER = Object.keys(CATEGORY_META);

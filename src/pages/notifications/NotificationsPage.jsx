@@ -28,6 +28,8 @@ const CATEGORY_LABEL = {
   attendance:     'Attendance',
   tier:           'Tier',
   agenda:         'Agenda Meetings',
+  salary:         'Salary',
+  hr:             'HR',
   system:         'System',
 };
 
@@ -43,6 +45,8 @@ const CATEGORY_META = {
   attendance:     { Icon: BellIcon,      tone: 'system', bi: 'bi-clock-fill' },
   tier:           { Icon: StarIcon,      tone: 'brand',  bi: 'bi-award-fill' },
   agenda:         { Icon: CheckIcon,     tone: 'task',   bi: 'bi-calendar-week' },
+  salary:         { Icon: StarIcon,      tone: 'brand',  bi: 'bi-cash-coin' },
+  hr:             { Icon: CheckIcon,     tone: 'task',   bi: 'bi-award-fill' },
   system:         { Icon: BellIcon,      tone: 'system', bi: 'bi-bell-fill' },
 };
 

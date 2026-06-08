@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   emptyMonthlyReport, makeMonthInfo, detectNextMonth, getFirstTimeMonthOptions,
@@ -10,6 +11,7 @@ import {
   MONTHLY_SECTIONS, resolveSectionsEnabled,
   cleanNumericInput,
 } from '../../utils/monthlyReportingService';
+import { findPreviousMonthlyReport } from '../../lib/reportsApi';
 import { generateMonthlyKeyWinsInsight } from '../../utils/aiInsights';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parseMonthlyPdfToReport } from '../../utils/pdfReportParser';
@@ -170,6 +172,50 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   // Unsaved-changes guard — see WeeklyReportForm for the rationale.
   const [dirty, setDirty] = useState(false);
   useUnsavedGuard(dirty);
+  // P5 — reference-equality dirty tracking. See WeeklyReportForm for
+  // the full comment. Captures `data` once loading completes and
+  // flips dirty=true on any subsequent `data` ref change.
+  const initialDataRef = useRef(null);
+  useEffect(() => {
+    if (loading) return;
+    if (initialDataRef.current === null) initialDataRef.current = data;
+  }, [loading, data]);
+  useEffect(() => {
+    if (initialDataRef.current === null) return;
+    if (data === initialDataRef.current) return;
+    setDirty(true);
+  }, [data]);
+
+  // Auto-save to localStorage every 30s — same pattern as the
+  // weekly / bi-weekly forms. Monthly was missing autosave entirely
+  // before this; an APC editing a monthly report had ZERO safety
+  // net if the editor got remounted. Now enabled for both new and
+  // edit modes, with editReportId in the key to keep drafts of
+  // different reports isolated.
+  const periodStartForKey = selectedMonth ? `${selectedMonth.year}-${String(selectedMonth.month).padStart(2,'0')}-01` : null;
+  const draftKey = {
+    type: 'monthly',
+    uid: currentUser?.uid,
+    brandId: selectedBrand?.id,
+    periodStart: periodStartForKey,
+    editId: editReportId || null,
+  };
+  const { clear: clearLocalDraft } = useReportAutosave({
+    ...draftKey,
+    data,
+  });
+  const restoredKeyRef = useRef('');
+  useEffect(() => {
+    if (!draftKey.uid || !draftKey.brandId || !draftKey.periodStart) return;
+    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}|${draftKey.editId || ''}`;
+    if (restoredKeyRef.current === k) return;
+    restoredKeyRef.current = k;
+    const saved = loadDraft(draftKey);
+    if (saved?.data) {
+      setData((d) => ({ ...d, ...saved.data }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey.uid, draftKey.brandId, draftKey.periodStart, draftKey.editId]);
   const [detecting, setDetecting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [reportStatus, setReportStatus] = useState('draft');
@@ -226,64 +272,68 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     getMonthlyReportsForBrand(selectedBrand.id).then(setExistingReports);
   }, [selectedBrand, editReportId]);
 
-  // Load report for editing
+  // Load report for editing. Deps are [editReportId] only — see the
+  // long-form comment in WeeklyReportForm.jsx for the brands-realtime
+  // wipe rationale. Same fix applied here.
   useEffect(() => {
     if (!editReportId) return;
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      const r = await getMonthlyReport(editReportId);
-      if (r) {
-        const brand = brands.find(b => b.id === r.brandId);
-        setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
-        setSelectedMonth(makeMonthInfo(r.year, r.month));
-        const empty = emptyMonthlyReport();
-        setData({
-          currency: r.currency || empty.currency,
-          sectionsEnabled: resolveSectionsEnabled(r.sectionsEnabled),
-          totalSales: r.totalSales || empty.totalSales,
-          keyMetrics: r.keyMetrics || empty.keyMetrics,
-          kpis: r.kpis || empty.kpis,
-          gmvBreakdown: r.gmvBreakdown || empty.gmvBreakdown,
-          topCreators: r.topCreators?.length ? r.topCreators : empty.topCreators,
-          topVideos:   r.topVideos?.length   ? r.topVideos   : empty.topVideos,
-          videoPerformance: r.videoPerformance || empty.videoPerformance,
-          creatorsPerformance: r.creatorsPerformance || empty.creatorsPerformance,
-          productAnalytics: r.productAnalytics?.length ? r.productAnalytics : empty.productAnalytics,
-          gmvMax: r.gmvMax?.length ? r.gmvMax : empty.gmvMax,
-          customers: r.customers || empty.customers,
-          keyWinsInsights: r.keyWinsInsights || '',
-          campaignsText: r.campaignsText || '',
-          recommendations: r.recommendations || '',
-          customFields: r.customFields || {},
-        });
-        setReportStatus(r.status || 'draft');
-        setRejectionNote(r.rejectionNote || '');
+      try {
+        const r = await getMonthlyReport(editReportId);
+        if (cancelled) return;
+        if (r) {
+          const brand = brands.find(b => b.id === r.brandId);
+          setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
+          setSelectedMonth(makeMonthInfo(r.year, r.month));
+          const empty = emptyMonthlyReport();
+          setData({
+            currency: r.currency || empty.currency,
+            sectionsEnabled: resolveSectionsEnabled(r.sectionsEnabled),
+            totalSales: r.totalSales || empty.totalSales,
+            keyMetrics: r.keyMetrics || empty.keyMetrics,
+            kpis: r.kpis || empty.kpis,
+            gmvBreakdown: r.gmvBreakdown || empty.gmvBreakdown,
+            topCreators: r.topCreators?.length ? r.topCreators : empty.topCreators,
+            topVideos:   r.topVideos?.length   ? r.topVideos   : empty.topVideos,
+            videoPerformance: r.videoPerformance || empty.videoPerformance,
+            creatorsPerformance: r.creatorsPerformance || empty.creatorsPerformance,
+            productAnalytics: r.productAnalytics?.length ? r.productAnalytics : empty.productAnalytics,
+            gmvMax: r.gmvMax?.length ? r.gmvMax : empty.gmvMax,
+            customers: r.customers || empty.customers,
+            keyWinsInsights: r.keyWinsInsights || '',
+            campaignsText: r.campaignsText || '',
+            recommendations: r.recommendations || '',
+            customFields: r.customFields || {},
+          });
+          setReportStatus(r.status || 'draft');
+          setRejectionNote(r.rejectionNote || '');
+        }
+      } catch (e) {
+        console.warn('Failed to load monthly report for editing:', e?.message || e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
-  }, [editReportId, brands]);
+    return () => { cancelled = true; };
+  }, [editReportId]);
 
-  // Previous report = the one created before this one. Stable across OL month edits.
+  // Previous report = the closest earlier calendar month for this brand.
+  // Routed through findPreviousMonthlyReport so the Edit screen agrees
+  // with the View screen — both now compare by monthKey, never by
+  // createdAt. (createdAt ordering produced visible inconsistencies:
+  // a report created out-of-order, e.g. an OL backfill, could pick a
+  // different "previous" than what the View showed → user saw
+  // contradictory MoM deltas.)
   const previousReport = useMemo(() => {
     if (!existingReports.length || !selectedMonth) return null;
-    const tsOf = r => r.createdAt?.toMillis ? r.createdAt.toMillis()
-      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
-      : null;
-    const current = editReportId ? existingReports.find(r => r.id === editReportId) : null;
-    const currentTs = current ? tsOf(current) : Date.now();
-    const candidates = existingReports.filter(r => {
-      if (current && r.id === current.id) return false;
-      const ts = tsOf(r);
-      if (ts != null && currentTs != null) return ts < currentTs;
-      return (r.monthKey || '') < selectedMonth.monthKey;
-    });
-    candidates.sort((a, b) => {
-      const aTs = tsOf(a), bTs = tsOf(b);
-      if (aTs != null && bTs != null) return bTs - aTs;
-      return (b.monthKey || '').localeCompare(a.monthKey || '');
-    });
-    return candidates[0] || null;
-  }, [existingReports, selectedMonth, editReportId]);
+    const current = editReportId
+      ? existingReports.find(r => r.id === editReportId)
+      : { id: '__pending__', brandId: selectedBrand?.id, monthKey: selectedMonth.monthKey };
+    if (!current) return null;
+    return findPreviousMonthlyReport(existingReports, current);
+  }, [existingReports, selectedMonth, editReportId, selectedBrand?.id]);
 
   // APC-only submission gates: duplicate month or prior not yet OL-approved
   const isApc = userRole === 'apc';
@@ -526,6 +576,10 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         extraFields: extra,
       });
       setDirty(false); // changes are persisted — release the guard
+      clearLocalDraft();  // discard the localStorage safety-net for this report
+      setReportStatus(status); // mirror the saved status into the pill so it
+                               // doesn't show the stale loaded value (e.g.
+                               // 'approved' lingering after Save-as-Draft).
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,

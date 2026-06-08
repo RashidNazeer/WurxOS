@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { useAuth } from './AuthContext';
 import { listBrandsForReporting } from '../lib/reportsApi';
 import { supabase } from '../lib/supabase';
+import { hasUnsavedWork } from '../lib/appUpdate';
 
 /**
  * v1 verbatim-port shim — v1 components import `useBrands()` to get the
@@ -50,6 +51,11 @@ export function useBrands() {
   const { user, profile } = useAuth();
   const uid = user?.id;
   const role = profile?.role;
+  // Per-user 'canViewAllBrands' override (mig 192) — when true, a
+  // TL/PCTL/APC sees the same brand list a Boss/OL would. Used for
+  // special-case accounts (Abdul Subhan as of 2026-06-04). Profile
+  // changes propagate via AuthContext's realtime UPDATE listener.
+  const permissions = profile?.permissions || {};
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   // Per-hook unique channel suffix. Multiple useBrands() consumers can
@@ -65,6 +71,18 @@ export function useBrands() {
 
   useEffect(() => {
     if (!uid || !role) {
+      // If a dirty editor is mounted, this is probably a transient
+      // auth flutter — keep the existing brand list around for 2s
+      // before clearing. Same rationale as ProtectedRoute/RoleGuard
+      // grace: don't yank state out from under an active edit on the
+      // basis of one auth event that may reverse milliseconds later.
+      if (hasUnsavedWork()) {
+        const t = setTimeout(() => {
+          setBrands([]);
+          setLoading(true);
+        }, 2000);
+        return () => clearTimeout(t);
+      }
       setBrands([]);
       setLoading(true);
       return undefined;
@@ -79,7 +97,7 @@ export function useBrands() {
     }, 8000);
     (async () => {
       try {
-        const rows = await listBrandsForReporting({ role, uid });
+        const rows = await listBrandsForReporting({ role, uid, permissions });
         if (!cancelled) {
           setBrands((rows || []).map(_normBrand));
           setLoading(false);
@@ -100,7 +118,7 @@ export function useBrands() {
       .channel(`brands-ctx-${uid}-${instanceIdRef.current}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, async () => {
         try {
-          const rows = await listBrandsForReporting({ role, uid });
+          const rows = await listBrandsForReporting({ role, uid, permissions });
           if (!cancelled) setBrands((rows || []).map(_normBrand));
         } catch { /* ignore */ }
       })
@@ -111,7 +129,9 @@ export function useBrands() {
       clearTimeout(safetyTimer);
       supabase.removeChannel(ch);
     };
-  }, [uid, role]);
+  // canViewAllBrands flipping should re-fetch with the broader query.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, role, permissions?.canViewAllBrands]);
 
   return useMemo(() => {
     const byId = new Map(brands.map((b) => [b.id, b]));

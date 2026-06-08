@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getBrandReportResources } from '../../utils/brandReportResources';
+import { getBrandReportResources, sectionAppliesTo } from '../../utils/brandReportResources';
 
 /**
  * Brand-default "Report Links" — auto-rendered link sections in reports.
@@ -191,8 +191,8 @@ export function UnmatchedReportLinkSections({ sections }) {
  *   getUnmatched(knownNames): returns sections whose names DON'T appear in
  *                             the provided knownNames list
  */
-export function useBrandReportLinks(brandId) {
-  const [sections, setSections] = useState([]);
+export function useBrandReportLinks(brandId, reportType) {
+  const [allSections, setAllSections] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -200,11 +200,20 @@ export function useBrandReportLinks(brandId) {
     if (!brandId) { setLoaded(true); return; }
     setLoaded(false);
     getBrandReportResources(brandId)
-      .then(s => { if (!cancelled) setSections(s); })
-      .catch(() => { if (!cancelled) setSections([]); })
+      .then(s => { if (!cancelled) setAllSections(s); })
+      .catch(() => { if (!cancelled) setAllSections([]); })
       .finally(() => { if (!cancelled) setLoaded(true); });
     return () => { cancelled = true; };
   }, [brandId]);
+
+  // Filter to sections that apply to this report type. Legacy sections
+  // (no appliesTo field) keep showing in all three for back-compat.
+  // A missing reportType (older callers) is treated as legacy too —
+  // shows everything.
+  const sections = useMemo(
+    () => allSections.filter(s => sectionAppliesTo(s, reportType)),
+    [allSections, reportType]
+  );
 
   const byName = useMemo(() => {
     const m = {};
@@ -227,8 +236,8 @@ export function useBrandReportLinks(brandId) {
  * cards. New code should prefer the hook + EmbeddedLinks pattern so that
  * matching names embed into existing report sections instead of duplicating.
  */
-export default function BrandReportLinks({ brandId, knownSectionNames = [] }) {
-  const { getUnmatched, loaded } = useBrandReportLinks(brandId);
+export default function BrandReportLinks({ brandId, knownSectionNames = [], reportType }) {
+  const { getUnmatched, loaded } = useBrandReportLinks(brandId, reportType);
   if (!loaded) return null;
   const unmatched = getUnmatched(knownSectionNames);
   if (unmatched.length === 0) return null;

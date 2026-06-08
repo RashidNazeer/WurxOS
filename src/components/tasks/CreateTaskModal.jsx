@@ -548,7 +548,16 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
               const me = user?.id;
               const isAssignee = isEdit && task?.assignee_id === me;
               const isCreator  = isEdit && task?.created_by  === me;
-              const creatorName  = task?.creator?.display_name  || 'creator';
+              // Prefer the assignee's CURRENT TL over the cached
+              // task.creator. tasks.created_by is a snapshot frozen
+              // when the task was created (or by the mig 141 backfill
+              // for legacy APC self-assigned brand tasks); when the
+              // APC moves to a new TL via brand-switch, that snapshot
+              // doesn't auto-update for older tasks. Mirrors the
+              // long-standing fix in TaskRow.jsx so the inline
+              // dropdown and the edit modal don't disagree.
+              const currentTlName = task?.assignee?.current_tl?.display_name;
+              const creatorName  = currentTlName || task?.creator?.display_name || 'creator';
               const assigneeName = (() => {
                 if (isEdit) return task?.assignee?.display_name || 'assignee';
                 const picked = assignees.find((u) => u.id === assigneeId);

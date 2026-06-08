@@ -11,7 +11,10 @@ export {
   addReportSection,
   renameReportSection,
   removeReportSection,
+  setReportSectionApplies,
   addReportLink,
   updateReportLink,
   removeReportLink,
+  sectionAppliesTo,
+  REPORT_TYPES,
 } from '../lib/brandReportResourcesApi';

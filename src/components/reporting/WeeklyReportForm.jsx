@@ -14,6 +14,7 @@ import {
   generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
   generateAllInsights,
 } from '../../utils/aiInsights';
+import { findPreviousReport } from '../../lib/reportsApi';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
@@ -270,38 +271,42 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const [existingReports, setExistingReports] = useState([]);
   const [data, setData] = useState(emptyReport());
 
-  // Auto-save in-progress new reports to localStorage every 30s so a
-  // mid-edit sign-out, tab crash, or deploy doesn't lose the work.
-  // Only enabled on the new-report flow — editing an existing report
-  // already writes to the DB on every Save.
+  // Auto-save to localStorage every 30s so a mid-edit sign-out, tab
+  // crash, deploy, or any of the bugs analyzed in the report-editor
+  // investigation (Brands realtime wipe, profile-null unmount, SW
+  // nav) doesn't destroy work. Enabled for BOTH new and edit modes;
+  // editId in the key prevents drafts of different reports from
+  // colliding. Edit-mode drafts are restored only if newer than the
+  // server data the load-effect just pulled.
   const draftKey = {
     type: 'weekly',
     uid: currentUser?.uid,
     brandId: selectedBrand?.id,
     periodStart: selectedWeek?.startDate,
+    editId: editReportId || null,
   };
   const { clear: clearLocalDraft } = useReportAutosave({
     ...draftKey,
     data,
-    enabled: !editReportId,
   });
-  // Once we know brand + week (and we're NOT editing), restore any
-  // locally-saved draft. Runs once per (brand, week) pair.
+  // Restore any locally-saved draft once we know brand + period.
+  // For new reports: restore directly. For edits: only restore if
+  // the local draft is newer than the server's updated_at (or close
+  // — within 10s of the load — since server time can drift). This
+  // way a stale draft from a previous session doesn't clobber what
+  // someone else may have legitimately saved in the meantime.
   const restoredKeyRef = useRef('');
   useEffect(() => {
-    if (editReportId) return;
     if (!draftKey.uid || !draftKey.brandId || !draftKey.periodStart) return;
-    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}`;
+    const k = `${draftKey.uid}|${draftKey.brandId}|${draftKey.periodStart}|${draftKey.editId || ''}`;
     if (restoredKeyRef.current === k) return;
     restoredKeyRef.current = k;
     const saved = loadDraft(draftKey);
     if (saved?.data) {
-      // Merge over the empty template so any new fields we've added
-      // since the draft was saved still have sane defaults.
       setData((d) => ({ ...d, ...saved.data }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editReportId, draftKey.uid, draftKey.brandId, draftKey.periodStart]);
+  }, [draftKey.uid, draftKey.brandId, draftKey.periodStart, draftKey.editId]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!!editReportId);
   // Unsaved-changes guard — flips true on the first edit, back to
@@ -310,6 +315,23 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // in-progress report data can't be silently lost.
   const [dirty, setDirty] = useState(false);
   useUnsavedGuard(dirty);
+  // P5 — reference-equality dirty tracking. The onInput={() => setDirty(true)}
+  // catch-all in the form body only fires on native input bubbles, so
+  // PDF Import, AI Generate, RichTextEditor onChange, date pickers and
+  // section toggles all bypass it. Here we capture the data baseline
+  // once loading completes and flip dirty=true whenever the `data`
+  // ref changes from that baseline — covering every setData path with
+  // no deep-equality cost (ref compare is O(1)).
+  const initialDataRef = useRef(null);
+  useEffect(() => {
+    if (loading) return;
+    if (initialDataRef.current === null) initialDataRef.current = data;
+  }, [loading, data]);
+  useEffect(() => {
+    if (initialDataRef.current === null) return;
+    if (data === initialDataRef.current) return;
+    setDirty(true);
+  }, [data]);
   const [detectingWeek, setDetectingWeek] = useState(false);
   const [aiLoading, setAiLoading] = useState({}); // per-section loading state
   const [customFieldDefs, setCustomFieldDefs] = useState([]); // [{id, name}]
@@ -501,44 +523,72 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // here and the next report will pick up at week 8 automatically.
   const [startWeekNumInput, setStartWeekNumInput] = useState(1);
 
-  // Load report for editing
+  // Load report for editing.
+  //
+  // CRITICAL: deps are [editReportId] ONLY — NOT [editReportId, brands].
+  // BrandsContext subscribes to Supabase Realtime on the entire brands
+  // table; any brand mutation anywhere in the org produces a new
+  // `brands` array reference, which would re-fire this effect, call
+  // setLoading(true), re-fetch the report, and setData(...) over the
+  // user's typed edits. That manifested as "I was editing and my
+  // changes disappeared" — root cause analyzed 2026-06-01.
+  //
+  // The brand object is captured ONCE at load time; subsequent brand
+  // mutations don't affect the editor's in-progress data.
   useEffect(() => {
     if (!editReportId) return;
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      const r = await getReport(editReportId);
-      if (r) {
-        const brand = brands.find(b => b.id === r.brandId);
-        setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
-        setSelectedWeek({ week: r.week, startDate: r.weekStart, endDate: r.weekEnd, label: r.weekLabel, year: r.year, month: r.month });
-        setData({
-          overallPerformance: r.overallPerformance || emptyReport().overallPerformance,
-          overallNotes: r.overallNotes || {},
-          overallInsights: r.overallInsights || '',
-          topCreators: r.topCreators || emptyReport().topCreators,
-          topCreatorsInsights: r.topCreatorsInsights || '',
-          topVideos: r.topVideos || emptyReport().topVideos,
-          topVideosInsights: r.topVideosInsights || '',
-          gmvMax: r.gmvMax || emptyReport().gmvMax,
-          gmvMaxInsights: r.gmvMaxInsights || '',
-          productHighlights: r.productHighlights || emptyReport().productHighlights,
-          productHighlightsInsights: r.productHighlightsInsights || '',
-          offsitePerformance: r.offsitePerformance || emptyReport().offsitePerformance,
-          offsiteInsights: r.offsiteInsights || '',
-          upcomingCampaigns: r.upcomingCampaigns || '',
-          operationalUpdates: r.operationalUpdates || '',
-          recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
-          actionItems: '',
-          customFields: r.customFields || {},
-          sectionsEnabled: resolveWeeklySectionsEnabled(r.sectionsEnabled),
-        });
-        setReportStatus(r.status || 'approved');
-        setRejectionNote(r.rejectionNote || '');
-        setStep(2);
+      try {
+        const r = await getReport(editReportId);
+        if (cancelled) return;
+        if (r) {
+          // brands may not be loaded yet on a deep-link refresh —
+          // fall back to a stub with the report's own brand fields
+          // so the editor renders. A later brands fetch won't
+          // re-trigger this effect (intentional), and the stub
+          // carries enough info (id + name) for save/display.
+          const brand = brands.find(b => b.id === r.brandId);
+          setSelectedBrand(brand || { id: r.brandId, name: r.brandName });
+          setSelectedWeek({ week: r.week, startDate: r.weekStart, endDate: r.weekEnd, label: r.weekLabel, year: r.year, month: r.month });
+          setData({
+            overallPerformance: r.overallPerformance || emptyReport().overallPerformance,
+            overallNotes: r.overallNotes || {},
+            overallInsights: r.overallInsights || '',
+            topCreators: r.topCreators || emptyReport().topCreators,
+            topCreatorsInsights: r.topCreatorsInsights || '',
+            topVideos: r.topVideos || emptyReport().topVideos,
+            topVideosInsights: r.topVideosInsights || '',
+            gmvMax: r.gmvMax || emptyReport().gmvMax,
+            gmvMaxInsights: r.gmvMaxInsights || '',
+            productHighlights: r.productHighlights || emptyReport().productHighlights,
+            productHighlightsInsights: r.productHighlightsInsights || '',
+            offsitePerformance: r.offsitePerformance || emptyReport().offsitePerformance,
+            offsiteInsights: r.offsiteInsights || '',
+            upcomingCampaigns: r.upcomingCampaigns || '',
+            operationalUpdates: r.operationalUpdates || '',
+            recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
+            actionItems: '',
+            customFields: r.customFields || {},
+            sectionsEnabled: resolveWeeklySectionsEnabled(r.sectionsEnabled),
+          });
+          setReportStatus(r.status || 'approved');
+          setRejectionNote(r.rejectionNote || '');
+          setStep(2);
+        }
+      } catch (e) {
+        // Don't wedge on the loading spinner if getReport throws
+        // (RLS hiccup, JWT rotation, transient network). The caller's
+        // Cancel button still works; the editor falls back to its
+        // initial state and at least the user isn't stuck.
+        console.warn('Failed to load report for editing:', e?.message || e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
-  }, [editReportId, brands]);
+    return () => { cancelled = true; };
+  }, [editReportId]);
 
   const handleBrandSelect = (brand) => {
     setSelectedBrand(brand);
@@ -570,28 +620,21 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   }, []);
 
   // Previous report = the one created *before* this one for the same brand.
-  // We sort by createdAt (descending) so OL date-edits don't reshuffle history.
-  // Legacy reports without createdAt fall back to weekStart for ordering.
+  // Previous report = the closest earlier week for this brand. Routed
+  // through findPreviousReport (lib/reportsApi.js) so the Edit screen
+  // agrees with the View screen — both compare by weekStart, not by
+  // createdAt. createdAt-based ordering produced visible mismatches:
+  // a report created out-of-order (OL backfill, fixed week edit) made
+  // Edit pick a different "previous" than the View, so the two showed
+  // contradictory WoW deltas to the same user on the same report.
   const previousReport = useMemo(() => {
     if (!existingReports.length || !selectedWeek) return null;
-    const tsOf = r => r.createdAt?.toMillis ? r.createdAt.toMillis()
-      : r.createdAt?.seconds ? r.createdAt.seconds * 1000
-      : null;
-    const current = editReportId ? existingReports.find(r => r.id === editReportId) : null;
-    const currentTs = current ? tsOf(current) : Date.now();
-    const candidates = existingReports.filter(r => {
-      if (current && r.id === current.id) return false;
-      const ts = tsOf(r);
-      if (ts != null && currentTs != null) return ts < currentTs;
-      return (r.weekStart || '') < selectedWeek.startDate;
-    });
-    candidates.sort((a, b) => {
-      const aTs = tsOf(a), bTs = tsOf(b);
-      if (aTs != null && bTs != null) return bTs - aTs;
-      return (b.weekStart || '').localeCompare(a.weekStart || '');
-    });
-    return candidates[0] || null;
-  }, [existingReports, selectedWeek, editReportId]);
+    const current = editReportId
+      ? existingReports.find(r => r.id === editReportId)
+      : { id: '__pending__', brandId: selectedBrand?.id, weekStart: selectedWeek.startDate };
+    if (!current) return null;
+    return findPreviousReport(existingReports, current);
+  }, [existingReports, selectedWeek, editReportId, selectedBrand?.id]);
 
   // Pre-fill Product Highlights from the most recent prior report that
   // actually has products (new-report path only — never on edit). Walk
@@ -924,6 +967,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       // server now has the canonical copy.
       clearLocalDraft();
       setDirty(false); // changes are persisted — release the guard
+      setReportStatus(status); // keep the form's status pill in sync
       if (onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,

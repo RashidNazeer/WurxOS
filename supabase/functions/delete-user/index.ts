@@ -115,27 +115,21 @@ Deno.serve(async (req) => {
     cleanupResults[t] = error ? error.message : null;
   }
 
-  // Reassign brand ownership: a deleted user can't own a brand. Move
-  // any owned brands to the caller (the Boss who triggered the delete).
-  // The brand-owner trigger blocks owner_id changes by non-Boss callers,
-  // but the caller IS Boss here, so it goes through. We bypass the
-  // service-role auth.uid() = NULL with the wurxos.bypass_owner_guard
-  // GUC just in case the trigger is also confused by NULL caller.
-  const { data: ownedBrands, error: brErr } = await admin
-    .from('brands')
-    .select('id')
-    .eq('owner_id', targetId);
-  if (!brErr && ownedBrands && ownedBrands.length) {
-    // Set the bypass flag on the connection used for the next statement.
-    // This is fine because admin client uses a connection pool; the
-    // GUC is set with is_local=false so it persists for the session.
-    await admin.rpc('sync_bypass_owner_guard').catch(() => {/* ignore if RPC missing */});
-    const { error: reErr } = await admin
-      .from('brands')
-      .update({ owner_id: user.id })  // hand to the calling Boss
-      .eq('owner_id', targetId);
-    cleanupResults['brands_reassigned'] = reErr ? reErr.message : `${ownedBrands.length}`;
-  }
+  // Reassign brand ownership: a deleted user can't own a brand. Hand
+  // every owned brand to the caller (the Boss who triggered the
+  // delete). The brand-owner trigger (mig 025) blocks owner_id
+  // changes by non-Boss callers; admin_reassign_orphaned_brands
+  // (mig 190) sets the bypass GUC inside its own transaction so the
+  // trigger lets the update through. Bonus: the cascade trigger
+  // added in mig 190 will also fix up reports_to for any single-
+  // brand APC assigned to those brands.
+  const { data: reassignedCount, error: reassignErr } = await admin
+    .rpc('admin_reassign_orphaned_brands', {
+      p_orphan: targetId,
+      p_new_owner: user.id,
+    });
+  cleanupResults['brands_reassigned'] =
+    reassignErr ? reassignErr.message : String(reassignedCount ?? 0);
 
   return json({
     ok: true,

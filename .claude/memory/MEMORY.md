@@ -1,0 +1,5 @@
+- [Euka integration](euka-integration.md) — plan to sync Euka TikTok Shop data into WurxOS via Supabase; paused awaiting bearer token from Euka
+- [Agenda Meetings](agenda-meetings.md) — Weekly Agenda Meetings module; phase 1 shipped, phase 2 scope (meeting records, ratings) deferred
+- [Refresh / state loss](refresh-state-loss.md) — stale-deploy auto-reload destroyed unsaved work; fixed via appUpdate.js coordinator — never add a bare window.location.reload()
+- [Git workflow](git-workflow.md) — atomic commits to main by default; branch only for multi-commit features or risky work; tag known-good states before load-bearing changes
+- [Salary management](salary-management.md) — Boss has NO salary (owner, not payroll). Exclude Boss role from every salary backfill, list, prompt, and anniversary surface.

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { updateUserProfile, deleteUser } from '../../lib/adminApi';
+import { setUserHireDate } from '../../lib/salariesApi';
 import { ROLES, roleLabel, getRoleExtras } from '../../lib/roles';
 import { useAuth } from '../../contexts/AuthContext';
 import RoleExtraFields, { ResponsibilityTags } from './RoleExtraFields';
-import { XIcon, UserIcon, AlertIcon, TrashIcon } from '../common/Icon';
+import { XIcon, UserIcon, AlertIcon, TrashIcon, CalendarIcon } from '../common/Icon';
 
 // Boss cannot edit other Boss accounts or their own role.
 // All non-boss roles selectable.
@@ -19,6 +20,10 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
   const [reportsTo, setReportsTo]     = useState(user.reports_to || '');
   const [permissions, setPermissions] = useState(user.permissions || {});
   const [responsibilities, setResponsibilities] = useState(user.responsibilities || []);
+  // Hire date — Boss-only field, written via set_user_hire_date RPC
+  // (which logs an audit_log row). Hidden for the Boss editing his
+  // own profile since Boss has no payroll record.
+  const [hireDate, setHireDate]       = useState(user.start_date || '');
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
@@ -50,6 +55,14 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
     setSaving(true);
     try {
       await updateUserProfile(user.id, patch);
+      // Hire date is gated to Boss via the RPC. The profiles UPDATE
+      // policy lets Boss write start_date too, but routing through
+      // set_user_hire_date keeps the audit_log entry uniform.
+      const cleanHire = hireDate || null;
+      const prevHire = user.start_date || null;
+      if (!isTargetBoss && cleanHire !== prevHire) {
+        await setUserHireDate(user.id, cleanHire);
+      }
       onUpdated();
     } catch (err) {
       setError(err.message || 'Failed to update user.');
@@ -163,6 +176,26 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
                   />
                 </div>
               </>
+            )}
+
+            {/* Hire date — Boss-managed, drives anniversary detection and
+                years-completed counts in Salary Management. */}
+            {!isTargetBoss && (
+              <div style={{ marginBottom: 14, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
+                <label className="wx-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CalendarIcon width="13" height="13" /> Hire date
+                </label>
+                <input
+                  type="date"
+                  className="wx-input"
+                  value={hireDate}
+                  onChange={(e) => setHireDate(e.target.value)}
+                  disabled={saving}
+                />
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Drives years-completed counts and the work-anniversary celebrations.
+                </div>
+              </div>
             )}
 
             {/* Responsibilities: editable for everyone except foreign Boss accounts */}

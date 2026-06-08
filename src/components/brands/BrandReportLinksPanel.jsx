@@ -3,8 +3,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getBrandReportResources,
   addReportSection, renameReportSection, removeReportSection,
+  setReportSectionApplies,
   addReportLink, updateReportLink, removeReportLink,
+  REPORT_TYPES,
 } from '../../lib/brandReportResourcesApi';
+
+const REPORT_TYPE_LABEL = { weekly: 'Weekly', biweekly: 'Bi-Weekly', monthly: 'Monthly' };
+// Legacy sections (no appliesTo field set) historically rendered in
+// all three. Show that as the displayed selection until the user
+// explicitly changes it.
+function effectiveApplies(section) {
+  if (Array.isArray(section?.appliesTo) && section.appliesTo.length) return section.appliesTo;
+  return REPORT_TYPES.slice();
+}
 import {
   PlusIcon, XIcon, PencilIcon, TrashIcon, LinkIcon,
   BookmarkIcon, AlertIcon,
@@ -21,6 +32,9 @@ export default function BrandReportLinksPanel({ brandId, brandName }) {
   const [error, setError]                 = useState('');
   const [addingSection, setAddingSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
+  // Default: new sections render in weekly reports only. User can
+  // tick bi-weekly / monthly here before saving.
+  const [newSectionApplies, setNewSectionApplies] = useState(['weekly']);
 
   const { data: sections = [], isPending: loading } = useQuery({
     queryKey: ['brand-report-resources', brandId],
@@ -33,13 +47,32 @@ export default function BrandReportLinksPanel({ brandId, brandName }) {
   async function handleAddSection() {
     const name = newSectionName.trim();
     if (!name) return;
+    if (!newSectionApplies.length) {
+      return setError('Pick at least one report type for this section.');
+    }
     setError('');
     try {
-      await addReportSection(brandId, name);
+      await addReportSection(brandId, name, newSectionApplies);
       setNewSectionName('');
+      setNewSectionApplies(['weekly']);
       setAddingSection(false);
       reload();
     } catch (err) { setError(err.message || 'Could not add section.'); }
+  }
+
+  async function handleToggleApplies(section, reportType) {
+    const current = effectiveApplies(section);
+    const next = current.includes(reportType)
+      ? current.filter((t) => t !== reportType)
+      : [...current, reportType];
+    if (!next.length) {
+      return setError(`"${section.name}" needs to apply to at least one report type. Untick another first.`);
+    }
+    setError('');
+    try {
+      await setReportSectionApplies(brandId, section.id, next);
+      reload();
+    } catch (err) { setError(err.message || 'Could not update.'); }
   }
 
   async function handleRenameSection(section) {
@@ -67,9 +100,10 @@ export default function BrandReportLinksPanel({ brandId, brandName }) {
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
             Report Links
           </h3>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, maxWidth: 560 }}>
-            Links saved here auto-render in every weekly, bi-weekly, and monthly report for{' '}
-            <strong style={{ color: 'var(--text-secondary)' }}>{brandName}</strong> — no need to retype them each week.
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, maxWidth: 620 }}>
+            Links saved here auto-render in reports for{' '}
+            <strong style={{ color: 'var(--text-secondary)' }}>{brandName}</strong>. Pick which report
+            types each section appears in — new sections default to <strong>weekly only</strong>.
           </div>
         </div>
         {!addingSection && (
@@ -102,6 +136,19 @@ export default function BrandReportLinksPanel({ brandId, brandName }) {
             value={newSectionName}
             onChange={(e) => setNewSectionName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSection(); } }} />
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 600 }}>
+              Appears in:
+            </div>
+            <AppliesChips
+              applies={newSectionApplies}
+              onToggle={(t) => {
+                setNewSectionApplies((cur) => cur.includes(t)
+                  ? cur.filter((x) => x !== t)
+                  : [...cur, t]);
+              }}
+            />
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
             <button className="wx-btn wx-btn-ghost"
               onClick={() => { setAddingSection(false); setNewSectionName(''); }}>
@@ -132,6 +179,7 @@ export default function BrandReportLinksPanel({ brandId, brandName }) {
               brandId={brandId}
               onRename={() => handleRenameSection(section)}
               onRemove={() => handleRemoveSection(section)}
+              onToggleApplies={(t) => handleToggleApplies(section, t)}
               onChanged={reload}
               setError={setError}
             />
@@ -145,7 +193,7 @@ export default function BrandReportLinksPanel({ brandId, brandName }) {
 // ============================================================
 // SectionCard — header + list of links + add-link form
 // ============================================================
-function SectionCard({ section, brandId, onRename, onRemove, onChanged, setError }) {
+function SectionCard({ section, brandId, onRename, onRemove, onToggleApplies, onChanged, setError }) {
   const [adding, setAdding] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState(null);
 
@@ -201,6 +249,18 @@ function SectionCard({ section, brandId, onRename, onRemove, onChanged, setError
       </div>
 
       <div style={{ padding: 12 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.02em' }}>
+            APPEARS IN
+          </span>
+          <AppliesChips
+            applies={effectiveApplies(section)}
+            onToggle={onToggleApplies}
+          />
+        </div>
+
         {links.length === 0 && !adding && (
           <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8 }}>
             No links in this section yet.
@@ -310,5 +370,39 @@ function CheckLikePlus() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
     </svg>
+  );
+}
+
+// ============================================================
+// AppliesChips — three toggle chips (Weekly · Bi-Weekly · Monthly)
+// Active = filled accent. Inactive = ghost. Click toggles inclusion.
+// ============================================================
+function AppliesChips({ applies = [], onToggle }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {REPORT_TYPES.map((t) => {
+        const on = applies.includes(t);
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => onToggle?.(t)}
+            style={{
+              fontSize: 11, fontWeight: 700,
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-pill)',
+              border: on ? '1px solid var(--accent)' : '1px solid var(--border-default)',
+              background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
+              color: on ? 'var(--accent)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 120ms ease',
+            }}
+            title={on ? `Showing in ${REPORT_TYPE_LABEL[t]} reports — click to hide` : `Click to show in ${REPORT_TYPE_LABEL[t]} reports`}
+          >
+            {on ? '✓ ' : ''}{REPORT_TYPE_LABEL[t]}
+          </button>
+        );
+      })}
+    </div>
   );
 }

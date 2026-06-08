@@ -10,6 +10,8 @@ const CATEGORIES = [
   { key: 'brand',       label: 'Brands',      blurb: 'Brand switch requests, approvals/rejections.' },
   { key: 'leave',       label: 'Leave',       blurb: 'New requests you need to decide on, and decisions on yours.' },
   { key: 'paid_collab', label: 'Paid Collab', blurb: 'Creator and video activity updates.' },
+  { key: 'salary',      label: 'Salary',      blurb: 'When your fixed salary is updated.' },
+  { key: 'hr',          label: 'HR',          blurb: 'Work anniversaries and other people-ops alerts.' },
   { key: 'system',      label: 'System',      blurb: 'Maintenance and account alerts.' },
 ];
 

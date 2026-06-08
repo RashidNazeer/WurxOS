@@ -543,7 +543,7 @@ export default function AllBiWeeklyReportsPage() {
           </div>
         )}
         <WeeklyReportView report={viewReportCompat} previousReport={prevCompat} allReports={brandReportsCompat}
-          onActions={setReportActions} />
+          onActions={setReportActions} reportType="biweekly" />
 
         {editDatesReport && (
           <EditReportDatesModal

@@ -1008,7 +1008,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             <CardStat label="ORDERS" value={orders.toLocaleString()} note={aov > 0 ? `${sym}${aov.toFixed(0)} AOV` : null} />
             <CardStat label="ROAS" value={roi.toFixed(2)} note={roiNote}
               noteColor={roi >= 2 ? '#16a34a' : roi <= 0 ? '#94a3b8' : '#64748b'} />
-            <CardStat label="VIDEOS" value={videos.toLocaleString()} note={videos > 0 ? `${Math.max(1, Math.round(videos * 0.05))} viral` : null} />
+            <CardStat label="VIDEOS" value={videos.toLocaleString()} />
           </div>
         </div>
 

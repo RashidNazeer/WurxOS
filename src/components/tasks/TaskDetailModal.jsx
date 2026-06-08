@@ -91,8 +91,14 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
 
   const assigneeName = task.assignee?.display_name || task.assignee?.email?.split('@')[0] || '—';
   const assigneeRole = task.assignee?.role || '';
-  const creatorName  = task.creator?.display_name  || '—';
-  const creatorRole  = task.creator?.role || '';
+  // Prefer the assignee's CURRENT TL over the snapshot of who
+  // historically created the task — see CreateTaskModal for the
+  // long-form rationale. Keeps "Assigned by" honest after an
+  // APC moves to a new TL.
+  const currentTlName = task.assignee?.current_tl?.display_name;
+  const currentTlRole = currentTlName ? 'tl' : '';
+  const creatorName  = currentTlName || task.creator?.display_name  || '—';
+  const creatorRole  = currentTlName ? currentTlRole : (task.creator?.role || '');
 
   return (
     <div className="wx-modal-backdrop" onClick={onClose}>
