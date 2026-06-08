@@ -38,7 +38,7 @@ When merging a feature branch back to `main`: `git merge --no-ff feat/<slug>` so
 
 ## Hard rules
 
-- Never `git reset --hard`, `git push --force`, or amend a commit that already left this machine. (No remote exists today, but if one is added later, these become destructive.)
+- Never `git reset --hard`, `git push --force`, or amend a commit that already left this machine. A private GitHub remote now exists (`RashidNazeer/WurxOS`) and every commit is pushed there, so all three rewrite *shared* history and are genuinely destructive — undo with `git revert` instead.
 - Never `--no-verify` to skip hooks unless the user explicitly says so.
 - Never bundle unrelated changes in one commit. If a refactor and a bugfix both happen during one task, commit them separately so each can be reverted independently.
 - Never delete a branch without confirming — local branches are free, and the user may want it as a reference point.
