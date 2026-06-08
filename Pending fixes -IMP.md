@@ -6,56 +6,46 @@
 
 ---
 
-## Report editor: residual causes (P2 and P5)
+## Report editor: residual cause (P5 — P2 now done)
 
-**Symptom:** APC editing a Weekly / Bi-Weekly / Monthly report is unexpectedly
-sent back to the reports list / dashboard, unsaved work appears lost.
+**Symptom (historical):** APC editing a Weekly / Bi-Weekly / Monthly report is
+unexpectedly sent back to the reports list / dashboard, unsaved work appears
+lost.
 
 **Investigation date:** 2026-06-01 (5-agent parallel code audit)
-**First-round fix date:** 2026-06-02 — branch `fix/report-editor-state-loss`, commit `e3bb93c`
+**Round 1 fix:** 2026-06-02 — branch `fix/report-editor-state-loss`, commit `e3bb93c`
+**Round 2 fix (P2):** 2026-06-03 — branch `fix/apc-tl-cascade-complete`, commit `04bb1ea`
 
-The 2026-06-02 fix shipped Priority 1 (Brands-dep wipe) + Priority 4 (universal
-autosave) + Priority 3 minimal (SW nav guard). Two distinct mechanisms remain
-unaddressed because they touch sensitive code and we agreed to wait and see
-whether the shipped fixes alone settle the reports.
-
-### Pending P2 — Auth-null kick to `/login` on transient profile errors
-
-**Where:** [src/contexts/AuthContext.jsx](src/contexts/AuthContext.jsx) lines 73, 80, 87, 353 + [src/components/auth/RoleGuard.jsx](src/components/auth/RoleGuard.jsx) line 14.
-
-**What happens:**
-1. APC alt-tabs to Discord/WhatsApp for a moment, then back to WurxOS
-2. `visibilitychange` event fires → `refreshProfileIfStale()` runs (60s throttle)
-3. `loadProfile(uid)` does a SELECT on `profiles`
-4. Any error — Pakistan-ISP network blip, 15s timeout, transient RLS hiccup — sets `setProfile(null)`
-5. `RoleGuard.jsx:14`: `if (!role) return <Navigate to="/login" replace />`
-6. WeeklyReportsRouter unmounts synchronously; the editor is destroyed
-7. PublicOnly bounces from `/login` to `/dashboard` because the session is still valid
-8. User is now on `/dashboard`, opens `/weekly-reports` — fresh mount, `view='overview'` = "kicked back to the list"
-
-**Why we didn't fix yet:** AuthContext is highly load-bearing. A wrong tweak could
-cause real auth failures to be silently swallowed (security hole) or session
-flickering across the app. We wanted P1+P4 in the wild first to see whether the
-reports stop.
-
-**The proposed fix when we revisit:**
-- In `loadProfile`, never `setProfile(null)` on **transient** errors. Keep the
-  previous profile object and surface a non-destructive "couldn't refresh
-  profile, retrying" toast.
-- Only null the profile if the error is *explicit*: session truly gone, row
-  really deleted, 403, or token revoked.
-- Distinguish errors via `error.status` and `error.code`. Transient = network /
-  timeout / 5xx. Permanent = 401, 403, "row not found".
-
-**Confirmation tells:** if a user reports the bug again AND the autosave restored
-their draft when they came back, P2 is the culprit. If autosave didn't restore
-(meaning the data was wiped before 30s of editing), it's something else.
+Three of the four originally-identified mechanisms are now fixed.
+**Only P5 (programmatic-mutation dirty tracking) remains.**
 
 ---
 
-### Pending P5 — Deep-equality dirty tracking
+### ✅ DONE — P1: Brands realtime form-wipe (shipped 2026-06-02)
+- `WeeklyReportForm.jsx` / `BiWeeklyReportForm.jsx` / `MonthlyReportForm.jsx` load-effects
+- Removed `brands` from dep list; wrapped `getReport` in try/catch; cleanup-flag added
 
-**Where:** [src/components/reporting/WeeklyReportForm.jsx:1136](src/components/reporting/WeeklyReportForm.jsx#L1136) (and equivalents in BiWeekly/Monthly forms).
+### ✅ DONE — P4: Universal autosave (shipped 2026-06-02, tightened 2026-06-02)
+- `useReportAutosave` always-on for new + edit; `editId` in key; **interval now 5s** (was 30s)
+- MonthlyReportForm autosave added (was missing entirely)
+
+### ✅ DONE — P3 minimal: SW nav guard (shipped 2026-06-02)
+- AppShell `wurxos-nav` handler now calls `hasUnsavedWork()` and confirms before navigating
+
+### ✅ DONE — P2: Auth-null kick to `/login` on transient profile errors (shipped 2026-06-03)
+- Was reported again as the Haider "Topbar shows '—'" / 3-reloads bug
+- `AuthContext.loadProfile()` now takes `{ isRefresh }` opt
+- On a refresh path: preserves existing profile when the SELECT fails transiently
+- Initial-load path: retries once after 1s before nulling
+- Realtime UPDATE/DELETE listener still handles real deletions via `setSessionInvalid`
+- Commit: `04bb1ea`
+
+---
+
+### ⏸ STILL PENDING — P5: Deep-equality dirty tracking
+
+**Where:** [src/components/reporting/WeeklyReportForm.jsx](src/components/reporting/WeeklyReportForm.jsx)
+(and equivalents in BiWeekly/Monthly forms).
 
 **What happens:**
 ```jsx
@@ -63,55 +53,52 @@ their draft when they came back, P2 is the culprit. If autosave didn't restore
 ```
 `setDirty(true)` fires on native browser `input` events. It does **NOT** fire for:
 - Programmatic `setData(...)` (e.g. PDF Import, AI Generate-All)
-- `RichTextEditor` `onChange` callbacks (rich-text libs often use `beforeinput`/`compositionend` instead of bubbling `input`)
+- `RichTextEditor` `onChange` callbacks (rich-text libs often use
+  `beforeinput`/`compositionend` instead of bubbling `input`)
 - Date pickers / `<select>` (they fire `change`, not `input`)
 - Section toggle switches
 
-**Impact:** A user who opens the form and immediately hits "Import from PDF" has
-a fully-populated form whose `dirty` flag is still `false`. The
+**Impact:** A user who opens the form and immediately hits "Import from PDF"
+has a fully-populated form whose `dirty` flag is still `false`. The
 `useUnsavedGuard` doesn't register it as dirty, so the appUpdate coordinator
 would happily reload them away if a stale deploy is detected.
 
-**Mitigation already in place (2026-06-02 fix):** Autosave now runs every 30s
-regardless of the dirty flag, so even programmatic mutations get persisted to
-localStorage. A reload would still destroy the editor view, but the user's
-draft would be restored on remount.
+**Mitigation already in place:** Autosave runs every 5s regardless of the
+dirty flag, so even programmatic mutations get persisted to localStorage
+within seconds. A reload would still destroy the editor view, but the user's
+draft would be restored on remount via the autosave restore path. So this is
+no longer catastrophic — it's UX polish (the unsaved-changes confirm dialog
+won't show when it should).
 
-**Why we didn't fix yet:** Deep-equality on a large nested `data` object every
-render is expensive and could introduce performance issues, especially on the
-Monthly report which is the largest. We deferred until we either see the bug
-recur or have a clean way to do it (e.g. tracking dirty per-section instead of
-per-form).
+**Why we still haven't shipped:** Deep-equality on a large nested `data`
+object every render is expensive — especially on the Monthly report which is
+the largest. We deferred until we either see the bug recur with data loss
+(which would mean autosave isn't catching it) or have a clean approach
+(per-section dirty flags instead of per-form deep-equality).
 
 **The proposed fix when we revisit:**
-- Capture the initial `data` snapshot when the editor mounts.
-- Compute `dirty = !structuredEqual(data, initialSnapshot)` via a stable deep-
-  compare, debounced to once per second.
+- Capture the initial `data` snapshot when the editor mounts
+- Compute `dirty = !structuredEqual(data, initialSnapshot)` via a stable
+  deep-compare, debounced to once per second
 - Or: derive `dirty` from per-section flags maintained at the section level —
-  each section sets its own dirty on any state change.
+  each section sets its own dirty on any state change
 
----
-
-## What we shipped on 2026-06-02 (for reference)
-
-| Fix | Where | What |
-|---|---|---|
-| P1 — Brands-dep wipe | All 3 form load-effects | Removed `brands` from deps; added try/catch around `getReport` |
-| P4 — Universal autosave | `reportDraftAutosave.js`, all 3 forms | Always-on autosave including edit mode; `editId` in storage key; MonthlyReportForm autosave added (was missing entirely) |
-| P3 minimal — SW nav guard | `AppShell.jsx` `wurxos-nav` handler | `hasUnsavedWork()` confirm dialog before navigating away on push-notification clicks |
+**Confirmation tells:** if a user reports the autosave catching their work but
+the unsaved-changes confirm dialog NOT firing when they try to leave, that's
+P5. If autosave isn't catching the work either, that's a different bug.
 
 ---
 
 ## How to use this file
 
 1. **When a report-editor bug is reported again:** start here, not from scratch.
-2. **If autosave restored the draft on the user's next visit:** the symptom is real but
-   the data is safe — investigate P2 / P5 next.
-3. **If autosave did NOT restore the draft:** that means something destroyed the editor
-   before 30s of editing OR the autosave path itself has a bug — investigate the autosave
-   `enabled` flag and storage key first.
-4. **Don't re-investigate from scratch.** The agent-driven investigation in this
-   thread already mapped every navigation source, every realtime channel, every
+2. **If autosave restored the draft on the user's next visit:** the symptom is
+   real but the data is safe — investigate P5 next (or a brand-new mechanism).
+3. **If autosave did NOT restore the draft:** that means something destroyed
+   the editor before 5s of editing OR the autosave path itself has a bug —
+   investigate the autosave `enabled` flag and storage key first.
+4. **Don't re-investigate from scratch.** The agent-driven investigation
+   already mapped every navigation source, every realtime channel, every
    error boundary, every chunk-load path, and every git commit. Read the
    findings before spawning a new investigation.
 
@@ -120,5 +107,8 @@ per-form).
 ## Related branches and tags
 
 - `feat/salary-management` — parent of the report-editor fix branch
-- `fix/report-editor-state-loss` — current deploy branch
-- Tag `stable-pre-report-editor-fix` on parent — instant revert point if anything goes wrong
+- `fix/report-editor-state-loss` — branched off salary, shipped P1/P4/P3-minimal
+- `fix/apc-tl-cascade-complete` — current deploy branch, includes the P2 fix
+- Tag `stable-pre-report-editor-fix` — instant revert point for the report
+  editor work
+- Tag `stable-pre-salary-feature` — older revert point on main
