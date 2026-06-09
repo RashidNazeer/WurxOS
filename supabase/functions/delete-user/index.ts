@@ -115,6 +115,26 @@ Deno.serve(async (req) => {
     cleanupResults[t] = error ? error.message : null;
   }
 
+  // Agenda meetings are keyed by tl_id (not user_id). Soft-delete means the
+  // ON DELETE CASCADE on these FKs never fires, so a deleted TL would keep a
+  // lingering meeting schedule that agenda_notify_week re-materialises every
+  // week (a ghost "0 APCs" card). Drop the schedule + any upcoming/ongoing
+  // meeting; completed meetings stay for history (child rows cascade, mig 179).
+  {
+    const { error: agSchedErr } = await admin
+      .from('agenda_team_schedules')
+      .delete()
+      .eq('tl_id', targetId);
+    cleanupResults['agenda_team_schedules'] = agSchedErr ? agSchedErr.message : null;
+
+    const { error: agMeetErr } = await admin
+      .from('agenda_meetings')
+      .delete()
+      .eq('tl_id', targetId)
+      .in('status', ['upcoming', 'ongoing']);
+    cleanupResults['agenda_meetings'] = agMeetErr ? agMeetErr.message : null;
+  }
+
   // Reassign brand ownership: a deleted user can't own a brand. Hand
   // every owned brand to the caller (the Boss who triggered the
   // delete). The brand-owner trigger (mig 025) blocks owner_id

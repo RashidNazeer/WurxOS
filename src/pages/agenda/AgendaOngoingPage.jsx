@@ -65,9 +65,16 @@ export default function AgendaOngoingPage() {
       ]);
       setAllTeams(teams);
       setMeetLink(settings?.google_meet_link || '');
+      // Defensive guard: never surface a meeting whose TL is no longer an
+      // active team (deleted/deactivated users can leave orphaned schedules
+      // + meetings behind). The DB cleanup removes the records; this keeps
+      // the UI correct regardless of DB state.
+      const activeTlIds = new Set((teams || []).map((t) => t.tl.id));
+      const ongoingActive  = (ongoing  || []).filter((m) => activeTlIds.has(m.tl_id));
+      const upcomingActive = (upcoming || []).filter((m) => activeTlIds.has(m.tl_id));
       const wk = mondayStr();
-      setWeekUpcoming((upcoming || []).filter((m) => m.week_start === wk));
-      const m = ongoing[0] || null;
+      setWeekUpcoming(upcomingActive.filter((m) => m.week_start === wk));
+      const m = ongoingActive[0] || null;
       if (!m) {
         setMeeting(null); setTeam(null); setAttendance([]); setPresentations([]);
         return;
