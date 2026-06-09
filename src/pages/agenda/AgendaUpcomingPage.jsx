@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, getAgendaTeamSchedules,
-  notifyWeek, startMeeting, subscribeAgendaMeetings,
+  notifyWeek, startMeeting, subscribeAgendaMeetings, agendaEarliestStart,
 } from '../../lib/agendaApi';
+import { useNow } from '../../hooks/useNow';
 
 // Weekly Agenda Meetings — Upcoming. A month grid of week cards;
 // only the current week is live (OL can notify + start meetings).
@@ -73,6 +74,7 @@ export default function AgendaUpcomingPage() {
   const today = ymd(new Date());
   const currentWeekStart = ymd(mondayOf(new Date()));
   const anyOngoing = meetings.some((m) => m.status === 'ongoing');
+  const now = useNow();
 
   const teamsById = useMemo(() => {
     const m = new Map();
@@ -206,6 +208,7 @@ export default function AgendaUpcomingPage() {
                 isOL={isOL}
                 myTeamTlId={myTeamTlId}
                 today={today}
+                now={now}
                 busyId={busyId}
                 anyOngoing={anyOngoing}
                 onStart={handleStart}
@@ -219,7 +222,7 @@ export default function AgendaUpcomingPage() {
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }) {
+function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onStart }) {
   const rows = myTeamTlId
     ? card.rows.filter((r) => r.tlId === myTeamTlId)
     : card.rows;
@@ -231,6 +234,16 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
   const weekProgressed = card.rows.some(
     (r) => r.meeting && (r.meeting.status === 'completed' || r.meeting.status === 'ongoing'),
   );
+  // Global time gate (current week): Start buttons stay hidden until the
+  // earliest scheduled meeting time is reached, then all teams unlock
+  // together. Once the week is under way (one started/finished) it stays open.
+  const weekUpcoming = card.rows
+    .filter((r) => r.meeting && r.meeting.status === 'upcoming')
+    .map((r) => r.meeting);
+  const earliestMeeting = [...weekUpcoming].sort((a, b) =>
+    `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`))[0] || null;
+  const earliestStart = agendaEarliestStart(weekUpcoming);
+  const gateOpen = weekProgressed || !earliestStart || now.getTime() >= earliestStart.getTime();
 
   let state = 'future';
   if (card.isPast) state = 'past';
@@ -276,10 +289,7 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
           ) : rows.map((r) => {
             const mStatus = r.meeting?.status || 'not_notified';
             const isUpcoming = live && isOL && mStatus === 'upcoming' && !!r.meeting;
-            // Only the first meeting of the week waits for its date;
-            // after one is under way the rest can start any time.
-            const canStart    = isUpcoming && !anyOngoing && (today >= r.meetingDate || weekProgressed);
-            const waitDate    = isUpcoming && !anyOngoing && today < r.meetingDate && !weekProgressed;
+            const canStart    = isUpcoming && !anyOngoing && gateOpen;
             const blockedBusy = isUpcoming && anyOngoing;
             return (
               <div key={r.tlId} className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
@@ -308,11 +318,6 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
                       : <><i className="bi bi-play-fill" /> Start Meeting</>}
                   </button>
                 )}
-                {waitDate && (
-                  <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
-                    <i className="bi bi-hourglass-split me-1" />Can start on {fmtDate(r.meetingDate, false)}
-                  </div>
-                )}
                 {blockedBusy && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
                     <i className="bi bi-lock-fill me-1" />Finish the ongoing meeting first
@@ -327,6 +332,16 @@ function WeekCard({ card, isOL, myTeamTlId, today, busyId, anyOngoing, onStart }
             );
           })}
         </div>
+        {live && isOL && !anyOngoing && !gateOpen && earliestMeeting && (
+          <div className="rounded-2 p-2 mt-2 d-flex align-items-start gap-2"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+            <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '0.8rem', marginTop: 1 }} />
+            <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>
+              Teams notified. You can start meetings at{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(earliestMeeting.meeting_time)}</strong>.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -5,9 +5,10 @@ import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
   listAgendaTasks, markAttendance, startPresenting, stopPresenting,
   startMeeting, finishMeeting, getAgendaSettings,
-  subscribeAgendaMeetings, subscribeAgendaRoom,
+  subscribeAgendaMeetings, subscribeAgendaRoom, agendaEarliestStart,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
+import { useNow } from '../../hooks/useNow';
 
 // Weekly Agenda Meetings — Ongoing (the live meeting room).
 // Realtime: attendance, presenter state and meeting status all sync
@@ -205,7 +206,7 @@ export default function AgendaOngoingPage() {
 
         {showNextUp ? (
           <NextUpPanel meetings={weekUpcoming} teamsById={teamsById}
-            busy={busy} onStart={handleStartMeeting} />
+            busy={busy} onStart={handleStartMeeting} weekProgressed={justFinished} />
         ) : (
           <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
             <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
@@ -439,14 +440,32 @@ export default function AgendaOngoingPage() {
 }
 
 // ── Next-up panel (OL, shown after finishing) ───────────────────────────
-function NextUpPanel({ meetings, teamsById, busy, onStart }) {
+function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = false }) {
+  const now = useNow();
   const sorted = [...meetings].sort((a, b) =>
     `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`));
+  // Global gate: keep Start buttons hidden until the EARLIEST scheduled time
+  // of the week is reached; then every team unlocks together. Once the week is
+  // under way (a meeting was finished this session) it stays open.
+  const earliest = agendaEarliestStart(meetings);
+  const gateOpen = weekProgressed || !earliest || now.getTime() >= earliest.getTime();
+  const first = sorted[0];
   return (
     <>
       <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
         <i className="bi bi-arrow-right-circle text-primary" />Next up this week
       </div>
+      {!gateOpen && first && (
+        <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+          <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '1.15rem' }} />
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Teams are notified. You’ll be able to start meetings at{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(first.meeting_time)}</strong>
+            {' '}({fmtDate(first.meeting_date)}).
+          </div>
+        </div>
+      )}
       <div className="row g-3">
         {sorted.map((m, i) => {
           const team = teamsById[m.tl_id];
@@ -477,14 +496,20 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
                     </div>
                   )}
                   <div style={{ flexGrow: 1 }} />
-                  <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.74rem' }}
-                    disabled={busy === `start-${m.id}`}
-                    onClick={() => onStart(m.id)}>
-                    {busy === `start-${m.id}`
-                      ? <span className="spinner-border spinner-border-sm" />
-                      : <><i className="bi bi-play-fill" /> Start Meeting</>}
-                  </button>
+                  {gateOpen ? (
+                    <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
+                      style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                      disabled={busy === `start-${m.id}`}
+                      onClick={() => onStart(m.id)}>
+                      {busy === `start-${m.id}`
+                        ? <span className="spinner-border spinner-border-sm" />
+                        : <><i className="bi bi-play-fill" /> Start Meeting</>}
+                    </button>
+                  ) : (
+                    <div className="text-muted text-center mt-3" style={{ fontSize: '0.7rem' }}>
+                      <i className="bi bi-clock-history me-1" />Starts at {fmtTime(m.meeting_time)}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

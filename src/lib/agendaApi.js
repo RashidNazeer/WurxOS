@@ -348,6 +348,29 @@ export async function deleteAgendaTeamSchedule(tlId) {
 // --------------------------------------------------------------
 // Meetings (phase 2)
 // --------------------------------------------------------------
+
+// Absolute instant a meeting is scheduled to start. meeting_date +
+// meeting_time are stored as Asia/Karachi wall-clock (the DB is PK-locked,
+// mig 095), so we pin to +05:00 (Pakistan has no DST). The comparison is
+// then correct regardless of the viewer's browser timezone.
+export function agendaMeetingStartAt(meeting) {
+  const date = meeting?.meeting_date;
+  let time = meeting?.meeting_time;
+  if (!date || !time) return null;
+  if (time.length === 5) time = `${time}:00`;        // HH:MM -> HH:MM:SS
+  const at = new Date(`${date}T${time}+05:00`);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+// The earliest start instant among a set of meetings (e.g. a week's), or null.
+export function agendaEarliestStart(meetings) {
+  const ms = (meetings || [])
+    .map(agendaMeetingStartAt)
+    .filter(Boolean)
+    .map((d) => d.getTime());
+  return ms.length ? new Date(Math.min(...ms)) : null;
+}
+
 export async function listAgendaMeetings({ status = null } = {}) {
   let q = supabase
     .from('agenda_meetings')
