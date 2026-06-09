@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, getAgendaTeamSchedules,
@@ -73,8 +74,8 @@ export default function AgendaUpcomingPage() {
 
   const today = ymd(new Date());
   const currentWeekStart = ymd(mondayOf(new Date()));
-  const anyOngoing = meetings.some((m) => m.status === 'ongoing');
   const now = useNow();
+  const navigate = useNavigate();
 
   const teamsById = useMemo(() => {
     const m = new Map();
@@ -137,16 +138,22 @@ export default function AgendaUpcomingPage() {
     }
   }
 
-  async function handleStart(meetingId) {
+  // Start (upcoming) / Resume (paused) / Reopen (completed) all flip the
+  // meeting to 'ongoing' via the same RPC, then drop the OL into its room.
+  async function goLive(meetingId) {
     setBusyId(meetingId);
     try {
       await startMeeting(meetingId);
-      reloadMeetings();
+      navigate('/agenda/ongoing', { state: { meetingId } });
     } catch (e) {
-      alert('Failed to start: ' + (e.message || 'unknown'));
+      alert('Failed: ' + (e.message || 'unknown'));
     } finally {
       setBusyId(null);
     }
+  }
+  // Open an already-ongoing meeting's room without changing its state.
+  function openRoom(meetingId) {
+    navigate('/agenda/ongoing', { state: { meetingId } });
   }
 
   const configuredCount = schedules.length;
@@ -174,6 +181,9 @@ export default function AgendaUpcomingPage() {
             {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} ·
             {' '}weekly agenda meeting schedule.
           </p>
+          <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: 2 }}>
+            <i className="bi bi-globe2 me-1" />All times shown in Pakistan time (PKT)
+          </div>
         </div>
         {isOL && (
           <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
@@ -210,8 +220,8 @@ export default function AgendaUpcomingPage() {
                 today={today}
                 now={now}
                 busyId={busyId}
-                anyOngoing={anyOngoing}
-                onStart={handleStart}
+                onStart={goLive}
+                onOpen={openRoom}
               />
             </div>
           ))}
@@ -222,7 +232,7 @@ export default function AgendaUpcomingPage() {
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onStart }) {
+function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, onStart, onOpen }) {
   const rows = myTeamTlId
     ? card.rows.filter((r) => r.tlId === myTeamTlId)
     : card.rows;
@@ -232,7 +242,7 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
   // Once any meeting in the week has started or finished, the week is
   // "in progress" — the remaining meetings no longer wait for their date.
   const weekProgressed = card.rows.some(
-    (r) => r.meeting && (r.meeting.status === 'completed' || r.meeting.status === 'ongoing'),
+    (r) => r.meeting && ['completed', 'ongoing', 'paused'].includes(r.meeting.status),
   );
   // Global time gate (current week): Start buttons stay hidden until the
   // earliest scheduled meeting time is reached, then all teams unlock
@@ -293,10 +303,12 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
             </div>
           ) : rows.map((r) => {
             const mStatus = r.meeting?.status || 'not_notified';
-            const isUpcoming = live && isOL && mStatus === 'upcoming' && !!r.meeting;
-            const canStart    = isUpcoming && !anyOngoing && startable(r.meeting);
-            const waitTime    = isUpcoming && !anyOngoing && !startable(r.meeting);
-            const blockedBusy = isUpcoming && anyOngoing;
+            // OL actions are available on the CURRENT week regardless of how
+            // far the flow has gone — so a completed meeting can be reopened.
+            const olCurrent = card.isCurrent && isOL && !!r.meeting;
+            const canStart  = olCurrent && mStatus === 'upcoming' && startable(r.meeting);
+            const waitTime  = olCurrent && mStatus === 'upcoming' && !startable(r.meeting);
+            const meetingBusy = r.meeting && busyId === r.meeting.id;
             return (
               <div key={r.tlId} className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                 <div className="d-flex align-items-center justify-content-between gap-2">
@@ -304,7 +316,7 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
                     <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{r.tlName}</div>
                     <div className="text-muted" style={{ fontSize: '0.66rem' }}>
                       <i className="bi bi-people me-1" />{r.apcs.length} APC{r.apcs.length === 1 ? '' : 's'}
-                      {' · '}<i className="bi bi-clock me-1" />{fmtTime(r.meetingTime)}
+                      {' · '}<i className="bi bi-clock me-1" />{fmtTime(r.meetingTime)} PKT
                     </div>
                   </div>
                   <StatusDot status={mStatus} />
@@ -317,24 +329,40 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
                 {canStart && (
                   <button className="btn btn-sm btn-success w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
                     style={{ borderRadius: 6, fontSize: '0.7rem' }}
-                    disabled={busyId === r.meeting.id}
+                    disabled={meetingBusy}
                     onClick={() => onStart(r.meeting.id)}>
-                    {busyId === r.meeting.id
-                      ? <span className="spinner-border spinner-border-sm" />
-                      : <><i className="bi bi-play-fill" /> Start Meeting</>}
+                    {meetingBusy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-play-fill" /> Start Meeting</>}
                   </button>
                 )}
                 {waitTime && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
-                    <i className="bi bi-clock-history me-1" />Starts at {fmtTime(r.meetingTime)}
+                    <i className="bi bi-clock-history me-1" />Starts at {fmtTime(r.meetingTime)} PKT
                   </div>
                 )}
-                {blockedBusy && (
-                  <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
-                    <i className="bi bi-lock-fill me-1" />Finish the ongoing meeting first
-                  </div>
+                {olCurrent && mStatus === 'ongoing' && (
+                  <button className="btn btn-sm btn-outline-danger w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    onClick={() => onOpen(r.meeting.id)}>
+                    <i className="bi bi-box-arrow-in-right" /> Open room
+                  </button>
                 )}
-                {live && isOL && mStatus === 'not_notified' && (
+                {olCurrent && mStatus === 'paused' && (
+                  <button className="btn btn-sm btn-primary w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    disabled={meetingBusy}
+                    onClick={() => onStart(r.meeting.id)}>
+                    {meetingBusy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-play-fill" /> Resume</>}
+                  </button>
+                )}
+                {olCurrent && mStatus === 'completed' && (
+                  <button className="btn btn-sm btn-outline-dark w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    disabled={meetingBusy}
+                    onClick={() => { if (window.confirm('Reopen this completed meeting and continue it?')) onStart(r.meeting.id); }}>
+                    {meetingBusy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-arrow-counterclockwise" /> Reopen</>}
+                  </button>
+                )}
+                {card.isCurrent && isOL && mStatus === 'not_notified' && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
                     <i className="bi bi-megaphone me-1" />Use “Notify Teams” to open this week.
                   </div>
@@ -343,13 +371,13 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
             );
           })}
         </div>
-        {live && isOL && !anyOngoing && !anyStartable && earliestMeeting && (
+        {live && isOL && !anyStartable && earliestMeeting && (
           <div className="rounded-2 p-2 mt-2 d-flex align-items-start gap-2"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '0.8rem', marginTop: 1 }} />
             <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>
               Teams notified. You can start meetings at{' '}
-              <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(earliestMeeting.meeting_time)}</strong>.
+              <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(earliestMeeting.meeting_time)} PKT</strong>.
             </div>
           </div>
         )}
@@ -363,6 +391,7 @@ function StatusDot({ status }) {
     not_notified: { label: 'Not notified', color: 'var(--text-muted)' },
     upcoming:     { label: 'Scheduled',    color: 'var(--warning)' },
     ongoing:      { label: 'In progress',  color: 'var(--info)' },
+    paused:       { label: 'Paused',       color: 'var(--warning)' },
     completed:    { label: 'Completed',    color: 'var(--success)' },
   }[status] || { label: status, color: 'var(--text-muted)' };
   return (

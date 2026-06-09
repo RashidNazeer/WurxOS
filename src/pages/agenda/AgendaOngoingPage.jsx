@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
   listAgendaTasks, markAttendance, startPresenting, stopPresenting,
-  startMeeting, finishMeeting, getAgendaSettings,
+  startMeeting, finishMeeting, pauseMeeting, getAgendaSettings,
   subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
@@ -42,8 +42,14 @@ export default function AgendaOngoingPage() {
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
   const uid = user?.id;
+  const location = useLocation();
 
   const [meeting, setMeeting]         = useState(null);
+  const [activeMeetings, setActiveMeetings] = useState([]);  // ongoing + paused (team-active)
+  const [selectedMeetingId, setSelectedMeetingId] = useState(location.state?.meetingId || null);
+  // Ref mirror so the mount-once realtime callback reads the latest selection
+  // without re-subscribing.
+  const selectedRef = useRef(location.state?.meetingId || null);
   const [team, setTeam]               = useState(null);   // { tl, apcs }
   const [attendance, setAttendance]   = useState([]);
   const [presentations, setPresentations] = useState([]);
@@ -58,24 +64,39 @@ export default function AgendaOngoingPage() {
 
   async function refresh() {
     try {
-      const [ongoing, upcoming, teams, settings] = await Promise.all([
-        listAgendaMeetings({ status: 'ongoing' }),
+      const [active, upcoming, teams, settings] = await Promise.all([
+        listAgendaMeetings({ statuses: ['ongoing', 'paused'] }),
         listAgendaMeetings({ status: 'upcoming' }),
         listAgendaTeams(),
         getAgendaSettings(),
       ]);
       setAllTeams(teams);
       setMeetLink(settings?.google_meet_link || '');
-      // Defensive guard: never surface a meeting whose TL is no longer an
-      // active team (deleted/deactivated users can leave orphaned schedules
-      // + meetings behind). The DB cleanup removes the records; this keeps
-      // the UI correct regardless of DB state.
+      // Only surface meetings whose TL is still an active team (deleted/
+      // deactivated users can leave orphaned rows behind).
       const activeTlIds = new Set((teams || []).map((t) => t.tl.id));
-      const ongoingActive  = (ongoing  || []).filter((m) => activeTlIds.has(m.tl_id));
+      const activeRooms    = (active   || []).filter((m) => activeTlIds.has(m.tl_id));
       const upcomingActive = (upcoming || []).filter((m) => activeTlIds.has(m.tl_id));
       const wk = mondayStr();
+      setActiveMeetings(activeRooms);
       setWeekUpcoming(upcomingActive.filter((m) => m.week_start === wk));
-      const m = ongoingActive[0] || null;
+
+      // Role-aware room selection. TL/APC always land on THEIR OWN team's
+      // active (ongoing/paused) room — never another team's, even when several
+      // run in parallel. OL/Boss pick from the list; default to no room (the
+      // list view) and keep their selection while it stays active.
+      let targetId;
+      if (isTL || isApc) {
+        const myTlId = isTL ? uid : (profile?.reports_to || null);
+        targetId = (activeRooms.find((m) => m.tl_id === myTlId) || null)?.id || null;
+      } else {
+        targetId = selectedRef.current;
+        if (targetId && !activeRooms.some((m) => m.id === targetId)) targetId = null;
+      }
+      selectedRef.current = targetId;
+      setSelectedMeetingId(targetId);
+
+      const m = activeRooms.find((x) => x.id === targetId) || null;
       if (!m) {
         setMeeting(null); setTeam(null); setAttendance([]); setPresentations([]);
         return;
@@ -88,6 +109,13 @@ export default function AgendaOngoingPage() {
       setAttendance(att);
       setPresentations(pres);
     } catch { /* keep last good state */ }
+  }
+
+  // OL opens a specific room from the list (or backs out with null).
+  function openRoom(id) {
+    selectedRef.current = id || null;
+    setSelectedMeetingId(id || null);
+    refresh();
   }
 
   useEffect(() => {
@@ -162,8 +190,20 @@ export default function AgendaOngoingPage() {
   }
   async function handleStartMeeting(meetingId) {
     setBusy(`start-${meetingId}`);
-    try { setJustFinished(false); await startMeeting(meetingId); await refresh(); }
+    try { setJustFinished(false); selectedRef.current = meetingId; setSelectedMeetingId(meetingId); await startMeeting(meetingId); await refresh(); }
     catch (e) { alert(e.message || 'Failed to start meeting'); }
+    finally { setBusy(''); }
+  }
+  async function handlePause() {
+    setBusy('pause');
+    try { await pauseMeeting(meeting.id); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to pause meeting'); }
+    finally { setBusy(''); }
+  }
+  async function handleResume() {
+    setBusy('resume');
+    try { await startMeeting(meeting.id); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to resume meeting'); }
     finally { setBusy(''); }
   }
 
@@ -180,6 +220,7 @@ export default function AgendaOngoingPage() {
   if (!meeting) {
     const teamsById = {};
     allTeams.forEach((t) => { teamsById[t.tl.id] = t; });
+    const hasActive  = isOL && activeMeetings.length > 0;
     const showNextUp = isOL && weekUpcoming.length > 0;
     return (
       <div style={{ padding: '32px 32px 48px' }}>
@@ -188,6 +229,11 @@ export default function AgendaOngoingPage() {
             <i className="bi bi-broadcast" style={{ fontSize: '1.15rem' }} />
             Ongoing Meetings
           </h5>
+          {isOL && (
+            <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+              <i className="bi bi-globe2 me-1" />All times shown in Pakistan time (PKT)
+            </div>
+          )}
         </div>
 
         {justFinished && (
@@ -197,24 +243,30 @@ export default function AgendaOngoingPage() {
             <div>
               <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--success)' }}>Meeting finished</div>
               <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                {showNextUp ? 'Start the next team right here — no need to leave this page.'
+                {showNextUp || hasActive ? 'Start or open another team right here — no need to leave this page.'
                   : 'All scheduled meetings for this week are done.'}
               </div>
             </div>
           </div>
         )}
 
-        {showNextUp ? (
+        {hasActive && (
+          <ActiveRoomsList meetings={activeMeetings} teamsById={teamsById} onOpen={openRoom} />
+        )}
+
+        {showNextUp && (
           <NextUpPanel meetings={weekUpcoming} teamsById={teamsById}
-            busy={busy} onStart={handleStartMeeting} weekProgressed={justFinished} />
-        ) : (
+            busy={busy} onStart={handleStartMeeting} weekProgressed={justFinished || hasActive} />
+        )}
+
+        {!hasActive && !showNextUp && (
           <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
             <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
               <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
             </div>
             <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
             <p className="text-muted small mb-2">
-              {isOL ? 'No more meetings scheduled for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
+              {isOL ? 'No active or scheduled meetings for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
             </p>
             {isOL && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
           </div>
@@ -224,18 +276,34 @@ export default function AgendaOngoingPage() {
   }
 
   const teamName = team?.tl?.display_name || meeting.tl?.display_name || 'Team';
+  const paused = meeting.status === 'paused';
 
   return (
     <div style={{ padding: '32px 32px 48px' }}>
+      {/* Back to the rooms list — OL only (TL/APC have a single room) */}
+      {isOL && (
+        <button type="button" onClick={() => openRoom(null)}
+          className="btn btn-sm btn-link text-decoration-none px-0 mb-2"
+          style={{ fontSize: '0.78rem' }}>
+          <i className="bi bi-arrow-left me-1" />Back to rooms
+        </button>
+      )}
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
         <div>
           <div className="d-flex align-items-center gap-2 mb-1">
-            <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
-              style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.62rem', fontWeight: 800 }}>
-              <span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--danger)', display: 'inline-block' }} />
-              LIVE
-            </span>
+            {paused ? (
+              <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
+                style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.62rem', fontWeight: 800 }}>
+                <i className="bi bi-pause-fill" />PAUSED
+              </span>
+            ) : (
+              <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
+                style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.62rem', fontWeight: 800 }}>
+                <span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--danger)', display: 'inline-block' }} />
+                LIVE
+              </span>
+            )}
             <h5 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{teamName} — Agenda Meeting</h5>
           </div>
           <p className="text-muted small mb-0">
@@ -243,15 +311,43 @@ export default function AgendaOngoingPage() {
           </p>
         </div>
         {isOL && (
-          <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.8rem' }}
-            onClick={handleFinishClick} disabled={busy === 'finish'}>
-            {busy === 'finish'
-              ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
-              : <><i className="bi bi-check2-circle" /> Finish Meeting</>}
-          </button>
+          <div className="d-flex gap-2 flex-wrap">
+            {paused ? (
+              <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                onClick={handleResume} disabled={busy === 'resume'}>
+                {busy === 'resume'
+                  ? <><span className="spinner-border spinner-border-sm" /> Resuming…</>
+                  : <><i className="bi bi-play-fill" /> Resume</>}
+              </button>
+            ) : (
+              <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                onClick={handlePause} disabled={busy === 'pause'}>
+                {busy === 'pause'
+                  ? <><span className="spinner-border spinner-border-sm" /> Pausing…</>
+                  : <><i className="bi bi-pause-fill" /> Pause</>}
+              </button>
+            )}
+            <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 8, fontSize: '0.8rem' }}
+              onClick={handleFinishClick} disabled={busy === 'finish'}>
+              {busy === 'finish'
+                ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
+                : <><i className="bi bi-check2-circle" /> Finish Meeting</>}
+            </button>
+          </div>
         )}
       </div>
+
+      {/* Paused banner — visible to the whole team */}
+      {paused && (
+        <div className="rounded-3 p-2 mb-3 d-flex align-items-center gap-2"
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <i className="bi bi-pause-circle-fill text-warning" />
+          Meeting paused{isOL ? ' — resume to continue presentations.' : ' — waiting for the OL to resume.'}
+        </div>
+      )}
 
       {/* Join meeting — live for everyone in the active team's room */}
       <div className="mb-3">
@@ -371,6 +467,7 @@ export default function AgendaOngoingPage() {
           uid={uid}
           myPresentation={presMap[uid]}
           activePresentation={activePresentation}
+          paused={paused}
           busy={busy === 'present'}
           onStart={handleStart}
           onStop={() => handleStop(uid)}
@@ -439,6 +536,55 @@ export default function AgendaOngoingPage() {
   );
 }
 
+// ── Active rooms list (OL) — open any live or paused meeting ────────────
+function ActiveRoomsList({ meetings, teamsById, onOpen }) {
+  const sorted = [...meetings].sort((a, b) =>
+    `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`));
+  return (
+    <div className="mb-4">
+      <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
+        <i className="bi bi-broadcast-pin text-danger" />Live &amp; paused rooms
+      </div>
+      <div className="row g-3">
+        {sorted.map((m) => {
+          const team = teamsById[m.tl_id];
+          const apcs = team?.apcs || [];
+          const isPaused = m.status === 'paused';
+          return (
+            <div key={m.id} className="col-12 col-md-6 col-xl-4">
+              <div className="card border-0 shadow-sm h-100"
+                style={{ borderRadius: 14, border: `1px solid ${isPaused ? 'color-mix(in srgb, var(--warning) 45%, transparent)' : 'color-mix(in srgb, var(--danger) 45%, transparent)'}` }}>
+                <div className="card-body p-3 d-flex flex-column">
+                  <span className="rounded-pill px-2 py-1 mb-2 align-self-start d-inline-flex align-items-center gap-1"
+                    style={{ fontSize: '0.6rem', fontWeight: 800,
+                      background: isPaused ? 'var(--warning-soft)' : 'var(--danger-soft)',
+                      color: isPaused ? 'var(--warning)' : 'var(--danger)' }}>
+                    {isPaused ? <><i className="bi bi-pause-fill" />PAUSED</>
+                      : <><span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--danger)', display: 'inline-block' }} />LIVE</>}
+                  </span>
+                  <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                    {team?.tl?.display_name || m.tl?.display_name || 'Team'}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                    <i className="bi bi-people me-1" />{apcs.length} APC{apcs.length === 1 ? '' : 's'}
+                    {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)} PKT
+                  </div>
+                  <div style={{ flexGrow: 1 }} />
+                  <button className="btn btn-sm btn-dark w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                    onClick={() => onOpen(m.id)}>
+                    <i className="bi bi-box-arrow-in-right" /> {isPaused ? 'Open / Resume' : 'Open room'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Next-up panel (OL, shown after finishing) ───────────────────────────
 function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = false }) {
   const now = useNow();
@@ -464,7 +610,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
           <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '1.15rem' }} />
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             Teams are notified. The first meeting can be started at{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(first.meeting_time)}</strong>
+            <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(first.meeting_time)} PKT</strong>
             {' '}({fmtDate(first.meeting_date)}) — each team unlocks at its own time.
           </div>
         </div>
@@ -491,7 +637,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
                   <div className="text-muted" style={{ fontSize: '0.72rem' }}>
                     <i className="bi bi-people me-1" />{apcs.length} APC{apcs.length === 1 ? '' : 's'}
                     {' · '}<i className="bi bi-calendar3 me-1" />{fmtDate(m.meeting_date)}
-                    {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)}
+                    {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)} PKT
                   </div>
                   {apcs.length > 0 && (
                     <div className="text-muted mt-1" style={{ fontSize: '0.66rem' }}>
@@ -510,7 +656,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
                     </button>
                   ) : (
                     <div className="text-muted text-center mt-3" style={{ fontSize: '0.7rem' }}>
-                      <i className="bi bi-clock-history me-1" />Starts at {fmtTime(m.meeting_time)}
+                      <i className="bi bi-clock-history me-1" />Starts at {fmtTime(m.meeting_time)} PKT
                     </div>
                   )}
                 </div>
@@ -565,7 +711,7 @@ function PresentationProgress({ apcs, presMap }) {
 }
 
 // ── APC controls ────────────────────────────────────────────────────────
-function APCControls({ meeting, uid, myPresentation, activePresentation, busy, onStart, onStop, myTasks }) {
+function APCControls({ meeting, uid, myPresentation, activePresentation, paused, busy, onStart, onStop, myTasks }) {
   const iAmPresenting   = activePresentation?.apc_id === uid;
   const someoneElse     = activePresentation && activePresentation.apc_id !== uid;
   const done            = myPresentation?.status === 'done' && !iAmPresenting;
@@ -580,6 +726,7 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, busy, o
               {iAmPresenting ? 'You are presenting now — the OL is reviewing your tasks.'
                 : someoneElse ? `Locked — ${activePresentation.apc?.display_name || 'another APC'} is presenting.`
                 : done ? 'You have finished presenting.'
+                : paused ? 'Meeting is paused — wait for the OL to resume.'
                 : 'When you are ready, start your presentation.'}
             </div>
           </div>
@@ -595,8 +742,9 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, busy, o
             </button>
           ) : (
             <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8 }} disabled={busy || someoneElse} onClick={onStart}>
-              {someoneElse ? <><i className="bi bi-lock-fill" /> Locked</>
+              style={{ borderRadius: 8 }} disabled={busy || someoneElse || paused} onClick={onStart}>
+              {paused ? <><i className="bi bi-pause-fill" /> Paused</>
+                : someoneElse ? <><i className="bi bi-lock-fill" /> Locked</>
                 : busy ? <span className="spinner-border spinner-border-sm" />
                 : <><i className="bi bi-play-fill" /> Start Presenting</>}
             </button>

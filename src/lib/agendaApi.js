@@ -371,12 +371,13 @@ export function agendaEarliestStart(meetings) {
   return ms.length ? new Date(Math.min(...ms)) : null;
 }
 
-export async function listAgendaMeetings({ status = null } = {}) {
+export async function listAgendaMeetings({ status = null, statuses = null } = {}) {
   let q = supabase
     .from('agenda_meetings')
     .select('*, tl:tl_id(id, display_name, email, avatar_url)')
     .order('meeting_date', { ascending: true });
-  if (status) q = q.eq('status', status);
+  if (Array.isArray(statuses) && statuses.length) q = q.in('status', statuses);
+  else if (status) q = q.eq('status', status);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return data || [];
@@ -398,8 +399,17 @@ export async function resyncWeek(weekStart) {
   return data;
 }
 
+// Starts an upcoming meeting AND doubles as resume (paused) / reopen
+// (completed) — the agenda_start_meeting RPC (mig 198) accepts all three.
 export async function startMeeting(id) {
   const { data, error } = await supabase.rpc('agenda_start_meeting', { p_meeting: id });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Pause a live meeting (ongoing -> paused); resume later via startMeeting.
+export async function pauseMeeting(id) {
+  const { data, error } = await supabase.rpc('agenda_pause_meeting', { p_meeting: id });
   if (error) throw new Error(error.message);
   return data;
 }

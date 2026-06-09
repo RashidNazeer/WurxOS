@@ -133,7 +133,7 @@ export default function AgendaPriorPage() {
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.74rem' }}>
                           <i className="bi bi-calendar3 me-1" />{fmtDate(m.meeting_date)}
-                          {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)}
+                          {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)} PKT
                         </div>
                         <div className="d-inline-flex align-items-center gap-1 mt-2" style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600 }}>
                           View record <i className="bi bi-arrow-right" />

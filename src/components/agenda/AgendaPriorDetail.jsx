@@ -38,13 +38,15 @@ function fmtTime(t) {
   let hh = Number(h); const ap = hh >= 12 ? 'PM' : 'AM'; hh = hh % 12 || 12;
   return `${hh}:${m} ${ap}`;
 }
+// Absolute timestamps are pinned to Pakistan time (Asia/Karachi) so a viewer
+// in another timezone still sees the PK wall-clock, not their own local time.
 function fmtClock(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Karachi' });
 }
 function fmtStamp(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Karachi' });
 }
 
 export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
@@ -136,9 +138,9 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
           </div>
           <div className="row g-2" style={{ fontSize: '0.78rem' }}>
             <Info icon="bi-calendar-event" label="Date" value={fmtDate(meeting.meeting_date)} />
-            <Info icon="bi-clock" label="Scheduled time" value={fmtTime(meeting.meeting_time)} />
+            <Info icon="bi-clock" label="Scheduled time (PKT)" value={fmtTime(meeting.meeting_time)} />
             <Info icon="bi-calendar3-week" label="Week" value={weekIndex ? `Week ${weekIndex}` : '—'} />
-            <Info icon="bi-hourglass" label="Duration"
+            <Info icon="bi-hourglass" label="Duration (PKT)"
               value={duration ? `${duration} min (${fmtClock(meeting.started_at)} – ${fmtClock(meeting.finished_at)})` : '—'} />
           </div>
         </div>
