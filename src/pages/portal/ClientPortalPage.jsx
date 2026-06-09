@@ -91,6 +91,7 @@ export default function ClientPortalPage() {
   const gmv           = data?.gmv_max || [];
   const sections      = data?.sections || [];          // [{ brand_id, sections: [...] }]
   const sectionValues = data?.section_values || [];    // flat list across all permitted reports
+  const reportResources = data?.report_resources || []; // [{ brand_id, sections: [...] }] — brand Report Links
 
   const tabsVisible = [perms.reports, perms.paidCollab, perms.gmvMax].filter(Boolean).length;
   const showTabs = tabsVisible >= 2;
@@ -147,6 +148,7 @@ export default function ClientPortalPage() {
             reports={reports} brands={brands}
             shareTypes={access.share_types || []}
             sections={sections} sectionValues={sectionValues}
+            reportResources={reportResources}
             token={access.token} onMutate={refresh}
           />
         )}

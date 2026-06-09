@@ -106,6 +106,7 @@ export default function ClientReportsSection({
   shareTypes = [],       // ['weekly','biweekly','monthly','paidCollab','gmvMax']
   sections = [],         // [{ brand_id, sections: [{id, name, ...}] }]
   sectionValues = [],    // flat list across permitted reports
+  reportResources = [],  // [{ brand_id, sections: [...] }] — brand "Report Links"
   token = null,
   onMutate,
 }) {
@@ -128,6 +129,16 @@ export default function ClientReportsSection({
     }
     return m;
   }, [sectionValues]);
+  // Per-brand "Report Links" sections, injected into the report views so
+  // they render for the anonymous client (the table is RLS-gated to authed
+  // users, so the views' own fetch returns nothing in the portal).
+  const resourcesByBrand = useMemo(() => {
+    const m = new Map();
+    for (const row of reportResources || []) {
+      m.set(row.brand_id, row.sections || []);
+    }
+    return m;
+  }, [reportResources]);
 
   // Tab list comes from share_types (granted set) — NOT from data. That
   // way every granted report type gets a tab even if no reports of that
@@ -236,6 +247,7 @@ export default function ClientReportsSection({
     const prev = findPreviousReport(brandReports, viewReport);
     const brandSections = sectionsByBrand.get(viewReport.brandId) || [];
     const reportValues  = valuesByReport.get(viewReport.id) || [];
+    const brandLinks    = resourcesByBrand.get(viewReport.brandId) || [];
     return (
       <div>
         <button
@@ -248,9 +260,9 @@ export default function ClientReportsSection({
           <span style={{ fontSize: 14 }}>←</span> Back to reports
         </button>
         {viewReport.type === 'monthly' ? (
-          <MonthlyReportView report={viewReport} previousReport={prev} clientView />
+          <MonthlyReportView report={viewReport} previousReport={prev} clientView reportLinks={brandLinks} />
         ) : (
-          <WeeklyReportView report={viewReport} previousReport={prev} allReports={brandReports} clientView />
+          <WeeklyReportView report={viewReport} previousReport={prev} allReports={brandReports} clientView reportLinks={brandLinks} />
         )}
         {/* Custom client sections — appears below the report dashboard.
             In client-mode (token present) they can add/edit/remove. */}
@@ -435,10 +447,12 @@ export default function ClientReportsSection({
         <div ref={offscreenRef} aria-hidden="true"
           style={{ position: 'fixed', left: '-100000px', top: 0, width: 1120, pointerEvents: 'none' }}>
           {pendingExport.report.type === 'monthly' ? (
-            <MonthlyReportView report={pendingExport.report} previousReport={pendingExport.prev} clientView />
+            <MonthlyReportView report={pendingExport.report} previousReport={pendingExport.prev} clientView
+              reportLinks={resourcesByBrand.get(pendingExport.report.brandId) || []} />
           ) : (
             <WeeklyReportView report={pendingExport.report} previousReport={pendingExport.prev}
-              allReports={pendingExport.brandReports} clientView />
+              allReports={pendingExport.brandReports} clientView
+              reportLinks={resourcesByBrand.get(pendingExport.report.brandId) || []} />
           )}
         </div>
       )}

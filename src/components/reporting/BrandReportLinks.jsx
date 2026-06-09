@@ -191,20 +191,26 @@ export function UnmatchedReportLinkSections({ sections }) {
  *   getUnmatched(knownNames): returns sections whose names DON'T appear in
  *                             the provided knownNames list
  */
-export function useBrandReportLinks(brandId, reportType) {
-  const [allSections, setAllSections] = useState([]);
+export function useBrandReportLinks(brandId, reportType, injectedSections = null) {
+  const [fetched, setFetched] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // The client portal injects sections from the get_client_access payload:
+    // brand_report_resources is RLS-gated to authenticated users (mig 103), so
+    // an anonymous client can't fetch it directly. When injected, skip the fetch.
+    if (injectedSections != null) { setLoaded(true); return; }
     let cancelled = false;
     if (!brandId) { setLoaded(true); return; }
     setLoaded(false);
     getBrandReportResources(brandId)
-      .then(s => { if (!cancelled) setAllSections(s); })
-      .catch(() => { if (!cancelled) setAllSections([]); })
+      .then(s => { if (!cancelled) setFetched(s); })
+      .catch(() => { if (!cancelled) setFetched([]); })
       .finally(() => { if (!cancelled) setLoaded(true); });
     return () => { cancelled = true; };
-  }, [brandId]);
+  }, [brandId, injectedSections]);
+
+  const allSections = injectedSections != null ? injectedSections : fetched;
 
   // Filter to sections that apply to this report type. Legacy sections
   // (no appliesTo field) keep showing in all three for back-compat.
@@ -236,8 +242,8 @@ export function useBrandReportLinks(brandId, reportType) {
  * cards. New code should prefer the hook + EmbeddedLinks pattern so that
  * matching names embed into existing report sections instead of duplicating.
  */
-export default function BrandReportLinks({ brandId, knownSectionNames = [], reportType }) {
-  const { getUnmatched, loaded } = useBrandReportLinks(brandId, reportType);
+export default function BrandReportLinks({ brandId, knownSectionNames = [], reportType, injectedSections = null }) {
+  const { getUnmatched, loaded } = useBrandReportLinks(brandId, reportType, injectedSections);
   if (!loaded) return null;
   const unmatched = getUnmatched(knownSectionNames);
   if (unmatched.length === 0) return null;
