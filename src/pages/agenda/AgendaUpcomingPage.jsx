@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, getAgendaTeamSchedules,
-  notifyWeek, startMeeting, subscribeAgendaMeetings, agendaEarliestStart,
+  notifyWeek, startMeeting, subscribeAgendaMeetings, agendaMeetingStartAt,
 } from '../../lib/agendaApi';
 import { useNow } from '../../hooks/useNow';
 
@@ -242,8 +242,13 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
     .map((r) => r.meeting);
   const earliestMeeting = [...weekUpcoming].sort((a, b) =>
     `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`))[0] || null;
-  const earliestStart = agendaEarliestStart(weekUpcoming);
-  const gateOpen = weekProgressed || !earliestStart || now.getTime() >= earliestStart.getTime();
+  // Per-meeting gate: each team's Start appears once that meeting's own
+  // scheduled time is reached; once the week is under way it all stays open.
+  const startable = (m) => {
+    const at = agendaMeetingStartAt(m);
+    return weekProgressed || !at || now.getTime() >= at.getTime();
+  };
+  const anyStartable = weekUpcoming.some(startable);
 
   let state = 'future';
   if (card.isPast) state = 'past';
@@ -289,7 +294,8 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
           ) : rows.map((r) => {
             const mStatus = r.meeting?.status || 'not_notified';
             const isUpcoming = live && isOL && mStatus === 'upcoming' && !!r.meeting;
-            const canStart    = isUpcoming && !anyOngoing && gateOpen;
+            const canStart    = isUpcoming && !anyOngoing && startable(r.meeting);
+            const waitTime    = isUpcoming && !anyOngoing && !startable(r.meeting);
             const blockedBusy = isUpcoming && anyOngoing;
             return (
               <div key={r.tlId} className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
@@ -318,6 +324,11 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
                       : <><i className="bi bi-play-fill" /> Start Meeting</>}
                   </button>
                 )}
+                {waitTime && (
+                  <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
+                    <i className="bi bi-clock-history me-1" />Starts at {fmtTime(r.meetingTime)}
+                  </div>
+                )}
                 {blockedBusy && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
                     <i className="bi bi-lock-fill me-1" />Finish the ongoing meeting first
@@ -332,7 +343,7 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, anyOngoing, onSt
             );
           })}
         </div>
-        {live && isOL && !anyOngoing && !gateOpen && earliestMeeting && (
+        {live && isOL && !anyOngoing && !anyStartable && earliestMeeting && (
           <div className="rounded-2 p-2 mt-2 d-flex align-items-start gap-2"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '0.8rem', marginTop: 1 }} />

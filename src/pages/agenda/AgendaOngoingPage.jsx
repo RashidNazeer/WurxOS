@@ -5,7 +5,7 @@ import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
   listAgendaTasks, markAttendance, startPresenting, stopPresenting,
   startMeeting, finishMeeting, getAgendaSettings,
-  subscribeAgendaMeetings, subscribeAgendaRoom, agendaEarliestStart,
+  subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 import { useNow } from '../../hooks/useNow';
@@ -444,25 +444,28 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
   const now = useNow();
   const sorted = [...meetings].sort((a, b) =>
     `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`));
-  // Global gate: keep Start buttons hidden until the EARLIEST scheduled time
-  // of the week is reached; then every team unlocks together. Once the week is
-  // under way (a meeting was finished this session) it stays open.
-  const earliest = agendaEarliestStart(meetings);
-  const gateOpen = weekProgressed || !earliest || now.getTime() >= earliest.getTime();
+  // Per-meeting gate: a team's Start button appears once that meeting's OWN
+  // scheduled time is reached (server clock). Once the week is under way (a
+  // meeting was finished this session) the rest stay open for back-to-back.
+  const startable = (m) => {
+    const at = agendaMeetingStartAt(m);
+    return weekProgressed || !at || now.getTime() >= at.getTime();
+  };
   const first = sorted[0];
+  const anyStartable = sorted.some(startable);
   return (
     <>
       <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
         <i className="bi bi-arrow-right-circle text-primary" />Next up this week
       </div>
-      {!gateOpen && first && (
+      {!anyStartable && first && (
         <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
           style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '1.15rem' }} />
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Teams are notified. You’ll be able to start meetings at{' '}
+            Teams are notified. The first meeting can be started at{' '}
             <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(first.meeting_time)}</strong>
-            {' '}({fmtDate(first.meeting_date)}).
+            {' '}({fmtDate(first.meeting_date)}) — each team unlocks at its own time.
           </div>
         </div>
       )}
@@ -496,7 +499,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
                     </div>
                   )}
                   <div style={{ flexGrow: 1 }} />
-                  {gateOpen ? (
+                  {startable(m) ? (
                     <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
                       style={{ borderRadius: 8, fontSize: '0.74rem' }}
                       disabled={busy === `start-${m.id}`}
