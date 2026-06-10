@@ -15,6 +15,21 @@ export { listBrandsForTaskCreate as listAgendaBrands };
 // Active brands a specific APC is assigned to — used by the assign
 // flow so the brand picker is scoped to that APC's brands (and can
 // auto-select when there is only one).
+// Brand IDs the CURRENT user is assigned to (raw brand_assignments —
+// includes inactive brands). Used to gate resource edit/delete in the UI
+// to match the resources RLS (mig 201: assigned APCs manage their brand).
+export async function listMyBrandIds() {
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user?.id;
+  if (!me) return [];
+  const { data, error } = await supabase
+    .from('brand_assignments')
+    .select('brand_id')
+    .eq('user_id', me);
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => r.brand_id);
+}
+
 export async function listBrandsForApc(apcId) {
   if (!apcId) return [];
   const { data, error } = await supabase
@@ -180,7 +195,7 @@ export async function listAgendaResources({ brandId = null, type = null, search 
     .from('agenda_resources')
     .select(`
       *,
-      brand:brand_id(id, brand_name, logo_url),
+      brand:brand_id(id, brand_name, logo_url, owner_id),
       creator:created_by(id, display_name)
     `)
     .order('created_at', { ascending: false });

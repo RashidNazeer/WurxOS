@@ -149,7 +149,7 @@ export default function AllResourcesPage() {
       || resource.addedBy?.uid === currentUser?.uid
       || myRole === 'boss'
       || myRole === 'ol'
-      || (resource._scope === 'brand' && brands.find(b => b.id === resource.brandId)?.ownerId === currentUser?.uid);
+      || (resource._scope === 'brand' && !!resource.brandId && brands.some(b => b.id === resource.brandId));
     if (!canDelete) { alert('You do not have permission to delete this resource.'); return; }
     if (!window.confirm(`Delete "${resource.name}"? This cannot be undone.`)) return;
     try {
@@ -438,11 +438,9 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
   const visCfg = isGeneral ? VISIBILITY_OPTIONS[r.visibility] : null;
 
   const isCreator = r.createdBy === currentUid || r.addedBy?.uid === currentUid;
-  const canEdit = isCreator || myRole === 'boss' || myRole === 'ol';
-  const canDelete = isCreator
-    || myRole === 'boss'
-    || myRole === 'ol'
-    || (r._scope === 'brand' && brands.find(b => b.id === r.brandId)?.ownerId === currentUid);
+  const manageBrand = r._scope === 'brand' && !!r.brandId && brands.some(b => b.id === r.brandId);
+  const canEdit = isCreator || myRole === 'boss' || myRole === 'ol' || manageBrand;
+  const canDelete = canEdit;
 
   return (
     <div
@@ -564,11 +562,9 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
               const bc   = brandColor(r.brandName);
               const isGeneral = r._scope === 'general';
               const isCreator = r.createdBy === currentUid || r.addedBy?.uid === currentUid;
-              const canEdit = isCreator || myRole === 'boss' || myRole === 'ol';
-              const canDelete = isCreator
-                || myRole === 'boss'
-                || myRole === 'ol'
-                || (r._scope === 'brand' && brands.find(b => b.id === r.brandId)?.ownerId === currentUid);
+              const manageBrand = r._scope === 'brand' && !!r.brandId && brands.some(b => b.id === r.brandId);
+              const canEdit = isCreator || myRole === 'boss' || myRole === 'ol' || manageBrand;
+              const canDelete = canEdit;
               return (
                 <tr key={`${r._scope}-${r.brandId || 'g'}-${r.id}`}>
                   <td style={{ padding: '11px 16px', verticalAlign: 'middle', maxWidth: 280 }}>

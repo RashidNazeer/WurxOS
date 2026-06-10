@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  listAgendaResources, deleteAgendaResource, subscribeAgendaResources,
+  listAgendaResources, deleteAgendaResource, subscribeAgendaResources, listMyBrandIds,
 } from '../../lib/agendaApi';
 import AgendaResourceModal from '../../components/agenda/AgendaResourceModal';
 
@@ -16,8 +16,11 @@ const TYPE_META = {
 };
 
 export default function AgendaResourcesPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const role = profile?.role || '';
+  const isAdmin = role === 'boss' || role === 'ol' || role === 'developer';
   const [rows, setRows]       = useState([]);
+  const [myBrandIds, setMyBrandIds] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -33,9 +36,18 @@ export default function AgendaResourcesPage() {
 
   useEffect(() => {
     reload();
+    listMyBrandIds().then((ids) => setMyBrandIds(new Set(ids || []))).catch(() => {});
     const unsub = subscribeAgendaResources(reload);
     return () => unsub();
   }, []);
+
+  // Edit/delete: the creator, an admin, the brand owner (TL), OR an APC/IPC
+  // assigned to the resource's brand (matches resources RLS, mig 201).
+  function canManage(r) {
+    return r.created_by === user?.id
+      || isAdmin
+      || (!!r.brand_id && (myBrandIds.has(r.brand_id) || r.brand?.owner_id === user?.id));
+  }
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -105,7 +117,7 @@ export default function AgendaResourcesPage() {
         <div className="row g-3">
           {filtered.map((r) => {
             const m = TYPE_META[r.type] || TYPE_META.link;
-            const mine = r.created_by === user?.id;
+            const mine = canManage(r);
             return (
               <div key={r.id} className="col-12 col-md-6 col-xl-4">
                 <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12 }}>
