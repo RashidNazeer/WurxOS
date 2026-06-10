@@ -53,7 +53,7 @@ function MetricInfoTip({ text }) {
     <span className="wx-metric-tip-wrap" tabIndex={0}
       aria-label={text}
       style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'help', outline: 'none' }}>
-      <i className="bi bi-info-circle" style={{ color: '#94a3b8', fontSize: '0.72rem' }} />
+      <i className="bi bi-info-circle" style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }} />
       {/* Anchor the tooltip's left edge to the icon and let it grow to
           the right. A previous centered-and-translateX layout overflowed
           left when the icon was near a panel/viewport edge, getting
@@ -62,7 +62,7 @@ function MetricInfoTip({ text }) {
       <span className="wx-metric-tip" role="tooltip"
         style={{
           position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-          background: '#0f172a', color: '#fff',
+          background: 'var(--accent)', color: 'var(--on-accent)',
           padding: '8px 10px', borderRadius: 8,
           fontSize: '0.72rem', lineHeight: 1.45, fontWeight: 400,
           width: 'max-content', maxWidth: 'min(320px, calc(100vw - 32px))',
@@ -89,17 +89,17 @@ const PILLARS = [
 const DEFAULT_WEIGHTS = { performance: 40, incentives: 25, attendance: 20, flags: 15 };
 
 const WEIGHTAGES = [
-  { key: 'low',      label: 'Low',      color: '#6c757d', bg: '#f3f4f6', pts: 3 },
-  { key: 'medium',   label: 'Medium',   color: '#fd7e14', bg: '#fff3e0', pts: 5 },
-  { key: 'high',     label: 'High',     color: '#dc3545', bg: '#fce4ec', pts: 8 },
-  { key: 'critical', label: 'Critical', color: '#7b1fa2', bg: '#f3e5f5', pts: 12 },
+  { key: 'low',      label: 'Low',      color: 'var(--text-secondary)', bg: 'var(--surface-2)', pts: 3 },
+  { key: 'medium',   label: 'Medium',   color: 'var(--warning)', bg: 'var(--warning-soft)', pts: 5 },
+  { key: 'high',     label: 'High',     color: 'var(--danger)', bg: 'var(--danger-soft)', pts: 8 },
+  { key: 'critical', label: 'Critical', color: 'var(--text-secondary)', bg: 'var(--surface-2)', pts: 12 },
 ];
 
 function getLevel(score) {
-  if (score >= 90) return { label: 'Promotion',   color: '#198754', bg: '#e6f4ea', icon: 'bi-trophy-fill' };
-  if (score >= 70) return { label: 'Good',         color: '#0d6efd', bg: '#e8f0fe', icon: 'bi-hand-thumbs-up-fill' };
-  if (score >= 50) return { label: 'Warning',      color: '#fd7e14', bg: '#fff3e0', icon: 'bi-exclamation-triangle' };
-  return              { label: 'Termination',   color: '#dc3545', bg: '#fce4ec', icon: 'bi-x-octagon-fill' };
+  if (score >= 90) return { label: 'Promotion',   color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-trophy-fill' };
+  if (score >= 70) return { label: 'Good',         color: 'var(--info)', bg: 'var(--info-soft)', icon: 'bi-hand-thumbs-up-fill' };
+  if (score >= 50) return { label: 'Warning',      color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-exclamation-triangle' };
+  return              { label: 'Termination',   color: 'var(--danger)', bg: 'var(--danger-soft)', icon: 'bi-x-octagon-fill' };
 }
 
 function calcMetricsAvg(metrics) {
@@ -307,7 +307,7 @@ function RateModal({ user, existing, month, onClose, onSaved }) {
             })}
           </div>
 
-          <div className="rounded-3 p-3 mb-3 text-center" style={{ background: level.bg, border: `1.5px solid ${level.color}30` }}>
+          <div className="rounded-3 p-3 mb-3 text-center" style={{ background: level.bg, border: `1.5px solid color-mix(in srgb, ${level.color} 19%, transparent)` }}>
             <div className="fw-bold" style={{ fontSize: '2rem', color: level.color }}>{overall}</div>
             <div className="d-flex align-items-center justify-content-center gap-1">
               <i className={`bi ${level.icon}`} style={{ color: level.color, fontSize: '0.8rem' }} />
@@ -334,7 +334,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const isGreen = flagType === 'green';
-  const color = isGreen ? '#198754' : '#dc3545';
+  const color = isGreen ? 'var(--success)' : 'var(--danger)';
 
   async function handleSave() {
     if (!description.trim()) return;
@@ -357,7 +357,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
         <div className="card-body p-4">
           <div className="d-flex align-items-center gap-2 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-              style={{ width: 36, height: 36, background: isGreen ? '#e6f4ea' : '#fce4ec' }}>
+              style={{ width: 36, height: 36, background: isGreen ? 'var(--success-soft)' : 'var(--danger-soft)' }}>
               <i className="bi bi-flag-fill" style={{ color, fontSize: '0.9rem' }} />
             </div>
             <div>
@@ -370,7 +370,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
             <div className="d-flex gap-2 flex-wrap">
               {WEIGHTAGES.map(w => (
                 <button key={w.key} type="button" className="btn btn-sm px-3"
-                  style={{ background: weightage === w.key ? w.color : w.bg, color: weightage === w.key ? '#fff' : w.color, border: `1.5px solid ${w.color}40`, borderRadius: 8, fontSize: '0.75rem', fontWeight: 600 }}
+                  style={{ background: weightage === w.key ? w.color : w.bg, color: weightage === w.key ? '#fff' : w.color, border: `1.5px solid color-mix(in srgb, ${w.color} 25%, transparent)`, borderRadius: 8, fontSize: '0.75rem', fontWeight: 600 }}
                   onClick={() => setWeightage(w.key)}>{w.label}</button>
               ))}
             </div>
@@ -496,7 +496,7 @@ function ViewFlagsModal({
               const g = t === 'green';
               return (
                 <button key={t} onClick={() => setTab(t)} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem', fontWeight: 600, background: tab === t ? (g ? '#198754' : '#dc3545') : '#f3f4f6', color: tab === t ? '#fff' : '#6c757d', border: 'none' }}>
+                  style={{ borderRadius: 8, fontSize: '0.78rem', fontWeight: 600, background: tab === t ? (g ? 'var(--success)' : 'var(--danger)') : 'var(--surface-2)', color: tab === t ? '#fff' : 'var(--text-secondary)', border: 'none' }}>
                   <i className="bi bi-flag-fill" /> {g ? 'Green' : 'Red'} ({count})
                 </button>
               );
@@ -513,7 +513,7 @@ function ViewFlagsModal({
                 const pending = pendingRemovals[f.id];
                 const isBusy = !!busy[f.id];
                 return (
-                  <div key={f.id} className="rounded-3 p-3" style={{ background: tab === 'green' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${tab === 'green' ? '#b7dfc4' : '#fecaca'}` }}>
+                  <div key={f.id} className="rounded-3 p-3" style={{ background: tab === 'green' ? 'var(--success-soft)' : 'var(--danger-soft)', border: `1px solid ${tab === 'green' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}` }}>
                     <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
                       <span className="small fw-medium">{f.description}</span>
                       <span className="badge rounded-pill flex-shrink-0" style={{ background: w.bg, color: w.color, fontSize: '0.58rem' }}>{w.label}</span>
@@ -540,7 +540,7 @@ function ViewFlagsModal({
                         can see this flag so the state is unambiguous. */}
                     {pending && (
                       <div className="mt-2 rounded-2 px-2 py-1 d-flex align-items-center gap-2"
-                        style={{ background: '#fff7ed', border: '1px solid #fed7aa', fontSize: '0.66rem', color: '#9a3412' }}>
+                        style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.66rem', color: 'var(--warning)' }}>
                         <i className="bi bi-hourglass-split" />
                         <span>
                           Removal pending Boss approval
@@ -556,7 +556,7 @@ function ViewFlagsModal({
                           <button
                             className="btn btn-sm d-inline-flex align-items-center gap-1"
                             style={{
-                              background: '#fff', border: '1px solid #fecaca', color: '#b91c1c',
+                              background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger)',
                               borderRadius: 6, fontSize: '0.7rem', padding: '3px 10px',
                             }}
                             disabled={isBusy}
@@ -567,7 +567,7 @@ function ViewFlagsModal({
                           <button
                             className="btn btn-sm d-inline-flex align-items-center gap-1"
                             style={{
-                              background: '#fff', border: '1px solid #c7d2fe', color: '#4338ca',
+                              background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', color: 'var(--info)',
                               borderRadius: 6, fontSize: '0.7rem', padding: '3px 10px',
                             }}
                             disabled={isBusy}
@@ -584,9 +584,9 @@ function ViewFlagsModal({
           )}
           {canManage && (
             <div className="d-flex gap-2">
-              <button className="btn btn-sm flex-grow-1" style={{ background: '#e6f4ea', color: '#198754', border: '1.5px solid #b7dfc4', borderRadius: 8, fontSize: '0.75rem' }}
+              <button className="btn btn-sm flex-grow-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', border: '1.5px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
                 onClick={() => onAddFlag('green')}><i className="bi bi-plus-lg me-1" />Green Flag</button>
-              <button className="btn btn-sm flex-grow-1" style={{ background: '#fce4ec', color: '#dc3545', border: '1.5px solid #fecaca', borderRadius: 8, fontSize: '0.75rem' }}
+              <button className="btn btn-sm flex-grow-1" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1.5px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
                 onClick={() => onAddFlag('red')}><i className="bi bi-plus-lg me-1" />Red Flag</button>
             </div>
           )}
@@ -631,10 +631,10 @@ function FlagRemovalRequestsPanel({ requests, onChanged }) {
   }
 
   return (
-    <div className="rounded-3 p-3 mb-3" style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+    <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
       <div className="d-flex align-items-center gap-2 mb-2">
-        <i className="bi bi-hourglass-split" style={{ color: '#c2410c' }} />
-        <h6 className="fw-bold mb-0" style={{ fontSize: '0.88rem', color: '#9a3412' }}>
+        <i className="bi bi-hourglass-split" style={{ color: 'var(--warning)' }} />
+        <h6 className="fw-bold mb-0" style={{ fontSize: '0.88rem', color: 'var(--warning)' }}>
           Pending flag-removal requests ({requests.length})
         </h6>
       </div>
@@ -646,12 +646,12 @@ function FlagRemovalRequestsPanel({ requests, onChanged }) {
             ? flagDate.toLocaleString(undefined, { year: 'numeric', month: 'long' })
             : null;
           return (
-            <div key={r.id} className="rounded-3 p-3" style={{ background: '#fff', border: '1px solid #fed7aa' }}>
+            <div key={r.id} className="rounded-3 p-3" style={{ background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
               <div className="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="small fw-semibold" style={{ color: '#1a1a2e' }}>
+                  <div className="small fw-semibold" style={{ color: 'var(--text-primary)' }}>
                     {r.requester?.display_name || 'OL'} requested removal of a flag on{' '}
-                    <span style={{ color: '#7c2d12' }}>{r.user?.display_name || 'a teammate'}</span>
+                    <span style={{ color: 'var(--warning)' }}>{r.user?.display_name || 'a teammate'}</span>
                   </div>
                   <div className="text-muted" style={{ fontSize: '0.7rem', marginTop: 2 }}>
                     {r.flag?.type === 'green' ? 'Green flag' : 'Red flag'}
@@ -662,14 +662,14 @@ function FlagRemovalRequestsPanel({ requests, onChanged }) {
                 <div className="d-flex gap-1 flex-shrink-0">
                   <button
                     className="btn btn-sm d-inline-flex align-items-center gap-1"
-                    style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', borderRadius: 6, fontSize: '0.72rem' }}
+                    style={{ background: 'var(--success-soft)', color: 'var(--success)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 6, fontSize: '0.72rem' }}
                     disabled={isBusy}
                     onClick={() => handleDecide(r, 'approve')}>
                     <i className="bi bi-check-lg" /> Approve
                   </button>
                   <button
                     className="btn btn-sm d-inline-flex align-items-center gap-1"
-                    style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 6, fontSize: '0.72rem' }}
+                    style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 6, fontSize: '0.72rem' }}
                     disabled={isBusy}
                     onClick={() => handleDecide(r, 'reject')}>
                     <i className="bi bi-x-lg" /> Reject
@@ -677,19 +677,19 @@ function FlagRemovalRequestsPanel({ requests, onChanged }) {
                 </div>
               </div>
               {/* OL's reason */}
-              <div className="rounded-2 p-2" style={{ background: '#f9fafb', border: '1px solid #e5e7eb', fontSize: '0.74rem' }}>
+              <div className="rounded-2 p-2" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)', fontSize: '0.74rem' }}>
                 <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                   Reason
                 </div>
-                <div style={{ color: '#1f2937', whiteSpace: 'pre-wrap' }}>{r.reason}</div>
+                <div style={{ color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{r.reason}</div>
               </div>
               {/* Original flag's reason for context */}
               {r.flag?.reason && (
-                <div className="rounded-2 p-2 mt-2" style={{ background: '#fef2f2', border: '1px solid #fecaca', fontSize: '0.72rem' }}>
+                <div className="rounded-2 p-2 mt-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', fontSize: '0.72rem' }}>
                   <div className="text-muted mb-1" style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                     Original flag
                   </div>
-                  <div style={{ color: '#7f1d1d', whiteSpace: 'pre-wrap' }}>{r.flag.reason}</div>
+                  <div style={{ color: 'var(--danger)', whiteSpace: 'pre-wrap' }}>{r.flag.reason}</div>
                 </div>
               )}
             </div>
@@ -726,10 +726,10 @@ function WeightsModal({ weights, onClose, onSaved }) {
           <h6 className="fw-bold mb-3"><i className="bi bi-gear me-2" />Configure Performance</h6>
 
           {/* Auto-attendance note */}
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
             <div className="d-flex align-items-center gap-2 mb-1">
-              <i className="bi bi-calendar-check" style={{ color: '#0284c7', fontSize: '0.9rem' }} />
-              <span className="small fw-bold" style={{ color: '#0284c7' }}>Attendance score is now automatic</span>
+              <i className="bi bi-calendar-check" style={{ color: 'var(--info)', fontSize: '0.9rem' }} />
+              <span className="small fw-bold" style={{ color: 'var(--info)' }}>Attendance score is now automatic</span>
             </div>
             <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>
               Calculated as effective days (clock-ins + manager-adjusted days) divided by the working days
@@ -753,7 +753,7 @@ function WeightsModal({ weights, onClose, onSaved }) {
             ))}
           </div>
           <div className={`rounded-2 p-2 text-center small fw-bold mb-3 ${total === 100 ? 'text-success' : 'text-danger'}`}
-            style={{ background: total === 100 ? '#e6f4ea' : '#fce4ec', borderRadius: 8 }}>
+            style={{ background: total === 100 ? 'var(--success-soft)' : 'var(--danger-soft)', borderRadius: 8 }}>
             Total: {total}% {total === 100 ? '✓' : `(must be 100%)`}
           </div>
           <div className="d-flex gap-2 justify-content-end">
@@ -790,8 +790,8 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fce4ec' }}>
-              <i className="bi bi-exclamation-triangle-fill" style={{ color: '#dc3545', fontSize: '1rem' }} />
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--danger-soft)' }}>
+              <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--danger)', fontSize: '1rem' }} />
             </div>
             <div>
               <h6 className="fw-bold mb-0">Issue Warning #{next}</h6>
@@ -799,7 +799,7 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
             </div>
           </div>
           {next >= 3 && (
-            <div className="alert py-2 small mb-3" style={{ background: '#fce4ec', border: '1px solid #fecaca', borderRadius: 8, color: '#dc3545' }}>
+            <div className="alert py-2 small mb-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, color: 'var(--danger)' }}>
               <i className="bi bi-exclamation-octagon-fill me-1" />Warning #{next} — 3 warnings may lead to termination.
             </div>
           )}
@@ -810,7 +810,7 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
           </div>
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm px-3" style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: 8 }}
+            <button className="btn btn-sm px-3" style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8 }}
               onClick={handleWarn} disabled={saving || !reason.trim()}>
               {saving ? 'Issuing…' : 'Issue Warning'}
             </button>
@@ -902,12 +902,12 @@ function PillarDetail({ pillarKey, ctx }) {
           return (
             <div key={m.key} className="d-flex align-items-center gap-2"
               style={{ fontSize: '0.75rem' }}>
-              <i className={`bi ${m.icon}`} style={{ color: '#6c757d', fontSize: '0.78rem', flex: '0 0 14px' }} />
-              <span style={{ flex: 1, color: '#374151', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <i className={`bi ${m.icon}`} style={{ color: 'var(--text-muted)', fontSize: '0.78rem', flex: '0 0 14px' }} />
+              <span style={{ flex: 1, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {m.label}
                 <MetricInfoTip text={m.description} />
               </span>
-              <div className="rounded-pill" style={{ flex: '0 0 90px', height: 5, background: '#e9ecef', overflow: 'hidden' }}>
+              <div className="rounded-pill" style={{ flex: '0 0 90px', height: 5, background: 'var(--surface-2)', overflow: 'hidden' }}>
                 <div className="h-100 rounded-pill" style={{ width: `${v}%`, background: lvl.color }} />
               </div>
               <span className="fw-semibold" style={{ flex: '0 0 38px', textAlign: 'right', color: lvl.color }}>
@@ -942,14 +942,14 @@ function PillarDetail({ pillarKey, ctx }) {
         {items.map((it, i) => (
           <div key={i} className="d-flex align-items-start gap-2 rounded-2 p-2"
             style={{
-              background: it.completed ? '#f0fdf4' : '#f9fafb',
-              border: `1px solid ${it.completed ? '#b7dfc4' : '#e9ecef'}`,
+              background: it.completed ? 'var(--success-soft)' : 'var(--surface-0)',
+              border: `1px solid ${it.completed ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
               fontSize: '0.74rem',
             }}>
             <i className={`bi ${it.completed ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}
               style={{ fontSize: '0.8rem', marginTop: 2 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="fw-semibold" style={{ color: '#1f2937' }}>
+              <div className="fw-semibold" style={{ color: 'var(--text-primary)' }}>
                 {it.title || it.label || (it._kind === 'bonus' ? 'Bonus' : 'Incentive')}
                 <span className="text-muted ms-1" style={{ fontSize: '0.6rem', fontWeight: 500 }}>
                   · {it._kind}
@@ -961,7 +961,7 @@ function PillarDetail({ pillarKey, ctx }) {
                 </div>
               )}
               {it.description && (
-                <div style={{ color: '#374151', marginTop: 2 }}>{it.description}</div>
+                <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>{it.description}</div>
               )}
             </div>
           </div>
@@ -992,41 +992,41 @@ function PillarDetail({ pillarKey, ctx }) {
           against the score. WFH days are treated as present.
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
-          style={{ background: '#fff7ed', border: '1px solid #fed7aa' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
           <span>Days this month</span>
           <strong>{wd}</strong>
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
-          style={{ background: '#f0fdf4', border: '1px solid #b7dfc4' }}>
+          style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
           <span>Days present (real clock-ins + adjustments)</span>
           <strong>{effective}</strong>
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
-          style={{ background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+          style={{ background: 'var(--surface-0)', border: '1px solid var(--border-default)' }}>
           <span>Weekends</span>
           <strong>{weekendDays}</strong>
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
-          style={{ background: '#eff6ff', border: '1px solid #93c5fd' }}>
+          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
           <span>Approved leave days</span>
           <strong>{leaveDays}</strong>
         </div>
         {holidayDays > 0 && (
           <div className="d-flex justify-content-between rounded-2 p-2"
-            style={{ background: '#fdf4ff', border: '1px solid #e9d5ff' }}>
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <span>Company holidays</span>
             <strong>{holidayDays}</strong>
           </div>
         )}
         {missed > 0 && (
           <div className="d-flex justify-content-between rounded-2 p-2"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
             <span>Days not covered</span>
             <strong className="text-danger">{missed}</strong>
           </div>
         )}
         <div className="d-flex justify-content-between rounded-2 p-2 fw-bold"
-          style={{ background: '#f3f4f6', border: '1px solid #e9ecef' }}>
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           <span>Covered ({covered} / {wd})</span>
           <span>{pct}%</span>
         </div>
@@ -1054,13 +1054,13 @@ function PillarDetail({ pillarKey, ctx }) {
           months don't affect this score.
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
-          style={{ background: '#f0fdf4', border: '1px solid #b7dfc4' }}>
-          <span><i className="bi bi-flag-fill me-1" style={{ color: '#198754' }} />Green flags this month</span>
+          style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+          <span><i className="bi bi-flag-fill me-1" style={{ color: 'var(--success)' }} />Green flags this month</span>
           <strong>{greens}</strong>
         </div>
         <div className="d-flex justify-content-between rounded-2 p-2"
-          style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-          <span><i className="bi bi-flag-fill me-1" style={{ color: '#dc3545' }} />Red flags this month</span>
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
+          <span><i className="bi bi-flag-fill me-1" style={{ color: 'var(--danger)' }} />Red flags this month</span>
           <strong>{reds}</strong>
         </div>
         {monthFlags.length === 0 && (
@@ -1481,7 +1481,7 @@ export default function PerformancePage() {
 
       {/* Main Tabs */}
       {hasTeamTab && (
-        <div className="d-flex gap-1 mb-4" style={{ borderBottom: '2px solid #e9ecef' }}>
+        <div className="d-flex gap-1 mb-4" style={{ borderBottom: '2px solid var(--border-subtle)' }}>
           {[
             { key: 'team', label: 'Team Performance', icon: 'bi-people' },
             ...(effectiveRole !== 'boss' ? [{ key: 'my', label: 'My Performance', icon: 'bi-person' }] : []),
@@ -1490,10 +1490,10 @@ export default function PerformancePage() {
               className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
               style={{
                 borderRadius: '8px 8px 0 0', fontWeight: 600, fontSize: '0.78rem',
-                background: mainTab === t.key ? '#1a1a2e' : 'transparent',
-                color: mainTab === t.key ? '#fff' : '#6c757d',
+                background: mainTab === t.key ? 'var(--accent)' : 'transparent',
+                color: mainTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)',
                 border: 'none', marginBottom: -2,
-                borderBottom: mainTab === t.key ? '2px solid #1a1a2e' : '2px solid transparent',
+                borderBottom: mainTab === t.key ? '2px solid var(--accent)' : '2px solid transparent',
               }}>
               <i className={`bi ${t.icon}`} /> {t.label}
             </button>
@@ -1512,21 +1512,21 @@ export default function PerformancePage() {
               misleading partial composite at the start of the month. */}
           {myPerfScore === null ? (
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ height: 4, background: 'linear-gradient(90deg,#94a3b8,#cbd5e1)' }} />
+              <div style={{ height: 4, background: 'linear-gradient(90deg,var(--border-strong),var(--border-default))' }} />
               <div className="card-body p-4 text-center">
                 <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
-                  style={{ width: 100, height: 100, background: '#f1f5f9', border: '3px solid #cbd5e1' }}>
-                  <i className="bi bi-hourglass-split" style={{ fontSize: '1.8rem', color: '#64748b' }} />
+                  style={{ width: 100, height: 100, background: 'var(--surface-2)', border: '3px solid var(--border-default)' }}>
+                  <i className="bi bi-hourglass-split" style={{ fontSize: '1.8rem', color: 'var(--text-secondary)' }} />
                 </div>
                 <div className="d-flex align-items-center justify-content-center gap-1 mb-1">
-                  <span className="fw-bold" style={{ color: '#475569' }}>Not Rated Yet</span>
+                  <span className="fw-bold" style={{ color: 'var(--text-secondary)' }}>Not Rated Yet</span>
                 </div>
                 <p className="text-muted small mb-0">Performance is rated at the end of {getMonthLabel(month)}</p>
               </div>
             </div>
           ) : (
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ height: 4, background: `linear-gradient(90deg,${myLevel.color},${myLevel.color}88)` }} />
+              <div style={{ height: 4, background: `linear-gradient(90deg,${myLevel.color},color-mix(in srgb, ${myLevel.color} 53%, transparent))` }} />
               <div className="card-body p-4 text-center">
                 <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
                   style={{ width: 100, height: 100, background: myLevel.bg, border: `3px solid ${myLevel.color}` }}>
@@ -1604,7 +1604,7 @@ export default function PerformancePage() {
                     ? created.toLocaleString(undefined, { year: 'numeric', month: 'long' })
                     : null;
                   return (
-                    <div key={f.id} className="rounded-3 p-3" style={{ background: f.type === 'green' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${f.type === 'green' ? '#b7dfc4' : '#fecaca'}` }}>
+                    <div key={f.id} className="rounded-3 p-3" style={{ background: f.type === 'green' ? 'var(--success-soft)' : 'var(--danger-soft)', border: `1px solid ${f.type === 'green' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}` }}>
                       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
                         <span className="small fw-medium">{f.description}</span>
                         <span className="badge rounded-pill flex-shrink-0" style={{ background: w.bg, color: w.color, fontSize: '0.58rem' }}>{w.label}</span>
@@ -1636,7 +1636,7 @@ export default function PerformancePage() {
 
           {/* Warnings */}
           {myWarnings > 0 && (
-            <div className="mt-4 rounded-3 p-3" style={{ background: '#fce4ec', border: '1px solid #fecaca' }}>
+            <div className="mt-4 rounded-3 p-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
               <div className="d-flex align-items-center gap-2">
                 <i className="bi bi-exclamation-triangle-fill text-danger" />
                 <span className="fw-bold small text-danger">Warnings: {myWarnings}/3</span>
@@ -1663,9 +1663,9 @@ export default function PerformancePage() {
               {teamSubTabs.map(t => (
                 <button key={t.key} onClick={() => { setTeamSubTab(t.key); setSearch(''); setLevelFilter('all'); }}
                   className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontWeight: 600, fontSize: '0.75rem', background: teamSubTab === t.key ? '#1a1a2e' : '#f3f4f6', color: teamSubTab === t.key ? '#fff' : '#6c757d', border: 'none' }}>
+                  style={{ borderRadius: 8, fontWeight: 600, fontSize: '0.75rem', background: teamSubTab === t.key ? 'var(--accent)' : 'var(--surface-2)', color: teamSubTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)', border: 'none' }}>
                   <i className={`bi ${t.icon}`} /> {t.label}
-                  <span className="badge ms-1" style={{ background: teamSubTab === t.key ? 'rgba(255,255,255,0.2)' : '#e9ecef', color: teamSubTab === t.key ? '#fff' : '#6c757d', fontSize: '0.55rem' }}>
+                  <span className="badge ms-1" style={{ background: teamSubTab === t.key ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)', color: teamSubTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)', fontSize: '0.55rem' }}>
                     {teamUsers.filter(u => u._tab === t.key).length}
                   </span>
                 </button>
@@ -1690,7 +1690,7 @@ export default function PerformancePage() {
 
           {/* Cards */}
           {filteredTeam.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 12 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
               <i className="bi bi-bar-chart text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">{search || levelFilter !== 'all' ? 'No matching results.' : 'No users found.'}</p>
             </div>
@@ -1704,8 +1704,8 @@ export default function PerformancePage() {
                 // pillars below stay visible so the manager can still see
                 // attendance / incentives / flags trending.
                 const stripe = isRated
-                  ? `linear-gradient(90deg,${level.color},${level.color}88)`
-                  : 'linear-gradient(90deg,#cbd5e1,#e2e8f0)';
+                  ? `linear-gradient(90deg,${level.color},color-mix(in srgb, ${level.color} 53%, transparent))`
+                  : 'linear-gradient(90deg,var(--border-default),var(--border-subtle))';
                 return (
                   <div key={u.id} className="col-sm-6 col-lg-4">
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
@@ -1731,7 +1731,7 @@ export default function PerformancePage() {
                                 </span>
                               </>
                             ) : (
-                              <span className="badge rounded-pill" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.6rem', padding: '6px 10px' }}>
+                              <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.6rem', padding: '6px 10px' }}>
                                 <i className="bi bi-hourglass-split me-1" />Not Rated Yet
                               </span>
                             )}
@@ -1761,15 +1761,15 @@ export default function PerformancePage() {
                                       <span className="text-muted" style={{ fontSize: '0.6rem' }}
                                         title={`${u.attData.actualDays} clocked-in${adj > 0 ? ` + ${adj} manager-adjusted` : ''}${leaveD > 0 ? ` + ${leaveD} approved leave` : ''}${holD > 0 ? ` + ${holD} holiday` : ''} + ${weekendD} weekend = ${coveredD} of ${u.workingDays} days`}>
                                         · {coveredD}/{u.workingDays} days
-                                        {adj > 0 && <span style={{ color: '#92400e' }}> (+{adj} adj)</span>}
-                                        {leaveD > 0 && <span style={{ color: '#1d4ed8' }}> (+{leaveD} leave)</span>}
+                                        {adj > 0 && <span style={{ color: 'var(--warning)' }}> (+{adj} adj)</span>}
+                                        {leaveD > 0 && <span style={{ color: 'var(--info)' }}> (+{leaveD} leave)</span>}
                                       </span>
                                     )}
                                   </span>
-                                  <span className="fw-semibold" style={{ color: lv?.color || '#adb5bd' }}>{s !== null ? s : '—'}</span>
+                                  <span className="fw-semibold" style={{ color: lv?.color || 'var(--text-muted)' }}>{s !== null ? s : '—'}</span>
                                 </div>
-                                <div className="rounded-pill overflow-hidden" style={{ height: 4, background: '#e9ecef' }}>
-                                  <div className="h-100 rounded-pill" style={{ width: `${s || 0}%`, background: lv?.color || '#e9ecef', transition: 'width 0.4s' }} />
+                                <div className="rounded-pill overflow-hidden" style={{ height: 4, background: 'var(--surface-2)' }}>
+                                  <div className="h-100 rounded-pill" style={{ width: `${s || 0}%`, background: lv?.color || 'var(--surface-2)', transition: 'width 0.4s' }} />
                                 </div>
                               </div>
                             );
@@ -1778,14 +1778,14 @@ export default function PerformancePage() {
 
                         {/* Flags + warnings strip */}
                         <div className="d-flex gap-1 mb-2 flex-wrap">
-                          <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.55rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.55rem' }}>
                             <i className="bi bi-flag-fill me-1" />{u.gCount} green
                           </span>
-                          <span className="badge rounded-pill" style={{ background: '#fce4ec', color: '#dc3545', fontSize: '0.55rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.55rem' }}>
                             <i className="bi bi-flag-fill me-1" />{u.rCount} red
                           </span>
                           {u.wCount > 0 && (
-                            <span className="badge rounded-pill" style={{ background: '#fce4ec', color: '#dc3545', fontSize: '0.55rem' }}>
+                            <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.55rem' }}>
                               <i className="bi bi-exclamation-triangle me-1" />{u.wCount} warn
                             </span>
                           )}
@@ -1795,19 +1795,19 @@ export default function PerformancePage() {
                         <div className="d-flex gap-2 mt-auto">
                           {u.canEdit && (
                             <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
+                              style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
                               onClick={() => setRateTarget(u)}>
                               <i className="bi bi-pencil" /> Rate
                             </button>
                           )}
                           <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                            style={{ border: '1.5px solid #dee2e6', borderRadius: 8, background: '#fff', color: '#495057', fontSize: '0.72rem' }}
+                            style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.72rem' }}
                             onClick={() => setFlagsTarget(u)}>
                             <i className="bi bi-flag" /> Flags
                           </button>
                           {isBoss && isRated && u.composite < 50 && (
                             <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: '#fce4ec', color: '#dc3545', border: '1.5px solid #fecaca', borderRadius: 8, fontSize: '0.72rem' }}
+                              style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1.5px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.72rem' }}
                               onClick={() => setWarnTarget(u)}>
                               <i className="bi bi-exclamation-triangle" />
                             </button>

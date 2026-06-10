@@ -41,6 +41,10 @@
   --info:         #0ea5e9;
   --info-soft:    #f0f9ff;
 
+  /* Purple — WFH/Other/Pending-Boss accents (no Bootstrap equivalent) */
+  --purple:       #6610f2;
+  --purple-soft:  #f0ebff;
+
   /* Inputs */
   --input-bg:     #ffffff;
   --input-border: #cbd5e1;
@@ -93,6 +97,10 @@
   --warning-soft: rgba(251, 191, 36, 0.14);
   --info:         #7bc7ed;
   --info-soft:    rgba(123, 199, 237, 0.14);
+
+  /* Purple — readable lavender on near-black + translucent fill */
+  --purple:       #c4b5fd;
+  --purple-soft:  rgba(168, 85, 247, 0.16);
 
   --input-bg:     #1a1a1a;
   --input-border: rgba(245, 213, 168, 0.18);

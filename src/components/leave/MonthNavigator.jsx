@@ -22,7 +22,7 @@ export default function MonthNavigator({ label, isCurrent, onPrev, onNext, onRes
       </button>
       <span
         className="d-inline-flex align-items-center justify-content-center gap-2 fw-semibold px-3 py-1 rounded-2"
-        style={{ background: '#f3f4f6', fontSize: '0.82rem', minWidth: 170, color: '#1a1a2e' }}
+        style={{ background: 'var(--surface-2)', fontSize: '0.82rem', minWidth: 170, color: 'var(--text-primary)' }}
       >
         <i className="bi bi-calendar3" style={{ fontSize: '0.78rem' }} />
         {label}

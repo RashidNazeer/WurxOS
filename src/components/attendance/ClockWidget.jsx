@@ -703,11 +703,11 @@ export default function ClockWidget() {
         .att-digit { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
         .att-colon { opacity: 0.35; animation: attColon 1s steps(2) infinite; }
         @keyframes attColon { 50% { opacity: 1; } }
-        .att-clock-card { background: #fff; color: #0f172a; }
-        .att-clock-hero { background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%); }
-        [data-theme="dark"] .att-clock-card { background: #121212 !important; color: #ffffff; }
-        [data-theme="dark"] .att-clock-hero { background: linear-gradient(135deg, #1a1a1a 0%, #161b2a 100%) !important; }
-        [data-theme="dark"] .att-clock-card .att-digit { color: #ffffff !important; }
+        .att-clock-card { background: var(--surface-1); color: var(--text-primary); }
+        .att-clock-hero { background: linear-gradient(135deg, var(--surface-0) 0%, var(--info-soft) 100%); }
+        [data-theme="dark"] .att-clock-card { background: var(--surface-1) !important; color: var(--text-primary); }
+        [data-theme="dark"] .att-clock-hero { background: linear-gradient(135deg, var(--surface-2) 0%, var(--info-soft) 100%) !important; }
+        [data-theme="dark"] .att-clock-card .att-digit { color: var(--text-primary) !important; }
 
         .att-primary-btn {
           width: 100%; padding: 18px 22px; border-radius: 16px; border: none;
@@ -717,42 +717,42 @@ export default function ClockWidget() {
         }
         .att-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
         .att-primary-btn i { font-size: 1.3rem; }
-        .att-primary-in  { background: #16a34a; }
-        .att-primary-in:hover:not(:disabled) { background: #15803d; transform: translateY(-1px); }
-        .att-primary-out { background: #ef4444; }
-        .att-primary-out:hover:not(:disabled) { background: #dc2626; transform: translateY(-1px); }
+        .att-primary-in  { background: var(--success); }
+        .att-primary-in:hover:not(:disabled) { background: var(--success); transform: translateY(-1px); }
+        .att-primary-out { background: var(--danger); }
+        .att-primary-out:hover:not(:disabled) { background: var(--danger); transform: translateY(-1px); }
 
         .att-secondary-btn {
-          width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #e2e8f0;
-          background: #f8fafc; color: #334155;
+          width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border-subtle);
+          background: var(--surface-0); color: var(--text-secondary);
           font-size: 0.82rem; font-weight: 600;
           display: inline-flex; align-items: center; justify-content: center; gap: 6px;
           transition: all 0.15s; cursor: pointer;
         }
         .att-secondary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .att-secondary-btn:hover:not(:disabled) { background: #f1f5f9; }
+        .att-secondary-btn:hover:not(:disabled) { background: var(--surface-2); }
 
         .att-today-card {
-          background: #0f172a; color: #f8fafc; border-radius: 22px;
+          background: var(--accent); color: var(--on-accent); border-radius: 22px;
           padding: 22px; height: 100%; display: flex; flex-direction: column;
         }
         .att-today-card .att-today-label {
           font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em;
-          text-transform: uppercase; color: rgba(248,250,252,0.55); margin-bottom: 4px;
+          text-transform: uppercase; color: color-mix(in srgb, var(--on-accent) 55%, transparent); margin-bottom: 4px;
         }
-        .att-today-card h4 { color: #fff; font-weight: 700; margin-bottom: 18px; font-size: 1.35rem; }
-        .att-today-card .att-digit { color: #fff; }
-        .att-today-progress { background: rgba(255,255,255,0.08); border-radius: 999px; height: 6px; overflow: hidden; }
-        .att-today-progress-fill { height: 100%; background: linear-gradient(90deg, #f5d5a8, #d4a574); transition: width 0.4s; }
+        .att-today-card h4 { color: var(--on-accent); font-weight: 700; margin-bottom: 18px; font-size: 1.35rem; }
+        .att-today-card .att-digit { color: var(--on-accent); }
+        .att-today-progress { background: color-mix(in srgb, var(--on-accent) 8%, transparent); border-radius: 999px; height: 6px; overflow: hidden; }
+        .att-today-progress-fill { height: 100%; background: color-mix(in srgb, var(--on-accent) 70%, transparent); transition: width 0.4s; }
         .att-today-stat-col {
           flex: 1; text-align: left;
         }
         .att-today-stat-col .l {
           font-size: 0.56rem; font-weight: 700; letter-spacing: 0.1em;
-          text-transform: uppercase; color: rgba(248,250,252,0.4);
+          text-transform: uppercase; color: color-mix(in srgb, var(--on-accent) 40%, transparent);
         }
         .att-today-stat-col .v {
-          font-size: 1.1rem; font-weight: 700; color: #fff; margin-top: 2px;
+          font-size: 1.1rem; font-weight: 700; color: var(--on-accent); margin-top: 2px;
           font-variant-numeric: tabular-nums;
         }
       `}</style>
@@ -762,8 +762,8 @@ export default function ClockWidget() {
           how the user confirms they're still on the clock vs. forgot. */}
       {showReminderBanner && (
         <div className="mb-3 rounded-3 d-flex align-items-start gap-2 p-3"
-          style={{ background: '#fff7ed', border: '1px solid #fed7aa', color: '#7c2d12' }}>
-          <i className="bi bi-clock-history flex-shrink-0 mt-1" style={{ fontSize: '1.1rem', color: '#ea580c' }} />
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', color: 'var(--warning)' }}>
+          <i className="bi bi-clock-history flex-shrink-0 mt-1" style={{ fontSize: '1.1rem', color: 'var(--warning)' }} />
           <div className="flex-grow-1">
             <div className="fw-bold" style={{ fontSize: '0.88rem' }}>
               You've been clocked in for {fmtDuration(times.totalWorkMs + times.totalBreakMs)}.
@@ -805,7 +805,7 @@ export default function ClockWidget() {
 
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <div className="mb-3">
-        <h2 className="fw-bold mb-1" style={{ fontSize: '2.4rem', letterSpacing: '-0.02em', color: '#0f172a' }}>
+        <h2 className="fw-bold mb-1" style={{ fontSize: '2.4rem', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
           {greetingPrefix()}, {firstName(userName)}.
         </h2>
         <p className="text-muted mb-0" style={{ fontSize: '0.92rem' }}>{greetingSubtitle(effStatus, record, times)}</p>
@@ -833,9 +833,9 @@ export default function ClockWidget() {
               {/* Big digital clock — HH:MM black, SS lighter */}
               <div className="att-digit fw-bold" style={{
                 fontSize: 'clamp(4rem, 10vw, 7rem)', lineHeight: 0.95,
-                letterSpacing: '-0.03em', color: '#0f172a',
+                letterSpacing: '-0.03em', color: 'var(--text-primary)',
               }}>
-                {hh}<span className="att-colon">:</span>{mm}<span style={{ color: '#cbd5e1' }}>:{ss}</span>
+                {hh}<span className="att-colon">:</span>{mm}<span style={{ color: 'var(--text-muted)' }}>:{ss}</span>
               </div>
 
               {locInfo && !isClockedOut && (
@@ -845,7 +845,7 @@ export default function ClockWidget() {
                 </div>
               )}
 
-              <hr style={{ margin: '22px 0', borderColor: '#e2e8f0' }} />
+              <hr style={{ margin: '22px 0', borderColor: 'var(--border-subtle)' }} />
 
               {loading ? (
                 <div className="text-center py-4"><div className="spinner-border spinner-border-sm text-primary" /></div>
@@ -854,8 +854,8 @@ export default function ClockWidget() {
                   {/* 3-column session stats */}
                   <div className="row g-0 mb-3">
                     <div className="col-4">
-                      <div style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Last Clock-In</div>
-                      <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: '#0f172a', marginTop: 2 }}>
+                      <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Last Clock-In</div>
+                      <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: 'var(--text-primary)', marginTop: 2 }}>
                         {record?.clockIn ? fmtTime(record.clockIn) : '—'}
                       </div>
                       <div className="text-muted" style={{ fontSize: '0.66rem' }}>
@@ -863,8 +863,8 @@ export default function ClockWidget() {
                       </div>
                     </div>
                     <div className="col-4">
-                      <div style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Session</div>
-                      <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: isClockedOut ? '#94a3b8' : '#16a34a', marginTop: 2 }}>
+                      <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Session</div>
+                      <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: isClockedOut ? 'var(--text-muted)' : 'var(--success)', marginTop: 2 }}>
                         {isClockedOut ? '—' : fmtDurationLive(times.totalWorkMs)}
                       </div>
                       <div className="text-muted" style={{ fontSize: '0.66rem' }}>
@@ -872,8 +872,8 @@ export default function ClockWidget() {
                       </div>
                     </div>
                     <div className="col-4">
-                      <div style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Breaks Today</div>
-                      <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: times.totalBreakMs > 0 ? '#f59e0b' : '#0f172a', marginTop: 2 }}>
+                      <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Breaks Today</div>
+                      <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: times.totalBreakMs > 0 ? 'var(--warning)' : 'var(--text-primary)', marginTop: 2 }}>
                         {times.totalBreakMs > 0 ? fmtDuration(times.totalBreakMs) : '0m'}
                       </div>
                       <div className="text-muted" style={{ fontSize: '0.66rem' }}>
@@ -890,15 +890,15 @@ export default function ClockWidget() {
                         {LOCATIONS.map(loc => (
                           <button key={loc.key}
                             className="btn d-flex align-items-center gap-2 px-3 py-2"
-                            style={{ border: `2px solid ${loc.color}25`, borderRadius: 12, background: '#fff', transition: 'all 0.15s' }}
+                            style={{ border: `2px solid ${loc.color}25`, borderRadius: 12, background: 'var(--surface-1)', transition: 'all 0.15s' }}
                             onClick={() => handleClockIn(loc.key)}
                             disabled={action === 'clockin'}
                             onMouseEnter={e => { e.currentTarget.style.background = `${loc.color}08`; e.currentTarget.style.borderColor = loc.color; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = `${loc.color}25`; }}>
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.borderColor = `${loc.color}25`; }}>
                             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 30, height: 30, background: `${loc.color}15` }}>
                               <i className={`bi ${loc.icon}`} style={{ color: loc.color, fontSize: '0.95rem' }} />
                             </div>
-                            <span className="fw-semibold" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{loc.label}</span>
+                            <span className="fw-semibold" style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>{loc.label}</span>
                           </button>
                         ))}
                         <button className="btn btn-sm btn-link text-muted mt-1" style={{ fontSize: '0.72rem', textDecoration: 'none' }} onClick={() => setShowClockIn(false)}>Cancel</button>
@@ -922,9 +922,9 @@ export default function ClockWidget() {
                       shift so no worked time is lost (mig 173). */}
                   {canResumeShift && (
                     <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2"
-                      style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                      <i className="bi bi-arrow-counterclockwise" style={{ color: '#16a34a', fontSize: '0.9rem' }} />
-                      <span style={{ fontSize: '0.73rem', color: '#166534', fontWeight: 600, flex: 1 }}>
+                      style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+                      <i className="bi bi-arrow-counterclockwise" style={{ color: 'var(--success)', fontSize: '0.9rem' }} />
+                      <span style={{ fontSize: '0.73rem', color: 'var(--success)', fontWeight: 600, flex: 1 }}>
                         Clocked out by mistake? Resume your shift — your time won't be lost.
                       </span>
                       <button
@@ -946,7 +946,7 @@ export default function ClockWidget() {
                     <div className="row g-2 mt-2">
                       <div className="col-sm-4">
                         <button className="att-secondary-btn" onClick={handleBreak} disabled={!!action}
-                          style={{ background: record.status === 'on-break' ? '#fef3c7' : '#f8fafc', borderColor: record.status === 'on-break' ? '#fde68a' : '#e2e8f0', color: record.status === 'on-break' ? '#92400e' : '#334155' }}>
+                          style={{ background: record.status === 'on-break' ? 'var(--warning-soft)' : 'var(--surface-0)', borderColor: record.status === 'on-break' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)', color: record.status === 'on-break' ? 'var(--warning)' : 'var(--text-secondary)' }}>
                           <i className={`bi ${record.status === 'on-break' ? 'bi-play-fill' : 'bi-cup-hot'}`} />
                           {record.status === 'on-break' ? 'End break' : 'Take break'}
                         </button>
@@ -993,7 +993,7 @@ export default function ClockWidget() {
 
                   {!loading && (
                     <div className="text-center text-muted mt-3" style={{ fontSize: '0.68rem' }}>
-                      Press <kbd style={{ background: '#e2e8f0', padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem' }}>Space</kbd> to clock in/out · <kbd style={{ background: '#e2e8f0', padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem' }}>B</kbd> for break
+                      Press <kbd style={{ background: 'var(--surface-3)', padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem' }}>Space</kbd> to clock in/out · <kbd style={{ background: 'var(--surface-3)', padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem' }}>B</kbd> for break
                     </div>
                   )}
 
@@ -1002,15 +1002,15 @@ export default function ClockWidget() {
                     const editReq = record?.editClockInRequest;
                     if (editReq && editReq.status === 'pending') {
                       return (
-                        <div className="rounded-3 p-2 mt-3 d-flex align-items-center gap-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                        <div className="rounded-3 p-2 mt-3 d-flex align-items-center gap-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
                           <div className="spinner-border spinner-border-sm text-primary" style={{ width: 14, height: 14 }} />
-                          <span style={{ fontSize: '0.74rem', color: '#1d4ed8', fontWeight: 600, flex: 1 }}>Clock-in edit request waiting for approval</span>
+                          <span style={{ fontSize: '0.74rem', color: 'var(--info)', fontWeight: 600, flex: 1 }}>Clock-in edit request waiting for approval</span>
                         </div>
                       );
                     }
                     if (editReq && editReq.status === 'rejected' && !isClockedOut) {
                       return (
-                        <div className="mt-3" style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 600 }}>
+                        <div className="mt-3" style={{ fontSize: '0.68rem', color: 'var(--danger)', fontWeight: 600 }}>
                           <i className="bi bi-x-circle-fill me-1" />Last edit request rejected
                         </div>
                       );
@@ -1023,9 +1023,9 @@ export default function ClockWidget() {
                     const breakReq = record?.editBreaksRequest;
                     if (breakReq && breakReq.status === 'pending') {
                       return (
-                        <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-                          <div className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, color: '#f59e0b' }} />
-                          <span style={{ fontSize: '0.74rem', color: '#92400e', fontWeight: 600, flex: 1 }}>Break edit request waiting for approval</span>
+                        <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+                          <div className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, color: 'var(--warning)' }} />
+                          <span style={{ fontSize: '0.74rem', color: 'var(--warning)', fontWeight: 600, flex: 1 }}>Break edit request waiting for approval</span>
                         </div>
                       );
                     }
@@ -1034,10 +1034,10 @@ export default function ClockWidget() {
 
                   {isTL && record?.status === 'clocked-in' && (
                     <div className="rounded-3 p-3 mt-3"
-                      style={{ background: autoClockOutEnabled ? '#fffbeb' : '#f8fafc', border: `1px solid ${autoClockOutEnabled ? '#fde68a' : '#e2e8f0'}`, transition: 'all 0.15s' }}>
+                      style={{ background: autoClockOutEnabled ? 'var(--warning-soft)' : 'var(--surface-0)', border: `1px solid ${autoClockOutEnabled ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)'}`, transition: 'all 0.15s' }}>
                       <div className="d-flex align-items-center gap-2" style={{ cursor: 'pointer' }} onClick={handleToggleAutoClockOut}>
                         <input type="checkbox" className="form-check-input flex-shrink-0" checked={autoClockOutEnabled} readOnly style={{ cursor: 'pointer' }} />
-                        <span className="small fw-semibold" style={{ color: autoClockOutEnabled ? '#d97706' : '#64748b' }}>
+                        <span className="small fw-semibold" style={{ color: autoClockOutEnabled ? 'var(--warning)' : 'var(--text-secondary)' }}>
                           <i className="bi bi-clock-history me-1" />Allow team to clock out without approval
                         </span>
                       </div>
@@ -1053,41 +1053,41 @@ export default function ClockWidget() {
                   )}
 
                   {isApcOrIpc && record?.status === 'clocked-in' && tlStatus === 'not_clocked_in' && (
-                    <div className="rounded-3 p-3 mt-3 d-flex align-items-center gap-2" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                      <i className="bi bi-info-circle-fill" style={{ color: '#16a34a' }} />
-                      <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>Team lead is not clocked in today. You can clock out directly.</span>
+                    <div className="rounded-3 p-3 mt-3 d-flex align-items-center gap-2" style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+                      <i className="bi bi-info-circle-fill" style={{ color: 'var(--success)' }} />
+                      <span style={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 600 }}>Team lead is not clocked in today. You can clock out directly.</span>
                     </div>
                   )}
                   {isApcOrIpc && record?.status === 'clocked-in' && tlStatus === 'auto_clockout' && (
-                    <div className="rounded-3 p-3 mt-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                    <div className="rounded-3 p-3 mt-3" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                       <div className="d-flex align-items-center gap-2 mb-1">
-                        <i className="bi bi-clock-history" style={{ color: '#d97706' }} />
-                        <span style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 600 }}>Auto clock-out enabled by team lead</span>
+                        <i className="bi bi-clock-history" style={{ color: 'var(--warning)' }} />
+                        <span style={{ fontSize: '0.78rem', color: 'var(--warning)', fontWeight: 600 }}>Auto clock-out enabled by team lead</span>
                       </div>
-                      {tlAutoNote && <p className="mb-0 small" style={{ color: '#92400e' }}>{tlAutoNote}</p>}
+                      {tlAutoNote && <p className="mb-0 small" style={{ color: 'var(--warning)' }}>{tlAutoNote}</p>}
                     </div>
                   )}
 
                   {record?.status === 'pending-approval' && (
-                    <div className="rounded-3 p-3 mt-3 d-flex align-items-center gap-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                    <div className="rounded-3 p-3 mt-3 d-flex align-items-center gap-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
                       <div className="spinner-border spinner-border-sm text-primary" />
-                      <span style={{ fontSize: '0.78rem', color: '#1d4ed8', fontWeight: 600 }}>Waiting for team lead approval…</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--info)', fontWeight: 600 }}>Waiting for team lead approval…</span>
                     </div>
                   )}
 
                   {record?.approvalStatus === 'rejected' && record?.status === 'clocked-in' && (
-                    <div className="rounded-3 p-3 mt-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+                    <div className="rounded-3 p-3 mt-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
                       <div className="d-flex align-items-center gap-2 mb-1">
                         <i className="bi bi-x-circle-fill text-danger" />
-                        <span style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: 700 }}>Clock-out Rejected</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--danger)', fontWeight: 700 }}>Clock-out Rejected</span>
                       </div>
-                      {record.rejectionReason && <p className="mb-2 small" style={{ color: '#991b1b' }}>{record.rejectionReason}</p>}
-                      <p className="mb-0" style={{ fontSize: '0.7rem', color: '#b91c1c' }}>Please complete the required work and request clock-out again.</p>
+                      {record.rejectionReason && <p className="mb-2 small" style={{ color: 'var(--danger)' }}>{record.rejectionReason}</p>}
+                      <p className="mb-0" style={{ fontSize: '0.7rem', color: 'var(--danger)' }}>Please complete the required work and request clock-out again.</p>
                     </div>
                   )}
 
                   {taskError && (
-                    <div className="rounded-3 p-3 mt-3 d-flex align-items-start gap-2" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+                    <div className="rounded-3 p-3 mt-3 d-flex align-items-start gap-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
                       <i className="bi bi-exclamation-triangle-fill text-danger flex-shrink-0" />
                       <div style={{ flex: 1 }}>
                         <span className="small fw-semibold text-danger">{taskError}</span>
@@ -1122,7 +1122,7 @@ export default function ClockWidget() {
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 16 }}>
             <div className="card-body p-4">
               <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
-                <i className="bi bi-pencil-square" style={{ color: '#3b82f6' }} />
+                <i className="bi bi-pencil-square" style={{ color: 'var(--info)' }} />
                 {isApcOrIpc ? 'Request Clock-In Edit' : 'Edit Clock-In Time'}
               </h6>
               <p className="text-muted small mb-3" style={{ fontSize: '0.76rem' }}>
@@ -1168,7 +1168,7 @@ export default function ClockWidget() {
               )}
 
               {editError && (
-                <div className="small mb-2" style={{ color: '#dc2626', fontWeight: 500 }}>
+                <div className="small mb-2" style={{ color: 'var(--danger)', fontWeight: 500 }}>
                   <i className="bi bi-exclamation-triangle-fill me-1" />{editError}
                 </div>
               )}
@@ -1197,7 +1197,7 @@ export default function ClockWidget() {
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="card-body p-4">
               <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
-                <i className="bi bi-cup-hot" style={{ color: '#f59e0b' }} />
+                <i className="bi bi-cup-hot" style={{ color: 'var(--warning)' }} />
                 {isApcOrIpc ? 'Request Break Edit' : 'Edit Breaks'}
               </h6>
               <p className="text-muted small mb-3" style={{ fontSize: '0.76rem' }}>
@@ -1207,21 +1207,21 @@ export default function ClockWidget() {
               </p>
 
               {breakRows.length === 0 && (
-                <div className="rounded-3 p-3 mb-3 text-center" style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.78rem' }}>
+                <div className="rounded-3 p-3 mb-3 text-center" style={{ background: 'var(--surface-0)', border: '1px dashed var(--border-default)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
                   No breaks yet. Add one below.
                 </div>
               )}
 
               {breakRows.map((row, idx) => (
-                <div key={idx} className="rounded-3 p-2 mb-2" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                <div key={idx} className="rounded-3 p-2 mb-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                   <div className="d-flex align-items-center justify-content-between mb-1">
-                    <span className="fw-semibold" style={{ fontSize: '0.72rem', color: '#92400e' }}>
+                    <span className="fw-semibold" style={{ fontSize: '0.72rem', color: 'var(--warning)' }}>
                       Break {idx + 1}
                     </span>
                     <button
                       type="button"
                       className="btn btn-sm p-0"
-                      style={{ color: '#dc2626', fontSize: '0.72rem' }}
+                      style={{ color: 'var(--danger)', fontSize: '0.72rem' }}
                       onClick={() => setBreakRows(breakRows.filter((_, i) => i !== idx))}
                     >
                       <i className="bi bi-trash" /> Remove
@@ -1229,7 +1229,7 @@ export default function ClockWidget() {
                   </div>
                   <div className="row g-2">
                     <div className="col-6">
-                      <label className="form-label small mb-1" style={{ fontSize: '0.66rem', color: '#92400e', fontWeight: 600 }}>Start</label>
+                      <label className="form-label small mb-1" style={{ fontSize: '0.66rem', color: 'var(--warning)', fontWeight: 600 }}>Start</label>
                       <input
                         type="datetime-local"
                         className="form-control form-control-sm"
@@ -1242,7 +1242,7 @@ export default function ClockWidget() {
                       />
                     </div>
                     <div className="col-6">
-                      <label className="form-label small mb-1" style={{ fontSize: '0.66rem', color: '#92400e', fontWeight: 600 }}>End</label>
+                      <label className="form-label small mb-1" style={{ fontSize: '0.66rem', color: 'var(--warning)', fontWeight: 600 }}>End</label>
                       <input
                         type="datetime-local"
                         className="form-control form-control-sm"
@@ -1286,7 +1286,7 @@ export default function ClockWidget() {
               )}
 
               {breakError && (
-                <div className="small mb-2" style={{ color: '#dc2626', fontWeight: 500 }}>
+                <div className="small mb-2" style={{ color: 'var(--danger)', fontWeight: 500 }}>
                   <i className="bi bi-exclamation-triangle-fill me-1" />{breakError}
                 </div>
               )}
@@ -1405,16 +1405,16 @@ function TodayStatsCard({ isClockedOut, loading, times, weekStats, dailyTargetMs
 
       <div className="mb-1">
         <span className="att-digit fw-bold" style={{ fontSize: '2.6rem', lineHeight: 1 }}>
-          {Math.floor(loggedMs / 3600000)}<span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>h</span>{' '}
-          {String(Math.floor((loggedMs % 3600000) / 60000)).padStart(2, '0')}<span style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>m</span>
+          {Math.floor(loggedMs / 3600000)}<span style={{ fontSize: '1.1rem', color: 'color-mix(in srgb, var(--on-accent) 50%, transparent)', fontWeight: 500 }}>h</span>{' '}
+          {String(Math.floor((loggedMs % 3600000) / 60000)).padStart(2, '0')}<span style={{ fontSize: '1.1rem', color: 'color-mix(in srgb, var(--on-accent) 50%, transparent)', fontWeight: 500 }}>m</span>
         </span>
       </div>
-      <div style={{ fontSize: '0.74rem', color: 'rgba(248,250,252,0.6)' }}>
+      <div style={{ fontSize: '0.74rem', color: 'color-mix(in srgb, var(--on-accent) 60%, transparent)' }}>
         logged of {fmtHm(dailyTargetMs)} target
       </div>
 
       <div className="mt-3 mb-4">
-        <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: '0.62rem', color: 'rgba(248,250,252,0.5)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: '0.62rem', color: 'color-mix(in srgb, var(--on-accent) 50%, transparent)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           <span>Progress</span>
           <span>{pct}%</span>
         </div>
@@ -1434,7 +1434,7 @@ function TodayStatsCard({ isClockedOut, loading, times, weekStats, dailyTargetMs
         </div>
         <div className="att-today-stat-col">
           <div className="l">Overtime</div>
-          <div className="v" style={{ color: weekStats.overtimeMs > 0 ? '#f5d5a8' : '#fff' }}>
+          <div className="v" style={{ color: 'var(--on-accent)' }}>
             {weekStats.overtimeMs > 0 ? `+${fmtHmShort(weekStats.overtimeMs)}` : '0:00'}
           </div>
         </div>
@@ -1456,13 +1456,13 @@ function StatBlock({ label, value, color, icon, live }) {
             style={{
               position: 'absolute', top: -1, right: -1,
               width: 6, height: 6, borderRadius: '50%',
-              background: color, boxShadow: `0 0 0 2px #fff`,
+              background: color, boxShadow: `0 0 0 2px var(--surface-1)`,
               animation: 'attPulse 1.4s ease-in-out infinite',
             }}
           />
         )}
       </div>
-      <div style={{ fontSize: '0.54rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: '0.54rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
       <div
@@ -1485,18 +1485,18 @@ function AutoClosedBanner({ record, onOK, onAdjust }) {
   return (
     <div className="d-flex align-items-start gap-3 p-3 mb-2"
       style={{
-        background: '#fef2f2', border: '1px solid #fecaca',
+        background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
         borderRadius: 12,
       }}>
       <div className="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center"
-        style={{ width: 36, height: 36, background: '#fee2e2' }}>
-        <i className="bi bi-exclamation-triangle-fill" style={{ color: '#dc2626' }} />
+        style={{ width: 36, height: 36, background: 'var(--danger-soft)' }}>
+        <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--danger)' }} />
       </div>
       <div className="flex-grow-1">
-        <div className="fw-bold mb-1" style={{ color: '#991b1b', fontSize: '0.86rem' }}>
+        <div className="fw-bold mb-1" style={{ color: 'var(--danger)', fontSize: '0.86rem' }}>
           You forgot to clock out on {dateStr}
         </div>
-        <div className="small" style={{ color: '#7f1d1d', fontSize: '0.78rem' }}>
+        <div className="small" style={{ color: 'var(--danger)', fontSize: '0.78rem' }}>
           We auto-closed your shift at <strong>{clockOutStr}</strong> (8h cap applied).
           {hasPendingEdit
             ? ' Your adjustment request is awaiting TL approval.'
@@ -1588,7 +1588,7 @@ function AdjustClockOutModal({ record, isApcOrIpc, onCancel, onSubmit }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
-            <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: '#dc2626' }} />{titleText}</h6>
+            <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: 'var(--danger)' }} />{titleText}</h6>
             <button className="btn btn-sm btn-light rounded-circle" onClick={onCancel} disabled={saving}
               style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />

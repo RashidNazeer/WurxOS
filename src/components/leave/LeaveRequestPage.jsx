@@ -15,10 +15,10 @@ import MonthNavigator, { currentMonthStr, monthLabel, stepMonthStr } from './Mon
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const REQUEST_CATEGORIES = [
-  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: '#dc3545', bg: '#fff0f0' },
-  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: '#0d6efd', bg: '#e8f0fe' },
-  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: '#fd7e14', bg: '#fff3e0' },
-  { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: '#6610f2', bg: '#f0ebff' },
+  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger)',  bg: 'var(--danger-soft)' },
+  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info)',    bg: 'var(--info-soft)' },
+  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: 'var(--warning)', bg: 'var(--warning-soft)' },
+  { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: 'var(--purple)', bg: 'var(--purple-soft)' },
 ];
 
 const LEAVE_TYPES = [
@@ -27,13 +27,13 @@ const LEAVE_TYPES = [
 ];
 
 const STATUS_CFG = {
-  pending_tl:   { label: 'Pending TL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
-  pending_pctl: { label: 'Pending PCTL', color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
-  pending_ol:   { label: 'Pending OL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
-  pending_boss: { label: 'Pending Boss', color: '#6610f2', bg: '#f0ebff', icon: 'bi-hourglass-split' },
-  approved:     { label: 'Approved',     color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle-fill' },
-  rejected:     { label: 'Rejected',     color: '#dc3545', bg: '#fff0f0', icon: 'bi-x-circle-fill' },
-  withdrawn:    { label: 'Withdrawn',    color: '#64748b', bg: '#f1f5f9', icon: 'bi-arrow-counterclockwise' },
+  pending_tl:   { label: 'Pending TL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_pctl: { label: 'Pending PCTL', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_ol:   { label: 'Pending OL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_boss: { label: 'Pending Boss', color: 'var(--purple)', bg: 'var(--purple-soft)', icon: 'bi-hourglass-split' },
+  approved:     { label: 'Approved',     color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
+  rejected:     { label: 'Rejected',     color: 'var(--danger)',  bg: 'var(--danger-soft)',  icon: 'bi-x-circle-fill' },
+  withdrawn:    { label: 'Withdrawn',    color: 'var(--text-secondary)', bg: 'var(--surface-2)', icon: 'bi-arrow-counterclockwise' },
 };
 
 function getCatCfg(val) { return REQUEST_CATEGORIES.find(c => c.value === val) || REQUEST_CATEGORIES[0]; }
@@ -169,7 +169,7 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
 
           {data.category !== 'other' && remainingQuota && (
             <>
-              <div className="rounded-2 p-2 mb-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+              <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
                 <div className="d-flex justify-content-between align-items-center mb-1">
                   <span className="small text-muted">Requested</span>
                   <span className="fw-semibold small">{effectiveDays} day{effectiveDays !== 1 ? 's' : ''}</span>
@@ -186,8 +186,8 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
                 )}
               </div>
               <div className="rounded-2 p-2 mb-3 d-flex align-items-center gap-2" style={{
-                background: allPaid ? '#e6f4ea' : allUnpaid ? '#fff3e0' : '#fff7ed',
-                border: `1px solid ${allPaid ? '#b7dfc4' : allUnpaid ? '#ffe0b2' : '#fed7aa'}`,
+                background: allPaid ? 'var(--success-soft)' : allUnpaid ? 'var(--warning-soft)' : 'var(--warning-soft)',
+                border: `1px solid ${allPaid ? 'color-mix(in srgb, var(--success) 35%, transparent)' : allUnpaid ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--warning) 35%, transparent)'}`,
               }}>
                 <i className={`bi ${allPaid ? 'bi-check-circle-fill text-success' : 'bi-info-circle text-warning'}`} style={{ fontSize: '0.85rem' }} />
                 <span className="small">
@@ -197,9 +197,9 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
                 </span>
               </div>
               {!allPaid && (
-                <div className="rounded-2 p-2 mb-3" style={{ background: '#f0f1f5', border: '1px solid #dee2e6' }}>
+                <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div className="d-flex align-items-center gap-2">
-                    <i className="bi bi-shield-check" style={{ fontSize: '0.78rem', color: '#6c757d' }} />
+                    <i className="bi bi-shield-check" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }} />
                     <span className="small text-muted">Boss may approve unpaid days as paid retroactively.</span>
                   </div>
                 </div>
@@ -208,7 +208,7 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
           )}
 
           {!allPaid && paidOverrideCount > 0 && (
-            <div className="rounded-2 p-2 mb-3" style={{ background: '#e8f0fe', border: '1px solid #c5d5ff' }}>
+            <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
               <div className="d-flex align-items-center gap-2">
                 <i className="bi bi-info-circle text-primary" style={{ fontSize: '0.75rem' }} />
                 <span className="small">Boss has approved <strong>{paidOverrideCount}</strong> of your past unpaid request{paidOverrideCount !== 1 ? 's' : ''} as paid this month.</span>
@@ -219,7 +219,7 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onCancel}>Cancel</button>
             <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
-              style={{ background: allPaid ? catCfg.color : '#fd7e14', color: '#fff', border: 'none' }}
+              style={{ background: allPaid ? catCfg.color : 'var(--warning)', color: '#fff', border: 'none' }}
               onClick={() => onConfirm({ paidDays, unpaidDays })}>
               <i className="bi bi-send" /> {allPaid ? 'Submit Request' : allUnpaid ? 'Submit as Unpaid' : 'Submit Request'}
             </button>
@@ -321,7 +321,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                         fontSize: '0.78rem', fontWeight: 600, padding: '5px 12px',
                         background: category === cat.value ? cat.color : cat.bg,
                         color: category === cat.value ? '#fff' : cat.color,
-                        borderColor: category === cat.value ? cat.color : `${cat.color}55`,
+                        borderColor: category === cat.value ? cat.color : `color-mix(in srgb, ${cat.color} 35%, transparent)`,
                         cursor: 'pointer', transition: 'all 0.12s',
                       }}>
                       <i className={`bi ${cat.icon}`} style={{ fontSize: '0.72rem' }} />{cat.label}
@@ -342,15 +342,15 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                           className="d-inline-flex align-items-center gap-1 rounded-2 border"
                           style={{
                             fontSize: '0.78rem', fontWeight: 500, padding: '6px 12px',
-                            background: leaveType === lt.value ? '#1a1a2e' : '#f8f9fa',
-                            color: leaveType === lt.value ? '#fff' : '#495057',
-                            borderColor: leaveType === lt.value ? '#1a1a2e' : '#dee2e6',
+                            background: leaveType === lt.value ? 'var(--accent)' : 'var(--surface-0)',
+                            color: leaveType === lt.value ? 'var(--on-accent)' : 'var(--text-secondary)',
+                            borderColor: leaveType === lt.value ? 'var(--accent)' : 'var(--border-subtle)',
                             cursor: 'pointer', transition: 'all 0.12s',
                           }}>
                           <i className={`bi ${lt.icon}`} style={{ fontSize: '0.72rem' }} />
                           {lt.label}
                           {remaining != null && (
-                            <span style={{ fontSize: '0.65rem', marginLeft: 4, color: leaveType === lt.value ? (isZero ? '#f87171' : 'rgba(255,255,255,0.7)') : (isZero ? '#dc3545' : '#6c757d') }}>
+                            <span style={{ fontSize: '0.65rem', marginLeft: 4, color: leaveType === lt.value ? (isZero ? 'var(--danger)' : 'var(--on-accent)') : (isZero ? 'var(--danger)' : 'var(--text-secondary)') }}>
                               ({remaining})
                             </span>
                           )}
@@ -362,7 +362,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                     <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>Numbers in parentheses = remaining paid days this month (resets monthly)</div>
                   )}
                   {remainingQuota && remainingQuota[leaveType] <= 0 && (
-                    <div className="mt-1 d-flex align-items-center gap-1" style={{ fontSize: '0.72rem', color: '#dc3545' }}>
+                    <div className="mt-1 d-flex align-items-center gap-1" style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>
                       <i className="bi bi-exclamation-triangle" /> No paid days remaining — this will be unpaid time off
                     </div>
                   )}
@@ -395,21 +395,21 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
               </div>
 
               {rangeBreakdown && rangeBreakdown.calendarDays > 0 && (
-                <div className="mb-3 rounded-3 p-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div className="mb-3 rounded-3 p-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
                   <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="fw-semibold" style={{ fontSize: '0.78rem', color: '#0f172a' }}>
+                    <span className="fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                       <i className="bi bi-calendar-week me-1" />
                       Range breakdown
                     </span>
                     <span className="rounded-pill px-2 py-1" style={{
                       fontSize: '0.72rem', fontWeight: 700,
-                      background: rangeBreakdown.actualDays > 0 ? '#fef3c7' : '#dcfce7',
-                      color:      rangeBreakdown.actualDays > 0 ? '#92400e' : '#166534',
+                      background: rangeBreakdown.actualDays > 0 ? 'var(--warning-soft)' : 'var(--success-soft)',
+                      color:      rangeBreakdown.actualDays > 0 ? 'var(--warning)' : 'var(--success)',
                     }}>
                       {rangeBreakdown.actualDays} actual day{rangeBreakdown.actualDays === 1 ? '' : 's'}
                     </span>
                   </div>
-                  <div className="d-flex flex-column gap-1" style={{ fontSize: '0.72rem', color: '#475569' }}>
+                  <div className="d-flex flex-column gap-1" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                     <div className="d-flex justify-content-between">
                       <span>Calendar days</span>
                       <strong>{rangeBreakdown.calendarDays}</strong>
@@ -417,7 +417,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                     {rangeBreakdown.weekendDays > 0 && (
                       <div className="d-flex justify-content-between">
                         <span>Weekends (Sat / Sun)</span>
-                        <span style={{ color: '#64748b' }}>− {rangeBreakdown.weekendDays}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>− {rangeBreakdown.weekendDays}</span>
                       </div>
                     )}
                     {rangeBreakdown.holidayDays > 0 && (
@@ -425,15 +425,15 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                         <span>
                           Company holidays
                           {rangeBreakdown.holidayLabels.length > 0 && (
-                            <span style={{ color: '#a855f7', marginLeft: 4 }}>
+                            <span style={{ color: 'var(--purple)', marginLeft: 4 }}>
                               ({rangeBreakdown.holidayLabels.join(', ')})
                             </span>
                           )}
                         </span>
-                        <span style={{ color: '#a855f7' }}>− {rangeBreakdown.holidayDays}</span>
+                        <span style={{ color: 'var(--purple)' }}>− {rangeBreakdown.holidayDays}</span>
                       </div>
                     )}
-                    <div className="d-flex justify-content-between pt-1 mt-1" style={{ borderTop: '1px dashed #cbd5e1', fontWeight: 700, color: '#0f172a' }}>
+                    <div className="d-flex justify-content-between pt-1 mt-1" style={{ borderTop: '1px dashed var(--border-default)', fontWeight: 700, color: 'var(--text-primary)' }}>
                       <span>Charged to your quota</span>
                       <span>{rangeBreakdown.actualDays}</span>
                     </div>
@@ -489,7 +489,7 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#e6f4ea' }}>
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--success-soft)' }}>
               <i className="bi bi-check-circle text-success" style={{ fontSize: '1rem' }} />
             </div>
             <div>
@@ -498,12 +498,12 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
             </div>
           </div>
 
-          <div className="rounded-2 p-3 mb-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+          <div className="rounded-2 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center gap-2 mb-1">
               <i className={`bi ${catCfg.icon}`} style={{ color: catCfg.color }} />
               <span className="fw-semibold small">{getRequestTitle(request)}</span>
               {request.bossOverrideToPaid ? (
-                <span className="badge" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.6rem' }}>Paid · Boss Override</span>
+                <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.6rem' }}>Paid · Boss Override</span>
               ) : (
                 <>
                   {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
@@ -517,12 +517,12 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
 
           <div
             className="d-flex align-items-center gap-2 rounded-2 p-2 mb-4"
-            style={{ background: forwardToBoss ? '#f0ebff' : '#f8f9fa', border: `1.5px solid ${forwardToBoss ? '#6610f266' : '#e9ecef'}`, cursor: 'pointer', transition: 'all 0.15s' }}
+            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `1.5px solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'all 0.15s' }}
             onClick={() => setForwardToBoss(v => !v)}
           >
             <input type="checkbox" className="form-check-input flex-shrink-0" checked={forwardToBoss}
               onChange={e => setForwardToBoss(e.target.checked)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
-            <span className="small" style={{ cursor: 'pointer', color: forwardToBoss ? '#6610f2' : '#495057' }}>
+            <span className="small" style={{ cursor: 'pointer', color: forwardToBoss ? 'var(--purple)' : 'var(--text-secondary)' }}>
               <i className="bi bi-arrow-up-circle me-1" />
               Forward to Boss for final approval
             </span>
@@ -550,7 +550,7 @@ function RejectTeamModal({ request, onConfirm, onCancel, saving }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff0f0' }}>
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--danger-soft)' }}>
               <i className="bi bi-x-circle text-danger" style={{ fontSize: '1rem' }} />
             </div>
             <div>
@@ -934,7 +934,7 @@ export default function LeaveRequestPage() {
                     // Boss-overridden = effectively paid. Suppress
                     // the Unpaid badge to avoid contradicting the
                     // "Boss Override to Paid" pill rendered elsewhere.
-                    <span className="badge" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.58rem' }}>Paid · Boss Override</span>
+                    <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.58rem' }}>Paid · Boss Override</span>
                   ) : (
                     <>
                       {r.unpaidDays > 0 && r.paidDays > 0 && (
@@ -952,14 +952,14 @@ export default function LeaveRequestPage() {
                 {hasReduction && (
                   <div
                     className="d-inline-flex flex-wrap align-items-center gap-1 mt-1 rounded-2 px-2 py-1"
-                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.66rem', color: '#475569' }}
+                    style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)', fontSize: '0.66rem', color: 'var(--text-secondary)' }}
                   >
                     <span>
-                      <strong style={{ color: '#0f172a' }}>{breakdown.actualDays}</strong> actual
+                      <strong style={{ color: 'var(--text-primary)' }}>{breakdown.actualDays}</strong> actual
                     </span>
                     {breakdown.weekendDays > 0 && (
                       <>
-                        <span style={{ color: '#cbd5e1' }}>·</span>
+                        <span style={{ color: 'var(--text-muted)' }}>·</span>
                         <span>
                           <strong>{breakdown.weekendDays}</strong> weekend
                         </span>
@@ -967,8 +967,8 @@ export default function LeaveRequestPage() {
                     )}
                     {breakdown.holidayDays > 0 && (
                       <>
-                        <span style={{ color: '#cbd5e1' }}>·</span>
-                        <span style={{ color: '#a855f7' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>·</span>
+                        <span style={{ color: 'var(--purple)' }}>
                           <strong>{breakdown.holidayDays}</strong> holiday
                           {breakdown.holidayLabels.length > 0 && (
                             <span style={{ marginLeft: 3, opacity: 0.8 }}>
@@ -1020,7 +1020,7 @@ export default function LeaveRequestPage() {
                   }
                   return (
                     <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                      style={{ background: isPositive ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
+                      style={{ background: isPositive ? 'var(--success-soft)' : 'var(--danger-soft)', fontSize: '0.65rem', fontWeight: 500 }}>
                       <i className={`bi ${isPositive ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
                       {label}
                       {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
@@ -1035,7 +1035,7 @@ export default function LeaveRequestPage() {
                   const when = formatDateTime(ba.resolvedAt);
                   return (
                     <div className="mt-1 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                      style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500, marginLeft: 4 }}>
+                      style={{ background: isApproved ? 'var(--success-soft)' : 'var(--danger-soft)', fontSize: '0.65rem', fontWeight: 500, marginLeft: 4 }}>
                       <i className={`bi ${isApproved ? 'bi-shield-check text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
                       Boss: {verb}{ba.approverName ? ` by ${ba.approverName}` : ''}
                       {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
@@ -1044,13 +1044,13 @@ export default function LeaveRequestPage() {
                 })()}
 
                 {r.status === 'rejected' && r.intermediateApproval?.rejectReason && (
-                  <div className="mt-2 rounded-2 p-2" style={{ background: '#fff0f0', border: '1px solid #f5c0c0' }}>
+                  <div className="mt-2 rounded-2 p-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
                     <span className="small fw-semibold text-danger"><i className="bi bi-x-circle me-1" />Rejection:</span>
                     <span className="small text-muted ms-1">{r.intermediateApproval.rejectReason}</span>
                   </div>
                 )}
                 {r.status === 'rejected' && r.bossApproval?.rejectReason && (
-                  <div className="mt-2 rounded-2 p-2" style={{ background: '#fff0f0', border: '1px solid #f5c0c0' }}>
+                  <div className="mt-2 rounded-2 p-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
                     <span className="small fw-semibold text-danger"><i className="bi bi-x-circle me-1" />Boss Rejection:</span>
                     <span className="small text-muted ms-1">{r.bossApproval.rejectReason}</span>
                   </div>
@@ -1105,7 +1105,7 @@ export default function LeaveRequestPage() {
     <div style={{ padding: '32px 32px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-file-earmark-text" style={{ fontSize: '1.15rem' }} />
             Requests
           </h5>
@@ -1144,15 +1144,15 @@ export default function LeaveRequestPage() {
           {remainingQuota && (
             <div className="d-flex flex-wrap gap-2 mb-4">
               {[
-                { label: 'Medical',   value: remainingQuota.medical,   total: leaveQuota?.medical   ?? 1, color: '#dc3545' },
-                { label: 'Emergency', value: remainingQuota.emergency, total: leaveQuota?.emergency ?? 1, color: '#fd7e14' },
-                { label: 'WFH',       value: remainingQuota.wfh,       total: leaveQuota?.wfh       ?? 2, color: '#0d6efd' },
+                { label: 'Medical',   value: remainingQuota.medical,   total: leaveQuota?.medical   ?? 1, color: 'var(--danger)' },
+                { label: 'Emergency', value: remainingQuota.emergency, total: leaveQuota?.emergency ?? 1, color: 'var(--warning)' },
+                { label: 'WFH',       value: remainingQuota.wfh,       total: leaveQuota?.wfh       ?? 2, color: 'var(--info)' },
               ].map(q => (
-                <div key={q.label} className="rounded-2 px-3 py-2" style={{ background: `${q.color}0d`, border: `1px solid ${q.color}25` }}>
+                <div key={q.label} className="rounded-2 px-3 py-2" style={{ background: `color-mix(in srgb, ${q.color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${q.color} 22%, transparent)` }}>
                   <div style={{ fontSize: '0.62rem', color: q.color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{q.label}</div>
                   <div className="d-flex align-items-baseline gap-1">
                     <span className="fw-bold" style={{ fontSize: '1.05rem', color: q.color }}>{q.value}</span>
-                    <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>/ {q.total} mo.</span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>/ {q.total} mo.</span>
                   </div>
                 </div>
               ))}
@@ -1162,16 +1162,16 @@ export default function LeaveRequestPage() {
           {!loading && (
             <div className="d-flex flex-wrap gap-2 mb-3">
               {[
-                { label: 'All',      value: '',         count: myStats.total,    color: '#1a1a2e', bg: '#f0f1f5', border: '#dee2e6' },
-                { label: 'Pending',  value: 'pending',  count: myStats.pending,  color: '#fd7e14', bg: '#fff3e0', border: '#ffe0b2' },
-                { label: 'Approved', value: 'approved', count: myStats.approved, color: '#198754', bg: '#e6f4ea', border: '#b7dfc4' },
-                { label: 'Rejected', value: 'rejected', count: myStats.rejected, color: '#dc3545', bg: '#fff0f0', border: '#f5c0c0' },
+                { label: 'All',      value: '',         count: myStats.total,    color: 'var(--accent)', activeText: 'var(--on-accent)', bg: 'var(--surface-2)', border: 'var(--border-subtle)' },
+                { label: 'Pending',  value: 'pending',  count: myStats.pending,  color: 'var(--warning)', activeText: '#fff', bg: 'var(--warning-soft)', border: 'color-mix(in srgb, var(--warning) 35%, transparent)' },
+                { label: 'Approved', value: 'approved', count: myStats.approved, color: 'var(--success)', activeText: '#fff', bg: 'var(--success-soft)', border: 'color-mix(in srgb, var(--success) 35%, transparent)' },
+                { label: 'Rejected', value: 'rejected', count: myStats.rejected, color: 'var(--danger)', activeText: '#fff', bg: 'var(--danger-soft)', border: 'color-mix(in srgb, var(--danger) 35%, transparent)' },
               ].map(s => (
                 <div key={s.label} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2"
                   style={{ background: filterStatus === s.value ? s.color : s.bg, border: `1px solid ${filterStatus === s.value ? s.color : s.border}`, cursor: 'pointer', transition: 'all 0.15s' }}
                   onClick={() => setFilterStatus(filterStatus === s.value ? '' : s.value)}>
-                  <span className="fw-bold" style={{ color: filterStatus === s.value ? '#fff' : s.color, fontSize: '1.05rem', lineHeight: 1 }}>{s.count}</span>
-                  <span style={{ fontSize: '0.7rem', color: filterStatus === s.value ? '#fff' : s.color, opacity: 0.75, fontWeight: 500 }}>{s.label}</span>
+                  <span className="fw-bold" style={{ color: filterStatus === s.value ? s.activeText : s.color, fontSize: '1.05rem', lineHeight: 1 }}>{s.count}</span>
+                  <span style={{ fontSize: '0.7rem', color: filterStatus === s.value ? s.activeText : s.color, opacity: 0.75, fontWeight: 500 }}>{s.label}</span>
                 </div>
               ))}
             </div>
@@ -1300,8 +1300,8 @@ export default function LeaveRequestPage() {
           {loading ? (
             <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
           ) : teamFiltered.length === 0 ? (
-            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-              <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+              <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
               </div>
               <p className="fw-semibold text-dark mb-1">No {teamFilter} team requests for {viewMonthLabel}</p>

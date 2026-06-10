@@ -88,9 +88,9 @@ export default function BugsPage() {
               className="wx-btn"
               onClick={() => setTab(t.k)}
               style={{
-                background: tab === t.k ? '#2563eb' : 'transparent',
-                color: tab === t.k ? '#fff' : '#475569',
-                border: tab === t.k ? 'none' : '1px solid #e5e7eb',
+                background: tab === t.k ? 'var(--accent)' : 'transparent',
+                color: tab === t.k ? 'var(--on-accent)' : 'var(--text-secondary)',
+                border: tab === t.k ? 'none' : '1px solid var(--border-subtle)',
               }}>{t.label}</button>
           ))}
         </div>
@@ -98,18 +98,18 @@ export default function BugsPage() {
 
       {isAdminView && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(130px, 100%), 1fr))', gap: 10, marginBottom: 14 }}>
-          <StatCard label="Total"       value={stats.total}       tone="#1f2937" />
-          <StatCard label="Open"        value={stats.open}        tone="#4338ca" />
-          <StatCard label="In Progress" value={stats.in_progress} tone="#92400e" />
-          <StatCard label="Fixed"       value={stats.fixed}       tone="#166534" />
-          <StatCard label="Closed"      value={stats.closed + stats.temp_closed} tone="#4b5563" />
-          <StatCard label="Won't Fix"   value={stats.wont_fix}    tone="#991b1b" />
+          <StatCard label="Total"       value={stats.total}       tone="var(--text-primary)" />
+          <StatCard label="Open"        value={stats.open}        tone="var(--info)" />
+          <StatCard label="In Progress" value={stats.in_progress} tone="var(--warning)" />
+          <StatCard label="Fixed"       value={stats.fixed}       tone="var(--success)" />
+          <StatCard label="Closed"      value={stats.closed + stats.temp_closed} tone="var(--text-secondary)" />
+          <StatCard label="Won't Fix"   value={stats.wont_fix}    tone="var(--danger)" />
         </div>
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 320 }}>
-          <SearchIcon width="14" height="14" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <SearchIcon width="14" height="14" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input className="wx-input" placeholder="Search title / description…"
             style={{ paddingLeft: 32 }}
             value={q} onChange={(e) => setQ(e.target.value)} />
@@ -184,19 +184,19 @@ function BugCard({ bug, onOpen }) {
       style={{
         all: 'unset', cursor: 'pointer',
         display: 'grid', gridTemplateColumns: '1fr auto', gap: 12,
-        padding: 14, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff',
+        padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)',
       }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
           <span style={{ color: t.color, display: 'inline-flex', alignItems: 'center' }}>
             <BugIcon width="15" height="15" />
           </span>
-          <strong style={{ fontSize: 14, color: '#0f172a' }}>{bug.title}</strong>
+          <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{bug.title}</strong>
           <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: t.color + '22', color: t.color }}>
             {t.label}
           </span>
         </div>
-        <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <span>{bug.reporter_name || '—'} {bug.reporter_role ? `· ${bug.reporter_role}` : ''}</span>
           <span>·</span>
           <span>{new Date(bug.created_at).toLocaleDateString()}</span>
@@ -220,8 +220,8 @@ function Pill({ label, fg, bg }) {
 
 function StatCard({ label, value, tone }) {
   return (
-    <div style={{ padding: 12, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff' }}>
-      <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+    <div style={{ padding: 12, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: tone, marginTop: 2 }}>{value}</div>
     </div>
   );
@@ -267,7 +267,7 @@ function BugForm({ onClose, onDone }) {
                 onClick={() => setBugType(t.key)}
                 style={{
                   background: bugType === t.key ? t.color : 'transparent',
-                  color: bugType === t.key ? '#fff' : t.color,
+                  color: bugType === t.key ? 'var(--on-accent)' : t.color,
                   border: bugType === t.key ? 'none' : `1px solid ${t.color}55`,
                   fontWeight: 600,
                 }}>{t.label}</button>
@@ -281,7 +281,7 @@ function BugForm({ onClose, onDone }) {
                 onClick={() => setPriority(p.key)}
                 style={{
                   background: priority === p.key ? p.fg : p.bg,
-                  color: priority === p.key ? '#fff' : p.fg,
+                  color: priority === p.key ? 'var(--on-accent)' : p.fg,
                   border: 'none',
                   fontWeight: 600,
                 }}>{p.label}</button>
@@ -363,21 +363,21 @@ function BugDetail({ bug: initial, canEdit, canDelete, onClose, onChanged }) {
             <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: t.color + '22', color: t.color }}>{t.label}</span>
           </div>
 
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
             Reported by <strong>{bug.reporter_name || '—'}</strong>
             {bug.reporter_role && <> ({bug.reporter_role})</>}
             {' · '}{new Date(bug.created_at).toLocaleString()}
           </div>
 
           <div className="wx-label">Description</div>
-          <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13 }}>
+          <div style={{ padding: 12, background: 'var(--surface-0)', borderRadius: 8, whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13 }}>
             {bug.description}
           </div>
 
           {bug.dev_notes && !editing && (
             <>
               <div className="wx-label">Dev notes</div>
-              <div style={{ padding: 12, background: '#eff6ff', borderRadius: 8, whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13, color: '#1e40af' }}>
+              <div style={{ padding: 12, background: 'var(--info-soft)', borderRadius: 8, whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13, color: 'var(--info)' }}>
                 {bug.dev_notes}
               </div>
             </>
@@ -389,7 +389,7 @@ function BugDetail({ bug: initial, canEdit, canDelete, onClose, onChanged }) {
             </button>
           )}
           {editing && (
-            <div style={{ padding: 12, border: '1px dashed #c7d2fe', background: '#eef2ff', borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ padding: 12, border: '1px dashed color-mix(in srgb, var(--info) 35%, transparent)', background: 'var(--info-soft)', borderRadius: 8, marginBottom: 12 }}>
               <div className="wx-label">Status</div>
               <select className="wx-input" value={status} onChange={(e) => setStatus(e.target.value)} style={{ marginBottom: 10 }}>
                 {BUG_STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -449,9 +449,9 @@ function Thread({ bugId }) {
       <div className="wx-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <MessageIcon width="14" height="14" /> Discussion
       </div>
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, maxHeight: 260, overflowY: 'auto', padding: 10, background: '#fff' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 260, overflowY: 'auto', padding: 10, background: 'var(--surface-1)' }}>
         {messages.length === 0 && !isFetching && (
-          <div style={{ padding: 12, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+          <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
             No messages yet.
           </div>
         )}
@@ -462,12 +462,12 @@ function Thread({ bugId }) {
               <div style={{
                 maxWidth: '82%',
                 padding: '6px 10px', borderRadius: 10,
-                background: mine ? '#2563eb' : '#f1f5f9',
-                color: mine ? '#fff' : '#0f172a',
+                background: mine ? 'var(--accent)' : 'var(--surface-2)',
+                color: mine ? 'var(--on-accent)' : 'var(--text-primary)',
                 fontSize: 13,
               }}>
                 {!mine && (
-                  <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: '#64748b' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: 'var(--text-secondary)' }}>
                     {m.sender_name || '—'}{m.sender_role ? ` · ${m.sender_role}` : ''}
                   </div>
                 )}

@@ -23,6 +23,16 @@ optgroup {
   font-size: inherit;
 }
 
+/* Raw <button>s do NOT inherit text color — the UA default is a near-black
+   (`ButtonText`), so button-based rows/toggles/cards (e.g. the Performance
+   score-breakdown rows) render invisible on dark surfaces while looking fine
+   on white. Force inheritance. Bootstrap .btn-* classes and inline `color`
+   both win on specificity, so only genuinely color-less buttons change — and
+   in light mode near-black ≈ --text-primary, so light mode is unaffected. */
+button {
+  color: inherit;
+}
+
 html,
 body,
 #root {

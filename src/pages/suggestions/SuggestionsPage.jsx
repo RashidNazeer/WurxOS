@@ -84,11 +84,11 @@ export default function SuggestionsPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(120px, 100%), 1fr))', gap: 10, marginBottom: 14 }}>
-        <Stat label="Total"       value={stats.total}      tone="#1f2937" />
-        <Stat label="New"         value={stats.new}        tone="#4b5563" />
-        <Stat label="Planned"     value={stats.planned}    tone="#92400e" />
-        <Stat label="Implemented" value={stats.implemented} tone="#166534" />
-        <Stat label="My ideas"    value={stats.mine}       tone="#2563eb" />
+        <Stat label="Total"       value={stats.total}      tone="var(--text-primary)" />
+        <Stat label="New"         value={stats.new}        tone="var(--text-secondary)" />
+        <Stat label="Planned"     value={stats.planned}    tone="var(--warning)" />
+        <Stat label="Implemented" value={stats.implemented} tone="var(--success)" />
+        <Stat label="My ideas"    value={stats.mine}       tone="var(--info)" />
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -96,16 +96,16 @@ export default function SuggestionsPage() {
           <button key={t.k} className="wx-btn"
             onClick={() => setTab(t.k)}
             style={{
-              background: tab === t.k ? '#2563eb' : 'transparent',
-              color: tab === t.k ? '#fff' : '#475569',
-              border: tab === t.k ? 'none' : '1px solid #e5e7eb',
+              background: tab === t.k ? 'var(--info)' : 'transparent',
+              color: tab === t.k ? 'var(--on-accent)' : 'var(--text-secondary)',
+              border: tab === t.k ? 'none' : '1px solid var(--border-subtle)',
             }}>{t.label}</button>
         ))}
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 320 }}>
-          <SearchIcon width="14" height="14" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <SearchIcon width="14" height="14" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input className="wx-input" placeholder="Search…" style={{ paddingLeft: 32 }}
             value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
@@ -120,13 +120,13 @@ export default function SuggestionsPage() {
       </div>
 
       {isPending ? (
-        <div style={{ padding: 30, textAlign: 'center', color: '#64748b' }}>
+        <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-secondary)' }}>
           <span className="wx-spinner" /> Loading…
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', border: '1px dashed #e5e7eb', borderRadius: 10, background: '#fff' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: 10, background: 'var(--surface-1)' }}>
           <LightbulbIcon width="28" height="28" />
-          <div style={{ marginTop: 8, fontWeight: 600, color: '#475569' }}>No suggestions yet.</div>
+          <div style={{ marginTop: 8, fontWeight: 600, color: 'var(--text-secondary)' }}>No suggestions yet.</div>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
@@ -136,34 +136,34 @@ export default function SuggestionsPage() {
             const mine = r.submitted_by === user?.id;
             const editable = mine && r.status === 'new';
             return (
-              <div key={r.id} className="suggestion-card" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, padding: 14, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff' }}>
+              <div key={r.id} className="suggestion-card" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
                 {/* Vote */}
                 <button onClick={() => doVote(r)}
                   style={{
                     all: 'unset', cursor: 'pointer',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     padding: '6px 10px', borderRadius: 10,
-                    background: r.i_upvoted ? '#dbeafe' : '#f8fafc',
-                    border: `1px solid ${r.i_upvoted ? '#93c5fd' : '#e5e7eb'}`,
+                    background: r.i_upvoted ? 'var(--info-soft)' : 'var(--surface-0)',
+                    border: `1px solid ${r.i_upvoted ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`,
                     minWidth: 46,
                   }}>
-                  <ArrowUpIcon width="14" height="14" color={r.i_upvoted ? '#2563eb' : '#64748b'} />
-                  <strong style={{ fontSize: 13, color: r.i_upvoted ? '#2563eb' : '#475569' }}>{r.upvote_count}</strong>
+                  <ArrowUpIcon width="14" height="14" color={r.i_upvoted ? 'var(--info)' : 'var(--text-secondary)'} />
+                  <strong style={{ fontSize: 13, color: r.i_upvoted ? 'var(--info)' : 'var(--text-secondary)' }}>{r.upvote_count}</strong>
                 </button>
 
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: 14, color: '#0f172a' }}>{r.title}</strong>
+                    <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{r.title}</strong>
                     <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: c.color + '22', color: c.color }}>{c.label}</span>
                     <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: s.bg, color: s.fg }}>{s.label}</span>
                   </div>
-                  <div style={{ fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap', marginBottom: 6 }}>{r.description}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: 6 }}>{r.description}</div>
                   {r.dev_notes && (
-                    <div style={{ padding: 8, background: '#eff6ff', color: '#1e40af', borderRadius: 6, fontSize: 12, marginBottom: 6 }}>
+                    <div style={{ padding: 8, background: 'var(--info-soft)', color: 'var(--info)', borderRadius: 6, fontSize: 12, marginBottom: 6 }}>
                       <strong>Dev response:</strong> {r.dev_notes}
                     </div>
                   )}
-                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                     {r.submitted_by_name || '—'}{r.submitted_by_role ? ` · ${r.submitted_by_role}` : ''}
                     {' · '}{new Date(r.created_at).toLocaleDateString()}
                   </div>
@@ -201,8 +201,8 @@ export default function SuggestionsPage() {
 
 function Stat({ label, value, tone }) {
   return (
-    <div style={{ padding: 12, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff' }}>
-      <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+    <div style={{ padding: 12, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: tone, marginTop: 2 }}>{value}</div>
     </div>
   );
@@ -249,7 +249,7 @@ function SuggestionForm({ editing, onClose, onDone }) {
                 onClick={() => setCategory(c.key)}
                 style={{
                   background: category === c.key ? c.color : 'transparent',
-                  color: category === c.key ? '#fff' : c.color,
+                  color: category === c.key ? 'var(--on-accent)' : c.color,
                   border: category === c.key ? 'none' : `1px solid ${c.color}55`,
                   fontWeight: 600,
                 }}>{c.label}</button>
@@ -301,7 +301,7 @@ function ReviewModal({ row, onClose, onDone }) {
         <div className="wx-modal-body">
           {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 10 }}>{err}</div>}
           <div style={{ marginBottom: 12, fontSize: 13 }}><strong>{row.title}</strong></div>
-          <div style={{ fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap', marginBottom: 12 }}>{row.description}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: 12 }}>{row.description}</div>
 
           <div className="wx-label">Status</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -310,7 +310,7 @@ function ReviewModal({ row, onClose, onDone }) {
                 onClick={() => setStatus(s.key)}
                 style={{
                   background: status === s.key ? s.fg : s.bg,
-                  color: status === s.key ? '#fff' : s.fg,
+                  color: status === s.key ? 'var(--on-accent)' : s.fg,
                   border: 'none', fontWeight: 600,
                 }}>{s.label}</button>
             ))}

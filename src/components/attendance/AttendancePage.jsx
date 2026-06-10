@@ -68,7 +68,7 @@ function BreakDetailsModal({ record, onClose }) {
         <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0' }}>
           <div>
             <h6 className="fw-bold mb-0">
-              <i className="bi bi-cup-hot-fill me-2" style={{ color: '#f59e0b' }} />
+              <i className="bi bi-cup-hot-fill me-2" style={{ color: 'var(--warning)' }} />
               Break details
             </h6>
             <p className="text-muted small mb-0">{record.userName} · {record.date}</p>
@@ -82,7 +82,7 @@ function BreakDetailsModal({ record, onClose }) {
             <>
               <table className="table table-sm align-middle mb-3">
                 <thead>
-                  <tr style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                  <tr style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                     <th className="border-0 ps-0">#</th>
                     <th className="border-0">Start</th>
                     <th className="border-0">End</th>
@@ -99,22 +99,22 @@ function BreakDetailsModal({ record, onClose }) {
                                     - (b.start.toMillis ? b.start.toMillis() : new Date(b.start).getTime())))
                       : '—';
                     return (
-                      <tr key={i} style={ongoing ? { background: '#fffbeb' } : undefined}>
+                      <tr key={i} style={ongoing ? { background: 'var(--warning-soft)' } : undefined}>
                         <td className="ps-0 fw-semibold text-muted small">{i + 1}</td>
                         <td className="small fw-medium">{start}</td>
                         <td className="small fw-medium">{end}</td>
-                        <td className="text-end pe-0 fw-semibold small" style={{ color: ongoing ? '#d97706' : '#0f172a' }}>{dur}</td>
+                        <td className="text-end pe-0 fw-semibold small" style={{ color: ongoing ? 'var(--warning)' : 'var(--text-primary)' }}>{dur}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
               <div className="d-flex justify-content-between align-items-center rounded-3 px-3 py-2"
-                style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-                <span className="small fw-semibold" style={{ color: '#92400e' }}>
+                style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+                <span className="small fw-semibold" style={{ color: 'var(--warning)' }}>
                   <i className="bi bi-cup-hot me-1" />Total break time
                 </span>
-                <span className="fw-bold" style={{ color: '#92400e' }}>{fmtDuration(total)}</span>
+                <span className="fw-bold" style={{ color: 'var(--warning)' }}>{fmtDuration(total)}</span>
               </div>
             </>
           )}
@@ -257,7 +257,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
   if (loading || !stats) {
     return (
       <div className="rounded-3 mb-3 p-3 d-flex align-items-center gap-2 text-muted"
-        style={{ background: '#fff', border: '1px solid #e2e8f0', fontSize: '0.82rem' }}>
+        style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.82rem' }}>
         <span className="spinner-border spinner-border-sm" /> Loading your monthly attendance…
       </div>
     );
@@ -268,10 +268,10 @@ function MyMonthlyAttendance({ userId, displayName }) {
   const minsTotal = Math.floor((stats.totalWorkMs % 3600000) / 60000);
 
   return (
-    <div className="rounded-3 mb-3 p-3" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+    <div className="rounded-3 mb-3 p-3" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
-          <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#0f172a' }}>
+          <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
             My attendance · {stats.monthLabel}
           </div>
           <div className="text-muted" style={{ fontSize: '0.72rem' }}>
@@ -281,22 +281,22 @@ function MyMonthlyAttendance({ userId, displayName }) {
           </div>
         </div>
         <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-          style={{ background: pct >= 80 ? '#f0fdf4' : pct >= 50 ? '#fff7ed' : '#fef2f2',
-                   color:      pct >= 80 ? '#15803d' : pct >= 50 ? '#c2410c' : '#dc2626',
+          style={{ background: pct >= 80 ? 'var(--success-soft)' : pct >= 50 ? 'var(--warning-soft)' : 'var(--danger-soft)',
+                   color:      pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
                    fontSize: '0.78rem', fontWeight: 700 }}>
           <i className="bi bi-check2-circle" /> {stats.accountedDays} / {stats.workingDays} days · {pct}%
         </span>
       </div>
 
       <div className="row g-2 mb-2">
-        <MyAttTile dot="#16a34a" label="Days present"
+        <MyAttTile dot="var(--success)" label="Days present"
           value={stats.presentDays}
           sub={stats.hasOverride && stats.actualPresentDays !== stats.presentDays
             ? `actual ${stats.actualPresentDays} · manager-adjusted`
             : 'clocked in'} />
-        <MyAttTile dot="#3b82f6" label="Days on leave" value={stats.leaveDays}    sub="approved" />
-        <MyAttTile dot="#dc2626" label="Days missed"   value={stats.missedDays}   sub="past weekdays not covered" />
-        <MyAttTile dot="#0f172a" label="Hours worked"  value={`${hrsTotal}h ${minsTotal}m`} sub="this month" prominent />
+        <MyAttTile dot="var(--info)" label="Days on leave" value={stats.leaveDays}    sub="approved" />
+        <MyAttTile dot="var(--danger)" label="Days missed"   value={stats.missedDays}   sub="past weekdays not covered" />
+        <MyAttTile dot="var(--on-accent)" label="Hours worked"  value={`${hrsTotal}h ${minsTotal}m`} sub="this month" prominent />
       </div>
 
       {/* Which days were missed — chip strip below the tiles. Only
@@ -304,7 +304,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
           deep-links into History (handled by the parent). */}
       {stats.missedDates && stats.missedDates.length > 0 && (
         <div className="d-flex flex-wrap align-items-center gap-2 mt-1 mb-2">
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--danger)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Missed:
           </span>
           {stats.missedDates.map((ds) => {
@@ -317,9 +317,9 @@ function MyMonthlyAttendance({ userId, displayName }) {
                   fontSize: 11, fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: 999,
-                  background: '#fef2f2',
-                  color: '#b91c1c',
-                  border: '1px solid #fecaca',
+                  background: 'var(--danger-soft)',
+                  color: 'var(--danger)',
+                  border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
                 }}>
                 {label}
               </span>
@@ -329,10 +329,10 @@ function MyMonthlyAttendance({ userId, displayName }) {
       )}
 
       {/* Stacked progress bar */}
-      <div className="rounded-pill d-flex overflow-hidden" style={{ height: 10, background: '#f1f5f9' }}>
+      <div className="rounded-pill d-flex overflow-hidden" style={{ height: 10, background: 'var(--surface-2)' }}>
         {stats.presentDays > 0 && (
           <div title={`Present: ${stats.presentDays} days`}
-            style={{ width: `${(stats.presentDays / stats.workingDays) * 100}%`, background: '#16a34a' }} />
+            style={{ width: `${(stats.presentDays / stats.workingDays) * 100}%`, background: 'var(--success)' }} />
         )}
         {(() => {
           // Leave + holidays that aren't already covered by a clock-in.
@@ -343,7 +343,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
             : `Approved leave: ${onlyOff} days`;
           return (
             <div title={label}
-              style={{ width: `${(onlyOff / stats.workingDays) * 100}%`, background: '#3b82f6' }} />
+              style={{ width: `${(onlyOff / stats.workingDays) * 100}%`, background: 'var(--info)' }} />
           );
         })()}
       </div>
@@ -355,18 +355,18 @@ function MyAttTile({ dot, label, value, sub, prominent }) {
   return (
     <div className="col-6 col-lg-3">
       <div className="rounded-3 h-100 p-3" style={{
-        background: prominent ? '#0f172a' : '#f8fafc',
-        border: prominent ? '1px solid #0f172a' : '1px solid #e2e8f0',
-        color: prominent ? '#fff' : '#0f172a',
+        background: prominent ? 'var(--accent)' : 'var(--surface-0)',
+        border: prominent ? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
+        color: prominent ? 'var(--on-accent)' : 'var(--text-primary)',
       }}>
         <div className="d-flex align-items-center gap-2"
           style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                   color: prominent ? 'rgba(255,255,255,0.7)' : '#64748b' }}>
+                   color: prominent ? 'color-mix(in srgb, var(--on-accent) 70%, transparent)' : 'var(--text-secondary)' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, display: 'inline-block' }} />
           {label}
         </div>
         <div className="fw-bold" style={{ fontSize: '1.1rem', letterSpacing: '-0.01em', lineHeight: 1.15, marginTop: 6 }}>{value}</div>
-        {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'rgba(255,255,255,0.6)' : '#64748b' }}>{sub}</div>}
+        {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'color-mix(in srgb, var(--on-accent) 60%, transparent)' : 'var(--text-secondary)' }}>{sub}</div>}
       </div>
     </div>
   );
@@ -374,7 +374,7 @@ function MyAttTile({ dot, label, value, sub, prominent }) {
 
 function DayLegend({ color, label }) {
   return (
-    <span className="d-inline-flex align-items-center gap-1" style={{ color: '#475569' }}>
+    <span className="d-inline-flex align-items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
       <span className="rounded-1" style={{ width: 9, height: 9, background: color, border: `1px solid ${color}` }} />
       {label}
     </span>
@@ -382,11 +382,11 @@ function DayLegend({ color, label }) {
 }
 
 function statusColor(s) {
-  if (s === 'clocked-in') return '#16a34a';
-  if (s === 'on-break') return '#f59e0b';
-  if (s === 'pending-approval') return '#3b82f6';
-  if (s === 'auto-closed') return '#dc2626';
-  return '#94a3b8';
+  if (s === 'clocked-in') return 'var(--success)';
+  if (s === 'on-break') return 'var(--warning)';
+  if (s === 'pending-approval') return 'var(--info)';
+  if (s === 'auto-closed') return 'var(--danger)';
+  return 'var(--text-muted)';
 }
 
 function statusLabel(s) {
@@ -419,7 +419,7 @@ function TimeWithDate({ ts, rowDate }) {
   return (
     <>
       {fmtTime(ts)}
-      <div style={{ fontSize: '0.62rem', fontWeight: 600, color: sameDay ? '#94a3b8' : '#dc2626' }}>
+      <div style={{ fontSize: '0.62rem', fontWeight: 600, color: sameDay ? 'var(--text-muted)' : 'var(--danger)' }}>
         {sameDay ? monthDay : <><i className="bi bi-arrow-right-short" />{monthDay}</>}
       </div>
     </>
@@ -469,7 +469,7 @@ function ApprovalModal({ record, onClose, onDone }) {
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-clock-history me-2 text-primary" />Clock-Out Request</h6>
 
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center gap-2 mb-2">
               <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
                 style={{ width: 36, height: 36, background: '#3b82f6', fontSize: '0.65rem' }}>
@@ -488,9 +488,9 @@ function ApprovalModal({ record, onClose, onDone }) {
           </div>
 
           {record.clockOutNote && (
-            <div className="rounded-3 p-3 mb-3" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <div className="fw-semibold small mb-1" style={{ color: '#2563eb' }}>Work Summary</div>
-              <p className="mb-0" style={{ fontSize: '0.82rem', color: '#1e40af' }}>{record.clockOutNote}</p>
+            <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+              <div className="fw-semibold small mb-1" style={{ color: 'var(--info)' }}>Work Summary</div>
+              <p className="mb-0" style={{ fontSize: '0.82rem', color: 'var(--info)' }}>{record.clockOutNote}</p>
             </div>
           )}
 
@@ -544,7 +544,7 @@ function EditRequestModal({ record, onClose, onDone }) {
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-pencil-square me-2 text-primary" />Clock-In Edit Request</h6>
 
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center gap-2 mb-3">
               <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
                 style={{ width: 36, height: 36, background: '#3b82f6', fontSize: '0.65rem' }}>
@@ -559,20 +559,20 @@ function EditRequestModal({ record, onClose, onDone }) {
             <div className="d-flex align-items-center gap-3" style={{ fontSize: '0.78rem' }}>
               <div style={{ flex: 1 }}>
                 <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current</div>
-                <div className="fw-bold" style={{ color: '#64748b', textDecoration: 'line-through' }}>{fmtTime(oldTime)}</div>
+                <div className="fw-bold" style={{ color: 'var(--text-secondary)', textDecoration: 'line-through' }}>{fmtTime(oldTime)}</div>
               </div>
               <i className="bi bi-arrow-right text-muted" />
               <div style={{ flex: 1, textAlign: 'right' }}>
-                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#2563eb' }}>Requested</div>
-                <div className="fw-bold" style={{ color: '#2563eb' }}>{fmtTime(newTime)}</div>
+                <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--info)' }}>Requested</div>
+                <div className="fw-bold" style={{ color: 'var(--info)' }}>{fmtTime(newTime)}</div>
               </div>
             </div>
           </div>
 
           {req.reason && (
-            <div className="rounded-3 p-3 mb-3" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <div className="fw-semibold small mb-1" style={{ color: '#2563eb' }}>Reason</div>
-              <p className="mb-0" style={{ fontSize: '0.82rem', color: '#1e40af' }}>{req.reason}</p>
+            <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+              <div className="fw-semibold small mb-1" style={{ color: 'var(--info)' }}>Reason</div>
+              <p className="mb-0" style={{ fontSize: '0.82rem', color: 'var(--info)' }}>{req.reason}</p>
             </div>
           )}
 
@@ -610,19 +610,19 @@ function TodayTimeline({ record }) {
         title: 'Clocked in',
         subtitle: locLabel(record.location),
         icon: 'bi-box-arrow-in-right',
-        color: '#16a34a',
+        color: 'var(--success)',
       });
     }
     (record.breaks || []).forEach((b, i) => {
       if (b.start) out.push({
         t: b.start, type: 'break-start',
         title: `Break ${i + 1} started`, subtitle: '',
-        icon: 'bi-cup-hot-fill', color: '#f59e0b',
+        icon: 'bi-cup-hot-fill', color: 'var(--warning)',
       });
       if (b.end) out.push({
         t: b.end, type: 'break-end',
         title: `Break ${i + 1} ended`, subtitle: '',
-        icon: 'bi-play-fill', color: '#f59e0b',
+        icon: 'bi-play-fill', color: 'var(--warning)',
       });
     });
     if (record.clockOutRequestedAt) {
@@ -630,7 +630,7 @@ function TodayTimeline({ record }) {
         t: record.clockOutRequestedAt, type: 'request',
         title: 'Clock-out requested',
         subtitle: record.clockOutNote || 'Waiting for TL approval',
-        icon: 'bi-send-fill', color: '#3b82f6',
+        icon: 'bi-send-fill', color: 'var(--info)',
       });
     }
     if (record.clockOut) {
@@ -638,7 +638,7 @@ function TodayTimeline({ record }) {
         t: record.clockOut, type: 'clock-out',
         title: 'Clocked out',
         subtitle: record.approvalStatus === 'rejected' ? 'Rejected — ' + (record.rejectionReason || '') : '',
-        icon: 'bi-box-arrow-right', color: '#64748b',
+        icon: 'bi-box-arrow-right', color: 'var(--text-muted)',
       });
     }
     return out.sort((a, b) => {
@@ -655,8 +655,8 @@ function TodayTimeline({ record }) {
       <div className="card-body p-4">
         <div className="d-flex align-items-center justify-content-between mb-3">
           <div>
-            <h6 className="fw-bold mb-1" style={{ color: '#0f172a' }}>
-              <i className="bi bi-list-ul me-2" style={{ color: '#3b82f6' }} />
+            <h6 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+              <i className="bi bi-list-ul me-2" style={{ color: 'var(--info)' }} />
               Today's Timeline
             </h6>
             <p className="text-muted mb-0" style={{ fontSize: '0.74rem' }}>
@@ -665,10 +665,10 @@ function TodayTimeline({ record }) {
           </div>
           {t && (
             <div className="d-flex gap-2">
-              <span className="rounded-pill px-3 py-1" style={{ background: '#f0fdf4', color: '#16a34a', fontSize: '0.68rem', fontWeight: 700, border: '1px solid #bbf7d0' }}>
+              <span className="rounded-pill px-3 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.68rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
                 <i className="bi bi-activity me-1" />{fmtDuration(t.totalWorkMs)}
               </span>
-              <span className="rounded-pill px-3 py-1" style={{ background: '#fffbeb', color: '#d97706', fontSize: '0.68rem', fontWeight: 700, border: '1px solid #fde68a' }}>
+              <span className="rounded-pill px-3 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.68rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                 <i className="bi bi-cup-hot me-1" />{fmtDuration(t.totalBreakMs)}
               </span>
             </div>
@@ -676,14 +676,14 @@ function TodayTimeline({ record }) {
         </div>
 
         {events.length === 0 ? (
-          <div className="text-center py-5" style={{ border: '2px dashed #e2e8f0', borderRadius: 12 }}>
+          <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
             <i className="bi bi-hourglass text-muted" style={{ fontSize: '2rem', opacity: 0.3 }} />
             <p className="text-muted mt-2 mb-0 small">No activity yet today. Clock in to get started.</p>
           </div>
         ) : (
           <div style={{ position: 'relative', paddingLeft: 20 }}>
             {/* vertical line */}
-            <div style={{ position: 'absolute', left: 9, top: 6, bottom: 6, width: 2, background: '#e2e8f0' }} />
+            <div style={{ position: 'absolute', left: 9, top: 6, bottom: 6, width: 2, background: 'var(--border-subtle)' }} />
             {events.map((ev, i) => (
               <div key={i} className="d-flex align-items-start gap-3 mb-3" style={{ position: 'relative' }}>
                 <div
@@ -691,7 +691,7 @@ function TodayTimeline({ record }) {
                   style={{
                     width: 20, height: 20,
                     background: ev.color,
-                    boxShadow: `0 0 0 3px ${ev.color}22`,
+                    boxShadow: `0 0 0 3px color-mix(in srgb, ${ev.color} 13%, transparent)`,
                     marginLeft: -20, marginTop: 2,
                     position: 'relative', zIndex: 1,
                   }}
@@ -700,7 +700,7 @@ function TodayTimeline({ record }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                    <span className="fw-semibold" style={{ fontSize: '0.82rem', color: '#0f172a' }}>{ev.title}</span>
+                    <span className="fw-semibold" style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{ev.title}</span>
                     <span className="text-muted" style={{ fontSize: '0.7rem', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(ev.t)}</span>
                   </div>
                   {ev.subtitle && (
@@ -918,8 +918,8 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
           <input type="month" className="form-control form-control-sm" value={month} onChange={e => setMonth(e.target.value)} style={{ maxWidth: 160 }} />
         </div>
         <div className="input-group input-group-sm" style={{ maxWidth: 240 }}>
-          <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
-          <input type="text" className="form-control border-0" placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+          <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
+          <input type="text" className="form-control border-0" placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'var(--surface-2)' }} />
         </div>
         <select className="form-select form-select-sm" value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ maxWidth: 160 }}>
           <option value="">All Roles</option>
@@ -988,8 +988,8 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
           {rows.map(r => {
             const editable = canEdit(r.user);
             const hasOverride = r.adjustments.length > 0;
-            const healthColor = r.health === 'green' ? '#16a34a' : r.health === 'yellow' ? '#f59e0b' : '#dc2626';
-            const healthBg    = r.health === 'green' ? '#f0fdf4' : r.health === 'yellow' ? '#fffbeb' : '#fef2f2';
+            const healthColor = r.health === 'green' ? 'var(--success)' : r.health === 'yellow' ? 'var(--warning)' : 'var(--danger)';
+            const healthBg    = r.health === 'green' ? 'var(--success-soft)' : r.health === 'yellow' ? 'var(--warning-soft)' : 'var(--danger-soft)';
             const healthLabel = r.health === 'green' ? 'On track' : r.health === 'yellow' ? 'Watch' : 'Behind';
             return (
               <div key={r.user.id} className="col-12 col-md-6 col-xl-4">
@@ -1002,13 +1002,13 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
                           {(r.user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="fw-semibold text-truncate" style={{ fontSize: '0.85rem', color: '#0f172a' }}>{r.user.name}</div>
+                          <div className="fw-semibold text-truncate" style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{r.user.name}</div>
                           <div className="text-muted text-truncate" style={{ fontSize: '0.66rem' }}>
                             {(r.user.role || '').toUpperCase()}{r.user.email ? ' · ' + r.user.email : ''}
                           </div>
                         </div>
                       </div>
-                      <span className="badge rounded-pill flex-shrink-0" style={{ background: healthBg, color: healthColor, border: `1px solid ${healthColor}30`, fontSize: '0.62rem' }}>
+                      <span className="badge rounded-pill flex-shrink-0" style={{ background: healthBg, color: healthColor, border: `1px solid color-mix(in srgb, ${healthColor} 30%, transparent)`, fontSize: '0.62rem' }}>
                         <span className="rounded-circle d-inline-block me-1" style={{ width: 6, height: 6, background: healthColor, verticalAlign: 'middle' }} />
                         {healthLabel}
                       </span>
@@ -1017,7 +1017,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
                     <div className="d-flex gap-3 mb-2" style={{ fontSize: '0.72rem' }}>
                       <div title="Working days the user clocked in or was manually marked present (does not include leaves)">
                         <div className="text-muted" style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 600 }}>Present</div>
-                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: '#0f172a' }}>
+                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>
                           {r.effectiveDays}
                           {hasOverride && r.actualDays !== r.effectiveDays && (
                             <span className="text-muted ms-1" style={{ fontSize: '0.66rem', fontWeight: 500 }}>
@@ -1028,17 +1028,17 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
                       </div>
                       <div title={`${r.leaveDays} approved medical / emergency leave day${r.leaveDays === 1 ? '' : 's'} this month (WFH days don't count here — they show as Present)`}>
                         <div className="text-muted" style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 600 }}>Leaves</div>
-                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: '#0f172a' }}>{r.leaveDays}</div>
+                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{r.leaveDays}</div>
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 600 }}>Hours</div>
-                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: '#0f172a' }}>{fmtDuration(r.totalHoursMs)}</div>
+                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{fmtDuration(r.totalHoursMs)}</div>
                       </div>
                     </div>
 
                     {hasOverride && (
-                      <div className="rounded-3 px-2 py-1 mb-2" style={{ background: '#fef3c7', border: '1px solid #fde68a' }}>
-                        <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.65rem', color: '#92400e' }}>
+                      <div className="rounded-3 px-2 py-1 mb-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+                        <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.65rem', color: 'var(--warning)' }}>
                           <i className="bi bi-pencil-square" />
                           <strong>{r.adjustments.length} manual adjustment{r.adjustments.length === 1 ? '' : 's'}</strong>
                         </div>
@@ -1125,7 +1125,7 @@ function BulkMarkConfirmModal({
             </button>
           </div>
 
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '0.78rem', color: '#1e3a8a' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.78rem', color: 'var(--info)' }}>
             <i className="bi bi-shield-check me-1" />
             Existing clock-ins, approved leaves, and previous manual adjustments will <strong>not</strong> change. Only days that are currently missed (red on the calendar) will get a manual adjustment so they count as present.
           </div>
@@ -1146,8 +1146,8 @@ function BulkMarkConfirmModal({
                 <span className="text-muted">Saving…</span>
                 <span className="fw-semibold">{progress.done} / {progress.total}</span>
               </div>
-              <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#f1f5f9' }}>
-                <div className="h-100" style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`, background: 'linear-gradient(90deg,#3b82f6,#7c3aed)', transition: 'width 200ms ease' }} />
+              <div className="rounded-pill overflow-hidden" style={{ height: 6, background: 'var(--surface-2)' }}>
+                <div className="h-100" style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`, background: 'linear-gradient(90deg,var(--info),var(--accent))', transition: 'width 200ms ease' }} />
               </div>
             </div>
           )}
@@ -1164,14 +1164,14 @@ function BulkMarkConfirmModal({
             <div className="d-flex flex-column gap-1" style={{ maxHeight: 280, overflowY: 'auto' }}>
               {preview.map(p => (
                 <div key={p.user.id} className="d-flex align-items-center justify-content-between rounded-2 p-2"
-                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
+                  style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem' }}>
                   <div className="text-truncate me-2" style={{ minWidth: 0 }}>
-                    <span className="fw-semibold" style={{ color: '#0f172a' }}>{p.user.userName || p.user.displayName || p.user.email}</span>
+                    <span className="fw-semibold" style={{ color: 'var(--text-primary)' }}>{p.user.userName || p.user.displayName || p.user.email}</span>
                     <span className="text-muted ms-2" style={{ fontSize: '0.66rem' }}>
                       {(p.user.userType || p.user.role || 'apc').toUpperCase()}
                     </span>
                   </div>
-                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: '#fee2e2', color: '#991b1b', fontSize: '0.66rem', fontWeight: 700 }}>
+                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.66rem', fontWeight: 700 }}>
                     {p.dates.length} day{p.dates.length === 1 ? '' : 's'}
                   </span>
                 </div>
@@ -1387,10 +1387,10 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
           </div>
 
           {/* How-to */}
-          <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '0.74rem', color: '#1e3a8a' }}>
+          <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.74rem', color: 'var(--info)' }}>
             <i className="bi bi-info-circle mt-1" />
             <div>
-              Tap a <strong style={{ color: '#dc2626' }}>red</strong> day to mark present, tap a <strong style={{ color: '#92400e' }}>yellow</strong> day to undo.
+              Tap a <strong style={{ color: 'var(--danger)' }}>red</strong> day to mark present, tap a <strong style={{ color: 'var(--warning)' }}>yellow</strong> day to undo.
               <strong> Shift+click</strong> a second day to mark a whole range at once.
             </div>
           </div>
@@ -1426,14 +1426,14 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
           </div>
 
           {/* Calendar */}
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex gap-2 flex-wrap mb-2" style={{ fontSize: '0.66rem' }}>
-              <DayLegend color="#16a34a" label={`Present ${summary.present}`} />
-              <DayLegend color="#3b82f6" label={`Leave ${summary.leave}`} />
-              <DayLegend color="#f59e0b" label={`Adjusted ${summary.adjusted}`} />
-              <DayLegend color="#dc2626" label={`Missed ${summary.missed}`} />
-              <DayLegend color="#cbd5e1" label={`Weekend ${summary.weekend}`} />
-              {summary.future > 0 && <DayLegend color="#e2e8f0" label={`Future ${summary.future}`} />}
+              <DayLegend color="var(--success)" label={`Present ${summary.present}`} />
+              <DayLegend color="var(--info)" label={`Leave ${summary.leave}`} />
+              <DayLegend color="var(--warning)" label={`Adjusted ${summary.adjusted}`} />
+              <DayLegend color="var(--danger)" label={`Missed ${summary.missed}`} />
+              <DayLegend color="var(--border-default)" label={`Weekend ${summary.weekend}`} />
+              {summary.future > 0 && <DayLegend color="var(--border-subtle)" label={`Future ${summary.future}`} />}
             </div>
             <div className="d-grid gap-1" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
@@ -1444,12 +1444,12 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
               ))}
               {days_.map(d => {
                 const colors = {
-                  present:  { bg: '#dcfce7', fg: '#15803d', border: '#16a34a' },
-                  leave:    { bg: '#dbeafe', fg: '#1e40af', border: '#3b82f6' },
-                  adjusted: { bg: '#fef3c7', fg: '#92400e', border: '#f59e0b' },
-                  missed:   { bg: '#fee2e2', fg: '#991b1b', border: '#dc2626' },
-                  weekend:  { bg: '#f8fafc', fg: '#94a3b8', border: '#e2e8f0' },
-                  future:   { bg: '#fff',    fg: '#cbd5e1', border: '#e2e8f0' },
+                  present:  { bg: 'var(--success-soft)', fg: 'var(--success)', border: 'var(--success)' },
+                  leave:    { bg: 'var(--info-soft)', fg: 'var(--info)', border: 'var(--info)' },
+                  adjusted: { bg: 'var(--warning-soft)', fg: 'var(--warning)', border: 'var(--warning)' },
+                  missed:   { bg: 'var(--danger-soft)', fg: 'var(--danger)', border: 'var(--danger)' },
+                  weekend:  { bg: 'var(--surface-0)', fg: 'var(--text-muted)', border: 'var(--border-subtle)' },
+                  future:   { bg: 'var(--surface-1)',    fg: 'var(--text-muted)', border: 'var(--border-subtle)' },
                 }[d.kind];
                 const clickable = d.kind === 'missed' || d.kind === 'adjusted' || d.kind === 'weekend';
                 const isPending = pendingDate === d.ds;
@@ -1471,7 +1471,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                     style={{
                       background: colors.bg,
                       color: colors.fg,
-                      border: `1px solid ${isAnchor ? '#0f172a' : colors.border}`,
+                      border: `1px solid ${isAnchor ? 'var(--text-primary)' : colors.border}`,
                       boxShadow: isAnchor ? '0 0 0 2px rgba(15,23,42,0.2)' : 'none',
                       fontSize: '0.7rem',
                       fontWeight: 700,
@@ -1482,7 +1482,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                     {isPending ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> : d.day}
                     {d.hasRedundantAdj && (
                       <span className="rounded-circle position-absolute"
-                        style={{ width: 6, height: 6, background: '#f59e0b', top: 2, right: 2 }}
+                        style={{ width: 6, height: 6, background: 'var(--warning)', top: 2, right: 2 }}
                         title="Manual mark exists for this day too — see list below to remove" />
                     )}
                   </button>
@@ -1499,9 +1499,9 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
               <div className="text-muted small mb-2" style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Manual marks this month</div>
               {[...row.adjustments].sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(a => (
                 <div key={a.id} className="rounded-3 p-2 mb-2 d-flex align-items-center justify-content-between gap-2"
-                  style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                  style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                   <div style={{ fontSize: '0.78rem' }}>
-                    <div className="fw-semibold" style={{ color: '#92400e' }}>
+                    <div className="fw-semibold" style={{ color: 'var(--warning)' }}>
                       <i className="bi bi-check-circle-fill me-1" />{a.date}
                     </div>
                     <div className="text-muted" style={{ fontSize: '0.66rem' }}>
@@ -1580,7 +1580,7 @@ function ForceCloseModal({ record, closer, onClose, onDone }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
-            <h6 className="fw-bold mb-0"><i className="bi bi-box-arrow-right me-2" style={{ color: '#dc2626' }} />Close session for {record.userName}</h6>
+            <h6 className="fw-bold mb-0"><i className="bi bi-box-arrow-right me-2" style={{ color: 'var(--danger)' }} />Close session for {record.userName}</h6>
             <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} disabled={saving} style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
@@ -1920,7 +1920,7 @@ export default function AttendancePage() {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#0f172a' }}>Attendance</h4>
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Attendance</h4>
           <p className="text-muted mb-0" style={{ fontSize: '0.82rem' }}>
             {(isBoss || isOL) ? 'Company-wide attendance tracking' : canSeeTeam ? 'Your team attendance' : 'Your attendance'}
           </p>
@@ -1955,55 +1955,55 @@ export default function AttendancePage() {
               <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 16 }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center gap-2 mb-3">
-                    <span className="rounded-circle" style={{ width: 8, height: 8, background: '#dc2626', boxShadow: '0 0 0 3px #dc262630' }} />
-                    <span className="fw-bold" style={{ fontSize: '0.82rem', color: '#dc2626' }}>Pending Approvals</span>
+                    <span className="rounded-circle" style={{ width: 8, height: 8, background: 'var(--danger)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--danger) 19%, transparent)' }} />
+                    <span className="fw-bold" style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>Pending Approvals</span>
                     <span className="badge bg-danger rounded-pill ms-auto">{pendingApprovals.length + pendingEditRequests.length + pendingEditOutRequests.length}</span>
                   </div>
                   <div className="d-flex flex-column gap-2">
                     {pendingApprovals.map(r => (
                       <div key={`co-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
-                        style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer' }}
+                        style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setApprovalTarget(r)}>
                         <div>
                           <div className="fw-semibold d-flex align-items-center gap-1" style={{ fontSize: '0.8rem' }}>
-                            <i className="bi bi-box-arrow-right" style={{ fontSize: '0.72rem', color: '#dc2626' }} />
+                            <i className="bi bi-box-arrow-right" style={{ fontSize: '0.72rem', color: 'var(--danger)' }} />
                             {r.userName}
                           </div>
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>Clock-out · {fmtTime(r.clockIn)} · {locLabel(r.location)}</div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: '#3b82f6', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--info)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                     {pendingEditRequests.map(r => (
                       <div key={`ed-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
-                        style={{ background: '#eff6ff', border: '1px solid #bfdbfe', cursor: 'pointer' }}
+                        style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setEditRequestTarget(r)}>
                         <div>
                           <div className="fw-semibold d-flex align-items-center gap-1" style={{ fontSize: '0.8rem' }}>
-                            <i className="bi bi-pencil-square" style={{ fontSize: '0.72rem', color: '#2563eb' }} />
+                            <i className="bi bi-pencil-square" style={{ fontSize: '0.72rem', color: 'var(--info)' }} />
                             {r.userName}
                           </div>
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>
                             Edit clock-in · {fmtTime(r.clockIn)} → {fmtTime(r.editClockInRequest?.requestedClockIn)}
                           </div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: '#2563eb', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--info)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                     {pendingEditOutRequests.map(r => (
                       <div key={`eo-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
-                        style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer' }}
+                        style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setEditOutTarget(r)}>
                         <div>
                           <div className="fw-semibold d-flex align-items-center gap-1" style={{ fontSize: '0.8rem' }}>
-                            <i className="bi bi-clock-history" style={{ fontSize: '0.72rem', color: '#dc2626' }} />
+                            <i className="bi bi-clock-history" style={{ fontSize: '0.72rem', color: 'var(--danger)' }} />
                             {r.userName}
                           </div>
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>
                             Adjust clock-out · {r.date} · was {fmtTime(r.clockOut)} → wants {fmtTime(r.editClockOutRequest?.requestedClockOut)}
                           </div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: '#dc2626', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--danger)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                   </div>
@@ -2023,12 +2023,12 @@ export default function AttendancePage() {
               {/* Stats */}
               <div className="d-flex gap-2 mb-3 flex-wrap">
                 {[
-                  { key: '',                 label: 'Total',    value: stats.total,   color: '#3b82f6', bg: '#eff6ff' },
-                  { key: 'clocked-in',       label: 'Working',  value: stats.working, color: '#16a34a', bg: '#f0fdf4' },
-                  { key: 'on-break',         label: 'On Break', value: stats.onBreak, color: '#f59e0b', bg: '#fffbeb' },
-                  { key: 'pending-approval', label: 'Pending',  value: stats.pending, color: '#dc2626', bg: '#fef2f2' },
-                  { key: 'clocked-out',      label: 'Done',     value: stats.done,    color: '#64748b', bg: '#f9fafb' },
-                  { key: 'missing',          label: 'Missing',  value: stats.missing, color: '#ef4444', bg: '#fef2f2' },
+                  { key: '',                 label: 'Total',    value: stats.total,   color: 'var(--info)', bg: 'var(--info-soft)' },
+                  { key: 'clocked-in',       label: 'Working',  value: stats.working, color: 'var(--success)', bg: 'var(--success-soft)' },
+                  { key: 'on-break',         label: 'On Break', value: stats.onBreak, color: 'var(--warning)', bg: 'var(--warning-soft)' },
+                  { key: 'pending-approval', label: 'Pending',  value: stats.pending, color: 'var(--danger)', bg: 'var(--danger-soft)' },
+                  { key: 'clocked-out',      label: 'Done',     value: stats.done,    color: 'var(--text-secondary)', bg: 'var(--surface-0)' },
+                  { key: 'missing',          label: 'Missing',  value: stats.missing, color: 'var(--danger)', bg: 'var(--danger-soft)' },
                 ].map(s => {
                   const active = filterStatus === s.key;
                   return (
@@ -2040,8 +2040,8 @@ export default function AttendancePage() {
                       title={`Show ${s.label.toLowerCase()}`}
                       style={{
                         background: s.bg, minWidth: 78, cursor: 'pointer',
-                        border: `1px solid ${s.color}${active ? '55' : '15'}`,
-                        boxShadow: active ? `0 0 0 2px ${s.color}55` : 'none',
+                        border: `1px solid color-mix(in srgb, ${s.color} ${active ? '33%' : '8%'}, transparent)`,
+                        boxShadow: active ? `0 0 0 2px color-mix(in srgb, ${s.color} 33%, transparent)` : 'none',
                         transition: 'box-shadow 0.15s, border-color 0.15s',
                       }}
                     >
@@ -2055,8 +2055,8 @@ export default function AttendancePage() {
               {/* Filters */}
               <div className="d-flex gap-2 mb-3 flex-wrap align-items-center">
                 <div className="input-group input-group-sm" style={{ maxWidth: 220 }}>
-                  <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
-                  <input type="text" className="form-control border-0" placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+                  <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
+                  <input type="text" className="form-control border-0" placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'var(--surface-2)' }} />
                 </div>
                 <select className="form-select form-select-sm" value={filterLoc} onChange={e => setFilterLoc(e.target.value)} style={{ maxWidth: 150 }}>
                   <option value="">All Locations</option>
@@ -2092,7 +2092,7 @@ export default function AttendancePage() {
               {loading ? (
                 <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
               ) : filteredToday.length === 0 ? (
-                <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16 }}>
+                <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16 }}>
                   <i className="bi bi-people text-muted" style={{ fontSize: '2rem', opacity: 0.3 }} />
                   <p className="text-muted mt-2 mb-0">No attendance records for today.</p>
                 </div>
@@ -2100,7 +2100,7 @@ export default function AttendancePage() {
                 <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden' }}>
                   <div className="table-responsive">
                     <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.82rem' }}>
-                      <thead><tr style={{ background: '#f8f9fa' }}>
+                      <thead><tr style={{ background: 'var(--surface-0)' }}>
                         <th className="fw-semibold text-muted border-0 ps-3" style={{ fontSize: '0.72rem' }}>Date</th>
                         <th className="fw-semibold text-muted border-0" style={{ fontSize: '0.72rem' }}>Name</th>
                         <th className="fw-semibold text-muted border-0 text-center" style={{ fontSize: '0.72rem' }}>Location</th>
@@ -2115,10 +2115,10 @@ export default function AttendancePage() {
                           const missing = r.__missing;
                           const t = missing ? { totalWorkMs: 0, totalBreakMs: 0 } : calcTimes(r);
                           const eff = missing ? null : getEffectiveStatus(r);
-                          const sc = missing ? '#ef4444' : statusColor(eff);
+                          const sc = missing ? 'var(--danger)' : statusColor(eff);
                           return (
-                            <tr key={r.id} style={missing ? { background: '#fef9f9' } : undefined}>
-                              <td className="ps-3 fw-semibold" style={missing ? { color: '#94a3b8' } : { color: '#0f172a' }}>
+                            <tr key={r.id} style={missing ? { background: 'var(--danger-soft)' } : undefined}>
+                              <td className="ps-3 fw-semibold" style={missing ? { color: 'var(--text-muted)' } : { color: 'var(--text-primary)' }}>
                                 {missing ? todayDateStr : r.date}
                                 {!missing && r.date !== todayDateStr && (
                                   <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>
@@ -2130,7 +2130,7 @@ export default function AttendancePage() {
                                 <div className="d-flex align-items-center gap-2">
                                   <span className="rounded-circle" style={{ width: 8, height: 8, background: sc, flexShrink: 0 }} />
                                   <div>
-                                    <div className="fw-semibold" style={missing ? { color: '#94a3b8' } : undefined}>{r.userName}</div>
+                                    <div className="fw-semibold" style={missing ? { color: 'var(--text-muted)' } : undefined}>{r.userName}</div>
                                     <div className="text-muted" style={{ fontSize: '0.65rem' }}>{r.userRole?.toUpperCase()}</div>
                                   </div>
                                 </div>
@@ -2140,17 +2140,17 @@ export default function AttendancePage() {
                                   : <span className="badge bg-light text-dark border" style={{ fontSize: '0.62rem' }}>{locLabel(r.location)}</span>}
                               </td>
                               <td className="text-center">{missing ? <span className="text-muted">—</span> : fmtTime(r.clockIn)}</td>
-                              <td className="text-center fw-semibold" style={{ color: missing ? '#cbd5e1' : '#16a34a' }}>
+                              <td className="text-center fw-semibold" style={{ color: missing ? 'var(--text-muted)' : 'var(--success)' }}>
                                 {missing ? '—' : fmtDuration(t.totalWorkMs)}
                               </td>
-                              <td className="text-center" style={{ color: missing ? '#cbd5e1' : '#f59e0b' }}>
+                              <td className="text-center" style={{ color: missing ? 'var(--text-muted)' : 'var(--warning)' }}>
                                 {missing ? '—' : (
                                   (r.breaks || []).length > 0 ? (
                                     <button
                                       type="button"
                                       className="btn btn-link p-0 fw-semibold"
                                       style={{
-                                        color: '#f59e0b',
+                                        color: 'var(--warning)',
                                         textDecoration: 'underline dotted',
                                         textDecorationThickness: '1px',
                                         textUnderlineOffset: '3px',
@@ -2166,7 +2166,7 @@ export default function AttendancePage() {
                                 )}
                               </td>
                               <td className="text-center">
-                                <span className="badge rounded-pill" style={{ background: `${sc}15`, color: sc, fontSize: '0.62rem', border: `1px solid ${sc}30` }}>
+                                <span className="badge rounded-pill" style={{ background: `color-mix(in srgb, ${sc} 12%, transparent)`, color: sc, fontSize: '0.62rem', border: `1px solid color-mix(in srgb, ${sc} 30%, transparent)` }}>
                                   {missing ? 'Not Clocked In' : statusLabel(eff)}
                                 </span>
                               </td>
@@ -2248,8 +2248,8 @@ export default function AttendancePage() {
               {/* Row 2: granular filters */}
               <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
                 <div className="input-group input-group-sm" style={{ maxWidth: 220 }}>
-                  <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
-                  <input type="text" className="form-control border-0" placeholder="Search name or email…" value={historySearch} onChange={e => setHistorySearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+                  <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
+                  <input type="text" className="form-control border-0" placeholder="Search name or email…" value={historySearch} onChange={e => setHistorySearch(e.target.value)} style={{ background: 'var(--surface-2)' }} />
                 </div>
                 <select className="form-select form-select-sm" value={historyLoc} onChange={e => setHistoryLoc(e.target.value)} style={{ maxWidth: 150 }}>
                   <option value="">All Locations</option>
@@ -2271,7 +2271,7 @@ export default function AttendancePage() {
                   <option value="clocked-out">Done</option>
                 </select>
                 <div className="input-group input-group-sm" style={{ maxWidth: 140 }} title="Only show days where the person worked at least N hours">
-                  <span className="input-group-text border-0" style={{ background: '#f1f5f9', fontSize: '0.68rem' }}>≥ hrs</span>
+                  <span className="input-group-text border-0" style={{ background: 'var(--surface-2)', fontSize: '0.68rem' }}>≥ hrs</span>
                   <input
                     type="number"
                     min="0" step="0.5"
@@ -2279,7 +2279,7 @@ export default function AttendancePage() {
                     placeholder="0"
                     value={historyMinHours}
                     onChange={e => setHistoryMinHours(e.target.value)}
-                    style={{ background: '#f1f5f9' }}
+                    style={{ background: 'var(--surface-2)' }}
                   />
                 </div>
                 {hasHistoryFilters && (
@@ -2292,7 +2292,7 @@ export default function AttendancePage() {
               {historyLoading ? (
                 <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
               ) : filteredHistory.length === 0 ? (
-                <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16 }}>
+                <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16 }}>
                   <i className="bi bi-calendar-x text-muted" style={{ fontSize: '2rem', opacity: 0.3 }} />
                   <p className="text-muted mt-2 mb-0">
                     {hasHistoryFilters ? 'No records match the current filters.' : 'No records for this month.'}
@@ -2305,7 +2305,7 @@ export default function AttendancePage() {
                 <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden' }}>
                   <div className="table-responsive">
                     <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.82rem' }}>
-                      <thead><tr style={{ background: '#f8f9fa' }}>
+                      <thead><tr style={{ background: 'var(--surface-0)' }}>
                         <th className="fw-semibold text-muted border-0 ps-3" style={{ fontSize: '0.72rem' }}>Date</th>
                         {canSeeTeam && <th className="fw-semibold text-muted border-0" style={{ fontSize: '0.72rem' }}>Name</th>}
                         <th className="fw-semibold text-muted border-0 text-center" style={{ fontSize: '0.72rem' }}>Location</th>
@@ -2329,13 +2329,13 @@ export default function AttendancePage() {
                               <td className="text-center">
                                 <TimeWithDate ts={r.clockOut} rowDate={r.date} />
                                 {r.autoClosed && (
-                                  <i className="bi bi-exclamation-triangle-fill ms-1" title="Auto-closed — user forgot to clock out" style={{ color: '#dc2626', fontSize: '0.68rem' }} />
+                                  <i className="bi bi-exclamation-triangle-fill ms-1" title="Auto-closed — user forgot to clock out" style={{ color: 'var(--danger)', fontSize: '0.68rem' }} />
                                 )}
                               </td>
-                              <td className="text-center fw-semibold" style={{ color: '#16a34a' }}>{fmtDuration(t.totalWorkMs)}</td>
-                              <td className="text-center" style={{ color: '#f59e0b' }}>{fmtDuration(t.totalBreakMs)}</td>
+                              <td className="text-center fw-semibold" style={{ color: 'var(--success)' }}>{fmtDuration(t.totalWorkMs)}</td>
+                              <td className="text-center" style={{ color: 'var(--warning)' }}>{fmtDuration(t.totalBreakMs)}</td>
                               <td className="text-center">
-                                <span className="badge rounded-pill" style={{ background: `${sc}15`, color: sc, fontSize: '0.62rem', border: `1px solid ${sc}30` }}>
+                                <span className="badge rounded-pill" style={{ background: `color-mix(in srgb, ${sc} 12%, transparent)`, color: sc, fontSize: '0.62rem', border: `1px solid color-mix(in srgb, ${sc} 30%, transparent)` }}>
                                   {statusLabel(eff)}
                                 </span>
                               </td>
@@ -2383,12 +2383,12 @@ export default function AttendancePage() {
             )}
 
             {[
-              { label: 'Medical Leave',  value: quotaMedical,   setter: setQuotaMedical,   icon: 'bi-heart-pulse', color: '#dc3545' },
-              { label: 'Emergency Leave',value: quotaEmergency, setter: setQuotaEmergency, icon: 'bi-exclamation-octagon', color: '#fd7e14' },
-              { label: 'Work From Home', value: quotaWfh,       setter: setQuotaWfh,       icon: 'bi-house',       color: '#0d6efd' },
+              { label: 'Medical Leave',  value: quotaMedical,   setter: setQuotaMedical,   icon: 'bi-heart-pulse', color: 'var(--danger)' },
+              { label: 'Emergency Leave',value: quotaEmergency, setter: setQuotaEmergency, icon: 'bi-exclamation-octagon', color: 'var(--warning)' },
+              { label: 'Work From Home', value: quotaWfh,       setter: setQuotaWfh,       icon: 'bi-house',       color: 'var(--info)' },
             ].map(q => (
               <div key={q.label} className="d-flex align-items-center gap-3 mb-3">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: `${q.color}15` }}>
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: `color-mix(in srgb, ${q.color} 8%, transparent)` }}>
                   <i className={`bi ${q.icon}`} style={{ color: q.color, fontSize: '0.9rem' }} />
                 </div>
                 <div className="flex-grow-1">
@@ -2417,7 +2417,7 @@ export default function AttendancePage() {
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <div className="card-body p-4" style={{ overflowY: 'auto' }}>
               <div className="d-flex align-items-start gap-3 mb-3">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff3e0' }}>
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
                   <i className="bi bi-exclamation-triangle-fill text-warning" />
                 </div>
                 <div>
@@ -2425,7 +2425,7 @@ export default function AttendancePage() {
                   <p className="text-muted mb-0 small">Their existing approved leaves this month stay <strong>paid</strong>. The new quota will apply to any future requests this month.</p>
                 </div>
               </div>
-              <div className="rounded-2 p-2 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', maxHeight: 220, overflowY: 'auto' }}>
+              <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)', maxHeight: 220, overflowY: 'auto' }}>
                 <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
                   <thead>
                     <tr><th>User</th><th>Type</th><th>Used</th><th>New quota</th></tr>
@@ -2523,24 +2523,24 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
-            <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: '#dc2626' }} />Review Clock-Out Adjustment</h6>
+            <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: 'var(--danger)' }} />Review Clock-Out Adjustment</h6>
             <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} disabled={saving} style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
           </div>
-          <div className="mb-3 p-3 rounded-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-            <div className="fw-bold mb-1" style={{ fontSize: '0.86rem', color: '#991b1b' }}>{record.userName} · {record.date}</div>
+          <div className="mb-3 p-3 rounded-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
+            <div className="fw-bold mb-1" style={{ fontSize: '0.86rem', color: 'var(--danger)' }}>{record.userName} · {record.date}</div>
             <div className="small mb-1" style={{ fontSize: '0.78rem' }}>
               Shift started at <strong>{fmtTime(record.clockIn)}</strong>, auto-closed at <strong>{fmtTime(record.clockOut)}</strong>.
             </div>
             <div className="small" style={{ fontSize: '0.78rem' }}>
-              Requested clock-out: <strong style={{ color: '#16a34a' }}>{fmtTime(req.requestedClockOut)}</strong>
+              Requested clock-out: <strong style={{ color: 'var(--success)' }}>{fmtTime(req.requestedClockOut)}</strong>
             </div>
           </div>
           {req.reason && (
             <div className="mb-3">
               <div className="small text-muted mb-1" style={{ fontSize: '0.7rem', fontWeight: 600 }}>REASON</div>
-              <div className="p-2 rounded-2" style={{ background: '#f8fafc', fontSize: '0.82rem' }}>{req.reason}</div>
+              <div className="p-2 rounded-2" style={{ background: 'var(--surface-0)', fontSize: '0.82rem' }}>{req.reason}</div>
             </div>
           )}
           {rejecting && (
@@ -2556,7 +2556,7 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
             {!rejecting ? (
               <>
                 <button className="btn btn-sm btn-outline-danger px-3" onClick={() => setRejecting(true)} disabled={saving}>Reject</button>
-                <button className="btn btn-sm px-4 text-white" style={{ background: '#16a34a', border: 'none' }} onClick={handleApprove} disabled={saving}>
+                <button className="btn btn-sm px-4 text-white" style={{ background: 'var(--success)', border: 'none' }} onClick={handleApprove} disabled={saving}>
                   {saving ? <><span className="spinner-border spinner-border-sm me-1" />…</> : 'Approve'}
                 </button>
               </>

@@ -10,10 +10,10 @@ import { supabase } from '../../lib/supabase';
 import MonthNavigator from './MonthNavigator';
 
 const REQUEST_CATEGORIES = [
-  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: '#dc3545', bg: '#fff0f0' },
-  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: '#0d6efd', bg: '#e8f0fe' },
-  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: '#fd7e14', bg: '#fff3e0' },
-  { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: '#6610f2', bg: '#f0ebff' },
+  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger)', bg: 'var(--danger-soft)' },
+  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info)', bg: 'var(--info-soft)' },
+  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: 'var(--warning)', bg: 'var(--warning-soft)' },
+  { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: 'var(--accent)', bg: 'var(--accent-soft)' },
 ];
 
 const LEAVE_TYPES = { medical: 'Medical', emergency: 'Emergency', medical_emergency: 'Medical' };
@@ -49,12 +49,12 @@ function getRequestTitle(r) {
 }
 
 const STATUS_CFG = {
-  pending_tl:   { label: 'Pending TL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
-  pending_pctl: { label: 'Pending PCTL', color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
-  pending_ol:   { label: 'Pending OL',   color: '#fd7e14', bg: '#fff3e0', icon: 'bi-hourglass-split' },
-  pending_boss: { label: 'Pending You',  color: '#6610f2', bg: '#f0ebff', icon: 'bi-hourglass-split' },
-  approved:     { label: 'Approved',     color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle-fill' },
-  rejected:     { label: 'Rejected',     color: '#dc3545', bg: '#fff0f0', icon: 'bi-x-circle-fill' },
+  pending_tl:   { label: 'Pending TL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_pctl: { label: 'Pending PCTL', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_ol:   { label: 'Pending OL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_boss: { label: 'Pending You',  color: 'var(--accent)', bg: 'var(--accent-soft)', icon: 'bi-hourglass-split' },
+  approved:     { label: 'Approved',     color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
+  rejected:     { label: 'Rejected',     color: 'var(--danger)', bg: 'var(--danger-soft)', icon: 'bi-x-circle-fill' },
 };
 function getStCfg(val) { return STATUS_CFG[val] || STATUS_CFG.pending_boss; }
 
@@ -70,7 +70,7 @@ function RejectModal({ request, onConfirm, onCancel, saving }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff0f0' }}>
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--danger-soft)' }}>
               <i className="bi bi-x-circle text-danger" style={{ fontSize: '1rem' }} />
             </div>
             <div>
@@ -110,7 +110,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#e6f4ea' }}>
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--success-soft)' }}>
               <i className="bi bi-check-circle text-success" style={{ fontSize: '1rem' }} />
             </div>
             <div>
@@ -119,14 +119,14 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
             </div>
           </div>
 
-          <div className="rounded-2 p-3 mb-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+          <div className="rounded-2 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center gap-2 mb-1">
               <i className={`bi ${catCfg.icon}`} style={{ color: catCfg.color }} />
               <span className="fw-semibold small">{getRequestTitle(request)}</span>
               {request.bossOverrideToPaid ? (
                 <>
                   <span className="badge bg-success" style={{ fontSize: '0.6rem' }}>Paid</span>
-                  <span className="badge" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.6rem' }}>Boss Override</span>
+                  <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.6rem' }}>Boss Override</span>
                 </>
               ) : (
                 <>
@@ -141,7 +141,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
           </div>
 
           {request.intermediateApproval && (request.intermediateApproval.status === 'approved' || request.intermediateApproval.status === 'forwarded') && (
-            <div className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3" style={{ background: '#e6f4ea', border: '1px solid #b7dfc4' }}>
+            <div className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3" style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
               <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '0.75rem' }} />
               <span className="small">
                 {request.intermediateApproval.forwardToBoss ? 'Forwarded' : 'Approved'} by <strong>{request.intermediateApproval.approverName}</strong>
@@ -160,15 +160,15 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
           )}
 
           {userQuota && (
-            <div className="rounded-2 p-2 mb-3" style={{ background: '#f0f1f5', border: '1px solid #dee2e6' }}>
+            <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               <div className="small fw-semibold text-muted mb-1" style={{ fontSize: '0.68rem' }}>User's Remaining Paid Quota (this month)</div>
               <div className="d-flex flex-wrap gap-2">
                 {[
-                  { label: 'Medical',   key: 'medical',   color: '#dc3545' },
-                  { label: 'Emergency', key: 'emergency', color: '#fd7e14' },
-                  { label: 'WFH',       key: 'wfh',       color: '#0d6efd' },
+                  { label: 'Medical',   key: 'medical',   color: 'var(--danger)' },
+                  { label: 'Emergency', key: 'emergency', color: 'var(--warning)' },
+                  { label: 'WFH',       key: 'wfh',       color: 'var(--info)' },
                 ].map(q => (
-                  <span key={q.key} className="d-inline-flex align-items-center gap-1 rounded-pill px-2" style={{ background: `${q.color}10`, border: `1px solid ${q.color}25`, fontSize: '0.65rem', fontWeight: 600, color: q.color, lineHeight: '20px' }}>
+                  <span key={q.key} className="d-inline-flex align-items-center gap-1 rounded-pill px-2" style={{ background: `color-mix(in srgb, ${q.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${q.color} 25%, transparent)`, fontSize: '0.65rem', fontWeight: 600, color: q.color, lineHeight: '20px' }}>
                     {q.label}: {userQuota[q.key] ?? '—'}
                   </span>
                 ))}
@@ -177,7 +177,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
           )}
 
           {hasUnpaid && paidOverrideCount > 0 && (
-            <div className="rounded-2 p-2 mb-3" style={{ background: '#e8f0fe', border: '1px solid #c5d5ff' }}>
+            <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
               <div className="d-flex align-items-center gap-2">
                 <i className="bi bi-info-circle text-primary" style={{ fontSize: '0.75rem' }} />
                 <span className="small">You have already approved <strong>{paidOverrideCount}</strong> unpaid request{paidOverrideCount !== 1 ? 's' : ''} as paid for <strong>{request.requesterName}</strong> this month.</span>
@@ -224,8 +224,8 @@ function ExportModal({ defaultMonth, onConfirm, onCancel }) {
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#f0f1f5' }}>
-              <i className="bi bi-download" style={{ fontSize: '1rem', color: '#495057' }} />
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--surface-2)' }}>
+              <i className="bi bi-download" style={{ fontSize: '1rem', color: 'var(--text-secondary)' }} />
             </div>
             <div>
               <p className="fw-semibold mb-0 small">Export Leave Requests</p>
@@ -493,7 +493,7 @@ export default function BossLeaveRequestsPage() {
     <div style={{ padding: '32px 32px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-file-earmark-text" style={{ fontSize: '1.15rem' }} />
             Leave & WFH Requests
           </h5>
@@ -506,19 +506,19 @@ export default function BossLeaveRequestsPage() {
 
       <div className="d-flex gap-2 mb-4 flex-wrap align-items-center">
         {[
-          { key: 'pending',  label: 'Pending',  count: stats.pending,  color: '#6610f2', bg: '#f0ebff' },
-          { key: 'approved', label: 'Approved', count: stats.approved, color: '#198754', bg: '#e6f4ea' },
-          { key: 'rejected', label: 'Rejected', count: stats.rejected, color: '#dc3545', bg: '#fff0f0' },
+          { key: 'pending',  label: 'Pending',  count: stats.pending,  color: 'var(--accent)', bg: 'var(--accent-soft)' },
+          { key: 'approved', label: 'Approved', count: stats.approved, color: 'var(--success)', bg: 'var(--success-soft)' },
+          { key: 'rejected', label: 'Rejected', count: stats.rejected, color: 'var(--danger)', bg: 'var(--danger-soft)' },
           // Unpaid tab is Boss-only — payroll-sensitive view that the
           // Developer support role shouldn't see.
-          ...(isBossOnly ? [{ key: 'unpaid',   label: 'Unpaid',   count: unpaidSummary.reduce((s, u) => s + u.days, 0), color: '#fd7e14', bg: '#fff3e0' }] : []),
-          { key: 'all',      label: 'All',      count: stats.all,      color: '#495057', bg: '#f3f4f6' },
+          ...(isBossOnly ? [{ key: 'unpaid',   label: 'Unpaid',   count: unpaidSummary.reduce((s, u) => s + u.days, 0), color: 'var(--warning)', bg: 'var(--warning-soft)' }] : []),
+          { key: 'all',      label: 'All',      count: stats.all,      color: 'var(--text-secondary)', bg: 'var(--surface-2)' },
         ].map(tab => (
           <button key={tab.key} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2 border-0"
-            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? '#fff' : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.15s' }}
+            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? 'var(--on-accent)' : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.15s' }}
             onClick={() => setActiveTab(tab.key)}>
             {tab.label}
-            <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : `${tab.color}20`, color: activeTab === tab.key ? '#fff' : tab.color, fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>
+            <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : `color-mix(in srgb, ${tab.color} 20%, transparent)`, color: activeTab === tab.key ? 'var(--on-accent)' : tab.color, fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>
               {tab.key === 'unpaid' ? `${tab.count}d` : tab.count}
             </span>
           </button>
@@ -537,7 +537,7 @@ export default function BossLeaveRequestsPage() {
       </div>
 
       {activeTab === 'unpaid' && isBossOnly && (
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, borderLeft: '4px solid #fd7e14' }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, borderLeft: '4px solid var(--warning)' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-2">
               <i className="bi bi-exclamation-triangle text-warning" />
@@ -549,7 +549,7 @@ export default function BossLeaveRequestsPage() {
               </div>
             ) : (
               <table className="table table-sm mb-0" style={{ fontSize: '0.78rem' }}>
-                <thead><tr style={{ color: '#9ca3af' }}><th>Employee</th><th>Role</th><th>Unpaid Days</th></tr></thead>
+                <thead><tr style={{ color: 'var(--text-muted)' }}><th>Employee</th><th>Role</th><th>Unpaid Days</th></tr></thead>
                 <tbody>
                   {unpaidSummary.map((u, i) => (
                     <tr key={i}>
@@ -590,8 +590,8 @@ export default function BossLeaveRequestsPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : filtered.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16, background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: '#f0f1f5' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
           <p className="fw-semibold text-dark mb-1">No {activeTab === 'all' ? '' : activeTab} requests for {viewMonthLabel}</p>
@@ -617,7 +617,7 @@ export default function BossLeaveRequestsPage() {
                       <div className="flex-grow-1">
                         <div className="d-flex align-items-center gap-2 mb-1 flex-wrap">
                           <span className="fw-semibold small">{r.requesterName}</span>
-                          <span className="badge rounded-pill" style={{ background: `${catCfg.color}15`, color: catCfg.color, fontSize: '0.63rem', fontWeight: 600 }}>
+                          <span className="badge rounded-pill" style={{ background: `color-mix(in srgb, ${catCfg.color} 15%, transparent)`, color: catCfg.color, fontSize: '0.63rem', fontWeight: 600 }}>
                             <i className={`bi ${catCfg.icon} me-1`} style={{ fontSize: '0.56rem' }} />{catCfg.label}
                           </span>
                           {r.requesterRole && <span className="text-muted" style={{ fontSize: '0.66rem' }}>{ROLE_LABELS[r.requesterRole] || r.requesterRole}</span>}
@@ -626,15 +626,15 @@ export default function BossLeaveRequestsPage() {
                             // suppress the original Unpaid badge so the row
                             // doesn't read as "Unpaid + Override to Paid"
                             // (confusing — looks contradictory).
-                            <span className="badge" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>Paid</span>
+                            <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>Paid</span>
                           ) : (
                             <>
                               {r.unpaidDays > 0 && r.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>}
                               {r.unpaidDays > 0 && !r.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>}
-                              {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>Paid</span>}
+                              {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>Paid</span>}
                             </>
                           )}
-                          {r.bossOverrideToPaid && <span className="badge" style={{ background: '#e8f0fe', color: '#0d6efd', fontSize: '0.58rem' }}>Boss Override to Paid</span>}
+                          {r.bossOverrideToPaid && <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.58rem' }}>Boss Override to Paid</span>}
                         </div>
                         <div className="fw-medium small mb-1">{title}</div>
                         <div className="text-muted" style={{ fontSize: '0.72rem' }}>
@@ -654,7 +654,7 @@ export default function BossLeaveRequestsPage() {
                           const when = formatDateTime(it.resolvedAt);
                           return (
                             <div className="mt-2 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                              style={{ background: isPositive ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500 }}>
+                              style={{ background: isPositive ? 'var(--success-soft)' : 'var(--danger-soft)', fontSize: '0.65rem', fontWeight: 500 }}>
                               <i className={`bi ${isPositive ? 'bi-check-circle text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
                               {verb} by {it.approverName}
                               {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
@@ -669,7 +669,7 @@ export default function BossLeaveRequestsPage() {
                           const when = formatDateTime(ba.resolvedAt);
                           return (
                             <div className="mt-2 d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                              style={{ background: isApproved ? '#e6f4ea' : '#fff0f0', fontSize: '0.65rem', fontWeight: 500, marginLeft: 4 }}>
+                              style={{ background: isApproved ? 'var(--success-soft)' : 'var(--danger-soft)', fontSize: '0.65rem', fontWeight: 500, marginLeft: 4 }}>
                               <i className={`bi ${isApproved ? 'bi-shield-check text-success' : 'bi-x-circle text-danger'}`} style={{ fontSize: '0.58rem' }} />
                               Boss: {verb}{ba.approverName ? ` by ${ba.approverName}` : ''}
                               {when && <span style={{ opacity: 0.7, marginLeft: 4 }}>· {when}</span>}
@@ -678,7 +678,7 @@ export default function BossLeaveRequestsPage() {
                         })()}
 
                         {r.bossApproval?.rejectReason && (
-                          <div className="mt-2 rounded-2 p-2" style={{ background: '#fff0f0', border: '1px solid #f5c0c0' }}>
+                          <div className="mt-2 rounded-2 p-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
                             <span className="small fw-semibold text-danger"><i className="bi bi-x-circle me-1" />Your Rejection:</span>
                             <span className="small text-muted ms-1">{r.bossApproval.rejectReason}</span>
                           </div>
