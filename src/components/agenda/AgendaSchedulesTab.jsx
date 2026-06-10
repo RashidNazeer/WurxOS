@@ -41,9 +41,9 @@ export default function AgendaSchedulesTab() {
         if (cancelled) return;
         setTeams(tm || []);
         const map = {};
-        (sched || []).forEach((s) => { map[s.tl_id] = { day: s.meeting_day, time: (s.meeting_time || '').slice(0, 5) }; });
+        (sched || []).forEach((s) => { map[s.tl_id] = { day: s.meeting_day, time: (s.meeting_time || '').slice(0, 5), link: s.meet_link || '' }; });
         const init = {};
-        (tm || []).forEach(({ tl }) => { init[tl.id] = map[tl.id] || { day: '', time: '15:00' }; });
+        (tm || []).forEach(({ tl }) => { init[tl.id] = map[tl.id] || { day: '', time: '15:00', link: '' }; });
         setDraft(init);
         setOriginal(JSON.parse(JSON.stringify(init)));
       })
@@ -74,7 +74,7 @@ export default function AgendaSchedulesTab() {
         const cur = draft[tlId] || { day: '', time: '' };
         const was = original[tlId] || { day: '', time: '' };
         if (cur.day) {
-          await upsertAgendaTeamSchedule(tlId, cur.day, cur.time || '15:00');
+          await upsertAgendaTeamSchedule(tlId, cur.day, cur.time || '15:00', cur.link || '');
         } else if (was.day) {
           await deleteAgendaTeamSchedule(tlId);
         }
@@ -117,7 +117,7 @@ export default function AgendaSchedulesTab() {
   return (
     <div>
       <p className="text-muted small mb-3">
-        Set each team’s recurring agenda-meeting slot. Teams left “Not scheduled” are skipped when you notify teams.
+        Set each team’s recurring agenda-meeting slot and its own permanent Google Meet link. Teams left “Not scheduled” are skipped when you notify teams.
       </p>
       {error && <div className="alert alert-danger py-2 small">{error}</div>}
 
@@ -126,7 +126,7 @@ export default function AgendaSchedulesTab() {
       ) : (
         <div className="d-flex flex-column gap-2">
           {teams.map(({ tl, apcs }) => {
-            const d = draft[tl.id] || { day: '', time: '15:00' };
+            const d = draft[tl.id] || { day: '', time: '15:00', link: '' };
             return (
               <div key={tl.id} className="card border-0 shadow-sm" style={{ borderRadius: 10 }}>
                 <div className="card-body p-3 d-flex align-items-center gap-3 flex-wrap">
@@ -143,6 +143,13 @@ export default function AgendaSchedulesTab() {
                   <input type="time" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
                     value={d.time} disabled={!d.day}
                     onChange={(e) => set(tl.id, { time: e.target.value })} />
+                  <div className="d-flex align-items-center gap-2" style={{ flexBasis: '100%', minWidth: 0 }}>
+                    <i className="bi bi-camera-video text-muted flex-shrink-0" style={{ fontSize: '0.85rem' }} title="This team’s Google Meet link" />
+                    <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                      placeholder={d.day ? 'Team Google Meet link — https://meet.google.com/abc-defg-hij' : 'Pick a meeting day first to add this team’s link'}
+                      value={d.link || ''} disabled={!d.day}
+                      onChange={(e) => set(tl.id, { link: e.target.value })} />
+                  </div>
                 </div>
               </div>
             );

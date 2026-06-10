@@ -97,13 +97,13 @@ function GeneralTab() {
               placeholder="https://meet.google.com/abc-defg-hij"
               value={meetLink} onChange={(e) => setMeetLink(e.target.value)} />
             <div className="text-muted mt-1" style={{ fontSize: '0.74rem' }}>
-              The reusable meeting link shared with the whole office each week.
+              Fallback link, used only for a team that has no link of its own.
             </div>
           </div>
 
           <div className="text-muted mb-4" style={{ fontSize: '0.74rem' }}>
             <i className="bi bi-info-circle me-1" />
-            Each team’s meeting day &amp; time is set per-team under the Schedules tab.
+            Each team’s meeting day, time, and its own Google Meet link are set per-team under the Schedules tab.
           </div>
 
           <div className="d-flex align-items-center gap-2">

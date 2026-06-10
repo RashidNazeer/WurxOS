@@ -325,12 +325,13 @@ export async function getAgendaTeamSchedules() {
   return data || [];
 }
 
-export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime) {
+export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime, meetLink = '') {
   const { data: auth } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('agenda_team_schedules')
     .upsert(
       { tl_id: tlId, meeting_day: meetingDay, meeting_time: meetingTime,
+        meet_link: (meetLink || '').trim(),
         updated_by: auth?.user?.id || null, updated_at: new Date().toISOString() },
       { onConflict: 'tl_id' },
     )
@@ -338,6 +339,15 @@ export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime) {
     .single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+// Resolve the Google Meet link to open for a meeting: the meeting team's
+// own per-team link, falling back to the single global link. `schedules`
+// is the array from getAgendaTeamSchedules(); `globalLink` is
+// agenda_settings.google_meet_link.
+export function agendaMeetLinkFor(meeting, schedules, globalLink = '') {
+  const teamLink = (schedules || []).find((s) => s.tl_id === meeting?.tl_id)?.meet_link;
+  return (teamLink || '').trim() || (globalLink || '').trim() || '';
 }
 
 export async function deleteAgendaTeamSchedule(tlId) {

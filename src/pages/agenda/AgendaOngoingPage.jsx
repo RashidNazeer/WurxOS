@@ -4,8 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
   listAgendaTasks, markAttendance, startPresenting, stopPresenting,
-  startMeeting, finishMeeting, pauseMeeting, getAgendaSettings,
-  subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt,
+  startMeeting, finishMeeting, pauseMeeting, getAgendaSettings, getAgendaTeamSchedules,
+  subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt, agendaMeetLinkFor,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 import { useNow } from '../../hooks/useNow';
@@ -57,6 +57,7 @@ export default function AgendaOngoingPage() {
   const [weekUpcoming, setWeekUpcoming] = useState([]);
   const [allTeams, setAllTeams]       = useState([]);
   const [meetLink, setMeetLink]       = useState('');
+  const [schedules, setSchedules]     = useState([]);
   const [justFinished, setJustFinished] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [busy, setBusy]               = useState('');
@@ -64,14 +65,16 @@ export default function AgendaOngoingPage() {
 
   async function refresh() {
     try {
-      const [active, upcoming, teams, settings] = await Promise.all([
+      const [active, upcoming, teams, settings, sched] = await Promise.all([
         listAgendaMeetings({ statuses: ['ongoing', 'paused'] }),
         listAgendaMeetings({ status: 'upcoming' }),
         listAgendaTeams(),
         getAgendaSettings(),
+        getAgendaTeamSchedules(),
       ]);
       setAllTeams(teams);
       setMeetLink(settings?.google_meet_link || '');
+      setSchedules(sched || []);
       // Only surface meetings whose TL is still an active team (deleted/
       // deactivated users can leave orphaned rows behind).
       const activeTlIds = new Set((teams || []).map((t) => t.tl.id));
@@ -277,6 +280,7 @@ export default function AgendaOngoingPage() {
 
   const teamName = team?.tl?.display_name || meeting.tl?.display_name || 'Team';
   const paused = meeting.status === 'paused';
+  const joinLink = agendaMeetLinkFor(meeting, schedules, meetLink);
 
   return (
     <div style={{ padding: '32px 32px 48px' }}>
@@ -351,8 +355,8 @@ export default function AgendaOngoingPage() {
 
       {/* Join meeting — live for everyone in the active team's room */}
       <div className="mb-3">
-        {meetLink ? (
-          <a href={meetLink} target="_blank" rel="noreferrer"
+        {joinLink ? (
+          <a href={joinLink} target="_blank" rel="noreferrer"
             className="btn btn-success w-100 d-inline-flex align-items-center justify-content-center gap-2"
             style={{ borderRadius: 12, fontWeight: 700, fontSize: '0.95rem', padding: '12px 16px' }}>
             <i className="bi bi-camera-video-fill" style={{ fontSize: '1.1rem' }} />
@@ -367,7 +371,7 @@ export default function AgendaOngoingPage() {
           <div className="rounded-3 p-2 text-center text-muted"
             style={{ background: 'var(--surface-2)', border: '1px dashed var(--border-default)', fontSize: '0.78rem' }}>
             <i className="bi bi-camera-video-off me-1" />
-            No Google Meet link set — an OL can add one in Settings → General.
+            No Google Meet link set for this team — an OL can add one in Settings → Schedules.
           </div>
         )}
       </div>
