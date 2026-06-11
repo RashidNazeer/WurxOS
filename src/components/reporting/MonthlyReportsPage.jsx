@@ -315,7 +315,7 @@ export default function MonthlyReportsPage() {
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.08)';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.borderColor = 'var(--border-default)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';

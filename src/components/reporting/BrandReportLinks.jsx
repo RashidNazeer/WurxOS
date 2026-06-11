@@ -111,7 +111,7 @@ export function EmbeddedLinks({ section, accent = '#d97706' }) {
   const links = (section && section.links) ? section.links.filter(l => l && l.url) : [];
   if (links.length === 0) return null;
   return (
-    <div className="mt-3 pt-3" style={{ borderTop: '1px dashed #e9ecef' }}>
+    <div className="mt-3 pt-3" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
       <div className="row g-2">
         {links.map(l => (
           <div key={l.id} className="col-12 col-md-6">

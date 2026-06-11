@@ -262,7 +262,7 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
       <div style={{
         width: 22, height: 22, borderRadius: 5,
         background: rank === 1 ? '#fef3c7' : rank === 2 ? '#e2e8f0' : rank === 3 ? '#fde68a' : '#f1f5f9',
-        color: C.ink, fontSize: '0.72rem', fontWeight: 700,
+        color: '#1f2937', fontSize: '0.72rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{rank}</div>
       <div style={{
@@ -602,7 +602,7 @@ function ComparisonRow({ label, current, previous, fmt }) {
       <div className="d-flex align-items-center gap-2">
         <span style={{ width: 70, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last mo</span>
         <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: '#cbd5e1', transition: 'width 320ms ease' }} />
+          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width 320ms ease' }} />
         </div>
         <span style={{ minWidth: 88, textAlign: 'right', fontSize: '0.78rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmt(previous)}</span>
       </div>
@@ -667,7 +667,7 @@ function TrendTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
-      background: '#fff', border: `1px solid ${C.line}`, borderRadius: 10,
+      background: 'var(--surface-1)', border: `1px solid ${C.line}`, borderRadius: 10,
       padding: '8px 12px', boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
       fontSize: '0.74rem',
     }}>
@@ -775,7 +775,7 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
   if (!text) return null;
   return (
     <div className="mt-3 mb-4 rounded-3" style={{
-      background: '#fffbeb', border: `1px solid ${C.amberLine}`, padding: '14px 16px',
+      background: 'var(--warning-soft)', border: `1px solid ${C.amberLine}`, padding: '14px 16px',
     }}>
       <div className="d-flex align-items-start gap-2">
         <i className="bi bi-lightbulb-fill" style={{ color: C.amber, fontSize: '0.95rem', marginTop: 2 }} />
@@ -785,10 +785,10 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
               highlighterActive={highlighterActive}
               highlightColor={highlightColor} highlightIntensity={highlightIntensity}
               className="insight-rich"
-              style={{ fontSize: '0.8rem', color: '#7c4c00', lineHeight: 1.55 }} />
+              style={{ fontSize: '0.8rem', color: 'var(--warning)', lineHeight: 1.55 }} />
           ) : (
             <RichContent html={text} className="insight-rich"
-              style={{ fontSize: '0.8rem', color: '#7c4c00', lineHeight: 1.55 }} />
+              style={{ fontSize: '0.8rem', color: 'var(--warning)', lineHeight: 1.55 }} />
           )}
         </div>
       </div>
@@ -1382,7 +1382,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                 <GmvMaxCard key={i} row={r} currency={currency} isFirst={i === 0} />
               ))}
               <div className="d-flex flex-wrap align-items-center gap-3 mt-3 p-3 rounded-3"
-                style={{ background: '#fff7ed', border: `1px solid ${C.amberLine}` }}>
+                style={{ background: 'var(--warning-soft)', border: `1px solid ${C.amberLine}` }}>
                 <span style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Overall</span>
                 <span style={{ fontSize: '0.82rem', color: C.ink }}>Spend <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{ms(sum.spend)}</strong></span>
                 <span style={{ fontSize: '0.82rem', color: C.ink }}>ROI <strong style={{ color: overallRoi >= 1 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{overallRoi.toFixed(2)}×</strong></span>

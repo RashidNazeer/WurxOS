@@ -531,7 +531,7 @@ export default function WeeklyReportsPage() {
                         <div><div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>ROI</div><div className="fw-bold" style={{ fontSize: '0.88rem' }}>{num(perf.roi).toFixed(2)}</div></div>
                       </div>
                       {gmvChange !== null && (
-                        <div style={{ fontSize: '0.68rem', color: gmvChange >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                        <div style={{ fontSize: '0.68rem', color: gmvChange >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
                           <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
                           {formatPctChange(gmvChange)} GMV vs prev week
                         </div>

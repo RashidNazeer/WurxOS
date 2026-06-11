@@ -84,7 +84,7 @@ function RangeEditor({ report, type, siblings, onSaved, onClose }) {
       {overlaps.length > 0 && (
         <div className="rounded-2 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
           <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--warning)', marginTop: 2 }} />
-          <div style={{ fontSize: '0.72rem', color: '#78350f', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--warning)', lineHeight: 1.5 }}>
             <strong>Heads up — these dates overlap {overlaps.length} other report{overlaps.length === 1 ? '' : 's'} for this brand:</strong>
             <ul className="mb-0 mt-1" style={{ paddingLeft: 18 }}>
               {overlaps.slice(0, 5).map(r => (
@@ -161,7 +161,7 @@ function MonthlyEditor({ report, siblings, onSaved, onClose }) {
       {conflict && (
         <div className="rounded-2 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
           <i className="bi bi-x-circle-fill" style={{ color: 'var(--danger)', marginTop: 2 }} />
-          <div style={{ fontSize: '0.72rem', color: '#7f1d1d', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--danger)', lineHeight: 1.5 }}>
             <strong>{conflict.monthLabel || conflict.monthKey}</strong> already has a report for this brand. Pick a different month.
           </div>
         </div>

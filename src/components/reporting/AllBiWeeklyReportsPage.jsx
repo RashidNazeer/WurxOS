@@ -759,7 +759,7 @@ export default function AllBiWeeklyReportsPage() {
                 <div className="card h-100 position-relative" style={{
                     borderRadius: 14,
                     cursor: 'pointer',
-                    border: isSel ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                    border: isSel ? '2px solid #ef4444' : '1px solid var(--border-subtle)',
                     boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.03)',
                     transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
                   }}
@@ -767,7 +767,7 @@ export default function AllBiWeeklyReportsPage() {
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)';
-                    if (!isSel) e.currentTarget.style.borderColor = '#cbd5e1';
+                    if (!isSel) e.currentTarget.style.borderColor = 'var(--border-default)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
@@ -780,7 +780,7 @@ export default function AllBiWeeklyReportsPage() {
                       style={{
                         top: 8, left: 8, width: 24, height: 24,
                         background: isSel ? '#ef4444' : 'rgba(255,255,255,0.95)',
-                        border: `1.5px solid ${isSel ? '#ef4444' : '#cbd5e1'}`,
+                        border: `1.5px solid ${isSel ? '#ef4444' : 'var(--border-default)'}`,
                         borderRadius: 6, cursor: 'pointer', zIndex: 2,
                         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                       }}
@@ -844,7 +844,7 @@ export default function AllBiWeeklyReportsPage() {
                     </div>
 
                     {gmvChange !== null && (
-                      <div className="mt-1" style={{ fontSize: '0.65rem', color: gmvChange >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                      <div className="mt-1" style={{ fontSize: '0.65rem', color: gmvChange >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
                         <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
                         {formatPctChange(gmvChange)} vs prev period
                       </div>

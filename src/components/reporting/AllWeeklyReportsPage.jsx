@@ -65,8 +65,8 @@ function StatCard({ icon, iconBg, iconColor, value, subtitle, label, trendDelta,
         </div>
         {sign && (
           <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-            style={{ background: trendDelta >= 0 ? '#f0fdf4' : '#fef2f2',
-                     color:      trendDelta >= 0 ? '#15803d' : '#dc2626',
+            style={{ background: trendDelta >= 0 ? 'var(--success-soft)' : 'var(--danger-soft)',
+                     color:      trendDelta >= 0 ? 'var(--success)' : 'var(--danger)',
                      fontSize: '0.66rem', fontWeight: 600 }}>
             <i className={`bi bi-arrow-${trendDelta >= 0 ? 'up' : 'down'}-right`} />
             {sign}
@@ -77,7 +77,7 @@ function StatCard({ icon, iconBg, iconColor, value, subtitle, label, trendDelta,
       <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
         {value} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>{subtitle}</span>
       </div>
-      <Sparkbars values={bars || []} highlightLast color={barColor || '#94a3b8'} muted="#e2e8f0" />
+      <Sparkbars values={bars || []} highlightLast color={barColor || 'var(--text-muted)'} muted="var(--border-subtle)" />
     </div>
   );
 }
@@ -558,7 +558,7 @@ export default function AllWeeklyReportsPage() {
             )}
             {canSubmitAsApc && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#0ea5e9', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--info)', color: 'white', border: 'none' }}
                 onClick={() => handleSubmitAsApc(viewReport)}
                 title="Move this draft to submitted (acting on behalf of the APC)">
                 <i className="bi bi-send-fill" /> Submit as APC
@@ -574,7 +574,7 @@ export default function AllWeeklyReportsPage() {
             )}
             {canApprove && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#16a34a', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--success)', color: 'white', border: 'none' }}
                 onClick={() => handleApprove(viewReport)}>
                 <i className="bi bi-shield-check-fill" /> Approve
               </button>
@@ -610,7 +610,7 @@ export default function AllWeeklyReportsPage() {
             )}
             {canDelete && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#dc2626', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--danger)', color: 'white', border: 'none' }}
                 onClick={() => handleDeleteReport(viewReport)}
                 title="Permanently delete this report">
                 <i className="bi bi-trash3" /> Delete
@@ -701,18 +701,18 @@ export default function AllWeeklyReportsPage() {
         {/* Reports submitted */}
         <div className="col-6 col-xl">
           <StatCard
-            icon="bi-file-earmark-text" iconBg="#eff6ff" iconColor="#3b82f6"
+            icon="bi-file-earmark-text" iconBg="var(--info-soft)" iconColor="var(--info)"
             value={monthStats.reportCount} subtitle="this period" label="Reports submitted"
-            trendDelta={monthStats.reportsTrend} bars={monthStats.barPcts} barColor="#3b82f6"
+            trendDelta={monthStats.reportsTrend} bars={monthStats.barPcts} barColor="var(--info)"
           />
         </div>
 
         {/* Active brands */}
         <div className="col-6 col-xl">
           <StatCard
-            icon="bi-grid" iconBg="#f0fdf4" iconColor="#10b981"
+            icon="bi-grid" iconBg="var(--success-soft)" iconColor="var(--success)"
             value={monthStats.brandCount} subtitle="tracked" label="Active brands"
-            trendDelta={monthStats.brandsTrend} bars={monthStats.barPcts} barColor="#10b981"
+            trendDelta={monthStats.brandsTrend} bars={monthStats.barPcts} barColor="var(--success)"
           />
         </div>
 
@@ -722,7 +722,7 @@ export default function AllWeeklyReportsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilterStatus(filterStatus === 'approved' ? '' : 'approved')}
             title="Click to filter approved reports">
-            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'approved' ? '1.5px solid #16a34a' : '1px solid #e2e8f0' }}>
+            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'approved' ? '1.5px solid var(--success)' : '1px solid var(--border-subtle)' }}>
               <div className="d-flex align-items-start justify-content-between mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
                   style={{ width: 30, height: 30, background: 'var(--success-soft)' }}>
@@ -737,7 +737,7 @@ export default function AllWeeklyReportsPage() {
               <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
                 {monthStats.approved} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>of {monthStats.reportCount}</span>
               </div>
-              <Sparkbars values={monthStats.barPcts} highlightLast color="#16a34a" muted="#e2e8f0" />
+              <Sparkbars values={monthStats.barPcts} highlightLast color="var(--success)" muted="var(--border-subtle)" />
             </div>
           </button>
         </div>
@@ -748,10 +748,10 @@ export default function AllWeeklyReportsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilterStatus(filterStatus === 'verified' ? '' : 'verified')}
             title="Click to filter pending approval">
-            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'verified' ? '1.5px solid #ea580c' : '1px solid #e2e8f0' }}>
+            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'verified' ? '1.5px solid var(--warning)' : '1px solid var(--border-subtle)' }}>
               <div className="d-flex align-items-start justify-content-between mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
-                  style={{ width: 30, height: 30, background: '#fff7ed' }}>
+                  style={{ width: 30, height: 30, background: 'var(--warning-soft)' }}>
                   <i className="bi bi-hourglass-split" style={{ color: 'var(--warning)', fontSize: '0.85rem' }} />
                 </div>
                 {monthStats.pendingOverdue > 0 && (
@@ -766,7 +766,7 @@ export default function AllWeeklyReportsPage() {
               <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
                 {monthStats.pendingApproval} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting</span>
               </div>
-              <Sparkbars values={monthStats.barPcts} highlightLast color="#ea580c" muted="#e2e8f0" />
+              <Sparkbars values={monthStats.barPcts} highlightLast color="var(--warning)" muted="var(--border-subtle)" />
             </div>
           </button>
         </div>
@@ -866,8 +866,8 @@ export default function AllWeeklyReportsPage() {
 
       {/* Results — polished card grid */}
       {filtered.length === 0 ? (
-        <div className="text-center py-5 rounded-3" style={{ background: 'var(--surface-1)', border: '1px dashed #e2e8f0' }}>
-          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: '#cbd5e1' }} />
+        <div className="text-center py-5 rounded-3" style={{ background: 'var(--surface-1)', border: '1px dashed var(--border-subtle)' }}>
+          <i className="bi bi-file-earmark-bar-graph" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
           <p className="text-muted mt-3 mb-0">No reports for {MONTH_NAMES[calMonth]} {calYear}.</p>
         </div>
       ) : (
@@ -909,10 +909,10 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
 
   // Status pill style — match the screenshot's lavender "APPROVED"
   const statusPillStyle = (() => {
-    if (status === 'approved')  return { bg: '#ede9fe', color: '#6d28d9' };
-    if (status === 'verified')  return { bg: '#ffedd5', color: '#c2410c' };
-    if (status === 'submitted') return { bg: '#dbeafe', color: 'var(--info)' };
-    return { bg: '#f1f5f9', color: 'var(--text-secondary)' };
+    if (status === 'approved')  return { bg: 'var(--purple-soft)', color: 'var(--purple)' };
+    if (status === 'verified')  return { bg: 'var(--warning-soft)', color: 'var(--warning)' };
+    if (status === 'submitted') return { bg: 'var(--info-soft)', color: 'var(--info)' };
+    return { bg: 'var(--surface-2)', color: 'var(--text-secondary)' };
   })();
 
   // Mini sparkline of brand's recent GMV (last 6 weeks ending at this report)
@@ -930,7 +930,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
     <div className="col-12 col-md-6 col-xl-4">
       <div className="rounded-3 h-100 position-relative" style={{
         background: 'var(--surface-1)',
-        border: isSelected ? '2px solid #ef4444' : '1px solid #e2e8f0',
+        border: isSelected ? '2px solid var(--danger)' : '1px solid var(--border-subtle)',
         cursor: 'pointer',
         transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
       }}
@@ -938,7 +938,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-2px)';
           e.currentTarget.style.boxShadow = '0 8px 20px rgba(15,23,42,0.08)';
-          if (!isSelected) e.currentTarget.style.borderColor = '#cbd5e1';
+          if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-default)';
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = 'none';
@@ -950,8 +950,8 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             className="position-absolute d-flex align-items-center justify-content-center"
             style={{
               top: 8, left: 8, width: 24, height: 24,
-              background: isSelected ? '#ef4444' : 'rgba(255,255,255,0.95)',
-              border: `1.5px solid ${isSelected ? '#ef4444' : '#cbd5e1'}`,
+              background: isSelected ? 'var(--danger)' : 'rgba(255,255,255,0.95)',
+              border: `1.5px solid ${isSelected ? 'var(--danger)' : 'var(--border-default)'}`,
               borderRadius: 6, cursor: 'pointer', zIndex: 2,
               boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
@@ -991,7 +991,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             </span>
           )}
           <span className="ms-auto rounded-pill d-inline-flex align-items-center gap-1"
-            style={{ background: 'var(--success-soft)', color: '#166534', fontSize: '0.62rem', fontWeight: 600, padding: '3px 8px' }}>
+            style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.62rem', fontWeight: 600, padding: '3px 8px' }}>
             <i className="bi bi-tiktok" style={{ fontSize: '0.62rem' }} />
             TikTok
           </span>
@@ -1004,10 +1004,10 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
               note={gmvChange != null
                 ? formatPctChange(gmvChange)
                 : null}
-              noteColor={gmvChange != null ? (gmvChange >= 0 ? '#16a34a' : '#dc2626') : '#94a3b8'} />
+              noteColor={gmvChange != null ? (gmvChange >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)'} />
             <CardStat label="ORDERS" value={orders.toLocaleString()} note={aov > 0 ? `${sym}${aov.toFixed(0)} AOV` : null} />
             <CardStat label="ROAS" value={roi.toFixed(2)} note={roiNote}
-              noteColor={roi >= 2 ? '#16a34a' : roi <= 0 ? '#94a3b8' : '#64748b'} />
+              noteColor={roi >= 2 ? 'var(--success)' : roi <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)'} />
             <CardStat label="VIDEOS" value={videos.toLocaleString()} />
           </div>
         </div>
@@ -1015,13 +1015,13 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         {/* Sparkline footer (vs prev week) */}
         {gmvChange != null && seriesBars.length > 1 && (
           <div className="d-flex align-items-center gap-2 px-3 py-2"
-            style={{ borderTop: '1px solid var(--border-subtle)', background: '#fafafa', borderRadius: '0 0 12px 12px' }}>
+            style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-0)', borderRadius: '0 0 12px 12px' }}>
             <span className="text-muted" style={{ fontSize: '0.7rem' }}>vs prev week</span>
             <div className="flex-grow-1">
-              <Sparkbars values={seriesBars} highlightLast color={gmvChange >= 0 ? '#16a34a' : '#dc2626'} muted="#e2e8f0" />
+              <Sparkbars values={seriesBars} highlightLast color={gmvChange >= 0 ? 'var(--success)' : 'var(--danger)'} muted="var(--border-subtle)" />
             </div>
             <span className="d-inline-flex align-items-center gap-1 fw-bold" style={{ fontSize: '0.72rem',
-                color: gmvChange >= 0 ? '#16a34a' : '#dc2626' }}>
+                color: gmvChange >= 0 ? 'var(--success)' : 'var(--danger)' }}>
               <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-right`} />
               {formatPctChange(gmvChange)}
             </span>
@@ -1038,7 +1038,7 @@ function CardStat({ label, value, note, noteColor }) {
       <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.04em' }}>{label}</div>
       <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: 2 }}>{value}</div>
       {note && (
-        <div style={{ fontSize: '0.65rem', color: noteColor || '#64748b', fontWeight: 600, marginTop: 2 }}>{note}</div>
+        <div style={{ fontSize: '0.65rem', color: noteColor || 'var(--text-secondary)', fontWeight: 600, marginTop: 2 }}>{note}</div>
       )}
     </div>
   );

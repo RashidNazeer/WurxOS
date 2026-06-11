@@ -37,9 +37,9 @@ export default function ReportFiltersPopover({ filters, onClear }) {
         style={{
           borderRadius: 8,
           fontSize: '0.78rem',
-          border: `1px solid ${activeCount ? '#3b82f6' : '#d1d5db'}`,
-          background: activeCount ? '#eff6ff' : '#fff',
-          color: activeCount ? '#1d4ed8' : '#334155',
+          border: `1px solid ${activeCount ? 'var(--info)' : 'var(--border-default)'}`,
+          background: activeCount ? 'var(--info-soft)' : 'var(--surface-1)',
+          color: activeCount ? 'var(--info)' : 'var(--text-secondary)',
           fontWeight: 500,
         }}
         onClick={() => setOpen(v => !v)}>
@@ -77,7 +77,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
             <div className="d-flex align-items-center justify-content-between"
               style={{
                 padding: '12px 14px',
-                background: 'linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%)',
+                background: 'linear-gradient(135deg, var(--info-soft) 0%, var(--purple-soft) 100%)',
                 borderBottom: '1px solid var(--border-subtle)',
               }}>
               <div className="fw-bold" style={{ fontSize: '0.84rem', color: 'var(--text-primary)' }}>

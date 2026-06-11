@@ -428,21 +428,21 @@
 
 /* Highlight marks rendered in views */
 mark.rh { padding: 0 1px; border-radius: 2px; }
-mark.rh[data-color='yellow'][data-intensity='light']  { background: #fef9c3; color: inherit; }
-mark.rh[data-color='yellow'][data-intensity='medium'] { background: #fef08a; color: inherit; }
-mark.rh[data-color='yellow'][data-intensity='dark']   { background: #fde047; color: inherit; }
-mark.rh[data-color='green'][data-intensity='light']   { background: #dcfce7; color: inherit; }
-mark.rh[data-color='green'][data-intensity='medium']  { background: #bbf7d0; color: inherit; }
-mark.rh[data-color='green'][data-intensity='dark']    { background: #86efac; color: inherit; }
-mark.rh[data-color='pink'][data-intensity='light']    { background: #fce7f3; color: inherit; }
-mark.rh[data-color='pink'][data-intensity='medium']   { background: #f9a8d4; color: inherit; }
-mark.rh[data-color='pink'][data-intensity='dark']     { background: #f472b6; color: inherit; }
-mark.rh[data-color='blue'][data-intensity='light']    { background: #dbeafe; color: inherit; }
-mark.rh[data-color='blue'][data-intensity='medium']   { background: #93c5fd; color: inherit; }
-mark.rh[data-color='blue'][data-intensity='dark']     { background: #60a5fa; color: inherit; }
-mark.rh[data-color='orange'][data-intensity='light']  { background: #ffedd5; color: inherit; }
-mark.rh[data-color='orange'][data-intensity='medium'] { background: #fdba74; color: inherit; }
-mark.rh[data-color='orange'][data-intensity='dark']   { background: #fb923c; color: inherit; }
+mark.rh[data-color='yellow'][data-intensity='light']  { background: #fef9c3; color: #1f2937; }
+mark.rh[data-color='yellow'][data-intensity='medium'] { background: #fef08a; color: #1f2937; }
+mark.rh[data-color='yellow'][data-intensity='dark']   { background: #fde047; color: #1f2937; }
+mark.rh[data-color='green'][data-intensity='light']   { background: #dcfce7; color: #1f2937; }
+mark.rh[data-color='green'][data-intensity='medium']  { background: #bbf7d0; color: #1f2937; }
+mark.rh[data-color='green'][data-intensity='dark']    { background: #86efac; color: #1f2937; }
+mark.rh[data-color='pink'][data-intensity='light']    { background: #fce7f3; color: #1f2937; }
+mark.rh[data-color='pink'][data-intensity='medium']   { background: #f9a8d4; color: #1f2937; }
+mark.rh[data-color='pink'][data-intensity='dark']     { background: #f472b6; color: #1f2937; }
+mark.rh[data-color='blue'][data-intensity='light']    { background: #dbeafe; color: #1f2937; }
+mark.rh[data-color='blue'][data-intensity='medium']   { background: #93c5fd; color: #1f2937; }
+mark.rh[data-color='blue'][data-intensity='dark']     { background: #60a5fa; color: #1f2937; }
+mark.rh[data-color='orange'][data-intensity='light']  { background: #ffedd5; color: #1f2937; }
+mark.rh[data-color='orange'][data-intensity='medium'] { background: #fdba74; color: #1f2937; }
+mark.rh[data-color='orange'][data-intensity='dark']   { background: #fb923c; color: #1f2937; }
 
 /* Highlightable area — different cursor when highlighter mode is on */
 .highlightable-content.highlighter-active { cursor: text; }

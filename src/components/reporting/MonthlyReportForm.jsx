@@ -792,10 +792,10 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {importToast && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
           style={{
-            background: importToast.kind === 'success' ? '#ecfdf5' : importToast.kind === 'warn' ? '#fffbeb' : '#fef2f2',
-            border: `1px solid ${importToast.kind === 'success' ? '#a7f3d0' : importToast.kind === 'warn' ? '#fde68a' : '#fecaca'}`,
+            background: importToast.kind === 'success' ? 'var(--success-soft)' : importToast.kind === 'warn' ? 'var(--warning-soft)' : 'var(--danger-soft)',
+            border: `1px solid ${importToast.kind === 'success' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : importToast.kind === 'warn' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}`,
             borderRadius: 10,
-            color: importToast.kind === 'success' ? '#065f46' : importToast.kind === 'warn' ? '#92400e' : '#991b1b',
+            color: importToast.kind === 'success' ? 'var(--success)' : importToast.kind === 'warn' ? 'var(--warning)' : 'var(--danger)',
           }}>
           <i className={`bi ${importToast.kind === 'success' ? 'bi-check-circle-fill' : importToast.kind === 'warn' ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'} flex-shrink-0 mt-1`} />
           <div className="flex-grow-1" style={{ fontSize: '0.78rem' }}>{importToast.msg}</div>
@@ -867,7 +867,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         return (
           <div className="card mb-3" style={{
             borderRadius: 12, border: '1px solid var(--border-subtle)',
-            background: '#fafbfc', boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
+            background: 'var(--surface-0)', boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
           }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-2">
@@ -897,7 +897,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
                           sectionsEnabled: { ...resolveSectionsEnabled(d.sectionsEnabled), [s.key]: e.target.checked },
                         }))}
                       />
-                      <span style={{ fontSize: '0.78rem', fontWeight: 500, color: enabled[s.key] ? '#0f172a' : '#94a3b8' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 500, color: enabled[s.key] ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                         {s.title}
                       </span>
                     </label>

@@ -688,7 +688,7 @@ export default function AllMonthlyReportsPage() {
               <div key={r.id} className="col-12 col-md-6 col-lg-4">
                 <div className="card h-100 position-relative" style={{
                     borderRadius: 14, cursor: 'pointer',
-                    border: isSel ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                    border: isSel ? '2px solid #ef4444' : '1px solid var(--border-subtle)',
                     boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
                     transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
                   }}
@@ -696,7 +696,7 @@ export default function AllMonthlyReportsPage() {
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.08)';
-                    if (!isSel) e.currentTarget.style.borderColor = '#cbd5e1';
+                    if (!isSel) e.currentTarget.style.borderColor = 'var(--border-default)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
@@ -708,8 +708,8 @@ export default function AllMonthlyReportsPage() {
                       className="position-absolute d-flex align-items-center justify-content-center"
                       style={{
                         top: 8, left: 8, width: 24, height: 24,
-                        background: isSel ? '#ef4444' : 'rgba(255,255,255,0.95)',
-                        border: `1.5px solid ${isSel ? '#ef4444' : '#cbd5e1'}`,
+                        background: isSel ? '#ef4444' : 'var(--surface-1)',
+                        border: `1.5px solid ${isSel ? '#ef4444' : 'var(--border-default)'}`,
                         borderRadius: 6, cursor: 'pointer', zIndex: 2,
                         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                       }}

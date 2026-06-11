@@ -885,7 +885,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
         </p>
         <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 420 }}>
           <div className="card-body p-4">
-            <label className="form-label fw-semibold" style={{ fontSize: '0.8rem', color: '#374151' }}>
+            <label className="form-label fw-semibold" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               <i className="bi bi-calendar2-range me-1 text-primary" /> Starting Date of Period 1
             </label>
             <input
@@ -896,11 +896,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
               style={{ borderRadius: 8, fontSize: '0.85rem' }}
             />
             {anchorStartInput && (
-              <div className="rounded-3 p-3 mb-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
-                <div className="fw-semibold" style={{ fontSize: '0.8rem', color: '#0369a1' }}>
+              <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+                <div className="fw-semibold" style={{ fontSize: '0.8rem', color: 'var(--info)' }}>
                   <i className="bi bi-calendar-check me-1" /> Period 1 Preview
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#0c4a6e', marginTop: 4 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 4 }}>
                   {startDisplay} — {previewEnd}
                 </div>
                 <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>

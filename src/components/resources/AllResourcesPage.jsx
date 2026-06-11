@@ -217,7 +217,7 @@ export default function AllResourcesPage() {
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: '#1a1a2e' }}>
+          <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-collection-fill" style={{ fontSize: '1.15rem' }} />
             All Resources
           </h5>
@@ -262,9 +262,9 @@ export default function AllResourcesPage() {
       {/* Stats strip */}
       {!loading && (
         <div className="d-flex flex-wrap gap-2 mb-4">
-          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style={{ background: '#f0f1f5', border: '1px solid #dee2e6' }}>
-            <span className="fw-bold" style={{ color: '#1a1a2e', fontSize: '1.1rem', lineHeight: 1 }}>{resources.length}</span>
-            <span style={{ fontSize: '0.72rem', color: '#6c757d', fontWeight: 500 }}>Total</span>
+          <div className="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+            <span className="fw-bold" style={{ color: 'var(--text-primary)', fontSize: '1.1rem', lineHeight: 1 }}>{resources.length}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total</span>
           </div>
           {Object.entries(TYPE_CFG).map(([type, cfg]) => (
             <div
@@ -330,9 +330,9 @@ export default function AllResourcesPage() {
                   className="btn btn-sm d-inline-flex align-items-center gap-1"
                   style={{
                     borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap',
-                    background: filterScope === v.key ? '#0d6efd' : '#f1f5f9',
-                    color: filterScope === v.key ? '#fff' : '#64748b',
-                    border: filterScope === v.key ? '1.5px solid #0d6efd' : '1.5px solid #e2e8f0',
+                    background: filterScope === v.key ? '#0d6efd' : 'var(--surface-2)',
+                    color: filterScope === v.key ? '#fff' : 'var(--text-secondary)',
+                    border: filterScope === v.key ? '1.5px solid #0d6efd' : '1.5px solid var(--border-subtle)',
                   }}
                   onClick={() => setFilterScope(filterScope === v.key ? '' : v.key)}>
                   <i className={`bi ${v.icon}`} style={{ fontSize: '0.65rem' }} />{v.label}
@@ -389,8 +389,8 @@ export default function AllResourcesPage() {
               </div>
             ))}
           </div>
-          <div className="mt-3" style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
-            Showing <strong style={{ color: '#495057' }}>{filtered.length}</strong> of <strong style={{ color: '#495057' }}>{resources.length}</strong> resource{resources.length !== 1 ? 's' : ''}
+          <div className="mt-3" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            Showing <strong style={{ color: 'var(--text-secondary)' }}>{filtered.length}</strong> of <strong style={{ color: 'var(--text-secondary)' }}>{resources.length}</strong> resource{resources.length !== 1 ? 's' : ''}
           </div>
         </>
       ) : (
@@ -458,7 +458,7 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
             <i className={`bi ${tCfg.icon}`} style={{ color: tCfg.color, fontSize: '1.05rem' }} />
           </div>
           <div className="flex-grow-1" style={{ minWidth: 0, overflow: 'hidden' }}>
-            <p className="fw-semibold mb-0" style={{ fontSize: '0.88rem', color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p className="fw-semibold mb-0" style={{ fontSize: '0.88rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {r.name}
             </p>
             <div className="d-flex align-items-center gap-1 flex-wrap mt-1">
@@ -480,7 +480,7 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
             {canEdit && (
               <button
                 className="btn btn-sm btn-light border-0 rounded-circle"
-                style={{ width: 26, height: 26, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#adb5bd' }}
+                style={{ width: 26, height: 26, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}
                 onClick={() => onEdit(r)}
                 title="Edit"
               >
@@ -490,7 +490,7 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
             {canDelete && (
               <button
                 className="btn btn-sm btn-light border-0 rounded-circle"
-                style={{ width: 26, height: 26, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#adb5bd' }}
+                style={{ width: 26, height: 26, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}
                 onClick={() => onDelete(r)}
                 title="Delete"
               >
@@ -516,10 +516,10 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
           </a>
         )}
 
-        <div className="d-flex align-items-center justify-content-between mt-auto pt-2" style={{ borderTop: '1px solid #f0f0f0' }}>
+        <div className="d-flex align-items-center justify-content-between mt-auto pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           {isGeneral ? (
             <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-              style={{ background: '#f3f4f6', border: '1px solid #dee2e6', fontSize: '0.65rem', fontWeight: 600, color: '#6c757d' }}>
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               <i className="bi bi-globe2" style={{ fontSize: '0.6rem' }} />
               General
             </span>
@@ -531,8 +531,8 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
             </span>
           )}
           <div className="text-end">
-            {r.addedBy?.name && <div style={{ fontSize: '0.62rem', color: '#adb5bd' }}>{r.addedBy.name}</div>}
-            <div style={{ fontSize: '0.62rem', color: '#c0c7d0' }}>{timeAgo(r.createdAt)}</div>
+            {r.addedBy?.name && <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{r.addedBy.name}</div>}
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{timeAgo(r.createdAt)}</div>
           </div>
         </div>
       </div>
@@ -548,9 +548,9 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
       <div style={{ overflowX: 'auto' }}>
         <table className="table table-hover mb-0" style={{ fontSize: '0.83rem', minWidth: 640 }}>
           <thead>
-            <tr style={{ background: '#f8f9fa' }}>
+            <tr style={{ background: 'var(--surface-0)' }}>
               {['Resource', 'Type', 'Scope', 'Added By', 'Date', ''].map(col => (
-                <th key={col} style={{ padding: '10px 16px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', borderBottom: '2px solid #e9ecef' }}>
+                <th key={col} style={{ padding: '10px 16px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', borderBottom: '2px solid var(--border-subtle)' }}>
                   {col}
                 </th>
               ))}
@@ -589,7 +589,7 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
                   </td>
                   <td style={{ padding: '11px 16px', verticalAlign: 'middle' }}>
                     {isGeneral ? (
-                      <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1" style={{ background: '#f3f4f6', border: '1px solid #dee2e6', fontSize: '0.68rem', fontWeight: 600, color: '#6c757d' }}>
+                      <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                         <i className="bi bi-globe2" style={{ fontSize: '0.6rem' }} />
                         General
                       </span>
@@ -600,17 +600,17 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '11px 16px', verticalAlign: 'middle', fontSize: '0.78rem', color: '#6c757d' }}>{r.addedBy?.name || '—'}</td>
-                  <td style={{ padding: '11px 16px', verticalAlign: 'middle', fontSize: '0.72rem', color: '#9ca3af' }}>{timeAgo(r.createdAt)}</td>
+                  <td style={{ padding: '11px 16px', verticalAlign: 'middle', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{r.addedBy?.name || '—'}</td>
+                  <td style={{ padding: '11px 16px', verticalAlign: 'middle', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{timeAgo(r.createdAt)}</td>
                   <td style={{ padding: '11px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
                     <div className="d-flex gap-1 justify-content-end">
                       {canEdit && (
-                        <button className="btn btn-sm btn-link p-0" style={{ color: '#adb5bd', fontSize: '0.82rem' }} onClick={() => onEdit(r)} title="Edit">
+                        <button className="btn btn-sm btn-link p-0" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }} onClick={() => onEdit(r)} title="Edit">
                           <i className="bi bi-pencil" />
                         </button>
                       )}
                       {canDelete && (
-                        <button className="btn btn-sm btn-link p-0" style={{ color: '#adb5bd', fontSize: '0.82rem' }} onClick={() => onDelete(r)} title="Delete">
+                        <button className="btn btn-sm btn-link p-0" style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }} onClick={() => onDelete(r)} title="Delete">
                           <i className="bi bi-trash" />
                         </button>
                       )}
@@ -622,8 +622,8 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-2 border-top d-flex align-items-center justify-content-between" style={{ background: '#f8f9fa', fontSize: '0.72rem', color: '#9ca3af' }}>
-        <span>Showing <strong style={{ color: '#495057' }}>{resources.length}</strong> of <strong style={{ color: '#495057' }}>{total}</strong> resource{total !== 1 ? 's' : ''}</span>
+      <div className="px-4 py-2 border-top d-flex align-items-center justify-content-between" style={{ background: 'var(--surface-0)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+        <span>Showing <strong style={{ color: 'var(--text-secondary)' }}>{resources.length}</strong> of <strong style={{ color: 'var(--text-secondary)' }}>{total}</strong> resource{total !== 1 ? 's' : ''}</span>
       </div>
     </div>
   );
@@ -720,28 +720,28 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                   onClick={() => setScope('brand')}
                   className="d-inline-flex align-items-center gap-2 rounded-3 border flex-grow-1 p-2"
                   style={{
-                    background: scope === 'brand' ? '#e8f0fe' : '#fff',
-                    borderColor: scope === 'brand' ? '#0d6efd' : '#dee2e6',
+                    background: scope === 'brand' ? '#e8f0fe' : 'var(--surface-1)',
+                    borderColor: scope === 'brand' ? '#0d6efd' : 'var(--border-subtle)',
                     cursor: 'pointer',
                   }}>
                   <i className="bi bi-shop" style={{ color: '#0d6efd' }} />
                   <div className="text-start" style={{ lineHeight: 1.2 }}>
-                    <div className="small fw-semibold" style={{ color: scope === 'brand' ? '#0d6efd' : '#495057' }}>Brand resource</div>
-                    <div style={{ fontSize: '0.65rem', color: '#868e96' }}>Tied to a specific brand</div>
+                    <div className="small fw-semibold" style={{ color: scope === 'brand' ? '#0d6efd' : 'var(--text-secondary)' }}>Brand resource</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Tied to a specific brand</div>
                   </div>
                 </button>
                 <button type="button"
                   onClick={() => setScope('general')}
                   className="d-inline-flex align-items-center gap-2 rounded-3 border flex-grow-1 p-2"
                   style={{
-                    background: scope === 'general' ? '#e8f0fe' : '#fff',
-                    borderColor: scope === 'general' ? '#0d6efd' : '#dee2e6',
+                    background: scope === 'general' ? '#e8f0fe' : 'var(--surface-1)',
+                    borderColor: scope === 'general' ? '#0d6efd' : 'var(--border-subtle)',
                     cursor: 'pointer',
                   }}>
                   <i className="bi bi-globe2" style={{ color: '#0d6efd' }} />
                   <div className="text-start" style={{ lineHeight: 1.2 }}>
-                    <div className="small fw-semibold" style={{ color: scope === 'general' ? '#0d6efd' : '#495057' }}>General</div>
-                    <div style={{ fontSize: '0.65rem', color: '#868e96' }}>Personal or shared</div>
+                    <div className="small fw-semibold" style={{ color: scope === 'general' ? '#0d6efd' : 'var(--text-secondary)' }}>General</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Personal or shared</div>
                   </div>
                 </button>
               </div>
@@ -770,13 +770,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                       <label key={v}
                         className="d-flex align-items-center gap-2 p-2 rounded-2"
                         style={{
-                          background: visibility === v ? `${cfg.color}15` : '#fff',
-                          border: `1.5px solid ${visibility === v ? cfg.color + '55' : '#e9ecef'}`,
+                          background: visibility === v ? `${cfg.color}15` : 'var(--surface-1)',
+                          border: `1.5px solid ${visibility === v ? cfg.color + '55' : 'var(--border-subtle)'}`,
                           cursor: 'pointer',
                         }}>
                         <input type="radio" className="form-check-input" checked={visibility === v} onChange={() => setVisibility(v)} />
                         <i className={`bi ${cfg.icon}`} style={{ color: cfg.color }} />
-                        <span className="small fw-medium" style={{ color: visibility === v ? cfg.color : '#495057' }}>
+                        <span className="small fw-medium" style={{ color: visibility === v ? cfg.color : 'var(--text-secondary)' }}>
                           {cfg.label}
                         </span>
                       </label>
@@ -795,7 +795,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                       onChange={e => setUserSearch(e.target.value)}
                       style={{ borderRadius: 8 }}
                     />
-                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e9ecef', borderRadius: 8 }}>
+                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
                       {userOptions.length === 0 && (
                         <div className="text-center py-2 small text-muted">No users match</div>
                       )}
@@ -805,13 +805,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                           style={{
                             cursor: 'pointer',
                             background: visibleToUid === u.id ? '#e8f0fe' : 'transparent',
-                            borderBottom: '1px solid #f1f3f5',
+                            borderBottom: '1px solid var(--border-subtle)',
                           }}
                           onClick={() => setVisibleToUid(u.id)}>
                           <input type="radio" checked={visibleToUid === u.id} onChange={() => setVisibleToUid(u.id)} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="small fw-semibold text-truncate">{u.name}</div>
-                            <div style={{ fontSize: '0.65rem', color: '#868e96' }}>{u.role?.toUpperCase()}</div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{u.role?.toUpperCase()}</div>
                           </div>
                         </div>
                       ))}
@@ -869,13 +869,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
             {((scope === 'brand' && brandId) || (scope === 'general' && visibility === 'user' && visibleToUid)) && (
               <div
                 className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3"
-                style={{ background: notifyInApp ? '#e8f0fe' : '#f8f9fa', border: `1.5px solid ${notifyInApp ? '#c5d5ff' : '#e9ecef'}`, cursor: 'pointer' }}
+                style={{ background: notifyInApp ? '#e8f0fe' : 'var(--surface-0)', border: `1.5px solid ${notifyInApp ? '#c5d5ff' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                 onClick={() => setNotifyInApp(v => !v)}
               >
                 <input type="checkbox" className="form-check-input flex-shrink-0"
                   checked={notifyInApp} onChange={e => setNotifyInApp(e.target.checked)}
                   onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
-                <span className="small mb-0" style={{ cursor: 'pointer', color: notifyInApp ? '#0d6efd' : '#495057' }}>
+                <span className="small mb-0" style={{ cursor: 'pointer', color: notifyInApp ? '#0d6efd' : 'var(--text-secondary)' }}>
                   <i className="bi bi-bell me-1" />
                   Notify {scope === 'brand' ? 'brand members' : 'the recipient'}
                 </span>

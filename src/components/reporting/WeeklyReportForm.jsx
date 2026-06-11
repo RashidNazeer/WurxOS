@@ -1114,7 +1114,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <div className="card-body p-4">
             <div className="row g-2">
               <div className="col-7">
-                <label className="form-label fw-semibold" style={{ fontSize: '0.78rem', color: '#374151' }}>
+                <label className="form-label fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                   <i className="bi bi-calendar-week me-1 text-primary" /> Starting date
                 </label>
                 <input
@@ -1126,7 +1126,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                 />
               </div>
               <div className="col-5">
-                <label className="form-label fw-semibold" style={{ fontSize: '0.78rem', color: '#374151' }}>
+                <label className="form-label fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                   <i className="bi bi-hash me-1 text-primary" />Week #
                 </label>
                 <input
@@ -1144,11 +1144,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               (e.g. Google Docs) and you&apos;re currently on week 7, enter <strong>7</strong> — the next report will pick up at week 8.
             </div>
             {weekStartInput && (
-              <div className="rounded-3 p-3 mb-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
-                <div className="fw-semibold" style={{ fontSize: '0.8rem', color: '#0369a1' }}>
+              <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+                <div className="fw-semibold" style={{ fontSize: '0.8rem', color: 'var(--info)' }}>
                   <i className="bi bi-calendar-check me-1" /> Week {Math.max(1, Math.floor(Number(startWeekNumInput) || 1))} Preview
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#0c4a6e', marginTop: 4 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--info)', marginTop: 4 }}>
                   {startDisplay} — {previewEnd}
                 </div>
                 <div className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
@@ -1268,10 +1268,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {importToast && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
           style={{
-            background: importToast.kind === 'success' ? '#ecfdf5' : importToast.kind === 'warn' ? '#fffbeb' : '#fef2f2',
-            border: `1px solid ${importToast.kind === 'success' ? '#a7f3d0' : importToast.kind === 'warn' ? '#fde68a' : '#fecaca'}`,
+            background: importToast.kind === 'success' ? 'var(--success-soft)' : importToast.kind === 'warn' ? 'var(--warning-soft)' : 'var(--danger-soft)',
+            border: `1px solid ${importToast.kind === 'success' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : importToast.kind === 'warn' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}`,
             borderRadius: 10,
-            color: importToast.kind === 'success' ? '#065f46' : importToast.kind === 'warn' ? '#92400e' : '#991b1b',
+            color: importToast.kind === 'success' ? 'var(--success)' : importToast.kind === 'warn' ? 'var(--warning)' : 'var(--danger)',
           }}>
           <i className={`bi ${importToast.kind === 'success' ? 'bi-check-circle-fill' : importToast.kind === 'warn' ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'} flex-shrink-0 mt-1`} />
           <div className="flex-grow-1" style={{ fontSize: '0.78rem' }}>{importToast.msg}</div>
@@ -1862,7 +1862,7 @@ function BrandTableFieldRow({ field, value, prevValue, onChange }) {
             {delta && (
               <span style={{
                 marginLeft: 6,
-                color: delta.up ? '#16a34a' : '#dc2626',
+                color: delta.up ? 'var(--success)' : 'var(--danger)',
                 fontWeight: 700,
               }}>
                 {delta.up ? '▲' : '▼'} {Math.abs(delta.diff).toLocaleString()}
@@ -2063,7 +2063,7 @@ function NumericDelta({ cur, prev, type }) {
   if (diff === 0) return null;
   const up = diff > 0;
   return (
-    <span style={{ marginLeft: 6, color: up ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+    <span style={{ marginLeft: 6, color: up ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
       {up ? '▲' : '▼'} {Math.abs(diff).toLocaleString()}
     </span>
   );

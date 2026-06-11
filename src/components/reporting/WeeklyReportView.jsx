@@ -226,7 +226,7 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
     <div className="d-flex align-items-center gap-3 px-3 py-3" style={{ borderTop: `1px solid ${C.line}` }}>
       <div style={{
         width: 22, height: 22, borderRadius: 5,
-        background: rank === 1 ? '#fef3c7' : rank === 2 ? '#e2e8f0' : rank === 3 ? '#fde68a' : '#f1f5f9',
+        background: rank === 1 ? '#fef3c7' : rank === 2 ? 'var(--surface-3)' : rank === 3 ? '#fde68a' : 'var(--surface-2)',
         color: C.ink, fontSize: '0.72rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{rank}</div>
@@ -443,7 +443,7 @@ function ComparisonRow({ label, current, previous, fmt }) {
       <div className="d-flex align-items-center gap-2">
         <span style={{ width: 64, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last wk</span>
         <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: '#cbd5e1', transition: 'width 320ms ease' }} />
+          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width 320ms ease' }} />
         </div>
         <span style={{ minWidth: 78, textAlign: 'right', fontSize: '0.78rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmt(previous)}</span>
       </div>
@@ -484,7 +484,7 @@ function TrendTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
-      background: '#fff', border: `1px solid ${C.line}`, borderRadius: 10,
+      background: 'var(--surface-1)', border: `1px solid ${C.line}`, borderRadius: 10,
       padding: '8px 12px', boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
       fontSize: '0.74rem',
     }}>
