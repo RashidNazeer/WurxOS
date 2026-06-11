@@ -45,6 +45,11 @@
   --purple:       #6610f2;
   --purple-soft:  #f0ebff;
 
+  /* Attendance "spotlight" cards (Hours-worked tile + Today/clock card):
+     dark navy in light mode (original look) — flips to the peach accent in dark. */
+  --att-spotlight-bg: #0f172a;
+  --att-spotlight-fg: #ffffff;
+
   /* Inputs */
   --input-bg:     #ffffff;
   --input-border: #cbd5e1;
@@ -101,6 +106,10 @@
   /* Purple — readable lavender on near-black + translucent fill */
   --purple:       #c4b5fd;
   --purple-soft:  rgba(168, 85, 247, 0.16);
+
+  /* Attendance spotlight — keep the peach accent in dark (it reads well). */
+  --att-spotlight-bg: var(--accent);
+  --att-spotlight-fg: var(--on-accent);
 
   --input-bg:     #1a1a1a;
   --input-border: rgba(245, 213, 168, 0.18);

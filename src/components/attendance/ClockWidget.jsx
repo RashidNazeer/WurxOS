@@ -733,26 +733,27 @@ export default function ClockWidget() {
         .att-secondary-btn:hover:not(:disabled) { background: var(--surface-2); }
 
         .att-today-card {
-          background: var(--accent); color: var(--on-accent); border-radius: 22px;
+          background: var(--att-spotlight-bg); color: var(--att-spotlight-fg); border-radius: 22px;
           padding: 22px; height: 100%; display: flex; flex-direction: column;
         }
         .att-today-card .att-today-label {
           font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em;
-          text-transform: uppercase; color: color-mix(in srgb, var(--on-accent) 55%, transparent); margin-bottom: 4px;
+          text-transform: uppercase; color: color-mix(in srgb, var(--att-spotlight-fg) 55%, transparent); margin-bottom: 4px;
         }
-        .att-today-card h4 { color: var(--on-accent); font-weight: 700; margin-bottom: 18px; font-size: 1.35rem; }
-        .att-today-card .att-digit { color: var(--on-accent); }
-        .att-today-progress { background: color-mix(in srgb, var(--on-accent) 8%, transparent); border-radius: 999px; height: 6px; overflow: hidden; }
-        .att-today-progress-fill { height: 100%; background: color-mix(in srgb, var(--on-accent) 70%, transparent); transition: width 0.4s; }
+        .att-today-card h4 { color: var(--att-spotlight-fg); font-weight: 700; margin-bottom: 18px; font-size: 1.35rem; }
+        .att-today-card .att-digit { color: var(--att-spotlight-fg); }
+        .att-today-progress { background: color-mix(in srgb, var(--att-spotlight-fg) 8%, transparent); border-radius: 999px; height: 6px; overflow: hidden; }
+        .att-today-progress-fill { height: 100%; background: linear-gradient(90deg, #f5d5a8, #d4a574); transition: width 0.4s; }
+        [data-theme='dark'] .att-today-progress-fill { background: color-mix(in srgb, var(--on-accent) 70%, transparent); }
         .att-today-stat-col {
           flex: 1; text-align: left;
         }
         .att-today-stat-col .l {
           font-size: 0.56rem; font-weight: 700; letter-spacing: 0.1em;
-          text-transform: uppercase; color: color-mix(in srgb, var(--on-accent) 40%, transparent);
+          text-transform: uppercase; color: color-mix(in srgb, var(--att-spotlight-fg) 40%, transparent);
         }
         .att-today-stat-col .v {
-          font-size: 1.1rem; font-weight: 700; color: var(--on-accent); margin-top: 2px;
+          font-size: 1.1rem; font-weight: 700; color: var(--att-spotlight-fg); margin-top: 2px;
           font-variant-numeric: tabular-nums;
         }
       `}</style>

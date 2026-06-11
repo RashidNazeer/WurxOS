@@ -296,7 +296,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
             : 'clocked in'} />
         <MyAttTile dot="var(--info)" label="Days on leave" value={stats.leaveDays}    sub="approved" />
         <MyAttTile dot="var(--danger)" label="Days missed"   value={stats.missedDays}   sub="past weekdays not covered" />
-        <MyAttTile dot="var(--on-accent)" label="Hours worked"  value={`${hrsTotal}h ${minsTotal}m`} sub="this month" prominent />
+        <MyAttTile dot="var(--att-spotlight-fg)" label="Hours worked"  value={`${hrsTotal}h ${minsTotal}m`} sub="this month" prominent />
       </div>
 
       {/* Which days were missed — chip strip below the tiles. Only
@@ -355,18 +355,18 @@ function MyAttTile({ dot, label, value, sub, prominent }) {
   return (
     <div className="col-6 col-lg-3">
       <div className="rounded-3 h-100 p-3" style={{
-        background: prominent ? 'var(--accent)' : 'var(--surface-0)',
-        border: prominent ? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
-        color: prominent ? 'var(--on-accent)' : 'var(--text-primary)',
+        background: prominent ? 'var(--att-spotlight-bg)' : 'var(--surface-0)',
+        border: prominent ? '1px solid var(--att-spotlight-bg)' : '1px solid var(--border-subtle)',
+        color: prominent ? 'var(--att-spotlight-fg)' : 'var(--text-primary)',
       }}>
         <div className="d-flex align-items-center gap-2"
           style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                   color: prominent ? 'color-mix(in srgb, var(--on-accent) 70%, transparent)' : 'var(--text-secondary)' }}>
+                   color: prominent ? 'color-mix(in srgb, var(--att-spotlight-fg) 70%, transparent)' : 'var(--text-secondary)' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, display: 'inline-block' }} />
           {label}
         </div>
         <div className="fw-bold" style={{ fontSize: '1.1rem', letterSpacing: '-0.01em', lineHeight: 1.15, marginTop: 6 }}>{value}</div>
-        {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'color-mix(in srgb, var(--on-accent) 60%, transparent)' : 'var(--text-secondary)' }}>{sub}</div>}
+        {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'color-mix(in srgb, var(--att-spotlight-fg) 60%, transparent)' : 'var(--text-secondary)' }}>{sub}</div>}
       </div>
     </div>
   );
