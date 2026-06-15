@@ -15,30 +15,13 @@ import HighlighterPicker, { useHighlightStyle } from './HighlighterPicker';
  *   • RhHighlight → <mark class="rh" data-color data-intensity> (same as v1;
  *     reports.css + report views render it identically).
  *   • FontSize    → <span style="font-size:Npx"> on the textStyle mark.
+ *
+ * The toolbar is a pure presentation layer over the engine — icons (Bootstrap
+ * Icons), grouped sections, hover/active states, a focus ring and a sticky
+ * bar. None of the editor commands changed.
  */
 
 const FONT_SIZES = ['10', '11', '12', '14', '16', '18', '20', '24', '28', '32', '36', '48', '72'];
-
-const BTN = {
-  background: 'transparent', border: '1px solid transparent', borderRadius: 6,
-  padding: '4px 8px', fontSize: 13, cursor: 'pointer', color: 'var(--text-primary)',
-  minWidth: 30, height: 30, display: 'inline-flex', alignItems: 'center',
-  justifyContent: 'center', fontWeight: 700, fontFamily: 'inherit', lineHeight: 1,
-};
-const BTN_ACTIVE = { background: 'var(--accent-soft)', borderColor: 'color-mix(in srgb, var(--accent) 45%, transparent)', color: 'var(--accent)' };
-
-function Tb({ onClick, active, title, children, style }) {
-  return (
-    <button type="button" title={title}
-      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
-      style={{ ...BTN, ...(active ? BTN_ACTIVE : null), ...style }}>
-      {children}
-    </button>
-  );
-}
-function Divider() {
-  return <span style={{ width: 1, height: 22, background: 'var(--border-default)', margin: '0 3px' }} />;
-}
 
 const HEADINGS = [
   { v: 'p',  label: 'Normal' },
@@ -47,6 +30,38 @@ const HEADINGS = [
   { v: '3',  label: 'Heading 3' },
   { v: '4',  label: 'Heading 4' },
 ];
+
+// Toolbar icon button. mousedown+preventDefault keeps the editor selection
+// alive (a plain click would blur the contenteditable before the command runs).
+function Tb({ onClick, active, title, icon, children }) {
+  return (
+    <button type="button" title={title} aria-label={title} aria-pressed={!!active}
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      className={`rte-btn${active ? ' is-active' : ''}`}>
+      {icon ? <i className={`bi bi-${icon}`} /> : children}
+    </button>
+  );
+}
+
+function Group({ children }) {
+  return <div className="rte-group">{children}</div>;
+}
+function Sep() {
+  return <span className="rte-sep" aria-hidden="true" />;
+}
+
+// Styled dropdown with a custom chevron (native arrow stripped) so it matches
+// the icon buttons in both light and dark themes.
+function ToolSelect({ value, onChange, title, minWidth, children }) {
+  return (
+    <span className="rte-select-wrap" style={minWidth ? { minWidth } : undefined}>
+      <select className="rte-select" value={value} onChange={onChange} title={title} aria-label={title}>
+        {children}
+      </select>
+      <i className="bi bi-chevron-down rte-select-caret" aria-hidden="true" />
+    </span>
+  );
+}
 
 export default function RichTextEditor({
   value = '',
@@ -113,52 +128,120 @@ export default function RichTextEditor({
   }
 
   return (
-    <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
+    <div className={`rte-container${readOnly ? ' is-readonly' : ''}`}>
       {!readOnly && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3, padding: 6, background: 'var(--surface-2)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <Tb title="Bold (Ctrl+B)" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>B</Tb>
-          <Tb title="Italic (Ctrl+I)" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} style={{ fontStyle: 'italic' }}>I</Tb>
-          <Tb title="Underline (Ctrl+U)" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} style={{ textDecoration: 'underline' }}>U</Tb>
-          <Tb title="Strikethrough" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} style={{ textDecoration: 'line-through' }}>S</Tb>
-          <Divider />
-          <select value={headingValue} onChange={(e) => setHeading(e.target.value)} title="Paragraph style"
-            style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 6, padding: '2px 6px', fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)', height: 30 }}>
-            {HEADINGS.map((h) => <option key={h.v} value={h.v}>{h.label}</option>)}
-          </select>
-          <select value="" onChange={(e) => { if (e.target.value) editor.chain().focus().setFontSize(`${e.target.value}px`).run(); }} title="Font size (px)"
-            style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 6, padding: '2px 6px', fontSize: 12, cursor: 'pointer', color: 'var(--text-primary)', height: 30 }}>
-            <option value="">Size</option>
-            {FONT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <Divider />
-          <Tb title="Bulleted list" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>•</Tb>
-          <Tb title="Numbered list" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</Tb>
-          <Tb title="Checklist" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>☑</Tb>
-          <Divider />
-          <Tb title="Align left" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>⇤</Tb>
-          <Tb title="Align center" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>↔</Tb>
-          <Tb title="Align right" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()}>⇥</Tb>
-          <Tb title="Justify" active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()}>≣</Tb>
-          <Divider />
-          <Tb title="Quote" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>❝</Tb>
-          <Tb title="Code block" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} style={{ fontFamily: 'var(--font-mono)' }}>{'</>'}</Tb>
-          <Tb title="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>―</Tb>
-          <Tb title="Insert / edit link" active={editor.isActive('link')} onClick={handleLink}>🔗</Tb>
-          <Divider />
-          <Tb title="Highlight selection" active={editor.isActive('rhHighlight')}
-            onClick={() => editor.chain().focus().toggleRhHighlight({ color: hColor, intensity: hIntensity }).run()}>✏︎</Tb>
-          <HighlighterPicker color={hColor} onColorChange={setHColor} intensity={hIntensity} onIntensityChange={setHIntensity} compact />
-          <Tb title="Clear formatting" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}>⌫</Tb>
-          <Divider />
-          <Tb title="Undo (Ctrl+Z)" onClick={() => editor.chain().focus().undo().run()}>↶</Tb>
-          <Tb title="Redo (Ctrl+Y)" onClick={() => editor.chain().focus().redo().run()}>↷</Tb>
+        <div className="rte-toolbar">
+          <Group>
+            <Tb title="Bold (Ctrl+B)" icon="type-bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} />
+            <Tb title="Italic (Ctrl+I)" icon="type-italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} />
+            <Tb title="Underline (Ctrl+U)" icon="type-underline" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} />
+            <Tb title="Strikethrough" icon="type-strikethrough" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} />
+          </Group>
+          <Sep />
+          <Group>
+            <ToolSelect value={headingValue} onChange={(e) => setHeading(e.target.value)} title="Paragraph style" minWidth={108}>
+              {HEADINGS.map((h) => <option key={h.v} value={h.v}>{h.label}</option>)}
+            </ToolSelect>
+            <ToolSelect value="" onChange={(e) => { if (e.target.value) editor.chain().focus().setFontSize(`${e.target.value}px`).run(); }} title="Font size (px)" minWidth={72}>
+              <option value="">Size</option>
+              {FONT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </ToolSelect>
+          </Group>
+          <Sep />
+          <Group>
+            <Tb title="Bulleted list" icon="list-ul" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} />
+            <Tb title="Numbered list" icon="list-ol" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+            <Tb title="Checklist" icon="list-check" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()} />
+          </Group>
+          <Sep />
+          <Group>
+            <Tb title="Align left" icon="text-left" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} />
+            <Tb title="Align center" icon="text-center" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} />
+            <Tb title="Align right" icon="text-right" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} />
+            <Tb title="Justify" icon="justify" active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()} />
+          </Group>
+          <Sep />
+          <Group>
+            <Tb title="Quote" icon="quote" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
+            <Tb title="Code block" icon="code-slash" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
+            <Tb title="Divider" icon="hr" onClick={() => editor.chain().focus().setHorizontalRule().run()} />
+            <Tb title="Insert / edit link" icon="link-45deg" active={editor.isActive('link')} onClick={handleLink} />
+          </Group>
+          <Sep />
+          <Group>
+            <Tb title="Highlight selection" icon="highlighter" active={editor.isActive('rhHighlight')}
+              onClick={() => editor.chain().focus().toggleRhHighlight({ color: hColor, intensity: hIntensity }).run()} />
+            <HighlighterPicker color={hColor} onColorChange={setHColor} intensity={hIntensity} onIntensityChange={setHIntensity} compact />
+          </Group>
+          <Sep />
+          <Group>
+            <Tb title="Clear formatting" icon="eraser" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} />
+          </Group>
+          <Sep />
+          <Group>
+            <Tb title="Undo (Ctrl+Z)" icon="arrow-counterclockwise" onClick={() => editor.chain().focus().undo().run()} />
+            <Tb title="Redo (Ctrl+Y)" icon="arrow-clockwise" onClick={() => editor.chain().focus().redo().run()} />
+          </Group>
         </div>
       )}
 
       <EditorContent editor={editor} />
 
       <style>{`
-        .rte-surface { padding: 12px 14px; font-size: 13.5px; line-height: 1.6; outline: none; color: var(--text-primary); word-break: break-word; }
+        .rte-container {
+          border: 1px solid var(--border-default);
+          border-radius: var(--radius-md);
+          background: var(--surface-1);
+          transition: border-color 130ms ease, box-shadow 130ms ease;
+        }
+        .rte-container:focus-within {
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        .rte-toolbar {
+          position: sticky; top: 0; z-index: 5;
+          display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
+          padding: 8px 10px;
+          background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+          backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--border-subtle);
+          border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
+        }
+        .rte-group { display: inline-flex; align-items: center; gap: 2px; }
+        .rte-sep { width: 1px; height: 22px; background: var(--border-subtle); margin: 0 5px; flex: 0 0 auto; }
+
+        .rte-btn {
+          background: transparent; border: 1px solid transparent; border-radius: 7px;
+          height: 32px; min-width: 32px; padding: 0 7px;
+          display: inline-flex; align-items: center; justify-content: center;
+          cursor: pointer; color: var(--text-secondary);
+          font-size: 15px; line-height: 1; font-family: inherit;
+          transition: background 110ms ease, color 110ms ease, border-color 110ms ease, transform 60ms ease;
+        }
+        .rte-btn i { font-size: 15px; line-height: 1; }
+        .rte-btn:hover { background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary); }
+        .rte-btn:active { transform: translateY(0.5px); }
+        .rte-btn.is-active {
+          background: var(--accent-soft);
+          border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+          color: var(--accent);
+        }
+
+        .rte-select-wrap { position: relative; display: inline-flex; align-items: center; }
+        .rte-select {
+          appearance: none; -webkit-appearance: none; -moz-appearance: none;
+          background: var(--surface-1); border: 1px solid var(--border-default); border-radius: 7px;
+          height: 32px; padding: 0 26px 0 10px; width: 100%;
+          font-size: 12.5px; font-weight: 600; color: var(--text-primary);
+          cursor: pointer; font-family: inherit;
+          transition: border-color 110ms ease, background 110ms ease;
+        }
+        .rte-select:hover { border-color: var(--border-strong); background: var(--surface-2); }
+        .rte-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+        .rte-select-caret { position: absolute; right: 9px; font-size: 9px; color: var(--text-muted); pointer-events: none; }
+
+        .rte-surface { padding: 14px 16px; font-size: 13.5px; line-height: 1.65; outline: none; color: var(--text-primary); word-break: break-word; }
         .rte-surface:focus { outline: none; }
         .rte-surface > * { margin: 0 0 0.55rem; }
         .rte-surface > *:last-child { margin-bottom: 0; }
