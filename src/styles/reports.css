@@ -413,6 +413,9 @@
    <p> tags handle paragraph breaks instead of literal newlines. */
 .rich-content {
   white-space: normal;
+  /* Small left inset so bullet markers (list-style: outside) and paragraphs
+     don't hug the card's content edge. */
+  padding-left: 0.5rem;
 }
 .rich-content p { margin: 0 0 0.6em; }
 .rich-content p:last-child { margin-bottom: 0; }
