@@ -588,9 +588,8 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
 function InsightBox({ text, report, fieldKey, highlighterOn, hlColor, hlIntensity }) {
   if (!text) return null;
   return (
-    <div style={{
+    <div className="insight-box" style={{
       marginTop: 12, marginBottom: 4,
-      background: '#fffbeb', border: `1px solid ${C.amberLine}`,
       borderRadius: 12, padding: '14px 16px',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -601,9 +600,9 @@ function InsightBox({ text, report, fieldKey, highlighterOn, hlColor, hlIntensit
               html={text} report={report} fieldKey={fieldKey}
               highlighterActive={highlighterOn}
               highlightColor={hlColor} highlightIntensity={hlIntensity}
-              style={{ fontSize: 13, color: '#7c4c00', lineHeight: 1.55 }} />
+              style={{ fontSize: 13, lineHeight: 1.55 }} />
           ) : (
-            <RichContent html={text} style={{ fontSize: 13, color: '#7c4c00', lineHeight: 1.55 }} />
+            <RichContent html={text} style={{ fontSize: 13, lineHeight: 1.55 }} />
           )}
         </div>
       </div>

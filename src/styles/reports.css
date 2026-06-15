@@ -429,6 +429,22 @@
   font-family: inherit !important;
 }
 
+/* ── AI insight callout (lightbulb box) ──────────────────────────────────
+   Theme-aware background + forced-readable text. The stored insight HTML
+   often carries inline `color: var(--text-primary)` (or white) on its spans,
+   which flips to near-white in dark mode and VANISHES on the light amber box.
+   We force every run to the theme's insight foreground so nothing can go
+   invisible, regardless of what colour is baked into the saved markup.
+   Highlighted runs keep dark text — highlight backgrounds are always light. */
+.insight-box {
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent);
+}
+.insight-box .rich-content { color: var(--insight-fg) !important; }
+.insight-box .rich-content * { color: inherit !important; }
+.insight-box .rich-content mark.rh,
+.insight-box .rich-content mark.rh * { color: #1f2937 !important; }
+
 /* Highlight marks rendered in views */
 mark.rh { padding: 0 1px; border-radius: 2px; }
 mark.rh[data-color='yellow'][data-intensity='light']  { background: #fef9c3; color: #1f2937; }

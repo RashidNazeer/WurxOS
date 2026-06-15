@@ -38,6 +38,7 @@
   --danger-soft:  #fef2f2;
   --warning:      #f59e0b;
   --warning-soft: #fffbeb;
+  --insight-fg:   #7c4c00;     /* readable text on the amber insight callout */
   --info:         #0ea5e9;
   --info-soft:    #f0f9ff;
 
@@ -100,6 +101,7 @@
   --danger-soft:  rgba(248, 113, 113, 0.14);
   --warning:      #fbbf24;
   --warning-soft: rgba(251, 191, 36, 0.14);
+  --insight-fg:   #fbe3b3;     /* warm light amber — readable on the dark insight callout */
   --info:         #7bc7ed;
   --info-soft:    rgba(123, 199, 237, 0.14);
 
