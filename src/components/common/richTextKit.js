@@ -80,8 +80,8 @@ export const Indent = Extension.create({
     return {
       blockTypes: ['paragraph', 'heading'],
       listTypes: ['bulletList', 'orderedList', 'taskList'],
-      step: 32,
-      maxLevel: 10,
+      step: 16,
+      maxLevel: 16,
     };
   },
   addGlobalAttributes() {
