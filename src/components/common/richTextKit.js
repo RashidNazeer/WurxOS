@@ -80,48 +80,50 @@ export const Indent = Extension.create({
     return {
       blockTypes: ['paragraph', 'heading'],
       listTypes: ['bulletList', 'orderedList', 'taskList'],
-      step: 16,
-      maxLevel: 16,
+      step: 6,        // px added/removed per Tab or +/- button press (fine)
+      maxIndent: 320, // px ceiling
     };
   },
   addGlobalAttributes() {
-    const { blockTypes, listTypes, step, maxLevel } = this.options;
+    const { blockTypes, listTypes, maxIndent } = this.options;
     return [{
       // Lists carry the indent on the <ul>/<ol> so the WHOLE list shifts as a
-      // block; paragraphs/headings carry it themselves.
+      // block; paragraphs/headings carry it themselves. Stored as the exact
+      // pixel margin so it's freely customisable (not fixed "levels").
       types: [...blockTypes, ...listTypes],
       attributes: {
         indent: {
           default: 0,
           // Read el.style first (browser), fall back to parsing the raw style
-          // attribute (robust in any DOM impl). margin-left:Npx → level.
+          // attribute (robust in any DOM impl). margin-left:Npx → px value.
           parseHTML: (el) => {
             const raw = (el.style && el.style.marginLeft)
               || (/margin-left:\s*([^;]+)/i.exec((el.getAttribute && el.getAttribute('style')) || '') || [])[1]
               || '';
             const px = parseFloat(raw);
             if (!px || Number.isNaN(px)) return 0;
-            return Math.min(maxLevel, Math.max(0, Math.round(px / step)));
+            return Math.min(maxIndent, Math.max(0, Math.round(px)));
           },
-          renderHTML: (attrs) => (attrs.indent ? { style: `margin-left: ${attrs.indent * step}px` } : {}),
+          renderHTML: (attrs) => (attrs.indent ? { style: `margin-left: ${attrs.indent}px` } : {}),
         },
       },
     }];
   },
   addCommands() {
-    const { blockTypes, listTypes, maxLevel } = this.options;
-    const clamp = (n) => Math.min(maxLevel, Math.max(0, n));
-    const shift = (delta) => ({ state, dispatch }) => {
+    const { blockTypes, listTypes, step, maxIndent } = this.options;
+    const clamp = (n) => Math.max(0, Math.min(maxIndent, Math.round(n)));
+    // `resolve(currentPx)` returns the new px value for the targeted block.
+    const apply = (resolve) => ({ state, dispatch }) => {
       const { selection } = state;
       const { $from } = selection;
-      // 1) In a list → move the whole NEAREST list left/right by adding margin
-      //    to the <ul>/<ol>. Works on every bullet incl. the first (unlike
-      //    nesting, which can't sink a first item — that's what looked broken).
+      // 1) In a list → move the whole NEAREST list by adding margin to the
+      //    <ul>/<ol>. Works on every bullet incl. the first (unlike nesting,
+      //    which can't sink a first item — that's what looked broken).
       for (let d = $from.depth; d > 0; d--) {
         const node = $from.node(d);
         if (listTypes.includes(node.type.name)) {
           const cur = node.attrs.indent || 0;
-          const next = clamp(cur + delta);
+          const next = clamp(resolve(cur));
           if (next === cur) return false;
           if (dispatch) dispatch(state.tr.setNodeMarkup($from.before(d), undefined, { ...node.attrs, indent: next }));
           return true;
@@ -134,13 +136,17 @@ export const Indent = Extension.create({
       state.doc.nodesBetween(from, to, (node, pos) => {
         if (!blockTypes.includes(node.type.name)) return;
         const cur = node.attrs.indent || 0;
-        const next = clamp(cur + delta);
+        const next = clamp(resolve(cur));
         if (next !== cur) { tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: next }); changed = true; }
       });
       if (changed && dispatch) dispatch(tr);
       return changed;
     };
-    return { indent: () => shift(1), outdent: () => shift(-1) };
+    return {
+      indent:    () => apply((cur) => cur + step),
+      outdent:   () => apply((cur) => cur - step),
+      setIndent: (px) => apply(() => px), // exact px (used by the toolbar picker)
+    };
   },
   addKeyboardShortcuts() {
     return {

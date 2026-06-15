@@ -23,6 +23,10 @@ import HighlighterPicker, { useHighlightStyle } from './HighlighterPicker';
 
 const FONT_SIZES = ['10', '11', '12', '14', '16', '18', '20', '24', '28', '32', '36', '48', '72'];
 
+// Exact left-margin presets (px) for the indent picker — pick any amount, or
+// nudge with the +/- buttons / Tab. 0 = no indent.
+const INDENT_OPTIONS = [0, 4, 8, 12, 16, 24, 32, 48, 64, 96];
+
 const HEADINGS = [
   { v: 'p',  label: 'Normal' },
   { v: '1',  label: 'Heading 1' },
@@ -109,6 +113,15 @@ export default function RichTextEditor({
 
   const headingValue = HEADINGS.slice(1).find((h) => editor.isActive('heading', { level: Number(h.v) }))?.v || 'p';
 
+  // Current left indent (px) of the block/list at the cursor — drives the
+  // indent picker. Lists take priority (they carry the indent on the ul/ol).
+  const curIndent = editor.getAttributes('bulletList').indent
+    ?? editor.getAttributes('orderedList').indent
+    ?? editor.getAttributes('taskList').indent
+    ?? editor.getAttributes('heading').indent
+    ?? editor.getAttributes('paragraph').indent
+    ?? 0;
+
   function setHeading(v) {
     const c = editor.chain().focus();
     if (v === 'p') c.setParagraph().run();
@@ -164,6 +177,12 @@ export default function RichTextEditor({
           <Group>
             <Tb title="Decrease indent (Shift+Tab)" icon="text-indent-left" onClick={() => editor.chain().focus().outdent().run()} />
             <Tb title="Increase indent (Tab)" icon="text-indent-right" onClick={() => editor.chain().focus().indent().run()} />
+            <ToolSelect value={INDENT_OPTIONS.includes(curIndent) ? String(curIndent) : ''}
+              onChange={(e) => editor.chain().focus().setIndent(Number(e.target.value || 0)).run()}
+              title="Left indent / margin — pick an exact amount" minWidth={96}>
+              {curIndent !== 0 && !INDENT_OPTIONS.includes(curIndent) && <option value={String(curIndent)}>{`${curIndent}px`}</option>}
+              {INDENT_OPTIONS.map((v) => <option key={v} value={String(v)}>{v === 0 ? 'No indent' : `Indent ${v}px`}</option>)}
+            </ToolSelect>
           </Group>
           <Sep />
           <Group>
