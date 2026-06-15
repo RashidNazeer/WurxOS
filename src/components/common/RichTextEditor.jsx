@@ -162,6 +162,11 @@ export default function RichTextEditor({
           </Group>
           <Sep />
           <Group>
+            <Tb title="Decrease indent (Shift+Tab)" icon="text-indent-left" onClick={() => editor.chain().focus().outdent().run()} />
+            <Tb title="Increase indent (Tab)" icon="text-indent-right" onClick={() => editor.chain().focus().indent().run()} />
+          </Group>
+          <Sep />
+          <Group>
             <Tb title="Quote" icon="quote" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
             <Tb title="Code block" icon="code-slash" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
             <Tb title="Divider" icon="hr" onClick={() => editor.chain().focus().setHorizontalRule().run()} />

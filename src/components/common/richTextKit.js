@@ -67,6 +67,78 @@ export const RhHighlight = Mark.create({
   },
 });
 
+// Paragraph / heading indentation (the "add margin from the left" control).
+// Stored as an inline margin-left so it round-trips through getHTML AND renders
+// identically in the report views: DOMPurify keeps margin-left, and an inline
+// style beats the `.rich-content p { margin: … }` reset (same mechanism that
+// makes font-size + text-align render in views). Lists are NOT given the attr —
+// inside a list, Tab/indent nests the list item natively (handled below), so
+// Tab and the toolbar buttons behave the same whether or not you're in a list.
+export const Indent = Extension.create({
+  name: 'indent',
+  addOptions() {
+    return { types: ['paragraph', 'heading'], step: 32, maxLevel: 10 };
+  },
+  addGlobalAttributes() {
+    const { types, step, maxLevel } = this.options;
+    return [{
+      types,
+      attributes: {
+        indent: {
+          default: 0,
+          // Read el.style first (browser), fall back to parsing the raw style
+          // attribute (robust in any DOM impl). margin-left:Npx → level.
+          parseHTML: (el) => {
+            const raw = (el.style && el.style.marginLeft)
+              || (/margin-left:\s*([^;]+)/i.exec((el.getAttribute && el.getAttribute('style')) || '') || [])[1]
+              || '';
+            const px = parseFloat(raw);
+            if (!px || Number.isNaN(px)) return 0;
+            return Math.min(maxLevel, Math.max(0, Math.round(px / step)));
+          },
+          renderHTML: (attrs) => (attrs.indent ? { style: `margin-left: ${attrs.indent * step}px` } : {}),
+        },
+      },
+    }];
+  },
+  addCommands() {
+    const { types, step, maxLevel } = this.options;
+    const shift = (delta) => ({ editor, state, dispatch, commands }) => {
+      // Inside a list, indent/outdent means nest/un-nest the list item.
+      if (editor.isActive('listItem')) return delta > 0 ? commands.sinkListItem('listItem') : commands.liftListItem('listItem');
+      if (editor.isActive('taskItem')) return delta > 0 ? commands.sinkListItem('taskItem') : commands.liftListItem('taskItem');
+      const { from, to } = state.selection;
+      const tr = state.tr;
+      let changed = false;
+      state.doc.nodesBetween(from, to, (node, pos) => {
+        if (!types.includes(node.type.name)) return;
+        const cur = node.attrs.indent || 0;
+        const next = Math.min(maxLevel, Math.max(0, cur + delta));
+        if (next !== cur) { tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: next }); changed = true; }
+      });
+      if (changed && dispatch) dispatch(tr);
+      return changed;
+    };
+    return { indent: () => shift(1), outdent: () => shift(-1) };
+  },
+  addKeyboardShortcuts() {
+    return {
+      // Always swallow Tab so focus stays in the editor (except code blocks,
+      // which want a literal tab character).
+      Tab: () => {
+        if (this.editor.isActive('codeBlock')) return false;
+        this.editor.commands.indent();
+        return true;
+      },
+      'Shift-Tab': () => {
+        if (this.editor.isActive('codeBlock')) return false;
+        this.editor.commands.outdent();
+        return true;
+      },
+    };
+  },
+});
+
 // The full extension set. `placeholder` is editor-only (ignored when headless).
 export function buildExtensions(placeholder = '') {
   return [
@@ -77,6 +149,7 @@ export function buildExtensions(placeholder = '') {
     RhHighlight,
     Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Indent,
     TaskList,
     TaskItem.configure({ nested: true }),
     Placeholder.configure({ placeholder }),
