@@ -77,12 +77,19 @@ export const RhHighlight = Mark.create({
 export const Indent = Extension.create({
   name: 'indent',
   addOptions() {
-    return { types: ['paragraph', 'heading'], step: 32, maxLevel: 10 };
+    return {
+      blockTypes: ['paragraph', 'heading'],
+      listTypes: ['bulletList', 'orderedList', 'taskList'],
+      step: 32,
+      maxLevel: 10,
+    };
   },
   addGlobalAttributes() {
-    const { types, step, maxLevel } = this.options;
+    const { blockTypes, listTypes, step, maxLevel } = this.options;
     return [{
-      types,
+      // Lists carry the indent on the <ul>/<ol> so the WHOLE list shifts as a
+      // block; paragraphs/headings carry it themselves.
+      types: [...blockTypes, ...listTypes],
       attributes: {
         indent: {
           default: 0,
@@ -102,18 +109,32 @@ export const Indent = Extension.create({
     }];
   },
   addCommands() {
-    const { types, step, maxLevel } = this.options;
-    const shift = (delta) => ({ editor, state, dispatch, commands }) => {
-      // Inside a list, indent/outdent means nest/un-nest the list item.
-      if (editor.isActive('listItem')) return delta > 0 ? commands.sinkListItem('listItem') : commands.liftListItem('listItem');
-      if (editor.isActive('taskItem')) return delta > 0 ? commands.sinkListItem('taskItem') : commands.liftListItem('taskItem');
-      const { from, to } = state.selection;
+    const { blockTypes, listTypes, maxLevel } = this.options;
+    const clamp = (n) => Math.min(maxLevel, Math.max(0, n));
+    const shift = (delta) => ({ state, dispatch }) => {
+      const { selection } = state;
+      const { $from } = selection;
+      // 1) In a list → move the whole NEAREST list left/right by adding margin
+      //    to the <ul>/<ol>. Works on every bullet incl. the first (unlike
+      //    nesting, which can't sink a first item — that's what looked broken).
+      for (let d = $from.depth; d > 0; d--) {
+        const node = $from.node(d);
+        if (listTypes.includes(node.type.name)) {
+          const cur = node.attrs.indent || 0;
+          const next = clamp(cur + delta);
+          if (next === cur) return false;
+          if (dispatch) dispatch(state.tr.setNodeMarkup($from.before(d), undefined, { ...node.attrs, indent: next }));
+          return true;
+        }
+      }
+      // 2) Otherwise indent every paragraph/heading in the selection.
+      const { from, to } = selection;
       const tr = state.tr;
       let changed = false;
       state.doc.nodesBetween(from, to, (node, pos) => {
-        if (!types.includes(node.type.name)) return;
+        if (!blockTypes.includes(node.type.name)) return;
         const cur = node.attrs.indent || 0;
-        const next = Math.min(maxLevel, Math.max(0, cur + delta));
+        const next = clamp(cur + delta);
         if (next !== cur) { tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: next }); changed = true; }
       });
       if (changed && dispatch) dispatch(tr);
