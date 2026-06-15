@@ -3,7 +3,7 @@ import WeeklyReportView from '../reporting/WeeklyReportView';
 import MonthlyReportView from '../reporting/MonthlyReportView';
 import BrandSectionsPanel from './BrandSectionsPanel';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
-import { formatPctChange } from '../../utils/formatPctChange';
+import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
 
 /**
@@ -371,9 +371,8 @@ export default function ClientReportsSection({
                 const prev = findPreviousReport(brandReports, r);
                 const m = reportMetrics(r);
                 const prevM = prev ? reportMetrics(prev) : null;
-                const gmvChange = prevM && prevM.gmv
-                  ? (((m.gmv - prevM.gmv) / prevM.gmv) * 100)
-                  : null;
+                const gmvChange = pctChange(m.gmv, prevM ? prevM.gmv : 0, !!prevM);
+                const changeDir = pctChangeDir(gmvChange);
                 const sym = currencySymbol(r.currency || DEFAULT_CURRENCY);
                 const label = r.weekLabel || r.periodLabel || r.monthLabel || '—';
                 return (
@@ -411,10 +410,10 @@ export default function ClientReportsSection({
                         {gmvChange !== null && (
                           <div className="mt-1" style={{
                             fontSize: '0.65rem', fontWeight: 600,
-                            color: gmvChange >= 0 ? '#16a34a' : '#dc2626',
+                            color: changeDir > 0 ? '#16a34a' : changeDir < 0 ? '#dc2626' : '#64748b',
                           }}>
-                            <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
-                            {formatPctChange(gmvChange)} vs prev{' '}
+                            <i className={`bi bi-arrow-${changeDir > 0 ? 'up' : changeDir < 0 ? 'down' : 'right'}-short`} />
+                            {formatPctChange(gmvChange, { withSign: changeDir !== 0 })} vs prev{' '}
                             {activeType === 'biweekly' ? 'period' : activeType === 'monthly' ? 'month' : 'week'}
                           </div>
                         )}

@@ -6,7 +6,7 @@ import {
   REPORT_STATUSES, getReportStatus, updateReportStatus,
 } from '../../utils/biWeeklyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
-import { formatPctChange } from '../../utils/formatPctChange';
+import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import BiWeeklyReportForm from './BiWeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
@@ -749,7 +749,10 @@ export default function AllBiWeeklyReportsPage() {
               .sort((a, b) => (b.periodStart || '').localeCompare(a.periodStart || ''))[0] || null;
             const perf = r.overallPerformance || {};
             const prevPerf = prevReport?.overallPerformance || {};
-            const gmvChange = num(prevPerf.gmv) ? (((num(perf.gmv) - num(prevPerf.gmv)) / num(prevPerf.gmv)) * 100) : null;
+            const gmvChange = pctChange(num(perf.gmv), num(prevPerf.gmv), !!prevReport);
+            const changeDir = pctChangeDir(gmvChange);
+            const changeColor = changeDir == null ? 'var(--text-muted)'
+              : changeDir > 0 ? 'var(--success)' : changeDir < 0 ? 'var(--danger)' : 'var(--text-secondary)';
             const brandName = r.brandName || 'Unknown';
             const clientName = clientByBrandId.get(r.brandId);
             const isSel = selected.has(r.id);
@@ -844,9 +847,9 @@ export default function AllBiWeeklyReportsPage() {
                     </div>
 
                     {gmvChange !== null && (
-                      <div className="mt-1" style={{ fontSize: '0.65rem', color: gmvChange >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                        <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-short`} />
-                        {formatPctChange(gmvChange)} vs prev period
+                      <div className="mt-1" style={{ fontSize: '0.65rem', color: changeColor, fontWeight: 600 }}>
+                        <i className={`bi bi-arrow-${changeDir > 0 ? 'up' : changeDir < 0 ? 'down' : 'right'}-short`} />
+                        {formatPctChange(gmvChange, { withSign: changeDir !== 0 })} vs prev period
                       </div>
                     )}
                   </div>

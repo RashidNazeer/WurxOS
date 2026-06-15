@@ -7,7 +7,7 @@ import {
   REPORT_STATUSES, getReportStatus, updateReportStatus, deleteReport,
 } from '../../utils/reportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
-import { formatPctChange } from '../../utils/formatPctChange';
+import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import WeeklyReportForm from './WeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
@@ -898,7 +898,15 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
   const orders   = num(perf.orders);
   const roi      = num(perf.roi);
   const videos   = num(perf.videosPosted);
-  const gmvChange = num(prevPerf.gmv) ? (((gmv - num(prevPerf.gmv)) / num(prevPerf.gmv)) * 100) : null;
+  // Always computable when a previous report exists — incl. growth/drop from
+  // $0 (was returning null before, which hid the whole "vs prev week" footer).
+  const gmvChange = pctChange(gmv, num(prevPerf.gmv), !!prev);
+  const changeDir = pctChangeDir(gmvChange); // 1 up · -1 down · 0 flat · null none
+  const changeColor = changeDir == null ? 'var(--text-muted)'
+    : changeDir > 0 ? 'var(--success)' : changeDir < 0 ? 'var(--danger)' : 'var(--text-secondary)';
+  const changeArrow = changeDir > 0 ? 'up-right' : changeDir < 0 ? 'down-right' : 'right';
+  const changeText = gmvChange == null ? null
+    : formatPctChange(gmvChange, { withSign: changeDir !== 0 });
   const aov = orders > 0 ? gmv / orders : 0;
   const sym = currencySymbol(r.currency || DEFAULT_CURRENCY);
   const roiNote = roi <= 0 ? 'organic' : roi < 1 ? 'paid mix' : roi < 2 ? 'paid mix' : 'strong';
@@ -1001,10 +1009,8 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         <div className="px-3 pb-2 pt-1">
           <div className="d-flex justify-content-between gap-2">
             <CardStat label="GMV" value={sym + gmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              note={gmvChange != null
-                ? formatPctChange(gmvChange)
-                : null}
-              noteColor={gmvChange != null ? (gmvChange >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)'} />
+              note={changeText}
+              noteColor={changeColor} />
             <CardStat label="ORDERS" value={orders.toLocaleString()} note={aov > 0 ? `${sym}${aov.toFixed(0)} AOV` : null} />
             <CardStat label="ROAS" value={roi.toFixed(2)} note={roiNote}
               noteColor={roi >= 2 ? 'var(--success)' : roi <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)'} />
@@ -1012,18 +1018,18 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
           </div>
         </div>
 
-        {/* Sparkline footer (vs prev week) */}
+        {/* Sparkline footer (vs prev week) — shown whenever a previous report
+            exists, including growth/drop from $0 (capped to ±100%+). */}
         {gmvChange != null && seriesBars.length > 1 && (
           <div className="d-flex align-items-center gap-2 px-3 py-2"
             style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-0)', borderRadius: '0 0 12px 12px' }}>
             <span className="text-muted" style={{ fontSize: '0.7rem' }}>vs prev week</span>
             <div className="flex-grow-1">
-              <Sparkbars values={seriesBars} highlightLast color={gmvChange >= 0 ? 'var(--success)' : 'var(--danger)'} muted="var(--border-subtle)" />
+              <Sparkbars values={seriesBars} highlightLast color={changeColor} muted="var(--border-subtle)" />
             </div>
-            <span className="d-inline-flex align-items-center gap-1 fw-bold" style={{ fontSize: '0.72rem',
-                color: gmvChange >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-              <i className={`bi bi-arrow-${gmvChange >= 0 ? 'up' : 'down'}-right`} />
-              {formatPctChange(gmvChange)}
+            <span className="d-inline-flex align-items-center gap-1 fw-bold" style={{ fontSize: '0.72rem', color: changeColor }}>
+              <i className={`bi bi-arrow-${changeArrow}`} />
+              {changeText}
             </span>
           </div>
         )}
