@@ -1195,6 +1195,45 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                       </div>
                     );
                   })}
+                  {/* Overall — auto-calculated from the campaign rows. Spend/GMV/
+                      Orders are summed; ROI = GMV/Spend and CPO = Spend/Orders
+                      are derived from those totals (not entered manually). */}
+                  {(() => {
+                    const rows = (report.gmvMax || []).filter(g => g.campaign);
+                    if (rows.length < 1) return null;
+                    const t = rows.reduce((a, g) => ({
+                      spend:  a.spend  + num(g.spend),
+                      gmv:    a.gmv    + num(g.gmv),
+                      orders: a.orders + num(g.orders),
+                    }), { spend: 0, gmv: 0, orders: 0 });
+                    const roi = t.spend  > 0 ? t.gmv / t.spend : 0;
+                    const cpo = t.orders > 0 ? t.spend / t.orders : 0;
+                    const cells = [
+                      { label: 'Spend', value: ms(t.spend) },
+                      { label: 'GMV', value: ms(t.gmv) },
+                      { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
+                      { label: 'Orders', value: fmtN(t.orders) },
+                      { label: 'CPO', value: m(cpo) },
+                    ];
+                    return (
+                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
+                        <div className="d-flex align-items-center gap-2 mb-2">
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Overall</span>
+                          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {rows.length} campaign{rows.length > 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="row g-2">
+                          {cells.map(c => (
+                            <div className="col-4 col-md" key={c.label}>
+                              <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
+                                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 {renderExtraStatCards('gmvMax')}
                 <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
