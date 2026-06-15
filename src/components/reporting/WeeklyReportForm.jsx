@@ -19,6 +19,7 @@ import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
+import ReportReturnNotice from './ReportReturnNotice';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import {
   getBrandSections, normalizeSection,
@@ -1279,17 +1280,8 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         </div>
       )}
 
-      {/* ─── Rejection banner (shown when report was rejected back) ────── */}
-      {rejectionNote && reportStatus === 'draft' && editReportId && (
-        <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
-          <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
-          <div>
-            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>This report was returned for revision</div>
-            <div style={{ fontSize: '0.78rem', marginTop: 2 }}>{rejectionNote}</div>
-          </div>
-        </div>
-      )}
+      {/* Return notice — visible to the recipient at any returned stage, with full history (mig 203). */}
+      <ReportReturnNotice report={{ id: editReportId, status: reportStatus }} />
 
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (

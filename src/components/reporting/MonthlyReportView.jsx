@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import ReportReturnNotice from './ReportReturnNotice';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer,
@@ -1064,6 +1065,9 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
 
   return (
     <div>
+      {!clientView && (
+        <div className="d-print-none"><ReportReturnNotice report={report} /></div>
+      )}
       {/* ─── Action bar — hidden in clientView, and when onActions
               lifts these into the sticky bar ──────────────────────── */}
       {!clientView && !onActions && (

@@ -332,6 +332,20 @@ export async function getReport(id) {
   return data;
 }
 
+// Append-only return history for a report (newest first), with the
+// returner's name. Powers the "Report Returned" notice + history (mig 203).
+// Silent on failure (e.g. anonymous client portal has no access) → [].
+export async function listReportReturns(reportId) {
+  if (!reportId) return [];
+  const { data, error } = await supabase
+    .from('report_returns')
+    .select('id, report_id, returned_at, from_status, to_status, note, by:returned_by(id, display_name, role)')
+    .eq('report_id', reportId)
+    .order('returned_at', { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
 // Fetch a brand's recent reports for trend charts + previous-week deltas.
 // Limit the window so the chart stays readable (last N reports, ascending).
 export async function listReportsForBrandTrend(brandId, type, { limit = 8 } = {}) {

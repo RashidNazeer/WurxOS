@@ -18,6 +18,7 @@ import { parseMonthlyPdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import { formatPctChange } from '../../utils/formatPctChange';
 import RichTextEditor from '../shared/RichTextEditor';
+import ReportReturnNotice from './ReportReturnNotice';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
@@ -803,16 +804,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         </div>
       )}
 
-      {rejectionNote && reportStatus === 'draft' && (
-        <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
-          <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
-          <div>
-            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
-            <div style={{ fontSize: '0.78rem', marginTop: 2 }}>{rejectionNote}</div>
-          </div>
-        </div>
-      )}
+      {/* Return notice — visible to the recipient at any returned stage, with full history (mig 203). */}
+      <ReportReturnNotice report={{ id: editReportId, status: reportStatus }} />
 
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
