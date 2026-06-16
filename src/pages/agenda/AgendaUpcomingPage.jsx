@@ -45,7 +45,9 @@ export default function AgendaUpcomingPage() {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
-  const myTeamTlId = isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null);
+  // All-meeting attendees (e.g. Paid Media lead) see every team's row, like an OL.
+  const canAttendAll = isOL || profile?.permissions?.canAttendAllMeetings === true;
+  const myTeamTlId = canAttendAll ? null : (isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null));
 
   const [meetings, setMeetings]   = useState([]);
   const [teams, setTeams]         = useState([]);
@@ -216,6 +218,7 @@ export default function AgendaUpcomingPage() {
               <WeekCard
                 card={card}
                 isOL={isOL}
+                canViewAll={canAttendAll}
                 myTeamTlId={myTeamTlId}
                 today={today}
                 now={now}
@@ -232,7 +235,7 @@ export default function AgendaUpcomingPage() {
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, onStart, onOpen }) {
+function WeekCard({ card, isOL, canViewAll, myTeamTlId, today, now, busyId, onStart, onOpen }) {
   const rows = myTeamTlId
     ? card.rows.filter((r) => r.tlId === myTeamTlId)
     : card.rows;
@@ -306,6 +309,9 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, onStart, onOpen 
             // OL actions are available on the CURRENT week regardless of how
             // far the flow has gone — so a completed meeting can be reopened.
             const olCurrent = card.isCurrent && isOL && !!r.meeting;
+            // All-meeting attendees can OPEN (join) a live room, but never
+            // start/resume/reopen/notify (those stay OL-only via olCurrent).
+            const canOpenRoom = card.isCurrent && canViewAll && !!r.meeting;
             const canStart  = olCurrent && mStatus === 'upcoming' && startable(r.meeting);
             const waitTime  = olCurrent && mStatus === 'upcoming' && !startable(r.meeting);
             const meetingBusy = r.meeting && busyId === r.meeting.id;
@@ -339,7 +345,7 @@ function WeekCard({ card, isOL, myTeamTlId, today, now, busyId, onStart, onOpen 
                     <i className="bi bi-clock-history me-1" />Starts at {fmtTime(r.meetingTime)} PKT
                   </div>
                 )}
-                {olCurrent && mStatus === 'ongoing' && (
+                {canOpenRoom && mStatus === 'ongoing' && (
                   <button className="btn btn-sm btn-outline-danger w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
                     style={{ borderRadius: 6, fontSize: '0.7rem' }}
                     onClick={() => onOpen(r.meeting.id)}>

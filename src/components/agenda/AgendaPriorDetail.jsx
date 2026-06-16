@@ -54,6 +54,8 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
   const role = profile?.role || '';
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isApc = role === 'apc';
+  // All-meeting attendees see the full read-only record of any team's meeting.
+  const canViewAll = isOL || profile?.permissions?.canAttendAllMeetings === true;
   const uid = user?.id;
 
   const [attendance, setAttendance]   = useState([]);
@@ -223,8 +225,8 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
             </div>
           )}
 
-          {/* Presentation timeline — OL */}
-          {isOL && presentations.some((p) => p.started_at) && (
+          {/* Presentation timeline — OL + all-meeting attendees (read-only) */}
+          {canViewAll && presentations.some((p) => p.started_at) && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
               <div className="card-body p-3">
                 <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">

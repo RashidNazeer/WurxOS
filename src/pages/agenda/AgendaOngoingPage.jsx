@@ -41,6 +41,9 @@ export default function AgendaOngoingPage() {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
+  // View/join every team's meeting (Paid Media lead etc.) without OL controls.
+  // Mirrors canViewAllBrands — view-only; never grants start/finish/evaluate.
+  const canAttendAll = isOL || profile?.permissions?.canAttendAllMeetings === true;
   const uid = user?.id;
   const location = useLocation();
 
@@ -89,10 +92,11 @@ export default function AgendaOngoingPage() {
       // run in parallel. OL/Boss pick from the list; default to no room (the
       // list view) and keep their selection while it stays active.
       let targetId;
-      if (isTL || isApc) {
+      if ((isTL || isApc) && !canAttendAll) {
         const myTlId = isTL ? uid : (profile?.reports_to || null);
         targetId = (activeRooms.find((m) => m.tl_id === myTlId) || null)?.id || null;
       } else {
+        // OL and all-meeting attendees pick from the rooms list (default none).
         targetId = selectedRef.current;
         if (targetId && !activeRooms.some((m) => m.id === targetId)) targetId = null;
       }
@@ -223,8 +227,8 @@ export default function AgendaOngoingPage() {
   if (!meeting) {
     const teamsById = {};
     allTeams.forEach((t) => { teamsById[t.tl.id] = t; });
-    const hasActive  = isOL && activeMeetings.length > 0;
-    const showNextUp = isOL && weekUpcoming.length > 0;
+    const hasActive  = canAttendAll && activeMeetings.length > 0;
+    const showNextUp = isOL && weekUpcoming.length > 0;  // Start buttons — OL only
     return (
       <div style={{ padding: '32px 32px 48px' }}>
         <div className="mb-4">
@@ -269,9 +273,9 @@ export default function AgendaOngoingPage() {
             </div>
             <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
             <p className="text-muted small mb-2">
-              {isOL ? 'No active or scheduled meetings for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
+              {canAttendAll ? 'No active or scheduled meetings for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
             </p>
-            {isOL && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
+            {canAttendAll && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
           </div>
         )}
       </div>
@@ -281,11 +285,14 @@ export default function AgendaOngoingPage() {
   const teamName = team?.tl?.display_name || meeting.tl?.display_name || 'Team';
   const paused = meeting.status === 'paused';
   const joinLink = agendaMeetLinkFor(meeting, schedules, meetLink);
+  // Is this the viewer's OWN team's meeting? Own-team controls (attendance)
+  // only apply there; an all-meeting attendee views other rooms as an observer.
+  const isMyTeam = isTL && meeting.tl_id === uid;
 
   return (
     <div style={{ padding: '32px 32px 48px' }}>
-      {/* Back to the rooms list — OL only (TL/APC have a single room) */}
-      {isOL && (
+      {/* Back to the rooms list — anyone with a multi-room list (OL or all-meeting attendee) */}
+      {canAttendAll && (
         <button type="button" onClick={() => openRoom(null)}
           className="btn btn-sm btn-link text-decoration-none px-0 mb-2"
           style={{ fontSize: '0.78rem' }}>
@@ -384,7 +391,7 @@ export default function AgendaOngoingPage() {
               <i className="bi bi-people-fill text-primary" />Attendance
             </span>
             <span className="text-muted" style={{ fontSize: '0.72rem' }}>
-              {isTL ? 'Tap a name to mark Present / Absent' : 'Marked by the Team Lead'}
+              {isMyTeam ? 'Tap a name to mark Present / Absent' : 'Marked by the Team Lead'}
             </span>
           </div>
           {apcs.length === 0 ? (
@@ -408,7 +415,7 @@ export default function AgendaOngoingPage() {
                         {st === 'present' ? 'Present' : 'Absent'}
                       </span>
                     )}
-                    {isTL && (
+                    {isMyTeam && (
                       <span className="d-inline-flex gap-1">
                         <button className="btn btn-sm p-0 px-1" title="Present"
                           style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'present' ? 'var(--success)' : 'var(--surface-1)', color: st === 'present' ? 'var(--surface-1)' : 'var(--success)', border: '1px solid var(--success)' }}
@@ -459,8 +466,9 @@ export default function AgendaOngoingPage() {
         )}
       </div>
 
-      {/* Presentation progress — OL sees who has presented / who is pending */}
-      {isOL && apcs.length > 0 && (
+      {/* Presentation progress — who has presented / who is pending (read-only;
+          OL and all-meeting observers). */}
+      {canAttendAll && apcs.length > 0 && (
         <PresentationProgress apcs={apcs} presMap={presMap} />
       )}
 
@@ -484,12 +492,22 @@ export default function AgendaOngoingPage() {
         <OngoingEvaluation meeting={meeting} activePresentation={activePresentation} />
       )}
 
-      {/* TL — presenter / OL actions overview */}
-      {isTL && (
+      {/* TL of THIS team — presenter / OL actions overview */}
+      {isMyTeam && (
         <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
           <div className="card-body p-3 text-muted small">
             <i className="bi bi-info-circle me-1" />
             Mark attendance above. The OL is running the presentation review.
+          </div>
+        </div>
+      )}
+
+      {/* All-meeting attendee viewing ANOTHER team's room — observer only */}
+      {canAttendAll && !isOL && !isMyTeam && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+          <div className="card-body p-3 text-muted small">
+            <i className="bi bi-eye me-1" />
+            You’re attending this meeting as an observer. The team’s own Team Lead marks attendance and the OL runs the review.
           </div>
         </div>
       )}
