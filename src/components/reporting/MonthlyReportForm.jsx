@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useReportLeaveGuard } from './useReportLeaveGuard';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -555,7 +556,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     }
   };
 
-  const _doSave = async (status, extra = {}) => {
+  const _doSave = async (status, extra = {}, opts = {}) => {
     if (!selectedBrand || !selectedMonth) return;
     setSaving(true);
     try {
@@ -581,7 +582,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       setReportStatus(status); // mirror the saved status into the pill so it
                                // doesn't show the stale loaded value (e.g.
                                // 'approved' lingering after Save-as-Draft).
-      if (onSaved) onSaved({
+      // `opts.stay` (used by the leave-guard draft save) persists silently
+      // without bubbling the navigate-away that onSaved triggers.
+      if (!opts.stay && onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,
         brandName,
@@ -594,14 +597,22 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         ...cleanedData,
         ...extra,
       });
+      return savedId;
     } catch (err) {
       alert('Failed to save report: ' + err.message);
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
   const handleSaveDraft = () => _doSave('draft', { rejectionNote: rejectionNote || null });
+
+  // Leave-guard: persist the current state as a draft WITHOUT navigating
+  // (preserves the report's current status — 'draft' for a new report).
+  const onSaveDraft = () => _doSave(reportStatus, { rejectionNote: rejectionNote || null }, { stay: true });
+  const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft });
+
   const handleSaveChanges = () => _doSave(reportStatus);
 
   const handleSubmitReport = async () => {
@@ -652,8 +663,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     }
     return (
       <div>
+        {guardModal}
         {onCancel && (
-          <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={onCancel}>
+          <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={() => guardAction(onCancel)}>
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
         )}
@@ -721,6 +733,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
   return (
     <div onInput={() => setDirty(true)}>
+      {guardModal}
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
         style={{
           position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
@@ -730,7 +743,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         }}>
         <div style={{ minWidth: 0, flex: '1 1 auto' }}>
           <button className="btn btn-sm btn-link text-muted p-0 mb-1 d-block"
-            onClick={() => onCancel ? onCancel() : setStep(0)}>
+            onClick={() => guardAction(() => onCancel ? onCancel() : setStep(0))}>
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
           <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>

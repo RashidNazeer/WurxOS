@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
+import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { formatRelTime } from '../../lib/notificationsApi';
 import {
@@ -73,7 +74,7 @@ export default function NotificationBell() {
   function handleItemClick(n) {
     markRead(n.id);
     setOpen(false);
-    if (n.link) navigate(n.link);
+    if (n.link) { const go = () => navigate(n.link); if (!maybeGuardLeave(go)) go(); }
   }
 
   const unread = counts.total || 0;

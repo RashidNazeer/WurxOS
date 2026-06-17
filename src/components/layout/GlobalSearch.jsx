@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import BrandAvatar from '../brands/BrandAvatar';
@@ -102,7 +103,8 @@ export default function GlobalSearch() {
   function go(path) {
     setOpen(false);
     setQ('');
-    navigate(path);
+    const run = () => navigate(path);
+    if (!maybeGuardLeave(run)) run();
   }
 
   const total = results.brands.length + results.users.length + results.tasks.length + results.reports.length;

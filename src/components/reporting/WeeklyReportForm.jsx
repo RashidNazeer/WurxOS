@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useReportLeaveGuard } from './useReportLeaveGuard';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   detectNextWeek, emptyReport, makeWeekFromStart,
@@ -932,7 +933,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     }
   };
 
-  const _doSave = async (status, extra = {}) => {
+  const _doSave = async (status, extra = {}, opts = {}) => {
     if (!selectedBrand || !selectedWeek) return;
     setSaving(true);
     try {
@@ -972,7 +973,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       clearLocalDraft();
       setDirty(false); // changes are persisted — release the guard
       setReportStatus(status); // keep the form's status pill in sync
-      if (onSaved) onSaved({
+      // `opts.stay` (used by the leave-guard draft save) persists silently
+      // without bubbling the navigate-away that onSaved triggers.
+      if (!opts.stay && onSaved) onSaved({
         id: savedId,
         brandId: selectedBrand.id,
         brandName,
@@ -987,8 +990,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         ...data,
         ...extra,
       });
+      return savedId;
     } catch (err) {
       alert('Failed to save report: ' + err.message);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -996,6 +1001,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
   /** Save progress without validation — keeps current draft status */
   const handleSaveDraft = () => _doSave('draft', { rejectionNote: rejectionNote || null });
+
+  // Leave-guard: persist the current state as a draft WITHOUT navigating
+  // (preserves the report's current status — 'draft' for a new report).
+  const onSaveDraft = () => _doSave(reportStatus, { rejectionNote: rejectionNote || null }, { stay: true });
+  const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft });
 
   /** Save without status change — used by TL/OL editing a non-draft report */
   const handleSaveChanges = () => _doSave(reportStatus);
@@ -1051,8 +1061,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
     return (
       <div>
+        {guardModal}
         {onCancel && (
-          <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={onCancel}>
+          <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={() => guardAction(onCancel)}>
             <i className="bi bi-arrow-left me-1" /> Back to reports
           </button>
         )}
@@ -1182,8 +1193,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
   return (
     <div onInput={() => setDirty(true)}>
+      {guardModal}
       {onCancel && (
-        <button className="btn btn-sm btn-link text-muted p-0 mb-2" onClick={onCancel}>
+        <button className="btn btn-sm btn-link text-muted p-0 mb-2" onClick={() => guardAction(onCancel)}>
           <i className="bi bi-arrow-left me-1" /> {editReportId ? 'Cancel editing' : 'Back to reports'}
         </button>
       )}

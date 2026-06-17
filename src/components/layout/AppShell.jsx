@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
-import { hasUnsavedWork } from '../../lib/appUpdate';
+import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import '../../styles/shell.css';
 
 // Suspense fallback for lazy-loaded route chunks. Keeps the shell
@@ -79,13 +79,9 @@ export default function AppShell() {
     function onMessage(e) {
       const m = e.data;
       if (m && m.type === 'wurxos-nav' && typeof m.link === 'string') {
-        if (hasUnsavedWork()) {
-          const ok = window.confirm(
-            "You have unsaved changes in a form. Leave anyway?\n\nYour draft is auto-saved locally and will reappear when you return."
-          );
-          if (!ok) return;
-        }
-        navigate(m.link);
+        const go = () => navigate(m.link);
+        // Dirty report form → show the Save-as-draft modal instead of leaving.
+        if (!maybeGuardLeave(go)) go();
       }
     }
     navigator.serviceWorker.addEventListener('message', onMessage);

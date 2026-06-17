@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { useAuth } from '../../contexts/AuthContext';
 import { roleLabel } from '../../lib/roles';
 import ThemeToggle from '../common/ThemeToggle';
@@ -87,7 +88,7 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
               <div className="shell-user-menu-divider" />
               <button
                 className="shell-user-menu-item"
-                onClick={() => { setMenuOpen(false); navigate('/settings'); }}
+                onClick={() => { setMenuOpen(false); const go = () => navigate('/settings'); if (!maybeGuardLeave(go)) go(); }}
               >
                 <SettingsIcon width="16" height="16" />
                 Account &amp; settings

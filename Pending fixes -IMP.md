@@ -89,7 +89,24 @@ Three of the four originally-identified mechanisms are now fixed.
   safety win is much larger than the cosmetic cost, and the grace window is
   SCOPED to `hasUnsavedWork()` so non-edit pages still redirect instantly.
 
-### ⏸ STILL PENDING — (none for the report editor as of 2026-06-08)
+### ✅ DONE — In-app navigation guard + save-as-draft modal (shipped 2026-06-17)
+- **Symptom:** creating a report, clicking a sidebar menu item or the "Back to
+  reports" arrow navigated away instantly. localStorage autosave kept the data
+  but users perceived it as lost (no server draft, restore not obvious).
+- **Fix:** new `useReportLeaveGuard` (src/components/reporting/) used by all 3
+  forms. While `dirty`, it (a) intercepts internal `<a href="/…">` clicks via a
+  capture-phase document listener, and (b) registers a global singleton
+  (`src/lib/reportLeaveGuard.js`) so PROGRAMMATIC `navigate()` paths route
+  through it too — Topbar settings gear, NotificationBell jump, GlobalSearch,
+  AppShell SW `wurxos-nav`. A modal then offers **Save & leave** / **Save & stay**;
+  BOTH persist a real server draft (`_doSave(reportStatus, …, { stay:true })` —
+  upsert-keyed by brand/type/period so no duplicates, status preserved). The
+  modal is dismissable ONLY via those two buttons (static backdrop, no Esc).
+- **Known limits (BrowserRouter, no useBlocker):** the browser Back/Forward
+  button and a hard reload (F5) can't show the custom modal — those still rely
+  on the native beforeunload prompt + the localStorage autosave backstop.
+
+### ⏸ STILL PENDING — (none for the report editor as of 2026-06-17)
 
 All known mechanisms that could destroy editor state without a user click
 on Save/Cancel are now mitigated. If the symptom recurs, that's a new
