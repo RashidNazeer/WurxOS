@@ -10,6 +10,7 @@ import {
   fmtMoney, fmtMoney0, fmtNum, fmtPct, fmtCompact, Delta, Section, Kpi, Empty,
   LineChart, FunnelBars, Table,
 } from './EukaKit';
+import EukaReportPreview from './EukaReportPreview';
 
 const ymd = (d) => d.toISOString().slice(0, 10);
 const daysAgo = (n) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d; };
@@ -127,6 +128,10 @@ export default function EukaAnalyticsPage() {
 
       {ready && (
         <>
+          <div className="row g-3 mb-1">
+            <EukaReportPreview storeId={storeId} store={store} />
+          </div>
+
           <KpiRow storeId={storeId} start={startDate} end={endDate} />
 
           <div className="row g-3 mt-1">
