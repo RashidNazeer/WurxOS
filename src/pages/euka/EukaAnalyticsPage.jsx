@@ -77,35 +77,49 @@ export default function EukaAnalyticsPage() {
       </div>
 
       {/* Filters */}
-      <div className="d-flex align-items-center flex-wrap gap-2 mt-3 mb-4 p-2 rounded-3"
-        style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
-        <div className="d-inline-flex align-items-center gap-1">
-          <i className="bi bi-shop text-muted" style={{ fontSize: '0.85rem' }} />
-          <select className="form-select form-select-sm" style={{ width: 'auto', borderRadius: 8 }}
+      <div className="d-flex align-items-center flex-wrap mt-3 mb-4 px-3 py-2 rounded-3"
+        style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', columnGap: 18, rowGap: 10 }}>
+        {/* Store */}
+        <div className="d-inline-flex align-items-center gap-2">
+          <i className="bi bi-shop text-muted" style={{ fontSize: '0.95rem' }} />
+          <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 168, borderRadius: 9 }}
             value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={storesQ.isLoading}>
             {(storesQ.data || []).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.region})</option>)}
             {storesQ.isLoading && <option>Loading stores…</option>}
           </select>
         </div>
-        <div className="vr d-none d-md-block" />
-        <div className="btn-group btn-group-sm" role="group">
-          {PRESETS.map((p) => (
-            <button key={p.k} className={`btn ${preset === p.k ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: 8 }} onClick={() => setPreset(p.k)}>{p.label}</button>
-          ))}
-          <button className={`btn ${preset === 'custom' ? 'btn-dark' : 'btn-outline-secondary'}`}
-            style={{ borderRadius: 8 }} onClick={() => setPreset('custom')}>Custom</button>
+
+        {/* Range — segmented control */}
+        <div className="d-inline-flex align-items-center gap-1 p-1 rounded-3" style={{ background: 'var(--surface-2)' }}>
+          {[...PRESETS, { k: 'custom', label: 'Custom' }].map((p) => {
+            const on = preset === p.k;
+            return (
+              <button key={p.k} type="button" className="btn btn-sm border-0"
+                style={{
+                  borderRadius: 7, fontSize: '0.78rem', fontWeight: 600, padding: '3px 14px',
+                  background: on ? 'var(--surface-1)' : 'transparent',
+                  color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                  boxShadow: on ? 'var(--shadow-sm)' : 'none',
+                }}
+                onClick={() => setPreset(p.k)}>{p.label}</button>
+            );
+          })}
         </div>
+
         {preset === 'custom' && (
-          <div className="d-inline-flex align-items-center gap-1">
-            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 8 }}
+          <div className="d-inline-flex align-items-center gap-2">
+            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 9 }}
               value={customStart} max={customEnd} onChange={(e) => setCustomStart(e.target.value)} />
             <span className="text-muted">→</span>
-            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 8 }}
+            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 9 }}
               value={customEnd} min={customStart} max={ymd(new Date())} onChange={(e) => setCustomEnd(e.target.value)} />
           </div>
         )}
-        <span className="text-muted ms-auto" style={{ fontSize: '0.72rem' }}>{startDate} → {endDate}</span>
+
+        <span className="ms-auto rounded-pill d-inline-flex align-items-center gap-1 px-3 py-1"
+          style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600 }}>
+          <i className="bi bi-calendar3" />{startDate} → {endDate}
+        </span>
       </div>
 
       {storesQ.isError && <div className="alert alert-danger py-2 small">Couldn’t reach Euka: {String(storesQ.error?.message || storesQ.error)}</div>}
