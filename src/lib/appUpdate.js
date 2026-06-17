@@ -76,12 +76,19 @@ export function hasUnsavedWork() {
 }
 
 // beforeunload guard — warns before an accidental tab close or
-// browser-level reload while a registered form is dirty.
+// browser-level reload (Ctrl+R / F5) while a registered form is dirty.
+// This is the ONLY thing a page can do during unload — browsers forbid a
+// custom modal here, so it's always the native "Leave site?" dialog.
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', (e) => {
     if (dirtyForms.size === 0) return;
     e.preventDefault();
-    e.returnValue = ''; // required for the prompt in some browsers
+    // Several Chrome builds only raise the dialog when returnValue is a
+    // NON-EMPTY string — '' was silently skipping the prompt on Ctrl+R.
+    // The text is ignored by modern browsers (they show a generic message),
+    // but it must be present.
+    e.returnValue = 'You have an unsaved report. Leave this page?';
+    return e.returnValue;
   });
 }
 
