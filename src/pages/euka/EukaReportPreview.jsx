@@ -39,7 +39,9 @@ function overallInsights(ov, topCreators) {
 function buildReport(week, store, { overview, creators, products }) {
   const ov = overview || {};
   const topCreators = (creators?.affiliates || []).map((c) => ({
-    name: c.handle ? `@${c.handle}` : '', videosPosted: '', itemsSold: '', gmv: num(c.totalGmv), notes: '',
+    // videoCount is provided per creator; units/orders per creator is NOT (no
+    // per-creator filter on performance-overview) → leave itemsSold blank.
+    name: c.handle ? `@${c.handle}` : '', videosPosted: num(c.videoCount), itemsSold: '', gmv: num(c.totalGmv), notes: '',
   }));
   const productHighlights = (products || [])
     .filter((p) => Number(p.affiliateGmv) > 0)
