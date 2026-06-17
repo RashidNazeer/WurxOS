@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import WeeklyReportView from '../../components/reporting/WeeklyReportView';
 import { makeWeekFromStart } from '../../lib/reportsApi';
-import {
-  eukaOverview, eukaTopCreators, eukaTopProducts, eukaTopVideos, eukaContentOverview,
-} from '../../lib/eukaAnalyticsApi';
+import { eukaOverview, eukaTopCreators } from '../../lib/eukaAnalyticsApi';
 import { Section } from './EukaKit';
 
 const num = (v) => (v == null || Number.isNaN(Number(v)) ? '' : Number(v));
@@ -21,29 +19,26 @@ function weekFromPicked(dateStr) {
   return makeWeekFromStart(`${y}-${m}-${da}`, 1);
 }
 
-function overallInsights(ov) {
+function overallInsights(ov, topCreators) {
   const money = (v) => (v == null ? '—' : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
   const n = (v) => (v == null ? '—' : Number(v).toLocaleString());
+  const top = topCreators.slice(0, 3).map((c) => `${c.name} (${money(c.gmv)})`).join(', ');
   return `<ul>`
-    + `<li>Total Shop GMV <b>${money(ov.totalShopGMV)}</b>, Affiliate GMV <b>${money(ov.totalAffiliateGMV)}</b>, with <b>${n(ov.totalOrders)}</b> orders.</li>`
-    + `<li><b>${n(ov.creatorsReached)}</b> creators reached · <b>${n(ov.activeCreators)}</b> active · <b>${n(ov.samplesApproved)}</b> samples approved.</li>`
-    + `<li>Video conversion rate <b>${ov.videoConvRate != null ? Number(ov.videoConvRate).toFixed(1) : '—'}%</b> across <b>${n(ov.videoConvRateTotalVideos)}</b> videos.</li>`
+    + `<li>Total Shop GMV <b>${money(ov.totalShopGMV)}</b>, Affiliate GMV <b>${money(ov.totalAffiliateGMV)}</b>, with <b>${n(ov.totalOrders)}</b> orders this week.</li>`
+    + (top ? `<li>Top creators by GMV: <b>${top}</b>.</li>` : '')
     + `</ul>`;
 }
 
-// Map the Euka responses into the EXACT weekly-report data shape the APC
-// form/view uses (EMPTY_REPORT_DATA in reportsApi.js).
-function buildReport(week, store, { overview, creators, products, videos, content }) {
+// Map ONLY the fields Euka provides exactly (verified to match the manual
+// report to the cent): GMV, Affiliate GMV, Orders, and Top Creators by GMV.
+// Everything else is intentionally left blank for manual entry — Euka either
+// doesn't expose it (ROI, Shop Score, GMV Max, Off-site) or reports a
+// different metric than the report uses (product total GMV, top videos,
+// samples approved, videos posted).
+function buildReport(week, store, { overview, creators }) {
   const ov = overview || {};
   const topCreators = (creators?.affiliates || []).map((c) => ({
-    name: c.handle ? `@${c.handle}` : '', videosPosted: num(c.videoCount), itemsSold: '', gmv: num(c.totalGmv), notes: '',
-  }));
-  const productHighlights = (products?.products || []).map((p) => ({
-    productId: p.productId || '', productName: p.title || '', unitsSold: '', gmv: num(p.totalRevenue), newVideos: num(p.videoCount), notes: '',
-  }));
-  const topVideos = (videos?.videos || []).slice(0, 10).map((v) => ({
-    creatorName: v.creatorHandle ? `@${v.creatorHandle}` : '', videoLink: '', itemsSold: num(v.gmvOrders),
-    gmv: num(v.revenue), views: num(v.viewsCount), productClicks: num(v.productClicks), notes: '',
+    name: c.handle ? `@${c.handle}` : '', videosPosted: '', itemsSold: '', gmv: num(c.totalGmv), notes: '',
   }));
   return {
     id: null, brandId: null, brandName: store?.name || 'Store', status: 'draft', currency: 'USD',
@@ -52,17 +47,16 @@ function buildReport(week, store, { overview, creators, products, videos, conten
       gmv: num(ov.totalShopGMV),
       affiliateGmv: num(ov.totalAffiliateGMV),
       orders: num(ov.totalOrders),
-      samplesApproved: num(ov.samplesApproved),
-      videosPosted: num(content?.totals?.videos),
-      roi: '',                  // Euka has no all-channels ROI (ad spend often 0) → APC enters manually
-      shopPerformanceScore: '', // not exposed by Euka → manual
+      samplesApproved: '',      // Euka 'approved' (96) ≠ report (67) — manual
+      videosPosted: '',         // Euka counts differ from the report — manual
+      roi: '',                  // needs ad spend; Euka hasAdsApiConfig=false — manual
+      shopPerformanceScore: '', // not exposed by Euka — manual
     },
-    overallInsights: overallInsights(ov),
+    overallInsights: overallInsights(ov, topCreators),
     topCreators, topCreatorsInsights: '',
-    productHighlights, productHighlightsInsights: '',
-    topVideos, topVideosInsights: '',
-    gmvMax: [],                 // TikTok GMV Max ad campaigns not exposed by Euka → manual
-    gmvMaxInsights: '',
+    productHighlights: [], productHighlightsInsights: '', // total product GMV not in Euka — manual
+    topVideos: [], topVideosInsights: '',                 // earned-in-week videos not in Euka — manual
+    gmvMax: [], gmvMaxInsights: '',                        // GMV Max ads not in Euka — manual
     offsitePerformance: { offsiteGmv: '', tiktokShopGmv: '', offsiteEffect: '' }, offsiteInsights: '',
     upcomingCampaigns: '', operationalUpdates: '', recommendations: '', actionItems: '',
     customFields: {},
@@ -91,15 +85,12 @@ export default function EukaReportPreview({ storeId, store }) {
     setBusy(true); setErr(''); setReport(null);
     const s = week.startDate, e = week.endDate;
     try {
-      const [overview, creators, products, videos, content] = await Promise.all([
-        eukaOverview(storeId, s, e).catch(() => null),
+      const [overview, creators] = await Promise.all([
+        eukaOverview(storeId, s, e),
         eukaTopCreators(storeId, s, e, { limit: 10 }).catch(() => null),
-        eukaTopProducts(storeId, s, e, { limit: 10 }).catch(() => null),
-        eukaTopVideos(storeId, s, e).catch(() => null),
-        eukaContentOverview(storeId, s, e).catch(() => null),
       ]);
       if (!overview) throw new Error('Euka returned no performance data for this week.');
-      setReport(buildReport(week, store, { overview, creators, products, videos, content }));
+      setReport(buildReport(week, store, { overview, creators }));
     } catch (ex) {
       setErr(ex?.message || String(ex));
     } finally {
@@ -109,7 +100,7 @@ export default function EukaReportPreview({ storeId, store }) {
 
   return (
     <Section span={12} title="Weekly report — auto-fill preview" icon="bi-magic" color="#7c3aed"
-      eyebrow="Generate the exact weekly-report template from Euka for any week. Preview only — nothing is saved and no existing report is touched.">
+      eyebrow="Generates the weekly-report template from Euka for any week. Preview only — nothing is saved and no existing report is touched.">
       <div className="d-flex align-items-center flex-wrap gap-3 mb-1">
         <div className="d-inline-flex align-items-center gap-2">
           <span className="text-muted" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Anchor date</span>
@@ -128,8 +119,9 @@ export default function EukaReportPreview({ storeId, store }) {
         </button>
       </div>
       <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-        <i className="bi bi-info-circle me-1" />
-        Fields Euka can’t provide (ROI, Shop Performance Score, GMV Max campaigns, Off-site) are left blank — those stay manual.
+        <i className="bi bi-check-circle me-1 text-success" />
+        Auto-filled (verified exact): <b>GMV, Affiliate GMV, Orders, Top creators by GMV</b>.
+        Everything else (ROI, Shop Score, Samples, Videos Posted, Products, Top videos, GMV Max, Off-site) is left blank for manual entry.
       </div>
 
       {err && <div className="alert alert-danger py-2 small mt-3 mb-0">{err}</div>}
