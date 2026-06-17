@@ -46,7 +46,7 @@ function buildReport(week, store, { overview, creators, products }) {
     .sort((a, b) => Number(b.affiliateGmv) - Number(a.affiliateGmv))
     .slice(0, 8)
     .map((p) => ({
-      productId: p.productId || '', productName: p.title || '', unitsSold: '',
+      productId: p.productId || '', productName: p.title || '', unitsSold: num(p.orders),
       gmv: num(p.affiliateGmv), newVideos: num(p.videoCount), notes: '',
     }));
   return {
@@ -105,8 +105,8 @@ export default function EukaReportPreview({ storeId, store }) {
       const baseProducts = prodResp?.products || [];
       const products = await Promise.all(baseProducts.map((p) =>
         eukaOverview(storeId, s, e, { productIds: [p.productId] })
-          .then((o) => ({ ...p, affiliateGmv: o?.totalAffiliateGMV ?? null }))
-          .catch(() => ({ ...p, affiliateGmv: null })),
+          .then((o) => ({ ...p, affiliateGmv: o?.totalAffiliateGMV ?? null, orders: o?.totalOrders ?? null }))
+          .catch(() => ({ ...p, affiliateGmv: null, orders: null })),
       ));
       setReport(buildReport(week, store, { overview, creators, products }));
     } catch (ex) {

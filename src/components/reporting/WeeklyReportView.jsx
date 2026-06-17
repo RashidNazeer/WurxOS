@@ -782,6 +782,10 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
   const productData = (report.productHighlights || []).filter(p => p.productName);
   const totalProductGmv = productData.reduce((s, p) => s + num(p.gmv), 0);
+  // "Share of GMV" denominator: a STABLE store total (affiliate GMV, else total
+  // GMV) so a product's share doesn't shift with how many products are listed.
+  // Falls back to the listed-products sum for older reports without totals.
+  const productShareDenom = num(perf.affiliateGmv) || num(perf.gmv) || totalProductGmv;
   const totalCreatorGmv = (report.topCreators || [])
     .filter(c => c.name).reduce((s, c) => s + num(c.gmv), 0);
   const sortedCreators = [...(report.topCreators || [])].filter(c => c.name).sort((a, b) => num(b.gmv) - num(a.gmv));
@@ -1106,7 +1110,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   </div>
                   {sortedProducts.map((p, i) => (
                     <ProductRow key={i} product={p} rank={i + 1}
-                      gmvShare={totalProductGmv > 0 ? (num(p.gmv) / totalProductGmv) * 100 : 0}
+                      gmvShare={productShareDenom > 0 ? Math.min(100, (num(p.gmv) / productShareDenom) * 100) : 0}
                       currency={currency} />
                   ))}
                 </div>
