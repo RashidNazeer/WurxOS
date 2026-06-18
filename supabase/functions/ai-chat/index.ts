@@ -23,7 +23,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GPT_TOKEN = Deno.env.get('GPT_TOKEN') ?? '';
 const MODELS_URL = 'https://models.github.ai/inference/chat/completions';
-const KNOWLEDGE_BUDGET = 12000; // chars of knowledge injected per call
+const KNOWLEDGE_BUDGET = 40000; // chars of knowledge injected per call (gpt-4o-mini has 128k context)
 const HISTORY_TURNS = 16;       // prior messages kept as memory
 
 const cors = {
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     const aiText = await aiRes.text();
     if (!aiRes.ok) {
       console.error('model error', aiRes.status, aiText.slice(0, 300));
-      return json({ error: `AI service error (${aiRes.status})`, conversationId }, 502);
+      return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
     }
     let reply = '';
     try { reply = JSON.parse(aiText)?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }

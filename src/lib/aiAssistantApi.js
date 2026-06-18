@@ -6,7 +6,13 @@ import { supabase } from './supabase';
 // ── Chat ──────────────────────────────────────────────────────────
 export async function aiSend({ conversationId, message }) {
   const { data, error } = await supabase.functions.invoke('ai-chat', { body: { conversationId, message } });
-  if (error) throw new Error(error.message || 'AI request failed');
+  if (error) {
+    // supabase-js masks the function's body on non-2xx as a generic message;
+    // dig the real reason out of error.context (the raw Response).
+    let detail = error.message || 'AI request failed';
+    try { const b = await error.context?.json?.(); if (b?.error) detail = b.error; } catch { /* keep generic */ }
+    throw new Error(detail);
+  }
   if (data?.error) throw new Error(data.error);
   return data; // { conversationId, reply }
 }

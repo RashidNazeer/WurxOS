@@ -11,7 +11,7 @@ export default function AiAssistantPage() {
   const [tab, setTab] = useState('chat');
 
   return (
-    <div style={{ padding: '24px 24px 8px', height: 'calc(100vh - var(--topbar-h, 64px))', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: 'calc(100vh - 110px)', minHeight: 480, display: 'flex', flexDirection: 'column' }}>
       <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
