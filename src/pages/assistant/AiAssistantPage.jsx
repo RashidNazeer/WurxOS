@@ -32,7 +32,7 @@ export default function AiAssistantPage() {
           </div>
         )}
       </div>
-      {tab === 'chat' ? <ChatView /> : <TrainView />}
+      {tab === 'chat' ? <ChatView /> : <TrainView onBack={() => setTab('chat')} />}
     </div>
   );
 }
@@ -171,7 +171,7 @@ function Bubble({ role, content, typing }) {
 }
 
 // ── Train (Boss) ───────────────────────────────────────────────────
-function TrainView() {
+function TrainView({ onBack }) {
   const [cfg, setCfg] = useState(null);
   const [docs, setDocs] = useState([]);
   const [editing, setEditing] = useState(null); // doc being edited / new
@@ -205,13 +205,16 @@ function TrainView() {
 
   return (
     <div style={{ overflowY: 'auto', flex: 1 }}>
+      <button type="button" className="btn btn-sm btn-link text-decoration-none px-0 mb-2" onClick={onBack}>
+        <i className="bi bi-arrow-left me-1" /> Back to chat
+      </button>
       <div className="row g-3">
         {/* Behaviour */}
-        <div className="col-12 col-lg-5">
+        <div className="col-12 col-lg-5 order-2">
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: 18 }}>
             <div className="fw-bold mb-2" style={{ fontSize: '0.92rem' }}><i className="bi bi-sliders me-2" />Behaviour</div>
             <label className="form-label small fw-semibold mb-1">Persona / instructions</label>
-            <textarea className="form-control form-control-sm mb-2" rows={7} value={cfg.persona} onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} style={{ borderRadius: 9 }} />
+            <textarea className="form-control form-control-sm mb-2" rows={5} value={cfg.persona} onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} style={{ borderRadius: 9 }} />
             <label className="form-label small fw-semibold mb-1">Greeting</label>
             <textarea className="form-control form-control-sm mb-2" rows={2} value={cfg.greeting} onChange={(e) => setCfg({ ...cfg, greeting: e.target.value })} style={{ borderRadius: 9 }} />
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
@@ -233,8 +236,8 @@ function TrainView() {
           </div>
         </div>
 
-        {/* Knowledge */}
-        <div className="col-12 col-lg-7">
+        {/* Knowledge (shown first) */}
+        <div className="col-12 col-lg-7 order-1">
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: 18 }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div className="fw-bold" style={{ fontSize: '0.92rem' }}><i className="bi bi-journal-text me-2" />Knowledge ({docs.length})</div>
