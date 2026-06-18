@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         auth: { persistSession: false, autoRefreshToken: false },
       });
       const { data: kb } = await userClient.from('kb_articles')
-        .select('id, title, body, category, sop_group_id, version')
+        .select('id, title, body, url, category, sop_group_id, version')
         .eq('approval_status', 'approved')
         .order('version', { ascending: false });
       const seenGroup = new Set<string>();
@@ -192,7 +192,14 @@ Deno.serve(async (req) => {
         if (seenGroup.has(key)) continue;
         seenGroup.add(key);
         const body = String(a.body || '').trim();
-        if (body) kbDocs.push({ title: `[KB · ${a.category || 'General'}] ${a.title}`, content: body });
+        const url = String(a.url || '').trim();
+        // Most KB articles in this org carry no body text — the real content
+        // is an external guide (e.g. a Google Doc) in `url`. Keep those so the
+        // assistant can still ROUTE the user to the right document by its link.
+        let content = body;
+        if (url) content = (body ? `${body}\n\n` : '') + `Full guide (open this link for the steps): ${url}`;
+        if (!content) continue;
+        kbDocs.push({ title: `[KB · ${a.category || 'General'}] ${a.title}`, content });
       }
     }
 
@@ -249,6 +256,7 @@ Deno.serve(async (req) => {
       '- If they ask how to do something their role cannot do (e.g. a Boss asking how to apply for leave), do NOT invent steps. Briefly say it is not part of their role and point them to what they CAN do instead.',
       '- Never invent pages, buttons, or steps that are not supported by the knowledge or the page list. If you do not know, say so and suggest asking their Team Lead, Operation Lead, or the Boss.',
       '- When you mention a page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never show a bare URL or invent a path.',
+      '- Some knowledge entries have no written steps — only a title and a link to a full guide (e.g. a Google Doc). For those, do NOT say you have no information and do NOT invent steps: point the user to the guide with a markdown link, e.g. [open the guide](https://…). Recite detailed steps only when the knowledge actually contains them.',
       '- Be concise and friendly; use short numbered steps when describing a flow.',
     ].join('\n');
 
