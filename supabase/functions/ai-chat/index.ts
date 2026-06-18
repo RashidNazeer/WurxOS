@@ -23,8 +23,10 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GPT_TOKEN = Deno.env.get('GPT_TOKEN') ?? '';
 const MODELS_URL = 'https://models.github.ai/inference/chat/completions';
-const KNOWLEDGE_BUDGET = 40000; // chars of knowledge injected per call (gpt-4o-mini has 128k context)
-const HISTORY_TURNS = 16;       // prior messages kept as memory
+const KNOWLEDGE_BUDGET = 6000;  // chars of knowledge injected per call — kept small so the request
+                                // fits even strict models (e.g. GitHub Models gpt-5-mini = 4000 input tokens)
+const HISTORY_CHAR_CAP = 3000;  // cap recent-history chars for the same reason
+const HISTORY_TURNS = 10;       // most-recent messages considered for memory
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -75,13 +77,25 @@ Deno.serve(async (req) => {
       conversationId = created.id;
     }
 
-    // ── Knowledge (RAG context) ────────────────────────────────────
+    // ── Knowledge (RAG) — pick the docs most relevant to THIS question
+    //    and cap the size, so the request fits the model's input limit
+    //    instead of stuffing the whole knowledge base into every call. ──
     const { data: docs } = await admin.from('ai_assistant_docs')
       .select('title, content').eq('is_active', true).order('updated_at', { ascending: false });
+    const STOP = new Set(['the','a','an','to','how','do','does','i','what','is','are','my','of','in','on','for','and','me','about','this','that','you','your','with','it','at','be','or','as','will','can','please','need','want','where','when','who','why','from','our','we','us']);
+    const terms = (message.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 2 && !STOP.has(w));
+    const scored = (docs || []).map((d) => {
+      const hay = `${d.title} ${d.title} ${d.title} ${d.content}`.toLowerCase(); // weight the title
+      let score = 0;
+      for (const t of terms) { let i = 0; while ((i = hay.indexOf(t, i)) !== -1) { score++; i += t.length; } }
+      return { d, score };
+    }).sort((a, b) => b.score - a.score);
+    let picked = scored.filter((s) => s.score > 0).map((s) => s.d);
+    if (picked.length === 0) picked = (docs || []).slice(0, 2); // no keyword hit → a little general context
     let knowledge = '';
-    for (const d of docs || []) {
+    for (const d of picked) {
       const block = `\n\n## ${d.title}\n${d.content}`;
-      if (knowledge.length + block.length > KNOWLEDGE_BUDGET) break;
+      if (knowledge.length && knowledge.length + block.length > KNOWLEDGE_BUDGET) break; // always include the top match
       knowledge += block;
     }
     const knowledgeBlock = knowledge
@@ -92,7 +106,15 @@ Deno.serve(async (req) => {
     const { data: history } = await admin.from('ai_messages')
       .select('role, content').eq('conversation_id', conversationId)
       .order('created_at', { ascending: false }).limit(HISTORY_TURNS);
-    const priorTurns = (history || []).reverse().map((m) => ({ role: m.role, content: m.content }));
+    // Keep only the most recent turns within a char cap (newest-first, then re-order).
+    const trimmed = [];
+    let histChars = 0;
+    for (const m of history || []) { // already newest-first
+      histChars += (m.content || '').length;
+      if (histChars > HISTORY_CHAR_CAP) break;
+      trimmed.push(m);
+    }
+    const priorTurns = trimmed.reverse().map((m) => ({ role: m.role, content: m.content }));
 
     const systemPrompt = `${persona}\n\nThe employee you are helping is ${profile.display_name || 'a team member'} (role: ${profile.role || 'staff'}).\n\n${knowledgeBlock}`;
 
