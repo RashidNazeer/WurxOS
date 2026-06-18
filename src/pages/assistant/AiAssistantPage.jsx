@@ -209,10 +209,10 @@ function TrainView({ onBack }) {
         <i className="bi bi-arrow-left me-1" /> Back to chat
       </button>
       <div className="row g-3">
-        {/* Behaviour */}
-        <div className="col-12 col-lg-5 order-2">
+        {/* Settings */}
+        <div className="col-12 order-2">
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: 18 }}>
-            <div className="fw-bold mb-2" style={{ fontSize: '0.92rem' }}><i className="bi bi-sliders me-2" />Behaviour</div>
+            <div className="fw-bold mb-2" style={{ fontSize: '0.92rem' }}><i className="bi bi-sliders me-2" />Assistant settings (persona, greeting, model)</div>
             <label className="form-label small fw-semibold mb-1">Persona / instructions</label>
             <textarea className="form-control form-control-sm mb-2" rows={5} value={cfg.persona} onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} style={{ borderRadius: 9 }} />
             <label className="form-label small fw-semibold mb-1">Greeting</label>
@@ -237,11 +237,11 @@ function TrainView({ onBack }) {
         </div>
 
         {/* Knowledge (shown first) */}
-        <div className="col-12 col-lg-7 order-1">
+        <div className="col-12 order-1">
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: 18 }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div className="fw-bold" style={{ fontSize: '0.92rem' }}><i className="bi bi-journal-text me-2" />Knowledge ({docs.length})</div>
-              <button className="btn btn-sm btn-outline-primary" style={{ borderRadius: 9 }} onClick={() => setEditing({ title: '', content: '', is_active: true })}>
+              <button className="btn btn-sm btn-primary" style={{ borderRadius: 9 }} onClick={() => setEditing({ title: '', content: '', is_active: true })}>
                 <i className="bi bi-plus-lg me-1" />Add knowledge
               </button>
             </div>
@@ -249,7 +249,7 @@ function TrainView({ onBack }) {
             {docs.length === 0 && <div className="text-muted small py-3">No knowledge yet — add your first entry so the assistant can answer.</div>}
             {docs.map((d) => (
               <div key={d.id} className="d-flex align-items-start gap-2 px-2 py-2 rounded-2 mb-1" style={{ background: 'var(--surface-2)' }}>
-                <div className="flex-grow-1 min-w-0">
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
                   <div className="fw-semibold text-truncate" style={{ fontSize: '0.82rem', color: d.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }}>{d.title}</div>
                   <div className="text-muted text-truncate" style={{ fontSize: '0.7rem' }}>{d.content}</div>
                 </div>
