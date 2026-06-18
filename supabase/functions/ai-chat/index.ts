@@ -275,6 +275,15 @@ Deno.serve(async (req) => {
     const aiText = await aiRes.text();
     if (!aiRes.ok) {
       console.error('model error', aiRes.status, aiText.slice(0, 300));
+      if (aiRes.status === 429) {
+        // GitHub Models free tier caps requests per-minute and per-day. Don't
+        // dump GitHub's raw ToS blurb at the user — give a clean, calm message.
+        const retry = aiRes.headers.get('retry-after');
+        const wait = retry && Number(retry) > 0
+          ? `about ${Math.ceil(Number(retry) / 60) || 1} minute(s)`
+          : 'a minute';
+        return json({ error: `The assistant is getting a lot of requests right now and the AI provider's free rate limit was hit. Please wait ${wait} and try again.`, conversationId }, 429);
+      }
       return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
     }
     let reply = '';
