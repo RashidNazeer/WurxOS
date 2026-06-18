@@ -7,7 +7,7 @@ import {
 
 export default function AiAssistantPage() {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'boss' || profile?.role === 'developer';
+  const isAdmin = profile?.role === 'boss'; // training is Boss-only
   const [tab, setTab] = useState('chat');
 
   return (
@@ -248,11 +248,10 @@ function TrainView({ onBack }) {
             <div className="text-muted small mb-2">What you add here is what the assistant answers from (e.g. “Applying for leave”, “Submitting a weekly report”).</div>
             {docs.length === 0 && <div className="text-muted small py-3">No knowledge yet — add your first entry so the assistant can answer.</div>}
             {docs.map((d) => (
-              <div key={d.id} className="d-flex align-items-start gap-2 px-2 py-2 rounded-2 mb-1" style={{ background: 'var(--surface-2)' }}>
-                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                  <div className="fw-semibold text-truncate" style={{ fontSize: '0.82rem', color: d.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }}>{d.title}</div>
-                  <div className="text-muted text-truncate" style={{ fontSize: '0.7rem' }}>{d.content}</div>
-                </div>
+              <div key={d.id} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2 mb-1" style={{ background: 'var(--surface-2)' }}>
+                <i className="bi bi-file-text flex-shrink-0" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }} />
+                <span className="flex-grow-1 text-truncate fw-semibold" style={{ minWidth: 0, fontSize: '0.82rem', cursor: 'pointer', color: d.is_active ? 'var(--text-primary)' : 'var(--text-muted)' }} onClick={() => setEditing(d)} title="Open to view or edit">{d.title}</span>
+                {!d.is_active && <span className="badge flex-shrink-0" style={{ background: 'var(--surface-3, #e5e7eb)', color: 'var(--text-muted)', fontSize: '0.6rem', fontWeight: 600 }}>OFF</span>}
                 <button className="btn btn-sm p-1 border-0" title={d.is_active ? 'Active — click to disable' : 'Disabled — click to enable'} style={{ background: 'transparent', color: d.is_active ? 'var(--success)' : 'var(--text-muted)' }} onClick={() => toggleActive(d)}>
                   <i className={`bi ${d.is_active ? 'bi-toggle-on' : 'bi-toggle-off'}`} />
                 </button>
