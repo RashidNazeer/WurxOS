@@ -22,6 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const GPT_TOKEN = Deno.env.get('GPT_TOKEN') ?? '';
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''; // used to read KB as the caller (RLS applies)
 const MODELS_URL = 'https://models.github.ai/inference/chat/completions';
 const KNOWLEDGE_BUDGET = 4500;  // chars of knowledge injected per call — kept small so the request
                                 // fits even strict models (e.g. GitHub Models gpt-5-mini = 4000 input tokens).
@@ -169,16 +170,48 @@ Deno.serve(async (req) => {
     //    instead of stuffing the whole knowledge base into every call. ──
     const { data: docs } = await admin.from('ai_assistant_docs')
       .select('title, content').eq('is_active', true).order('updated_at', { ascending: false });
+
+    // Company Knowledge Base — queried through the CALLER's own token so
+    // Supabase RLS (mig 134) returns only the articles they may see
+    // (office/role/users + approved). A role-restricted or private SOP is
+    // therefore never surfaced to a user who can't normally see it.
+    const useKb = cfg ? cfg.use_kb !== false : true;
+    const kbDocs: { title: string; content: string }[] = [];
+    if (useKb && ANON_KEY) {
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: kb } = await userClient.from('kb_articles')
+        .select('id, title, body, category, sop_group_id, version')
+        .eq('approval_status', 'approved')
+        .order('version', { ascending: false });
+      const seenGroup = new Set<string>();
+      for (const a of kb || []) {          // version desc → first seen per SOP group is the latest
+        const key = a.sop_group_id || a.id;
+        if (seenGroup.has(key)) continue;
+        seenGroup.add(key);
+        const body = String(a.body || '').trim();
+        if (body) kbDocs.push({ title: `[KB · ${a.category || 'General'}] ${a.title}`, content: body });
+      }
+    }
+
+    // Unified relevance pool — curated WurxOS guides ranked slightly above KB
+    // so "how do I use the app" questions prefer the how-to guides.
+    const pool = [
+      ...(docs || []).map((d) => ({ title: d.title, content: d.content, boost: 1.2 })),
+      ...kbDocs.map((d) => ({ title: d.title, content: d.content, boost: 1.0 })),
+    ];
     const STOP = new Set(['the','a','an','to','how','do','does','i','what','is','are','my','of','in','on','for','and','me','about','this','that','you','your','with','it','at','be','or','as','will','can','please','need','want','where','when','who','why','from','our','we','us']);
     const terms = (message.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 2 && !STOP.has(w));
-    const scored = (docs || []).map((d) => {
+    const scored = pool.map((d) => {
       const hay = `${d.title} ${d.title} ${d.title} ${d.content}`.toLowerCase(); // weight the title
       let score = 0;
       for (const t of terms) { let i = 0; while ((i = hay.indexOf(t, i)) !== -1) { score++; i += t.length; } }
-      return { d, score };
+      return { d, score: score * d.boost };
     }).sort((a, b) => b.score - a.score);
     let picked = scored.filter((s) => s.score > 0).map((s) => s.d);
-    if (picked.length === 0) picked = (docs || []).slice(0, 2); // no keyword hit → a little general context
+    if (picked.length === 0) picked = pool.filter((d) => d.boost > 1).slice(0, 2); // no hit → a little general WurxOS context
     let knowledge = '';
     for (const d of picked) {
       const block = `\n\n## ${d.title}\n${d.content}`;
@@ -186,8 +219,8 @@ Deno.serve(async (req) => {
       knowledge += block;
     }
     const knowledgeBlock = knowledge
-      ? `WURXOS KNOWLEDGE (answer only from this):${knowledge}`
-      : 'No knowledge has been added yet — if you cannot answer from general WurxOS context, say so and suggest asking the Team Lead or Boss.';
+      ? `KNOWLEDGE (answer using this — WurxOS app help and company Knowledge Base articles):${knowledge}`
+      : 'No specific knowledge matched this question. Answer from general WurxOS context if you can; otherwise say you are not sure and suggest asking the Team Lead or Boss.';
 
     // ── History (memory) ───────────────────────────────────────────
     const { data: history } = await admin.from('ai_messages')

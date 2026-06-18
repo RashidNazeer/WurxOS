@@ -204,7 +204,7 @@ function TrainView({ onBack }) {
 
   async function saveConfig() {
     setSavingCfg(true); setFlash('');
-    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, model: cfg.model, enabled: cfg.enabled }); setFlash('Saved.'); }
+    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, model: cfg.model, enabled: cfg.enabled, use_kb: cfg.use_kb !== false }); setFlash('Saved.'); }
     catch (e) { setFlash('Error: ' + e.message); }
     finally { setSavingCfg(false); setTimeout(() => setFlash(''), 2500); }
   }
@@ -246,6 +246,10 @@ function TrainView({ onBack }) {
               <div className="form-check mt-3">
                 <input className="form-check-input" type="checkbox" id="ai-enabled" checked={cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />
                 <label className="form-check-label small" htmlFor="ai-enabled">Assistant enabled</label>
+              </div>
+              <div className="form-check mt-3">
+                <input className="form-check-input" type="checkbox" id="ai-usekb" checked={cfg.use_kb !== false} onChange={(e) => setCfg({ ...cfg, use_kb: e.target.checked })} />
+                <label className="form-check-label small" htmlFor="ai-usekb" title="Also answer from the company Knowledge Base (each user only sees articles they're allowed to)">Use Knowledge Base</label>
               </div>
             </div>
             <button className="btn btn-sm btn-primary" style={{ borderRadius: 9 }} disabled={savingCfg} onClick={saveConfig}>
