@@ -184,6 +184,8 @@ const AGENDA_GROUP_BASIC = {
 // groups (Paid Collab, Reporting, Requests), then footer-style
 // items (notifications/settings).
 
+const ASSISTANT_ITEM = { label: 'Assistant', icon: MessageIcon, to: '/assistant' };
+
 export const MENUS = {
   boss: [
     DASHBOARD_ITEM,
@@ -341,5 +343,10 @@ export const MENUS = {
 };
 
 export function getMenuForRole(role) {
-  return MENUS[role] || MENUS.apc;
+  // Inject the AI Assistant for every role, just above Notifications.
+  const base = MENUS[role] || MENUS.apc;
+  const out = [...base];
+  const i = out.indexOf(NOTIFS_ITEM);
+  out.splice(i >= 0 ? i : out.length, 0, ASSISTANT_ITEM);
+  return out;
 }

@@ -81,6 +81,7 @@ const TLTeamPage            = lazy(() => import('./pages/tl/TeamPage'));
 const AuditPage             = lazy(() => import('./pages/audit/AuditPage'));
 const SettingsPage          = lazy(() => import('./pages/settings/SettingsPage'));
 const NotificationsPage     = lazy(() => import('./pages/notifications/NotificationsPage'));
+const AiAssistantPage       = lazy(() => import('./pages/assistant/AiAssistantPage'));
 const ReportsPage           = lazy(() => import('./pages/reports/ReportsPage'));
 const ReportPage            = lazy(() => import('./pages/reports/ReportPage'));
 const ResourcePlannerPage   = lazy(() => import('./pages/resourcePlanner/ResourcePlannerPage'));
@@ -193,6 +194,14 @@ export default function App() {
             }>
               <Route path="/"          element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardRouter />} />
+              <Route
+                path="/assistant"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer']}>
+                    <AiAssistantPage />
+                  </RoleGuard>
+                }
+              />
 
               {/* Brands — Boss / OL / TL / APC / IPC / Developer (visibility enforced by RLS) */}
               <Route
