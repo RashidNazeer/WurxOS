@@ -1,0 +1,13 @@
+/* AI assistant rendered-message formatting (see assistantMarkdown.js). */
+.ai-md > div { margin: 0; }
+.ai-md .ai-sp { height: 0.5rem; }
+.ai-md .ai-h { font-weight: 700; margin: 0.5rem 0 0.2rem; }
+.ai-md .ai-h:first-child { margin-top: 0; }
+.ai-md ul, .ai-md ol { margin: 0.25rem 0 0.45rem; padding-left: 1.25rem; }
+.ai-md li { margin: 0.12rem 0; }
+.ai-md code {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  padding: 0.05rem 0.32rem; border-radius: 5px; font-size: 0.85em;
+}
+.ai-md a.ai-link { color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
+.ai-md a.ai-link:hover { text-decoration: underline; }

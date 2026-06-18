@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   aiSend, listConversations, getMessages, deleteConversation,
   getAiConfig, updateAiConfig, listDocs, saveDoc, deleteDoc,
 } from '../../lib/aiAssistantApi';
+import { renderAssistantHtml } from '../../lib/assistantMarkdown';
+import '../../styles/assistant.css';
 
 export default function AiAssistantPage() {
   const { profile } = useAuth();
@@ -151,6 +154,17 @@ function ChatView() {
 
 function Bubble({ role, content, typing }) {
   const isUser = role === 'user';
+  const navigate = useNavigate();
+
+  // Intercept clicks on in-app links the assistant rendered ([Leave](/leave))
+  // so navigation stays inside the SPA instead of a full page reload.
+  const onContentClick = (e) => {
+    const a = e.target.closest?.('a[data-nav]');
+    if (!a) return;
+    const to = a.getAttribute('data-nav');
+    if (to && to.startsWith('/')) { e.preventDefault(); navigate(to); }
+  };
+
   return (
     <div className="d-flex mb-3" style={{ justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       {!isUser && (
@@ -159,12 +173,17 @@ function Bubble({ role, content, typing }) {
         </div>
       )}
       <div style={{
-        maxWidth: '76%', padding: '10px 14px', borderRadius: 12, fontSize: '0.86rem', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        maxWidth: '76%', padding: '10px 14px', borderRadius: 12, fontSize: '0.86rem', lineHeight: 1.55,
+        whiteSpace: isUser ? 'pre-wrap' : 'normal', wordBreak: 'break-word',
         background: isUser ? 'var(--accent)' : 'var(--surface-2)',
         color: isUser ? 'var(--on-accent)' : 'var(--text-primary)',
         borderTopRightRadius: isUser ? 4 : 12, borderTopLeftRadius: isUser ? 12 : 4,
       }}>
-        {typing ? <span className="text-muted">…thinking</span> : content}
+        {typing
+          ? <span className="text-muted">…thinking</span>
+          : isUser
+            ? content
+            : <div className="ai-md" onClick={onContentClick} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(content) }} />}
       </div>
     </div>
   );
