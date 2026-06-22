@@ -96,7 +96,7 @@ function SectionHeader({ icon, title, color, required, enabled = true, onToggle,
   );
 }
 
-function Field({ label, value, onChange, type = 'text', placeholder, note, width }) {
+function Field({ label, value, onChange, type = 'text', placeholder, note, width, readOnly }) {
   // Use type="text" + inputMode="decimal" for numeric fields so users can paste
   // formatted strings like "$3,456.9" — type="number" silently rejects them.
   // Live-clean via cleanNumericInput so currency, commas, and % drop out.
@@ -106,8 +106,10 @@ function Field({ label, value, onChange, type = 'text', placeholder, note, width
       <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
+        readOnly={readOnly}
         className="form-control form-control-sm" placeholder={placeholder || label}
-        value={value} onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} style={{ borderRadius: 8 }} />
+        value={value} onChange={readOnly ? undefined : (e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value))}
+        style={{ borderRadius: 8, ...(readOnly ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : null) }} />
       {note && <div className="text-muted" style={{ fontSize: '0.6rem' }}>{note}</div>}
     </div>
   );
@@ -641,6 +643,19 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     return findPreviousReport(existingReports, current);
   }, [existingReports, selectedWeek, editReportId, selectedBrand?.id]);
 
+  // "Total Videos (all-time)" auto-accumulates: the previous report's all-time
+  // total + this week's "Videos Posted". We only auto-compute when the prior
+  // report actually has a numeric all-time; otherwise the field stays editable
+  // so the FIRST report can set the historical baseline (the chain takes over
+  // from the next week on). Computed for display + injected at save (see
+  // _doSave) rather than written live, so loading a report never falsely marks
+  // the form dirty.
+  const prevAllTimeRaw = previousReport?.overallNotes?.videosPosted;
+  const prevAllTimeVideos = (prevAllTimeRaw === '' || prevAllTimeRaw == null) ? NaN : Number(prevAllTimeRaw);
+  const hasPrevAllTime = Number.isFinite(prevAllTimeVideos);
+  const weeklyVideos = Number(data.overallPerformance.videosPosted) || 0;
+  const autoTotalVideos = hasPrevAllTime ? prevAllTimeVideos + weeklyVideos : null;
+
   // Pre-fill Product Highlights from the most recent prior report that
   // actually has products (new-report path only — never on edit). Walk
   // back through history because the immediately previous report may
@@ -814,7 +829,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         if (op[k] === '' || op[k] == null) missing.push(`Overall: ${label}`);
       });
       if (!data.overallNotes?.samplesApproved) missing.push('Overall: MTD Approved');
-      if (!data.overallNotes?.videosPosted) missing.push('Overall: Total Videos');
+      // Total Videos (all-time) is auto-computed when a prior all-time exists
+      // (injected at save), so only require manual entry on the first report.
+      if (!hasPrevAllTime && !data.overallNotes?.videosPosted) missing.push('Overall: Total Videos');
     }
 
     if (en.topCreators && !(data.topCreators || []).some(c => c.name && c.name.trim()))
@@ -958,6 +975,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         })
       );
       const cleanedData = { ...data, customFields: cleanedCustomFields };
+      // Persist the auto-accumulated all-time video total (previous all-time +
+      // this week's Videos Posted) so the next week reads it as its baseline.
+      if (hasPrevAllTime) {
+        cleanedData.overallNotes = { ...(data.overallNotes || {}), videosPosted: autoTotalVideos };
+      }
       const savedId = await saveReport({
         brandId: selectedBrand.id,
         brandName,
@@ -1360,7 +1382,13 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           </div>
           <div className="d-flex flex-wrap gap-2">
             <Field label="MTD Approved (Samples Month-to-Date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
-            <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px" />
+            {hasPrevAllTime ? (
+              <Field label="Total Videos (all-time)" value={autoTotalVideos} type="number" width="220px" readOnly
+                note={`Auto: ${prevAllTimeVideos.toLocaleString()} previous + ${weeklyVideos.toLocaleString()} this week`} />
+            ) : (
+              <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px"
+                note="First report: enter the all-time total. Future weeks add automatically." />
+            )}
           </div>
           <BuiltinExtras sectionKey="overallPerformance" sectionTitle="Overall Performance"
             fields={brandSectionExtras.overallPerformance || []}
