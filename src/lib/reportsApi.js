@@ -1152,7 +1152,49 @@ export async function editMonthlyReportMonth(oldReportId, newYear, newMonthIndex
 // dispatches to the right one and writes audit fields server-side.
 export async function updateReportStatus(reportId, nextStatus, auditData = null) {
   // v2 RPCs: submitReport, verifyReport, approveReport, rejectReport, reopenReport
+  //
+  // Map the audit fields (camelCase → snake_case) UP FRONT so the fallback path
+  // can write them TOGETHER with the status change. This is load-bearing for
+  // returns (status → 'draft'): the report_returns trigger (mig 203) copies
+  // reports.rejection_note into the return log AT THE INSTANT status changes.
+  // Writing the note in a separate later update logs an empty note → the
+  // recipient (APC) sees "No reason was provided." even though one was given.
+  const KEY_MAP = {
+    submittedActingAs: 'submitted_acting_as',
+    verifiedActingAs:  'verified_acting_as',
+    approvedActingAs:  'approved_acting_as',
+    rejectedActingAs:  'rejected_acting_as',
+    submittedAt: 'submitted_at',
+    verifiedAt:  'verified_at',
+    approvedAt:  'approved_at',
+    rejectedAt:  'rejected_at',
+    submittedBy: 'submitted_by',
+    verifiedBy:  'verified_by',
+    approvedBy:  'approved_by',
+    rejectedBy:  'rejected_by',
+    submittedByName: 'submitted_by_name',
+    verifiedByName:  'verified_by_name',
+    approvedByName:  'approved_by_name',
+    rejectedByName:  'rejected_by_name',
+    rejectionNote: 'rejection_note',
+  };
+  const SKIP = new Set([
+    // RPCs already write these — don't clobber
+    'submitted_at', 'submitted_by',
+    'verified_at',  'verified_by',
+    'approved_at',  'approved_by',
+  ]);
+  const patch = {};
+  if (auditData && typeof auditData === 'object') {
+    for (const [k, v] of Object.entries(auditData)) {
+      const col = KEY_MAP[k] || (k.includes('_') ? k : null);
+      if (!col || SKIP.has(col)) continue;
+      patch[col] = v;
+    }
+  }
+
   let result;
+  let patchWritten = false;
   if (nextStatus === 'submitted') {
     // submitReport expects (id, data) — pass null so it preserves what's there
     result = await submitReport(reportId, null);
@@ -1161,55 +1203,21 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
   } else if (nextStatus === 'approved') {
     result = await approveReport(reportId);
   } else {
-    // Unknown — fall back to a direct status update (boss/dev RLS allows this).
+    // Unknown status (e.g. 'draft' = return to APC). Write status + audit
+    // fields in ONE update so the return-logging trigger captures the note.
     const { error } = await supabase
       .from('reports')
-      .update({ status: nextStatus })
+      .update({ status: nextStatus, ...patch })
       .eq('id', reportId);
     if (error) throw new Error(error.message);
+    patchWritten = true;
   }
 
-  // Apply any extra audit fields the caller passed (e.g. v1's
-  // submittedActingAs / verifiedActingAs flags for OL acting-as flows).
-  // Skip fields we already wrote via the RPC; map camelCase → snake_case
-  // for the few names that v1 used.
-  if (auditData && typeof auditData === 'object') {
-    const KEY_MAP = {
-      submittedActingAs: 'submitted_acting_as',
-      verifiedActingAs:  'verified_acting_as',
-      approvedActingAs:  'approved_acting_as',
-      rejectedActingAs:  'rejected_acting_as',
-      submittedAt: 'submitted_at',
-      verifiedAt:  'verified_at',
-      approvedAt:  'approved_at',
-      rejectedAt:  'rejected_at',
-      submittedBy: 'submitted_by',
-      verifiedBy:  'verified_by',
-      approvedBy:  'approved_by',
-      rejectedBy:  'rejected_by',
-      submittedByName: 'submitted_by_name',
-      verifiedByName:  'verified_by_name',
-      approvedByName:  'approved_by_name',
-      rejectedByName:  'rejected_by_name',
-      rejectionNote: 'rejection_note',
-    };
-    const SKIP = new Set([
-      // RPCs already write these — don't clobber
-      'submitted_at', 'submitted_by',
-      'verified_at',  'verified_by',
-      'approved_at',  'approved_by',
-    ]);
-    const patch = {};
-    for (const [k, v] of Object.entries(auditData)) {
-      const col = KEY_MAP[k] || (k.includes('_') ? k : null);
-      if (!col || SKIP.has(col)) continue;
-      patch[col] = v;
-    }
-    if (Object.keys(patch).length > 0) {
-      try {
-        await supabase.from('reports').update(patch).eq('id', reportId);
-      } catch { /* non-fatal — RPC already moved status */ }
-    }
+  // RPC paths above already changed status; apply remaining audit fields after.
+  if (!patchWritten && Object.keys(patch).length > 0) {
+    try {
+      await supabase.from('reports').update(patch).eq('id', reportId);
+    } catch { /* non-fatal — RPC already moved status */ }
   }
   return result;
 }
