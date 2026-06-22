@@ -717,9 +717,13 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       r.status && r.status !== 'draft'
     ) || null;
   }, [existingReports, selectedWeek, editReportId]);
+  // APC can submit the next report once the previous one is at least VERIFIED
+  // by the Team Lead (status 'verified' or 'approved'). Block only while a prior
+  // report is still unverified — draft / submitted / returned.
   const priorPendingApproval = useMemo(() => {
     if (!isApc || !previousReport) return null;
-    return (previousReport.status && previousReport.status !== 'approved') ? previousReport : null;
+    const s = previousReport.status;
+    return (s && s !== 'verified' && s !== 'approved') ? previousReport : null;
   }, [isApc, previousReport]);
   const submitBlock = duplicateForThisWeek
     ? { kind: 'duplicate', report: duplicateForThisWeek }
@@ -1041,7 +1045,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     }
     if (submitBlock?.kind === 'pendingPrior') {
       const prev = submitBlock.report;
-      alert(`Your previous report (${prev.weekLabel}) is still waiting for OL approval. It needs to be approved before you can submit a new one.`);
+      alert(`Your previous report (${prev.weekLabel}) hasn't been verified by the Team Lead yet. It must be verified before you can submit a new one.`);
       return;
     }
     const missing = validate();
@@ -1270,7 +1274,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               <button className="btn btn-sm px-4 d-inline-flex align-items-center gap-1"
                 style={{ borderRadius: 10, background: submitBlock ? '#94a3b8' : '#2563eb', color: 'white', border: 'none' }}
                 onClick={handleSubmitReport} disabled={saving || !!submitBlock}
-                title={submitBlock?.kind === 'duplicate' ? 'A report already exists for this week.' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
+                title={submitBlock?.kind === 'duplicate' ? 'A report already exists for this week.' : submitBlock?.kind === 'pendingPrior' ? 'The previous report must be verified by the Team Lead first' : ''}>
                 {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-send-fill" /> Submit Report</>}
               </button>
             </>
@@ -1333,10 +1337,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
-            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report awaiting OL approval</div>
+            <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report not yet verified</div>
             <div style={{ fontSize: '0.78rem', marginTop: 2 }}>
               Your {submitBlock.report.weekLabel} report is still <strong>{REPORT_STATUSES[submitBlock.report.status]?.label || submitBlock.report.status}</strong>.
-              It needs to be approved by the Operation Lead before you can submit a new one. You can keep drafting this report in the meantime.
+              It needs to be verified by the Team Lead before you can submit a new one. You can keep drafting this report in the meantime.
             </div>
           </div>
         </div>
@@ -1744,7 +1748,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <button className="btn px-5 d-inline-flex align-items-center gap-2"
               style={{ borderRadius: 10, background: submitBlock ? '#94a3b8' : '#2563eb', color: 'white', border: 'none' }}
               onClick={handleSubmitReport} disabled={saving || !!submitBlock}
-              title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this week' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
+              title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this week' : submitBlock?.kind === 'pendingPrior' ? 'The previous report must be verified by the Team Lead first' : ''}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-send-fill" /> Submit Report</>}
             </button>
           </>
