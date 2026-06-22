@@ -1159,11 +1159,11 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
   // reports.rejection_note into the return log AT THE INSTANT status changes.
   // Writing the note in a separate later update logs an empty note → the
   // recipient (APC) sees "No reason was provided." even though one was given.
+  // The reports table has NO *_by_name or *_acting_as columns — reviewer names
+  // come from joins on *_by → profiles. v1 callers still pass those keys; we
+  // must NOT try to write them or PostgREST rejects the WHOLE update
+  // ("Could not find the 'rejected_by_name' column …") and the return fails.
   const KEY_MAP = {
-    submittedActingAs: 'submitted_acting_as',
-    verifiedActingAs:  'verified_acting_as',
-    approvedActingAs:  'approved_acting_as',
-    rejectedActingAs:  'rejected_acting_as',
     submittedAt: 'submitted_at',
     verifiedAt:  'verified_at',
     approvedAt:  'approved_at',
@@ -1172,12 +1172,15 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
     verifiedBy:  'verified_by',
     approvedBy:  'approved_by',
     rejectedBy:  'rejected_by',
-    submittedByName: 'submitted_by_name',
-    verifiedByName:  'verified_by_name',
-    approvedByName:  'approved_by_name',
-    rejectedByName:  'rejected_by_name',
     rejectionNote: 'rejection_note',
   };
+  // Allowlist of columns that actually exist — anything else (legacy name /
+  // acting-as keys, however passed) is dropped so the update can't fail.
+  const VALID_COLS = new Set([
+    'submitted_at', 'submitted_by', 'verified_at', 'verified_by',
+    'approved_at', 'approved_by', 'rejected_at', 'rejected_by',
+    'reopened_at', 'reopened_by', 'rejection_note',
+  ]);
   const SKIP = new Set([
     // RPCs already write these — don't clobber
     'submitted_at', 'submitted_by',
@@ -1188,7 +1191,7 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
   if (auditData && typeof auditData === 'object') {
     for (const [k, v] of Object.entries(auditData)) {
       const col = KEY_MAP[k] || (k.includes('_') ? k : null);
-      if (!col || SKIP.has(col)) continue;
+      if (!col || SKIP.has(col) || !VALID_COLS.has(col)) continue;
       patch[col] = v;
     }
   }
