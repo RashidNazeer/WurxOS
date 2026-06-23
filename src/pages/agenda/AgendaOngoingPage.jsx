@@ -43,7 +43,7 @@ export default function AgendaOngoingPage() {
   const isApc = role === 'apc';
   // View/join every team's meeting (Paid Media lead etc.) without OL controls.
   // Mirrors canViewAllBrands — view-only; never grants start/finish/evaluate.
-  const canAttendAll = isOL || profile?.permissions?.canAttendAllMeetings === true;
+  const canAttendAll = isOL || role === 'pctl' || role === 'ipc' || profile?.permissions?.canAttendAllMeetings === true;
   const uid = user?.id;
   const location = useLocation();
 

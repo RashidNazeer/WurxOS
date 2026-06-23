@@ -46,7 +46,7 @@ export default function AgendaUpcomingPage() {
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
   // All-meeting attendees (e.g. Paid Media lead) see every team's row, like an OL.
-  const canAttendAll = isOL || profile?.permissions?.canAttendAllMeetings === true;
+  const canAttendAll = isOL || role === 'pctl' || role === 'ipc' || profile?.permissions?.canAttendAllMeetings === true;
   const myTeamTlId = canAttendAll ? null : (isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null));
 
   const [meetings, setMeetings]   = useState([]);

@@ -55,7 +55,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isApc = role === 'apc';
   // All-meeting attendees see the full read-only record of any team's meeting.
-  const canViewAll = isOL || profile?.permissions?.canAttendAllMeetings === true;
+  const canViewAll = isOL || role === 'pctl' || role === 'ipc' || profile?.permissions?.canAttendAllMeetings === true;
   const uid = user?.id;
 
   const [attendance, setAttendance]   = useState([]);

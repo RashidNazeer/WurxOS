@@ -226,7 +226,7 @@ export default function App() {
               <Route
                 path="/agenda/upcoming"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
                     <AgendaUpcomingPage />
                   </RoleGuard>
                 }
@@ -234,7 +234,7 @@ export default function App() {
               <Route
                 path="/agenda/ongoing"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
                     <AgendaOngoingPage />
                   </RoleGuard>
                 }
@@ -242,7 +242,7 @@ export default function App() {
               <Route
                 path="/agenda/prior"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
                     <AgendaPriorPage />
                   </RoleGuard>
                 }
@@ -258,7 +258,7 @@ export default function App() {
               <Route
                 path="/agenda/tasks"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
                     <AgendaTasksPage />
                   </RoleGuard>
                 }
@@ -266,7 +266,7 @@ export default function App() {
               <Route
                 path="/agenda/resources"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
                     <AgendaResourcesPage />
                   </RoleGuard>
                 }
