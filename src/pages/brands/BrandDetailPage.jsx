@@ -19,6 +19,7 @@ import { paidCollabStatusLabel } from '../../lib/roles';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import BrandForm from '../../components/brands/BrandForm';
 import SwitchApcModal from '../../components/brands/SwitchApcModal';
+import AssignBrandModal from '../../components/brands/AssignBrandModal';
 import BrandResourcesPanel from '../../components/brands/BrandResourcesPanel';
 import BrandReportLinksPanel from '../../components/brands/BrandReportLinksPanel';
 import BrandReportSectionsPanel from '../../components/brands/BrandReportSectionsPanel';
@@ -65,6 +66,7 @@ export default function BrandDetailPage() {
   const [tab, setTab] = useState('overview');
   const [showEdit, setShowEdit] = useState(false);
   const [showSwitchApc, setShowSwitchApc] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [editTask, setEditTask] = useState(null);
   const [viewTask, setViewTask] = useState(null);
@@ -223,6 +225,12 @@ export default function BrandDetailPage() {
                   <PencilIcon width="14" height="14" /> Edit brand
                 </button>
               )}
+              {canEditBrand && brand.status === 'active' && (
+                <button className="wx-btn wx-btn-ghost" onClick={() => setShowAssign(true)}
+                  title="Assign this brand to an APC/IPC for temporary cover">
+                  <UsersIcon width="14" height="14" /> Assign APC/IPC
+                </button>
+              )}
               {canSwitchApc && (
                 <button className="wx-btn wx-btn-ghost" onClick={() => setShowSwitchApc(true)}
                   title="Move this brand to a different APC (the brand's TL follows the new APC)">
@@ -352,6 +360,11 @@ export default function BrandDetailPage() {
             qc.invalidateQueries({ queryKey: ['brands'] });
             qc.invalidateQueries({ queryKey: ['brand-tasks', id] });
           }} />
+      )}
+      {showAssign && (
+        <AssignBrandModal brand={brand}
+          onClose={() => setShowAssign(false)}
+          onDone={() => { refetchBrand(); qc.invalidateQueries({ queryKey: ['brands'] }); }} />
       )}
       {showCreateTask && (
         <CreateTaskModal task={null} defaultBrandId={brand.id}

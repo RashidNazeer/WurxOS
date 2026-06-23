@@ -11,7 +11,7 @@ export async function listBrands({ status } = {}) {
     .select(`
       *,
       owner:owner_id(id, display_name, email, role, avatar_url, deleted_at),
-      assignments:brand_assignments(user_id, profile:user_id(id, display_name, email, role, avatar_url, deleted_at))
+      assignments:brand_assignments(user_id, assigned_at, expires_at, profile:user_id(id, display_name, email, role, avatar_url, deleted_at))
     `)
     .order('created_at', { ascending: false });
   if (status) q = q.eq('status', status);
@@ -26,7 +26,7 @@ export async function getBrand(id) {
     .select(`
       *,
       owner:owner_id(id, display_name, email, role, avatar_url, deleted_at),
-      assignments:brand_assignments(user_id, profile:user_id(id, display_name, email, role, avatar_url, deleted_at))
+      assignments:brand_assignments(user_id, assigned_at, expires_at, profile:user_id(id, display_name, email, role, avatar_url, deleted_at))
     `)
     .eq('id', id)
     .maybeSingle();
@@ -39,8 +39,8 @@ function normalizeBrand(row) {
   // Profile rows have deleted_at set by the delete-user Edge Function;
   // we don't want them showing up as brand members.
   const assignedUsers = (row.assignments || [])
-    .map((a) => a.profile)
-    .filter((p) => p && !p.deleted_at);
+    .filter((a) => a.profile && !a.profile.deleted_at)
+    .map((a) => ({ ...a.profile, assignedAt: a.assigned_at, expiresAt: a.expires_at }));
   const owner = row.owner && !row.owner.deleted_at ? row.owner : null;
   return { ...row, assignedUsers, owner };
 }
@@ -180,6 +180,33 @@ export async function setBrandAssignments(brandId, userIds) {
   }
 
   return { added: toAdd.length, removed: toRemove.length };
+}
+
+// --------------------------------------------------------------
+// Assign a brand to an APC/IPC ALONGSIDE any existing assignees, optionally
+// for a limited time. Used by the brand's owning TL (and OL/Boss) to cover a
+// brand when its usual APC is unavailable. expiresAt = ISO string for a
+// temporary assignment (auto-removed by the expire-brand-assignments cron),
+// or null for permanent. RLS already gates this to can_edit_brand.
+// --------------------------------------------------------------
+export async function assignBrandUser(brandId, userId, expiresAt = null) {
+  const { data: me } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from('brand_assignments')
+    .upsert(
+      { brand_id: brandId, user_id: userId, assigned_by: me?.user?.id ?? null, expires_at: expiresAt },
+      { onConflict: 'brand_id,user_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+export async function unassignBrandUser(brandId, userId) {
+  const { error } = await supabase
+    .from('brand_assignments')
+    .delete()
+    .eq('brand_id', brandId)
+    .eq('user_id', userId);
+  if (error) throw new Error(error.message);
 }
 
 // --------------------------------------------------------------
