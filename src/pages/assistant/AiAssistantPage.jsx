@@ -130,7 +130,7 @@ function ChatView() {
                 <i className="bi bi-robot" style={{ fontSize: '1.5rem', color: 'var(--accent)' }} />
               </div>
               <p className="mb-1 fw-semibold" style={{ color: 'var(--text-primary)' }}>{greeting || 'How can I help you with WurxOS today?'}</p>
-              <p className="text-muted small mb-0">e.g. “How do I apply for leave?” · “How do I submit my weekly report?”</p>
+              <p className="text-muted small mb-0">e.g. “How do I apply for leave?” · “Which week had my brand’s highest GMV?”</p>
             </div>
           )}
           {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} />)}

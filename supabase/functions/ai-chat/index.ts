@@ -7,6 +7,14 @@
 // (ai_assistant_docs) + a Boss-set persona (ai_assistant_config), with
 // persistent per-user memory (ai_conversations / ai_messages).
 //
+// Two grounding modes, picked per question:
+//   • HELP mode  — "how do I use X?" → Knowledge Base RAG (default).
+//   • DATA mode  — "which week had the highest GMV?" → the user's OWN brand
+//     reports, read with their JWT so RLS (reports_select) scopes the rows to
+//     brands they may view. The model only ever sees already-authorized data,
+//     so it cannot be prompted into another user's/brand's figures. The KB is
+//     skipped in this mode to stay well inside the free-tier token budget.
+//
 // The function is the ONLY writer of ai_messages, so assistant replies can't
 // be forged by a client.
 //
@@ -29,6 +37,8 @@ const KNOWLEDGE_BUDGET = 4500;  // chars of knowledge injected per call — kept
                                 // Lowered from 6000 to leave room for the role-grounding block below.
 const HISTORY_CHAR_CAP = 2500;  // cap recent-history chars for the same reason
 const HISTORY_TURNS = 10;       // most-recent messages considered for memory
+const DATA_BUDGET = 4500;       // chars of brand-report metrics injected in DATA mode
+const REPORTS_FETCH_LIMIT = 120; // rows pulled (RLS-scoped) before compacting
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -124,6 +134,88 @@ const PAGES: Page[] = [
 const pagesForRole = (role: string) =>
   PAGES.filter((p) => p.roles === 'all' || (p.roles as string[]).includes(role));
 
+// ── Data mode (brand-report analytics) ──────────────────────────────
+// Lets a user ask about THEIR OWN brands' report metrics ("which week had
+// the highest GMV?"). Security is enforced by RLS, NOT by the model: reports
+// are fetched with the caller's JWT, so the DB only ever returns brands they
+// may view. The model just reasons over the rows it's handed — it can't be
+// prompted into fetching anyone else's data, because that data is never read.
+
+// Metric stored as a string like "$12,345.67" / "1,200" / "3.5x" → number|null.
+function parseNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).replace(/[^0-9.\-]/g, '');
+  if (s === '' || s === '-' || s === '.' || s === '-.') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Heuristic: does the question want report DATA/metrics rather than how-to help?
+// Misrouting is harmless to security (RLS still scopes everything); worst case
+// a how-to gets answered from data context. Kept deliberately specific.
+function looksLikeDataQuestion(msg: string): boolean {
+  const m = msg.toLowerCase();
+  const metric = /\b(gmv|sales|revenue|orders?|roi|spend|cpo|views?|videos?|samples?|shop\s*(performance|score)|affiliate|offsite|conversion|metrics?|numbers?|stats?|statistics|performance)\b/;
+  const analytic = /\b(highest|lowest|best|worst|top|most|least|maximum|minimum|max|min|compare|comparison|trend|growth|grew|increase|increased|decrease|decreased|drop|dropped|average|avg|total|sum|how much|how many|which (week|month|period|brand)|over time|so far|this (week|month)|last (week|month))\b/;
+  return metric.test(m) || (analytic.test(m) && /\b(week|month|period|quarter|brand|report)\b/.test(m));
+}
+
+const METRIC_COLS: { label: string; path: (d: Record<string, any>) => unknown }[] = [
+  { label: 'GMV',           path: (d) => d?.overallPerformance?.gmv },
+  { label: 'Affiliate GMV', path: (d) => d?.overallPerformance?.affiliateGmv },
+  { label: 'Orders',        path: (d) => d?.overallPerformance?.orders },
+  { label: 'ROI',           path: (d) => d?.overallPerformance?.roi },
+  { label: 'Videos',        path: (d) => d?.overallPerformance?.videosPosted },
+  { label: 'Samples',       path: (d) => d?.overallPerformance?.samplesApproved },
+  { label: 'Shop Score',    path: (d) => d?.overallPerformance?.shopPerformanceScore },
+  { label: 'Offsite GMV',   path: (d) => d?.offsitePerformance?.offsiteGmv },
+];
+
+// Turn the RLS-scoped report rows into a compact, token-bounded metrics block.
+function buildDataBlock(reps: any[], message: string): string {
+  const intro = 'BRAND REPORT DATA (these are the ONLY brands/reports you can access — they all belong to this user. Never reference, invent, or imply data for any brand or person not listed here):';
+  if (!reps.length) {
+    return `${intro}\n\n(No reports are visible to you yet, so there is no performance data to analyze.)`;
+  }
+  // Group rows by brand (preserve newest-first order from the query).
+  const byBrand = new Map<string, { name: string; currency: string; rows: any[] }>();
+  for (const r of reps) {
+    const name = r.brand?.brand_name || `Brand ${String(r.brand_id).slice(0, 8)}`;
+    if (!byBrand.has(r.brand_id)) {
+      byBrand.set(r.brand_id, { name, currency: String(r.data?.currency || 'USD'), rows: [] });
+    }
+    byBrand.get(r.brand_id)!.rows.push(r);
+  }
+  // If the user named one of THEIR brands, narrow to it (still within the
+  // authorized set — naming a brand they don't have simply matches nothing).
+  const ml = message.toLowerCase();
+  const named = [...byBrand.values()].filter((b) => b.name.length > 1 && ml.includes(b.name.toLowerCase()));
+  const brands = named.length ? named : [...byBrand.values()];
+
+  const MAX_BRANDS = named.length ? named.length : 6;
+  const MAX_ROWS = 18;
+  let out = '';
+  let omittedBrands = 0;
+  const list = brands.slice(0, MAX_BRANDS);
+  for (let bi = 0; bi < list.length; bi++) {
+    const b = list[bi];
+    const cols = METRIC_COLS.filter((c) => b.rows.some((r) => parseNum(c.path(r.data)) !== null));
+    if (!cols.length) continue; // brand with no numeric metrics yet — skip
+    const header = ['Type', 'Period', 'Status', ...cols.map((c) => c.label)].join(' | ');
+    let block = `\n\n### ${b.name} (currency: ${b.currency})\n${header}`;
+    const rows = b.rows.slice(0, MAX_ROWS);
+    for (const r of rows) {
+      const vals = cols.map((c) => { const n = parseNum(c.path(r.data)); return n === null ? '' : String(n); });
+      block += `\n${r.type} | ${r.period_label || r.period_start} | ${r.status} | ${vals.join(' | ')}`;
+    }
+    if (b.rows.length > MAX_ROWS) block += `\n…(${b.rows.length - MAX_ROWS} older reports omitted)`;
+    if (out.length && out.length + block.length > DATA_BUDGET) { omittedBrands = list.length - bi; break; }
+    out += block;
+  }
+  if (omittedBrands > 0) out += `\n\n(${omittedBrands} more brand(s) omitted to stay within size limits — ask about a specific brand by name.)`;
+  return `${intro}${out || '\n\n(No numeric metrics have been filled into your reports yet.)'}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -165,69 +257,95 @@ Deno.serve(async (req) => {
       conversationId = created.id;
     }
 
-    // ── Knowledge (RAG) — pick the docs most relevant to THIS question
-    //    and cap the size, so the request fits the model's input limit
-    //    instead of stuffing the whole knowledge base into every call. ──
-    const { data: docs } = await admin.from('ai_assistant_docs')
-      .select('title, content').eq('is_active', true).order('updated_at', { ascending: false });
+    // ── Caller-scoped client (RLS applies) ─────────────────────────
+    // Used to read the Knowledge Base AND brand reports AS THE USER, so the
+    // database itself guarantees they only ever see what they're allowed to.
+    const userClient = ANON_KEY
+      ? createClient(SUPABASE_URL, ANON_KEY, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : null;
 
-    // Company Knowledge Base — queried through the CALLER's own token so
-    // Supabase RLS (mig 134) returns only the articles they may see
-    // (office/role/users + approved). A role-restricted or private SOP is
-    // therefore never surfaced to a user who can't normally see it.
-    const useKb = cfg ? cfg.use_kb !== false : true;
-    const kbDocs: { title: string; content: string }[] = [];
-    if (useKb && ANON_KEY) {
-      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-        global: { headers: { Authorization: `Bearer ${token}` } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const { data: kb } = await userClient.from('kb_articles')
-        .select('id, title, body, url, category, sop_group_id, version')
-        .eq('approval_status', 'approved')
-        .order('version', { ascending: false });
-      const seenGroup = new Set<string>();
-      for (const a of kb || []) {          // version desc → first seen per SOP group is the latest
-        const key = a.sop_group_id || a.id;
-        if (seenGroup.has(key)) continue;
-        seenGroup.add(key);
-        const body = String(a.body || '').trim();
-        const url = String(a.url || '').trim();
-        // Most KB articles in this org carry no body text — the real content
-        // is an external guide (e.g. a Google Doc) in `url`. Keep those so the
-        // assistant can still ROUTE the user to the right document by its link.
-        let content = body;
-        if (url) content = (body ? `${body}\n\n` : '') + `Full guide (open this link for the steps): ${url}`;
-        if (!content) continue;
-        kbDocs.push({ title: `[KB · ${a.category || 'General'}] ${a.title}`, content });
+    // Route the question: a metrics/analytics ask → DATA mode (read the user's
+    // own brand reports, and SKIP the KB to keep us well under the token cap).
+    // Anything else → help mode (Knowledge Base RAG, unchanged).
+    const dataMode = !!userClient && looksLikeDataQuestion(message);
+
+    let knowledgeBlock: string;
+    if (dataMode) {
+      // RLS-scoped read: `reports_select` (mig 012 → can_view_report →
+      // can_view_brand) means this returns ONLY reports for brands the caller
+      // may view — owned (TL), assigned (APC/IPC, incl. temporary), or authored;
+      // OL/Boss/Dev see all. The model never picks the filter, so it can't be
+      // prompted into another user's or brand's data: that data is never read.
+      const { data: reps } = await userClient!
+        .from('reports')
+        .select('brand_id, type, period_start, period_label, status, data, brand:brand_id(brand_name)')
+        .order('period_start', { ascending: false })
+        .limit(REPORTS_FETCH_LIMIT);
+      knowledgeBlock = buildDataBlock(reps || [], message);
+    } else {
+      // ── Knowledge (RAG) — pick the docs most relevant to THIS question
+      //    and cap the size, so the request fits the model's input limit
+      //    instead of stuffing the whole knowledge base into every call. ──
+      const { data: docs } = await admin.from('ai_assistant_docs')
+        .select('title, content').eq('is_active', true).order('updated_at', { ascending: false });
+
+      // Company Knowledge Base — queried through the CALLER's own token so
+      // Supabase RLS (mig 134) returns only the articles they may see
+      // (office/role/users + approved). A role-restricted or private SOP is
+      // therefore never surfaced to a user who can't normally see it.
+      const useKb = cfg ? cfg.use_kb !== false : true;
+      const kbDocs: { title: string; content: string }[] = [];
+      if (useKb && userClient) {
+        const { data: kb } = await userClient.from('kb_articles')
+          .select('id, title, body, url, category, sop_group_id, version')
+          .eq('approval_status', 'approved')
+          .order('version', { ascending: false });
+        const seenGroup = new Set<string>();
+        for (const a of kb || []) {          // version desc → first seen per SOP group is the latest
+          const key = a.sop_group_id || a.id;
+          if (seenGroup.has(key)) continue;
+          seenGroup.add(key);
+          const body = String(a.body || '').trim();
+          const url = String(a.url || '').trim();
+          // Most KB articles in this org carry no body text — the real content
+          // is an external guide (e.g. a Google Doc) in `url`. Keep those so the
+          // assistant can still ROUTE the user to the right document by its link.
+          let content = body;
+          if (url) content = (body ? `${body}\n\n` : '') + `Full guide (open this link for the steps): ${url}`;
+          if (!content) continue;
+          kbDocs.push({ title: `[KB · ${a.category || 'General'}] ${a.title}`, content });
+        }
       }
-    }
 
-    // Unified relevance pool — curated WurxOS guides ranked slightly above KB
-    // so "how do I use the app" questions prefer the how-to guides.
-    const pool = [
-      ...(docs || []).map((d) => ({ title: d.title, content: d.content, boost: 1.2 })),
-      ...kbDocs.map((d) => ({ title: d.title, content: d.content, boost: 1.0 })),
-    ];
-    const STOP = new Set(['the','a','an','to','how','do','does','i','what','is','are','my','of','in','on','for','and','me','about','this','that','you','your','with','it','at','be','or','as','will','can','please','need','want','where','when','who','why','from','our','we','us']);
-    const terms = (message.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 2 && !STOP.has(w));
-    const scored = pool.map((d) => {
-      const hay = `${d.title} ${d.title} ${d.title} ${d.content}`.toLowerCase(); // weight the title
-      let score = 0;
-      for (const t of terms) { let i = 0; while ((i = hay.indexOf(t, i)) !== -1) { score++; i += t.length; } }
-      return { d, score: score * d.boost };
-    }).sort((a, b) => b.score - a.score);
-    let picked = scored.filter((s) => s.score > 0).map((s) => s.d);
-    if (picked.length === 0) picked = pool.filter((d) => d.boost > 1).slice(0, 2); // no hit → a little general WurxOS context
-    let knowledge = '';
-    for (const d of picked) {
-      const block = `\n\n## ${d.title}\n${d.content}`;
-      if (knowledge.length && knowledge.length + block.length > KNOWLEDGE_BUDGET) break; // always include the top match
-      knowledge += block;
+      // Unified relevance pool — curated WurxOS guides ranked slightly above KB
+      // so "how do I use the app" questions prefer the how-to guides.
+      const pool = [
+        ...(docs || []).map((d) => ({ title: d.title, content: d.content, boost: 1.2 })),
+        ...kbDocs.map((d) => ({ title: d.title, content: d.content, boost: 1.0 })),
+      ];
+      const STOP = new Set(['the','a','an','to','how','do','does','i','what','is','are','my','of','in','on','for','and','me','about','this','that','you','your','with','it','at','be','or','as','will','can','please','need','want','where','when','who','why','from','our','we','us']);
+      const terms = (message.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 2 && !STOP.has(w));
+      const scored = pool.map((d) => {
+        const hay = `${d.title} ${d.title} ${d.title} ${d.content}`.toLowerCase(); // weight the title
+        let score = 0;
+        for (const t of terms) { let i = 0; while ((i = hay.indexOf(t, i)) !== -1) { score++; i += t.length; } }
+        return { d, score: score * d.boost };
+      }).sort((a, b) => b.score - a.score);
+      let picked = scored.filter((s) => s.score > 0).map((s) => s.d);
+      if (picked.length === 0) picked = pool.filter((d) => d.boost > 1).slice(0, 2); // no hit → a little general WurxOS context
+      let knowledge = '';
+      for (const d of picked) {
+        const block = `\n\n## ${d.title}\n${d.content}`;
+        if (knowledge.length && knowledge.length + block.length > KNOWLEDGE_BUDGET) break; // always include the top match
+        knowledge += block;
+      }
+      knowledgeBlock = knowledge
+        ? `KNOWLEDGE (answer using this — WurxOS app help and company Knowledge Base articles):${knowledge}`
+        : 'No specific knowledge matched this question. Answer from general WurxOS context if you can; otherwise say you are not sure and suggest asking the Team Lead or Boss.';
     }
-    const knowledgeBlock = knowledge
-      ? `KNOWLEDGE (answer using this — WurxOS app help and company Knowledge Base articles):${knowledge}`
-      : 'No specific knowledge matched this question. Answer from general WurxOS context if you can; otherwise say you are not sure and suggest asking the Team Lead or Boss.';
 
     // ── History (memory) ───────────────────────────────────────────
     const { data: history } = await admin.from('ai_messages')
@@ -246,28 +364,50 @@ Deno.serve(async (req) => {
     // ── Role grounding (correctness + real navigation links) ───────
     const roleKey = String(profile.role || '').toLowerCase();
     const roleLabel = ROLE_LABEL[roleKey] || (profile.role || 'team member');
-    const roleCap = ROLE_CAPS[roleKey] || 'You are a WurxOS user.';
-    const pageList = pagesForRole(roleKey)
-      .map((p) => `- ${p.label} (${p.path}): ${p.purpose}`).join('\n');
 
-    const groundingRules = [
-      'HOW TO ANSWER:',
-      `- The person you are helping is a ${roleLabel}. Only explain actions THIS role can actually do, based on "WHAT THEY CAN DO" and the page list above.`,
-      '- If they ask how to do something their role cannot do (e.g. a Boss asking how to apply for leave), do NOT invent steps. Briefly say it is not part of their role and point them to what they CAN do instead.',
-      '- Never invent pages, buttons, or steps that are not supported by the knowledge or the page list. If you do not know, say so and suggest asking their Team Lead, Operation Lead, or the Boss.',
-      '- When you mention a page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never show a bare URL or invent a path.',
-      '- Some knowledge entries have no written steps — only a title and a link to a full guide (e.g. a Google Doc). For those, do NOT say you have no information and do NOT invent steps: point the user to the guide with a markdown link, e.g. [open the guide](https://…). Recite detailed steps only when the knowledge actually contains them.',
-      '- Be concise and friendly; use short numbered steps when describing a flow.',
-    ].join('\n');
+    let systemPrompt: string;
+    if (dataMode) {
+      // Lean prompt: persona + who + the (RLS-scoped) data + analysis rules.
+      // No page list / KB here — keeps the request small and the answer focused.
+      const dataRules = [
+        'HOW TO ANSWER (DATA MODE):',
+        '- Answer ONLY from the BRAND REPORT DATA above. Do the math yourself (max, min, totals, averages, growth, comparisons) and state the exact period and the number.',
+        "- Show money using the brand's stated currency. A blank metric means \"not reported\" for that period — do not treat it as zero.",
+        "- This data is the user's OWN brand(s). You have NO access to any other employee's or brand's figures. If they ask about a brand or person not listed above, tell them you can only see their own brand data and do not guess or fabricate.",
+        '- If the data does not contain what they asked, say so plainly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
+        '- Be concise: a direct sentence with the answer, plus a small list or table only when comparing periods.',
+      ].join('\n');
+      systemPrompt = [
+        persona,
+        `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
+        knowledgeBlock,
+        dataRules,
+      ].join('\n\n');
+    } else {
+      const roleCap = ROLE_CAPS[roleKey] || 'You are a WurxOS user.';
+      const pageList = pagesForRole(roleKey)
+        .map((p) => `- ${p.label} (${p.path}): ${p.purpose}`).join('\n');
 
-    const systemPrompt = [
-      persona,
-      `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
-      `WHAT THEY CAN DO: ${roleCap}`,
-      `PAGES THEY CAN OPEN (use these exact paths for links; never invent one):\n${pageList}`,
-      knowledgeBlock,
-      groundingRules,
-    ].join('\n\n');
+      const groundingRules = [
+        'HOW TO ANSWER:',
+        `- The person you are helping is a ${roleLabel}. Only explain actions THIS role can actually do, based on "WHAT THEY CAN DO" and the page list above.`,
+        '- If they ask how to do something their role cannot do (e.g. a Boss asking how to apply for leave), do NOT invent steps. Briefly say it is not part of their role and point them to what they CAN do instead.',
+        '- Never invent pages, buttons, or steps that are not supported by the knowledge or the page list. If you do not know, say so and suggest asking their Team Lead, Operation Lead, or the Boss.',
+        '- When you mention a page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never show a bare URL or invent a path.',
+        '- Some knowledge entries have no written steps — only a title and a link to a full guide (e.g. a Google Doc). For those, do NOT say you have no information and do NOT invent steps: point the user to the guide with a markdown link, e.g. [open the guide](https://…). Recite detailed steps only when the knowledge actually contains them.',
+        '- If the user is clearly asking about their brand\'s performance/metrics (GMV, orders, etc.), tell them you can answer that — ask them to mention the metric and brand — rather than guessing numbers.',
+        '- Be concise and friendly; use short numbered steps when describing a flow.',
+      ].join('\n');
+
+      systemPrompt = [
+        persona,
+        `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
+        `WHAT THEY CAN DO: ${roleCap}`,
+        `PAGES THEY CAN OPEN (use these exact paths for links; never invent one):\n${pageList}`,
+        knowledgeBlock,
+        groundingRules,
+      ].join('\n\n');
+    }
 
     // ── Call the model ─────────────────────────────────────────────
     const aiRes = await fetch(MODELS_URL, {
