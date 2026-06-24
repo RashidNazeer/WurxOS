@@ -167,16 +167,16 @@ function looksLikeDataQuestion(msg: string): boolean {
 
 // Headline numeric metrics — the compact per-period time-series backbone.
 const METRIC_COLS: { label: string; path: (d: Record<string, any>) => unknown }[] = [
-  { label: 'GMV',             path: (d) => d?.overallPerformance?.gmv },
-  { label: 'Affiliate GMV',   path: (d) => d?.overallPerformance?.affiliateGmv },
-  { label: 'Orders',          path: (d) => d?.overallPerformance?.orders },
-  { label: 'ROI',             path: (d) => d?.overallPerformance?.roi },
-  { label: 'Videos',          path: (d) => d?.overallPerformance?.videosPosted },
-  { label: 'Samples',         path: (d) => d?.overallPerformance?.samplesApproved },
-  { label: 'Shop Score',      path: (d) => d?.overallPerformance?.shopPerformanceScore },
-  { label: 'Offsite GMV',     path: (d) => d?.offsitePerformance?.offsiteGmv },
-  { label: 'TikTok Shop GMV', path: (d) => d?.offsitePerformance?.tiktokShopGmv },
-  { label: 'Offsite Effect',  path: (d) => d?.offsitePerformance?.offsiteEffect },
+  { label: 'GMV',                    path: (d) => d?.overallPerformance?.gmv },
+  { label: 'Affiliate GMV',          path: (d) => d?.overallPerformance?.affiliateGmv },
+  { label: 'Orders',                 path: (d) => d?.overallPerformance?.orders },
+  { label: 'ROI',                    path: (d) => d?.overallPerformance?.roi },
+  { label: 'Videos Posted',          path: (d) => d?.overallPerformance?.videosPosted },
+  { label: 'Samples Approved',       path: (d) => d?.overallPerformance?.samplesApproved },
+  { label: 'Shop Performance Score', path: (d) => d?.overallPerformance?.shopPerformanceScore },
+  { label: 'Offsite GMV',            path: (d) => d?.offsitePerformance?.offsiteGmv },
+  { label: 'TikTok Shop GMV',        path: (d) => d?.offsitePerformance?.tiktokShopGmv },
+  { label: 'Offsite Effect',         path: (d) => d?.offsitePerformance?.offsiteEffect },
 ];
 
 // ── Detail serialization helpers ────────────────────────────────────
@@ -513,6 +513,7 @@ Deno.serve(async (req) => {
       const dataRules = [
         'HOW TO ANSWER (DATA MODE):',
         '- Answer ONLY from the BRAND REPORT DATA above. It has a per-brand headline metrics table (every period) AND DETAILED BREAKDOWNS — top creators, top videos, GMV Max campaigns, product highlights, offsite performance, plus written insights and notes — for the most relevant periods.',
+        '- MATCH FIELDS BY MEANING, not by exact wording. Users name metrics loosely — map their phrasing to the closest column/field and never say a metric is missing just because the words differ from the header. Guide: "samples" / "samples approved" / "approved samples" = Samples Approved; "orders" / "orders shipped" / "orders placed" = Orders; "sales" / "revenue" / "total sales" = GMV; "creator/affiliate sales" = Affiliate GMV; "videos" / "content posted" = Videos Posted; "shop score" / "store score" / "performance score" = Shop Performance Score; "ad return" / "return on investment" = ROI; "offsite" / "off-platform" = Offsite GMV / TikTok Shop GMV / Offsite Effect; "creators", "videos list", "campaigns/ads", "products" live in the detailed breakdowns. If a term is genuinely ambiguous between two fields, ask which one they mean.',
         '- Do the math yourself (max, min, totals, averages, growth, comparisons, rankings) and state the exact period and the number.',
         '- For max/min/average, use ONLY the periods where that metric actually has a value (ignore blanks). If even ONE period shows the metric, you CAN compute its lowest/highest — NEVER claim it was "not reported for any week" when values are present in the table.',
         '- READ FOLLOW-UPS IN CONTEXT. A short follow-up continues the previous topic: after you gave the highest of a metric, "also the minimum one" / "and the lowest?" / "what about videos?" means the SAME kind of question on the same data — answer it from the table; do NOT say you lack the information.',
