@@ -514,10 +514,14 @@ Deno.serve(async (req) => {
         'HOW TO ANSWER (DATA MODE):',
         '- Answer ONLY from the BRAND REPORT DATA above. It has a per-brand headline metrics table (every period) AND DETAILED BREAKDOWNS — top creators, top videos, GMV Max campaigns, product highlights, offsite performance, plus written insights and notes — for the most relevant periods.',
         '- Do the math yourself (max, min, totals, averages, growth, comparisons, rankings) and state the exact period and the number.',
+        '- For max/min/average, use ONLY the periods where that metric actually has a value (ignore blanks). If even ONE period shows the metric, you CAN compute its lowest/highest — NEVER claim it was "not reported for any week" when values are present in the table.',
+        '- READ FOLLOW-UPS IN CONTEXT. A short follow-up continues the previous topic: after you gave the highest of a metric, "also the minimum one" / "and the lowest?" / "what about videos?" means the SAME kind of question on the same data — answer it from the table; do NOT say you lack the information.',
         '- The detailed breakdowns are shown only for the most relevant or recent periods. If asked for detail (e.g. a creator or video list) about a period that is NOT shown, ask the user to name that specific week/month so it can be pulled in.',
         "- Show money using the brand's stated currency. A blank metric means \"not reported\" for that period — do not treat it as zero.",
         "- This data is the user's OWN brand(s). You have NO access to any other employee's or brand's figures. If they ask about a brand or person not listed above, tell them you can only see their own brand data and do not guess or fabricate.",
-        '- If the data does not contain what they asked, say so plainly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
+        '- If a question is relevant but unclear or could mean several things (which metric? which brand? which report type?), ask ONE short clarifying question instead of refusing. "I don\'t have that information" is correct ONLY when the data genuinely does not contain it — never as a response to ambiguity.',
+        '- If the data spans more than one brand and the user did not name one, either answer per brand or ask which brand they mean.',
+        '- Only when the data truly lacks the requested metric, say so briefly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
         '- Be concise and well-structured: a direct answer first, then a small list or table when it helps (e.g. comparing periods or ranking creators).',
       ].join('\n');
       systemPrompt = [
@@ -539,6 +543,7 @@ Deno.serve(async (req) => {
         '- When you mention a page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never show a bare URL or invent a path.',
         '- Some knowledge entries have no written steps — only a title and a link to a full guide (e.g. a Google Doc). For those, do NOT say you have no information and do NOT invent steps: point the user to the guide with a markdown link, e.g. [open the guide](https://…). Recite detailed steps only when the knowledge actually contains them.',
         '- If the user is clearly asking about their brand\'s performance/metrics (GMV, orders, etc.), tell them you can answer that — ask them to mention the metric and brand — rather than guessing numbers.',
+        '- Read short follow-up questions in the context of the conversation so far — they usually continue the previous topic. If a question is relevant but unclear, ask ONE short clarifying question instead of replying that you do not know.',
         '- Be concise and friendly; use short numbered steps when describing a flow.',
       ].join('\n');
 
