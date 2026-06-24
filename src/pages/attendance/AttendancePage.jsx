@@ -470,6 +470,14 @@ export default function AttendancePage() {
           </div>
         </div>
       </div>
+      </>}
+
+      {/* Manager approval queues — shown on BOTH the Today and Team tabs so a
+          TL/OL finds pending clock-out + time-edit (incl. break) requests where
+          they manage their team. Previously these lived only on the personal
+          Today tab, so a TL looking under "Team" couldn't see a break-edit
+          request waiting on them. */}
+      {isManager && (tab === 'today' || tab === 'team') && (<>
 
       {/* ---------- Manager: pending approvals ---------- */}
       {isManager && pending.length > 0 && (
@@ -578,7 +586,7 @@ export default function AttendancePage() {
         </div>
       )}
 
-      </>}
+      </>)}
 
       {tab === 'history' && (
         <HistorySection
