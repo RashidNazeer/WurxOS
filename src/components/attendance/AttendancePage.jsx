@@ -8,6 +8,7 @@ import {
   approveClockOut, rejectClockOut,
   approveEditClockIn, rejectEditClockIn,
   approveEditClockOut, rejectEditClockOut,
+  decideAttendanceEdit,
   calcTimes, fmtDuration, fmtTime, exportToCSV,
   getEffectiveStatus, forceCloseSession,
   getAdjustmentsForMonth, createAttendanceAdjustment,
@@ -579,6 +580,89 @@ function EditRequestModal({ record, onClose, onDone }) {
           <div className="mb-3">
             <label className="form-label small fw-semibold">Rejection reason (optional)</label>
             <input type="text" className="form-control form-control-sm" placeholder="e.g. Time looks inaccurate…"
+              value={reason} onChange={e => setReason(e.target.value)} />
+          </div>
+
+          <div className="d-flex gap-2 justify-content-end">
+            <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Cancel</button>
+            <button className="btn btn-sm btn-outline-danger px-3 d-inline-flex align-items-center gap-1" onClick={handleReject} disabled={!!saving}>
+              {saving === 'reject' ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-x-lg" />}Reject
+            </button>
+            <button className="btn btn-sm btn-success px-4 d-inline-flex align-items-center gap-1" onClick={handleApprove} disabled={!!saving}>
+              {saving === 'approve' ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-check-lg" />}Approve
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Break edit-request review (manager) ─────────────────────────────────── */
+function BreaksEditModal({ record, onClose, onDone }) {
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState('');
+  const req = record.editBreaksRequest || {};
+  const oldBreaks = record.breaks || [];
+  const newBreaks = req.requestedBreaks || [];
+  const fmtB = (b) => `${b?.start ? fmtTime(b.start) : '—'} → ${b?.end ? fmtTime(b.end) : 'open'}`;
+
+  async function handleApprove() {
+    setSaving('approve');
+    try { await decideAttendanceEdit({ editId: req._editId, approve: true }); onDone(); }
+    finally { setSaving(''); }
+  }
+  async function handleReject() {
+    setSaving('reject');
+    try { await decideAttendanceEdit({ editId: req._editId, approve: false, note: reason || null }); onDone(); }
+    finally { setSaving(''); }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 16 }}>
+        <div className="card-body p-4">
+          <h6 className="fw-bold mb-3"><i className="bi bi-cup-hot-fill me-2 text-warning" />Break Edit Request</h6>
+
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+              style={{ width: 36, height: 36, background: '#f59e0b', fontSize: '0.65rem' }}>
+              {(record.userName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="fw-semibold" style={{ fontSize: '0.88rem' }}>{record.userName}</div>
+              <div className="text-muted" style={{ fontSize: '0.68rem' }}>{record.userRole?.toUpperCase()} · {locLabel(record.location)}</div>
+            </div>
+          </div>
+
+          <div className="row g-2 mb-3">
+            <div className="col-6">
+              <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Current</div>
+              <div className="rounded-3 p-2" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)', minHeight: 44 }}>
+                {oldBreaks.length === 0 ? <div className="text-muted" style={{ fontSize: '0.72rem' }}>No breaks</div>
+                  : oldBreaks.map((b, i) => <div key={i} style={{ fontSize: '0.74rem', textDecoration: 'line-through', color: 'var(--text-secondary)' }}>{fmtB(b)}</div>)}
+              </div>
+            </div>
+            <div className="col-6">
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--warning)', marginBottom: 4 }}>Requested</div>
+              <div className="rounded-3 p-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', minHeight: 44 }}>
+                {newBreaks.length === 0 ? <div className="text-muted" style={{ fontSize: '0.72rem' }}>No breaks</div>
+                  : newBreaks.map((b, i) => <div key={i} style={{ fontSize: '0.74rem', fontWeight: 600 }}>{fmtB(b)}</div>)}
+              </div>
+            </div>
+          </div>
+
+          {req.reason && (
+            <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+              <div className="fw-semibold small mb-1" style={{ color: 'var(--info)' }}>Reason</div>
+              <p className="mb-0" style={{ fontSize: '0.82rem', color: 'var(--info)' }}>{req.reason}</p>
+            </div>
+          )}
+
+          <div className="mb-3">
+            <label className="form-label small fw-semibold">Rejection reason (optional)</label>
+            <input type="text" className="form-control form-control-sm" placeholder="e.g. Break times look off…"
               value={reason} onChange={e => setReason(e.target.value)} />
           </div>
 
@@ -1648,6 +1732,7 @@ export default function AttendancePage() {
   const [approvalTarget, setApprovalTarget] = useState(null);
   const [editRequestTarget, setEditRequestTarget] = useState(null);
   const [editOutTarget, setEditOutTarget] = useState(null);
+  const [editBreaksTarget, setEditBreaksTarget] = useState(null);
   const [forceCloseTarget, setForceCloseTarget] = useState(null);
   const [breakDetailsTarget, setBreakDetailsTarget] = useState(null);
   const [pendingEditOutRequests, setPendingEditOutRequests] = useState([]);
@@ -1897,6 +1982,12 @@ export default function AttendancePage() {
     () => todayRecords.filter(r => r.editClockInRequest?.status === 'pending'),
     [todayRecords]
   );
+  // Break-edit requests are normalized onto each record as editBreaksRequest
+  // but were never surfaced for the TL to approve — this exposes them.
+  const pendingEditBreaksRequests = useMemo(
+    () => todayRecords.filter(r => r.editBreaksRequest?.status === 'pending'),
+    [todayRecords]
+  );
 
   // Stats
   const stats = useMemo(() => {
@@ -1951,13 +2042,13 @@ export default function AttendancePage() {
             <ClockWidget />
 
             {/* Pending approvals for TL */}
-            {isTL && (pendingApprovals.length > 0 || pendingEditRequests.length > 0 || pendingEditOutRequests.length > 0) && (
+            {isTL && (pendingApprovals.length > 0 || pendingEditRequests.length > 0 || pendingEditOutRequests.length > 0 || pendingEditBreaksRequests.length > 0) && (
               <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 16 }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <span className="rounded-circle" style={{ width: 8, height: 8, background: 'var(--danger)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--danger) 19%, transparent)' }} />
                     <span className="fw-bold" style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>Pending Approvals</span>
-                    <span className="badge bg-danger rounded-pill ms-auto">{pendingApprovals.length + pendingEditRequests.length + pendingEditOutRequests.length}</span>
+                    <span className="badge bg-danger rounded-pill ms-auto">{pendingApprovals.length + pendingEditRequests.length + pendingEditOutRequests.length + pendingEditBreaksRequests.length}</span>
                   </div>
                   <div className="d-flex flex-column gap-2">
                     {pendingApprovals.map(r => (
@@ -2004,6 +2095,22 @@ export default function AttendancePage() {
                           </div>
                         </div>
                         <span className="badge rounded-pill" style={{ background: 'var(--danger)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                      </div>
+                    ))}
+                    {pendingEditBreaksRequests.map(r => (
+                      <div key={`eb-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
+                        style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', cursor: 'pointer' }}
+                        onClick={() => setEditBreaksTarget(r)}>
+                        <div>
+                          <div className="fw-semibold d-flex align-items-center gap-1" style={{ fontSize: '0.8rem' }}>
+                            <i className="bi bi-cup-hot-fill" style={{ fontSize: '0.72rem', color: 'var(--warning)' }} />
+                            {r.userName}
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.65rem' }}>
+                            Edit breaks · {(r.editBreaksRequest?.requestedBreaks || []).length} break(s) proposed
+                          </div>
+                        </div>
+                        <span className="badge rounded-pill" style={{ background: 'var(--warning)', color: '#000', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                   </div>
@@ -2473,6 +2580,15 @@ export default function AttendancePage() {
           approverId={currentUser.uid}
           onClose={() => setEditOutTarget(null)}
           onDone={() => setEditOutTarget(null)}
+        />
+      )}
+
+      {/* Edit Breaks Request Modal */}
+      {editBreaksTarget && (
+        <BreaksEditModal
+          record={editBreaksTarget}
+          onClose={() => setEditBreaksTarget(null)}
+          onDone={() => setEditBreaksTarget(null)}
         />
       )}
 
