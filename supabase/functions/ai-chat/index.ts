@@ -280,13 +280,37 @@ function reportDetail(r: any): string {
   return parts.join('\n');
 }
 
-// Does the message reference this report's period (e.g. "week 11", "June")?
+// ── Fuzzy matching of brand names & periods to loose user wording ───
+function escapeRe(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+// Generic words in brand names that shouldn't be required for a match.
+const BRAND_STOPW = new Set(['the', 'shop', 'us', 'usa', 'inc', 'co', 'llc', 'ltd', 'pets', 'pet', 'store', 'official', 'brand', 'company', 'group', 'tts']);
+// Did the user name this brand, even loosely? ("solid gold" → "Solid Gold Pets")
+function brandNamedInMessage(name: string, ml: string): boolean {
+  const n = String(name || '').toLowerCase().trim();
+  if (n.length < 2) return false;
+  if (ml.includes(n)) return true;                                            // full name
+  const words = n.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && ml.includes(words.slice(0, 2).join(' '))) return true; // first two words ("solid gold")
+  const sig = words.filter((w) => !BRAND_STOPW.has(w) && w.length >= 3);      // distinctive words
+  if (sig.length >= 2 && sig.every((w) => ml.includes(w))) return true;       // all distinctive words present
+  if (sig.some((w) => w.length >= 5 && new RegExp(`\\b${escapeRe(w)}\\b`).test(ml))) return true; // one strong word ("biostime")
+  return false;
+}
+
+// Does the message reference this report's period? ("week 11", "June", "14-20")
 function periodMentioned(label: string, ml: string): boolean {
   const lab = (label || '').toLowerCase();
   const wk = lab.match(/week\s*(\d+)/);
   if (wk && new RegExp(`\\bweek\\s*${wk[1]}\\b`).test(ml)) return true;
   const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  return months.some((m) => lab.includes(m) && ml.includes(m));
+  if (months.some((m) => lab.includes(m) && ml.includes(m))) return true;
+  // A date range in the message ("14-20", "14 to 20") matching the label's days.
+  const ranges = ml.match(/\b\d{1,2}\s*(?:[-–—]|to)\s*\d{1,2}\b/g) || [];
+  for (const rg of ranges) {
+    const nums = rg.match(/\d{1,2}/g) || [];
+    if (nums.length === 2 && nums.every((x) => new RegExp(`\\b${x}\\b`).test(lab))) return true;
+  }
+  return false;
 }
 
 // Build the (token-bounded) DATA block: a headline time-series per brand, then
@@ -306,7 +330,7 @@ function buildDataBlock(reps: any[], message: string): string {
   // If the user named one of THEIR brands, narrow to it (still within the
   // authorized set — naming a brand they don't have simply matches nothing).
   const ml = message.toLowerCase();
-  const named = [...byBrand.values()].filter((b) => b.name.length > 1 && ml.includes(b.name.toLowerCase()));
+  const named = [...byBrand.values()].filter((b) => brandNamedInMessage(b.name, ml));
   const brands = named.length ? named : [...byBrand.values()];
   const list = brands.slice(0, named.length ? named.length : 5);
   const headlineRows = (list.length <= 1 || named.length) ? 26 : 12;
@@ -329,14 +353,24 @@ function buildDataBlock(reps: any[], message: string): string {
 
   // Pass 2 — full detailed breakdowns, prioritized: periods the user named,
   // then named brand, then most recent. Fills whatever budget remains.
-  const candidates: { b: any; r: any; idx: number; brandNamed: boolean; periodNamed: boolean }[] = [];
+  // Report-type hint: "last month/monthly" prefers monthly reports; "week/weekly" prefers weekly/biweekly.
+  const wantsMonthly = /\bmonth(ly)?\b/.test(ml) && !/\bweek/.test(ml);
+  const wantsWeekly = /\bweek(ly)?\b/.test(ml);
+  const typeMatch = (t: string) => (wantsMonthly && t === 'monthly') || (wantsWeekly && (t === 'weekly' || t === 'biweekly'));
+
+  const candidates: { b: any; r: any; idx: number; brandNamed: boolean; periodNamed: boolean; typeOk: boolean }[] = [];
   list.forEach((b) => {
     const brandNamed = named.includes(b);
-    b.rows.forEach((r: any, idx: number) => candidates.push({ b, r, idx, brandNamed, periodNamed: periodMentioned(r.period_label, ml) }));
+    b.rows.forEach((r: any, idx: number) => candidates.push({
+      b, r, idx, brandNamed,
+      periodNamed: periodMentioned(r.period_label, ml),
+      typeOk: typeMatch(r.type),
+    }));
   });
   candidates.sort((a, z) =>
     (Number(z.periodNamed) - Number(a.periodNamed)) ||
     (Number(z.brandNamed) - Number(a.brandNamed)) ||
+    (Number(z.typeOk) - Number(a.typeOk)) ||
     (a.idx - z.idx));
 
   let detailHeader = false;
