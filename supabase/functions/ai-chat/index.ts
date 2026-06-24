@@ -37,7 +37,8 @@ const KNOWLEDGE_BUDGET = 4500;  // chars of knowledge injected per call — kept
                                 // Lowered from 6000 to leave room for the role-grounding block below.
 const HISTORY_CHAR_CAP = 2500;  // cap recent-history chars for the same reason
 const HISTORY_TURNS = 10;       // most-recent messages considered for memory
-const DATA_BUDGET = 4500;       // chars of brand-report metrics injected in DATA mode
+const DATA_BUDGET = 8000;       // chars of brand-report data injected in DATA mode (KB + page list
+                                // are skipped in this mode, so there's room for the full breakdowns)
 const REPORTS_FETCH_LIMIT = 120; // rows pulled (RLS-scoped) before compacting
 
 const cors = {
@@ -152,38 +153,154 @@ function parseNum(v: unknown): number | null {
 
 // Heuristic: does the question want report DATA/metrics rather than how-to help?
 // Misrouting is harmless to security (RLS still scopes everything); worst case
-// a how-to gets answered from data context. Kept deliberately specific.
+// a how-to gets answered from data context. An explicit "how do I…" phrasing
+// stays in HELP mode even if it mentions a metric word ("how do I post videos").
 function looksLikeDataQuestion(msg: string): boolean {
   const m = msg.toLowerCase();
-  const metric = /\b(gmv|sales|revenue|orders?|roi|spend|cpo|views?|videos?|samples?|shop\s*(performance|score)|affiliate|offsite|conversion|metrics?|numbers?|stats?|statistics|performance)\b/;
-  const analytic = /\b(highest|lowest|best|worst|top|most|least|maximum|minimum|max|min|compare|comparison|trend|growth|grew|increase|increased|decrease|decreased|drop|dropped|average|avg|total|sum|how much|how many|which (week|month|period|brand)|over time|so far|this (week|month)|last (week|month))\b/;
-  return metric.test(m) || (analytic.test(m) && /\b(week|month|period|quarter|brand|report)\b/.test(m));
+  const analytic = /\b(highest|lowest|best|worst|top|most|least|maximum|minimum|max|min|compare|comparison|versus|vs|trend|growth|grew|increase[d]?|decrease[d]?|drop(ped)?|decline[d]?|average|avg|total|sum|how much|how many|which (week|month|period|brand)|over time|so far|this (week|month)|last (week|month)|year to date|ytd)\b/;
+  const metric = /\b(gmv|sales|revenue|orders?|roi|spend|cpo|views?|clicks?|samples?|shop\s*(performance|score)|affiliate|offsite|conversion|creators?|campaigns?|products?|videos?|metrics?|numbers?|figures?|stats?|statistics|performance|insights?)\b/;
+  const howto = /^\s*(how\s+(do|can|to|would|should)|where\s+(do|is|can|are)|what('?s| is| are) the (process|step|way)|guide me|walk me|teach me|explain how)/;
+  if (analytic.test(m)) return true;     // explicit analytics intent → data
+  if (howto.test(m)) return false;       // explicit how-to → help (KB), even with a metric word
+  return metric.test(m);                 // otherwise a metric/section noun → data
 }
 
+// Headline numeric metrics — the compact per-period time-series backbone.
 const METRIC_COLS: { label: string; path: (d: Record<string, any>) => unknown }[] = [
-  { label: 'GMV',           path: (d) => d?.overallPerformance?.gmv },
-  { label: 'Affiliate GMV', path: (d) => d?.overallPerformance?.affiliateGmv },
-  { label: 'Orders',        path: (d) => d?.overallPerformance?.orders },
-  { label: 'ROI',           path: (d) => d?.overallPerformance?.roi },
-  { label: 'Videos',        path: (d) => d?.overallPerformance?.videosPosted },
-  { label: 'Samples',       path: (d) => d?.overallPerformance?.samplesApproved },
-  { label: 'Shop Score',    path: (d) => d?.overallPerformance?.shopPerformanceScore },
-  { label: 'Offsite GMV',   path: (d) => d?.offsitePerformance?.offsiteGmv },
+  { label: 'GMV',             path: (d) => d?.overallPerformance?.gmv },
+  { label: 'Affiliate GMV',   path: (d) => d?.overallPerformance?.affiliateGmv },
+  { label: 'Orders',          path: (d) => d?.overallPerformance?.orders },
+  { label: 'ROI',             path: (d) => d?.overallPerformance?.roi },
+  { label: 'Videos',          path: (d) => d?.overallPerformance?.videosPosted },
+  { label: 'Samples',         path: (d) => d?.overallPerformance?.samplesApproved },
+  { label: 'Shop Score',      path: (d) => d?.overallPerformance?.shopPerformanceScore },
+  { label: 'Offsite GMV',     path: (d) => d?.offsitePerformance?.offsiteGmv },
+  { label: 'TikTok Shop GMV', path: (d) => d?.offsitePerformance?.tiktokShopGmv },
+  { label: 'Offsite Effect',  path: (d) => d?.offsitePerformance?.offsiteEffect },
 ];
 
-// Turn the RLS-scoped report rows into a compact, token-bounded metrics block.
+// ── Detail serialization helpers ────────────────────────────────────
+const num = (v: unknown): string => { const n = parseNum(v); return n === null ? '' : String(n); };
+function clip(v: unknown, n: number): string {
+  // Insight/notes fields are stored as rich-text HTML — strip tags & decode
+  // the common entities so the model sees clean prose, not "<p>…</p>".
+  const t = String(v ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#3?9;/gi, "'")
+    .replace(/\s+/g, ' ').trim();
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+}
+// Compact pipe sub-table from an array of row objects; drops blank rows.
+function miniTable(arr: any[], cols: { label: string; get: (x: any) => string }[], maxRows: number): string {
+  const rows = (arr || []).filter((x) => x && cols.some((c) => c.get(x) !== '')).slice(0, maxRows);
+  if (!rows.length) return '';
+  let t = cols.map((c) => c.label).join(' | ');
+  for (const x of rows) t += `\n${cols.map((c) => c.get(x)).join(' | ')}`;
+  const more = (arr?.length || 0) - rows.length;
+  if (more > 0) t += `\n…(+${more} more)`;
+  return t;
+}
+
+// Full, compact serialization of ONE report's detail sections — every part of
+// the report (creators, videos, GMV Max, products, offsite, insights, notes,
+// operational sections, custom fields), each capped so a single period stays
+// token-bounded.
+function reportDetail(r: any): string {
+  const d = r?.data || {};
+  const parts: string[] = [];
+  const text = (label: string, v: unknown, n = 320) => { const s = clip(v, n); if (s) parts.push(`${label}: ${s}`); };
+
+  text('Overall insights', d.overallInsights);
+  text('Samples note', d.overallNotes?.samplesApproved, 160);
+  text('Videos note', d.overallNotes?.videosPosted, 160);
+
+  const creators = miniTable(d.topCreators, [
+    { label: 'Creator', get: (x) => clip(x.name, 40) },
+    { label: 'Videos', get: (x) => num(x.videosPosted) },
+    { label: 'Items', get: (x) => num(x.itemsSold) },
+    { label: 'GMV', get: (x) => num(x.gmv) },
+    { label: 'Notes', get: (x) => clip(x.notes, 60) },
+  ], 8);
+  if (creators) parts.push(`Top creators:\n${creators}`);
+  text('Creators insight', d.topCreatorsInsights);
+
+  const videos = miniTable(d.topVideos, [
+    { label: 'Creator', get: (x) => clip(x.creatorName, 30) },
+    { label: 'Items', get: (x) => num(x.itemsSold) },
+    { label: 'GMV', get: (x) => num(x.gmv) },
+    { label: 'Views', get: (x) => num(x.views) },
+    { label: 'Clicks', get: (x) => num(x.productClicks) },
+    { label: 'Notes', get: (x) => clip(x.notes, 50) },
+  ], 8);
+  if (videos) parts.push(`Top videos:\n${videos}`);
+  text('Videos insight', d.topVideosInsights);
+
+  const gmvmax = miniTable(d.gmvMax, [
+    { label: 'Campaign', get: (x) => clip(x.campaign, 40) },
+    { label: 'Spend', get: (x) => num(x.spend) },
+    { label: 'GMV', get: (x) => num(x.gmv) },
+    { label: 'ROI', get: (x) => num(x.roi) },
+    { label: 'Orders', get: (x) => num(x.orders) },
+    { label: 'CPO', get: (x) => num(x.cpo) },
+    { label: 'Notes', get: (x) => clip(x.notes, 50) },
+  ], 8);
+  if (gmvmax) parts.push(`GMV Max campaigns:\n${gmvmax}`);
+  text('GMV Max insight', d.gmvMaxInsights);
+
+  const products = miniTable(d.productHighlights, [
+    { label: 'Product', get: (x) => clip(x.productName, 40) },
+    { label: 'Units', get: (x) => num(x.unitsSold) },
+    { label: 'GMV', get: (x) => num(x.gmv) },
+    { label: 'New Videos', get: (x) => num(x.newVideos) },
+    { label: 'Notes', get: (x) => clip(x.notes, 50) },
+  ], 8);
+  if (products) parts.push(`Product highlights:\n${products}`);
+  text('Products insight', d.productHighlightsInsights);
+
+  // Offsite headline numbers are already in the per-period table; include the
+  // narrative + the three figures together here for context.
+  const off = d.offsitePerformance || {};
+  if (num(off.offsiteGmv) || num(off.tiktokShopGmv) || num(off.offsiteEffect)) {
+    parts.push(`Offsite: GMV=${num(off.offsiteGmv) || '—'}, TikTok Shop GMV=${num(off.tiktokShopGmv) || '—'}, Offsite effect=${num(off.offsiteEffect) || '—'}`);
+  }
+  text('Offsite insight', d.offsiteInsights);
+
+  text('Current & upcoming campaigns', d.upcomingCampaigns);
+  text('Operational updates', d.operationalUpdates);
+  text('Recommendations', d.recommendations);
+  text('Action items', d.actionItems);
+
+  if (d.customFields && typeof d.customFields === 'object') {
+    const cf = Object.values(d.customFields as Record<string, any>)
+      .filter((f) => f && (f.name || f.value))
+      .map((f) => `${clip(f.name, 40)}=${clip(f.value, 80)}`).slice(0, 10);
+    if (cf.length) parts.push(`Custom fields: ${cf.join('; ')}`);
+  }
+  return parts.join('\n');
+}
+
+// Does the message reference this report's period (e.g. "week 11", "June")?
+function periodMentioned(label: string, ml: string): boolean {
+  const lab = (label || '').toLowerCase();
+  const wk = lab.match(/week\s*(\d+)/);
+  if (wk && new RegExp(`\\bweek\\s*${wk[1]}\\b`).test(ml)) return true;
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  return months.some((m) => lab.includes(m) && ml.includes(m));
+}
+
+// Build the (token-bounded) DATA block: a headline time-series per brand, then
+// full detailed breakdowns for the most relevant periods (named first, else
+// most recent), filling the remaining budget.
 function buildDataBlock(reps: any[], message: string): string {
   const intro = 'BRAND REPORT DATA (these are the ONLY brands/reports you can access — they all belong to this user. Never reference, invent, or imply data for any brand or person not listed here):';
-  if (!reps.length) {
-    return `${intro}\n\n(No reports are visible to you yet, so there is no performance data to analyze.)`;
-  }
-  // Group rows by brand (preserve newest-first order from the query).
+  if (!reps.length) return `${intro}\n\n(No reports are visible to you yet, so there is no performance data to analyze.)`;
+
+  // Group by brand (newest-first order preserved from the query).
   const byBrand = new Map<string, { name: string; currency: string; rows: any[] }>();
   for (const r of reps) {
     const name = r.brand?.brand_name || `Brand ${String(r.brand_id).slice(0, 8)}`;
-    if (!byBrand.has(r.brand_id)) {
-      byBrand.set(r.brand_id, { name, currency: String(r.data?.currency || 'USD'), rows: [] });
-    }
+    if (!byBrand.has(r.brand_id)) byBrand.set(r.brand_id, { name, currency: String(r.data?.currency || 'USD'), rows: [] });
     byBrand.get(r.brand_id)!.rows.push(r);
   }
   // If the user named one of THEIR brands, narrow to it (still within the
@@ -191,29 +308,53 @@ function buildDataBlock(reps: any[], message: string): string {
   const ml = message.toLowerCase();
   const named = [...byBrand.values()].filter((b) => b.name.length > 1 && ml.includes(b.name.toLowerCase()));
   const brands = named.length ? named : [...byBrand.values()];
+  const list = brands.slice(0, named.length ? named.length : 5);
+  const headlineRows = (list.length <= 1 || named.length) ? 26 : 12;
 
-  const MAX_BRANDS = named.length ? named.length : 6;
-  const MAX_ROWS = 18;
   let out = '';
-  let omittedBrands = 0;
-  const list = brands.slice(0, MAX_BRANDS);
-  for (let bi = 0; bi < list.length; bi++) {
-    const b = list[bi];
+  let truncated = false;
+
+  // Pass 1 — headline time-series for every (capped) brand. Cheap, so these
+  // generally all fit and cover any "which week/month was X highest" question.
+  for (const b of list) {
     const cols = METRIC_COLS.filter((c) => b.rows.some((r) => parseNum(c.path(r.data)) !== null));
-    if (!cols.length) continue; // brand with no numeric metrics yet — skip
-    const header = ['Type', 'Period', 'Status', ...cols.map((c) => c.label)].join(' | ');
-    let block = `\n\n### ${b.name} (currency: ${b.currency})\n${header}`;
-    const rows = b.rows.slice(0, MAX_ROWS);
-    for (const r of rows) {
-      const vals = cols.map((c) => { const n = parseNum(c.path(r.data)); return n === null ? '' : String(n); });
-      block += `\n${r.type} | ${r.period_label || r.period_start} | ${r.status} | ${vals.join(' | ')}`;
-    }
-    if (b.rows.length > MAX_ROWS) block += `\n…(${b.rows.length - MAX_ROWS} older reports omitted)`;
-    if (out.length && out.length + block.length > DATA_BUDGET) { omittedBrands = list.length - bi; break; }
-    out += block;
+    if (!cols.length) continue;
+    let tbl = `\n\n### ${b.name} (currency: ${b.currency}) — headline metrics by period\n${['Type', 'Period', 'Status', ...cols.map((c) => c.label)].join(' | ')}`;
+    const hrows = b.rows.slice(0, headlineRows);
+    for (const r of hrows) tbl += `\n${r.type} | ${r.period_label || r.period_start} | ${r.status} | ${cols.map((c) => num(c.path(r.data))).join(' | ')}`;
+    if (b.rows.length > headlineRows) tbl += `\n…(${b.rows.length - headlineRows} older periods not shown in this table)`;
+    if (out.length && out.length + tbl.length > DATA_BUDGET) { truncated = true; break; }
+    out += tbl;
   }
-  if (omittedBrands > 0) out += `\n\n(${omittedBrands} more brand(s) omitted to stay within size limits — ask about a specific brand by name.)`;
-  return `${intro}${out || '\n\n(No numeric metrics have been filled into your reports yet.)'}`;
+
+  // Pass 2 — full detailed breakdowns, prioritized: periods the user named,
+  // then named brand, then most recent. Fills whatever budget remains.
+  const candidates: { b: any; r: any; idx: number; brandNamed: boolean; periodNamed: boolean }[] = [];
+  list.forEach((b) => {
+    const brandNamed = named.includes(b);
+    b.rows.forEach((r: any, idx: number) => candidates.push({ b, r, idx, brandNamed, periodNamed: periodMentioned(r.period_label, ml) }));
+  });
+  candidates.sort((a, z) =>
+    (Number(z.periodNamed) - Number(a.periodNamed)) ||
+    (Number(z.brandNamed) - Number(a.brandNamed)) ||
+    (a.idx - z.idx));
+
+  let detailHeader = false;
+  let emitted = 0;
+  for (const c of candidates) {
+    if (emitted >= 12) break;
+    const detail = reportDetail(c.r);
+    if (!detail) continue;
+    const head = detailHeader ? '' : '\n\n## DETAILED BREAKDOWNS (top creators, top videos, GMV Max campaigns, product highlights, offsite, insights & notes — shown for the most relevant periods):';
+    const block = `${head}\n\n— ${c.b.name} · ${c.r.period_label || c.r.period_start} (${c.r.type}, ${c.r.status}) —\n${detail}`;
+    if (out.length + block.length > DATA_BUDGET) { truncated = true; break; }
+    out += block;
+    detailHeader = true;
+    emitted++;
+  }
+
+  if (truncated) out += '\n\n(Some detail was omitted to stay within size limits. For older periods, other brands, or a specific section, ask about that brand and week/month by name.)';
+  return `${intro}${out || '\n\n(No metrics have been filled into your reports yet.)'}`;
 }
 
 Deno.serve(async (req) => {
@@ -371,11 +512,13 @@ Deno.serve(async (req) => {
       // No page list / KB here — keeps the request small and the answer focused.
       const dataRules = [
         'HOW TO ANSWER (DATA MODE):',
-        '- Answer ONLY from the BRAND REPORT DATA above. Do the math yourself (max, min, totals, averages, growth, comparisons) and state the exact period and the number.',
+        '- Answer ONLY from the BRAND REPORT DATA above. It has a per-brand headline metrics table (every period) AND DETAILED BREAKDOWNS — top creators, top videos, GMV Max campaigns, product highlights, offsite performance, plus written insights and notes — for the most relevant periods.',
+        '- Do the math yourself (max, min, totals, averages, growth, comparisons, rankings) and state the exact period and the number.',
+        '- The detailed breakdowns are shown only for the most relevant or recent periods. If asked for detail (e.g. a creator or video list) about a period that is NOT shown, ask the user to name that specific week/month so it can be pulled in.',
         "- Show money using the brand's stated currency. A blank metric means \"not reported\" for that period — do not treat it as zero.",
         "- This data is the user's OWN brand(s). You have NO access to any other employee's or brand's figures. If they ask about a brand or person not listed above, tell them you can only see their own brand data and do not guess or fabricate.",
         '- If the data does not contain what they asked, say so plainly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
-        '- Be concise: a direct sentence with the answer, plus a small list or table only when comparing periods.',
+        '- Be concise and well-structured: a direct answer first, then a small list or table when it helps (e.g. comparing periods or ranking creators).',
       ].join('\n');
       systemPrompt = [
         persona,
