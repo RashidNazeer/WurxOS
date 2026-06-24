@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import NotificationToaster from './NotificationToaster';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
@@ -145,6 +146,8 @@ export default function AppShell() {
       {/* Non-blocking "new version available" banner. Never reloads
           on its own — the user reloads when their work is safe. */}
       <UpdateAvailableBanner />
+      {/* Top-right popup queue for incoming notifications. */}
+      <NotificationToaster />
     </div>
   );
 }

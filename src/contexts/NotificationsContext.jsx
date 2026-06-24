@@ -11,14 +11,29 @@ import {
 
 const NotificationsContext = createContext(null);
 
+// Popup ("toast") tuning. Live arrivals are queued unbounded up to
+// MAX_TOAST_QUEUE; on a fresh load we surface at most MAX_INITIAL_TOASTS
+// recent unread so a user who's been away doesn't get buried.
+const MAX_TOAST_QUEUE = 12;
+const MAX_INITIAL_TOASTS = 5;
+const toastSeenKey = (uid) => `wurxos:toastSeenAt:${uid}`;
+
 export function NotificationsProvider({ children }) {
   const { user } = useAuth();
   const uid = user?.id;
   const [items, setItems] = useState([]);      // Recent notifications (cap ~50)
   const [counts, setCounts] = useState({ total: 0, byCategory: {} });
   const [loading, setLoading] = useState(true);
+  const [toasts, setToasts] = useState([]);    // Popup queue — newest first
 
   const channelRef = useRef(null);
+
+  // Toast session bookkeeping: ids already shown as a popup this session
+  // (never re-enqueue the same notification), and a guard so the
+  // surface-recent-unread-on-load pass runs only once per mount — not on
+  // every focus/SW re-load.
+  const toastedIdsRef = useRef(new Set());
+  const didInitialToastRef = useRef(false);
 
   // CRITICAL: hold the latest items in a ref so the callbacks below
   // can read fresh data WITHOUT depending on `items` in their useCallback
@@ -29,6 +44,20 @@ export function NotificationsProvider({ children }) {
   // See audit Finding 1+2.
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
+
+  // --- Toast popup queue ---------------------------------------------------
+  // Stable callbacks (empty dep set) so they never re-bind the effects that
+  // consume them, matching the ref-driven pattern used by the mutations below.
+  const enqueueToast = useCallback((n) => {
+    if (!n || !n.id || n.read_at) return;
+    if (toastedIdsRef.current.has(n.id)) return;
+    toastedIdsRef.current.add(n.id);
+    setToasts((prev) => [n, ...prev.filter((t) => t.id !== n.id)].slice(0, MAX_TOAST_QUEUE));
+  }, []);
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+  const clearToasts = useCallback(() => setToasts([]), []);
 
   // --- Initial load --------------------------------------------------------
   // Load also lives in a ref so other effects (visibilitychange, SW
@@ -45,15 +74,36 @@ export function NotificationsProvider({ children }) {
       ]);
       setItems(list);
       setCounts(c);
+
+      // Surface recent unread as popups ONCE per session. A persisted
+      // "last seen" timestamp keeps a refresh (or the focus/SW re-loads)
+      // from re-popping notifications the user already saw; live arrivals
+      // come through the realtime INSERT handler instead.
+      if (!didInitialToastRef.current) {
+        didInitialToastRef.current = true;
+        let since = 0;
+        try { since = Number(localStorage.getItem(toastSeenKey(uid))) || 0; } catch {}
+        list
+          .filter((n) => !n.read_at && new Date(n.created_at).getTime() > since)
+          .slice(0, MAX_INITIAL_TOASTS)   // list is newest-first
+          .reverse()                       // enqueue oldest→newest so newest lands on top
+          .forEach(enqueueToast);
+        try { localStorage.setItem(toastSeenKey(uid), String(Date.now())); } catch {}
+      }
     } catch (err) {
       console.warn('[notifications] load failed:', err.message);
     } finally {
       setLoading(false);
     }
-  }, [uid]);
+  }, [uid, enqueueToast]);
   useEffect(() => { loadRef.current = load; }, [load]);
 
   useEffect(() => {
+    // Reset per-session toast bookkeeping whenever the user changes
+    // (login, logout, or account switch) so popups never leak across users.
+    setToasts([]);
+    toastedIdsRef.current = new Set();
+    didInitialToastRef.current = false;
     if (!uid) {
       setItems([]);
       setCounts({ total: 0, byCategory: {} });
@@ -137,6 +187,7 @@ export function NotificationsProvider({ children }) {
             byCategory[n.category] = (byCategory[n.category] || 0) + 1;
             return { total: c.total + 1, byCategory };
           });
+          enqueueToast(n);   // pop it up
         },
       )
       .on(
@@ -159,7 +210,7 @@ export function NotificationsProvider({ children }) {
       try { supabase.removeChannel(channel); } catch {}
       channelRef.current = null;
     };
-  }, [uid]);
+  }, [uid, enqueueToast]);
 
   // --- Mutations -----------------------------------------------------------
   // All read items via itemsRef.current so the callbacks have an
@@ -215,7 +266,7 @@ export function NotificationsProvider({ children }) {
 
   return (
     <NotificationsContext.Provider
-      value={{ items, counts, loading, reload: load, markRead, markAllRead, markCategoryRead, markVisibleRead }}
+      value={{ items, counts, loading, reload: load, markRead, markAllRead, markCategoryRead, markVisibleRead, toasts, dismissToast, clearToasts }}
     >
       {children}
     </NotificationsContext.Provider>

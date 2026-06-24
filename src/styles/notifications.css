@@ -465,6 +465,228 @@
   .notif-row-time { grid-column: 2; margin-top: 2px; font-size: 11px; }
 }
 
+/* ============================================================
+   Toast popups — incoming notifications, top-right, one at a time
+   ============================================================ */
+.notif-toast-region {
+  position: fixed;
+  top: calc(var(--topbar-h, 68px) + 14px);
+  right: 18px;
+  width: 380px;
+  max-width: calc(100vw - 28px);
+  z-index: 1300;            /* above the dropdown panel (1100) */
+  pointer-events: none;     /* never block the page; card re-enables below */
+}
+
+/* Wrapper holds the live card plus faint "stacked" ghosts behind it
+   so a queue of several reads as a deck, not a single card. */
+.notif-toast-wrap {
+  position: relative;
+  pointer-events: auto;
+}
+.notif-toast-ghost {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md);
+  z-index: 0;
+}
+.notif-toast-ghost-1 { transform: translateY(9px)  scaleX(0.95); opacity: 0.9; }
+.notif-toast-ghost-2 { transform: translateY(18px) scaleX(0.9);  opacity: 0.6; }
+
+/* The card itself */
+.notif-toast {
+  position: relative;
+  z-index: 1;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 13px 14px 11px 18px;
+  overflow: hidden;
+  animation: notif-toast-in 0.42s var(--ease-out) both;
+  will-change: transform, opacity;
+}
+.notif-toast.is-leaving {
+  animation: notif-toast-out 0.24s ease-in forwards;
+  pointer-events: none;
+}
+@keyframes notif-toast-in {
+  from { opacity: 0; transform: translateX(calc(100% + 28px)); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes notif-toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(calc(100% + 28px)); }
+}
+
+/* Colored category rail down the left edge */
+.notif-toast-rail {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--accent);
+}
+.notif-toast-rail-task        { background: var(--accent); }
+.notif-toast-rail-report      { background: #818cf8; }
+.notif-toast-rail-brand       { background: #eab308; }
+.notif-toast-rail-paid_collab { background: #10b981; }
+.notif-toast-rail-leave       { background: #06b6d4; }
+.notif-toast-rail-resource    { background: #ec4899; }
+.notif-toast-rail-performance { background: #f59e0b; }
+.notif-toast-rail-agenda      { background: #6366f1; }
+.notif-toast-rail-system      { background: var(--text-muted); }
+
+/* Header row: icon · category · stack badge · time · close */
+.notif-toast-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notif-toast-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  color: #fff;
+  background: var(--accent);
+}
+.notif-toast-icon img { width: 100%; height: 100%; object-fit: cover; }
+.notif-toast-icon-task        { background: var(--accent); }
+.notif-toast-icon-report      { background: #818cf8; }
+.notif-toast-icon-brand       { background: #eab308; }
+.notif-toast-icon-paid_collab { background: #10b981; }
+.notif-toast-icon-leave       { background: #06b6d4; }
+.notif-toast-icon-resource    { background: #ec4899; }
+.notif-toast-icon-performance { background: #f59e0b; }
+.notif-toast-icon-agenda      { background: #6366f1; }
+.notif-toast-icon-system      { background: var(--text-muted); }
+
+.notif-toast-cat {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.notif-toast-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+.notif-toast-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.notif-toast-x {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: all var(--dur-fast);
+}
+.notif-toast-x:hover { color: var(--text-primary); background: var(--surface-2); }
+
+/* Body — the clickable area that opens the linked entity */
+.notif-toast-body {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  padding: 8px 0 2px;
+}
+.notif-toast-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.35;
+  transition: color var(--dur-fast);
+}
+.notif-toast-body:hover .notif-toast-title { color: var(--accent); }
+.notif-toast-text {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Footer — view link + mark-all */
+.notif-toast-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-subtle);
+}
+.notif-toast-open {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.notif-toast-open:hover { text-decoration: underline; }
+.notif-toast-markall {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--dur-fast);
+}
+.notif-toast-markall:hover { color: var(--accent); background: var(--surface-2); }
+
+@media (max-width: 560px) {
+  .notif-toast-region {
+    top: calc(var(--topbar-h, 68px) + 8px);
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notif-toast { animation-duration: 0.01ms; }
+  .notif-toast.is-leaving { animation-duration: 0.01ms; }
+}
+
 /* Sidebar unread dot — tiny pulsing peach dot on nav items */
 .sidebar-unread-dot {
   position: absolute;
