@@ -160,9 +160,42 @@ function looksLikeDataQuestion(msg: string): boolean {
   const analytic = /\b(highest|lowest|best|worst|top|most|least|maximum|minimum|max|min|compare|comparison|versus|vs|trend|growth|grew|increase[d]?|decrease[d]?|drop(ped)?|decline[d]?|average|avg|total|sum|how much|how many|which (week|month|period|brand)|over time|so far|this (week|month)|last (week|month)|year to date|ytd)\b/;
   const metric = /\b(gmv|sales|revenue|orders?|roi|spend|cpo|views?|clicks?|samples?|shop\s*(performance|score)|affiliate|offsite|conversion|creators?|campaigns?|products?|videos?|metrics?|numbers?|figures?|stats?|statistics|performance|insights?)\b/;
   const howto = /^\s*(how\s+(do|can|to|would|should)|where\s+(do|is|can|are)|what('?s| is| are) the (process|step|way)|guide me|walk me|teach me|explain how)/;
+  // "who handles X / which apc / who's assigned / who owns" → brand-team data.
+  const team = /\b(apc|ipc|who(?:'?s| is| are)?\s+(?:handl|manag|run|own|assign|the apc|the ipc|on)|who\s+handles|handling|managing|assigned\s+to|coordinator|team\s+for|owner\s+of|works?\s+on)\b/;
   if (analytic.test(m)) return true;     // explicit analytics intent → data
   if (howto.test(m)) return false;       // explicit how-to → help (KB), even with a metric word
-  return metric.test(m);                 // otherwise a metric/section noun → data
+  if (metric.test(m)) return true;       // a metric/section noun → data
+  return team.test(m);                   // a who-handles/assignment question → data
+}
+
+// Resolve the owner (TL) + assigned APC/IPC names for the brands the caller may
+// see. Scoped to those already RLS-authorized brand ids; display names only
+// (not sensitive — shown on the brand page). Lets the assistant answer
+// "who handles this brand?" from real data instead of guessing a name.
+async function buildBrandTeams(brands: any[]): Promise<{ name: string; owner: string; members: string[] }[]> {
+  const ids = brands.map((b) => b.id).filter(Boolean);
+  if (!ids.length) return [];
+  const { data: assigns } = await admin.from('brand_assignments').select('brand_id, user_id').in('brand_id', ids);
+  const allIds = [...new Set([
+    ...brands.map((b) => b.owner_id).filter(Boolean),
+    ...(assigns || []).map((a) => a.user_id),
+  ])];
+  const nameById = new Map<string, string>();
+  if (allIds.length) {
+    const { data: people } = await admin.from('profiles').select('id, display_name').in('id', allIds);
+    for (const p of people || []) nameById.set(p.id, p.display_name);
+  }
+  const byBrand = new Map<string, string[]>();
+  for (const a of assigns || []) {
+    const nm = nameById.get(a.user_id);
+    if (!nm) continue;
+    const arr = byBrand.get(a.brand_id) ?? [];
+    arr.push(nm);
+    byBrand.set(a.brand_id, arr);
+  }
+  return brands
+    .map((b) => ({ name: b.brand_name, owner: nameById.get(b.owner_id) || '', members: byBrand.get(b.id) || [] }))
+    .filter((t) => t.name && (t.owner || t.members.length));
 }
 
 // Headline numeric metrics — the compact per-period time-series backbone.
@@ -316,9 +349,21 @@ function periodMentioned(label: string, ml: string): boolean {
 // Build the (token-bounded) DATA block: a headline time-series per brand, then
 // full detailed breakdowns for the most relevant periods (named first, else
 // most recent), filling the remaining budget.
-function buildDataBlock(reps: any[], allBrands: any[], message: string): string {
+function buildDataBlock(reps: any[], allBrands: any[], brandTeams: { name: string; owner: string; members: string[] }[], message: string): string {
   const intro = 'BRAND REPORT DATA (these are the ONLY brands/reports you can access — they all belong to this user. Never reference, invent, or imply data for any brand or person not listed here):';
   const ml = message.toLowerCase();
+
+  // Who manages each brand (owner TL + assigned APC/IPC). Named brands first,
+  // capped to stay within the token budget. Used to answer "who handles X?".
+  const teamLines = (brandTeams || [])
+    .slice()
+    .sort((a, b) => (Number(brandNamedInMessage(b.name, ml)) - Number(brandNamedInMessage(a.name, ml)))
+      || String(a.name).localeCompare(String(b.name)))
+    .slice(0, 15)
+    .map((t) => `- ${t.name} — TL/owner: ${t.owner || 'unknown'}${t.members.length ? `; APC/IPC: ${t.members.join(', ')}` : ''}`);
+  const teamsNote = teamLines.length
+    ? `\n\n## BRAND TEAMS (who manages each brand — answer "who handles X" using ONLY these names; never invent a person):\n${teamLines.join('\n')}${(brandTeams || []).length > teamLines.length ? `\n…(+${(brandTeams || []).length - teamLines.length} more brands' teams — ask by brand name)` : ''}`
+    : '';
 
   // Brands the user manages that have NO reports filed yet — nothing to analyze
   // until the first report is saved, but the assistant should still acknowledge
@@ -338,7 +383,7 @@ function buildDataBlock(reps: any[], allBrands: any[], message: string): string 
     const empty = noReport.length
       ? `\n\nYou manage these brand(s), but none have any reports filed yet, so there is no performance data to analyze: ${noReportNames}.`
       : '\n\n(No reports are visible to you yet, so there is no performance data to analyze.)';
-    return `${intro}${empty}`;
+    return `${intro}${empty}${teamsNote}`;
   }
 
   // Group by brand (newest-first order preserved from the query).
@@ -408,7 +453,7 @@ function buildDataBlock(reps: any[], allBrands: any[], message: string): string 
   }
 
   if (truncated) out += '\n\n(Some detail was omitted to stay within size limits. For older periods, other brands, or a specific section, ask about that brand and week/month by name.)';
-  return `${intro}${out || '\n\n(No metrics have been filled into your reports yet.)'}${noReportNote}`;
+  return `${intro}${out || '\n\n(No metrics have been filled into your reports yet.)'}${noReportNote}${teamsNote}`;
 }
 
 Deno.serve(async (req) => {
@@ -483,9 +528,10 @@ Deno.serve(async (req) => {
         // Also RLS-scoped (brands_select → can_view_brand): the caller's brands.
         // Lets the assistant acknowledge brands that exist but have no reports
         // yet (e.g. one created today), instead of saying it doesn't know them.
-        userClient!.from('brands').select('id, brand_name, status').limit(200),
+        userClient!.from('brands').select('id, brand_name, status, owner_id').limit(200),
       ]);
-      knowledgeBlock = buildDataBlock(reps || [], myBrands || [], message);
+      const brandTeams = await buildBrandTeams(myBrands || []);
+      knowledgeBlock = buildDataBlock(reps || [], myBrands || [], brandTeams, message);
     } else {
       // ── Knowledge (RAG) — pick the docs most relevant to THIS question
       //    and cap the size, so the request fits the model's input limit
@@ -583,6 +629,7 @@ Deno.serve(async (req) => {
         '- If a question is relevant but unclear or could mean several things (which metric? which brand? which report type?), ask ONE short clarifying question instead of refusing. "I don\'t have that information" is correct ONLY when the data genuinely does not contain it — never as a response to ambiguity.',
         '- If the data spans more than one brand and the user did not name one, either answer per brand or ask which brand they mean.',
         '- If the user asks about a brand listed under "BRANDS YOU MANAGE WITH NO REPORTS YET", tell them that brand exists but has no reports filed yet, so there is nothing to analyze until the first report is saved — never say you do not recognize or cannot find the brand.',
+        '- To answer who handles / manages / is assigned to / owns a brand, use ONLY the names in the BRAND TEAMS section. NEVER invent or guess a person\'s name. If a brand or its team is not listed, say you don\'t have that assignment on record and suggest checking the brand\'s page or [My Team](/tl/team).',
         '- Only when the data truly lacks the requested metric, say so briefly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
         '- Be concise and well-structured: a direct answer first, then a small list or table when it helps (e.g. comparing periods or ranking creators).',
       ].join('\n');
@@ -606,6 +653,7 @@ Deno.serve(async (req) => {
         '- Some knowledge entries have no written steps — only a title and a link to a full guide (e.g. a Google Doc). For those, do NOT say you have no information and do NOT invent steps: point the user to the guide with a markdown link, e.g. [open the guide](https://…). Recite detailed steps only when the knowledge actually contains them.',
         '- If the user is clearly asking about their brand\'s performance/metrics (GMV, orders, etc.), tell them you can answer that — ask them to mention the metric and brand — rather than guessing numbers.',
         '- Read short follow-up questions in the context of the conversation so far — they usually continue the previous topic. If a question is relevant but unclear, ask ONE short clarifying question instead of replying that you do not know.',
+        '- NEVER invent the name of a person, brand, APC/IPC, or assignment. If you are asked who handles a brand or who someone is and you have not been given that fact, say you do not have that information and point them to the brand\'s page or [My Team](/tl/team) — do not guess a name.',
         '- Be concise and friendly; use short numbered steps when describing a flow.',
       ].join('\n');
 
