@@ -316,9 +316,30 @@ function periodMentioned(label: string, ml: string): boolean {
 // Build the (token-bounded) DATA block: a headline time-series per brand, then
 // full detailed breakdowns for the most relevant periods (named first, else
 // most recent), filling the remaining budget.
-function buildDataBlock(reps: any[], message: string): string {
+function buildDataBlock(reps: any[], allBrands: any[], message: string): string {
   const intro = 'BRAND REPORT DATA (these are the ONLY brands/reports you can access — they all belong to this user. Never reference, invent, or imply data for any brand or person not listed here):';
-  if (!reps.length) return `${intro}\n\n(No reports are visible to you yet, so there is no performance data to analyze.)`;
+  const ml = message.toLowerCase();
+
+  // Brands the user manages that have NO reports filed yet — nothing to analyze
+  // until the first report is saved, but the assistant should still acknowledge
+  // them (a brand created today has zero reports; that's not "doesn't exist").
+  const reportBrandIds = new Set(reps.map((r) => r.brand_id));
+  const noReport = (allBrands || [])
+    .filter((b) => b && b.brand_name && b.status !== 'inactive' && !reportBrandIds.has(b.id))
+    .sort((a, b) => (Number(brandNamedInMessage(b.brand_name, ml)) - Number(brandNamedInMessage(a.brand_name, ml)))
+      || String(a.brand_name).localeCompare(String(b.brand_name)));
+  const noReportNames = noReport.slice(0, 12).map((b) => b.brand_name).join(', ')
+    + (noReport.length > 12 ? ` (+${noReport.length - 12} more)` : '');
+  const noReportNote = noReport.length
+    ? `\n\n## BRANDS YOU MANAGE WITH NO REPORTS YET (these brands exist but have no report filed, so there is nothing to analyze until the first report is saved — acknowledge the brand and say it has no reports yet; do NOT claim you don't recognize it): ${noReportNames}`
+    : '';
+
+  if (!reps.length) {
+    const empty = noReport.length
+      ? `\n\nYou manage these brand(s), but none have any reports filed yet, so there is no performance data to analyze: ${noReportNames}.`
+      : '\n\n(No reports are visible to you yet, so there is no performance data to analyze.)';
+    return `${intro}${empty}`;
+  }
 
   // Group by brand (newest-first order preserved from the query).
   const byBrand = new Map<string, { name: string; currency: string; rows: any[] }>();
@@ -329,7 +350,6 @@ function buildDataBlock(reps: any[], message: string): string {
   }
   // If the user named one of THEIR brands, narrow to it (still within the
   // authorized set — naming a brand they don't have simply matches nothing).
-  const ml = message.toLowerCase();
   const named = [...byBrand.values()].filter((b) => brandNamedInMessage(b.name, ml));
   const brands = named.length ? named : [...byBrand.values()];
   const list = brands.slice(0, named.length ? named.length : 5);
@@ -388,7 +408,7 @@ function buildDataBlock(reps: any[], message: string): string {
   }
 
   if (truncated) out += '\n\n(Some detail was omitted to stay within size limits. For older periods, other brands, or a specific section, ask about that brand and week/month by name.)';
-  return `${intro}${out || '\n\n(No metrics have been filled into your reports yet.)'}`;
+  return `${intro}${out || '\n\n(No metrics have been filled into your reports yet.)'}${noReportNote}`;
 }
 
 Deno.serve(async (req) => {
@@ -454,12 +474,18 @@ Deno.serve(async (req) => {
       // may view — owned (TL), assigned (APC/IPC, incl. temporary), or authored;
       // OL/Boss/Dev see all. The model never picks the filter, so it can't be
       // prompted into another user's or brand's data: that data is never read.
-      const { data: reps } = await userClient!
-        .from('reports')
-        .select('brand_id, type, period_start, period_label, status, data, brand:brand_id(brand_name)')
-        .order('period_start', { ascending: false })
-        .limit(REPORTS_FETCH_LIMIT);
-      knowledgeBlock = buildDataBlock(reps || [], message);
+      const [{ data: reps }, { data: myBrands }] = await Promise.all([
+        userClient!
+          .from('reports')
+          .select('brand_id, type, period_start, period_label, status, data, brand:brand_id(brand_name)')
+          .order('period_start', { ascending: false })
+          .limit(REPORTS_FETCH_LIMIT),
+        // Also RLS-scoped (brands_select → can_view_brand): the caller's brands.
+        // Lets the assistant acknowledge brands that exist but have no reports
+        // yet (e.g. one created today), instead of saying it doesn't know them.
+        userClient!.from('brands').select('id, brand_name, status').limit(200),
+      ]);
+      knowledgeBlock = buildDataBlock(reps || [], myBrands || [], message);
     } else {
       // ── Knowledge (RAG) — pick the docs most relevant to THIS question
       //    and cap the size, so the request fits the model's input limit
@@ -556,6 +582,7 @@ Deno.serve(async (req) => {
         "- This data is the user's OWN brand(s). You have NO access to any other employee's or brand's figures. If they ask about a brand or person not listed above, tell them you can only see their own brand data and do not guess or fabricate.",
         '- If a question is relevant but unclear or could mean several things (which metric? which brand? which report type?), ask ONE short clarifying question instead of refusing. "I don\'t have that information" is correct ONLY when the data genuinely does not contain it — never as a response to ambiguity.',
         '- If the data spans more than one brand and the user did not name one, either answer per brand or ask which brand they mean.',
+        '- If the user asks about a brand listed under "BRANDS YOU MANAGE WITH NO REPORTS YET", tell them that brand exists but has no reports filed yet, so there is nothing to analyze until the first report is saved — never say you do not recognize or cannot find the brand.',
         '- Only when the data truly lacks the requested metric, say so briefly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
         '- Be concise and well-structured: a direct answer first, then a small list or table when it helps (e.g. comparing periods or ranking creators).',
       ].join('\n');
