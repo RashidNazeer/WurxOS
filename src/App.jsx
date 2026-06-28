@@ -207,7 +207,7 @@ export default function App() {
               <Route
                 path="/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'ipc', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'ipc']}>
                     <BrandsPage />
                   </RoleGuard>
                 }
@@ -215,7 +215,7 @@ export default function App() {
               <Route
                 path="/brands/:id"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
                     <BrandDetailPage />
                   </RoleGuard>
                 }
@@ -274,7 +274,7 @@ export default function App() {
               <Route
                 path="/agenda/settings"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol']}>
                     <AgendaSettingsPage />
                   </RoleGuard>
                 }
@@ -292,7 +292,7 @@ export default function App() {
               <Route
                 path="/paid-collab/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'pctl', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol', 'pctl']}>
                     <PaidCollabBrandsPage />
                   </RoleGuard>
                 }
@@ -300,7 +300,7 @@ export default function App() {
               <Route
                 path="/paid-collab/creators"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'pctl', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol', 'pctl']}>
                     <PaidCollabCreatorsPage />
                   </RoleGuard>
                 }
@@ -308,7 +308,7 @@ export default function App() {
               <Route
                 path="/paid-collab/videos"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'pctl', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol', 'pctl']}>
                     <PaidCollabVideosPage />
                   </RoleGuard>
                 }
@@ -324,7 +324,7 @@ export default function App() {
               <Route
                 path="/weekly-reports"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc','developer']}>
+                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
                     <WeeklyReportsRouter />
                   </RoleGuard>
                 }
@@ -332,7 +332,7 @@ export default function App() {
               <Route
                 path="/biweekly-reports"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc','developer']}>
+                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
                     <BiWeeklyReportsRouter />
                   </RoleGuard>
                 }
@@ -340,7 +340,7 @@ export default function App() {
               <Route
                 path="/monthly-reports"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc','developer']}>
+                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
                     <MonthlyReportsRouter />
                   </RoleGuard>
                 }
@@ -348,7 +348,7 @@ export default function App() {
               <Route
                 path="/gmv-max"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc','developer']}>
+                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
                     <GmvMaxReportingPage />
                   </RoleGuard>
                 }
@@ -361,7 +361,7 @@ export default function App() {
               <Route
                 path="/client-access"
                 element={
-                  <RoleGuard allow={['boss','ol','developer']}>
+                  <RoleGuard allow={['boss','ol']}>
                     <ClientAccessPage />
                   </RoleGuard>
                 }
@@ -369,7 +369,7 @@ export default function App() {
               <Route
                 path="/team-management"
                 element={
-                  <RoleGuard allow={['boss','ol','developer']}>
+                  <RoleGuard allow={['boss','ol']}>
                     <TeamManagementPage />
                   </RoleGuard>
                 }
@@ -377,7 +377,7 @@ export default function App() {
               <Route
                 path="/team-hierarchy"
                 element={
-                  <RoleGuard allow={['boss','ol','developer']}>
+                  <RoleGuard allow={['boss','ol']}>
                     <TeamHierarchyPage />
                   </RoleGuard>
                 }
@@ -399,13 +399,41 @@ export default function App() {
               {/* Resources */}
               <Route path="/resources" element={<ResourcesPage />} />
 
-              {/* Performance */}
-              <Route path="/performance" element={<PerformancePage />} />
+              {/* Performance — staff only (developer excluded; RLS still the boundary) */}
+              <Route
+                path="/performance"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <PerformancePage />
+                  </RoleGuard>
+                }
+              />
 
-              {/* Incentives */}
-              <Route path="/incentives" element={<IncentivesPage />} />
-              <Route path="/incentives/new"          element={<IncentivePlanEditorPage />} />
-              <Route path="/incentives/edit/:userId" element={<IncentivePlanEditorPage />} />
+              {/* Incentives — staff only (developer excluded; RLS still the boundary) */}
+              <Route
+                path="/incentives"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <IncentivesPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/incentives/new"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <IncentivePlanEditorPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/incentives/edit/:userId"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <IncentivePlanEditorPage />
+                  </RoleGuard>
+                }
+              />
 
               {/* Broadcasts / Reminders / KB / Chat */}
               <Route path="/broadcasts"    element={<BroadcastsPage />} />
@@ -413,17 +441,31 @@ export default function App() {
               <Route path="/campaigns" element={<CampaignTrackerPage />} />
               <Route path="/reminders"     element={<RemindersPage />} />
               <Route path="/kb"            element={<KnowledgeBasePage />} />
-              <Route path="/chat"          element={<ChatPage />} />
+              <Route
+                path="/chat"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <ChatPage />
+                  </RoleGuard>
+                }
+              />
 
               {/* Leave */}
               <Route path="/leave"           element={<LeavePage />} />
-              <Route path="/leave/approvals" element={<LeaveApprovalsPage />} />
+              <Route
+                path="/leave/approvals"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <LeaveApprovalsPage />
+                  </RoleGuard>
+                }
+              />
 
               {/* Analytics */}
               <Route
                 path="/analytics/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol']}>
                     <BrandAnalyticsPage />
                   </RoleGuard>
                 }
@@ -433,7 +475,7 @@ export default function App() {
               <Route
                 path="/audit"
                 element={
-                  <RoleGuard allow={['boss','ol','developer']}>
+                  <RoleGuard allow={['boss','ol']}>
                     <AuditPage />
                   </RoleGuard>
                 }
@@ -443,7 +485,7 @@ export default function App() {
               <Route
                 path="/brand-switcher"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol']}>
                     <BrandSwitcherPage />
                   </RoleGuard>
                 }
