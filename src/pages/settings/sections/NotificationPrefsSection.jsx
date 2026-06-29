@@ -17,15 +17,22 @@ const CATEGORIES = [
 
 const DEFAULT_ALL_ON = Object.fromEntries(CATEGORIES.map((c) => [c.key, { push: true }]));
 
+// Seed/merge the editable prefs ON TOP of whatever is already stored, so
+// keys owned by SIBLING sections (tier notifications, campaign expiry) and
+// our own `sound` key survive a save here — save() writes the whole object.
+function seedPrefs(stored) {
+  return { ...DEFAULT_ALL_ON, ...(stored || {}) };
+}
+
 export default function NotificationPrefsSection() {
   const { user, profile, refreshProfile } = useAuth();
-  const [prefs, setPrefs] = useState(profile?.notification_prefs || DEFAULT_ALL_ON);
+  const [prefs, setPrefs] = useState(() => seedPrefs(profile?.notification_prefs));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk]   = useState('');
 
   useEffect(() => {
-    setPrefs(profile?.notification_prefs || DEFAULT_ALL_ON);
+    setPrefs(seedPrefs(profile?.notification_prefs));
   }, [profile?.notification_prefs]);
 
   function toggle(key) {
@@ -33,6 +40,11 @@ export default function NotificationPrefsSection() {
       ...cur,
       [key]: { ...(cur[key] || { push: true }), push: !(cur[key]?.push ?? true) },
     }));
+  }
+
+  const soundOn = prefs?.sound?.enabled ?? true;
+  function toggleSound() {
+    setPrefs((cur) => ({ ...cur, sound: { enabled: !(cur?.sound?.enabled ?? true) } }));
   }
 
   async function save() {
@@ -46,7 +58,7 @@ export default function NotificationPrefsSection() {
     finally { setSaving(false); }
   }
 
-  const dirty = JSON.stringify(prefs) !== JSON.stringify(profile?.notification_prefs || DEFAULT_ALL_ON);
+  const dirty = JSON.stringify(prefs) !== JSON.stringify(seedPrefs(profile?.notification_prefs));
 
   return (
     <SectionShell
@@ -64,6 +76,45 @@ export default function NotificationPrefsSection() {
           <CheckIcon width="14" height="14" /> <span>{ok}</span>
         </div>
       )}
+
+      {/* Global in-app sound toggle — plays a short chime when a new
+          notification arrives while this tab is open. Distinct from the
+          per-category web-push toggles below. */}
+      <div
+        onClick={() => !saving && toggleSound()}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 14px',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: 12,
+          cursor: saving ? 'not-allowed' : 'pointer',
+          background: soundOn ? 'var(--accent-soft)' : 'var(--surface-1)',
+        }}
+      >
+        <div style={{ marginRight: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5 }}>Notification sound</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Play a short chime when a new notification arrives in this tab.
+          </div>
+        </div>
+        <span style={{
+          width: 36, height: 20, borderRadius: 999,
+          background: soundOn ? 'var(--accent)' : 'var(--surface-3)',
+          border: '1px solid',
+          borderColor: soundOn ? 'var(--accent)' : 'var(--border-default)',
+          position: 'relative', flex: '0 0 auto',
+          transition: 'background var(--dur-fast)',
+        }}>
+          <span style={{
+            position: 'absolute', top: 1, left: soundOn ? 17 : 1,
+            width: 16, height: 16, borderRadius: '50%',
+            background: '#fff',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            transition: 'left var(--dur-fast)',
+          }} />
+        </span>
+      </div>
 
       <div style={{
         border: '1px solid var(--border-subtle)',
