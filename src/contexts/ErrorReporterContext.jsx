@@ -146,10 +146,17 @@ export function ErrorReporterProvider({ children }) {
       //      option." with name=AbortError, code=20. This is the
       //      auth client working as designed — older tabs' refresh
       //      requests fail loudly so the new tab can take over.
+      //      The SAME contention also surfaces during signOut() as
+      //      "Lock "lock:sb-...-auth-token" was released because
+      //      another request stole it" — sign-out vs. a mid-flight
+      //      token refresh / SIGNED_OUT teardown racing for the auth
+      //      lock. The sign-out still completes (local token is wiped
+      //      regardless); it's just noisy internal coordination, not a
+      //      failure the user can act on.
       // Match on err.name first because err.message varies; fall
       // back to message text for older browsers that don't set name.
       if (name === 'AbortError') return;
-      if (/AbortError|ResizeObserver loop|cancell?ed|Lock broken/i.test(msg)) return;
+      if (/AbortError|ResizeObserver loop|cancell?ed|Lock broken|another request stole it|was released because another/i.test(msg)) return;
       // Inactive-brand task freeze (mig 171) — local handlers in
       // TaskRow / TaskKanban / TasksPage already show a friendly
       // notice. If one slips through, don't escalate to the
