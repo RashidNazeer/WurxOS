@@ -471,7 +471,19 @@ export function AuthProvider({ children }) {
     // which logs them out of all other devices too — surprising
     // behavior when a user is signed in on their phone and laptop
     // and signs out of one expecting the other to keep working.
-    await supabase.auth.signOut({ scope: 'local' });
+    //
+    // Wrapped in try/catch: signOut acquires the Web Locks auth-token
+    // lock, which can race a mid-flight token refresh / SIGNED_OUT
+    // teardown and reject with 'Lock … was released because another
+    // request stole it'. The sign-out still completes (we've already
+    // wiped local state above and the local token is cleared), so
+    // swallow the benign lock-contention rejection instead of letting
+    // it bubble up as an unhandled rejection.
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      console.warn('[auth] signOut lock contention (benign):', e?.message);
+    }
   }, [qc, session?.user?.id]);
 
   const refreshProfile = useCallback(
