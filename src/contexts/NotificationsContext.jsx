@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { playNotificationChime, primeNotificationSound } from '../lib/notificationSound';
 import {
   fetchUnreadCounts, listNotifications,
   markRead as apiMarkRead,
@@ -19,7 +20,7 @@ const MAX_INITIAL_TOASTS = 5;
 const toastSeenKey = (uid) => `wurxos:toastSeenAt:${uid}`;
 
 export function NotificationsProvider({ children }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const uid = user?.id;
   const [items, setItems] = useState([]);      // Recent notifications (cap ~50)
   const [counts, setCounts] = useState({ total: 0, byCategory: {} });
@@ -27,6 +28,33 @@ export function NotificationsProvider({ children }) {
   const [toasts, setToasts] = useState([]);    // Popup queue — newest first
 
   const channelRef = useRef(null);
+
+  // Whether to chime on a new arrival. Held in a ref so the realtime
+  // effect (deps [uid, enqueueToast]) never re-binds — toggling the pref
+  // mustn't tear down/resubscribe the channel. Default ON, matching the
+  // rest of notification_prefs (truthy by default). Live-updates as the
+  // profile's prefs change (AuthContext realtime merge + refreshProfile).
+  const soundOnRef = useRef(true);
+  useEffect(() => {
+    soundOnRef.current = profile?.notification_prefs?.sound?.enabled ?? true;
+  }, [profile?.notification_prefs]);
+
+  // Unlock the chime past the browser autoplay gate on the FIRST user
+  // gesture (any click/keypress), then detach. Until this fires,
+  // playNotificationChime() is a silent no-op. Mount-once.
+  useEffect(() => {
+    const prime = () => {
+      primeNotificationSound();
+      window.removeEventListener('pointerdown', prime);
+      window.removeEventListener('keydown', prime);
+    };
+    window.addEventListener('pointerdown', prime, { once: true });
+    window.addEventListener('keydown', prime, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', prime);
+      window.removeEventListener('keydown', prime);
+    };
+  }, []);
 
   // Toast session bookkeeping: ids already shown as a popup this session
   // (never re-enqueue the same notification), and a guard so the
@@ -188,6 +216,10 @@ export function NotificationsProvider({ children }) {
             return { total: c.total + 1, byCategory };
           });
           enqueueToast(n);   // pop it up
+          // Chime ONLY on a genuine live arrival (this callback never
+          // runs during load() backfill). Guarded like enqueueToast so a
+          // racing already-read row stays silent.
+          if (soundOnRef.current && n && n.id && !n.read_at) playNotificationChime();
         },
       )
       .on(
