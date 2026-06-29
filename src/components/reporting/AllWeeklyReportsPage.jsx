@@ -176,6 +176,20 @@ export default function AllWeeklyReportsPage() {
   // Weeks in selected calendar month, aligned to anchor
   const calWeeks = useMemo(() => getWeeksForMonth(calYear, calMonth, anchor), [calYear, calMonth, anchor]);
 
+  // Week filter options — derived DYNAMICALLY from the reports that actually
+  // exist in the selected month (so it never shows phantom weeks and grows on
+  // its own as new weeks are reported), sorted DESCENDING (newest week first).
+  // Falls back to the calendar weeks for the month if no reports yet.
+  const weekOptions = useMemo(() => {
+    const mk = monthKey(calYear, calMonth);
+    const weeks = new Set();
+    reports.forEach(r => {
+      if (r.weekStart && r.weekStart.startsWith(mk) && r.week != null) weeks.add(Number(r.week));
+    });
+    if (weeks.size === 0) calWeeks.forEach(w => weeks.add(Number(w.week)));
+    return [...weeks].sort((a, b) => b - a).map(w => ({ value: String(w), label: `Week ${w}` }));
+  }, [reports, calYear, calMonth, calWeeks]);
+
   // Filter options derived from data
   const brandOptions = useMemo(() => {
     const s = new Set();
@@ -330,7 +344,7 @@ export default function AllWeeklyReportsPage() {
     { key: 'reporter', label: 'Reporter', value: filterCreator, setValue: setFilterCreator,
       options: creatorOptions.map(c => ({ value: c, label: c })) },
     { key: 'week', label: 'Week', value: filterWeek, setValue: setFilterWeek,
-      options: calWeeks.map(w => ({ value: String(w.week), label: `Week ${w.week}` })) },
+      options: weekOptions },
     { key: 'status', label: 'Status', value: filterStatus, setValue: setFilterStatus,
       options: [
         { value: 'draft', label: 'Draft' },

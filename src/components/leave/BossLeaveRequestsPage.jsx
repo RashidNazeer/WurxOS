@@ -397,12 +397,14 @@ export default function BossLeaveRequestsPage() {
     [requests, viewMonth],
   );
 
+  // Pending count spans ALL months — a future-dated request awaiting Boss
+  // approval still needs action and must not be hidden by the month view.
   const stats = useMemo(() => ({
-    pending:  monthRequests.filter(r => r.status === 'pending_boss').length,
+    pending:  requests.filter(r => r.status === 'pending_boss').length,
     approved: monthRequests.filter(r => r.status === 'approved').length,
     rejected: monthRequests.filter(r => r.status === 'rejected').length,
     all:      monthRequests.length,
-  }), [monthRequests]);
+  }), [monthRequests, requests]);
 
   const unpaidSummary = useMemo(() => {
     // Per-user unpaid-day totals for the selected month. Skips
@@ -444,7 +446,11 @@ export default function BossLeaveRequestsPage() {
   }, [viewMonth]);
 
   const filtered = useMemo(() => {
-    return monthRequests.filter(r => {
+    // The Pending tab spans ALL months so a future-dated request awaiting
+    // Boss approval is never hidden behind the month navigator. Other tabs
+    // stay month-scoped (history browsing + payroll deduction by month).
+    const base = activeTab === 'pending' ? requests : monthRequests;
+    return base.filter(r => {
       if (activeTab === 'pending' && r.status !== 'pending_boss') return false;
       if (activeTab === 'approved' && r.status !== 'approved') return false;
       if (activeTab === 'rejected' && r.status !== 'rejected') return false;
@@ -461,7 +467,7 @@ export default function BossLeaveRequestsPage() {
       }
       return true;
     });
-  }, [monthRequests, activeTab, filterCategory, search]);
+  }, [monthRequests, requests, activeTab, filterCategory, search]);
 
   // Build + download the CSV. monthFilter is 'YYYY-MM' for a single
   // month, or null to export every request on record.
@@ -565,6 +571,14 @@ export default function BossLeaveRequestsPage() {
         </div>
       )}
 
+      {activeTab === 'pending' && (
+        <div className="d-flex align-items-center gap-2 mb-3 rounded-2 px-3 py-2"
+          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)', fontSize: '0.74rem', color: 'var(--info)' }}>
+          <i className="bi bi-info-circle" />
+          <span>Showing all pending requests across every month — including future-dated ones — so nothing waiting on you is hidden.</span>
+        </div>
+      )}
+
       {activeTab !== 'unpaid' && (
         <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
           <div className="card-body p-3">
@@ -594,7 +608,7 @@ export default function BossLeaveRequestsPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No {activeTab === 'all' ? '' : activeTab} requests for {viewMonthLabel}</p>
+          <p className="fw-semibold text-dark mb-1">{activeTab === 'pending' ? 'No pending requests' : `No ${activeTab === 'all' ? '' : activeTab} requests for ${viewMonthLabel}`}</p>
           <p className="text-muted small mb-0">{activeTab === 'pending' ? 'All caught up!' : 'Try another month from the navigator above.'}</p>
         </div>
       ) : (

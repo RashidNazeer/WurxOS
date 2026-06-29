@@ -863,37 +863,46 @@ export default function LeaveRequestPage() {
     });
   }
 
-  const myFiltered = useMemo(() =>
-    applyFilters(monthMyRequests, { statusFilter: filterStatus, searchVal: search, catFilter: filterCategory, fromDate: dateFrom, toDate: dateTo, isPendingCheck: true }),
+  // Pending requests must NEVER be hidden behind month navigation — a
+  // future-dated request (e.g. submitted in June for July 1st) still needs
+  // action now, and the reviewer is on the current month. So when the active
+  // status filter is "pending", source from the ALL-MONTHS list; approved /
+  // rejected stay month-scoped (browsing history by month is intended).
+  const myFiltered = useMemo(() => {
+    const base = filterStatus === 'pending' ? myRequests : monthMyRequests;
+    return applyFilters(base, { statusFilter: filterStatus, searchVal: search, catFilter: filterCategory, fromDate: dateFrom, toDate: dateTo, isPendingCheck: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [monthMyRequests, filterStatus, search, filterCategory, dateFrom, dateTo]
-  );
+  }, [monthMyRequests, myRequests, filterStatus, search, filterCategory, dateFrom, dateTo]);
 
-  const teamFiltered = useMemo(() =>
-    applyFilters(monthTeamRequests, {
+  const teamFiltered = useMemo(() => {
+    const base = teamFilter === 'pending' ? teamRequests : monthTeamRequests;
+    return applyFilters(base, {
       statusFilter: teamFilter, searchVal: teamSearch, catFilter: teamFilterCategory,
       fromDate: teamDateFrom, toDate: teamDateTo, isPendingCheck: false,
       pendingStage: teamPendingStage, requesterRoleFilter: teamRequesterRole,
-    }),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [monthTeamRequests, teamFilter, teamSearch, teamFilterCategory, teamDateFrom, teamDateTo, teamPendingStage, teamRequesterRole]
-  );
+  }, [monthTeamRequests, teamRequests, teamFilter, teamSearch, teamFilterCategory, teamDateFrom, teamDateTo, teamPendingStage, teamRequesterRole]);
 
+  // Pending count spans ALL months (a future-dated pending request still
+  // needs action); approved/rejected counts stay month-scoped to match the
+  // month-navigated history view.
   const myStats = useMemo(() => ({
     total: monthMyRequests.length,
-    pending: monthMyRequests.filter(r => r.status.startsWith('pending')).length,
+    pending: myRequests.filter(r => r.status.startsWith('pending')).length,
     approved: monthMyRequests.filter(r => r.status === 'approved').length,
     rejected: monthMyRequests.filter(r => r.status === 'rejected').length,
-  }), [monthMyRequests]);
+  }), [monthMyRequests, myRequests]);
 
   // Count only requests waiting at THIS user's level. TL acts on
   // pending_tl; OL acts on pending_ol. Requests already forwarded to
   // Boss (pending_boss) shouldn't inflate the OL's queue badge.
+  // Spans all months so a future request shows up in the tab badge.
   const teamPendingCount = useMemo(() => {
-    if (isOL)   return monthTeamRequests.filter(r => r.status === 'pending_ol').length;
-    if (isPCTL) return monthTeamRequests.filter(r => r.status === 'pending_pctl').length;
-    return monthTeamRequests.filter(r => r.status === 'pending_tl').length;
-  }, [monthTeamRequests, isOL, isPCTL]);
+    if (isOL)   return teamRequests.filter(r => r.status === 'pending_ol').length;
+    if (isPCTL) return teamRequests.filter(r => r.status === 'pending_pctl').length;
+    return teamRequests.filter(r => r.status === 'pending_tl').length;
+  }, [teamRequests, isOL, isPCTL]);
 
   function renderRequestCard(r, showActions = false) {
     const catCfg = getCatCfg(r.category);
@@ -1220,8 +1229,8 @@ export default function LeaveRequestPage() {
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
               </div>
-              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'No matching requests' : `No requests for ${viewMonthLabel}`}</p>
-              <p className="text-muted small mb-0">{(filterStatus || search || filterCategory || dateFrom || dateTo) ? 'Try adjusting your filters.' : 'Try another month, or submit a new request.'}</p>
+              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{filterStatus === 'pending' ? 'No pending requests' : (filterStatus || search || filterCategory || dateFrom || dateTo) ? 'No matching requests' : `No requests for ${viewMonthLabel}`}</p>
+              <p className="text-muted small mb-0">{filterStatus === 'pending' ? "You're all caught up." : (filterStatus || search || filterCategory || dateFrom || dateTo) ? 'Try adjusting your filters.' : 'Try another month, or submit a new request.'}</p>
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">{myFiltered.map(r => renderRequestCard(r, false))}</div>
@@ -1239,6 +1248,16 @@ export default function LeaveRequestPage() {
               </button>
             ))}
           </div>
+
+          {/* Pending spans all months so future-dated requests (e.g. a July
+              request reviewed in June) are never hidden by the month navigator. */}
+          {teamFilter === 'pending' && (
+            <div className="d-flex align-items-center gap-2 mb-3 rounded-2 px-3 py-2"
+              style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)', fontSize: '0.74rem', color: 'var(--info)' }}>
+              <i className="bi bi-info-circle" />
+              <span>Showing all pending requests across every month — including future-dated ones — so nothing waiting on you is hidden.</span>
+            </div>
+          )}
 
           {!loading && teamRequests.length > 0 && (
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
@@ -1304,8 +1323,10 @@ export default function LeaveRequestPage() {
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
               </div>
-              <p className="fw-semibold text-dark mb-1">No {teamFilter} team requests for {viewMonthLabel}</p>
-              <p className="text-muted small mb-0">{(teamSearch || teamFilterCategory || teamDateFrom || teamDateTo) ? 'Try adjusting your filters.' : 'Try another month from the navigator above.'}</p>
+              <p className="fw-semibold text-dark mb-1">
+                {teamFilter === 'pending' ? 'No pending team requests' : `No ${teamFilter} team requests for ${viewMonthLabel}`}
+              </p>
+              <p className="text-muted small mb-0">{(teamSearch || teamFilterCategory || teamDateFrom || teamDateTo) ? 'Try adjusting your filters.' : teamFilter === 'pending' ? "You're all caught up." : 'Try another month from the navigator above.'}</p>
             </div>
           ) : (
             <div className="d-flex flex-column gap-3">{teamFiltered.map(r => renderRequestCard(r, true))}</div>
