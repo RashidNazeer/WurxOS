@@ -29,13 +29,19 @@ export const EMPTY_REPORT_DATA = () => ({
   // before this feature have no `currency` and render as USD.
   currency: 'USD',
   overallPerformance: { gmv: '', affiliateGmv: '', orders: '', samplesApproved: '', roi: '', shopPerformanceScore: '', videosPosted: '' },
-  overallNotes: { samplesApproved: '', videosPosted: '' },
+  // overallNotes holds the month-to-date "Total"/MTD figures shown beneath
+  // the weekly numbers: samplesApproved (MTD), videosPosted (all-time total),
+  // and gmv (MTD GMV shown under the weekly GMV hero).
+  overallNotes: { samplesApproved: '', videosPosted: '', gmv: '' },
   overallInsights: '',
   topCreators: [emptyCreator()],
   topCreatorsInsights: '',
   topVideos: [emptyVideo()],
   topVideosInsights: '',
   gmvMax: [emptyGmvMax()],
+  // Month-to-date GMV Max campaigns — same shape as the weekly gmvMax; the
+  // view auto-calculates the MTD overall the same way.
+  gmvMaxMtd: [emptyGmvMax()],
   gmvMaxInsights: '',
   productHighlights: [emptyProduct()],
   productHighlightsInsights: '',
@@ -53,7 +59,10 @@ export const EMPTY_REPORT_DATA = () => ({
 export const emptyCreator = () => ({ name: '', videosPosted: '', itemsSold: '', gmv: '', notes: '' });
 export const emptyVideo   = () => ({ creatorName: '', videoLink: '', itemsSold: '', gmv: '', views: '', productClicks: '', notes: '' });
 export const emptyGmvMax  = () => ({ campaign: '', spend: '', roi: '', orders: '', cpo: '', gmv: '', notes: '' });
-export const emptyProduct = () => ({ productId: '', productName: '', unitsSold: '', gmv: '', newVideos: '' , notes: '' });
+// newVideos = videos posted for this product THIS WEEK (kept as-is for
+// historical rows). samplesApprovedWeek/Mtd + videosMtd are the MTD additions;
+// the monthly sample goal is NOT stored here (it lives on brand_products).
+export const emptyProduct = () => ({ productId: '', productName: '', unitsSold: '', gmv: '', newVideos: '', samplesApprovedWeek: '', samplesApprovedMtd: '', videosMtd: '', notes: '' });
 
 // --------------------------------------------------------------
 // Period computation

@@ -28,7 +28,7 @@ export async function getProduct(id) {
 
 export async function createProduct({
   brandId, productName, productId, productUrl,
-  type = 'focus', retailPrice = 0, skus = [],
+  type = 'focus', retailPrice = 0, skus = [], monthlySampleGoal = null,
 }) {
   const { data: me } = await supabase.auth.getUser();
   const payload = {
@@ -38,6 +38,7 @@ export async function createProduct({
     product_url:  productUrl || null,
     type,
     retail_price: Number(retailPrice || 0),
+    monthly_sample_goal: monthlySampleGoal,
     skus:         normalizeSkus(skus),
     created_by:   me?.user?.id,
   };

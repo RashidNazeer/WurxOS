@@ -1,6 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import ReportReturnNotice from './ReportReturnNotice';
 import HierarchicalGmvDonut from './HierarchicalGmvDonut';
+import GoalBar from './GoalBar';
+
+const normName = (s) => String(s || '').trim().toLowerCase();
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer,
@@ -370,7 +373,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
   );
 }
 
-function ProductRow({ product, rank, gmvShare, currency = DEFAULT_CURRENCY }) {
+function ProductRow({ product, rank, gmvShare, currency = DEFAULT_CURRENCY, goal = 0 }) {
   const gmv = num(product.gmv);
   return (
     <div className="d-flex align-items-center gap-3 px-3 py-3"
@@ -395,6 +398,8 @@ function ProductRow({ product, rank, gmvShare, currency = DEFAULT_CURRENCY }) {
           <span>Samples <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.samplesApproved)}</strong></span>
           <span>Share <strong style={{ color: C.ink, fontWeight: 600 }}>{(gmvShare || 0).toFixed(1)}%</strong></span>
         </div>
+        {/* Sample-goal progress: month's approved vs the product's monthly goal. */}
+        <GoalBar approved={product.samplesApproved} goal={goal} label="Sample goal" compact />
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontSize: '1rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
@@ -800,6 +805,26 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
 /* ─── Main view ───────────────────────────────────────────────────────── */
 export default function MonthlyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'monthly', reportLinks = null }) {
   const printRef = useRef();
+  // Per-product monthly sample goals for this report's brand (keyed by
+  // normalized product name). Self-fetched like the weekly view; never in the
+  // anonymous client portal.
+  const [productGoals, setProductGoals] = React.useState({});
+  React.useEffect(() => {
+    if (clientView || !report?.brandId) return undefined;
+    let cancelled = false;
+    import('../../lib/productsApi')
+      .then(({ listProducts }) => listProducts(report.brandId))
+      .then((rows) => {
+        if (cancelled) return;
+        const map = {};
+        (rows || []).forEach((p) => {
+          if (p.monthly_sample_goal != null) map[normName(p.product_name)] = p.monthly_sample_goal;
+        });
+        setProductGoals(map);
+      })
+      .catch(() => { if (!cancelled) setProductGoals({}); });
+    return () => { cancelled = true; };
+  }, [report?.brandId, clientView]);
   // v2 auth shim → v1 shape (v1 destructures `userRole` directly; v2's
   // useAuth returns `{ user, profile }` so we derive role from profile).
   const { profile } = useAuth();
@@ -1176,8 +1201,31 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                   {sortedProducts.map((p, i) => (
                     <ProductRow key={i} product={p} rank={i + 1}
                       gmvShare={totalProductGmv > 0 ? (num(p.gmv) / totalProductGmv) * 100 : 0}
-                      currency={currency} />
+                      currency={currency} goal={productGoals[normName(p.productName)] || 0} />
                   ))}
+                  {/* Overall sample goal — Σ approved vs Σ product goals. */}
+                  {(() => {
+                    const totalGoal = sortedProducts.reduce((s, p) => s + (Number(productGoals[normName(p.productName)]) || 0), 0);
+                    if (totalGoal <= 0) return null;
+                    const totalApproved = sortedProducts.reduce((s, p) => s + num(p.samplesApproved), 0);
+                    return (
+                      <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+                        <GoalBar approved={totalApproved} goal={totalGoal} label="Overall sample goal" />
+                      </div>
+                    );
+                  })()}
+                  {/* Count-validation: per-product samples sum vs overall (warn only). */}
+                  {(() => {
+                    const sumSamples = sortedProducts.reduce((s, p) => s + num(p.samplesApproved), 0);
+                    const overall = num(report.kpis?.freeSamplesApproved);
+                    if (!(sumSamples > 0 && overall > 0 && sumSamples !== overall)) return null;
+                    return (
+                      <div className="mx-3 mb-3 rounded-2 px-3 py-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.7rem', color: 'var(--warning)' }}>
+                        <i className="bi bi-exclamation-triangle-fill me-1" />
+                        Per-product samples ({sumSamples}) don't match overall Samples Approved ({overall}).
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

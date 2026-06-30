@@ -146,6 +146,9 @@ function ProductEditModal({ brandId, product, onClose, onSaved }) {
   const [retailPrice, setRP]   = useState(
     product.retail_price != null ? String(product.retail_price) : '',
   );
+  const [sampleGoal, setSG]    = useState(
+    product.monthly_sample_goal != null ? String(product.monthly_sample_goal) : '',
+  );
   const [skus, setSkus] = useState(
     (product.skus || []).length
       ? product.skus.map((s) => ({ id: s.id, sku_name: s.sku_name, retail_price: s.retail_price }))
@@ -169,12 +172,14 @@ function ProductEditModal({ brandId, product, onClose, onSaved }) {
     if (!productName.trim()) return setErr('Product name is required.');
     setSaving(true);
     try {
+      const goalVal = sampleGoal === '' ? null : Math.max(0, Math.round(Number(sampleGoal) || 0));
       const payload = {
         productName,
         productId:   productId  || null,
         productUrl:  productUrl || null,
         type,
         retailPrice: Number(retailPrice || 0),
+        monthlySampleGoal: goalVal,
         skus,
       };
       if (isNew) await createProduct({ brandId, ...payload });
@@ -184,6 +189,7 @@ function ProductEditModal({ brandId, product, onClose, onSaved }) {
         product_url:  payload.productUrl,
         type:         payload.type,
         retail_price: payload.retailPrice,
+        monthly_sample_goal: goalVal,
         skus:         payload.skus,
       });
       onSaved();
@@ -263,6 +269,19 @@ function ProductEditModal({ brandId, product, onClose, onSaved }) {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+
+          <div className="wx-m-field">
+            <div className="wx-m-field-head">
+              <div className="wx-m-field-label">Monthly sample goal</div>
+              <div className="wx-m-field-meta">Optional</div>
+            </div>
+            <input type="number" step="1" min="0" className="wx-m-input"
+              value={sampleGoal} onChange={(e) => setSG(e.target.value)}
+              placeholder="e.g. 500" />
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+              Target samples approved per month for this product. Reports compare month-to-date approvals against it; the brand's overall goal is the sum of all products'.
             </div>
           </div>
 

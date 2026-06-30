@@ -1,5 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react';
 import ReportReturnNotice from './ReportReturnNotice';
+import GoalBar from './GoalBar';
+
+// Normalize a product name for matching report rows to brand-product goals
+// (productId is unreliable free text, so we key goals by trimmed lowercase name).
+const normName = (s) => String(s || '').trim().toLowerCase();
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -359,7 +364,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
   );
 }
 
-function ProductRow({ product, rank, gmvShare, isLast, currency = DEFAULT_CURRENCY }) {
+function ProductRow({ product, rank, gmvShare, isLast, currency = DEFAULT_CURRENCY, goal = 0 }) {
   const gmv = num(product.gmv);
   return (
     <div className="d-flex align-items-center gap-3 px-3 py-3"
@@ -380,11 +385,16 @@ function ProductRow({ product, rank, gmvShare, isLast, currency = DEFAULT_CURREN
             ID&nbsp;{product.productId}
           </div>
         )}
-        <div className="d-flex align-items-center gap-3 mt-1" style={{ fontSize: '0.7rem', color: C.inkDim }}>
+        <div className="d-flex align-items-center gap-3 mt-1 flex-wrap" style={{ fontSize: '0.7rem', color: C.inkDim }}>
           <span>Units <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.unitsSold)}</strong></span>
-          <span>New videos <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.newVideos)}</strong></span>
+          <span>Videos <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.newVideos)}</strong>{num(product.videosMtd) > 0 && <span style={{ color: C.muted }}> · MTD {fmtN(product.videosMtd)}</span>}</span>
+          {(num(product.samplesApprovedWeek) > 0 || num(product.samplesApprovedMtd) > 0) && (
+            <span>Samples <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.samplesApprovedWeek)}</strong>{num(product.samplesApprovedMtd) > 0 && <span style={{ color: C.muted }}> · MTD {fmtN(product.samplesApprovedMtd)}</span>}</span>
+          )}
           <span>Share of GMV <strong style={{ color: C.ink, fontWeight: 600 }}>{(gmvShare || 0).toFixed(1)}%</strong></span>
         </div>
+        {/* Per-product sample-goal progress (MTD approved vs the product's monthly goal). */}
+        <GoalBar approved={product.samplesApprovedMtd} goal={goal} label="Sample goal (MTD)" compact />
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontSize: '1rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
@@ -612,10 +622,33 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
 }
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
-export default function WeeklyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'weekly', reportLinks = null }) {
+export default function WeeklyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'weekly', reportLinks = null, productGoals: productGoalsProp = null }) {
   const printRef = useRef();
   const { profile } = useAuth();
   const userRole = profile?.role || '';
+  // Per-product monthly sample goals for this report's brand, keyed by
+  // normalized product name. Fetched here so every view site (weekly,
+  // biweekly, all-reports) gets the goal bars without prop-threading. Never
+  // fetched in the anonymous client portal (RLS would block it). A caller may
+  // still pass productGoals to override.
+  const [fetchedGoals, setFetchedGoals] = React.useState({});
+  React.useEffect(() => {
+    if (clientView || productGoalsProp || !report?.brandId) return undefined;
+    let cancelled = false;
+    import('../../lib/productsApi')
+      .then(({ listProducts }) => listProducts(report.brandId))
+      .then((rows) => {
+        if (cancelled) return;
+        const map = {};
+        (rows || []).forEach((p) => {
+          if (p.monthly_sample_goal != null) map[String(p.product_name || '').trim().toLowerCase()] = p.monthly_sample_goal;
+        });
+        setFetchedGoals(map);
+      })
+      .catch(() => { if (!cancelled) setFetchedGoals({}); });
+    return () => { cancelled = true; };
+  }, [report?.brandId, clientView, productGoalsProp]);
+  const productGoals = productGoalsProp || fetchedGoals;
   const [copyState, setCopyState] = React.useState('idle');
   const [highlighterActive, setHighlighterActive] = React.useState(false);
   const { color: highlightColor, setColor: setHighlightColor,
@@ -1017,7 +1050,8 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           <div className="col-6 col-lg-3">
             <StatCard label="GMV (Gross Merchandise Value)" value={m(perf.gmv)}
               current={num(perf.gmv)} prevValue={hasPrev ? m(prevPerf.gmv) : null}
-              primary sparkData={sparkFor('gmv')} />
+              primary sparkData={sparkFor('gmv')}
+              subText={num(notes.gmv) > 0 ? `Month-to-date: ${m(notes.gmv)}` : ''} />
           </div>
           <div className="col-6 col-lg-3">
             <StatCard label="Affiliate GMV" value={m(perf.affiliateGmv)}
@@ -1111,8 +1145,38 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   {sortedProducts.map((p, i) => (
                     <ProductRow key={i} product={p} rank={i + 1}
                       gmvShare={productShareDenom > 0 ? Math.min(100, (num(p.gmv) / productShareDenom) * 100) : 0}
-                      currency={currency} />
+                      currency={currency} goal={productGoals[normName(p.productName)] || 0} />
                   ))}
+                  {/* Overall sample goal — sum of per-product MTD approved vs
+                      sum of product goals. Only when at least one goal is set. */}
+                  {(() => {
+                    const totalGoal = sortedProducts.reduce((s, p) => s + (Number(productGoals[normName(p.productName)]) || 0), 0);
+                    if (totalGoal <= 0) return null;
+                    const totalMtd = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedMtd), 0);
+                    return (
+                      <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+                        <GoalBar approved={totalMtd} goal={totalGoal} label="Overall sample goal (MTD)" />
+                      </div>
+                    );
+                  })()}
+                  {/* Count-validation — per-product weekly sums vs the overall
+                      figures (warn, never block; products are often a subset). */}
+                  {(() => {
+                    const sumSamplesWk = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedWeek), 0);
+                    const sumVideosWk  = sortedProducts.reduce((s, p) => s + num(p.newVideos), 0);
+                    const overallSamples = num(perf.samplesApproved);
+                    const overallVideos  = num(perf.videosPosted);
+                    const sampleMismatch = sumSamplesWk > 0 && overallSamples > 0 && sumSamplesWk !== overallSamples;
+                    const videoMismatch  = sumVideosWk  > 0 && overallVideos  > 0 && sumVideosWk  !== overallVideos;
+                    if (!sampleMismatch && !videoMismatch) return null;
+                    return (
+                      <div className="mx-3 mb-3 rounded-2 px-3 py-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.7rem', color: 'var(--warning)' }}>
+                        <i className="bi bi-exclamation-triangle-fill me-1" />
+                        {sampleMismatch && <div>Per-product samples this week ({sumSamplesWk}) don't match Overall Samples Approved ({overallSamples}).</div>}
+                        {videoMismatch && <div>Per-product videos this week ({sumVideosWk}) don't match Overall Videos Posted ({overallVideos}).</div>}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {renderExtraStatCards('productHighlights')}
                 <InsightBox text={report.productHighlightsInsights} report={report} fieldKey="productHighlightsInsights"
@@ -1229,6 +1293,45 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                           {cells.map(c => (
                             <div className="col-4 col-md" key={c.label}>
                               <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
+                                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Month-to-Date GMV Max — auto-calculated overall from the
+                      MTD campaign rows (same math as the weekly overall). */}
+                  {(() => {
+                    const rows = (report.gmvMaxMtd || []).filter(g => g.campaign);
+                    if (rows.length < 1) return null;
+                    const t = rows.reduce((a, g) => ({
+                      spend:  a.spend  + num(g.spend),
+                      gmv:    a.gmv    + num(g.gmv),
+                      orders: a.orders + num(g.orders),
+                    }), { spend: 0, gmv: 0, orders: 0 });
+                    const roi = t.spend  > 0 ? t.gmv / t.spend : 0;
+                    const cpo = t.orders > 0 ? t.spend / t.orders : 0;
+                    const cells = [
+                      { label: 'Spend', value: ms(t.spend) },
+                      { label: 'GMV', value: ms(t.gmv) },
+                      { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
+                      { label: 'Orders', value: fmtN(t.orders) },
+                      { label: 'CPO', value: m(cpo) },
+                    ];
+                    return (
+                      <div className="mt-4 pt-3" style={{ borderTop: `2px solid ${C.line}` }}>
+                        <div className="d-flex align-items-center gap-2 mb-2">
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Month-to-Date Overall</span>
+                          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {rows.length} campaign{rows.length > 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="row g-2">
+                          {cells.map(c => (
+                            <div className="col-4 col-md" key={c.label}>
+                              <div style={{ background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                                 <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
                                 <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
                               </div>
