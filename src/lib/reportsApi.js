@@ -41,11 +41,6 @@ export const EMPTY_REPORT_DATA = () => ({
   productHighlightsInsights: '',
   offsitePerformance: { offsiteGmv: '', tiktokShopGmv: '', offsiteEffect: '' },
   offsiteInsights: '',
-  // GMV mix by traffic source — same shape as the monthly report's
-  // gmvBreakdown. Only shown for brands the OL enables (per-brand flag),
-  // so it defaults empty + hidden for everyone else.
-  gmvBreakdown: { affiliateGmv: '', organicGmv: '', liveGmv: '', videoGmv: '', productCardGmv: '' },
-  gmvBreakdownInsights: '',
   upcomingCampaigns: '',
   operationalUpdates: '',
   recommendations: '',
@@ -923,16 +918,11 @@ export const WEEKLY_SECTIONS = [
   { key: 'gmvMax',              title: 'GMV Max Performance',           required: true  },
   { key: 'productHighlights',   title: 'Product Highlights',            required: true  },
   { key: 'offsitePerformance',  title: 'Offsite Performance',           required: false },
-  // Opt-in per brand (OL toggle) — defaults OFF so it never appears for
-  // brands that haven't enabled it.
-  { key: 'gmvBreakdown',        title: 'GMV Breakdown',                 required: false, defaultOff: true },
   { key: 'upcomingCampaigns',   title: 'Current & Upcoming Campaigns',  required: true  },
   { key: 'operationalUpdates',  title: 'Operational Updates',           required: true  },
   { key: 'recommendations',     title: 'Recommendations & Action Items', required: false },
 ];
-// Most sections default ON; ones flagged defaultOff (GMV Breakdown) default
-// OFF so they only appear when explicitly enabled (per-brand flag seeds it).
-const _DEFAULT_WEEKLY_SECTIONS_ENABLED = Object.fromEntries(WEEKLY_SECTIONS.map((s) => [s.key, !s.defaultOff]));
+const _DEFAULT_WEEKLY_SECTIONS_ENABLED = Object.fromEntries(WEEKLY_SECTIONS.map((s) => [s.key, true]));
 export function resolveWeeklySectionsEnabled(raw) {
   return { ..._DEFAULT_WEEKLY_SECTIONS_ENABLED, ...(raw || {}) };
 }

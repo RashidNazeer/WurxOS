@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getBrandSections, addBrandSectionRich, renameBrandSection,
   removeBrandSection, updateBrandSectionFields, normalizeSection,
-  getBrandSectionVisibility, setBrandSectionVisibility,
 } from '../../lib/brandReportSectionsApi';
 import {
   PlusIcon, PencilIcon, TrashIcon, AlertIcon,
@@ -32,22 +31,6 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
     enabled: !!brandId,
   });
   const sections = rawSections.map(normalizeSection);
-
-  // Per-brand visibility for built-in sections (e.g. GMV Breakdown).
-  const { data: visibility = {} } = useQuery({
-    queryKey: ['brand-section-visibility', brandId],
-    queryFn: () => getBrandSectionVisibility(brandId),
-    enabled: !!brandId,
-  });
-  const [savingVis, setSavingVis] = useState(false);
-  async function toggleBuiltin(key, enabled) {
-    setError(''); setSavingVis(true);
-    try {
-      await setBrandSectionVisibility(brandId, key, enabled);
-      qc.invalidateQueries({ queryKey: ['brand-section-visibility', brandId] });
-    } catch (err) { setError(err.message || 'Could not update.'); }
-    finally { setSavingVis(false); }
-  }
 
   function reload() { qc.invalidateQueries({ queryKey: ['brand-report-sections', brandId] }); }
 
@@ -113,37 +96,6 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
           <AlertIcon width="14" height="14" /> <span>{error}</span>
         </div>
       )}
-
-      {/* Built-in section toggles (per brand) — currently just GMV Breakdown.
-          Controls whether the donut/section appears in this brand's weekly
-          AND monthly reports. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 12, padding: '12px 14px', marginBottom: 14,
-        border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-        background: visibility?.gmvBreakdown ? 'var(--accent-soft)' : 'var(--surface-1)',
-        cursor: savingVis ? 'wait' : 'pointer',
-      }}
-        onClick={() => !savingVis && toggleBuiltin('gmvBreakdown', !visibility?.gmvBreakdown)}>
-        <div style={{ marginRight: 12 }}>
-          <div style={{ fontWeight: 600, fontSize: 13.5 }}>GMV Breakdown section</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Show the GMV-mix donut (Affiliate / Organic / LIVE / Video / Product Card) in this brand's weekly &amp; monthly reports.
-          </div>
-        </div>
-        <span style={{
-          width: 36, height: 20, borderRadius: 999, flex: '0 0 auto', position: 'relative',
-          background: visibility?.gmvBreakdown ? 'var(--accent)' : 'var(--surface-3)',
-          border: '1px solid', borderColor: visibility?.gmvBreakdown ? 'var(--accent)' : 'var(--border-default)',
-          transition: 'background var(--dur-fast)',
-        }}>
-          <span style={{
-            position: 'absolute', top: 1, left: visibility?.gmvBreakdown ? 17 : 1,
-            width: 16, height: 16, borderRadius: '50%', background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'left var(--dur-fast)',
-          }} />
-        </span>
-      </div>
 
       {adding && (
         <NewSectionForm

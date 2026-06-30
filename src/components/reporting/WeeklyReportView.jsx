@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
 import ReportReturnNotice from './ReportReturnNotice';
-import HierarchicalGmvDonut from './HierarchicalGmvDonut';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -1075,38 +1074,6 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           <ComparisonPanel current={perf} previous={prevPerf} prevLabel={prev.weekLabel} currency={currency} />
         )}
         </>)}
-
-        {/* ─── GMV Breakdown (opt-in per brand; same donut as monthly) ──── */}
-        {sectEnabled.gmvBreakdown && (() => {
-          const g = report.gmvBreakdown || {};
-          // Only Affiliate + Organic are top-level; LIVE+Video roll INTO
-          // Affiliate, Product Card rolls INTO Organic. Total = the two
-          // parents only (summing all five double-counts — see monthly).
-          const parents = [
-            {
-              key: 'affiliate', label: 'Affiliate GMV', value: num(g.affiliateGmv), color: '#0891b2',
-              children: [
-                { label: 'LIVE GMV',  value: num(g.liveGmv),  color: '#ef4444' },
-                { label: 'Video GMV', value: num(g.videoGmv), color: '#8b5cf6' },
-              ],
-            },
-            {
-              key: 'organic', label: 'Organic GMV', value: num(g.organicGmv), color: '#10b981',
-              children: [
-                { label: 'Product Card GMV', value: num(g.productCardGmv), color: '#f59e0b' },
-              ],
-            },
-          ];
-          const total = parents.reduce((s, p) => s + p.value, 0);
-          if (!total) return null;
-          return (
-            <ContentSection icon="bi-pie-chart-fill" color="#0891b2" title="GMV breakdown" eyebrow="Revenue mix by traffic source">
-              <HierarchicalGmvDonut parents={parents} total={total} currencySym={currencySymbol(currency)} />
-              <InsightBox text={report.gmvBreakdownInsights} report={report} fieldKey="gmvBreakdownInsights"
-                highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
-            </ContentSection>
-          );
-        })()}
 
         {/* ─── Top Creators + Products row ─────────────────────────────── */}
         {(sectEnabled.topCreators || sectEnabled.productHighlights) && (sortedCreators.length > 0 || sortedProducts.length > 0) && (
