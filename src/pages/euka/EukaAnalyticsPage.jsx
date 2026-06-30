@@ -5,7 +5,7 @@ import {
   eukaOutreachFunnel, eukaTopCreators, eukaTopProducts, eukaTopVideos, eukaContentOverview,
   eukaAdsOverview, eukaCreatorTiers, eukaSampleApproval, eukaFeaturedProducts, eukaLivestreamGmv,
   eukaCampaignBreakdown, eukaDataExport,
-  EUKA_BRANDS, setEukaBrand, getEukaBrand,
+  EUKA_BRANDS_FALLBACK, eukaBrandList, setEukaBrand, getEukaBrand,
 } from '../../lib/eukaAnalyticsApi';
 import {
   fmtMoney, fmtMoney0, fmtNum, fmtPct, fmtCompact, Delta, Section, Kpi, Empty,
@@ -65,6 +65,11 @@ export default function EukaAnalyticsPage() {
     qc.removeQueries({ queryKey: ['euka'] });
   }
 
+  // Brand list is discovered server-side (from env secrets) so the dropdown
+  // picks up new brands without a frontend change. Brand-agnostic → fetch once.
+  const brandsQ = useQuery({ queryKey: ['euka', 'brandList'], queryFn: eukaBrandList, staleTime: 30 * 60 * 1000, retry: 1 });
+  const brands = brandsQ.data && brandsQ.data.length ? brandsQ.data : EUKA_BRANDS_FALLBACK;
+
   // All Euka queries are keyed by brand so React Query never serves one
   // brand's data for another.
   const meQ = useQuery({ queryKey: ['euka', brand, 'me'], queryFn: eukaMe, staleTime: 30 * 60 * 1000, retry: 1 });
@@ -115,7 +120,7 @@ export default function EukaAnalyticsPage() {
           <i className="bi bi-shop text-muted" style={{ fontSize: '0.95rem' }} />
           <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 168, borderRadius: 9 }}
             value={brand} onChange={(e) => changeBrand(e.target.value)}>
-            {EUKA_BRANDS.map((b) => <option key={b.slug} value={b.slug}>{b.label}</option>)}
+            {brands.map((b) => <option key={b.slug} value={b.slug}>{b.label}</option>)}
           </select>
         </div>
 
@@ -153,7 +158,7 @@ export default function EukaAnalyticsPage() {
       </div>
 
       {storesQ.isError && <div className="alert alert-danger py-2 small">Couldn’t reach Euka: {String(storesQ.error?.message || storesQ.error)}</div>}
-      {!ready && !storesQ.isError && <div className="text-muted small">Loading {EUKA_BRANDS.find((b) => b.slug === brand)?.label || 'brand'}…</div>}
+      {!ready && !storesQ.isError && <div className="text-muted small">Loading {brands.find((b) => b.slug === brand)?.label || 'brand'}…</div>}
 
       {ready && (
         <>

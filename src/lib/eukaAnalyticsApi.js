@@ -10,10 +10,17 @@ import { supabase } from './supabase';
 // picks the key from this slug. The page sets it via setEukaBrand() when the
 // brand selector changes; defaults to Solid Gold (the original single brand)
 // so any caller that doesn't set it keeps working.
-export const EUKA_BRANDS = [
+//
+// The brand LIST is discovered at runtime from the edge function's /__brands
+// endpoint (which reads env secrets by convention), so adding a brand is a
+// pure secrets change — no frontend edit. EUKA_BRANDS_FALLBACK is only used
+// if that fetch fails.
+export const EUKA_BRANDS_FALLBACK = [
   { slug: 'solidgold', label: 'Solid Gold Pets' },
   { slug: 'innosupps', label: 'InnoSupps' },
 ];
+// Back-compat alias for any older import.
+export const EUKA_BRANDS = EUKA_BRANDS_FALLBACK;
 let currentBrand = 'solidgold';
 export function setEukaBrand(slug) {
   if (EUKA_BRANDS.some((b) => b.slug === slug)) currentBrand = slug;
@@ -35,6 +42,19 @@ async function call(path, { body, query, method, fresh } = {}) {
 export const eukaMe     = () => call('/me');
 export const eukaBrands = () => call('/brands');
 export const eukaStores = () => call('/stores');
+
+// The available analytics brands (slug + label), discovered server-side from
+// env secrets. Used to populate the brand selector. Falls back to the static
+// list if the call fails. NOTE: this is brand-agnostic (it doesn't depend on
+// currentBrand), so call it once on mount.
+export async function eukaBrandList() {
+  try {
+    const list = await call('/__brands');
+    return Array.isArray(list) && list.length ? list : EUKA_BRANDS_FALLBACK;
+  } catch {
+    return EUKA_BRANDS_FALLBACK;
+  }
+}
 
 // ── Dashboard — flat {startDate,endDate} form ─────────────────────
 export const eukaOverview = (storeId, startDate, endDate, extra = {}, fresh) =>

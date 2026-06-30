@@ -31,18 +31,56 @@ const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const EUKA_BASE = 'https://api.euka.ai/v0';
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 min — caps billed Euka calls
 
-// Each Euka brand is a SEPARATE OpenAPI account/key. The client sends a
-// `brand` slug; we pick the matching secret. Unknown/missing brand falls
-// back to Solid Gold so existing callers (and old cached clients) keep
-// working unchanged. Add a brand by setting its secret + a row here.
-const BRAND_KEYS: Record<string, string> = {
-  solidgold: Deno.env.get('EUKA_API_KEY') ?? '',
-  innosupps: Deno.env.get('EUKA_API_KEY_INNOSUPPS') ?? '',
-};
+// ── Brands are DATA-DRIVEN by env secrets — no code edit to add one ──
+// Each Euka brand is a SEPARATE OpenAPI account/key. Brands are discovered
+// from env vars by convention so a NEW brand needs only a secret (and one
+// optional label), never a redeploy of this routing code:
+//   EUKA_API_KEY              → brand slug "solidgold" (the original)
+//   EUKA_API_KEY_INNOSUPPS    → brand slug "innosupps"
+//   EUKA_API_KEY_<SLUG>       → brand slug "<slug>" (lowercased)
+// Optional human labels live in EUKA_BRAND_LABELS (JSON, e.g.
+//   {"solidgold":"Solid Gold Pets","innosupps":"InnoSupps"}); a missing
+// label falls back to a title-cased slug. The frontend reads the brand
+// list from the virtual `/__brands` endpoint below, so adding a brand is
+// purely a secrets change.
 const DEFAULT_BRAND = 'solidgold';
+
+function brandLabels(): Record<string, string> {
+  try { return JSON.parse(Deno.env.get('EUKA_BRAND_LABELS') || '{}'); }
+  catch { return {}; }
+}
+function titleCase(slug: string): string {
+  return slug.replace(/(^|[-_ ])(\w)/g, (_, s, c) => (s ? ' ' : '') + c.toUpperCase());
+}
+
+// Discover { slug → key } from the env. Reads Deno.env.toObject() once.
+function discoverBrands(): Record<string, string> {
+  const env = Deno.env.toObject();
+  const out: Record<string, string> = {};
+  for (const [name, val] of Object.entries(env)) {
+    if (!val) continue;
+    if (name === 'EUKA_API_KEY') out[DEFAULT_BRAND] = val;
+    else if (name.startsWith('EUKA_API_KEY_')) {
+      const slug = name.slice('EUKA_API_KEY_'.length).toLowerCase();
+      if (slug) out[slug] = val;
+    }
+  }
+  return out;
+}
+
+// Public brand list for the frontend dropdown — slugs + labels, NO keys.
+function brandList(): Array<{ slug: string; label: string }> {
+  const labels = brandLabels();
+  const keys = discoverBrands();
+  return Object.keys(keys)
+    .sort((a, b) => (a === DEFAULT_BRAND ? -1 : b === DEFAULT_BRAND ? 1 : a.localeCompare(b)))
+    .map((slug) => ({ slug, label: labels[slug] || titleCase(slug) }));
+}
+
 function keyForBrand(brand: string | null): { slug: string; key: string } {
-  const slug = brand && BRAND_KEYS[brand] !== undefined ? brand : DEFAULT_BRAND;
-  return { slug, key: BRAND_KEYS[slug] || '' };
+  const keys = discoverBrands();
+  const slug = brand && keys[brand] ? brand : DEFAULT_BRAND;
+  return { slug, key: keys[slug] || '' };
 }
 
 const cors = {
@@ -95,6 +133,11 @@ Deno.serve(async (req) => {
     // ── Parse + validate the request ────────────────────────────────
     const payload = await req.json().catch(() => ({}));
     const path: string = payload?.path || '';
+
+    // Virtual endpoint: the frontend asks which brands exist (slugs + labels,
+    // never keys) so its dropdown auto-discovers brands from env secrets.
+    if (path === '/__brands') return json({ data: brandList() });
+
     if (!path || !pathAllowed(path)) return json({ error: `path not allowed: ${path}` }, 400);
 
     const method: string = payload?.method
