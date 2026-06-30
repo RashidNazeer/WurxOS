@@ -12,6 +12,12 @@ import './styles/global.css';
 import { registerServiceWorker } from './lib/pwa';
 import { startUpdatePolling } from './lib/appUpdate';
 import { syncServerTime } from './lib/serverTime';
+import { installModalGuard } from './lib/modalGuard';
+
+// Dialogs must not close on an accidental click outside them — only via
+// their close (×) / action buttons (and Esc). One capture-phase guard
+// covers all .wx-modal-backdrop dialogs.
+installModalGuard();
 
 // Sync once at boot so the attendance live-elapsed timer stays correct on
 // laptops with a wrong system clock. Re-sync hourly to absorb long-session drift.
