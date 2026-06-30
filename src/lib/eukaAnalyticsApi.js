@@ -5,9 +5,24 @@
 // bypass the server cache (the dashboard's "Refresh" button).
 import { supabase } from './supabase';
 
+// Which Euka brand/account the analytics page is currently viewing. Each
+// brand is a separate Euka OpenAPI key held server-side; the edge function
+// picks the key from this slug. The page sets it via setEukaBrand() when the
+// brand selector changes; defaults to Solid Gold (the original single brand)
+// so any caller that doesn't set it keeps working.
+export const EUKA_BRANDS = [
+  { slug: 'solidgold', label: 'Solid Gold Pets' },
+  { slug: 'innosupps', label: 'InnoSupps' },
+];
+let currentBrand = 'solidgold';
+export function setEukaBrand(slug) {
+  if (EUKA_BRANDS.some((b) => b.slug === slug)) currentBrand = slug;
+}
+export function getEukaBrand() { return currentBrand; }
+
 async function call(path, { body, query, method, fresh } = {}) {
   const { data, error } = await supabase.functions.invoke('euka-api', {
-    body: { path, body, query, method, fresh },
+    body: { path, body, query, method, fresh, brand: currentBrand },
   });
   if (error) throw new Error(error.message || 'Euka request failed');
   if (data?.error) {
