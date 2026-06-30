@@ -56,35 +56,6 @@ async function writeExtras(brandId, extras) {
   if (error) throw new Error(error.message);
 }
 
-// --------------- Built-in section VISIBILITY (per brand) -------------
-// Whether a built-in section (e.g. "GMV Breakdown") shows in this
-// brand's reports. Keyed by the form's camelCase section key, value
-// boolean. Missing key → caller's code default. Lives in the
-// `section_visibility` jsonb on the same row (migration 216).
-
-export async function getBrandSectionVisibility(brandId) {
-  if (!brandId) return {};
-  const { data, error } = await supabase
-    .from('brand_report_sections')
-    .select('section_visibility')
-    .eq('brand_id', brandId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data?.section_visibility || {};
-}
-
-export async function setBrandSectionVisibility(brandId, sectionKey, enabled) {
-  if (!brandId || !sectionKey) throw new Error('Brand and section are required.');
-  const vis = await getBrandSectionVisibility(brandId);
-  const next = { ...vis, [sectionKey]: !!enabled };
-  // Upsert only this column — Postgres merges, leaving sections/extras intact.
-  const { error } = await supabase
-    .from('brand_report_sections')
-    .upsert({ brand_id: brandId, section_visibility: next }, { onConflict: 'brand_id' });
-  if (error) throw new Error(error.message);
-  return next;
-}
-
 function normalizeExtraField(f) {
   return {
     id: f.id || genId(),
