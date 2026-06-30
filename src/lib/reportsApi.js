@@ -346,6 +346,24 @@ export async function listReportReturns(reportId) {
   return data || [];
 }
 
+// Resolve the two "owning" parties of a report so a return notice can name
+// the recipient ("returned to your team lead Haider Ali"): the APC who wrote
+// it (author_id) and the TL who owns the brand (brand.owner_id). Best-effort —
+// returns whatever it can resolve; the notice falls back to generic wording.
+export async function getReportParties(reportId) {
+  if (!reportId) return { apc: null, tl: null };
+  const { data, error } = await supabase
+    .from('reports')
+    .select('author:author_id(id, display_name, role), brand:brand_id(owner_id, owner:owner_id(id, display_name, role))')
+    .eq('id', reportId)
+    .maybeSingle();
+  if (error || !data) return { apc: null, tl: null };
+  const apc = data.author ? { id: data.author.id, name: data.author.display_name } : null;
+  const ownerJoin = data.brand?.owner;
+  const tl = ownerJoin ? { id: ownerJoin.id, name: ownerJoin.display_name } : null;
+  return { apc, tl };
+}
+
 // Fetch a brand's recent reports for trend charts + previous-week deltas.
 // Limit the window so the chart stays readable (last N reports, ascending).
 export async function listReportsForBrandTrend(brandId, type, { limit = 8 } = {}) {
