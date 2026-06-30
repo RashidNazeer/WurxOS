@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { listReportReturns } from '../../lib/reportsApi';
+import { listReportReturns, getReportParties } from '../../lib/reportsApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { fmtPktStamp } from '../../utils/pktTime';
 
 // Shows the person now holding a returned report WHY it came back — generic at
@@ -11,18 +12,53 @@ import { fmtPktStamp } from '../../utils/pktTime';
 
 const STATUS_LABEL = { draft: 'Draft', submitted: 'Pending TL', verified: 'Pending OL', approved: 'Approved' };
 
+// Who a return landed on, worded for the VIEWER. `to_status` identifies the
+// stage it was returned to: 'draft' → the APC author, 'submitted' → the TL,
+// 'verified' → the OL. If the viewer IS that person we say "you"; otherwise we
+// name them relative to the viewer ("your team lead Haider Ali"). Returns a
+// short phrase (no leading capital) so callers can prefix "Returned to ".
+function recipientLabel(toStatus, parties, viewerId, viewerRole) {
+  const apc = parties.apc;
+  const tl  = parties.tl;
+  if (toStatus === 'draft') {
+    // Back to the APC who wrote it.
+    if (apc && viewerId && apc.id === viewerId) return 'you';
+    if (viewerRole === 'tl' || viewerRole === 'pctl') return apc ? `your team member ${apc.name}` : 'the team member';
+    return apc ? `${apc.name} (APC)` : 'the APC';
+  }
+  if (toStatus === 'submitted') {
+    // Back to the brand's TL.
+    if (tl && viewerId && tl.id === viewerId) return 'you';
+    if (apc && viewerId && apc.id === viewerId) return tl ? `your team lead ${tl.name}` : 'your team lead';
+    return tl ? `${tl.name} (Team Lead)` : 'the Team Lead';
+  }
+  if (toStatus === 'verified') {
+    // Back to the OL stage.
+    if (viewerRole === 'ol' || viewerRole === 'boss') return 'you';
+    return 'the Operation Lead';
+  }
+  return STATUS_LABEL[toStatus] || toStatus;
+}
+
 export default function ReportReturnNotice({ report }) {
   const reportId = report?.id;
   const status = report?.status;
+  const { user, profile } = useAuth();
+  const viewerId = user?.id;
+  const viewerRole = profile?.role || '';
   const [returns, setReturns] = useState([]);
+  const [parties, setParties] = useState({ apc: null, tl: null });
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    if (!reportId) { setReturns([]); return undefined; }
+    if (!reportId) { setReturns([]); setParties({ apc: null, tl: null }); return undefined; }
     listReportReturns(reportId)
       .then((r) => { if (!cancelled) setReturns(r || []); })
       .catch(() => { if (!cancelled) setReturns([]); });
+    getReportParties(reportId)
+      .then((p) => { if (!cancelled) setParties(p || { apc: null, tl: null }); })
+      .catch(() => { if (!cancelled) setParties({ apc: null, tl: null }); });
     return () => { cancelled = true; };
   }, [reportId, status]);
 
@@ -52,6 +88,8 @@ export default function ReportReturnNotice({ report }) {
               </div>
               <div className="text-muted mt-1" style={{ fontSize: '0.74rem' }}>
                 Returned by <strong style={{ color: 'var(--text-primary)' }}>{latest.by?.display_name || 'a reviewer'}</strong>
+                {' · Returned to '}
+                <strong style={{ color: 'var(--text-primary)' }}>{recipientLabel(latest.to_status, parties, viewerId, viewerRole)}</strong>
                 {' · '}{fmtPktStamp(latest.returned_at)} PKT
               </div>
               <div className="rounded-2 mt-2 px-3 py-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
@@ -80,10 +118,10 @@ export default function ReportReturnNotice({ report }) {
                   <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                     <span className="fw-semibold" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>
                       Return #{i + 1}
-                      <span className="text-muted fw-normal"> · {STATUS_LABEL[r.from_status] || r.from_status} → {STATUS_LABEL[r.to_status] || r.to_status}</span>
+                      <span className="text-muted fw-normal"> · to {recipientLabel(r.to_status, parties, viewerId, viewerRole)}</span>
                     </span>
                     <span className="text-muted" style={{ fontSize: '0.68rem' }}>
-                      {r.by?.display_name || 'reviewer'} · {fmtPktStamp(r.returned_at)} PKT
+                      by {r.by?.display_name || 'reviewer'} · {fmtPktStamp(r.returned_at)} PKT
                     </span>
                   </div>
                   {r.note && <div className="mt-1" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{r.note}</div>}
