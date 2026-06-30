@@ -1196,17 +1196,27 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
     }
   }
 
+  // A "return" is any transition that carries a rejection note (a reviewer
+  // sending the report back down the chain with a reason). The note MUST be
+  // written in the SAME update as the status change so the report_returns
+  // trigger (mig 203) captures it — otherwise the recipient sees "No reason
+  // was provided." This is true for EVERY downward hop, not just → 'draft'.
+  const isReturnWithNote = !!patch.rejection_note;
+
   let result;
   let patchWritten = false;
-  if (nextStatus === 'submitted') {
-    // submitReport expects (id, data) — pass null so it preserves what's there
+  if (nextStatus === 'submitted' && !isReturnWithNote) {
+    // Genuine APC (re)submit: submitReport intentionally clears any stale
+    // rejection_note. Only take this path when NO note is being returned.
+    // submitReport expects (id, data) — pass null so it preserves what's there.
     result = await submitReport(reportId, null);
   } else if (nextStatus === 'verified') {
     result = await verifyReport(reportId);
   } else if (nextStatus === 'approved') {
     result = await approveReport(reportId);
   } else {
-    // Unknown status (e.g. 'draft' = return to APC). Write status + audit
+    // A return (status → 'draft' = back to APC, or → 'submitted' = OL back to
+    // TL with a note), or any other direct status set. Write status + audit
     // fields in ONE update so the return-logging trigger captures the note.
     const { error } = await supabase
       .from('reports')
