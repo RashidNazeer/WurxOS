@@ -595,6 +595,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             topVideos: r.topVideos || emptyReport().topVideos,
             topVideosInsights: r.topVideosInsights || '',
             gmvMax: r.gmvMax || emptyReport().gmvMax,
+            gmvMaxMtd: r.gmvMaxMtd || emptyReport().gmvMaxMtd,
             gmvMaxInsights: r.gmvMaxInsights || '',
             productHighlights: r.productHighlights || emptyReport().productHighlights,
             productHighlightsInsights: r.productHighlightsInsights || '',
@@ -725,6 +726,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           unitsSold:   '',
           gmv:         '',
           newVideos:   '',
+          videosMtd:   '',
+          samplesApprovedWeek: '',
+          samplesApprovedMtd:  '',
           notes:       '',
         })),
       };
@@ -1412,6 +1416,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <Field label="Videos Posted" value={data.overallPerformance.videosPosted} onChange={v => setPerf('videosPosted', v)} type="number" placeholder="1377" />
           </div>
           <div className="d-flex flex-wrap gap-2">
+            <Field label={`GMV Month-to-Date (${curSym})`} value={data.overallNotes.gmv || ''} onChange={v => setPerfNote('gmv', v)} type="number" placeholder="231714.01" width="240px" />
             <Field label="MTD Approved (Samples Month-to-Date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
             {hasPrevAllTime ? (
               <Field label="Total Videos (all-time)" value={autoTotalVideos} type="number" width="220px" readOnly
@@ -1520,6 +1525,32 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       </div>
       )}
 
+      {/* ─── Month-to-Date GMV Max (same shape; app auto-calcs MTD overall) ── */}
+      {sectEnabled.gmvMax && (
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card-body p-3">
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <i className="bi bi-calendar-range-fill" style={{ color: '#ef4444' }} />
+            <span className="fw-semibold" style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Month-to-Date GMV Max Campaigns</span>
+          </div>
+          <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
+            Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically, like the weekly section above.
+          </p>
+          <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
+            addLabel="Add MTD Campaign"
+            fields={[
+              { key: 'campaign', label: 'Campaign', width: '130px' },
+              { key: 'spend', label: `Spend (${curSym})`, type: 'number', width: '100px' },
+              { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
+              { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
+              { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
+              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+              { key: 'notes', label: 'Notes', width: '140px' },
+            ]} />
+        </div>
+      </div>
+      )}
+
       {/* ─── Section 5: Product Highlights ──────────────────────────────── */}
       <SectionHeader icon="bi-box-seam-fill" title="Product Highlights" color="#06b6d4" required
         enabled={sectEnabled.productHighlights} onToggle={toggleSection('productHighlights')} />
@@ -1533,7 +1564,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               { key: 'productName', label: 'Product Name', width: '160px' },
               { key: 'unitsSold', label: 'Units Sold', type: 'number', width: '90px' },
               { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
-              { key: 'newVideos', label: 'New Videos', type: 'number', width: '90px' },
+              { key: 'newVideos', label: 'Videos (wk)', type: 'number', width: '90px' },
+              { key: 'videosMtd', label: 'Videos MTD', type: 'number', width: '90px' },
+              { key: 'samplesApprovedWeek', label: 'Samples (wk)', type: 'number', width: '95px' },
+              { key: 'samplesApprovedMtd', label: 'Samples MTD', type: 'number', width: '95px' },
               { key: 'notes', label: 'Notes', width: '130px' },
             ]} />
           <BuiltinExtras sectionKey="productHighlights" sectionTitle="Product Highlights"
