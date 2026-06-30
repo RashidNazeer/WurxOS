@@ -26,9 +26,35 @@ import {
   getBrandSections, normalizeSection,
   getBrandSectionExtras, addBrandSectionExtraField, removeBrandSectionExtraField,
   addBrandSectionRich, removeBrandSection,
+  getBrandSectionVisibility,
 } from '../../lib/brandReportSectionsApi';
+import { formatPctChange } from '../../utils/formatPctChange';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
+
+// "Last: $X +Y%" chip under a money field — same as the monthly form's.
+function ComparisonChip({ thisVal, lastVal, format = 'num' }) {
+  if (lastVal == null || lastVal === '') return null;
+  const c = parseFloat(thisVal) || 0;
+  const p = parseFloat(lastVal) || 0;
+  if (!c && !p) return null;
+  const fmt = (v) => format === 'usd'
+    ? '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : Number(v).toLocaleString();
+  let pct = null;
+  if (p !== 0) pct = ((c - p) / Math.abs(p)) * 100;
+  const color = pct == null ? 'var(--text-muted)' : pct >= 0 ? 'var(--success)' : 'var(--danger)';
+  return (
+    <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+      Last: <strong>{fmt(p)}</strong>
+      {pct != null && (
+        <span style={{ color, marginLeft: 6, fontWeight: 600 }}>
+          {formatPctChange(pct)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 // `onDelete`, when provided, renders a trash button — used ONLY for
 // APC-created custom sections. Built-in/default sections never pass
@@ -155,12 +181,14 @@ function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
     <div className="mt-2">
       <div className="d-flex align-items-center justify-content-between mb-1">
         <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Insights</label>
+        {onGenerate && (
         <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
           style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 8, fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
           onClick={onGenerate} disabled={loading}>
           {loading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
             : <><i className="bi bi-stars" /> Generate with AI</>}
         </button>
+        )}
       </div>
       <RichTextEditor value={value || ''} onChange={onChange}
         minHeight={Math.max(100, rows * 28)}
@@ -348,6 +376,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // Per-builtin-section custom fields. Keyed by section key
   // (overallPerformance, topCreators, ...). Persists per-brand.
   const [brandSectionExtras, setBrandSectionExtras] = useState({});
+  // Per-brand opt-in for the GMV Breakdown section (OL-controlled). Off
+  // unless the brand has it enabled.
+  const [brandGmvEnabled, setBrandGmvEnabled] = useState(false);
   const [reportStatus, setReportStatus] = useState('draft');
   const [rejectionNote, setRejectionNote] = useState('');
   const [importing, setImporting] = useState(false);
@@ -399,21 +430,33 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // immediately and any additions they make here persist back to the
   // brand template so future weekly reports inherit them.
   useEffect(() => {
-    if (!selectedBrand?.id) { setBrandSectionDefs([]); setBrandSectionExtras({}); return; }
+    if (!selectedBrand?.id) { setBrandSectionDefs([]); setBrandSectionExtras({}); setBrandGmvEnabled(false); return; }
     let cancelled = false;
     Promise.all([
       getBrandSections(selectedBrand.id).catch(() => []),
       getBrandSectionExtras(selectedBrand.id).catch(() => ({})),
-    ]).then(([list, extras]) => {
+      getBrandSectionVisibility(selectedBrand.id).catch(() => ({})),
+    ]).then(([list, extras, visibility]) => {
       if (cancelled) return;
       // Exclude client-portal sections (addedBy:'client'). They share the
       // brand_report_sections array but belong in the read-only Client
       // Sections panel, not the editable author "Brand Sections" fields.
       setBrandSectionDefs(list.filter((s) => s?.addedBy !== 'client').map(normalizeSection));
       setBrandSectionExtras(extras || {});
+      const gmvOn = !!visibility?.gmvBreakdown;
+      setBrandGmvEnabled(gmvOn);
+      // Seed the per-report toggle for a NEW report so the saved
+      // sectionsEnabled (what the VIEW reads) matches the brand setting.
+      // Only seed when not editing an existing report.
+      if (gmvOn && !editReportId) {
+        setData((d) => ({
+          ...d,
+          sectionsEnabled: { ...(d.sectionsEnabled || {}), gmvBreakdown: true },
+        }));
+      }
     });
     return () => { cancelled = true; };
-  }, [selectedBrand?.id]);
+  }, [selectedBrand?.id, editReportId]);
 
   // Persist a new custom field inside a built-in section to the brand
   // template, then mirror locally so the row appears immediately.
@@ -573,6 +616,8 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             productHighlightsInsights: r.productHighlightsInsights || '',
             offsitePerformance: r.offsitePerformance || emptyReport().offsitePerformance,
             offsiteInsights: r.offsiteInsights || '',
+            gmvBreakdown: r.gmvBreakdown || emptyReport().gmvBreakdown,
+            gmvBreakdownInsights: r.gmvBreakdownInsights || '',
             upcomingCampaigns: r.upcomingCampaigns || '',
             operationalUpdates: r.operationalUpdates || '',
             recommendations: [r.recommendations, r.actionItems].filter(s => s && s.trim()).join('\n\n') || '',
@@ -621,6 +666,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   }, []);
   const setPerfNote = useCallback((key, val) => {
     setData(d => ({ ...d, overallNotes: { ...d.overallNotes, [key]: val } }));
+  }, []);
+  const setGmvBreakdown = useCallback((key, val) => {
+    setData(d => ({ ...d, gmvBreakdown: { ...(d.gmvBreakdown || {}), [key]: val } }));
   }, []);
   const setOffsite = useCallback((key, val) => {
     setData(d => ({ ...d, offsitePerformance: { ...d.offsitePerformance, [key]: val } }));
@@ -1542,6 +1590,37 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             onGenerate={() => runAi('offsite', generateOffsiteInsight, 'offsiteInsights')} />
         </div>
       </div>
+      )}
+
+      {/* ─── GMV Breakdown (opt-in per brand by the OL) ─────────────────── */}
+      {brandGmvEnabled && (
+        <>
+          <SectionHeader icon="bi-pie-chart-fill" title="GMV Breakdown" color="#0891b2"
+            enabled={sectEnabled.gmvBreakdown} onToggle={toggleSection('gmvBreakdown')} />
+          {sectEnabled.gmvBreakdown && (
+          <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+            <div className="card-body p-3">
+              <div className="d-flex flex-wrap gap-3">
+                {[
+                  { key: 'affiliateGmv',   label: `Affiliate GMV (${curSym})`,    placeholder: '141476.88' },
+                  { key: 'organicGmv',     label: `Organic GMV (${curSym})`,      placeholder: '23905.37' },
+                  { key: 'liveGmv',        label: `LIVE GMV (${curSym})`,         placeholder: '374.83' },
+                  { key: 'videoGmv',       label: `Video GMV (${curSym})`,        placeholder: '139836.25' },
+                  { key: 'productCardGmv', label: `Product Card GMV (${curSym})`, placeholder: '25171.17' },
+                ].map(f => (
+                  <div key={f.key} style={{ width: 200 }}>
+                    <Field label={f.label} type="number" placeholder={f.placeholder}
+                      value={data.gmvBreakdown?.[f.key]}
+                      onChange={v => setGmvBreakdown(f.key, v)} />
+                    <ComparisonChip thisVal={data.gmvBreakdown?.[f.key]} lastVal={previousReport?.gmvBreakdown?.[f.key]} format="usd" />
+                  </div>
+                ))}
+              </div>
+              <InsightArea value={data.gmvBreakdownInsights} onChange={v => setData(d => ({ ...d, gmvBreakdownInsights: v }))} />
+            </div>
+          </div>
+          )}
+        </>
       )}
 
       {/* ─── Current & Upcoming Campaigns (mandatory) ───────────────────── */}
