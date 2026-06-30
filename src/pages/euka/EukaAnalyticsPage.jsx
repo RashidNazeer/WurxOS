@@ -5,6 +5,7 @@ import {
   eukaOutreachFunnel, eukaTopCreators, eukaTopProducts, eukaTopVideos, eukaContentOverview,
   eukaAdsOverview, eukaCreatorTiers, eukaSampleApproval, eukaFeaturedProducts, eukaLivestreamGmv,
   eukaCampaignBreakdown, eukaDataExport,
+  EUKA_BRANDS, setEukaBrand, getEukaBrand,
 } from '../../lib/eukaAnalyticsApi';
 import {
   fmtMoney, fmtMoney0, fmtNum, fmtPct, fmtCompact, Delta, Section, Kpi, Empty,
@@ -15,6 +16,19 @@ import EukaReportPreview from './EukaReportPreview';
 const ymd = (d) => d.toISOString().slice(0, 10);
 const daysAgo = (n) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return d; };
 const PRESETS = [{ k: '7d', label: '7 days', n: 7 }, { k: '30d', label: '30 days', n: 30 }, { k: '90d', label: '90 days', n: 90 }];
+
+// The analytics are grouped into sections so the page isn't one long scroll.
+// The Boss picks a section tab; only that section's blocks render (and only
+// then run their queries).
+const SECTIONS = [
+  { k: 'overview',  label: 'Overview',   icon: 'bi-speedometer2' },
+  { k: 'creators',  label: 'Creators',   icon: 'bi-people' },
+  { k: 'products',  label: 'Products',   icon: 'bi-box-seam' },
+  { k: 'content',   label: 'Content & Ads', icon: 'bi-collection-play' },
+  { k: 'funnels',   label: 'Funnels',    icon: 'bi-funnel' },
+  { k: 'campaigns', label: 'Campaigns',  icon: 'bi-diagram-3' },
+  { k: 'export',    label: 'Export',     icon: 'bi-download' },
+];
 
 // One-shot "bypass server cache" flag, consumed by the queries during a
 // Refresh wave (reset shortly after so normal navigation stays cached).
@@ -32,13 +46,29 @@ function useEuka(key, fn, enabled) {
 
 export default function EukaAnalyticsPage() {
   const qc = useQueryClient();
+  const [brand, setBrandState] = useState(getEukaBrand());
+  const [tab, setTab] = useState('overview');
   const [storeId, setStoreId] = useState('');
   const [preset, setPreset] = useState('30d');
   const [customStart, setCustomStart] = useState(ymd(daysAgo(29)));
   const [customEnd, setCustomEnd] = useState(ymd(new Date()));
 
-  const meQ = useQuery({ queryKey: ['euka', 'me'], queryFn: eukaMe, staleTime: 30 * 60 * 1000, retry: 1 });
-  const storesQ = useQuery({ queryKey: ['euka', 'stores'], queryFn: eukaStores, staleTime: 30 * 60 * 1000, retry: 1 });
+  // Switching brand points the API at the other Euka key/account. Reset the
+  // selected store (each brand has its own) and drop cached Euka queries so
+  // nothing from the previous brand bleeds through. The `brand` segment in
+  // every query key below also keeps the two brands' caches separate.
+  function changeBrand(slug) {
+    if (slug === brand) return;
+    setEukaBrand(slug);
+    setBrandState(slug);
+    setStoreId('');
+    qc.removeQueries({ queryKey: ['euka'] });
+  }
+
+  // All Euka queries are keyed by brand so React Query never serves one
+  // brand's data for another.
+  const meQ = useQuery({ queryKey: ['euka', brand, 'me'], queryFn: eukaMe, staleTime: 30 * 60 * 1000, retry: 1 });
+  const storesQ = useQuery({ queryKey: ['euka', brand, 'stores'], queryFn: eukaStores, staleTime: 30 * 60 * 1000, retry: 1 });
 
   useEffect(() => {
     if (!storeId && Array.isArray(storesQ.data) && storesQ.data.length) setStoreId(storesQ.data[0].id);
@@ -80,13 +110,12 @@ export default function EukaAnalyticsPage() {
       {/* Filters */}
       <div className="d-flex align-items-center flex-wrap mt-3 mb-4 px-3 py-2 rounded-3"
         style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', columnGap: 18, rowGap: 10 }}>
-        {/* Store */}
+        {/* Brand — picks which Euka account/key to query */}
         <div className="d-inline-flex align-items-center gap-2">
           <i className="bi bi-shop text-muted" style={{ fontSize: '0.95rem' }} />
           <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 168, borderRadius: 9 }}
-            value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={storesQ.isLoading}>
-            {(storesQ.data || []).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.region})</option>)}
-            {storesQ.isLoading && <option>Loading stores…</option>}
+            value={brand} onChange={(e) => changeBrand(e.target.value)}>
+            {EUKA_BRANDS.map((b) => <option key={b.slug} value={b.slug}>{b.label}</option>)}
           </select>
         </div>
 
@@ -124,55 +153,94 @@ export default function EukaAnalyticsPage() {
       </div>
 
       {storesQ.isError && <div className="alert alert-danger py-2 small">Couldn’t reach Euka: {String(storesQ.error?.message || storesQ.error)}</div>}
-      {!ready && !storesQ.isError && <div className="text-muted small">Select a store to begin.</div>}
+      {!ready && !storesQ.isError && <div className="text-muted small">Loading {EUKA_BRANDS.find((b) => b.slug === brand)?.label || 'brand'}…</div>}
 
       {ready && (
         <>
-          <div className="row g-3 mb-1">
-            <EukaReportPreview storeId={storeId} store={store} />
+          {/* Section tabs — keep the page from being one long scroll */}
+          <div className="d-flex align-items-center gap-1 mb-3 flex-wrap p-1 rounded-3"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', width: 'fit-content', maxWidth: '100%' }}>
+            {SECTIONS.map((s) => {
+              const on = tab === s.k;
+              return (
+                <button key={s.k} type="button" className="btn btn-sm border-0 d-inline-flex align-items-center gap-2"
+                  style={{
+                    borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, padding: '5px 14px',
+                    background: on ? 'var(--surface-1)' : 'transparent',
+                    color: on ? 'var(--accent)' : 'var(--text-secondary)',
+                    boxShadow: on ? 'var(--shadow-sm)' : 'none',
+                  }}
+                  onClick={() => setTab(s.k)}>
+                  <i className={`bi ${s.icon}`} />{s.label}
+                </button>
+              );
+            })}
           </div>
 
-          <KpiRow storeId={storeId} start={startDate} end={endDate} />
+          {tab === 'overview' && (
+            <>
+              <KpiRow storeId={storeId} start={startDate} end={endDate} />
+              <div className="row g-3 mt-1">
+                <TrendSection storeId={storeId} start={startDate} end={endDate} />
+              </div>
+              <div className="row g-3 mt-1">
+                <SmallStatsSection storeId={storeId} start={startDate} end={endDate} />
+              </div>
+            </>
+          )}
 
-          <div className="row g-3 mt-1">
-            <TrendSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
+          {tab === 'creators' && (
+            <>
+              <div className="row g-3">
+                <TopCreatorsSection storeId={storeId} start={startDate} end={endDate} />
+                <TopVideosSection storeId={storeId} start={startDate} end={endDate} />
+              </div>
+              <div className="row g-3 mt-1">
+                <CreatorTiersSection storeId={storeId} start={startDate} end={endDate} />
+              </div>
+              <div className="row g-3 mt-1">
+                <OutreachFunnelSection storeId={storeId} start={startDate} end={endDate} />
+              </div>
+            </>
+          )}
 
-          <div className="row g-3 mt-1">
-            <AffiliateFunnelSection storeId={storeId} start={startDate} end={endDate} />
-            <OutreachFunnelSection storeId={storeId} start={startDate} end={endDate} />
-            <ConversionFunnelSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
+          {tab === 'products' && (
+            <>
+              <div className="row g-3">
+                <EukaReportPreview storeId={storeId} store={store} />
+              </div>
+              <div className="row g-3 mt-1">
+                <TopProductsSection storeId={storeId} start={startDate} end={endDate} />
+              </div>
+            </>
+          )}
 
-          <div className="row g-3 mt-1">
-            <TopCreatorsSection storeId={storeId} start={startDate} end={endDate} />
-            <TopProductsSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
+          {tab === 'content' && (
+            <div className="row g-3">
+              <ContentSection storeId={storeId} start={startDate} end={endDate} />
+              <AdsSection storeId={storeId} start={startDate} end={endDate} />
+            </div>
+          )}
 
-          <div className="row g-3 mt-1">
-            <TopVideosSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
+          {tab === 'funnels' && (
+            <div className="row g-3">
+              <AffiliateFunnelSection storeId={storeId} start={startDate} end={endDate} />
+              <OutreachFunnelSection storeId={storeId} start={startDate} end={endDate} />
+              <ConversionFunnelSection storeId={storeId} start={startDate} end={endDate} />
+            </div>
+          )}
 
-          <div className="row g-3 mt-1">
-            <ContentSection storeId={storeId} start={startDate} end={endDate} />
-            <AdsSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
+          {tab === 'campaigns' && (
+            <div className="row g-3">
+              <CampaignSection storeId={storeId} start={startDate} end={endDate} />
+            </div>
+          )}
 
-          <div className="row g-3 mt-1">
-            <CreatorTiersSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
-
-          <div className="row g-3 mt-1">
-            <SmallStatsSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
-
-          <div className="row g-3 mt-1">
-            <CampaignSection storeId={storeId} start={startDate} end={endDate} />
-          </div>
-
-          <div className="row g-3 mt-1">
-            <ExportSection storeId={storeId} start={startDate} end={endDate} store={store} />
-          </div>
+          {tab === 'export' && (
+            <div className="row g-3">
+              <ExportSection storeId={storeId} start={startDate} end={endDate} store={store} />
+            </div>
+          )}
         </>
       )}
     </div>

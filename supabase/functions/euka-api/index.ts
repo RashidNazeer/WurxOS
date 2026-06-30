@@ -28,9 +28,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const EUKA_API_KEY = Deno.env.get('EUKA_API_KEY') ?? '';
 const EUKA_BASE = 'https://api.euka.ai/v0';
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 min — caps billed Euka calls
+
+// Each Euka brand is a SEPARATE OpenAPI account/key. The client sends a
+// `brand` slug; we pick the matching secret. Unknown/missing brand falls
+// back to Solid Gold so existing callers (and old cached clients) keep
+// working unchanged. Add a brand by setting its secret + a row here.
+const BRAND_KEYS: Record<string, string> = {
+  solidgold: Deno.env.get('EUKA_API_KEY') ?? '',
+  innosupps: Deno.env.get('EUKA_API_KEY_INNOSUPPS') ?? '',
+};
+const DEFAULT_BRAND = 'solidgold';
+function keyForBrand(brand: string | null): { slug: string; key: string } {
+  const slug = brand && BRAND_KEYS[brand] !== undefined ? brand : DEFAULT_BRAND;
+  return { slug, key: BRAND_KEYS[slug] || '' };
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -62,8 +75,6 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    if (!EUKA_API_KEY) return json({ error: 'EUKA_API_KEY not configured' }, 500);
-
     // ── AuthN/AuthZ: caller must be an active Boss ──────────────────
     const authHeader = req.headers.get('Authorization') || '';
     const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -92,6 +103,10 @@ Deno.serve(async (req) => {
     const query = payload?.query ?? null;
     const fresh = payload?.fresh === true;
 
+    // Pick the Euka key for the requested brand (separate accounts).
+    const { slug: brandSlug, key: brandKey } = keyForBrand(payload?.brand ?? null);
+    if (!brandKey) return json({ error: `Euka key not configured for brand "${brandSlug}"` }, 500);
+
     // Build the upstream URL (+ query string for GET endpoints).
     let url = EUKA_BASE + path;
     if (query && typeof query === 'object') {
@@ -105,7 +120,7 @@ Deno.serve(async (req) => {
 
     // ── Cache (skip CSV exports — they can be large/streamed) ───────
     const isExport = path === '/data-export';
-    const cacheKey = `${method}:${path}:${JSON.stringify(query || {})}:${JSON.stringify(body || {})}`;
+    const cacheKey = `${brandSlug}:${method}:${path}:${JSON.stringify(query || {})}:${JSON.stringify(body || {})}`;
     if (!fresh && !isExport) {
       const { data: hit } = await admin
         .from('euka_api_cache')
@@ -121,7 +136,7 @@ Deno.serve(async (req) => {
     const upstream = await fetch(url, {
       method,
       headers: {
-        Authorization: `Bearer ${EUKA_API_KEY}`,
+        Authorization: `Bearer ${brandKey}`,
         Accept: 'application/json',
         ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
       },
