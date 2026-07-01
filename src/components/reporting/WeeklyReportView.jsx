@@ -225,6 +225,88 @@ function SectionHead({ title, eyebrow, action }) {
   );
 }
 
+// One GMV Max block — campaign rows + an auto-calculated overall. Shared by
+// the Weekly and Month-to-Date sections so they render identically side by
+// side. `overallSoft` tints the overall card (accent for MTD, neutral for
+// weekly's own overall). Self-contained: derives its money formatters from
+// `currency`.
+function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEfficiency = true, overallLabel = 'Overall' }) {
+  const list = (rows || []).filter(g => g.campaign);
+  if (list.length < 1) return null;
+  const ms = (v) => fmt$short(v, currency);
+  const m  = (v) => fmt$(v, currency);
+  const t = list.reduce((a, g) => ({ spend: a.spend + num(g.spend), gmv: a.gmv + num(g.gmv), orders: a.orders + num(g.orders) }), { spend: 0, gmv: 0, orders: 0 });
+  const roi = t.spend > 0 ? t.gmv / t.spend : 0;
+  const cpo = t.orders > 0 ? t.spend / t.orders : 0;
+  const cellsOf = (g) => [
+    { label: 'Spend', value: ms(g.spend) },
+    { label: 'GMV', value: ms(g.gmv) },
+    { label: 'ROI', value: num(g.roi).toFixed(2) + '×', accent: num(g.roi) >= 1 ? C.green : C.red },
+    { label: 'Orders', value: fmtN(g.orders) },
+    { label: 'CPO', value: m(g.cpo) },
+  ];
+  const overallCells = [
+    { label: 'Spend', value: ms(t.spend) },
+    { label: 'GMV', value: ms(t.gmv) },
+    { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
+    { label: 'Orders', value: fmtN(t.orders) },
+    { label: 'CPO', value: m(cpo) },
+  ];
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px', height: '100%' }}>
+      <SectionHead title={title} eyebrow={eyebrow} />
+      {list.map((g, i) => {
+        const spend = num(g.spend), gmv = num(g.gmv);
+        const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
+        return (
+          <div key={i} className={i > 0 ? 'mt-3 pt-3' : ''} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : 'none' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: C.ink, marginBottom: 8 }}>{g.campaign}</div>
+            <div className="row g-2">
+              {cellsOf(g).map(c => (
+                <div className="col-4 col-md" key={c.label}>
+                  <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {showEfficiency && spend > 0 && gmv > 0 && (
+              <div className="mt-3">
+                <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  <span>Spend efficiency</span>
+                  <span>$1 → ${(gmv / spend).toFixed(2)}</span>
+                </div>
+                <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>{ms(spend)} in</div>
+                  <div style={{ flex: 1, background: C.amber, color: C.hero, fontSize: '0.66rem', fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>{ms(gmv)} returned →</div>
+                </div>
+              </div>
+            )}
+            {g.notes && <div className="mt-2" style={{ fontSize: '0.72rem', color: C.muted }}>{g.notes}</div>}
+          </div>
+        );
+      })}
+      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
+        <div className="d-flex align-items-center gap-2 mb-2">
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{overallLabel}</span>
+          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {list.length} campaign{list.length > 1 ? 's' : ''}</span>
+        </div>
+        <div className="row g-2">
+          {overallCells.map(c => (
+            <div className="col-4 col-md" key={c.label}>
+              <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
   const gmv = num(creator.gmv);
   const sharePct = totalGmv > 0 ? (gmv / totalGmv) * 100 : 0;
@@ -1219,178 +1301,37 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           </>
         )}
 
-        {/* ─── GMV Max + Offsite (side-by-side) ────────────────────────── */}
-        {((sectEnabled.gmvMax && (report.gmvMax || []).some(g => g.campaign)) || (sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0))) && (
-          <div className="row g-3 mt-1">
-            {sectEnabled.gmvMax && (report.gmvMax || []).some(g => g.campaign) && (
-              <div className="col-12 col-lg-7">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px' }}>
-                  <SectionHead title="GMV Max performance" eyebrow="Brand-managed campaigns · overall stats" />
-                  {(report.gmvMax || []).filter(g => g.campaign).map((g, i) => {
-                    const cells = [
-                      { label: 'Spend', value: ms(g.spend) },
-                      { label: 'GMV', value: ms(g.gmv) },
-                      { label: 'ROI', value: num(g.roi).toFixed(2) + '×', accent: num(g.roi) >= 1 ? C.green : C.red },
-                      { label: 'Orders', value: fmtN(g.orders) },
-                      { label: 'CPO', value: m(g.cpo) },
-                    ];
-                    const spend = num(g.spend), gmv = num(g.gmv);
-                    const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
-                    return (
-                      <div key={i} className={i > 0 ? 'mt-3 pt-3' : ''} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : 'none' }}>
-                        <div className="d-flex flex-wrap align-items-center justify-content-between mb-2">
-                          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: C.ink }}>{g.campaign}</div>
-                        </div>
-                        <div className="row g-2">
-                          {cells.map(c => (
-                            <div className="col-4 col-md" key={c.label}>
-                              <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {/* Spend efficiency bar */}
-                        {spend > 0 && gmv > 0 && (
-                          <div className="mt-3">
-                            <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              <span>Spend efficiency</span>
-                              <span>$1 → ${(gmv / spend).toFixed(2)}</span>
-                            </div>
-                            <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
-                              <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
-                                {ms(spend)} in
-                              </div>
-                              <div style={{ flex: 1, background: C.amber, color: C.hero, fontSize: '0.66rem', fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                                {ms(gmv)} returned →
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {g.notes && (
-                          <div className="mt-2" style={{ fontSize: '0.72rem', color: C.muted }}>{g.notes}</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {/* Overall — auto-calculated from the campaign rows. Spend/GMV/
-                      Orders are summed; ROI = GMV/Spend and CPO = Spend/Orders
-                      are derived from those totals (not entered manually). */}
-                  {(() => {
-                    const rows = (report.gmvMax || []).filter(g => g.campaign);
-                    if (rows.length < 1) return null;
-                    const t = rows.reduce((a, g) => ({
-                      spend:  a.spend  + num(g.spend),
-                      gmv:    a.gmv    + num(g.gmv),
-                      orders: a.orders + num(g.orders),
-                    }), { spend: 0, gmv: 0, orders: 0 });
-                    const roi = t.spend  > 0 ? t.gmv / t.spend : 0;
-                    const cpo = t.orders > 0 ? t.spend / t.orders : 0;
-                    const cells = [
-                      { label: 'Spend', value: ms(t.spend) },
-                      { label: 'GMV', value: ms(t.gmv) },
-                      { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
-                      { label: 'Orders', value: fmtN(t.orders) },
-                      { label: 'CPO', value: m(cpo) },
-                    ];
-                    return (
-                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Overall</span>
-                          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {rows.length} campaign{rows.length > 1 ? 's' : ''}</span>
-                        </div>
-                        <div className="row g-2">
-                          {cells.map(c => (
-                            <div className="col-4 col-md" key={c.label}>
-                              <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* ── Month-to-Date GMV Max — a full parallel subsection
-                      (its own campaign rows + auto-calculated MTD overall),
-                      alongside the weekly one above. The weekly section is
-                      untouched. */}
-                  {(report.gmvMaxMtd || []).some(g => g.campaign) && (
-                    <div className="mt-4 pt-3" style={{ borderTop: `2px solid ${C.line}` }}>
-                      <div className="d-flex align-items-center gap-2 mb-3">
-                        <i className="bi bi-calendar-range-fill" style={{ color: C.amber }} />
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: C.ink }}>Month-to-Date GMV Max</span>
-                        <span style={{ fontSize: '0.64rem', color: C.muted }}>· campaigns so far this month</span>
-                      </div>
-                      {(report.gmvMaxMtd || []).filter(g => g.campaign).map((g, i) => {
-                        const cells = [
-                          { label: 'Spend', value: ms(g.spend) },
-                          { label: 'GMV', value: ms(g.gmv) },
-                          { label: 'ROI', value: num(g.roi).toFixed(2) + '×', accent: num(g.roi) >= 1 ? C.green : C.red },
-                          { label: 'Orders', value: fmtN(g.orders) },
-                          { label: 'CPO', value: m(g.cpo) },
-                        ];
-                        return (
-                          <div key={i} className={i > 0 ? 'mt-3 pt-3' : ''} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : 'none' }}>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: C.ink, marginBottom: 8 }}>{g.campaign}</div>
-                            <div className="row g-2">
-                              {cells.map(c => (
-                                <div className="col-4 col-md" key={c.label}>
-                                  <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            {g.notes && <div className="mt-2" style={{ fontSize: '0.72rem', color: C.muted }}>{g.notes}</div>}
-                          </div>
-                        );
-                      })}
-                      {/* MTD Overall — auto-calculated from the MTD rows. */}
-                      {(() => {
-                        const rows = (report.gmvMaxMtd || []).filter(g => g.campaign);
-                        const t = rows.reduce((a, g) => ({ spend: a.spend + num(g.spend), gmv: a.gmv + num(g.gmv), orders: a.orders + num(g.orders) }), { spend: 0, gmv: 0, orders: 0 });
-                        const roi = t.spend > 0 ? t.gmv / t.spend : 0;
-                        const cpo = t.orders > 0 ? t.spend / t.orders : 0;
-                        const cells = [
-                          { label: 'Spend', value: ms(t.spend) },
-                          { label: 'GMV', value: ms(t.gmv) },
-                          { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
-                          { label: 'Orders', value: fmtN(t.orders) },
-                          { label: 'CPO', value: m(cpo) },
-                        ];
-                        return (
-                          <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
-                            <div className="d-flex align-items-center gap-2 mb-2">
-                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>MTD Overall</span>
-                              <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {rows.length} campaign{rows.length > 1 ? 's' : ''}</span>
-                            </div>
-                            <div className="row g-2">
-                              {cells.map(c => (
-                                <div className="col-4 col-md" key={c.label}>
-                                  <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
+        {/* ─── GMV Max (weekly + MTD side-by-side) ─────────────────────── */}
+        {sectEnabled.gmvMax && ((report.gmvMax || []).some(g => g.campaign) || (report.gmvMaxMtd || []).some(g => g.campaign)) && (() => {
+          const hasWeekly = (report.gmvMax || []).some(g => g.campaign);
+          const hasMtd = (report.gmvMaxMtd || []).some(g => g.campaign);
+          // Both present → two half-width columns fill the row (no empty
+          // right space). Only one present → it spans wider.
+          const colClass = (hasWeekly && hasMtd) ? 'col-12 col-lg-6' : 'col-12 col-lg-8';
+          return (
+            <div className="row g-3 mt-1">
+              {hasWeekly && (
+                <div className={colClass}>
+                  <GmvMaxBlock rows={report.gmvMax} currency={currency}
+                    title="GMV Max performance" eyebrow="Brand-managed campaigns · this week" overallLabel="Overall" />
+                  {renderExtraStatCards('gmvMax')}
+                  <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
+                    highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
                 </div>
-                {renderExtraStatCards('gmvMax')}
-                <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
-                  highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
-              </div>
-            )}
-            {sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
+              )}
+              {hasMtd && (
+                <div className={colClass}>
+                  <GmvMaxBlock rows={report.gmvMaxMtd} currency={currency}
+                    title="Month-to-Date GMV Max" eyebrow="Campaigns so far this month" overallLabel="MTD Overall" />
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ─── Offsite performance ─────────────────────────────────────── */}
+        {sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
+          <div className="row g-3 mt-1">
               <div className="col-12 col-lg-5">
                 <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px' }}>
                   <SectionHead title="Offsite performance" eyebrow="Halo from non-TikTok channels" />
@@ -1433,7 +1374,6 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                 <InsightBox text={report.offsiteInsights} report={report} fieldKey="offsiteInsights"
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
-            )}
           </div>
         )}
 
