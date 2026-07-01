@@ -202,7 +202,7 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
         </div>
       )}
       {subText && (
-        <div style={{ fontSize: '0.66rem', color: primary ? '#a8a29e' : C.muted, marginTop: 6 }}>{subText}</div>
+        <div style={{ fontSize: '0.75rem', color: primary ? '#e7e5e4' : C.inkDim, marginTop: 8, fontWeight: 600 }}>{subText}</div>
       )}
       {sparkData && sparkData.length > 1 && (
         <Sparkline data={sparkData} color={primary ? C.amber : color} />
@@ -815,6 +815,9 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
   const productData = (report.productHighlights || []).filter(p => p.productName);
   const totalProductGmv = productData.reduce((s, p) => s + num(p.gmv), 0);
+  // Overall MTD videos = sum of the per-product month-to-date video counts
+  // (there is no single overall MTD-videos field; it rolls up from products).
+  const mtdVideos = productData.reduce((s, p) => s + num(p.videosMtd), 0);
   // "Share of GMV" denominator: a STABLE store total (affiliate GMV, else total
   // GMV) so a product's share doesn't shift with how many products are listed.
   // Falls back to the listed-products sum for older reports without totals.
@@ -1051,7 +1054,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             <StatCard label="GMV (Gross Merchandise Value)" value={m(perf.gmv)}
               current={num(perf.gmv)} prevValue={hasPrev ? m(prevPerf.gmv) : null}
               primary sparkData={sparkFor('gmv')}
-              subText={num(notes.gmv) > 0 ? `Month-to-date: ${m(notes.gmv)}` : ''} />
+              subText={num(notes.gmv) > 0 ? <>Month-to-date: <strong style={{ fontWeight: 800 }}>{m(notes.gmv)}</strong></> : ''} />
           </div>
           <div className="col-6 col-lg-3">
             <StatCard label="Affiliate GMV" value={m(perf.affiliateGmv)}
@@ -1073,7 +1076,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           <div className="col-6 col-lg-3">
             <StatCard label="Samples Approved" value={fmtN(perf.samplesApproved)}
               current={num(perf.samplesApproved)} prevValue={hasPrev ? fmtN(prevPerf.samplesApproved) : null}
-              subText={notes.samplesApproved ? `MTD: ${fmtN(notes.samplesApproved)}` : ''}
+              subText={notes.samplesApproved ? <>MTD: <strong style={{ fontWeight: 800 }}>{fmtN(notes.samplesApproved)}</strong></> : ''}
               sparkData={sparkFor('samplesApproved')} />
           </div>
           <div className="col-6 col-lg-3">
@@ -1084,7 +1087,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           <div className="col-6 col-lg-3">
             <StatCard label="Videos Posted" value={fmtN(perf.videosPosted)}
               current={num(perf.videosPosted)} prevValue={hasPrev ? fmtN(prevPerf.videosPosted) : null}
-              subText={notes.videosPosted ? `Total: ${fmtN(notes.videosPosted)}` : ''}
+              subText={(mtdVideos > 0 || notes.videosPosted) ? (
+                <>
+                  {mtdVideos > 0 && <>MTD: <strong style={{ fontWeight: 800 }}>{fmtN(mtdVideos)}</strong></>}
+                  {mtdVideos > 0 && notes.videosPosted && <span style={{ opacity: 0.6 }}> · </span>}
+                  {notes.videosPosted && <span style={{ fontWeight: 500, opacity: 0.85 }}>Total {fmtN(notes.videosPosted)}</span>}
+                </>
+              ) : ''}
               sparkData={sparkFor('videosPosted')} />
           </div>
           <div className="col-6 col-lg-3">
@@ -1303,44 +1312,76 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                     );
                   })()}
 
-                  {/* Month-to-Date GMV Max — auto-calculated overall from the
-                      MTD campaign rows (same math as the weekly overall). */}
-                  {(() => {
-                    const rows = (report.gmvMaxMtd || []).filter(g => g.campaign);
-                    if (rows.length < 1) return null;
-                    const t = rows.reduce((a, g) => ({
-                      spend:  a.spend  + num(g.spend),
-                      gmv:    a.gmv    + num(g.gmv),
-                      orders: a.orders + num(g.orders),
-                    }), { spend: 0, gmv: 0, orders: 0 });
-                    const roi = t.spend  > 0 ? t.gmv / t.spend : 0;
-                    const cpo = t.orders > 0 ? t.spend / t.orders : 0;
-                    const cells = [
-                      { label: 'Spend', value: ms(t.spend) },
-                      { label: 'GMV', value: ms(t.gmv) },
-                      { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
-                      { label: 'Orders', value: fmtN(t.orders) },
-                      { label: 'CPO', value: m(cpo) },
-                    ];
-                    return (
-                      <div className="mt-4 pt-3" style={{ borderTop: `2px solid ${C.line}` }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Month-to-Date Overall</span>
-                          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {rows.length} campaign{rows.length > 1 ? 's' : ''}</span>
-                        </div>
-                        <div className="row g-2">
-                          {cells.map(c => (
-                            <div className="col-4 col-md" key={c.label}>
-                              <div style={{ background: C.surfaceAlt, border: `1px solid ${C.line}`, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                  {/* ── Month-to-Date GMV Max — a full parallel subsection
+                      (its own campaign rows + auto-calculated MTD overall),
+                      alongside the weekly one above. The weekly section is
+                      untouched. */}
+                  {(report.gmvMaxMtd || []).some(g => g.campaign) && (
+                    <div className="mt-4 pt-3" style={{ borderTop: `2px solid ${C.line}` }}>
+                      <div className="d-flex align-items-center gap-2 mb-3">
+                        <i className="bi bi-calendar-range-fill" style={{ color: C.amber }} />
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: C.ink }}>Month-to-Date GMV Max</span>
+                        <span style={{ fontSize: '0.64rem', color: C.muted }}>· campaigns so far this month</span>
                       </div>
-                    );
-                  })()}
+                      {(report.gmvMaxMtd || []).filter(g => g.campaign).map((g, i) => {
+                        const cells = [
+                          { label: 'Spend', value: ms(g.spend) },
+                          { label: 'GMV', value: ms(g.gmv) },
+                          { label: 'ROI', value: num(g.roi).toFixed(2) + '×', accent: num(g.roi) >= 1 ? C.green : C.red },
+                          { label: 'Orders', value: fmtN(g.orders) },
+                          { label: 'CPO', value: m(g.cpo) },
+                        ];
+                        return (
+                          <div key={i} className={i > 0 ? 'mt-3 pt-3' : ''} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : 'none' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: C.ink, marginBottom: 8 }}>{g.campaign}</div>
+                            <div className="row g-2">
+                              {cells.map(c => (
+                                <div className="col-4 col-md" key={c.label}>
+                                  <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
+                                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {g.notes && <div className="mt-2" style={{ fontSize: '0.72rem', color: C.muted }}>{g.notes}</div>}
+                          </div>
+                        );
+                      })}
+                      {/* MTD Overall — auto-calculated from the MTD rows. */}
+                      {(() => {
+                        const rows = (report.gmvMaxMtd || []).filter(g => g.campaign);
+                        const t = rows.reduce((a, g) => ({ spend: a.spend + num(g.spend), gmv: a.gmv + num(g.gmv), orders: a.orders + num(g.orders) }), { spend: 0, gmv: 0, orders: 0 });
+                        const roi = t.spend > 0 ? t.gmv / t.spend : 0;
+                        const cpo = t.orders > 0 ? t.spend / t.orders : 0;
+                        const cells = [
+                          { label: 'Spend', value: ms(t.spend) },
+                          { label: 'GMV', value: ms(t.gmv) },
+                          { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
+                          { label: 'Orders', value: fmtN(t.orders) },
+                          { label: 'CPO', value: m(cpo) },
+                        ];
+                        return (
+                          <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
+                            <div className="d-flex align-items-center gap-2 mb-2">
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>MTD Overall</span>
+                              <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {rows.length} campaign{rows.length > 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="row g-2">
+                              {cells.map(c => (
+                                <div className="col-4 col-md" key={c.label}>
+                                  <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
+                                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
                 {renderExtraStatCards('gmvMax')}
                 <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
