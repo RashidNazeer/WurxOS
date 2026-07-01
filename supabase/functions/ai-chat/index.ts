@@ -146,6 +146,236 @@ const PAGES: Page[] = [
 const pagesForRole = (role: string) =>
   PAGES.filter((p) => p.roles === 'all' || (p.roles as string[]).includes(role));
 
+// ════════════════════════════════════════════════════════════════════
+// BOSS DATA TOOLS (tool-calling)
+// The Boss can ask about live OS data (reports, brands, incentives/bonuses,
+// salaries). Instead of stuffing tables into the prompt, the model CHOOSES a
+// tool; we run a FIXED, parameterized query (never model-authored SQL) and feed
+// back only those rows — so token use stays tiny and the model can't be tricked
+// into reading anything outside these queries. Gated to Boss callers only.
+//
+// Queries use the service-role `admin` client (RLS bypass) — safe because the
+// caller is already verified Boss, who can see all of this in the app anyway.
+// ════════════════════════════════════════════════════════════════════
+
+const TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'find_person',
+      description: 'Resolve an employee by (partial) name to their id, full name and role. Use before other tools when the user names a person.',
+      parameters: {
+        type: 'object',
+        properties: { name: { type: 'string', description: 'Full or partial employee name, e.g. "Ali" or "Abdul Subhan".' } },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_incentives',
+      description: "Get monthly incentive & bonus goals (target vs achieved, PKR amount, completed/verified/paid) for one employee, or for ALL employees when no name is given. Month format YYYY-MM; omit for the latest month with data.",
+      parameters: {
+        type: 'object',
+        properties: {
+          person_name: { type: 'string', description: 'Employee name; omit to get everyone (e.g. for ranking/totals).' },
+          month: { type: 'string', description: 'YYYY-MM, e.g. "2026-06". Omit for the latest month that has data.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_salary',
+      description: 'Get current basic salary (PKR) and recent change history for one employee, or for ALL employees when no name is given. The Boss has no salary and is excluded.',
+      parameters: {
+        type: 'object',
+        properties: { person_name: { type: 'string', description: 'Employee name; omit to list everyone.' } },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_reports',
+      description: 'Get client report headline metrics (GMV, orders, samples approved, videos posted, ROI, shop score) for a brand, or across brands. Period is a substring match on the report period label (e.g. "June", "Week 13", "2026-06"); omit for the most recent reports.',
+      parameters: {
+        type: 'object',
+        properties: {
+          brand_name: { type: 'string', description: 'Brand name (partial ok); omit for all brands.' },
+          period: { type: 'string', description: 'Period label substring, e.g. "June" or "Week 13". Omit for most recent.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_brands',
+      description: 'List client brands with their status and owner. Use for "which brands do we have / who owns X".',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+];
+
+const money = (n: unknown) => {
+  const v = Number(n);
+  return Number.isFinite(v) ? `PKR ${v.toLocaleString('en-US')}` : String(n ?? '');
+};
+
+// Resolve a name → profile rows (active, non-deleted). Returns [] if none.
+async function resolvePeople(admin: any, name: string) {
+  const q = String(name || '').trim();
+  if (!q) return [];
+  const { data } = await admin.from('profiles')
+    .select('id, display_name, role')
+    .ilike('display_name', `%${q}%`)
+    .is('deleted_at', null)
+    .limit(8);
+  return data || [];
+}
+
+const goalLine = (g: any) => {
+  const tv = g?.targetValue, av = g?.achievedValue, sfx = g?.suffix || '';
+  const prog = (tv != null || av != null) ? ` (${av ?? '?'}${sfx} of ${tv ?? '?'}${sfx}${g?.completed ? ', met' : ', not met'})` : '';
+  return `    • ${String(g?.text || 'goal').trim()}${prog} — ${money(g?.amount)}`;
+};
+
+function fmtIncentiveRow(name: string, row: any): string {
+  const inc = Array.isArray(row.incentives) ? row.incentives : [];
+  const bon = Array.isArray(row.bonuses) ? row.bonuses : [];
+  const sum = (arr: any[]) => arr.reduce((s, g) => s + (g?.completed ? Number(g?.amount) || 0 : 0), 0);
+  const earned = sum(inc) + sum(bon);
+  const potential = [...inc, ...bon].reduce((s, g) => s + (Number(g?.amount) || 0), 0);
+  const lines = [
+    `${name} — ${row.month} (basic salary ${money(row.basic_salary)}; verified: ${row.verified ? 'yes' : 'no'}, payout cleared: ${row.payout_cleared ? 'yes' : 'no'})`,
+    `  Earned so far (completed goals): ${money(earned)} of ${money(potential)} potential.`,
+  ];
+  if (inc.length) { lines.push('  Incentives:'); inc.forEach((g) => lines.push(goalLine(g))); }
+  if (bon.length) { lines.push('  Bonuses:'); bon.forEach((g) => lines.push(goalLine(g))); }
+  return lines.join('\n');
+}
+
+// Run a tool. Returns a compact text block for the model. Boss-only (checked by caller).
+async function runTool(admin: any, name: string, args: any): Promise<string> {
+  try {
+    if (name === 'find_person') {
+      const people = await resolvePeople(admin, args?.name);
+      if (!people.length) return `No active employee matches "${args?.name}".`;
+      return 'Matches:\n' + people.map((p: any) => `- ${p.display_name} (${p.role})`).join('\n');
+    }
+
+    if (name === 'get_incentives') {
+      let userIds: string[] | null = null;
+      let label = 'all employees';
+      if (args?.person_name) {
+        const people = await resolvePeople(admin, args.person_name);
+        if (!people.length) return `No active employee matches "${args.person_name}".`;
+        if (people.length > 1) return `Multiple people match "${args.person_name}": ${people.map((p: any) => p.display_name).join(', ')}. Ask which one.`;
+        userIds = [people[0].id]; label = people[0].display_name;
+      }
+      // Resolve month: given, else latest month present in the table.
+      let month = String(args?.month || '').trim();
+      if (!month) {
+        const { data: mx } = await admin.from('incentives').select('month').order('month', { ascending: false }).limit(1);
+        month = mx?.[0]?.month || '';
+      }
+      let query = admin.from('incentives')
+        .select('user_id, month, basic_salary, incentives, bonuses, verified, payout_cleared')
+        .eq('month', month);
+      if (userIds) query = query.in('user_id', userIds);
+      const { data: rows } = await query;
+      if (!rows || !rows.length) return `No incentive records for ${label} in ${month || '(no data)'}.`;
+      // attach names
+      const ids = [...new Set(rows.map((r: any) => r.user_id))];
+      const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);
+      const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+      const blocks = rows
+        .sort((a: any, b: any) => String(nameOf.get(a.user_id)).localeCompare(String(nameOf.get(b.user_id))))
+        .map((r: any) => fmtIncentiveRow(nameOf.get(r.user_id) || 'Unknown', r));
+      return `Incentives for ${month} (${rows.length} record(s)):\n\n` + blocks.join('\n\n');
+    }
+
+    if (name === 'get_salary') {
+      let userIds: string[] | null = null;
+      if (args?.person_name) {
+        const people = await resolvePeople(admin, args.person_name);
+        if (!people.length) return `No active employee matches "${args.person_name}".`;
+        if (people.length > 1) return `Multiple people match "${args.person_name}": ${people.map((p: any) => p.display_name).join(', ')}. Ask which one.`;
+        userIds = [people[0].id];
+      }
+      let compQ = admin.from('employee_compensation').select('user_id, basic_salary, effective_from, last_change_reason');
+      if (userIds) compQ = compQ.in('user_id', userIds);
+      const { data: comp } = await compQ;
+      if (!comp || !comp.length) return userIds ? 'No salary on record for that person (the Boss has no salary).' : 'No salary records found.';
+      const ids = comp.map((c: any) => c.user_id);
+      const { data: profs } = await admin.from('profiles').select('id, display_name, role').in('id', ids);
+      const p = new Map((profs || []).map((x: any) => [x.id, x]));
+      // recent history for the (single) person, if asked
+      let histNote = '';
+      if (userIds) {
+        const { data: hist } = await admin.from('salary_history')
+          .select('effective_from, previous_amount, new_amount, increment_pct, change_reason')
+          .eq('user_id', userIds[0]).order('effective_from', { ascending: false }).limit(5);
+        if (hist && hist.length) {
+          histNote = '\nRecent changes:\n' + hist.map((h: any) =>
+            `  - ${h.effective_from}: ${money(h.previous_amount)} → ${money(h.new_amount)}${h.increment_pct != null ? ` (${h.increment_pct}%)` : ''}${h.change_reason ? ` — ${h.change_reason}` : ''}`).join('\n');
+        }
+      }
+      const lines = comp
+        .map((c: any) => ({ c, prof: p.get(c.user_id) }))
+        .filter((x: any) => x.prof && x.prof.role !== 'boss')
+        .sort((a: any, b: any) => (Number(b.c.basic_salary) || 0) - (Number(a.c.basic_salary) || 0))
+        .map((x: any) => `- ${x.prof.display_name} (${x.prof.role}): ${money(x.c.basic_salary)} (since ${x.c.effective_from || 'n/a'})`);
+      return `Salaries (${lines.length}):\n` + lines.join('\n') + histNote;
+    }
+
+    if (name === 'get_reports') {
+      let query = admin.from('reports')
+        .select('type, period_label, period_start, status, data, brand:brand_id(brand_name)')
+        .order('period_start', { ascending: false })
+        .limit(args?.brand_name || args?.period ? 40 : 12);
+      if (args?.period) query = query.ilike('period_label', `%${String(args.period).trim()}%`);
+      const { data: reps } = await query;
+      let rows = reps || [];
+      if (args?.brand_name) {
+        const bn = String(args.brand_name).toLowerCase();
+        rows = rows.filter((r: any) => String(r.brand?.brand_name || '').toLowerCase().includes(bn));
+      }
+      if (!rows.length) return 'No matching reports found.';
+      const pick = (o: any) => o?.overallPerformance || {};
+      const blocks = rows.slice(0, 20).map((r: any) => {
+        const o = pick(r.data);
+        const parts = [
+          o.gmv != null && o.gmv !== '' ? `GMV ${o.gmv}` : null,
+          o.orders != null && o.orders !== '' ? `orders ${o.orders}` : null,
+          o.samplesApproved != null && o.samplesApproved !== '' ? `samples ${o.samplesApproved}` : null,
+          o.videosPosted != null && o.videosPosted !== '' ? `videos ${o.videosPosted}` : null,
+          o.roi != null && o.roi !== '' ? `ROI ${o.roi}` : null,
+          o.shopPerformanceScore != null && o.shopPerformanceScore !== '' ? `shop score ${o.shopPerformanceScore}` : null,
+        ].filter(Boolean).join(', ');
+        return `- ${r.brand?.brand_name || 'Unknown brand'} · ${r.period_label || r.period_start} (${r.type}, ${r.status}): ${parts || 'no headline metrics filled'}`;
+      });
+      return `Reports (${rows.length} matched, showing ${blocks.length}):\n` + blocks.join('\n');
+    }
+
+    if (name === 'list_brands') {
+      const { data: brands } = await admin.from('brands').select('brand_name, status, owner_id').order('brand_name').limit(200);
+      if (!brands || !brands.length) return 'No brands found.';
+      const ids = brands.map((b: any) => b.owner_id).filter(Boolean);
+      const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000']);
+      const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+      return `Brands (${brands.length}):\n` + brands.map((b: any) =>
+        `- ${b.brand_name} (${b.status || 'n/a'})${b.owner_id ? ` — owner: ${nameOf.get(b.owner_id) || 'unknown'}` : ''}`).join('\n');
+    }
+
+    return `Unknown tool: ${name}`;
+  } catch (e) {
+    return `Tool ${name} failed: ${String((e as Error)?.message || e).slice(0, 150)}`;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -350,37 +580,72 @@ Deno.serve(async (req) => {
       '- Be concise, warm, and practical; use short numbered steps when describing a flow.',
     ].join('\n');
 
+    // Boss gets live-data tools; other roles never do (defense in depth — they
+    // also can't reach this function at all).
+    const isBoss = roleKey === 'boss';
+    const dataToolRules = isBoss ? [
+      '',
+      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, client report metrics, and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "GMV for Solid Gold last month?", "what is X\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR. If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
+    ].join('\n') : '';
+
     const systemPrompt = [
       persona,
       `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
       `WHAT THEY CAN DO: ${roleCap}`,
       `PAGES THEY CAN OPEN (use these exact paths for links; never invent one):\n${pageList}`,
       knowledgeBlock,
-      groundingRules,
+      groundingRules + dataToolRules,
     ].join('\n\n');
 
-    // ── Call the model (OpenAI) ────────────────────────────────────
+    // ── Call the model (OpenAI), with a tool-calling loop for the Boss ──
     // GPT-5.x require `max_completion_tokens` (not `max_tokens`) and reject a
     // non-default `temperature` — so we omit temperature and use the new field.
-    const aiRes = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: systemPrompt }, ...priorTurns, { role: 'user', content: message }],
-        max_completion_tokens: MAX_COMPLETION_TOKENS,
-      }),
-    });
-    const aiText = await aiRes.text();
-    if (!aiRes.ok) {
-      console.error('model error', aiRes.status, aiText.slice(0, 300));
-      if (aiRes.status === 429) {
-        return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
-      }
-      return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
-    }
+    // For the Boss we expose data TOOLS: the model may ask us to run a query,
+    // we return only those rows, and it answers from them. Loop is bounded so a
+    // misbehaving model can't spin forever (and to cap cost).
+    const convo: any[] = [{ role: 'system', content: systemPrompt }, ...priorTurns, { role: 'user', content: message }];
     let reply = '';
-    try { reply = JSON.parse(aiText)?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+    const MAX_TOOL_ROUNDS = 4;
+
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const payload: any = { model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS };
+      // Offer tools only to the Boss, and only while we still allow more rounds.
+      if (isBoss && round < MAX_TOOL_ROUNDS) { payload.tools = TOOLS; payload.tool_choice = 'auto'; }
+
+      const aiRes = await fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const aiText = await aiRes.text();
+      if (!aiRes.ok) {
+        console.error('model error', aiRes.status, aiText.slice(0, 300));
+        if (aiRes.status === 429) {
+          return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
+        }
+        return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
+      }
+
+      let choice: any = null;
+      try { choice = JSON.parse(aiText)?.choices?.[0]; } catch { /* ignore */ }
+      const msg = choice?.message;
+      const toolCalls = msg?.tool_calls;
+
+      if (toolCalls && toolCalls.length && isBoss) {
+        // Run each requested tool and feed results back for the next round.
+        convo.push({ role: 'assistant', content: msg.content ?? null, tool_calls: toolCalls });
+        for (const tc of toolCalls) {
+          let a: any = {};
+          try { a = JSON.parse(tc.function?.arguments || '{}'); } catch { /* ignore */ }
+          const result = await runTool(admin, tc.function?.name, a);
+          convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
+        }
+        continue; // ask the model again now that it has the data
+      }
+
+      reply = msg?.content || '';
+      break;
+    }
     if (!reply) reply = 'Sorry, I couldn’t generate a response just now. Please try again.';
 
     // ── Persist the turn (service role — only writer) ──────────────
