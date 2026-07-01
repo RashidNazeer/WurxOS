@@ -213,6 +213,20 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_performance',
+      description: "Get monthly performance ratings (0-100 per area: punctuality, reporting, response time, daily-task quality, task processing, overall workflow, plus overall score) for one employee, or for ALL employees ranked by overall score when no name is given. Also returns that person's performance flags (green = positive note, red = concern) and any warnings. Month format YYYY-MM; omit for the latest month with data.",
+      parameters: {
+        type: 'object',
+        properties: {
+          person_name: { type: 'string', description: 'Employee name; omit to get everyone (e.g. for ranking).' },
+          month: { type: 'string', description: 'YYYY-MM, e.g. "2026-06". Omit for the latest month that has ratings.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'list_brands',
       description: 'List client brands with their status and owner. Use for "which brands do we have / who owns X".',
       parameters: { type: 'object', properties: {} },
@@ -359,6 +373,71 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
         return `- ${r.brand?.brand_name || 'Unknown brand'} · ${r.period_label || r.period_start} (${r.type}, ${r.status}): ${parts || 'no headline metrics filled'}`;
       });
       return `Reports (${rows.length} matched, showing ${blocks.length}):\n` + blocks.join('\n');
+    }
+
+    if (name === 'get_performance') {
+      let userIds: string[] | null = null;
+      let single: any = null;
+      if (args?.person_name) {
+        const people = await resolvePeople(admin, args.person_name);
+        if (!people.length) return `No active employee matches "${args.person_name}".`;
+        if (people.length > 1) return `Multiple people match "${args.person_name}": ${people.map((p: any) => p.display_name).join(', ')}. Ask which one.`;
+        userIds = [people[0].id]; single = people[0];
+      }
+      // Resolve month: given, else latest month present in ratings.
+      let month = String(args?.month || '').trim();
+      if (!month) {
+        const { data: mx } = await admin.from('performance_ratings').select('month').order('month', { ascending: false }).limit(1);
+        month = mx?.[0]?.month || '';
+      }
+      let rq = admin.from('performance_ratings')
+        .select('user_id, month, metrics, overall_score')
+        .eq('month', month);
+      if (userIds) rq = rq.in('user_id', userIds);
+      const { data: ratings } = await rq;
+
+      const ids = [...new Set([...(ratings || []).map((r: any) => r.user_id), ...(userIds || [])])];
+      const { data: profs } = ids.length
+        ? await admin.from('profiles').select('id, display_name, role').in('id', ids)
+        : { data: [] };
+      const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+      const roleOf = new Map((profs || []).map((p: any) => [p.id, p.role]));
+
+      const metricLabel: Record<string, string> = {
+        punctuality: 'Punctuality', reporting: 'Reporting', responseTime: 'Response time',
+        dailyTasksQuality: 'Daily-task quality', tasksProcessing: 'Task processing', overallWorkflow: 'Overall workflow',
+      };
+      const fmtRating = (r: any) => {
+        const m = r.metrics || {};
+        const parts = Object.keys(metricLabel).filter((k) => m[k] != null).map((k) => `${metricLabel[k]} ${m[k]}`);
+        const ov = r.overall_score != null ? Number(r.overall_score).toFixed(1) : '?';
+        return `${nameOf.get(r.user_id) || 'Unknown'} — overall ${ov}/100${parts.length ? ` (${parts.join(', ')})` : ''}`;
+      };
+
+      let out = '';
+      if (ratings && ratings.length) {
+        const sorted = ratings.slice().sort((a: any, b: any) => (Number(b.overall_score) || 0) - (Number(a.overall_score) || 0));
+        out += `Performance ratings for ${month} (${ratings.length}):\n` + sorted.map((r: any) => `- ${fmtRating(r)}`).join('\n');
+      } else {
+        out += `No performance ratings for ${single ? single.display_name : 'anyone'} in ${month || '(no data)'}.`;
+      }
+
+      // Flags + warnings (all-time; small volume). Scoped to the person if named.
+      let fq = admin.from('performance_flags').select('user_id, type, severity, reason, created_at').order('created_at', { ascending: false }).limit(userIds ? 20 : 30);
+      if (userIds) fq = fq.in('user_id', userIds);
+      const { data: flags } = await fq;
+      if (flags && flags.length) {
+        out += `\n\nFlags (${flags.length}; green = positive, red = concern):\n` + flags.map((f: any) =>
+          `- ${nameOf.get(f.user_id) || 'Unknown'} · ${f.type || '?'}${f.severity ? `/${f.severity}` : ''} (${String(f.created_at).slice(0,10)}): ${String(f.reason || '').slice(0, 300)}`).join('\n');
+      }
+      let wq = admin.from('performance_warnings').select('user_id, reason, severity, created_at').order('created_at', { ascending: false }).limit(userIds ? 20 : 30);
+      if (userIds) wq = wq.in('user_id', userIds);
+      const { data: warns } = await wq;
+      if (warns && warns.length) {
+        out += `\n\nWarnings (${warns.length}):\n` + warns.map((w: any) =>
+          `- ${nameOf.get(w.user_id) || 'Unknown'}${w.severity ? ` (${w.severity})` : ''} (${String(w.created_at).slice(0,10)}): ${String(w.reason || '').slice(0, 300)}`).join('\n');
+      }
+      return out;
     }
 
     if (name === 'list_brands') {
@@ -585,7 +664,7 @@ Deno.serve(async (req) => {
     const isBoss = roleKey === 'boss';
     const dataToolRules = isBoss ? [
       '',
-      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, client report metrics, and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "GMV for Solid Gold last month?", "what is X\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR. If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
+      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, performance ratings/flags/warnings, client report metrics, and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing / his ratings?", "who has the best performance score?", "GMV for Solid Gold last month?", "what is X\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100. If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
     ].join('\n') : '';
 
     const systemPrompt = [
