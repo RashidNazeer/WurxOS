@@ -1,19 +1,21 @@
 // ============================================================
 // Edge Function: ai-chat
 //
-// The WurxOS AI Support Assistant backend. Any logged-in employee can chat;
-// the model is GitHub Models (OpenAI-compatible), called with GPT_TOKEN which
-// stays server-side. Answers are grounded (RAG) in Boss-curated knowledge
-// (ai_assistant_docs) + a Boss-set persona (ai_assistant_config), with
+// The WurxOS AI Support Assistant backend. Answers are grounded (RAG) in
+// Boss-curated knowledge (ai_assistant_docs — WurxOS how-to guides + the
+// company SOP library) plus a Boss-set persona (ai_assistant_config), with
 // persistent per-user memory (ai_conversations / ai_messages).
 //
-// Two grounding modes, picked per question:
-//   • HELP mode  — "how do I use X?" → Knowledge Base RAG (default).
-//   • DATA mode  — "which week had the highest GMV?" → the user's OWN brand
-//     reports, read with their JWT so RLS (reports_select) scopes the rows to
-//     brands they may view. The model only ever sees already-authorized data,
-//     so it cannot be prompted into another user's/brand's figures. The KB is
-//     skipped in this mode to stay well inside the free-tier token budget.
+// BOSS-ONLY (test phase): the assistant is locked to the Boss while it is
+// being validated on a paid model. Access is enforced HERE (hard 403 for any
+// non-Boss caller) as well as hidden in the UI — so it can't be reached by
+// hitting the function directly. Widen ALLOWED_ROLES to launch to more roles.
+//
+// Grounding: pure Knowledge Base RAG — on each question we score the docs by
+// relevance and inject only the most relevant ones (whole docs; they're small),
+// so the model answers from real SOPs and can't be pushed off-topic. (The old
+// brand-report "DATA mode" was removed — this is now a pure knowledge/SOP
+// assistant.)
 //
 // The function is the ONLY writer of ai_messages, so assistant replies can't
 // be forged by a client.
@@ -21,7 +23,13 @@
 // Request: { conversationId?: string, message: string }
 // Response: { conversationId, reply }
 //
-// Env (supabase secrets set): GPT_TOKEN, SUPABASE_URL/SERVICE_ROLE_KEY (auto)
+// Model: OpenAI (api.openai.com), key in OPEN_AI_API_KEY. NOTE the GPT-5.x
+// models require `max_completion_tokens` (not `max_tokens`) and reject a
+// non-default `temperature` — both handled below. Model id is overridable via
+// ai_assistant_config.model (no redeploy needed to switch).
+//
+// Env (supabase secrets): OPEN_AI_API_KEY, SUPABASE_URL/SERVICE_ROLE_KEY (auto),
+//   SUPABASE_ANON_KEY. (GPT_TOKEN kept as a legacy fallback only.)
 // Deploy: supabase functions deploy ai-chat
 // ============================================================
 
@@ -29,17 +37,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const GPT_TOKEN = Deno.env.get('GPT_TOKEN') ?? '';
+const OPENAI_KEY = Deno.env.get('OPEN_AI_API_KEY') ?? Deno.env.get('OPENAI_API_KEY') ?? '';
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''; // used to read KB as the caller (RLS applies)
-const MODELS_URL = 'https://models.github.ai/inference/chat/completions';
-const KNOWLEDGE_BUDGET = 4500;  // chars of knowledge injected per call — kept small so the request
-                                // fits even strict models (e.g. GitHub Models gpt-5-mini = 4000 input tokens).
-                                // Lowered from 6000 to leave room for the role-grounding block below.
-const HISTORY_CHAR_CAP = 2500;  // cap recent-history chars for the same reason
-const HISTORY_TURNS = 10;       // most-recent messages considered for memory
-const DATA_BUDGET = 8000;       // chars of brand-report data injected in DATA mode (KB + page list
-                                // are skipped in this mode, so there's room for the full breakdowns)
-const REPORTS_FETCH_LIMIT = 120; // rows pulled (RLS-scoped) before compacting
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_MODEL = 'gpt-5.4-mini'; // near-latest, cheap, strong at reading SOPs. Override in config.
+
+// Boss-only during the test phase. Add roles here to widen access at launch.
+const ALLOWED_ROLES = ['boss'];
+
+// Paid model (128K context) → comfortable budgets. Still RAG-tight for cost:
+// we send only the most relevant docs, not the whole library.
+const KNOWLEDGE_BUDGET = 14000; // chars of knowledge injected per call
+const HISTORY_CHAR_CAP = 4000;  // cap recent-history chars
+const HISTORY_TURNS = 12;       // most-recent messages considered for memory
+const MAX_COMPLETION_TOKENS = 1000; // output cap (cheap; keeps answers complete)
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -135,333 +146,13 @@ const PAGES: Page[] = [
 const pagesForRole = (role: string) =>
   PAGES.filter((p) => p.roles === 'all' || (p.roles as string[]).includes(role));
 
-// ── Data mode (brand-report analytics) ──────────────────────────────
-// Lets a user ask about THEIR OWN brands' report metrics ("which week had
-// the highest GMV?"). Security is enforced by RLS, NOT by the model: reports
-// are fetched with the caller's JWT, so the DB only ever returns brands they
-// may view. The model just reasons over the rows it's handed — it can't be
-// prompted into fetching anyone else's data, because that data is never read.
-
-// Metric stored as a string like "$12,345.67" / "1,200" / "3.5x" → number|null.
-function parseNum(v: unknown): number | null {
-  if (v === null || v === undefined) return null;
-  const s = String(v).replace(/[^0-9.\-]/g, '');
-  if (s === '' || s === '-' || s === '.' || s === '-.') return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
-
-// Heuristic: does the question want report DATA/metrics rather than how-to help?
-// Misrouting is harmless to security (RLS still scopes everything); worst case
-// a how-to gets answered from data context. An explicit "how do I…" phrasing
-// stays in HELP mode even if it mentions a metric word ("how do I post videos").
-function looksLikeDataQuestion(msg: string): boolean {
-  const m = msg.toLowerCase();
-  const analytic = /\b(highest|lowest|best|worst|top|most|least|maximum|minimum|max|min|compare|comparison|versus|vs|trend|growth|grew|increase[d]?|decrease[d]?|drop(ped)?|decline[d]?|average|avg|total|sum|how much|how many|which (week|month|period|brand)|over time|so far|this (week|month)|last (week|month)|year to date|ytd)\b/;
-  const metric = /\b(gmv|sales|revenue|orders?|roi|spend|cpo|views?|clicks?|samples?|shop\s*(performance|score)|affiliate|offsite|conversion|creators?|campaigns?|products?|videos?|metrics?|numbers?|figures?|stats?|statistics|performance|insights?)\b/;
-  const howto = /^\s*(how\s+(do|can|to|would|should)|where\s+(do|is|can|are)|what('?s| is| are) the (process|step|way)|guide me|walk me|teach me|explain how)/;
-  // "who handles X / which apc / who's assigned / who owns" → brand-team data.
-  const team = /\b(apc|ipc|who(?:'?s| is| are)?\s+(?:handl|manag|run|own|assign|the apc|the ipc|on)|who\s+handles|handling|managing|assigned\s+to|coordinator|team\s+for|owner\s+of|works?\s+on)\b/;
-  if (analytic.test(m)) return true;     // explicit analytics intent → data
-  if (howto.test(m)) return false;       // explicit how-to → help (KB), even with a metric word
-  if (metric.test(m)) return true;       // a metric/section noun → data
-  return team.test(m);                   // a who-handles/assignment question → data
-}
-
-// Resolve the owner (TL) + assigned APC/IPC names for the brands the caller may
-// see. Scoped to those already RLS-authorized brand ids; display names only
-// (not sensitive — shown on the brand page). Lets the assistant answer
-// "who handles this brand?" from real data instead of guessing a name.
-async function buildBrandTeams(brands: any[]): Promise<{ name: string; owner: string; members: string[] }[]> {
-  const ids = brands.map((b) => b.id).filter(Boolean);
-  if (!ids.length) return [];
-  const { data: assigns } = await admin.from('brand_assignments').select('brand_id, user_id').in('brand_id', ids);
-  const allIds = [...new Set([
-    ...brands.map((b) => b.owner_id).filter(Boolean),
-    ...(assigns || []).map((a) => a.user_id),
-  ])];
-  const nameById = new Map<string, string>();
-  if (allIds.length) {
-    const { data: people } = await admin.from('profiles').select('id, display_name').in('id', allIds);
-    for (const p of people || []) nameById.set(p.id, p.display_name);
-  }
-  const byBrand = new Map<string, string[]>();
-  for (const a of assigns || []) {
-    const nm = nameById.get(a.user_id);
-    if (!nm) continue;
-    const arr = byBrand.get(a.brand_id) ?? [];
-    arr.push(nm);
-    byBrand.set(a.brand_id, arr);
-  }
-  return brands
-    .map((b) => ({ name: b.brand_name, owner: nameById.get(b.owner_id) || '', members: byBrand.get(b.id) || [] }))
-    .filter((t) => t.name && (t.owner || t.members.length));
-}
-
-// Headline numeric metrics — the compact per-period time-series backbone.
-const METRIC_COLS: { label: string; path: (d: Record<string, any>) => unknown }[] = [
-  { label: 'GMV',                    path: (d) => d?.overallPerformance?.gmv },
-  { label: 'Affiliate GMV',          path: (d) => d?.overallPerformance?.affiliateGmv },
-  { label: 'Orders',                 path: (d) => d?.overallPerformance?.orders },
-  { label: 'ROI',                    path: (d) => d?.overallPerformance?.roi },
-  { label: 'Videos Posted',          path: (d) => d?.overallPerformance?.videosPosted },
-  { label: 'Samples Approved',       path: (d) => d?.overallPerformance?.samplesApproved },
-  { label: 'Shop Performance Score', path: (d) => d?.overallPerformance?.shopPerformanceScore },
-  { label: 'Offsite GMV',            path: (d) => d?.offsitePerformance?.offsiteGmv },
-  { label: 'TikTok Shop GMV',        path: (d) => d?.offsitePerformance?.tiktokShopGmv },
-  { label: 'Offsite Effect',         path: (d) => d?.offsitePerformance?.offsiteEffect },
-];
-
-// ── Detail serialization helpers ────────────────────────────────────
-const num = (v: unknown): string => { const n = parseNum(v); return n === null ? '' : String(n); };
-function clip(v: unknown, n: number): string {
-  // Insight/notes fields are stored as rich-text HTML — strip tags & decode
-  // the common entities so the model sees clean prose, not "<p>…</p>".
-  const t = String(v ?? '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#3?9;/gi, "'")
-    .replace(/\s+/g, ' ').trim();
-  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
-}
-// Compact pipe sub-table from an array of row objects; drops blank rows.
-function miniTable(arr: any[], cols: { label: string; get: (x: any) => string }[], maxRows: number): string {
-  const rows = (arr || []).filter((x) => x && cols.some((c) => c.get(x) !== '')).slice(0, maxRows);
-  if (!rows.length) return '';
-  let t = cols.map((c) => c.label).join(' | ');
-  for (const x of rows) t += `\n${cols.map((c) => c.get(x)).join(' | ')}`;
-  const more = (arr?.length || 0) - rows.length;
-  if (more > 0) t += `\n…(+${more} more)`;
-  return t;
-}
-
-// Full, compact serialization of ONE report's detail sections — every part of
-// the report (creators, videos, GMV Max, products, offsite, insights, notes,
-// operational sections, custom fields), each capped so a single period stays
-// token-bounded.
-function reportDetail(r: any): string {
-  const d = r?.data || {};
-  const parts: string[] = [];
-  const text = (label: string, v: unknown, n = 320) => { const s = clip(v, n); if (s) parts.push(`${label}: ${s}`); };
-
-  text('Overall insights', d.overallInsights);
-  text('Samples note', d.overallNotes?.samplesApproved, 160);
-  text('Videos note', d.overallNotes?.videosPosted, 160);
-
-  const creators = miniTable(d.topCreators, [
-    { label: 'Creator', get: (x) => clip(x.name, 40) },
-    { label: 'Videos', get: (x) => num(x.videosPosted) },
-    { label: 'Items', get: (x) => num(x.itemsSold) },
-    { label: 'GMV', get: (x) => num(x.gmv) },
-    { label: 'Notes', get: (x) => clip(x.notes, 60) },
-  ], 8);
-  if (creators) parts.push(`Top creators:\n${creators}`);
-  text('Creators insight', d.topCreatorsInsights);
-
-  const videos = miniTable(d.topVideos, [
-    { label: 'Creator', get: (x) => clip(x.creatorName, 30) },
-    { label: 'Items', get: (x) => num(x.itemsSold) },
-    { label: 'GMV', get: (x) => num(x.gmv) },
-    { label: 'Views', get: (x) => num(x.views) },
-    { label: 'Clicks', get: (x) => num(x.productClicks) },
-    { label: 'Notes', get: (x) => clip(x.notes, 50) },
-  ], 8);
-  if (videos) parts.push(`Top videos:\n${videos}`);
-  text('Videos insight', d.topVideosInsights);
-
-  const gmvmax = miniTable(d.gmvMax, [
-    { label: 'Campaign', get: (x) => clip(x.campaign, 40) },
-    { label: 'Spend', get: (x) => num(x.spend) },
-    { label: 'GMV', get: (x) => num(x.gmv) },
-    { label: 'ROI', get: (x) => num(x.roi) },
-    { label: 'Orders', get: (x) => num(x.orders) },
-    { label: 'CPO', get: (x) => num(x.cpo) },
-    { label: 'Notes', get: (x) => clip(x.notes, 50) },
-  ], 8);
-  if (gmvmax) parts.push(`GMV Max campaigns:\n${gmvmax}`);
-  text('GMV Max insight', d.gmvMaxInsights);
-
-  const products = miniTable(d.productHighlights, [
-    { label: 'Product', get: (x) => clip(x.productName, 40) },
-    { label: 'Units', get: (x) => num(x.unitsSold) },
-    { label: 'GMV', get: (x) => num(x.gmv) },
-    { label: 'New Videos', get: (x) => num(x.newVideos) },
-    { label: 'Notes', get: (x) => clip(x.notes, 50) },
-  ], 8);
-  if (products) parts.push(`Product highlights:\n${products}`);
-  text('Products insight', d.productHighlightsInsights);
-
-  // Offsite headline numbers are already in the per-period table; include the
-  // narrative + the three figures together here for context.
-  const off = d.offsitePerformance || {};
-  if (num(off.offsiteGmv) || num(off.tiktokShopGmv) || num(off.offsiteEffect)) {
-    parts.push(`Offsite: GMV=${num(off.offsiteGmv) || '—'}, TikTok Shop GMV=${num(off.tiktokShopGmv) || '—'}, Offsite effect=${num(off.offsiteEffect) || '—'}`);
-  }
-  text('Offsite insight', d.offsiteInsights);
-
-  text('Current & upcoming campaigns', d.upcomingCampaigns);
-  text('Operational updates', d.operationalUpdates);
-  text('Recommendations', d.recommendations);
-  text('Action items', d.actionItems);
-
-  if (d.customFields && typeof d.customFields === 'object') {
-    const cf = Object.values(d.customFields as Record<string, any>)
-      .filter((f) => f && (f.name || f.value))
-      .map((f) => `${clip(f.name, 40)}=${clip(f.value, 80)}`).slice(0, 10);
-    if (cf.length) parts.push(`Custom fields: ${cf.join('; ')}`);
-  }
-  return parts.join('\n');
-}
-
-// ── Fuzzy matching of brand names & periods to loose user wording ───
-function escapeRe(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-// Generic words in brand names that shouldn't be required for a match.
-const BRAND_STOPW = new Set(['the', 'shop', 'us', 'usa', 'inc', 'co', 'llc', 'ltd', 'pets', 'pet', 'store', 'official', 'brand', 'company', 'group', 'tts']);
-// Did the user name this brand, even loosely? ("solid gold" → "Solid Gold Pets")
-function brandNamedInMessage(name: string, ml: string): boolean {
-  const n = String(name || '').toLowerCase().trim();
-  if (n.length < 2) return false;
-  if (ml.includes(n)) return true;                                            // full name
-  const words = n.split(/\s+/).filter(Boolean);
-  if (words.length >= 2 && ml.includes(words.slice(0, 2).join(' '))) return true; // first two words ("solid gold")
-  const sig = words.filter((w) => !BRAND_STOPW.has(w) && w.length >= 3);      // distinctive words
-  if (sig.length >= 2 && sig.every((w) => ml.includes(w))) return true;       // all distinctive words present
-  if (sig.some((w) => w.length >= 5 && new RegExp(`\\b${escapeRe(w)}\\b`).test(ml))) return true; // one strong word ("biostime")
-  return false;
-}
-
-// Does the message reference this report's period? ("week 11", "June", "14-20")
-function periodMentioned(label: string, ml: string): boolean {
-  const lab = (label || '').toLowerCase();
-  const wk = lab.match(/week\s*(\d+)/);
-  if (wk && new RegExp(`\\bweek\\s*${wk[1]}\\b`).test(ml)) return true;
-  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  if (months.some((m) => lab.includes(m) && ml.includes(m))) return true;
-  // A date range in the message ("14-20", "14 to 20") matching the label's days.
-  const ranges = ml.match(/\b\d{1,2}\s*(?:[-–—]|to)\s*\d{1,2}\b/g) || [];
-  for (const rg of ranges) {
-    const nums = rg.match(/\d{1,2}/g) || [];
-    if (nums.length === 2 && nums.every((x) => new RegExp(`\\b${x}\\b`).test(lab))) return true;
-  }
-  return false;
-}
-
-// Build the (token-bounded) DATA block: a headline time-series per brand, then
-// full detailed breakdowns for the most relevant periods (named first, else
-// most recent), filling the remaining budget.
-function buildDataBlock(reps: any[], allBrands: any[], brandTeams: { name: string; owner: string; members: string[] }[], message: string): string {
-  const intro = 'BRAND REPORT DATA (these are the ONLY brands/reports you can access — they all belong to this user. Never reference, invent, or imply data for any brand or person not listed here):';
-  const ml = message.toLowerCase();
-
-  // Who manages each brand (owner TL + assigned APC/IPC). Named brands first,
-  // capped to stay within the token budget. Used to answer "who handles X?".
-  const teamLines = (brandTeams || [])
-    .slice()
-    .sort((a, b) => (Number(brandNamedInMessage(b.name, ml)) - Number(brandNamedInMessage(a.name, ml)))
-      || String(a.name).localeCompare(String(b.name)))
-    .slice(0, 15)
-    .map((t) => `- ${t.name} — TL/owner: ${t.owner || 'unknown'}${t.members.length ? `; APC/IPC: ${t.members.join(', ')}` : ''}`);
-  const teamsNote = teamLines.length
-    ? `\n\n## BRAND TEAMS (who manages each brand — answer "who handles X" using ONLY these names; never invent a person):\n${teamLines.join('\n')}${(brandTeams || []).length > teamLines.length ? `\n…(+${(brandTeams || []).length - teamLines.length} more brands' teams — ask by brand name)` : ''}`
-    : '';
-
-  // Brands the user manages that have NO reports filed yet — nothing to analyze
-  // until the first report is saved, but the assistant should still acknowledge
-  // them (a brand created today has zero reports; that's not "doesn't exist").
-  const reportBrandIds = new Set(reps.map((r) => r.brand_id));
-  const noReport = (allBrands || [])
-    .filter((b) => b && b.brand_name && b.status !== 'inactive' && !reportBrandIds.has(b.id))
-    .sort((a, b) => (Number(brandNamedInMessage(b.brand_name, ml)) - Number(brandNamedInMessage(a.brand_name, ml)))
-      || String(a.brand_name).localeCompare(String(b.brand_name)));
-  const noReportNames = noReport.slice(0, 12).map((b) => b.brand_name).join(', ')
-    + (noReport.length > 12 ? ` (+${noReport.length - 12} more)` : '');
-  const noReportNote = noReport.length
-    ? `\n\n## BRANDS YOU MANAGE WITH NO REPORTS YET (these brands exist but have no report filed, so there is nothing to analyze until the first report is saved — acknowledge the brand and say it has no reports yet; do NOT claim you don't recognize it): ${noReportNames}`
-    : '';
-
-  if (!reps.length) {
-    const empty = noReport.length
-      ? `\n\nYou manage these brand(s), but none have any reports filed yet, so there is no performance data to analyze: ${noReportNames}.`
-      : '\n\n(No reports are visible to you yet, so there is no performance data to analyze.)';
-    return `${intro}${empty}${teamsNote}`;
-  }
-
-  // Group by brand (newest-first order preserved from the query).
-  const byBrand = new Map<string, { name: string; currency: string; rows: any[] }>();
-  for (const r of reps) {
-    const name = r.brand?.brand_name || `Brand ${String(r.brand_id).slice(0, 8)}`;
-    if (!byBrand.has(r.brand_id)) byBrand.set(r.brand_id, { name, currency: String(r.data?.currency || 'USD'), rows: [] });
-    byBrand.get(r.brand_id)!.rows.push(r);
-  }
-  // If the user named one of THEIR brands, narrow to it (still within the
-  // authorized set — naming a brand they don't have simply matches nothing).
-  const named = [...byBrand.values()].filter((b) => brandNamedInMessage(b.name, ml));
-  const brands = named.length ? named : [...byBrand.values()];
-  const list = brands.slice(0, named.length ? named.length : 5);
-  const headlineRows = (list.length <= 1 || named.length) ? 26 : 12;
-
-  let out = '';
-  let truncated = false;
-
-  // Pass 1 — headline time-series for every (capped) brand. Cheap, so these
-  // generally all fit and cover any "which week/month was X highest" question.
-  for (const b of list) {
-    const cols = METRIC_COLS.filter((c) => b.rows.some((r) => parseNum(c.path(r.data)) !== null));
-    if (!cols.length) continue;
-    let tbl = `\n\n### ${b.name} (currency: ${b.currency}) — headline metrics by period\n${['Type', 'Period', 'Status', ...cols.map((c) => c.label)].join(' | ')}`;
-    const hrows = b.rows.slice(0, headlineRows);
-    for (const r of hrows) tbl += `\n${r.type} | ${r.period_label || r.period_start} | ${r.status} | ${cols.map((c) => num(c.path(r.data))).join(' | ')}`;
-    if (b.rows.length > headlineRows) tbl += `\n…(${b.rows.length - headlineRows} older periods not shown in this table)`;
-    if (out.length && out.length + tbl.length > DATA_BUDGET) { truncated = true; break; }
-    out += tbl;
-  }
-
-  // Pass 2 — full detailed breakdowns, prioritized: periods the user named,
-  // then named brand, then most recent. Fills whatever budget remains.
-  // Report-type hint: "last month/monthly" prefers monthly reports; "week/weekly" prefers weekly/biweekly.
-  const wantsMonthly = /\bmonth(ly)?\b/.test(ml) && !/\bweek/.test(ml);
-  const wantsWeekly = /\bweek(ly)?\b/.test(ml);
-  const typeMatch = (t: string) => (wantsMonthly && t === 'monthly') || (wantsWeekly && (t === 'weekly' || t === 'biweekly'));
-
-  const candidates: { b: any; r: any; idx: number; brandNamed: boolean; periodNamed: boolean; typeOk: boolean }[] = [];
-  list.forEach((b) => {
-    const brandNamed = named.includes(b);
-    b.rows.forEach((r: any, idx: number) => candidates.push({
-      b, r, idx, brandNamed,
-      periodNamed: periodMentioned(r.period_label, ml),
-      typeOk: typeMatch(r.type),
-    }));
-  });
-  candidates.sort((a, z) =>
-    (Number(z.periodNamed) - Number(a.periodNamed)) ||
-    (Number(z.brandNamed) - Number(a.brandNamed)) ||
-    (Number(z.typeOk) - Number(a.typeOk)) ||
-    (a.idx - z.idx));
-
-  let detailHeader = false;
-  let emitted = 0;
-  for (const c of candidates) {
-    if (emitted >= 12) break;
-    const detail = reportDetail(c.r);
-    if (!detail) continue;
-    const head = detailHeader ? '' : '\n\n## DETAILED BREAKDOWNS (top creators, top videos, GMV Max campaigns, product highlights, offsite, insights & notes — shown for the most relevant periods):';
-    const block = `${head}\n\n— ${c.b.name} · ${c.r.period_label || c.r.period_start} (${c.r.type}, ${c.r.status}) —\n${detail}`;
-    if (out.length + block.length > DATA_BUDGET) { truncated = true; break; }
-    out += block;
-    detailHeader = true;
-    emitted++;
-  }
-
-  if (truncated) out += '\n\n(Some detail was omitted to stay within size limits. For older periods, other brands, or a specific section, ask about that brand and week/month by name.)';
-  return `${intro}${out || '\n\n(No metrics have been filled into your reports yet.)'}${noReportNote}${teamsNote}`;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
-    if (!GPT_TOKEN) return json({ error: 'GPT_TOKEN not configured' }, 500);
+    if (!OPENAI_KEY) return json({ error: 'OPEN_AI_API_KEY not configured' }, 500);
 
-    // ── Auth: any active employee ──────────────────────────────────
+    // ── Auth: active employee, AND role must be allowed ────────────
     const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     if (!token) return json({ error: 'unauthenticated' }, 401);
     const { data: u } = await admin.auth.getUser(token);
@@ -469,6 +160,11 @@ Deno.serve(async (req) => {
     const { data: profile } = await admin.from('profiles')
       .select('display_name, role, is_active').eq('id', u.user.id).maybeSingle();
     if (!profile || profile.is_active === false) return json({ error: 'forbidden' }, 403);
+    // Boss-only during the test phase — enforced server-side so it can't be
+    // reached by calling the function directly, not just hidden in the UI.
+    if (!ALLOWED_ROLES.includes(String(profile.role || '').toLowerCase())) {
+      return json({ error: 'The assistant is currently in limited testing and not available for your role yet.' }, 403);
+    }
 
     const body = await req.json().catch(() => ({}));
     const message = String(body?.message || '').trim();
@@ -482,7 +178,13 @@ Deno.serve(async (req) => {
       return json({ error: 'The assistant is currently turned off by an admin.' }, 503);
     }
     const persona = cfg?.persona || 'You are the WurxOS assistant. Answer only from the provided knowledge; stay on WurxOS topics.';
-    const model = cfg?.model || 'openai/gpt-4o-mini';
+    // Config may still hold an old GitHub-Models id like "openai/gpt-4.1".
+    // Strip any "openai/" prefix (OpenAI's own API wants the bare id) and fall
+    // back to our default if it looks like a non-OpenAI/GitHub-only model.
+    const rawModel = String(cfg?.model || '').trim();
+    const model = rawModel && !rawModel.includes('/') ? rawModel
+      : rawModel.startsWith('openai/') ? rawModel.slice('openai/'.length)
+      : DEFAULT_MODEL;
 
     // ── Conversation (own it, or create) ───────────────────────────
     if (conversationId) {
@@ -498,8 +200,8 @@ Deno.serve(async (req) => {
     }
 
     // ── Caller-scoped client (RLS applies) ─────────────────────────
-    // Used to read the Knowledge Base AND brand reports AS THE USER, so the
-    // database itself guarantees they only ever see what they're allowed to.
+    // Used to read the company Knowledge Base AS THE USER, so the database
+    // itself guarantees they only ever see articles they're allowed to.
     const userClient = ANON_KEY
       ? createClient(SUPABASE_URL, ANON_KEY, {
           global: { headers: { Authorization: `Bearer ${token}` } },
@@ -507,35 +209,11 @@ Deno.serve(async (req) => {
         })
       : null;
 
-    // Route the question: a metrics/analytics ask → DATA mode (read the user's
-    // own brand reports, and SKIP the KB to keep us well under the token cap).
-    // Anything else → help mode (Knowledge Base RAG, unchanged).
-    const dataMode = !!userClient && looksLikeDataQuestion(message);
-
     let knowledgeBlock: string;
-    if (dataMode) {
-      // RLS-scoped read: `reports_select` (mig 012 → can_view_report →
-      // can_view_brand) means this returns ONLY reports for brands the caller
-      // may view — owned (TL), assigned (APC/IPC, incl. temporary), or authored;
-      // OL/Boss/Dev see all. The model never picks the filter, so it can't be
-      // prompted into another user's or brand's data: that data is never read.
-      const [{ data: reps }, { data: myBrands }] = await Promise.all([
-        userClient!
-          .from('reports')
-          .select('brand_id, type, period_start, period_label, status, data, brand:brand_id(brand_name)')
-          .order('period_start', { ascending: false })
-          .limit(REPORTS_FETCH_LIMIT),
-        // Also RLS-scoped (brands_select → can_view_brand): the caller's brands.
-        // Lets the assistant acknowledge brands that exist but have no reports
-        // yet (e.g. one created today), instead of saying it doesn't know them.
-        userClient!.from('brands').select('id, brand_name, status, owner_id').limit(200),
-      ]);
-      const brandTeams = await buildBrandTeams(myBrands || []);
-      knowledgeBlock = buildDataBlock(reps || [], myBrands || [], brandTeams, message);
-    } else {
+    {
       // ── Knowledge (RAG) — pick the docs most relevant to THIS question
-      //    and cap the size, so the request fits the model's input limit
-      //    instead of stuffing the whole knowledge base into every call. ──
+      //    and cap the size, so the request stays focused and cheap instead
+      //    of stuffing the whole knowledge base into every call. ──
       const { data: docs } = await admin.from('ai_assistant_docs')
         .select('title, content').eq('is_active', true).order('updated_at', { ascending: false });
 
@@ -567,31 +245,72 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Unified relevance pool — curated WurxOS guides ranked slightly above KB
-      // so "how do I use the app" questions prefer the how-to guides.
+      // Unified relevance pool — curated WurxOS how-to guides ranked slightly
+      // above the SOP library / KB so "how do I use the app" prefers the guides.
+      // Strip the internal import sentinel so it never reaches the model.
+      const strip = (s: string) => String(s || '').replace(/\s*<!--wurx-sop-import-->\s*/g, '').trim();
       const pool = [
-        ...(docs || []).map((d) => ({ title: d.title, content: d.content, boost: 1.2 })),
-        ...kbDocs.map((d) => ({ title: d.title, content: d.content, boost: 1.0 })),
+        ...(docs || []).map((d) => ({ title: d.title, content: strip(d.content), boost: 1.15 })),
+        ...kbDocs.map((d) => ({ title: d.title, content: strip(d.content), boost: 1.0 })),
       ];
-      const STOP = new Set(['the','a','an','to','how','do','does','i','what','is','are','my','of','in','on','for','and','me','about','this','that','you','your','with','it','at','be','or','as','will','can','please','need','want','where','when','who','why','from','our','we','us']);
-      const terms = (message.toLowerCase().match(/[a-z0-9']+/g) || []).filter((w) => w.length > 2 && !STOP.has(w));
+
+      // ── Retrieval scoring (keyword, synonym- and stem-aware) ──
+      // Free-text keyword match, hardened so wording differences don't miss:
+      //  • stem long words (prefix) so submit/submitting/submission all match;
+      //  • expand a few high-value domain synonyms onto the query;
+      //  • weight title hits heavily; normalise by doc length so a long doc
+      //    can't win on sheer size (reward density, not verbosity).
+      const STOP = new Set(['the','a','an','to','how','do','does','did','i','what','is','are','was','were','my','of','in','on','for','and','me','about','this','that','you','your','with','it','at','be','or','as','will','can','could','should','would','please','need','want','where','when','who','why','from','our','we','us','have','has','get','got','if','so','any','all','not','no']);
+      const stem = (w: string) => (w.length > 6 ? w.slice(0, Math.ceil(w.length * 0.75)) : w);
+      // query synonym expansion (mirrors the ingest keyword seeds)
+      const SYN: [RegExp, string][] = [
+        [/\b(vacation|holiday|time off|pto|day off)\b/i, 'leave'],
+        [/\b(clock|check in|check out|punch)\b/i, 'attendance'],
+        [/\b(budget|spend|roi|target)\b/i, 'gmv max campaign'],
+        [/\b(ad|ads|advert)\b/i, 'campaign'],
+        [/\b(influencer|creator|affiliate)\b/i, 'creator outreach'],
+        [/\b(banned|prohibited|flagged|restricted|compliance)\b/i, 'violation'],
+        [/\b(brief|hook|cta|talking points)\b/i, 'content brief'],
+        [/\b(competitor|research|kalodata)\b/i, 'competitor research'],
+        [/\b(onboard|new brand|kickoff)\b/i, 'onboarding brand'],
+      ];
+      let qraw = message.toLowerCase();
+      for (const [re, extra] of SYN) if (re.test(qraw)) qraw += ' ' + extra;
+      const terms = [...new Set((qraw.match(/[a-z0-9']+/g) || [])
+        .filter((w) => w.length > 2 && !STOP.has(w)).map(stem))];
+
       const scored = pool.map((d) => {
-        const hay = `${d.title} ${d.title} ${d.title} ${d.content}`.toLowerCase(); // weight the title
-        let score = 0;
-        for (const t of terms) { let i = 0; while ((i = hay.indexOf(t, i)) !== -1) { score++; i += t.length; } }
-        return { d, score: score * d.boost };
+        const title = d.title.toLowerCase();
+        const hay = `${title} ${d.content.toLowerCase()}`;
+        let hits = 0, titleHits = 0, distinct = 0;
+        for (const t of terms) {
+          let i = 0, c = 0;
+          while ((i = hay.indexOf(t, i)) !== -1) { c++; i += t.length; }
+          if (c > 0) { hits += c; distinct++; }
+          if (title.includes(t)) titleHits++;
+        }
+        // length normalisation: divide by sqrt(chars) so long docs don't dominate
+        const norm = hits / Math.sqrt(Math.max(300, d.content.length));
+        // distinct-term coverage matters more than raw repetition
+        const score = (norm + distinct * 0.6 + titleHits * 2.5) * d.boost;
+        return { d, score, distinct };
       }).sort((a, b) => b.score - a.score);
-      let picked = scored.filter((s) => s.score > 0).map((s) => s.d);
-      if (picked.length === 0) picked = pool.filter((d) => d.boost > 1).slice(0, 2); // no hit → a little general WurxOS context
+
+      // keep docs that matched at least one query term; else a little general context
+      let picked = scored.filter((s) => s.distinct > 0).map((s) => s.d);
+      if (picked.length === 0) picked = pool.filter((d) => d.boost > 1).slice(0, 3);
+
       let knowledge = '';
+      let used = 0;
       for (const d of picked) {
         const block = `\n\n## ${d.title}\n${d.content}`;
         if (knowledge.length && knowledge.length + block.length > KNOWLEDGE_BUDGET) break; // always include the top match
         knowledge += block;
+        if (++used >= 6) break; // at most 6 docs — keeps the prompt focused & cheap
       }
       knowledgeBlock = knowledge
-        ? `KNOWLEDGE (answer using this — WurxOS app help and company Knowledge Base articles):${knowledge}`
-        : 'No specific knowledge matched this question. Answer from general WurxOS context if you can; otherwise say you are not sure and suggest asking the Team Lead or Boss.';
+        ? `KNOWLEDGE (answer using ONLY this — WurxOS app help and the company SOP library):${knowledge}`
+        : 'No specific knowledge matched this question. If you can answer from general WurxOS context do so; otherwise say you are not sure and suggest asking the Team Lead or Boss.';
     }
 
     // ── History (memory) ───────────────────────────────────────────
@@ -612,83 +331,51 @@ Deno.serve(async (req) => {
     const roleKey = String(profile.role || '').toLowerCase();
     const roleLabel = ROLE_LABEL[roleKey] || (profile.role || 'team member');
 
-    let systemPrompt: string;
-    if (dataMode) {
-      // Lean prompt: persona + who + the (RLS-scoped) data + analysis rules.
-      // No page list / KB here — keeps the request small and the answer focused.
-      const dataRules = [
-        'HOW TO ANSWER (DATA MODE):',
-        '- Answer ONLY from the BRAND REPORT DATA above. It has a per-brand headline metrics table (every period) AND DETAILED BREAKDOWNS — top creators, top videos, GMV Max campaigns, product highlights, offsite performance, plus written insights and notes — for the most relevant periods.',
-        '- MATCH FIELDS BY MEANING, not by exact wording. Users name metrics loosely — map their phrasing to the closest column/field and never say a metric is missing just because the words differ from the header. Guide: "samples" / "samples approved" / "approved samples" = Samples Approved; "orders" / "orders shipped" / "orders placed" = Orders; "sales" / "revenue" / "total sales" = GMV; "creator/affiliate sales" = Affiliate GMV; "videos" / "content posted" = Videos Posted; "shop score" / "store score" / "performance score" = Shop Performance Score; "ad return" / "return on investment" = ROI; "offsite" / "off-platform" = Offsite GMV / TikTok Shop GMV / Offsite Effect; "creators", "videos list", "campaigns/ads", "products" live in the detailed breakdowns. If a term is genuinely ambiguous between two fields, ask which one they mean.',
-        '- Do the math yourself (max, min, totals, averages, growth, comparisons, rankings) and state the exact period and the number.',
-        '- For max/min/average, use ONLY the periods where that metric actually has a value (ignore blanks). If even ONE period shows the metric, you CAN compute its lowest/highest — NEVER claim it was "not reported for any week" when values are present in the table.',
-        '- READ FOLLOW-UPS IN CONTEXT. A short follow-up continues the previous topic: after you gave the highest of a metric, "also the minimum one" / "and the lowest?" / "what about videos?" means the SAME kind of question on the same data — answer it from the table; do NOT say you lack the information.',
-        '- The detailed breakdowns are shown only for the most relevant or recent periods. If asked for detail (e.g. a creator or video list) about a period that is NOT shown, ask the user to name that specific week/month so it can be pulled in.',
-        "- Show money using the brand's stated currency. A blank metric means \"not reported\" for that period — do not treat it as zero.",
-        "- This data is the user's OWN brand(s). You have NO access to any other employee's or brand's figures. If they ask about a brand or person not listed above, tell them you can only see their own brand data and do not guess or fabricate.",
-        '- If a question is relevant but unclear or could mean several things (which metric? which brand? which report type?), ask ONE short clarifying question instead of refusing. "I don\'t have that information" is correct ONLY when the data genuinely does not contain it — never as a response to ambiguity.',
-        '- If the data spans more than one brand and the user did not name one, either answer per brand or ask which brand they mean.',
-        '- If the user asks about a brand listed under "BRANDS YOU MANAGE WITH NO REPORTS YET", tell them that brand exists but has no reports filed yet, so there is nothing to analyze until the first report is saved — never say you do not recognize or cannot find the brand.',
-        '- To answer who handles / manages / is assigned to / owns a brand, use ONLY the names in the BRAND TEAMS section. NEVER invent or guess a person\'s name. If a brand or its team is not listed, say you don\'t have that assignment on record and suggest checking the brand\'s page or [My Team](/tl/team).',
-        '- Only when the data truly lacks the requested metric, say so briefly and point them to [Weekly Reports](/weekly-reports), [Bi-Weekly Reports](/biweekly-reports) or [Monthly Reports](/monthly-reports).',
-        '- Be concise and well-structured: a direct answer first, then a small list or table when it helps (e.g. comparing periods or ranking creators).',
-      ].join('\n');
-      systemPrompt = [
-        persona,
-        `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
-        knowledgeBlock,
-        dataRules,
-      ].join('\n\n');
-    } else {
-      const roleCap = ROLE_CAPS[roleKey] || 'You are a WurxOS user.';
-      const pageList = pagesForRole(roleKey)
-        .map((p) => `- ${p.label} (${p.path}): ${p.purpose}`).join('\n');
+    const roleCap = ROLE_CAPS[roleKey] || 'You are a WurxOS user.';
+    const pageList = pagesForRole(roleKey)
+      .map((p) => `- ${p.label} (${p.path}): ${p.purpose}`).join('\n');
 
-      const groundingRules = [
-        'HOW TO ANSWER:',
-        `- The person you are helping is a ${roleLabel}. Only explain actions THIS role can actually do, based on "WHAT THEY CAN DO" and the page list above.`,
-        '- If they ask how to do something their role cannot do (e.g. a Boss asking how to apply for leave), do NOT invent steps. Briefly say it is not part of their role and point them to what they CAN do instead.',
-        '- Never invent pages, buttons, or steps that are not supported by the knowledge or the page list. If you do not know, say so and suggest asking their Team Lead, Operation Lead, or the Boss.',
-        '- When you mention a page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never show a bare URL or invent a path.',
-        '- Some knowledge entries have no written steps — only a title and a link to a full guide (e.g. a Google Doc). For those, do NOT say you have no information and do NOT invent steps: point the user to the guide with a markdown link, e.g. [open the guide](https://…). Recite detailed steps only when the knowledge actually contains them.',
-        '- If the user is clearly asking about their brand\'s performance/metrics (GMV, orders, etc.), tell them you can answer that — ask them to mention the metric and brand — rather than guessing numbers.',
-        '- Read short follow-up questions in the context of the conversation so far — they usually continue the previous topic. If a question is relevant but unclear, ask ONE short clarifying question instead of replying that you do not know.',
-        '- NEVER invent the name of a person, brand, APC/IPC, or assignment. If you are asked who handles a brand or who someone is and you have not been given that fact, say you do not have that information and point them to the brand\'s page or [My Team](/tl/team) — do not guess a name.',
-        '- Be concise and friendly; use short numbered steps when describing a flow.',
-      ].join('\n');
+    const groundingRules = [
+      'HOW TO ANSWER:',
+      `- The person you are helping is a ${roleLabel}. Explain actions in a way that fits this role, using "WHAT THEY CAN DO" and the page list above.`,
+      '- Ground every answer in the KNOWLEDGE above (WurxOS how-to guides and the company SOP library). Prefer quoting the actual steps from the matched SOP.',
+      '- If they ask how to do something their role cannot do (e.g. a Boss asking how to apply for leave), do NOT invent steps. Briefly say it is not part of their role and point them to what they CAN do instead.',
+      '- Never invent pages, buttons, tools, or steps that are not in the knowledge or the page list. If the knowledge does not cover it, say you are not certain and suggest asking their Team Lead, Operation Lead, or the Boss — do NOT guess.',
+      '- MATCH BY MEANING, not exact words. If the user phrases something differently from the SOP (e.g. "time off" vs "leave", "budget" vs "target ROI"), still find and use the relevant SOP; never say you have nothing just because the wording differs.',
+      '- If a question is relevant but unclear or could mean several things, ask ONE short clarifying question instead of guessing or refusing.',
+      '- When you mention an in-app page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never invent a path.',
+      '- Some knowledge entries are only a title + a link to a full guide. For those, point the user to the guide with a markdown link; recite detailed steps only when the knowledge actually contains them.',
+      '- Read short follow-up questions in the context of the conversation so far — they usually continue the previous topic.',
+      '- NEVER invent the name of a person, brand, or assignment. If asked who handles something and you were not given that fact, say you do not have it.',
+      '- Be concise, warm, and practical; use short numbered steps when describing a flow.',
+    ].join('\n');
 
-      systemPrompt = [
-        persona,
-        `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
-        `WHAT THEY CAN DO: ${roleCap}`,
-        `PAGES THEY CAN OPEN (use these exact paths for links; never invent one):\n${pageList}`,
-        knowledgeBlock,
-        groundingRules,
-      ].join('\n\n');
-    }
+    const systemPrompt = [
+      persona,
+      `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
+      `WHAT THEY CAN DO: ${roleCap}`,
+      `PAGES THEY CAN OPEN (use these exact paths for links; never invent one):\n${pageList}`,
+      knowledgeBlock,
+      groundingRules,
+    ].join('\n\n');
 
-    // ── Call the model ─────────────────────────────────────────────
-    const aiRes = await fetch(MODELS_URL, {
+    // ── Call the model (OpenAI) ────────────────────────────────────
+    // GPT-5.x require `max_completion_tokens` (not `max_tokens`) and reject a
+    // non-default `temperature` — so we omit temperature and use the new field.
+    const aiRes = await fetch(OPENAI_URL, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${GPT_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         messages: [{ role: 'system', content: systemPrompt }, ...priorTurns, { role: 'user', content: message }],
-        max_tokens: 800,
-        temperature: 0.3,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
       }),
     });
     const aiText = await aiRes.text();
     if (!aiRes.ok) {
       console.error('model error', aiRes.status, aiText.slice(0, 300));
       if (aiRes.status === 429) {
-        // GitHub Models free tier caps requests per-minute and per-day. Don't
-        // dump GitHub's raw ToS blurb at the user — give a clean, calm message.
-        const retry = aiRes.headers.get('retry-after');
-        const wait = retry && Number(retry) > 0
-          ? `about ${Math.ceil(Number(retry) / 60) || 1} minute(s)`
-          : 'a minute';
-        return json({ error: `The assistant is getting a lot of requests right now and the AI provider's free rate limit was hit. Please wait ${wait} and try again.`, conversationId }, 429);
+        return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
       }
       return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
     }

@@ -197,7 +197,7 @@ export default function App() {
               <Route
                 path="/assistant"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer']}>
+                  <RoleGuard allow={['boss']}>
                     <AiAssistantPage />
                   </RoleGuard>
                 }
