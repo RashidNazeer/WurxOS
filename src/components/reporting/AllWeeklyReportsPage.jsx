@@ -909,6 +909,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
   const perf = r.overallPerformance || {};
   const prevPerf = prev?.overallPerformance || {};
   const gmv      = num(perf.gmv);
+  const gmvMtd   = num(r.overallNotes?.gmv);   // APC-entered month-to-date GMV
   const orders   = num(perf.orders);
   const roi      = num(perf.roi);
   const videos   = num(perf.videosPosted);
@@ -1023,6 +1024,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         <div className="px-3 pb-2 pt-1">
           <div className="d-flex justify-content-between gap-2">
             <CardStat label="GMV" value={sym + gmv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              subNote={gmvMtd > 0 ? `MTD ${sym}${gmvMtd.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : null}
               note={changeText}
               noteColor={changeColor} />
             <CardStat label="ORDERS" value={orders.toLocaleString()} note={aov > 0 ? `${sym}${aov.toFixed(0)} AOV` : null} />
@@ -1052,11 +1054,14 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
   );
 }
 
-function CardStat({ label, value, note, noteColor }) {
+function CardStat({ label, value, note, noteColor, subNote }) {
   return (
     <div style={{ minWidth: 0 }}>
       <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.04em' }}>{label}</div>
       <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+      {subNote && (
+        <div className="text-muted" style={{ fontSize: '0.58rem', marginTop: 2 }}>{subNote}</div>
+      )}
       {note && (
         <div style={{ fontSize: '0.65rem', color: noteColor || 'var(--text-secondary)', fontWeight: 600, marginTop: 2 }}>{note}</div>
       )}
