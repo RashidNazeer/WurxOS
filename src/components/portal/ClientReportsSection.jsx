@@ -43,10 +43,10 @@ function reportMetrics(r) {
   const roiRaw = op.roi;
   const hasRoi = roiRaw != null && roiRaw !== ''
     && !Number.isNaN(parseFloat(String(roiRaw).replace(/[^0-9.-]/g, '')));
-  // MTD samples approved: weekly/biweekly keep it in overallNotes.samplesApproved;
-  // monthly's month figure is kpis.freeSamplesApproved.
-  const samplesMtd = num(r?.overallNotes?.samplesApproved) || num(r?.kpis?.freeSamplesApproved);
-  return { gmv, orders, roi: num(roiRaw), hasRoi, samplesMtd };
+  // MTD GMV — the APC-entered month-to-date GMV (weekly/biweekly keep it in
+  // overallNotes.gmv). Shown under the weekly GMV; absent on old reports.
+  const gmvMtd = num(r?.overallNotes?.gmv);
+  return { gmv, orders, roi: num(roiRaw), hasRoi, gmvMtd };
 }
 
 // Convert a row from get_client_access (snake_case, flattened) into the
@@ -396,6 +396,11 @@ export default function ClientReportsSection({
                             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
                               {sym}{Number(m.gmv).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
+                            {m.gmvMtd > 0 && (
+                              <div className="text-muted" style={{ fontSize: '0.58rem', marginTop: 1 }}>
+                                MTD {sym}{Number(m.gmvMtd).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>ORDERS</div>
@@ -409,14 +414,6 @@ export default function ClientReportsSection({
                               {m.hasRoi ? m.roi.toFixed(2) : '—'}
                             </div>
                           </div>
-                          {m.samplesMtd > 0 && (
-                            <div>
-                              <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 600 }}>MTD APPROVED</div>
-                              <div className="fw-bold" style={{ fontSize: '0.85rem' }}>
-                                {m.samplesMtd.toLocaleString()}
-                              </div>
-                            </div>
-                          )}
                         </div>
                         {gmvChange !== null && (
                           <div className="mt-1" style={{

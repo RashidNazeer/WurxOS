@@ -529,12 +529,15 @@ export default function WeeklyReportsPage() {
                         </div>
                       </div>
                       <div className="d-flex flex-wrap gap-3 mb-2">
-                        <div><div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>GMV</div><div className="fw-bold" style={{ fontSize: '0.88rem' }}>{currencySymbol(r.currency || DEFAULT_CURRENCY)}{Number(num(perf.gmv)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></div>
+                        <div>
+                          <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>GMV</div>
+                          <div className="fw-bold" style={{ fontSize: '0.88rem' }}>{currencySymbol(r.currency || DEFAULT_CURRENCY)}{Number(num(perf.gmv)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                          {num(r.overallNotes?.gmv) > 0 && (
+                            <div className="text-muted" style={{ fontSize: '0.6rem', marginTop: 1 }}>MTD {currencySymbol(r.currency || DEFAULT_CURRENCY)}{Number(num(r.overallNotes.gmv)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                          )}
+                        </div>
                         <div><div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>ORDERS</div><div className="fw-bold" style={{ fontSize: '0.88rem' }}>{Number(num(perf.orders)).toLocaleString()}</div></div>
                         <div><div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>ROI</div><div className="fw-bold" style={{ fontSize: '0.88rem' }}>{num(perf.roi).toFixed(2)}</div></div>
-                        {num(r.overallNotes?.samplesApproved) > 0 && (
-                          <div><div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 600 }}>MTD APPROVED</div><div className="fw-bold" style={{ fontSize: '0.88rem' }}>{Number(num(r.overallNotes.samplesApproved)).toLocaleString()}</div></div>
-                        )}
                       </div>
                       {gmvChange !== null && (
                         <div style={{ fontSize: '0.68rem', color: changeColor, fontWeight: 600 }}>
