@@ -1079,6 +1079,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           <div className="d-flex flex-wrap gap-2">
             <Field label={`GMV Month-to-Date (${curSym})`} value={data.overallNotes.gmv || ''} onChange={v => setPerfNote('gmv', v)} type="number" placeholder="231714.01" width="240px" />
             <Field label="MTD Approved (Samples Month-to-Date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
+            <Field label="Videos Posted (Month-to-Date)" value={data.overallNotes.videosMtd || ''} onChange={v => setPerfNote('videosMtd', v)} type="number" placeholder="2140" width="240px" />
             <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px" />
           </div>
           <InsightArea value={data.overallInsights} onChange={v => setData(d => ({ ...d, overallInsights: v }))}
