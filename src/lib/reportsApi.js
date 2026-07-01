@@ -31,8 +31,8 @@ export const EMPTY_REPORT_DATA = () => ({
   overallPerformance: { gmv: '', affiliateGmv: '', orders: '', samplesApproved: '', roi: '', shopPerformanceScore: '', videosPosted: '' },
   // overallNotes holds the month-to-date "Total"/MTD figures shown beneath
   // the weekly numbers: samplesApproved (MTD), videosPosted (all-time total),
-  // and gmv (MTD GMV shown under the weekly GMV hero).
-  overallNotes: { samplesApproved: '', videosPosted: '', gmv: '' },
+  // gmv (MTD GMV), videosMtd (videos posted month-to-date).
+  overallNotes: { samplesApproved: '', videosPosted: '', gmv: '', videosMtd: '' },
   overallInsights: '',
   topCreators: [emptyCreator()],
   topCreatorsInsights: '',

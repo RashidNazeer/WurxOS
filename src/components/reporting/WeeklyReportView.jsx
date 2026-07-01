@@ -815,9 +815,11 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
   const productData = (report.productHighlights || []).filter(p => p.productName);
   const totalProductGmv = productData.reduce((s, p) => s + num(p.gmv), 0);
-  // Overall MTD videos = sum of the per-product month-to-date video counts
-  // (there is no single overall MTD-videos field; it rolls up from products).
-  const mtdVideos = productData.reduce((s, p) => s + num(p.videosMtd), 0);
+  // Overall MTD videos: the APC-entered overallNotes.videosMtd if present,
+  // else the sum of per-product month-to-date video counts as a fallback.
+  const mtdVideos = num(report.overallNotes?.videosMtd) > 0
+    ? num(report.overallNotes.videosMtd)
+    : productData.reduce((s, p) => s + num(p.videosMtd), 0);
   // "Share of GMV" denominator: a STABLE store total (affiliate GMV, else total
   // GMV) so a product's share doesn't shift with how many products are listed.
   // Falls back to the listed-products sum for older reports without totals.
