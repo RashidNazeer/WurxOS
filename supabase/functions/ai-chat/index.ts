@@ -414,27 +414,52 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
         return `${nameOf.get(r.user_id) || 'Unknown'} — overall ${ov}/100${parts.length ? ` (${parts.join(', ')})` : ''}`;
       };
 
+      // Flags + warnings. Scoped to the person if named. When a month is in
+      // play, filter by created_at within that month (these tables have no
+      // month column, only a timestamp).
+      let monthRange: { gte: string; lt: string } | null = null;
+      if (month && /^\d{4}-\d{2}$/.test(month)) {
+        const [y, mm] = month.split('-').map(Number);
+        const next = mm === 12 ? `${y + 1}-01` : `${y}-${String(mm + 1).padStart(2, '0')}`;
+        monthRange = { gte: `${month}-01`, lt: `${next}-01` };
+      }
+      let fq = admin.from('performance_flags').select('user_id, type, severity, reason, created_at').order('created_at', { ascending: false }).limit(userIds ? 30 : 50);
+      if (userIds) fq = fq.in('user_id', userIds);
+      if (monthRange) fq = fq.gte('created_at', monthRange.gte).lt('created_at', monthRange.lt);
+      const { data: flags } = await fq;
+      let wq = admin.from('performance_warnings').select('user_id, reason, severity, created_at').order('created_at', { ascending: false }).limit(userIds ? 30 : 50);
+      if (userIds) wq = wq.in('user_id', userIds);
+      if (monthRange) wq = wq.gte('created_at', monthRange.gte).lt('created_at', monthRange.lt);
+      const { data: warns } = await wq;
+
+      // Backfill names for flag/warning owners who had no rating this month
+      // (that's why they were showing as "Unknown").
+      const extraIds = [...new Set([
+        ...(flags || []).map((f: any) => f.user_id),
+        ...(warns || []).map((w: any) => w.user_id),
+      ])].filter((id) => id && !nameOf.has(id));
+      if (extraIds.length) {
+        const { data: more } = await admin.from('profiles').select('id, display_name, role').in('id', extraIds);
+        (more || []).forEach((p: any) => { nameOf.set(p.id, p.display_name); roleOf.set(p.id, p.role); });
+      }
+
+      const whoLabel = month ? ` in ${month}` : '';
       let out = '';
       if (ratings && ratings.length) {
         const sorted = ratings.slice().sort((a: any, b: any) => (Number(b.overall_score) || 0) - (Number(a.overall_score) || 0));
         out += `Performance ratings for ${month} (${ratings.length}):\n` + sorted.map((r: any) => `- ${fmtRating(r)}`).join('\n');
       } else {
-        out += `No performance ratings for ${single ? single.display_name : 'anyone'} in ${month || '(no data)'}.`;
+        out += `No performance ratings for ${single ? single.display_name : 'anyone'}${whoLabel || ' (no data)'}.`;
       }
 
-      // Flags + warnings (all-time; small volume). Scoped to the person if named.
-      let fq = admin.from('performance_flags').select('user_id, type, severity, reason, created_at').order('created_at', { ascending: false }).limit(userIds ? 20 : 30);
-      if (userIds) fq = fq.in('user_id', userIds);
-      const { data: flags } = await fq;
       if (flags && flags.length) {
-        out += `\n\nFlags (${flags.length}; green = positive, red = concern):\n` + flags.map((f: any) =>
+        out += `\n\nFlags${whoLabel} (${flags.length}; green = positive, red = concern):\n` + flags.map((f: any) =>
           `- ${nameOf.get(f.user_id) || 'Unknown'} · ${f.type || '?'}${f.severity ? `/${f.severity}` : ''} (${String(f.created_at).slice(0,10)}): ${String(f.reason || '').slice(0, 300)}`).join('\n');
+      } else if (single) {
+        out += `\n\nNo performance flags for ${single.display_name}${whoLabel}.`;
       }
-      let wq = admin.from('performance_warnings').select('user_id, reason, severity, created_at').order('created_at', { ascending: false }).limit(userIds ? 20 : 30);
-      if (userIds) wq = wq.in('user_id', userIds);
-      const { data: warns } = await wq;
       if (warns && warns.length) {
-        out += `\n\nWarnings (${warns.length}):\n` + warns.map((w: any) =>
+        out += `\n\nWarnings${whoLabel} (${warns.length}):\n` + warns.map((w: any) =>
           `- ${nameOf.get(w.user_id) || 'Unknown'}${w.severity ? ` (${w.severity})` : ''} (${String(w.created_at).slice(0,10)}): ${String(w.reason || '').slice(0, 300)}`).join('\n');
       }
       return out;
