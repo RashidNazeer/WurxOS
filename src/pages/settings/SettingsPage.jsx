@@ -15,6 +15,7 @@ import NotificationPrefsSection from './sections/NotificationPrefsSection';
 import CampaignExpirySection from './sections/CampaignExpirySection';
 import TierNotificationsSection from './sections/TierNotificationsSection';
 import LeaveDefaultsSection  from './sections/LeaveDefaultsSection';
+import BackupSection         from './sections/BackupSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import '../../styles/settings.css';
@@ -70,6 +71,9 @@ const GROUPS = [
     sections: [
       { id: 'leaveDefaults', label: 'Leave Defaults', sub: 'Starting quota for new hires',
         icon: ClockIcon, component: LeaveDefaultsSection,
+        roles: ['boss'] },
+      { id: 'backup', label: 'Data Backup', sub: 'Download a full snapshot of all data',
+        icon: ShieldIcon, component: BackupSection,
         roles: ['boss'] },
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
