@@ -200,12 +200,18 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_reports',
-      description: 'Get client report headline metrics (GMV, orders, samples approved, videos posted, ROI, shop score) for a brand, or across brands. Period is a substring match on the report period label (e.g. "June", "Week 13", "2026-06"); omit for the most recent reports.',
+      description: "Get client report data (weekly, biweekly, or monthly). IMPORTANT for cost: request ONLY the sections the question needs via `sections`. If the user asks just for GMV or a metric, use ['metrics'] — do NOT pull insights/tables. Use ['all'] only when they want the whole/full report for a specific brand+period. Period is a substring match on the report label (e.g. \"June\", \"Week 13\", \"2026-06\").",
       parameters: {
         type: 'object',
         properties: {
           brand_name: { type: 'string', description: 'Brand name (partial ok); omit for all brands.' },
           period: { type: 'string', description: 'Period label substring, e.g. "June" or "Week 13". Omit for most recent.' },
+          type: { type: 'string', enum: ['weekly', 'biweekly', 'monthly'], description: 'Report type; omit for any.' },
+          sections: {
+            type: 'array',
+            description: "Which parts to return. Pick the MINIMUM needed. Options: 'metrics' (GMV, orders, samples, videos, ROI, shop score, offsite), 'insights' (written analysis per area), 'creators' (top creators), 'videos' (top videos), 'gmvmax' (GMV Max ad campaigns), 'products' (product highlights/analytics), 'written' (recommendations, action items, upcoming campaigns, operational updates), or 'all' for the complete report. Default is ['metrics'].",
+            items: { type: 'string', enum: ['metrics', 'insights', 'creators', 'videos', 'gmvmax', 'products', 'written', 'all'] },
+          },
         },
       },
     },
@@ -238,6 +244,16 @@ const money = (n: unknown) => {
   const v = Number(n);
   return Number.isFinite(v) ? `PKR ${v.toLocaleString('en-US')}` : String(n ?? '');
 };
+
+// Rich-text (HTML) insight → clean plain text for the model.
+const htmlToText = (s: unknown) => String(s || '')
+  .replace(/<\s*(br|\/p|\/li|\/h[1-6]|\/div)\s*>/gi, '\n')
+  .replace(/<li[^>]*>/gi, '• ')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"')
+  .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+const has = (v: unknown) => v != null && v !== '' && v !== 'N/A';
 
 // Resolve a name → profile rows (active, non-deleted). Returns [] if none.
 async function resolvePeople(admin: any, name: string) {
@@ -347,32 +363,102 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
     }
 
     if (name === 'get_reports') {
+      // Which sections to include — default to metrics only (cheap).
+      let sections: string[] = Array.isArray(args?.sections) && args.sections.length ? args.sections : ['metrics'];
+      const wantAll = sections.includes('all');
+      const want = (s: string) => wantAll || sections.includes(s);
+
+      // Resolve brand name → ids IN THE DB first, then filter reports by
+      // brand_id. (Filtering by name in JS after a small LIMIT could drop the
+      // wanted brand if it fell outside the fetched window — real bug hit in
+      // testing: "Bentgo Week 12" returned nothing because 18 Week-12 reports
+      // existed and Bentgo wasn't in the first few fetched.)
+      let brandIds: string[] | null = null;
+      if (args?.brand_name) {
+        const { data: bmatch } = await admin.from('brands')
+          .select('id, brand_name').ilike('brand_name', `%${String(args.brand_name).trim()}%`).limit(20);
+        if (!bmatch || !bmatch.length) return `No brand matches "${args.brand_name}".`;
+        brandIds = bmatch.map((b: any) => b.id);
+      }
+
       let query = admin.from('reports')
         .select('type, period_label, period_start, status, data, brand:brand_id(brand_name)')
-        .order('period_start', { ascending: false })
-        .limit(args?.brand_name || args?.period ? 40 : 12);
+        .order('period_start', { ascending: false });
+      if (brandIds) query = query.in('brand_id', brandIds);
+      if (args?.type) query = query.eq('type', String(args.type));
       if (args?.period) query = query.ilike('period_label', `%${String(args.period).trim()}%`);
+      // Narrow (brand+period) ask may want the full report → few rows; broad
+      // scan → more rows but we only print headline lines.
+      query = query.limit(args?.brand_name && args?.period ? 8 : (args?.brand_name || args?.period ? 40 : 15));
       const { data: reps } = await query;
-      let rows = reps || [];
-      if (args?.brand_name) {
-        const bn = String(args.brand_name).toLowerCase();
-        rows = rows.filter((r: any) => String(r.brand?.brand_name || '').toLowerCase().includes(bn));
-      }
-      if (!rows.length) return 'No matching reports found.';
-      const pick = (o: any) => o?.overallPerformance || {};
-      const blocks = rows.slice(0, 20).map((r: any) => {
-        const o = pick(r.data);
+      const rows = reps || [];
+      if (!rows.length) return 'No matching reports found for that brand/period.';
+
+      // Detail sections cost tokens; only expand detail for a bounded number of
+      // reports. If the ask is broad and detail was requested, cap and note it.
+      const detailWanted = want('insights') || want('creators') || want('videos') || want('gmvmax') || want('products') || want('written');
+      const detailCap = detailWanted ? 3 : 20;
+
+      const metricsLine = (d: any) => {
+        const o = d?.overallPerformance || d?.keyMetrics || {};
+        const off = d?.offsitePerformance || {};
         const parts = [
-          o.gmv != null && o.gmv !== '' ? `GMV ${o.gmv}` : null,
-          o.orders != null && o.orders !== '' ? `orders ${o.orders}` : null,
-          o.samplesApproved != null && o.samplesApproved !== '' ? `samples ${o.samplesApproved}` : null,
-          o.videosPosted != null && o.videosPosted !== '' ? `videos ${o.videosPosted}` : null,
-          o.roi != null && o.roi !== '' ? `ROI ${o.roi}` : null,
-          o.shopPerformanceScore != null && o.shopPerformanceScore !== '' ? `shop score ${o.shopPerformanceScore}` : null,
+          has(o.gmv) ? `GMV ${o.gmv}` : null,
+          has(o.affiliateGmv) ? `affiliate GMV ${o.affiliateGmv}` : null,
+          has(o.orders) ? `orders ${o.orders}` : null,
+          has(o.samplesApproved) ? `samples ${o.samplesApproved}` : null,
+          has(o.videosPosted) ? `videos ${o.videosPosted}` : null,
+          has(o.roi) ? `ROI ${o.roi}` : null,
+          has(o.shopPerformanceScore) ? `shop score ${o.shopPerformanceScore}` : null,
+          has(off.offsiteGmv) ? `offsite GMV ${off.offsiteGmv}` : null,
         ].filter(Boolean).join(', ');
-        return `- ${r.brand?.brand_name || 'Unknown brand'} · ${r.period_label || r.period_start} (${r.type}, ${r.status}): ${parts || 'no headline metrics filled'}`;
+        return parts || 'no headline metrics filled';
+      };
+
+      const tableBlock = (title: string, arr: any[], cols: [string, string][]) => {
+        if (!Array.isArray(arr) || !arr.length) return '';
+        const lines = arr.slice(0, 8).map((it: any) => '  - ' + cols.map(([k, lbl]) => has(it[k]) ? `${lbl}: ${it[k]}` : null).filter(Boolean).join(', '));
+        return `\n  ${title}:\n${lines.join('\n')}`;
+      };
+
+      const insightBlock = (d: any) => {
+        const keys: [string, string][] = [
+          ['overallInsights', 'Overall'], ['gmvMaxInsights', 'GMV Max'], ['topCreatorsInsights', 'Top creators'],
+          ['topVideosInsights', 'Top videos'], ['productHighlightsInsights', 'Products'], ['offsiteInsights', 'Offsite'],
+          ['keyWinsInsights', 'Key wins'],
+        ];
+        const out = keys.map(([k, lbl]) => { const t = htmlToText(d[k]); return t && t.length > 3 ? `  ${lbl}: ${t}` : null; }).filter(Boolean);
+        return out.length ? '\n  Insights:\n' + out.join('\n') : '';
+      };
+
+      const writtenBlock = (d: any) => {
+        const keys: [string, string][] = [
+          ['recommendations', 'Recommendations'], ['actionItems', 'Action items'],
+          ['upcomingCampaigns', 'Upcoming campaigns'], ['operationalUpdates', 'Operational updates'], ['campaignsText', 'Campaigns'],
+        ];
+        const out = keys.map(([k, lbl]) => { const t = htmlToText(d[k]); return t && t.length > 3 ? `  ${lbl}: ${t}` : null; }).filter(Boolean);
+        return out.length ? '\n  Written sections:\n' + out.join('\n') : '';
+      };
+
+      let detailShown = 0;
+      const blocks = rows.map((r: any) => {
+        const d = r.data || {};
+        let block = `- ${r.brand?.brand_name || 'Unknown brand'} · ${r.period_label || r.period_start} (${r.type}, ${r.status})`;
+        if (want('metrics') || (!detailWanted)) block += `: ${metricsLine(d)}`;
+        if (detailWanted && detailShown < detailCap) {
+          if (want('creators')) block += tableBlock('Top creators', d.topCreators, [['name', 'name'], ['gmv', 'GMV'], ['videosPosted', 'videos'], ['itemsSold', 'sold'], ['notes', 'notes']]);
+          if (want('videos')) block += tableBlock('Top videos', d.topVideos, [['creatorName', 'creator'], ['gmv', 'GMV'], ['views', 'views'], ['productClicks', 'clicks'], ['videoLink', 'link']]);
+          if (want('gmvmax')) block += tableBlock('GMV Max campaigns', d.gmvMax, [['campaign', 'campaign'], ['spend', 'spend'], ['gmv', 'GMV'], ['roi', 'ROI'], ['orders', 'orders'], ['cpo', 'CPO']]);
+          if (want('products')) block += tableBlock('Product highlights', d.productHighlights || d.productAnalytics, [['productName', 'product'], ['gmv', 'GMV'], ['unitsSold', 'units'], ['newVideos', 'new videos']]);
+          if (want('insights')) block += insightBlock(d);
+          if (want('written')) block += writtenBlock(d);
+          detailShown++;
+        }
+        return block;
       });
-      return `Reports (${rows.length} matched, showing ${blocks.length}):\n` + blocks.join('\n');
+      let footer = '';
+      if (detailWanted && rows.length > detailCap) footer = `\n\n(Showing full detail for the first ${detailCap} of ${rows.length} reports. Ask about a specific brand + period for the rest.)`;
+      return `Reports (${rows.length} matched):\n` + blocks.join('\n') + footer;
     }
 
     if (name === 'get_performance') {
@@ -686,7 +772,9 @@ Deno.serve(async (req) => {
     const isBoss = roleKey === 'boss';
     const dataToolRules = isBoss ? [
       '',
-      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, performance ratings/flags/warnings, client report metrics, and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing / his ratings?", "who has the best performance score?", "GMV for Solid Gold last month?", "what is X\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100. If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
+      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, performance ratings/flags/warnings, client reports (weekly/biweekly/monthly), and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing?", "GMV for Solid Gold last week?", "what were the insights for Bentgo week 12?", "give me the full report for X", "what is Y\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100.',
+      'REPORTS — be token-smart: get_reports takes a `sections` list. Request ONLY what the question needs: just a metric ("GMV for X") → sections=["metrics"]; the written analysis → ["insights"]; top creators/videos/campaigns/products → the matching section; the whole/full report for a specific brand+period → ["all"]. Do not pull insights or tables when only a number was asked. When they want a full report, name the brand AND period so it returns that one report completely.',
+      'If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
     ].join('\n') : '';
 
     const systemPrompt = [
