@@ -72,7 +72,8 @@ function ChatView() {
     if (!msg || sending) return;
     setInput(''); setErr('');
     // Add the user turn + an empty assistant bubble we grow as tokens arrive.
-    setMessages((m) => [...m, { role: 'user', content: msg }, { role: 'assistant', content: '', streaming: true }]);
+    const now = new Date().toISOString();
+    setMessages((m) => [...m, { role: 'user', content: msg, created_at: now }, { role: 'assistant', content: '', streaming: true, created_at: now }]);
     setSending(true);
     // Append a delta to the last (assistant) message.
     const appendDelta = (chunk) => {
@@ -123,59 +124,77 @@ function ChatView() {
   }
 
   return (
-    <div className="d-flex gap-3" style={{ flex: 1, minHeight: 0 }}>
-      {/* Conversations */}
-      <div className="d-none d-md-flex flex-column" style={{ width: 240, flexShrink: 0 }}>
-        <button className="btn btn-sm btn-primary w-100 mb-2 d-inline-flex align-items-center justify-content-center gap-2" style={{ borderRadius: 9 }} onClick={newChat}>
-          <i className="bi bi-plus-lg" /> New chat
-        </button>
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+    <div className="wxai d-flex" style={{ flex: 1, minHeight: 0, gap: 16 }}>
+      {/* Conversations sidebar */}
+      <div className="wxai-sidebar d-none d-md-flex flex-column">
+        <div className="d-flex align-items-center justify-content-between px-1 mb-2">
+          <span className="wxai-sidebar-title">Chats</span>
+          <button className="wxai-newchat" onClick={newChat} title="Start a new chat">
+            <i className="bi bi-plus-lg" /> New
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, margin: '0 -4px', padding: '0 4px' }}>
           {convos.map((c) => (
             <div key={c.id} onClick={() => openConvo(c.id)}
-              className="d-flex align-items-center gap-2 px-2 py-2 rounded-2 mb-1"
-              style={{ cursor: 'pointer', background: activeId === c.id ? 'var(--accent-soft)' : 'transparent' }}>
-              <i className="bi bi-chat-left-text" style={{ fontSize: '0.8rem', color: activeId === c.id ? 'var(--accent)' : 'var(--text-muted)' }} />
-              <span className="text-truncate flex-grow-1" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{c.title || 'Conversation'}</span>
-              <button className="btn btn-sm p-0 border-0" style={{ color: 'var(--text-muted)', background: 'transparent' }} onClick={(e) => removeConvo(c.id, e)} title="Delete">
-                <i className="bi bi-trash3" style={{ fontSize: '0.72rem' }} />
+              className={`wxai-convo ${activeId === c.id ? 'is-active' : ''}`}>
+              <i className="bi bi-chat-left-text wxai-convo-icon" />
+              <span className="text-truncate flex-grow-1">{c.title || 'Conversation'}</span>
+              <button className="wxai-convo-del" onClick={(e) => removeConvo(c.id, e)} title="Delete">
+                <i className="bi bi-trash3" />
               </button>
             </div>
           ))}
-          {convos.length === 0 && <div className="text-muted small px-2">No conversations yet.</div>}
+          {convos.length === 0 && <div className="text-muted small px-2 py-2">No conversations yet.</div>}
         </div>
       </div>
 
       {/* Thread */}
-      <div className="d-flex flex-column flex-grow-1" style={{ minWidth: 0, background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '18px 18px 4px' }}>
+      <div className="wxai-thread d-flex flex-column flex-grow-1">
+        <div ref={scrollRef} className="wxai-scroll">
           {messages.length === 0 && (
             <div className="d-flex flex-column align-items-center justify-content-center text-center h-100 py-5">
-              <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 56, height: 56, background: 'var(--accent-soft)' }}>
-                <i className="bi bi-robot" style={{ fontSize: '1.5rem', color: 'var(--accent)' }} />
+              <div className="wxai-hero-icon mb-3">
+                <i className="bi bi-robot" />
               </div>
-              <p className="mb-1 fw-semibold" style={{ color: 'var(--text-primary)' }}>{greeting || 'How can I help you with WurxOS today?'}</p>
+              <p className="mb-1 fw-semibold" style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{greeting || 'How can I help you with WurxOS today?'}</p>
               <p className="text-muted small mb-0">e.g. “How do I apply for leave?” · “Which week had my brand’s highest GMV?”</p>
             </div>
           )}
-          {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} streaming={m.streaming} />)}
+          {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} streaming={m.streaming} at={m.created_at} />)}
         </div>
         {err && <div className="px-3 pb-1"><div className="alert alert-danger py-1 px-2 small mb-1">{err}</div></div>}
-        <div className="d-flex align-items-end gap-2 p-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-          <textarea className="form-control" rows={1} placeholder="Ask the WurxOS assistant…" value={input}
-            style={{ resize: 'none', borderRadius: 10, maxHeight: 120 }}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
-          <button className="btn btn-primary d-inline-flex align-items-center justify-content-center" style={{ borderRadius: 10, width: 42, height: 38, flexShrink: 0 }}
-            disabled={sending || !input.trim()} onClick={send} title="Send">
-            {sending ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-send" />}
-          </button>
+        <div className="wxai-composer">
+          <div className="wxai-input-wrap">
+            <textarea className="wxai-input" rows={1} placeholder="Ask the WurxOS assistant anything…" value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                // auto-grow
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
+            <button className="wxai-send" disabled={sending || !input.trim()} onClick={send} title="Send" aria-label="Send">
+              {sending ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-send-fill" />}
+            </button>
+          </div>
+          <div className="wxai-hint">Enter to send · Shift+Enter for a new line</div>
         </div>
       </div>
     </div>
   );
 }
 
-function Bubble({ role, content, streaming }) {
+function fmtMsgTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return sameDay ? time : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+function Bubble({ role, content, streaming, at }) {
   const isUser = role === 'user';
   const navigate = useNavigate();
   const waiting = streaming && !content; // streaming started but no text yet
@@ -189,25 +208,24 @@ function Bubble({ role, content, streaming }) {
     if (to && to.startsWith('/')) { e.preventDefault(); navigate(to); }
   };
 
+  const time = fmtMsgTime(at);
+
   return (
-    <div className="d-flex mb-3" style={{ justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+    <div className={`wxai-row ${isUser ? 'is-user' : 'is-bot'}`}>
       {!isUser && (
-        <div className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 me-2" style={{ width: 30, height: 30, background: 'var(--accent-soft)', marginTop: 2 }}>
-          <i className="bi bi-robot" style={{ fontSize: '0.85rem', color: 'var(--accent)' }} />
+        <div className="wxai-avatar">
+          <i className="bi bi-robot" />
         </div>
       )}
-      <div style={{
-        maxWidth: '76%', padding: '10px 14px', borderRadius: 12, fontSize: '0.86rem', lineHeight: 1.55,
-        whiteSpace: isUser ? 'pre-wrap' : 'normal', wordBreak: 'break-word',
-        background: isUser ? 'var(--accent)' : 'var(--surface-2)',
-        color: isUser ? 'var(--on-accent)' : 'var(--text-primary)',
-        borderTopRightRadius: isUser ? 4 : 12, borderTopLeftRadius: isUser ? 12 : 4,
-      }}>
-        {waiting
-          ? <span className="ai-typing text-muted">Thinking<span className="ai-dots" /></span>
-          : isUser
-            ? content
-            : <div className="ai-md" onClick={onContentClick} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(content) }} />}
+      <div className="wxai-bubble-wrap">
+        <div className={`wxai-bubble ${isUser ? 'is-user' : 'is-bot'}`}>
+          {waiting
+            ? <span className="ai-typing text-muted">Thinking<span className="ai-dots" /></span>
+            : isUser
+              ? content
+              : <div className="ai-md" onClick={onContentClick} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(content) }} />}
+        </div>
+        {time && !waiting && <div className="wxai-time">{time}</div>}
       </div>
     </div>
   );
