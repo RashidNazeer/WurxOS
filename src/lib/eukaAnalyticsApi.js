@@ -22,8 +22,14 @@ export const EUKA_BRANDS_FALLBACK = [
 // Back-compat alias for any older import.
 export const EUKA_BRANDS = EUKA_BRANDS_FALLBACK;
 let currentBrand = 'solidgold';
+// Accept ANY non-empty slug — the brand list is discovered at runtime from the
+// server's /__brands, so we must NOT gate against the static EUKA_BRANDS_FALLBACK
+// (that list is only the 2 original brands). Gating here silently pinned every
+// shared-key brand — Aurelia, Dr Harvey, etc. — to whatever brand was selected
+// before, so they showed the previous brand's data. The server safely defaults
+// an unknown/empty slug to Solid Gold, so there's nothing to defend against here.
 export function setEukaBrand(slug) {
-  if (EUKA_BRANDS.some((b) => b.slug === slug)) currentBrand = slug;
+  if (slug) currentBrand = slug;
 }
 export function getEukaBrand() { return currentBrand; }
 
