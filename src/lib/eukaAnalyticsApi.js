@@ -105,3 +105,112 @@ export const eukaDataExport = (type, storeId, { startDate, endDate, exportType =
     method: 'GET',
     query: { type, store_id: storeId, start_date: startDate, end_date: endDate, export_type: exportType, creator_handle: creatorHandle, creator_username: creatorUsername },
   });
+
+// ── Weekly-report autofill — EXACT fields only ────────────────────
+// Fetches a week's stats from Euka and returns a PARTIAL weekly-report
+// `data` object containing ONLY the numbers Euka provides that are
+// verified to match the manual report exactly:
+//   Overall: GMV (totalShopGMV), Affiliate GMV (totalAffiliateGMV), Orders
+//   Top Creators: name / videosPosted / gmv  (per-creator itemsSold is NOT
+//     available from Euka → left blank)
+//   Product Highlights: productId / name / GMV (per-product affiliate GMV
+//     via the productIds filter) / unitsSold
+//   overallInsights: a short auto-generated summary
+// Everything else (samples, ROI, shop score, videos posted, GMV Max,
+// offsite, top videos, all narrative) is DELIBERATELY omitted so it stays
+// blank for manual entry — Euka either lacks it or counts it differently
+// than the report does (e.g. samples 96 vs 67). Merge the result over
+// EMPTY_REPORT_DATA() before saving.
+//
+// Date shapes are non-interchangeable, so we reuse the wrappers above,
+// which already encode the right shape per endpoint:
+//   performance-overview  → flat {startDate,endDate}
+//   top-creators / top-products → {postedDateRange:{start,end}}
+const _num = (v) => (v == null || Number.isNaN(Number(v)) ? '' : Number(v));
+
+function _overallInsightsHtml(ov, creators) {
+  const money = (v) => (v == null ? '—' : `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
+  const n = (v) => (v == null ? '—' : Number(v).toLocaleString());
+  const top = (creators || []).slice(0, 3)
+    .map((c) => `${c.name} (${money(typeof c.gmv === 'number' ? c.gmv : null)})`)
+    .filter((s) => !s.startsWith(' '))
+    .join(', ');
+  return '<ul>'
+    + `<li>Total Shop GMV <b>${money(ov.totalShopGMV)}</b>, Affiliate GMV <b>${money(ov.totalAffiliateGMV)}</b>, with <b>${n(ov.totalOrders)}</b> orders this week.</li>`
+    + (top ? `<li>Top creators by GMV: <b>${top}</b>.</li>` : '')
+    + '</ul>';
+}
+
+// Returns { data, meta } where `data` is a partial weekly-report data
+// object (exact fields only) and `meta` reports what was filled. `week`
+// is a weekInfo from makeWeekFromStart/buildWeekInfoFromRange:
+//   { startDate: 'YYYY-MM-DD', endDate: 'YYYY-MM-DD', ... }
+export async function buildEukaAutofillData({ storeId, week, fresh = false }) {
+  if (!storeId) throw new Error('No Euka store selected.');
+  if (!week?.startDate || !week?.endDate) throw new Error('No week selected.');
+  const s = week.startDate, e = week.endDate;
+
+  const [overview, creatorsResp, prodResp] = await Promise.all([
+    eukaOverview(storeId, s, e, {}, fresh),
+    eukaTopCreators(storeId, s, e, { limit: 10 }, fresh).catch(() => null),
+    eukaTopProducts(storeId, s, e, { limit: 10 }, fresh).catch(() => null),
+  ]);
+  if (!overview) throw new Error('Euka returned no performance data for this week.');
+
+  const topCreators = (creatorsResp?.affiliates || []).map((c) => ({
+    name: c.handle ? `@${c.handle}` : '',
+    videosPosted: _num(c.videoCount),
+    itemsSold: '',            // no per-creator units from Euka → manual
+    gmv: _num(c.totalGmv),
+    notes: '',
+  }));
+
+  // Per-product AFFILIATE GMV + orders: one filtered performance-overview
+  // per product (the productIds filter) — this is the number the report's
+  // product column uses.
+  const baseProducts = prodResp?.products || [];
+  const withGmv = await Promise.all(baseProducts.map((p) =>
+    eukaOverview(storeId, s, e, { productIds: [p.productId] }, fresh)
+      .then((o) => ({ ...p, affiliateGmv: o?.totalAffiliateGMV ?? null, orders: o?.totalOrders ?? null }))
+      .catch(() => ({ ...p, affiliateGmv: null, orders: null })),
+  ));
+  const productHighlights = withGmv
+    .filter((p) => Number(p.affiliateGmv) > 0)
+    .sort((a, b) => Number(b.affiliateGmv) - Number(a.affiliateGmv))
+    .slice(0, 8)
+    .map((p) => ({
+      productId: p.productId || '',
+      productName: p.title || '',
+      unitsSold: _num(p.orders),
+      gmv: _num(p.affiliateGmv),
+      newVideos: '',           // Euka videoCount ≠ report "new videos" → manual
+      videosMtd: '',
+      samplesApprovedWeek: '',
+      samplesApprovedMtd: '',
+      notes: '',
+    }));
+
+  const data = {
+    overallPerformance: {
+      gmv: _num(overview.totalShopGMV),
+      affiliateGmv: _num(overview.totalAffiliateGMV),
+      orders: _num(overview.totalOrders),
+      samplesApproved: '',      // Euka count ≠ report → manual
+      roi: '',                  // needs ad spend (hasAdsApiConfig=false) → manual
+      shopPerformanceScore: '', // not exposed by Euka → manual
+      videosPosted: '',         // Euka counts differ → manual
+    },
+    overallInsights: _overallInsightsHtml(overview, topCreators),
+    topCreators: topCreators.length ? topCreators : undefined,
+    productHighlights: productHighlights.length ? productHighlights : undefined,
+  };
+
+  return {
+    data,
+    meta: {
+      filledOverall: true,
+      creatorCount: topCreators.length,
+      productCount: productHighlights.length,
+    },
+  };
+}

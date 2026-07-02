@@ -331,6 +331,27 @@ export async function findDuplicateReport({ brandId, type, periodStart, excludeI
   return data || null;
 }
 
+// Status-BLIND lookup for a report on the same brand + type + week —
+// INCLUDING drafts. Used by create-only flows (e.g. the Boss "Create weekly
+// report from Euka" tool) that must NOT clobber an existing row via the
+// period-keyed upsert: an existing draft would otherwise be silently
+// overwritten with no warning (findDuplicateReport excludes drafts), and an
+// existing approved/verified/submitted report would be reverted to draft and
+// blanked. This lets the caller block and point the user at the existing row.
+export async function findAnyReport({ brandId, type, periodStart }) {
+  if (!brandId || !type || !periodStart) return null;
+  const { data, error } = await supabase
+    .from('reports')
+    .select(`id, status, period_label, period_start, author:author_id(display_name)`)
+    .eq('brand_id', brandId)
+    .eq('type', type)
+    .eq('period_start', periodStart)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data || null;
+}
+
 export async function getReport(id) {
   const { data, error } = await supabase
     .from('reports')
@@ -1026,11 +1047,23 @@ async function _findExistingReportId(brandId, type, periodStart) {
   return data?.id || null;
 }
 
-async function _saveReportV1({ type, brandId, weekInfo, data, uid, status = 'draft', extraFields = {} }) {
+async function _saveReportV1({ type, brandId, weekInfo, data, uid, status = 'draft', extraFields = {}, createOnly = false }) {
   if (!uid) throw new Error('not authenticated');
   if (!brandId) throw new Error('brandId required');
   const periodStart = weekInfo.startDate;
   const existingId  = await _findExistingReportId(brandId, type, periodStart);
+  // Create-only callers (e.g. the Boss "Create weekly report from Euka"
+  // tool) must NEVER silently update an existing row for this brand+week —
+  // that would overwrite an APC's in-progress draft or revert a non-draft
+  // report to draft. Refuse instead so the caller can point the user at the
+  // existing report. This makes the overwrite branch unreachable at the
+  // library level, not just guarded in the UI.
+  if (createOnly && existingId) {
+    const e = new Error('A report already exists for this brand and week.');
+    e.code = 'REPORT_EXISTS';
+    e.existingId = existingId;
+    throw e;
+  }
 
   // Strip v1 doc-id wrapper / brandId (already a column) / non-data fields
   // we manage explicitly. v1 loads `data` via `{...d.data()}` so it can
@@ -1115,9 +1148,9 @@ async function _saveReportV1({ type, brandId, weekInfo, data, uid, status = 'dra
   throw new Error('report was saved but could not be re-read — refresh and check');
 }
 
-export async function saveReport({ brandId, brandName, weekInfo, data, uid, userName, status = 'draft', extraFields = {} }) {
+export async function saveReport({ brandId, brandName, weekInfo, data, uid, userName, status = 'draft', extraFields = {}, createOnly = false }) {
   void brandName; void userName; // v2 derives from joins
-  return _saveReportV1({ type: 'weekly', brandId, weekInfo, data, uid, status, extraFields });
+  return _saveReportV1({ type: 'weekly', brandId, weekInfo, data, uid, status, extraFields, createOnly });
 }
 export async function saveBiWeeklyReport({ brandId, brandName, periodInfo, data, uid, userName, status = 'draft', extraFields = {} }) {
   void brandName; void userName;
@@ -1528,4 +1561,19 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   return (data || [])
     .map((r) => r.brand)
     .filter((b) => b && b.status === 'active');
+}
+
+// Active brands + their Euka mapping (slug/store), for the Boss
+// "Create weekly report from Euka" picker. Boss-only surface, so a plain
+// select is fine — RLS still gates it. Includes euka_slug (mig 222) and
+// euka_store_id (mig 183) so the flow can auto-match the currently-viewed
+// Euka store to a WurxOS brand.
+export async function listBrandsForEukaReport() {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('id, brand_name, logo_url, euka_slug, euka_store_id')
+    .eq('status', 'active')
+    .order('brand_name');
+  if (error) throw new Error(error.message);
+  return data || [];
 }
