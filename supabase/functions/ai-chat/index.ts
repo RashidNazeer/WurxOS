@@ -233,6 +233,37 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_attendance',
+      description: "Get attendance for one employee, or a team summary when no name is given. Returns a SUMMARY by default (days present, total & average hours worked, break time). Set detail=true ONLY when the user wants the individual day-by-day log. Month format YYYY-MM; omit for the current/most-recent month with data.",
+      parameters: {
+        type: 'object',
+        properties: {
+          person_name: { type: 'string', description: 'Employee name; omit for a team-wide summary.' },
+          month: { type: 'string', description: 'YYYY-MM, e.g. "2026-06". Omit for the latest month with attendance.' },
+          detail: { type: 'boolean', description: 'true = list individual days (capped); false/omit = just the summary. Keep false unless day-level detail is asked for.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_leave',
+      description: "Get leave requests for one employee, or across everyone. Filter by status (approved/pending/rejected/cancelled) and/or type (wfh, emergency, medical, half_leave). Month filters by the leave's start date (YYYY-MM). Compact one line per request.",
+      parameters: {
+        type: 'object',
+        properties: {
+          person_name: { type: 'string', description: 'Employee name; omit for everyone.' },
+          status: { type: 'string', enum: ['approved', 'pending', 'rejected', 'cancelled'], description: 'Filter by decision status.' },
+          type: { type: 'string', enum: ['wfh', 'emergency', 'medical', 'half_leave'], description: 'Filter by leave type.' },
+          month: { type: 'string', description: 'YYYY-MM on the start date; omit for all/recent.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'list_brands',
       description: 'List client brands with their status and owner. Use for "which brands do we have / who owns X".',
       parameters: { type: 'object', properties: {} },
@@ -254,6 +285,23 @@ const htmlToText = (s: unknown) => String(s || '')
   .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 
 const has = (v: unknown) => v != null && v !== '' && v !== 'N/A';
+
+// milliseconds → "7h 20m"
+const hms = (ms: unknown) => {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return '0h';
+  const h = Math.floor(n / 3_600_000);
+  const m = Math.round((n % 3_600_000) / 60_000);
+  return `${h}h${m ? ` ${m}m` : ''}`;
+};
+
+// YYYY-MM → {gte, lt} date-range strings for created_at/date filtering.
+const monthToRange = (month: string) => {
+  if (!/^\d{4}-\d{2}$/.test(month)) return null;
+  const [y, mm] = month.split('-').map(Number);
+  const next = mm === 12 ? `${y + 1}-01` : `${y}-${String(mm + 1).padStart(2, '0')}`;
+  return { gte: `${month}-01`, lt: `${next}-01` };
+};
 
 // Resolve a name → profile rows (active, non-deleted). Returns [] if none.
 async function resolvePeople(admin: any, name: string) {
@@ -551,6 +599,98 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       return out;
     }
 
+    if (name === 'get_attendance') {
+      let userIds: string[] | null = null;
+      let single: any = null;
+      if (args?.person_name) {
+        const people = await resolvePeople(admin, args.person_name);
+        if (!people.length) return `No active employee matches "${args.person_name}".`;
+        if (people.length > 1) return `Multiple people match "${args.person_name}": ${people.map((p: any) => p.display_name).join(', ')}. Ask which one.`;
+        userIds = [people[0].id]; single = people[0];
+      }
+      // Month: given, else the latest month that has attendance.
+      let month = String(args?.month || '').trim();
+      if (!month) {
+        const { data: mx } = await admin.from('attendance').select('date').order('date', { ascending: false }).limit(1);
+        month = mx?.[0]?.date ? String(mx[0].date).slice(0, 7) : '';
+      }
+      const range = monthToRange(month);
+      let q = admin.from('attendance').select('user_id, date, clock_in, clock_out, total_work_ms, total_break_ms, status').order('date', { ascending: false });
+      if (userIds) q = q.in('user_id', userIds);
+      if (range) q = q.gte('date', range.gte).lt('date', range.lt);
+      q = q.limit(userIds ? 60 : 1500); // one person's month, or team month
+      const { data: att } = await q;
+      if (!att || !att.length) return `No attendance records for ${single ? single.display_name : 'anyone'} in ${month || '(no data)'}.`;
+
+      // names
+      const ids = [...new Set(att.map((a: any) => a.user_id))];
+      const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);
+      const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+
+      // aggregate per user
+      const agg = new Map<string, { days: number; work: number; brk: number }>();
+      for (const a of att) {
+        const cur = agg.get(a.user_id) || { days: 0, work: 0, brk: 0 };
+        cur.days += 1; cur.work += Number(a.total_work_ms) || 0; cur.brk += Number(a.total_break_ms) || 0;
+        agg.set(a.user_id, cur);
+      }
+
+      if (userIds && args?.detail) {
+        // day-by-day for the single person (capped)
+        const lines = att.slice(0, 40).map((a: any) => {
+          const ci = a.clock_in ? new Date(a.clock_in).toISOString().slice(11, 16) : '—';
+          const co = a.clock_out ? new Date(a.clock_out).toISOString().slice(11, 16) : '—';
+          return `  - ${a.date}: ${hms(a.total_work_ms)} worked (in ${ci}, out ${co}${Number(a.total_break_ms) > 0 ? `, break ${hms(a.total_break_ms)}` : ''})`;
+        });
+        const s = agg.get(userIds[0])!;
+        return `Attendance for ${single.display_name} — ${month} (${s.days} days, ${hms(s.work)} total, avg ${hms(Math.round(s.work / Math.max(1, s.days)))}/day):\n${lines.join('\n')}` + (att.length > 40 ? `\n  …and ${att.length - 40} more days.` : '');
+      }
+
+      // summary (default). Note: clock-in/out times are UTC in the DB.
+      const summ = [...agg.entries()]
+        .map(([uid, s]) => ({ name: nameOf.get(uid) || 'Unknown', ...s, avg: Math.round(s.work / Math.max(1, s.days)) }))
+        .sort((a, b) => b.work - a.work);
+      if (userIds) {
+        const s = summ[0];
+        return `Attendance for ${s.name} — ${month}: ${s.days} days present, ${hms(s.work)} total worked (avg ${hms(s.avg)}/day), ${hms(s.brk)} on breaks.`;
+      }
+      return `Team attendance summary — ${month} (${summ.length} employees):\n` +
+        summ.map((s) => `- ${s.name}: ${s.days} days, ${hms(s.work)} (avg ${hms(s.avg)}/day)`).join('\n');
+    }
+
+    if (name === 'get_leave') {
+      let userIds: string[] | null = null;
+      let single: any = null;
+      if (args?.person_name) {
+        const people = await resolvePeople(admin, args.person_name);
+        if (!people.length) return `No active employee matches "${args.person_name}".`;
+        if (people.length > 1) return `Multiple people match "${args.person_name}": ${people.map((p: any) => p.display_name).join(', ')}. Ask which one.`;
+        userIds = [people[0].id]; single = people[0];
+      }
+      let q = admin.from('leave_requests')
+        .select('requester_id, type, other_title, start_date, end_date, status, reason, paid_days, unpaid_days')
+        .order('start_date', { ascending: false });
+      if (userIds) q = q.in('requester_id', userIds);
+      if (args?.status) q = q.eq('status', String(args.status));
+      if (args?.type) q = q.eq('type', String(args.type));
+      const range = args?.month ? monthToRange(String(args.month)) : null;
+      if (range) q = q.gte('start_date', range.gte).lt('start_date', range.lt);
+      q = q.limit(60);
+      const { data: lv } = await q;
+      if (!lv || !lv.length) return `No leave requests found${single ? ` for ${single.display_name}` : ''}${args?.status ? ` (${args.status})` : ''}${args?.type ? ` of type ${args.type}` : ''}${args?.month ? ` in ${args.month}` : ''}.`;
+      const ids = [...new Set(lv.map((l: any) => l.requester_id))];
+      const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);
+      const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+      const span = (l: any) => l.start_date === l.end_date ? l.start_date : `${l.start_date}→${l.end_date}`;
+      const paid = (l: any) => {
+        const p = Number(l.paid_days) || 0, u = Number(l.unpaid_days) || 0;
+        return p || u ? ` [${p ? `${p} paid` : ''}${p && u ? ', ' : ''}${u ? `${u} unpaid` : ''}]` : '';
+      };
+      const lines = lv.map((l: any) =>
+        `- ${nameOf.get(l.requester_id) || 'Unknown'} · ${l.type === 'half_leave' ? 'half leave' : l.type}${l.other_title ? ` (${l.other_title})` : ''} · ${span(l)} · ${l.status}${paid(l)}${l.reason ? ` — ${String(l.reason).slice(0, 120)}` : ''}`);
+      return `Leave requests (${lv.length}):\n` + lines.join('\n');
+    }
+
     if (name === 'list_brands') {
       const { data: brands } = await admin.from('brands').select('brand_name, status, owner_id').order('brand_name').limit(200);
       if (!brands || !brands.length) return 'No brands found.';
@@ -772,7 +912,8 @@ Deno.serve(async (req) => {
     const isBoss = roleKey === 'boss';
     const dataToolRules = isBoss ? [
       '',
-      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, performance ratings/flags/warnings, client reports (weekly/biweekly/monthly), and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing?", "GMV for Solid Gold last week?", "what were the insights for Bentgo week 12?", "give me the full report for X", "what is Y\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100.',
+      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, performance ratings/flags/warnings, attendance, leave requests, client reports (weekly/biweekly/monthly), and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing?", "how many hours did Ali work in June?", "who is on leave / show pending leave requests", "GMV for Solid Gold last week?", "give me the full report for X", "what is Y\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100.',
+      'ATTENDANCE: get_attendance returns a SUMMARY (days present, total & average hours) by default — only pass detail=true if the user wants the day-by-day log. Clock times from the tool are in UTC; the office runs on Pakistan time (PKT = UTC+5), so add 5 hours if you state a clock time, or just report hours worked (which need no conversion).',
       'REPORTS — be token-smart: get_reports takes a `sections` list. Request ONLY what the question needs: just a metric ("GMV for X") → sections=["metrics"]; the written analysis → ["insights"]; top creators/videos/campaigns/products → the matching section; the whole/full report for a specific brand+period → ["all"]. Do not pull insights or tables when only a number was asked. When they want a full report, name the brand AND period so it returns that one report completely.',
       'If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
     ].join('\n') : '';
