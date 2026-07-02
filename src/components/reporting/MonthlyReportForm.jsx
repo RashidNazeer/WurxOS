@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useReportLeaveGuard } from './useReportLeaveGuard';
 import { useStickyHeaderOffset } from '../../hooks/useStickyHeaderOffset';
+import { useBrandSections, cleanCustomFields } from './useBrandSections';
+import { BrandSectionsBlock, AddCustomSectionInline } from './BrandCustomSections';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -485,6 +487,14 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     }));
   }, []);
 
+  // Per-section visibility toggle for brand custom sections (keyed by the
+  // section's id in data.sectionsEnabled), matching the weekly form's shape
+  // so BrandSectionsBlock can drive show/hide.
+  const toggleBrandSection = useCallback((key) => (val) => setData(d => ({
+    ...d,
+    sectionsEnabled: { ...resolveSectionsEnabled(d.sectionsEnabled), [key]: val },
+  })), []);
+
   // AI: generate Key Wins narrative
   const runKeyWinsAi = async () => {
     setAiLoading(true);
@@ -562,11 +572,12 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     setSaving(true);
     try {
       const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
-      // Strip any customFields entries whose template entry was deleted, so the view doesn't render orphans.
+      // Strip deleted per-user custom fields so the view doesn't render
+      // orphans — but KEEP brand-scoped entries (long_text / table /
+      // builtin_extra), which are owned by the brand template, not this
+      // user. Using validIds alone would wipe every brand section on save.
       const validIds = new Set(customFieldDefs.map(f => f.id));
-      const cleanedCustomFields = Object.fromEntries(
-        Object.entries(data.customFields || {}).filter(([id]) => validIds.has(id))
-      );
+      const cleanedCustomFields = cleanCustomFields(data.customFields, validIds);
       const cleanedData = { ...data, customFields: cleanedCustomFields };
       const savedId = await saveMonthlyReport({
         brandId: selectedBrand.id,
@@ -614,6 +625,13 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const onSaveDraft = () => _doSave(reportStatus, { rejectionNote: rejectionNote || null }, { stay: true });
   const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft });
   const { headerRef, rteTopStyle } = useStickyHeaderOffset();
+  // Brand-scoped custom sections (shared with the weekly form). These replace
+  // the old per-USER custom fields as the brand-specific mechanism, so a
+  // section added for one brand no longer leaks onto other brands' reports.
+  const {
+    brandSectionDefs, brandSectionExtras,
+    addBrandCustomSection, deleteBrandCustomSection,
+  } = useBrandSections({ brandId: selectedBrand?.id, setData });
 
   const handleSaveChanges = () => _doSave(reportStatus);
 
@@ -1172,6 +1190,31 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           placeholder="Share your recommendations and action items for next month."
           onChange={v => setData(d => ({ ...d, recommendations: v }))} />
       </SectionCard>
+      )}
+
+      {/* ── Brand Sections (per-brand custom sections, shared with weekly) ── */}
+      {(brandSectionDefs.length > 0 || selectedBrand?.id) && (
+        <>
+          {brandSectionDefs.length > 0 && (
+            <BrandSectionsBlock
+              sections={brandSectionDefs}
+              data={data}
+              setData={setData}
+              previousReport={previousReport}
+              sectEnabled={sectEnabled}
+              toggleSection={toggleBrandSection}
+              onDelete={deleteBrandCustomSection} />
+          )}
+          {selectedBrand?.id && (
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed' }}>
+              <div className="card-body p-3">
+                <AddCustomSectionInline
+                  disabled={!selectedBrand?.id}
+                  onAdd={addBrandCustomSection} />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Section 15: My Custom Fields (per-user, optional) ───────────── */}

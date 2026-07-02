@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useReportLeaveGuard } from './useReportLeaveGuard';
 import { useStickyHeaderOffset } from '../../hooks/useStickyHeaderOffset';
+import { cleanCustomFields } from './useBrandSections';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   emptyBiWeeklyReport, getBiWeeklyPeriodsFromAnchor,
@@ -731,12 +732,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
     setSaving(true);
     try {
       const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
-      // Strip customFields entries whose field def was deleted — otherwise the view
-      // keeps rendering them from the stored report doc.
+      // Strip deleted per-user custom fields, but keep brand-scoped entries
+      // (defensive: bi-weekly has no brand-section UI wired yet, but this
+      // matches weekly/monthly so a future wiring won't wipe them on save).
       const validIds = new Set(customFieldDefs.map(f => f.id));
-      const cleanedCustomFields = Object.fromEntries(
-        Object.entries(data.customFields || {}).filter(([id]) => validIds.has(id))
-      );
+      const cleanedCustomFields = cleanCustomFields(data.customFields, validIds);
       const cleanedData = { ...data, customFields: cleanedCustomFields };
       const savedId = await saveBiWeeklyReport({
         brandId: selectedBrand.id,

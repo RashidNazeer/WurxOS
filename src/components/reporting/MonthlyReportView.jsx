@@ -1401,10 +1401,71 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
         })()}
 
         {/* Custom Fields + unmatched brand resource sections */}
-        {sectEnabled.customFields && (() => {
+        {(() => {
           const customEntries = Object.entries(report.customFields || {});
           const customNames = [];
-          const renderedCustom = customEntries.map(([fieldId, entry]) => {
+          const prevCustom = previousReport?.customFields || {};
+          const prevOf = (fieldId, label) => {
+            const byId = prevCustom[fieldId];
+            if (byId && typeof byId === 'object') return byId.value;
+            if (label) {
+              const byName = Object.values(prevCustom).find(v => v && typeof v === 'object' && v.name === label);
+              if (byName) return byName.value;
+            }
+            return null;
+          };
+
+          // Group brand-defined TABLE-section entries (kind:'table' + sectionId)
+          // into one card per section. Everything else (long_text brand sections
+          // + legacy per-user custom fields) passes through as long-text cards.
+          const tableGroups = new Map(); // sectionId -> { name, sectionId, rows }
+          const passthrough = [];
+          for (const [fieldId, entry] of customEntries) {
+            if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
+              const key = entry.sectionId;
+              if (!tableGroups.has(key)) tableGroups.set(key, { name: entry.sectionName || 'Section', sectionId: key, rows: [] });
+              tableGroups.get(key).rows.push({ fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text' });
+            } else if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra') {
+              // Built-in extras are not rendered as standalone cards.
+            } else {
+              passthrough.push([fieldId, entry]);
+            }
+          }
+
+          const renderedTables = [...tableGroups.values()].map((group) => {
+            customNames.push(group.name);
+            // Brand table sections respect the per-report visibility toggle.
+            if (sectEnabled[group.sectionId] === false) return null;
+            const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
+            if (nonEmpty.length === 0) return null;
+            return (
+              <ContentSection key={`tbl:${group.sectionId}`} icon="bi-table" color="#0ea5e9" title={group.name}>
+                <div className="row g-3">
+                  {nonEmpty.map((r) => {
+                    const numericType = (r.type === 'number' || r.type === 'currency');
+                    const prevRaw = prevOf(r.fieldId, r.label);
+                    return (
+                      <div key={r.fieldId} className="col-6 col-lg-3">
+                        <StatCard
+                          label={r.label}
+                          value={String(r.value)}
+                          current={numericType ? num(r.value) : undefined}
+                          prevValue={numericType && prevRaw != null ? String(prevRaw) : null}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </ContentSection>
+            );
+          });
+
+          const renderedCustom = passthrough.map(([fieldId, entry]) => {
+            const isBrandLong = entry && typeof entry === 'object' && entry.kind === 'long_text';
+            // Brand long-text sections respect visibility; legacy per-user
+            // fields are gated by the customFields toggle (as before).
+            if (isBrandLong && sectEnabled[fieldId] === false) return null;
+            if (!isBrandLong && !sectEnabled.customFields) return null;
             const name = typeof entry === 'object' ? entry?.name : 'Custom Field';
             const value = typeof entry === 'object' ? entry?.value : entry;
             const isEmpty = !value || (typeof value === 'string' && !value.trim()) || (isHtml(value) && !value.replace(/<[^>]+>/g, '').trim());
@@ -1422,9 +1483,11 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
               </ContentSection>
             );
           });
+
           const known = ['Key Wins / Insights', 'Key Wins', 'Campaigns', 'Recommendations & Action Items', ...customNames];
           return (
             <>
+              {renderedTables}
               {renderedCustom}
               <BrandReportLinks brandId={report.brandId} knownSectionNames={known} reportType={reportType} injectedSections={reportLinks} />
             </>
