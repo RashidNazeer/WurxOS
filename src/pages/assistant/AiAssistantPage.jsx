@@ -204,7 +204,9 @@ function TrainView({ onBack }) {
 
   async function saveConfig() {
     setSavingCfg(true); setFlash('');
-    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, model: cfg.model, enabled: cfg.enabled, use_kb: cfg.use_kb !== false }); setFlash('Saved.'); }
+    // NOTE: `model` is intentionally NOT saved here — it is locked server-side
+    // (the ai-chat function pins gpt-5.4-mini) so the Boss can't change or break it.
+    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled, use_kb: cfg.use_kb !== false }); setFlash('Saved.'); }
     catch (e) { setFlash('Error: ' + e.message); }
     finally { setSavingCfg(false); setTimeout(() => setFlash(''), 2500); }
   }
@@ -231,7 +233,7 @@ function TrainView({ onBack }) {
         {/* Settings */}
         <div className="col-12 order-2">
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: 18 }}>
-            <div className="fw-bold mb-2" style={{ fontSize: '0.92rem' }}><i className="bi bi-sliders me-2" />Assistant settings (persona, greeting, model)</div>
+            <div className="fw-bold mb-2" style={{ fontSize: '0.92rem' }}><i className="bi bi-sliders me-2" />Assistant settings (persona &amp; greeting)</div>
             <label className="form-label small fw-semibold mb-1">Persona / instructions</label>
             <textarea className="form-control form-control-sm mb-2" rows={5} value={cfg.persona} onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} style={{ borderRadius: 9 }} />
             <label className="form-label small fw-semibold mb-1">Greeting</label>
@@ -239,9 +241,12 @@ function TrainView({ onBack }) {
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
               <div>
                 <label className="form-label small fw-semibold mb-1 d-block">Model</label>
-                <select className="form-select form-select-sm" style={{ width: 'auto', borderRadius: 9 }} value={cfg.model} onChange={(e) => setCfg({ ...cfg, model: e.target.value })}>
-                  {['openai/gpt-4o-mini', 'openai/gpt-4.1-mini', 'openai/gpt-4o', 'openai/gpt-4.1', 'openai/gpt-5-mini'].map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge rounded-pill" style={{ background: 'var(--surface-3)', color: 'var(--text-secondary)', fontWeight: 600, padding: '6px 12px', fontSize: '0.8rem' }}>
+                    <i className="bi bi-lock-fill me-1" style={{ fontSize: '0.72rem' }} />gpt-5.4-mini
+                  </span>
+                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>set by the developer</span>
+                </div>
               </div>
               <div className="form-check mt-3">
                 <input className="form-check-input" type="checkbox" id="ai-enabled" checked={cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />

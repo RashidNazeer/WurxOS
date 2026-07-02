@@ -512,13 +512,10 @@ Deno.serve(async (req) => {
       return json({ error: 'The assistant is currently turned off by an admin.' }, 503);
     }
     const persona = cfg?.persona || 'You are the WurxOS assistant. Answer only from the provided knowledge; stay on WurxOS topics.';
-    // Config may still hold an old GitHub-Models id like "openai/gpt-4.1".
-    // Strip any "openai/" prefix (OpenAI's own API wants the bare id) and fall
-    // back to our default if it looks like a non-OpenAI/GitHub-only model.
-    const rawModel = String(cfg?.model || '').trim();
-    const model = rawModel && !rawModel.includes('/') ? rawModel
-      : rawModel.startsWith('openai/') ? rawModel.slice('openai/'.length)
-      : DEFAULT_MODEL;
+    // Model is LOCKED in code (not read from config) so a stale or wrong
+    // ai_assistant_config.model value can never change or break it. To switch
+    // models, edit DEFAULT_MODEL and redeploy — deliberately a dev action.
+    const model = DEFAULT_MODEL;
 
     // ── Conversation (own it, or create) ───────────────────────────
     if (conversationId) {
