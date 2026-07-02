@@ -53,16 +53,39 @@ function titleCase(slug: string): string {
   return slug.replace(/(^|[-_ ])(\w)/g, (_, s, c) => (s ? ' ' : '') + c.toUpperCase());
 }
 
-// Discover { slug → key } from the env. Reads Deno.env.toObject() once.
-function discoverBrands(): Record<string, string> {
+// A brand resolves to a Euka key AND (for shared-key brands) a specific
+// storeId to scope requests. Two sources, unioned:
+//   1. Per-key brands (original): EUKA_API_KEY (=DEFAULT_BRAND) and
+//      EUKA_API_KEY_<SLUG>. Each key owns exactly one store, so no storeId is
+//      needed — the frontend reads it from /stores.
+//   2. Shared-key brands (new): ONE key (EUKA_SHARED_API_KEY) covers many
+//      brands. Which store each brand maps to lives in EUKA_SHARED_BRANDS, a
+//      JSON map { "<slug>": "<storeId>", ... }. Adding a brand on the shared
+//      account = add one line to that JSON secret. Because the shared key sees
+//      ALL stores, the server MUST inject the right storeId per brand (the
+//      frontend can't tell them apart from /stores).
+type BrandEntry = { key: string; storeId?: string };
+
+function discoverBrands(): Record<string, BrandEntry> {
   const env = Deno.env.toObject();
-  const out: Record<string, string> = {};
+  const out: Record<string, BrandEntry> = {};
+  // (1) per-key brands
   for (const [name, val] of Object.entries(env)) {
     if (!val) continue;
-    if (name === 'EUKA_API_KEY') out[DEFAULT_BRAND] = val;
+    if (name === 'EUKA_API_KEY') out[DEFAULT_BRAND] = { key: val };
     else if (name.startsWith('EUKA_API_KEY_')) {
       const slug = name.slice('EUKA_API_KEY_'.length).toLowerCase();
-      if (slug) out[slug] = val;
+      if (slug) out[slug] = { key: val };
+    }
+  }
+  // (2) shared-key brands
+  const sharedKey = env['EUKA_SHARED_API_KEY'] || '';
+  if (sharedKey) {
+    let map: Record<string, string> = {};
+    try { map = JSON.parse(env['EUKA_SHARED_BRANDS'] || '{}'); } catch { map = {}; }
+    for (const [slug, storeId] of Object.entries(map)) {
+      const s = slug.toLowerCase();
+      if (s && storeId) out[s] = { key: sharedKey, storeId: String(storeId) };
     }
   }
   return out;
@@ -71,16 +94,17 @@ function discoverBrands(): Record<string, string> {
 // Public brand list for the frontend dropdown — slugs + labels, NO keys.
 function brandList(): Array<{ slug: string; label: string }> {
   const labels = brandLabels();
-  const keys = discoverBrands();
-  return Object.keys(keys)
+  const brands = discoverBrands();
+  return Object.keys(brands)
     .sort((a, b) => (a === DEFAULT_BRAND ? -1 : b === DEFAULT_BRAND ? 1 : a.localeCompare(b)))
     .map((slug) => ({ slug, label: labels[slug] || titleCase(slug) }));
 }
 
-function keyForBrand(brand: string | null): { slug: string; key: string } {
-  const keys = discoverBrands();
-  const slug = brand && keys[brand] ? brand : DEFAULT_BRAND;
-  return { slug, key: keys[slug] || '' };
+function keyForBrand(brand: string | null): { slug: string; key: string; storeId?: string } {
+  const brands = discoverBrands();
+  const slug = brand && brands[brand] ? brand : DEFAULT_BRAND;
+  const entry = brands[slug] || { key: '' };
+  return { slug, key: entry.key || '', storeId: entry.storeId };
 }
 
 const cors = {
@@ -142,13 +166,22 @@ Deno.serve(async (req) => {
 
     const method: string = payload?.method
       || (path.startsWith('/dashboard/') ? 'POST' : 'GET');
-    const body = payload?.body ?? null;
+    let body = payload?.body ?? null;
     const query = payload?.query ?? null;
     const fresh = payload?.fresh === true;
 
-    // Pick the Euka key for the requested brand (separate accounts).
-    const { slug: brandSlug, key: brandKey } = keyForBrand(payload?.brand ?? null);
+    // Pick the Euka key (+ store, for shared-key brands) for the requested brand.
+    const { slug: brandSlug, key: brandKey, storeId: brandStoreId } = keyForBrand(payload?.brand ?? null);
     if (!brandKey) return json({ error: `Euka key not configured for brand "${brandSlug}"` }, 500);
+
+    // Shared-key brands: the key sees ALL stores, so the frontend can't tell
+    // them apart. Force the request to THIS brand's store so it can never read
+    // a sibling brand's data. (Dashboard endpoints take storeId in the body.)
+    if (brandStoreId) {
+      if (path.startsWith('/dashboard/') || path === '/data-export') {
+        body = { ...(body && typeof body === 'object' ? body : {}), storeId: brandStoreId };
+      }
+    }
 
     // Build the upstream URL (+ query string for GET endpoints).
     let url = EUKA_BASE + path;
@@ -201,6 +234,13 @@ Deno.serve(async (req) => {
 
     if (!upstream.ok) {
       return json({ error: `Euka ${upstream.status}`, detail: data }, upstream.status === 401 ? 502 : upstream.status);
+    }
+
+    // Shared-key brands: the key lists ALL stores/brands on the account. Narrow
+    // /stores (and /brands) to JUST the selected brand so the frontend — which
+    // takes stores[0] — never picks a sibling brand's store.
+    if (brandStoreId && Array.isArray(data)) {
+      if (path === '/stores') data = (data as any[]).filter((s) => s?.id === brandStoreId);
     }
 
     // Store in cache (best-effort; never block the response on a cache write).
