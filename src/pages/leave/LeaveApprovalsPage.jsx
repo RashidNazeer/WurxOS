@@ -149,7 +149,11 @@ function ApprovalRow({ row, isBoss, onAction, onOverride }) {
           </div>
         )}
       </div>
-      <div style={{ fontWeight: 700 }}>{days}</div>
+      <div style={{ fontWeight: 700 }}>
+        {row.type === 'half_leave'
+          ? <span title="Half-day leave (0.5 day)">½ day</span>
+          : days}
+      </div>
       <div style={{ fontSize: 11.5 }}>
         <span style={{ color: 'var(--success)', fontWeight: 700 }}>{Number(row.paid_days || 0)}</span>
         {Number(row.unpaid_days || 0) > 0 && (

@@ -35,6 +35,13 @@ function countDays(start, end) {
   }
   return count;
 }
+// Human day-count label for a request. A half_leave is 0.5 day — show it
+// as "½ day" so a bare "0.5"/"1 day" never looks like a bug to an approver.
+function daysLabel(r) {
+  if (r?.category === 'half_leave' || r?.type === 'half_leave') return '½ day';
+  const n = countDays(r?.startDate, r?.endDate);
+  return `${n} day${n > 1 ? 's' : ''}`;
+}
 function formatDate(ts) { if (!ts) return '—'; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function formatDateTime(ts) {
   if (!ts) return '';
@@ -101,7 +108,6 @@ function RejectModal({ request, onConfirm, onCancel, saving }) {
 function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOverrideCount }) {
   if (!request) return null;
   const catCfg = getCatCfg(request.category);
-  const days = countDays(request.startDate, request.endDate);
   const hasUnpaid = (request.unpaidDays || 0) > 0;
 
   return (
@@ -136,7 +142,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
                 </>
               )}
             </div>
-            <div className="text-muted small">{request.startDate} — {request.endDate} · {days} day{days > 1 ? 's' : ''}</div>
+            <div className="text-muted small">{request.startDate} — {request.endDate} · {daysLabel(request)}</div>
             <div className="text-muted small mt-1">{request.reason}</div>
           </div>
 
@@ -617,7 +623,6 @@ export default function BossLeaveRequestsPage() {
             const catCfg = getCatCfg(r.category);
             const stCfg = getStCfg(r.status);
             const title = getRequestTitle(r);
-            const days = countDays(r.startDate, r.endDate);
 
             return (
               <div key={r.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${catCfg.color}` }}>
@@ -652,7 +657,7 @@ export default function BossLeaveRequestsPage() {
                         </div>
                         <div className="fw-medium small mb-1">{title}</div>
                         <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-                          <i className="bi bi-calendar3 me-1" />{r.startDate} — {r.endDate} · {days} day{days > 1 ? 's' : ''}
+                          <i className="bi bi-calendar3 me-1" />{r.startDate} — {r.endDate} · {daysLabel(r)}
                         </div>
                         <p className="text-muted mb-0 mt-1" style={{ fontSize: '0.76rem' }}>{r.reason}</p>
 
