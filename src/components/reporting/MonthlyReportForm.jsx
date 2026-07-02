@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useReportLeaveGuard } from './useReportLeaveGuard';
+import { useStickyHeaderOffset } from '../../hooks/useStickyHeaderOffset';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -612,6 +613,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   // (preserves the report's current status — 'draft' for a new report).
   const onSaveDraft = () => _doSave(reportStatus, { rejectionNote: rejectionNote || null }, { stay: true });
   const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft });
+  const { headerRef, rteTopStyle } = useStickyHeaderOffset();
 
   const handleSaveChanges = () => _doSave(reportStatus);
 
@@ -732,9 +734,12 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const sCfg = REPORT_STATUSES[reportStatus] || REPORT_STATUSES.draft;
 
   return (
-    <div onInput={() => setDirty(true)}>
+    // Pin each rich-text toolbar BELOW this sticky header (topbar + measured
+    // header height) so it doesn't collide with the header when a text section
+    // scrolls up. Report header is z-index 4 > toolbar's 3, so it always wins.
+    <div onInput={() => setDirty(true)} style={rteTopStyle}>
       {guardModal}
-      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
+      <div ref={headerRef} className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
         style={{
           position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
           background: 'var(--surface-2)',

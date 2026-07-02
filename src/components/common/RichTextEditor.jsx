@@ -224,7 +224,10 @@ export default function RichTextEditor({
         }
 
         .rte-toolbar {
-          position: sticky; top: 0; z-index: 5;
+          /* Sticky offset is configurable so the toolbar can pin BELOW any
+             sticky page chrome above it (e.g. the report header) instead of
+             colliding with it. Defaults to 0 — unchanged everywhere else. */
+          position: sticky; top: var(--rte-toolbar-top, 0); z-index: 3;
           display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
           padding: 8px 10px;
           background: color-mix(in srgb, var(--surface-2) 88%, transparent);

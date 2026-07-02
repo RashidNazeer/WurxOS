@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useReportLeaveGuard } from './useReportLeaveGuard';
+import { useStickyHeaderOffset } from '../../hooks/useStickyHeaderOffset';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
   emptyBiWeeklyReport, getBiWeeklyPeriodsFromAnchor,
@@ -784,6 +785,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   // (preserves the report's current status — 'draft' for a new report).
   const onSaveDraft = () => _doSave(reportStatus, { rejectionNote: rejectionNote || null }, { stay: true });
   const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft });
+  const { headerRef, rteTopStyle } = useStickyHeaderOffset();
 
   /** Save without status change — used by TL/OL editing a non-draft report */
   const handleSaveChanges = () => _doSave(reportStatus);
@@ -952,14 +954,16 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   }));
 
   return (
-    <div onInput={() => setDirty(true)}>
+    // Pin each rich-text toolbar BELOW the sticky report header so it doesn't
+    // collide with it when a text section scrolls up (header z-index 4 > 3).
+    <div onInput={() => setDirty(true)} style={rteTopStyle}>
       {guardModal}
       {onCancel && (
         <button className="btn btn-sm btn-link text-muted p-0 mb-2" onClick={() => guardAction(onCancel)}>
           <i className="bi bi-arrow-left me-1" /> {editReportId ? 'Cancel editing' : 'Back to reports'}
         </button>
       )}
-      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2"
+      <div ref={headerRef} className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2"
         style={{
           position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
           background: 'var(--surface-2)',
