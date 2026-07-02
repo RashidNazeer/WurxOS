@@ -163,11 +163,26 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'find_person',
-      description: 'Resolve an employee by (partial) name to their id, full name and role. Use before other tools when the user names a person.',
+      description: "Look up one employee's profile by (partial) name — full name, role, manager, employment type, start date, responsibilities, email, active status. Use for 'who is X / tell me about X', and before other tools when the user names a person. For salary/incentives/performance/attendance/leave, also call the matching tool.",
       parameters: {
         type: 'object',
         properties: { name: { type: 'string', description: 'Full or partial employee name, e.g. "Ali" or "Abdul Subhan".' } },
         required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_employees',
+      description: "List employees — the whole team, or filtered by role and/or a name search. Returns name, role, manager, employment type, and start date. Use for 'list all employees', 'who are the APCs', 'show the team', 'how many TLs do we have'. For one person's full detail use find_person.",
+      parameters: {
+        type: 'object',
+        properties: {
+          role: { type: 'string', enum: ['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer'], description: 'Filter to a single role; omit for everyone.' },
+          search: { type: 'string', description: 'Optional name substring to filter by.' },
+          include_inactive: { type: 'boolean', description: 'Include deactivated/ex employees; default false (active only).' },
+        },
       },
     },
   },
@@ -286,6 +301,9 @@ const htmlToText = (s: unknown) => String(s || '')
 
 const has = (v: unknown) => v != null && v !== '' && v !== 'N/A';
 
+// Friendly role label (reuses the ROLE_LABEL map defined above; falls back to raw).
+const roleLabelOf = (role: unknown) => ROLE_LABEL[String(role || '').toLowerCase()] || String(role || 'unknown');
+
 // milliseconds → "7h 20m"
 const hms = (ms: unknown) => {
   const n = Number(ms);
@@ -340,9 +358,59 @@ function fmtIncentiveRow(name: string, row: any): string {
 async function runTool(admin: any, name: string, args: any): Promise<string> {
   try {
     if (name === 'find_person') {
-      const people = await resolvePeople(admin, args?.name);
-      if (!people.length) return `No active employee matches "${args?.name}".`;
-      return 'Matches:\n' + people.map((p: any) => `- ${p.display_name} (${p.role})`).join('\n');
+      const q = String(args?.name || '').trim();
+      if (!q) return 'Provide a name to look up.';
+      const { data: people } = await admin.from('profiles')
+        .select('id, display_name, role, email, reports_to, employment_type, start_date, responsibilities, is_active, deleted_at')
+        .ilike('display_name', `%${q}%`).is('deleted_at', null).limit(8);
+      if (!people || !people.length) return `No active employee matches "${q}".`;
+      if (people.length > 1) return `Multiple people match "${q}":\n` + people.map((p: any) => `- ${p.display_name} (${roleLabelOf(p.role)})`).join('\n') + '\nAsk which one.';
+      const p = people[0];
+      // resolve manager name
+      let mgr = '';
+      if (p.reports_to) {
+        const { data: m } = await admin.from('profiles').select('display_name, role').eq('id', p.reports_to).maybeSingle();
+        if (m) mgr = `${m.display_name} (${roleLabelOf(m.role)})`;
+      }
+      const resp = Array.isArray(p.responsibilities) && p.responsibilities.length ? p.responsibilities.join(', ') : '';
+      const lines = [
+        `${p.display_name}`,
+        `- Role: ${roleLabelOf(p.role)}`,
+        p.email ? `- Email: ${p.email}` : null,
+        mgr ? `- Reports to: ${mgr}` : (p.role === 'boss' ? null : '- Reports to: (not set)'),
+        p.employment_type ? `- Employment: ${p.employment_type}` : null,
+        p.start_date ? `- Start date: ${p.start_date}` : null,
+        resp ? `- Responsibilities: ${resp}` : null,
+        p.is_active === false ? '- Status: INACTIVE' : null,
+        '(For this person\'s salary, incentives, performance, attendance or leave, call the matching tool.)',
+      ].filter(Boolean);
+      return lines.join('\n');
+    }
+
+    if (name === 'get_employees') {
+      let q = admin.from('profiles')
+        .select('display_name, role, reports_to, employment_type, start_date, is_active')
+        .order('role', { ascending: true }).order('display_name', { ascending: true }).limit(300);
+      if (!args?.include_inactive) q = q.is('deleted_at', null).eq('is_active', true);
+      if (args?.role) q = q.eq('role', String(args.role));
+      if (args?.search) q = q.ilike('display_name', `%${String(args.search).trim()}%`);
+      const { data: emps } = await q;
+      if (!emps || !emps.length) return 'No employees match that filter.';
+      // manager names
+      const mgrIds = [...new Set(emps.map((e: any) => e.reports_to).filter(Boolean))];
+      const { data: mgrs } = mgrIds.length
+        ? await admin.from('profiles').select('id, display_name').in('id', mgrIds)
+        : { data: [] };
+      const mgrOf = new Map((mgrs || []).map((m: any) => [m.id, m.display_name]));
+      // group by role for a tidy, compact listing
+      const byRole = new Map<string, string[]>();
+      for (const e of emps) {
+        const line = `  - ${e.display_name}${e.employment_type ? ` · ${e.employment_type}` : ''}${e.reports_to && mgrOf.get(e.reports_to) ? ` · reports to ${mgrOf.get(e.reports_to)}` : ''}${e.start_date ? ` · since ${e.start_date}` : ''}${e.is_active === false ? ' · INACTIVE' : ''}`;
+        const k = roleLabelOf(e.role);
+        (byRole.get(k) || byRole.set(k, []).get(k)!).push(line);
+      }
+      const out = [...byRole.entries()].map(([role, lines]) => `${role} (${lines.length}):\n${lines.join('\n')}`);
+      return `Employees (${emps.length}):\n\n` + out.join('\n\n');
     }
 
     if (name === 'get_incentives') {
@@ -912,7 +980,7 @@ Deno.serve(async (req) => {
     const isBoss = roleKey === 'boss';
     const dataToolRules = isBoss ? [
       '',
-      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — employee incentives & bonuses, salaries, performance ratings/flags/warnings, attendance, leave requests, client reports (weekly/biweekly/monthly), and brands. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing?", "how many hours did Ali work in June?", "who is on leave / show pending leave requests", "GMV for Solid Gold last week?", "give me the full report for X", "what is Y\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100.',
+      'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — the employee directory (roles, manager, employment type, start date, responsibilities), incentives & bonuses, salaries, performance ratings/flags/warnings, attendance, leave requests, client reports (weekly/biweekly/monthly), and brands. For "who is X / tell me about X" use find_person; for lists like "all employees" or "who are the APCs" use get_employees. For a rich "tell me everything about X", combine find_person with their salary/incentives/performance tools. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing?", "how many hours did Ali work in June?", "who is on leave / show pending leave requests", "GMV for Solid Gold last week?", "give me the full report for X", "what is Y\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100.',
       'ATTENDANCE: get_attendance returns a SUMMARY (days present, total & average hours) by default — only pass detail=true if the user wants the day-by-day log. Clock times from the tool are in UTC; the office runs on Pakistan time (PKT = UTC+5), so add 5 hours if you state a clock time, or just report hours worked (which need no conversion).',
       'REPORTS — be token-smart: get_reports takes a `sections` list. Request ONLY what the question needs: just a metric ("GMV for X") → sections=["metrics"]; the written analysis → ["insights"]; top creators/videos/campaigns/products → the matching section; the whole/full report for a specific brand+period → ["all"]. Do not pull insights or tables when only a number was asked. When they want a full report, name the brand AND period so it returns that one report completely.',
       'If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
