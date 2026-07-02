@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  aiSend, listConversations, getMessages, deleteConversation,
+  aiSendStream, listConversations, getMessages, deleteConversation,
   getAiConfig, updateAiConfig, listDocs, saveDoc, deleteDoc,
 } from '../../lib/aiAssistantApi';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
@@ -71,18 +71,42 @@ function ChatView() {
     const msg = input.trim();
     if (!msg || sending) return;
     setInput(''); setErr('');
-    setMessages((m) => [...m, { role: 'user', content: msg }]);
+    // Add the user turn + an empty assistant bubble we grow as tokens arrive.
+    setMessages((m) => [...m, { role: 'user', content: msg }, { role: 'assistant', content: '', streaming: true }]);
     setSending(true);
+    // Append a delta to the last (assistant) message.
+    const appendDelta = (chunk) => {
+      setMessages((m) => {
+        const next = m.slice();
+        const last = next[next.length - 1];
+        if (last && last.role === 'assistant') next[next.length - 1] = { ...last, content: last.content + chunk, streaming: true };
+        return next;
+      });
+    };
     try {
-      const res = await aiSend({ conversationId: activeId, message: msg });
-      setMessages((m) => [...m, { role: 'assistant', content: res.reply }]);
+      const res = await aiSendStream({ conversationId: activeId, message: msg, onDelta: appendDelta });
+      // mark the assistant bubble as finished streaming
+      setMessages((m) => {
+        const next = m.slice();
+        const last = next[next.length - 1];
+        if (last && last.role === 'assistant') next[next.length - 1] = { ...last, streaming: false };
+        return next;
+      });
       if (!activeId && res.conversationId) {
         setActiveId(res.conversationId);
         listConversations().then(setConvos).catch(() => {});
       }
     } catch (e) {
       setErr(e.message || 'Failed to get a response.');
-      setMessages((m) => [...m, { role: 'assistant', content: '⚠️ ' + (e.message || 'Something went wrong. Please try again.') }]);
+      // Replace the (empty) streaming bubble with the error.
+      setMessages((m) => {
+        const next = m.slice();
+        const last = next[next.length - 1];
+        const errText = '⚠️ ' + (e.message || 'Something went wrong. Please try again.');
+        if (last && last.role === 'assistant') next[next.length - 1] = { role: 'assistant', content: errText };
+        else next.push({ role: 'assistant', content: errText });
+        return next;
+      });
     } finally {
       setSending(false);
     }
@@ -133,8 +157,7 @@ function ChatView() {
               <p className="text-muted small mb-0">e.g. “How do I apply for leave?” · “Which week had my brand’s highest GMV?”</p>
             </div>
           )}
-          {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} />)}
-          {sending && <Bubble role="assistant" content="" typing />}
+          {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} streaming={m.streaming} />)}
         </div>
         {err && <div className="px-3 pb-1"><div className="alert alert-danger py-1 px-2 small mb-1">{err}</div></div>}
         <div className="d-flex align-items-end gap-2 p-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
@@ -152,9 +175,10 @@ function ChatView() {
   );
 }
 
-function Bubble({ role, content, typing }) {
+function Bubble({ role, content, streaming }) {
   const isUser = role === 'user';
   const navigate = useNavigate();
+  const waiting = streaming && !content; // streaming started but no text yet
 
   // Intercept clicks on in-app links the assistant rendered ([Leave](/leave))
   // so navigation stays inside the SPA instead of a full page reload.
@@ -179,8 +203,8 @@ function Bubble({ role, content, typing }) {
         color: isUser ? 'var(--on-accent)' : 'var(--text-primary)',
         borderTopRightRadius: isUser ? 4 : 12, borderTopLeftRadius: isUser ? 12 : 4,
       }}>
-        {typing
-          ? <span className="text-muted">…thinking</span>
+        {waiting
+          ? <span className="ai-typing text-muted">Thinking<span className="ai-dots" /></span>
           : isUser
             ? content
             : <div className="ai-md" onClick={onContentClick} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(content) }} />}

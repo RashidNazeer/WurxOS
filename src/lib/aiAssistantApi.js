@@ -17,6 +17,65 @@ export async function aiSend({ conversationId, message }) {
   return data; // { conversationId, reply }
 }
 
+// Streaming chat. Calls ai-chat with { stream:true } and reads the SSE body,
+// invoking onDelta(textChunk) as tokens arrive. Resolves with { conversationId }
+// once the stream completes. supabase.functions.invoke can't stream, so we hit
+// the function URL directly with the user's access token.
+export async function aiSendStream({ conversationId, message, onDelta, signal }) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const base = import.meta.env.VITE_SUPABASE_URL;
+  if (!token || !base) throw new Error('Not signed in.');
+
+  const res = await fetch(`${base}/functions/v1/ai-chat`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: anon, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, message, stream: true }),
+    signal,
+  });
+
+  // Non-2xx → parse the JSON error the function returned.
+  if (!res.ok) {
+    let detail = `AI request failed (${res.status})`;
+    try { const b = await res.json(); if (b?.error) detail = b.error; } catch { /* keep generic */ }
+    throw new Error(detail);
+  }
+
+  // If the server didn't stream (older deploy / fallback), treat as JSON.
+  const ctype = res.headers.get('content-type') || '';
+  if (!ctype.includes('text/event-stream') || !res.body) {
+    const b = await res.json().catch(() => ({}));
+    if (b?.error) throw new Error(b.error);
+    if (b?.reply && onDelta) onDelta(b.reply);
+    return { conversationId: b?.conversationId || conversationId };
+  }
+
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  let newConvId = conversationId;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop() || '';
+    for (const line of lines) {
+      const s = line.trim();
+      if (!s.startsWith('data:')) continue;
+      const payload = s.slice(5).trim();
+      if (!payload) continue;
+      let obj;
+      try { obj = JSON.parse(payload); } catch { continue; }
+      if (obj.error) throw new Error(obj.error);
+      if (obj.delta && onDelta) onDelta(obj.delta);
+      if (obj.done) newConvId = obj.conversationId || newConvId;
+    }
+  }
+  return { conversationId: newConvId };
+}
+
 export async function listConversations() {
   const { data, error } = await supabase
     .from('ai_conversations').select('id, title, updated_at')

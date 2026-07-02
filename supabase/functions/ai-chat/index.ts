@@ -60,6 +60,74 @@ const cors = {
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 
+// ── SSE streaming helpers ──────────────────────────────────────────
+// Wire format (one JSON object per `data:` line):
+//   {"delta":"..."}                       — a chunk of answer text
+//   {"done":true,"conversationId":"..."}  — end of stream
+//   {"error":"..."}                       — failure (client shows it)
+const sseHeaders = { ...cors, 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' };
+const sseLine = (obj: unknown) => `data: ${JSON.stringify(obj)}\n\n`;
+
+// Relay OpenAI's SSE stream to the client as our own SSE, accumulating the full
+// text so we can persist it once the stream completes.
+function relayStream(upstream: ReadableStream<Uint8Array>, cid: string, persist: (reply: string) => Promise<void>): Response {
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  let full = '';
+  const out = new ReadableStream({
+    async start(controller) {
+      const reader = upstream.getReader();
+      let buf = '';
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          // OpenAI sends `data: {...}\n\n` lines; split on newlines.
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          for (const line of lines) {
+            const s = line.trim();
+            if (!s.startsWith('data:')) continue;
+            const payload = s.slice(5).trim();
+            if (payload === '[DONE]') continue;
+            try {
+              const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
+              if (delta) { full += delta; controller.enqueue(enc.encode(sseLine({ delta }))); }
+            } catch { /* ignore keep-alive / partial */ }
+          }
+        }
+      } catch (e) {
+        controller.enqueue(enc.encode(sseLine({ error: 'stream interrupted' })));
+        console.error('relayStream error', e);
+      }
+      if (!full) full = 'Sorry, I couldn’t generate a response just now. Please try again.';
+      try { await persist(full); } catch (e) { console.error('persist after stream failed', e); }
+      controller.enqueue(enc.encode(sseLine({ done: true, conversationId: cid })));
+      controller.close();
+    },
+  });
+  return new Response(out, { headers: sseHeaders });
+}
+
+// Stream an already-known string to the client as SSE (used when the model
+// returned the final answer during a tool round — no second call needed).
+function streamText(text: string, cid: string, persist: (reply: string) => Promise<void>): Response {
+  const enc = new TextEncoder();
+  const out = new ReadableStream({
+    async start(controller) {
+      // Chunk into small pieces so it still "types" rather than dumping at once.
+      for (let i = 0; i < text.length; i += 24) {
+        controller.enqueue(enc.encode(sseLine({ delta: text.slice(i, i + 24) })));
+      }
+      try { await persist(text); } catch (e) { console.error('persist (streamText) failed', e); }
+      controller.enqueue(enc.encode(sseLine({ done: true, conversationId: cid })));
+      controller.close();
+    },
+  });
+  return new Response(out, { headers: sseHeaders });
+}
+
 // ── Role grounding ──────────────────────────────────────────────────
 // So the assistant answers from what the user's role can ACTUALLY do (it
 // once told the Boss how to "apply for leave" — a flow the Boss doesn't have)
@@ -797,6 +865,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const message = String(body?.message || '').trim();
     let conversationId: string | null = body?.conversationId || null;
+    const wantStream = body?.stream === true; // client opts into SSE token streaming
     if (!message) return json({ error: 'empty message' }, 400);
     if (message.length > 4000) return json({ error: 'message too long' }, 400);
 
@@ -998,61 +1067,98 @@ Deno.serve(async (req) => {
     // ── Call the model (OpenAI), with a tool-calling loop for the Boss ──
     // GPT-5.x require `max_completion_tokens` (not `max_tokens`) and reject a
     // non-default `temperature` — so we omit temperature and use the new field.
-    // For the Boss we expose data TOOLS: the model may ask us to run a query,
-    // we return only those rows, and it answers from them. Loop is bounded so a
-    // misbehaving model can't spin forever (and to cap cost).
+    // Tool rounds run NON-streamed (the model just decides which query to run,
+    // no user-visible text). The FINAL answer is streamed to the client when
+    // requested. Loop is bounded so a misbehaving model can't spin forever.
     const convo: any[] = [{ role: 'system', content: systemPrompt }, ...priorTurns, { role: 'user', content: message }];
-    let reply = '';
     const MAX_TOOL_ROUNDS = 4;
+    const cid = conversationId;
 
-    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-      const payload: any = { model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS };
-      // Offer tools only to the Boss, and only while we still allow more rounds.
-      if (isBoss && round < MAX_TOOL_ROUNDS) { payload.tools = TOOLS; payload.tool_choice = 'auto'; }
+    // Persist helper — writes the user turn + assistant reply once we have it.
+    const persist = async (reply: string) => {
+      await admin.from('ai_messages').insert([
+        { conversation_id: cid, role: 'user', content: message },
+        { conversation_id: cid, role: 'assistant', content: reply },
+      ]);
+      await admin.from('ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', cid);
+    };
 
+    // Resolve any tool-calling rounds first (non-streamed). Returns when the
+    // model is ready to produce the final text answer (convo is primed for it).
+    let toolError: Response | null = null;
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (!isBoss) break; // only the Boss has tools; go straight to the answer
       const aiRes = await fetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, tools: TOOLS, tool_choice: 'auto' }),
       });
       const aiText = await aiRes.text();
       if (!aiRes.ok) {
-        console.error('model error', aiRes.status, aiText.slice(0, 300));
-        if (aiRes.status === 429) {
-          return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
-        }
-        return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
+        console.error('model error (tool round)', aiRes.status, aiText.slice(0, 300));
+        toolError = aiRes.status === 429
+          ? json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429)
+          : json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
+        break;
       }
-
       let choice: any = null;
       try { choice = JSON.parse(aiText)?.choices?.[0]; } catch { /* ignore */ }
-      const msg = choice?.message;
-      const toolCalls = msg?.tool_calls;
-
-      if (toolCalls && toolCalls.length && isBoss) {
-        // Run each requested tool and feed results back for the next round.
-        convo.push({ role: 'assistant', content: msg.content ?? null, tool_calls: toolCalls });
+      const m = choice?.message;
+      const toolCalls = m?.tool_calls;
+      if (toolCalls && toolCalls.length) {
+        convo.push({ role: 'assistant', content: m.content ?? null, tool_calls: toolCalls });
         for (const tc of toolCalls) {
           let a: any = {};
           try { a = JSON.parse(tc.function?.arguments || '{}'); } catch { /* ignore */ }
           const result = await runTool(admin, tc.function?.name, a);
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
         }
-        continue; // ask the model again now that it has the data
+        continue; // model has the data now → loop for the next decision
       }
-
-      reply = msg?.content || '';
-      break;
+      // No tool call → the model already produced the final answer text here.
+      const direct = m?.content || '';
+      if (direct) {
+        if (wantStream) return streamText(direct, cid!, persist);
+        await persist(direct);
+        return json({ conversationId, reply: direct });
+      }
+      break; // fall through to a dedicated final call
     }
+    if (toolError) return toolError;
+
+    // ── Final answer call ──────────────────────────────────────────
+    // No tools here (tool rounds are done). Stream it when the client asked.
+    if (wantStream) {
+      const aiRes = await fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, stream: true }),
+      });
+      if (!aiRes.ok || !aiRes.body) {
+        const t = await aiRes.text().catch(() => '');
+        console.error('model error (stream)', aiRes.status, t.slice(0, 300));
+        if (aiRes.status === 429) return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
+        return json({ error: `AI service error (${aiRes.status}): ${t.slice(0, 180)}`, conversationId }, 502);
+      }
+      return relayStream(aiRes.body, cid!, persist);
+    }
+
+    // Non-streaming final call (fallback / older clients).
+    const aiRes = await fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS }),
+    });
+    const aiText = await aiRes.text();
+    if (!aiRes.ok) {
+      console.error('model error', aiRes.status, aiText.slice(0, 300));
+      if (aiRes.status === 429) return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
+      return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
+    }
+    let reply = '';
+    try { reply = JSON.parse(aiText)?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
     if (!reply) reply = 'Sorry, I couldn’t generate a response just now. Please try again.';
-
-    // ── Persist the turn (service role — only writer) ──────────────
-    await admin.from('ai_messages').insert([
-      { conversation_id: conversationId, role: 'user', content: message },
-      { conversation_id: conversationId, role: 'assistant', content: reply },
-    ]);
-    await admin.from('ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId);
-
+    await persist(reply);
     return json({ conversationId, reply });
   } catch (err) {
     console.error('ai-chat failed:', err);
