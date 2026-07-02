@@ -13,12 +13,15 @@ import { setReportLeaveGuard, clearReportLeaveGuard } from '../../lib/reportLeav
  * While the form is dirty this guard intercepts any attempt to leave:
  *   • an internal route link (sidebar / topbar / any <a href="/…">), and
  *   • a guarded in-app action wrapped with `guardAction` (the Back arrow).
- * It shows a modal with exactly two choices — BOTH save the current state
- * as a draft first, so nothing is ever lost:
- *   • Save & leave   → persist draft, then go where they clicked.
- *   • Save & stay    → persist draft, keep the editor open.
- * The modal can ONLY be dismissed via those two buttons (no backdrop /
- * Escape dismissal), per product requirement.
+ * It shows a modal with three choices:
+ *   • Save & leave         → persist draft, then go where they clicked.
+ *   • Save & stay          → persist draft, keep the editor open.
+ *   • Exit without saving  → DISCARD the current edits and leave. Used when
+ *     the user typed something wrong and would rather drop the changes than
+ *     bake them into the saved draft. Destructive, so it's styled apart and
+ *     confirms first.
+ * The modal can ONLY be dismissed via those buttons (no backdrop / Escape
+ * dismissal), per product requirement.
  *
  * `onSaveDraft` must persist the current form state as a draft WITHOUT
  * navigating, and resolve to `false` only on a hard save failure (so we
@@ -89,14 +92,26 @@ export function useReportLeaveGuard({ dirty, onSaveDraft }) {
     setPending(null);
   }, [onSaveDraft]);
 
+  // Discard: leave WITHOUT saving. The pending navigation is a direct
+  // navigate()/callback, which does NOT re-enter this guard (only link
+  // clicks and the programmatic hand-off do), so the unsaved edits are
+  // simply dropped and we move on.
+  const onDiscard = useCallback(() => {
+    const run = pendingRef.current?.run;
+    setPending(null);
+    if (run) run();
+  }, []);
+
   const guardModal = pending ? (
-    <LeaveReportModal saving={saving} onLeave={onLeave} onStay={onStay} />
+    <LeaveReportModal saving={saving} onLeave={onLeave} onStay={onStay} onDiscard={onDiscard} />
   ) : null;
 
   return { guardModal, guardAction };
 }
 
-function LeaveReportModal({ saving, onLeave, onStay }) {
+function LeaveReportModal({ saving, onLeave, onStay, onDiscard }) {
+  // Discarding loses the user's edits, so require a second click to confirm.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1080,
@@ -133,6 +148,33 @@ function LeaveReportModal({ saving, onLeave, onStay }) {
             style={{ borderRadius: 10 }} disabled={saving} onClick={onStay}>
             <i className="bi bi-arrow-counterclockwise" /> Save &amp; stay here
           </button>
+          {/* Escape hatch: drop the edits and leave. Confirms first because
+              it's destructive — used when the user typed something wrong. */}
+          {!confirmDiscard ? (
+            <button type="button"
+              className="btn btn-link d-inline-flex align-items-center justify-content-center gap-2 text-decoration-none"
+              style={{ borderRadius: 10, color: 'var(--danger)', fontSize: '0.85rem' }}
+              disabled={saving} onClick={() => setConfirmDiscard(true)}>
+              <i className="bi bi-trash3" /> Exit without saving
+            </button>
+          ) : (
+            <div className="d-flex flex-column gap-2 rounded-2 p-2"
+              style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)' }}>
+              <div className="text-center" style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 600 }}>
+                Discard your changes and leave? This can’t be undone.
+              </div>
+              <div className="d-flex gap-2">
+                <button type="button" className="btn btn-danger flex-fill d-inline-flex align-items-center justify-content-center gap-2"
+                  style={{ borderRadius: 10 }} disabled={saving} onClick={onDiscard}>
+                  <i className="bi bi-trash3" /> Yes, discard
+                </button>
+                <button type="button" className="btn btn-outline-secondary flex-fill"
+                  style={{ borderRadius: 10 }} disabled={saving} onClick={() => setConfirmDiscard(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
