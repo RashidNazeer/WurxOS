@@ -21,7 +21,7 @@ export async function aiSend({ conversationId, message }) {
 // invoking onDelta(textChunk) as tokens arrive. Resolves with { conversationId }
 // once the stream completes. supabase.functions.invoke can't stream, so we hit
 // the function URL directly with the user's access token.
-export async function aiSendStream({ conversationId, message, onDelta, signal }) {
+export async function aiSendStream({ conversationId, message, onDelta, onStatus, signal }) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -69,6 +69,7 @@ export async function aiSendStream({ conversationId, message, onDelta, signal })
       let obj;
       try { obj = JSON.parse(payload); } catch { continue; }
       if (obj.error) throw new Error(obj.error);
+      if (obj.status && onStatus) onStatus(obj.status);
       if (obj.delta && onDelta) onDelta(obj.delta);
       if (obj.done) newConvId = obj.conversationId || newConvId;
     }

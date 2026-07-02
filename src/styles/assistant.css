@@ -124,8 +124,14 @@
   .wxai-bubble-wrap { max-width: 88%; }
 }
 
-/* Streaming "Thinking…" animated dots (shown until the first token arrives). */
-.ai-typing { font-size: 0.86rem; }
+/* Streaming status ("Checking incentives…") shown until the first token. */
+.ai-typing { font-size: 0.86rem; display: inline-flex; align-items: center; }
+.wxai-status-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+  display: inline-block; margin-right: 7px; flex-shrink: 0;
+  animation: wxai-pulse 1s ease-in-out infinite;
+}
+@keyframes wxai-pulse { 0%,100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
 .ai-dots::after {
   content: '';
   animation: ai-dots 1.4s steps(4, end) infinite;

@@ -73,7 +73,7 @@ function ChatView() {
     setInput(''); setErr('');
     // Add the user turn + an empty assistant bubble we grow as tokens arrive.
     const now = new Date().toISOString();
-    setMessages((m) => [...m, { role: 'user', content: msg, created_at: now }, { role: 'assistant', content: '', streaming: true, created_at: now }]);
+    setMessages((m) => [...m, { role: 'user', content: msg, created_at: now }, { role: 'assistant', content: '', streaming: true, status: 'Thinking…', created_at: now }]);
     setSending(true);
     // Append a delta to the last (assistant) message.
     const appendDelta = (chunk) => {
@@ -84,8 +84,17 @@ function ChatView() {
         return next;
       });
     };
+    // Update the live status label ("Checking incentives…").
+    const setStatus = (status) => {
+      setMessages((m) => {
+        const next = m.slice();
+        const last = next[next.length - 1];
+        if (last && last.role === 'assistant' && !last.content) next[next.length - 1] = { ...last, status };
+        return next;
+      });
+    };
     try {
-      const res = await aiSendStream({ conversationId: activeId, message: msg, onDelta: appendDelta });
+      const res = await aiSendStream({ conversationId: activeId, message: msg, onDelta: appendDelta, onStatus: setStatus });
       // mark the assistant bubble as finished streaming
       setMessages((m) => {
         const next = m.slice();
@@ -160,7 +169,7 @@ function ChatView() {
               <p className="text-muted small mb-0">e.g. “How do I apply for leave?” · “Which week had my brand’s highest GMV?”</p>
             </div>
           )}
-          {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} streaming={m.streaming} at={m.created_at} />)}
+          {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} streaming={m.streaming} status={m.status} at={m.created_at} />)}
         </div>
         {err && <div className="px-3 pb-1"><div className="alert alert-danger py-1 px-2 small mb-1">{err}</div></div>}
         <div className="wxai-composer">
@@ -194,7 +203,7 @@ function fmtMsgTime(iso) {
   return sameDay ? time : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
-function Bubble({ role, content, streaming, at }) {
+function Bubble({ role, content, streaming, status, at }) {
   const isUser = role === 'user';
   const navigate = useNavigate();
   const waiting = streaming && !content; // streaming started but no text yet
@@ -220,7 +229,7 @@ function Bubble({ role, content, streaming, at }) {
       <div className="wxai-bubble-wrap">
         <div className={`wxai-bubble ${isUser ? 'is-user' : 'is-bot'}`}>
           {waiting
-            ? <span className="ai-typing text-muted">Thinking<span className="ai-dots" /></span>
+            ? <span className="ai-typing text-muted"><span className="wxai-status-dot" />{(status || 'Thinking').replace(/…+$/, '')}<span className="ai-dots" /></span>
             : isUser
               ? content
               : <div className="ai-md" onClick={onContentClick} dangerouslySetInnerHTML={{ __html: renderAssistantHtml(content) }} />}

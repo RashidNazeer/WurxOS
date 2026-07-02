@@ -62,66 +62,115 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 
 // ── SSE streaming helpers ──────────────────────────────────────────
 // Wire format (one JSON object per `data:` line):
+//   {"status":"..."}                      — live "what I'm doing now" label
 //   {"delta":"..."}                       — a chunk of answer text
 //   {"done":true,"conversationId":"..."}  — end of stream
 //   {"error":"..."}                       — failure (client shows it)
 const sseHeaders = { ...cors, 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' };
 const sseLine = (obj: unknown) => `data: ${JSON.stringify(obj)}\n\n`;
 
-// Relay OpenAI's SSE stream to the client as our own SSE, accumulating the full
-// text so we can persist it once the stream completes.
-function relayStream(upstream: ReadableStream<Uint8Array>, cid: string, persist: (reply: string) => Promise<void>): Response {
+// Run the WHOLE conversation inside one SSE stream: emit live {status} events
+// while tool rounds run ("Checking incentives…"), then stream the answer as
+// {delta} events, persist, and finish with {done}. This is what lets the user
+// see what the assistant is doing instead of a generic "Thinking…".
+function streamConversation(opts: {
+  convo: any[]; model: string; isBoss: boolean; cid: string;
+  admin: any; persist: (reply: string) => Promise<void>; kbStatus: string;
+}): Response {
+  const { convo, model, isBoss, cid, admin, persist, kbStatus } = opts;
   const enc = new TextEncoder();
   const dec = new TextDecoder();
-  let full = '';
+  const MAX_TOOL_ROUNDS = 4;
+
   const out = new ReadableStream({
     async start(controller) {
-      const reader = upstream.getReader();
-      let buf = '';
+      const emit = (obj: unknown) => controller.enqueue(enc.encode(sseLine(obj)));
+      const callOpenAI = (body: unknown) => fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      let full = '';
+      let answered = false;
+
       try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          // OpenAI sends `data: {...}\n\n` lines; split on newlines.
-          const lines = buf.split('\n');
-          buf = lines.pop() || '';
-          for (const line of lines) {
-            const s = line.trim();
-            if (!s.startsWith('data:')) continue;
-            const payload = s.slice(5).trim();
-            if (payload === '[DONE]') continue;
-            try {
-              const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
-              if (delta) { full += delta; controller.enqueue(enc.encode(sseLine({ delta }))); }
-            } catch { /* ignore keep-alive / partial */ }
+        // Initial status while we figure out what to do.
+        emit({ status: isBoss ? 'Thinking…' : kbStatus });
+
+        // ── Tool-calling rounds (Boss only), emitting a status per tool ──
+        for (let round = 0; round < (isBoss ? MAX_TOOL_ROUNDS : 0); round++) {
+          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, tools: TOOLS, tool_choice: 'auto' });
+          if (!r.ok) {
+            const t = await r.text().catch(() => '');
+            console.error('model error (stream tool round)', r.status, t.slice(0, 200));
+            emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}).` });
+            controller.close(); return;
+          }
+          let choice: any = null;
+          try { choice = JSON.parse(await r.text())?.choices?.[0]; } catch { /* ignore */ }
+          const m = choice?.message;
+          const toolCalls = m?.tool_calls;
+          if (toolCalls && toolCalls.length) {
+            // Show the user what we're fetching (first tool's label is enough).
+            emit({ status: TOOL_STATUS[toolCalls[0]?.function?.name] || 'Looking that up…' });
+            convo.push({ role: 'assistant', content: m.content ?? null, tool_calls: toolCalls });
+            for (const tc of toolCalls) {
+              let a: any = {};
+              try { a = JSON.parse(tc.function?.arguments || '{}'); } catch { /* ignore */ }
+              const result = await runTool(admin, tc.function?.name, a);
+              convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
+            }
+            continue;
+          }
+          // Model produced the answer directly during a tool round → stream it out.
+          const direct = m?.content || '';
+          if (direct) {
+            emit({ status: 'Writing the answer…' });
+            for (let i = 0; i < direct.length; i += 24) emit({ delta: direct.slice(i, i + 24) });
+            full = direct; answered = true;
+          }
+          break;
+        }
+
+        // ── Final streamed answer (if not already produced) ──
+        if (!answered) {
+          emit({ status: 'Writing the answer…' });
+          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, stream: true });
+          if (!r.ok || !r.body) {
+            const t = await r.text().catch(() => '');
+            console.error('model error (stream final)', r.status, t.slice(0, 200));
+            emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}).` });
+            controller.close(); return;
+          }
+          const reader = r.body.getReader();
+          let buf = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+              const s = line.trim();
+              if (!s.startsWith('data:')) continue;
+              const payload = s.slice(5).trim();
+              if (payload === '[DONE]') continue;
+              try {
+                const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
+                if (delta) { full += delta; emit({ delta }); }
+              } catch { /* ignore keep-alive / partial */ }
+            }
           }
         }
       } catch (e) {
-        controller.enqueue(enc.encode(sseLine({ error: 'stream interrupted' })));
-        console.error('relayStream error', e);
+        console.error('streamConversation error', e);
+        emit({ error: 'Something went wrong generating the answer. Please try again.' });
+        controller.close(); return;
       }
+
       if (!full) full = 'Sorry, I couldn’t generate a response just now. Please try again.';
       try { await persist(full); } catch (e) { console.error('persist after stream failed', e); }
-      controller.enqueue(enc.encode(sseLine({ done: true, conversationId: cid })));
-      controller.close();
-    },
-  });
-  return new Response(out, { headers: sseHeaders });
-}
-
-// Stream an already-known string to the client as SSE (used when the model
-// returned the final answer during a tool round — no second call needed).
-function streamText(text: string, cid: string, persist: (reply: string) => Promise<void>): Response {
-  const enc = new TextEncoder();
-  const out = new ReadableStream({
-    async start(controller) {
-      // Chunk into small pieces so it still "types" rather than dumping at once.
-      for (let i = 0; i < text.length; i += 24) {
-        controller.enqueue(enc.encode(sseLine({ delta: text.slice(i, i + 24) })));
-      }
-      try { await persist(text); } catch (e) { console.error('persist (streamText) failed', e); }
-      controller.enqueue(enc.encode(sseLine({ done: true, conversationId: cid })));
+      emit({ done: true, conversationId: cid });
       controller.close();
     },
   });
@@ -357,6 +406,20 @@ const TOOLS = [
 const money = (n: unknown) => {
   const v = Number(n);
   return Number.isFinite(v) ? `PKR ${v.toLocaleString('en-US')}` : String(n ?? '');
+};
+
+// Human "what am I doing right now" label per tool — shown live to the user
+// while that tool runs (replaces a generic "Thinking…").
+const TOOL_STATUS: Record<string, string> = {
+  find_person: 'Looking up employee info…',
+  get_employees: 'Looking up the team directory…',
+  get_incentives: 'Checking incentives & bonuses…',
+  get_salary: 'Checking salaries…',
+  get_performance: 'Reviewing performance data…',
+  get_reports: 'Pulling report data…',
+  get_attendance: 'Checking attendance…',
+  get_leave: 'Checking leave requests…',
+  list_brands: 'Looking up brands…',
 };
 
 // Rich-text (HTML) insight → clean plain text for the model.
@@ -1073,6 +1136,9 @@ Deno.serve(async (req) => {
     const convo: any[] = [{ role: 'system', content: systemPrompt }, ...priorTurns, { role: 'user', content: message }];
     const MAX_TOOL_ROUNDS = 4;
     const cid = conversationId;
+    // Initial status for a non-tool answer (KB/how-to). Reflects whether the
+    // knowledge retrieval actually matched something.
+    const kbStatus = knowledgeBlock.startsWith('KNOWLEDGE') ? 'Searching the knowledge base…' : 'Thinking…';
 
     // Persist helper — writes the user turn + assistant reply once we have it.
     const persist = async (reply: string) => {
@@ -1083,8 +1149,13 @@ Deno.serve(async (req) => {
       await admin.from('ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', cid);
     };
 
-    // Resolve any tool-calling rounds first (non-streamed). Returns when the
-    // model is ready to produce the final text answer (convo is primed for it).
+    // Streaming path: run the whole thing inside one SSE stream so the client
+    // sees live {status} events ("Checking incentives…") then the answer.
+    if (wantStream) {
+      return streamConversation({ convo, model, isBoss, cid: cid!, admin, persist, kbStatus });
+    }
+
+    // ── Non-streaming path (fallback / older clients) ──────────────
     let toolError: Response | null = null;
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (!isBoss) break; // only the Boss has tools; go straight to the answer
@@ -1113,37 +1184,14 @@ Deno.serve(async (req) => {
           const result = await runTool(admin, tc.function?.name, a);
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
         }
-        continue; // model has the data now → loop for the next decision
+        continue;
       }
-      // No tool call → the model already produced the final answer text here.
       const direct = m?.content || '';
-      if (direct) {
-        if (wantStream) return streamText(direct, cid!, persist);
-        await persist(direct);
-        return json({ conversationId, reply: direct });
-      }
-      break; // fall through to a dedicated final call
+      if (direct) { await persist(direct); return json({ conversationId, reply: direct }); }
+      break;
     }
     if (toolError) return toolError;
 
-    // ── Final answer call ──────────────────────────────────────────
-    // No tools here (tool rounds are done). Stream it when the client asked.
-    if (wantStream) {
-      const aiRes = await fetch(OPENAI_URL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, stream: true }),
-      });
-      if (!aiRes.ok || !aiRes.body) {
-        const t = await aiRes.text().catch(() => '');
-        console.error('model error (stream)', aiRes.status, t.slice(0, 300));
-        if (aiRes.status === 429) return json({ error: `The assistant is busy right now (rate limit). Please wait a moment and try again.`, conversationId }, 429);
-        return json({ error: `AI service error (${aiRes.status}): ${t.slice(0, 180)}`, conversationId }, 502);
-      }
-      return relayStream(aiRes.body, cid!, persist);
-    }
-
-    // Non-streaming final call (fallback / older clients).
     const aiRes = await fetch(OPENAI_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
