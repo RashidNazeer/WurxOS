@@ -42,7 +42,12 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''; // used to read KB as 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const EMBED_URL = 'https://api.openai.com/v1/embeddings';
 const EMBED_MODEL = 'text-embedding-3-small'; // 1536-dim; matches tts_knowledge.embedding
-const DEFAULT_MODEL = 'gpt-5.4-mini'; // near-latest, cheap, strong at reading SOPs. Override in config.
+const DEFAULT_MODEL = 'gpt-5.4-mini'; // default: fast + cheap, strong at reading SOPs.
+// The Boss may switch the assistant model in the Train tab, but ONLY to a
+// vetted model in this allow-list — so a typo/stale/incompatible model can
+// never break the assistant. Both are GPT-5.x (use max_completion_tokens, no
+// temperature). Add a new option here to offer it in the Train dropdown.
+const ALLOWED_MODELS = ['gpt-5.4-mini', 'gpt-5.5'];
 
 // Embed one query string for TikTok-Academy semantic retrieval. Returns null
 // on any failure so retrieval degrades to keyword-only rather than erroring.
@@ -956,10 +961,11 @@ Deno.serve(async (req) => {
       return json({ error: 'The assistant is currently turned off by an admin.' }, 503);
     }
     const persona = cfg?.persona || 'You are the WurxOS assistant. Answer only from the provided knowledge; stay on WurxOS topics.';
-    // Model is LOCKED in code (not read from config) so a stale or wrong
-    // ai_assistant_config.model value can never change or break it. To switch
-    // models, edit DEFAULT_MODEL and redeploy — deliberately a dev action.
-    const model = DEFAULT_MODEL;
+    // Model comes from config but is GUARDED by an allow-list: the Boss can
+    // pick from the vetted options in the Train tab, and anything else (typo,
+    // stale value, incompatible model) falls back to the safe default. This
+    // keeps Boss choice without letting a bad value break the assistant.
+    const model = ALLOWED_MODELS.includes(cfg?.model) ? cfg.model : DEFAULT_MODEL;
 
     // ── Conversation (own it, or create) ───────────────────────────
     if (conversationId) {

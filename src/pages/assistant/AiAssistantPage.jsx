@@ -241,6 +241,15 @@ function Bubble({ role, content, streaming, status, at }) {
 }
 
 // ── Train (Boss) ───────────────────────────────────────────────────
+// Boss-selectable assistant models. MUST stay in sync with ALLOWED_MODELS in
+// supabase/functions/ai-chat/index.ts — the server only honours these values
+// (anything else falls back to the default), so keep the lists identical.
+const MODEL_OPTIONS = [
+  { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini — current (fast, economical)' },
+  { id: 'gpt-5.5', label: 'gpt-5.5 — latest (stronger reasoning, higher cost)' },
+];
+const DEFAULT_ASSISTANT_MODEL = 'gpt-5.4-mini';
+
 function TrainView({ onBack }) {
   const [cfg, setCfg] = useState(null);
   const [docs, setDocs] = useState([]);
@@ -255,9 +264,10 @@ function TrainView({ onBack }) {
 
   async function saveConfig() {
     setSavingCfg(true); setFlash('');
-    // NOTE: `model` is intentionally NOT saved here — it is locked server-side
-    // (the ai-chat function pins gpt-5.4-mini) so the Boss can't change or break it.
-    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled, use_kb: cfg.use_kb !== false }); setFlash('Saved.'); }
+    // `model` is Boss-selectable but allow-list-guarded server-side (the ai-chat
+    // function falls back to the safe default for any value not in its
+    // ALLOWED_MODELS), so a bad value can never break the assistant.
+    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled, use_kb: cfg.use_kb !== false, model: cfg.model }); setFlash('Saved.'); }
     catch (e) { setFlash('Error: ' + e.message); }
     finally { setSavingCfg(false); setTimeout(() => setFlash(''), 2500); }
   }
@@ -292,12 +302,16 @@ function TrainView({ onBack }) {
             <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
               <div>
                 <label className="form-label small fw-semibold mb-1 d-block">Model</label>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="badge rounded-pill" style={{ background: 'var(--surface-3)', color: 'var(--text-secondary)', fontWeight: 600, padding: '6px 12px', fontSize: '0.8rem' }}>
-                    <i className="bi bi-lock-fill me-1" style={{ fontSize: '0.72rem' }} />gpt-5.4-mini
-                  </span>
-                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>set by the developer</span>
-                </div>
+                <select className="form-select form-select-sm" style={{ borderRadius: 9, minWidth: 320 }}
+                  value={MODEL_OPTIONS.some((m) => m.id === cfg.model) ? cfg.model : DEFAULT_ASSISTANT_MODEL}
+                  onChange={(e) => setCfg({ ...cfg, model: e.target.value })}>
+                  {MODEL_OPTIONS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+                <span className="text-muted d-block mt-1" style={{ fontSize: '0.7rem' }}>
+                  Applies to new messages after you Save. gpt-5.5 is more capable but costs more per message.
+                </span>
               </div>
               <div className="form-check mt-3">
                 <input className="form-check-input" type="checkbox" id="ai-enabled" checked={cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />
