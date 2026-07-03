@@ -1,0 +1,44 @@
+{
+  "_note": "TikTok Shop Academy article/course URLs to ingest into tts_knowledge. Discovered via `site:seller-us.tiktok.com/university` search across topics. Expand freely — the ingest job dedups by knowledge_id and skips dead/404 IDs, recording them in the failures report. `category` is a coarse label used for filtering/citation; it is not authoritative.",
+  "urls": [
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7551634147264311&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5167814973818679&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2065766523094798&lang=en", "category": "Ads / Growth" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2507006000252685&lang=en", "category": "Ads / Getting Started" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6344045887866637&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4222454443099950&lang=en", "category": "Ads / Shop Ads" },
+    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6413325785581326&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6401284790880013&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6397225312110350&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6352193512343310&lang=en", "category": "Ads / GMV Max" },
+    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6305659645626125&lang=en", "category": "Ads / GMV Max" },
+
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3177596790916910&lang=en", "category": "Affiliate" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837873164896001&lang=en", "category": "Affiliate" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2273960886011703&lang=en", "category": "Affiliate" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6939143037667118&lang=en", "category": "Affiliate / Creator" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5764641632306946&lang=en", "category": "Affiliate / Samples" },
+
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3238037484275457&lang=en", "category": "Policy" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1399532709988097&lang=en", "category": "Policy" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3719218886117175&lang=en", "category": "Policy" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3196690250417921&lang=en", "category": "Policy" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1411277869713198&lang=en", "category": "Policy / Requirements" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1238551019980586&lang=en", "category": "Policy" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1789325403522858&lang=en", "category": "Policy / Requirements" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2297870046414638&lang=en", "category": "Policy / Requirements" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6747273381791534&lang=en", "category": "Policy / Updates" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1331308753078058&lang=en", "category": "Policy / Terms" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8699321100977966&lang=en", "category": "Policy / Terms" },
+
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7073362639816491&lang=en", "category": "Listings" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1707918207813422&lang=en", "category": "Listings" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3547281111402282&lang=en", "category": "Listings" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837894379964161&lang=en", "category": "Getting Started" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3029412015458091&lang=en", "category": "Shop Setup" },
+
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=969132212504366&lang=en", "category": "LIVE" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5769635937191681&lang=en", "category": "Content" },
+    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3547281111746346&lang=en", "category": "Content" }
+  ]
+}

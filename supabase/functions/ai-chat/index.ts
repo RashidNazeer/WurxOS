@@ -40,14 +40,32 @@ const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const OPENAI_KEY = Deno.env.get('OPEN_AI_API_KEY') ?? Deno.env.get('OPENAI_API_KEY') ?? '';
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''; // used to read KB as the caller (RLS applies)
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const EMBED_URL = 'https://api.openai.com/v1/embeddings';
+const EMBED_MODEL = 'text-embedding-3-small'; // 1536-dim; matches tts_knowledge.embedding
 const DEFAULT_MODEL = 'gpt-5.4-mini'; // near-latest, cheap, strong at reading SOPs. Override in config.
+
+// Embed one query string for TikTok-Academy semantic retrieval. Returns null
+// on any failure so retrieval degrades to keyword-only rather than erroring.
+async function embedQuery(text: string): Promise<number[] | null> {
+  try {
+    const res = await fetch(EMBED_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: EMBED_MODEL, input: text.slice(0, 8000) }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j?.data?.[0]?.embedding ?? null;
+  } catch { return null; }
+}
 
 // Boss-only during the test phase. Add roles here to widen access at launch.
 const ALLOWED_ROLES = ['boss'];
 
 // Paid model (128K context) → comfortable budgets. Still RAG-tight for cost:
 // we send only the most relevant docs, not the whole library.
-const KNOWLEDGE_BUDGET = 14000; // chars of knowledge injected per call
+const KNOWLEDGE_BUDGET = 14000; // chars of WurxOS/SOP knowledge injected per call
+const TTS_KNOWLEDGE_BUDGET = 9000; // chars of TikTok Shop Academy knowledge (separate budget)
 const HISTORY_CHAR_CAP = 4000;  // cap recent-history chars
 const HISTORY_TURNS = 12;       // most-recent messages considered for memory
 const MAX_COMPLETION_TOKENS = 1000; // output cap (cheap; keeps answers complete)
@@ -1068,6 +1086,37 @@ Deno.serve(async (req) => {
       knowledgeBlock = knowledge
         ? `KNOWLEDGE (answer using ONLY this — WurxOS app help and the company SOP library):${knowledge}`
         : 'No specific knowledge matched this question. If you can answer from general WurxOS context do so; otherwise say you are not sure and suggest asking the Team Lead or Boss.';
+
+      // ── TikTok Shop Academy knowledge (hybrid semantic + keyword) ──
+      // A second retrieval source: official TikTok Shop Academy content
+      // ingested into tts_knowledge. Embed the question, run the Boss-gated
+      // hybrid RPC (through the caller's client so RLS/is_boss applies), and
+      // append the top chunks WITH their source URLs so the model can cite.
+      // Degrades silently to nothing if embedding/RPC fails — never blocks.
+      if (userClient) {
+        const qEmbed = await embedQuery(message);
+        if (qEmbed) {
+          const { data: tts } = await userClient.rpc('tts_knowledge_search', {
+            p_query_embedding: qEmbed,
+            p_query_text: message,
+            p_match_count: 6,
+          });
+          if (Array.isArray(tts) && tts.length) {
+            let ttsBlock = '';
+            let ttsUsed = 0;
+            for (const c of tts) {
+              const head = [c.breadcrumb, c.title].filter(Boolean).join(' > ');
+              const block = `\n\n### ${head}\n${strip(c.chunk_text)}\nSource: ${c.source_url}`;
+              if (ttsBlock.length && ttsBlock.length + block.length > TTS_KNOWLEDGE_BUDGET) break;
+              ttsBlock += block;
+              if (++ttsUsed >= 6) break;
+            }
+            if (ttsBlock) {
+              knowledgeBlock += `\n\nTIKTOK SHOP KNOWLEDGE (official TikTok Shop Academy — use for TikTok Shop questions about ads/GMV Max, affiliate/creators, policy, listings, promotions, etc. Cite the Source link when you use one):${ttsBlock}`;
+            }
+          }
+        }
+      }
     }
 
     // ── History (memory) ───────────────────────────────────────────
@@ -1102,6 +1151,7 @@ Deno.serve(async (req) => {
       '- If a question is relevant but unclear or could mean several things, ask ONE short clarifying question instead of guessing or refusing.',
       '- When you mention an in-app page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never invent a path.',
       '- Some knowledge entries are only a title + a link to a full guide. For those, point the user to the guide with a markdown link; recite detailed steps only when the knowledge actually contains them.',
+      '- For TikTok Shop questions (GMV Max / ads, affiliate & creators, product policy, listings, promotions, LIVE, seller setup), use the TIKTOK SHOP KNOWLEDGE section. It is official TikTok Shop Academy content. When you use a fact from it, cite the article with its Source link as a markdown link. If both TikTok knowledge and the brand\'s live data are relevant, blend them (e.g. the TikTok best practice AND what the brand\'s actual campaign is doing).',
       '- Read short follow-up questions in the context of the conversation so far — they usually continue the previous topic.',
       '- NEVER invent the name of a person, brand, or assignment. If asked who handles something and you were not given that fact, say you do not have it.',
       '- Be concise, warm, and practical; use short numbered steps when describing a flow.',
