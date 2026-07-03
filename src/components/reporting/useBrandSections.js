@@ -108,10 +108,31 @@ export function useBrandSections({ brandId, setData }) {
   };
 }
 
-// Save-time filter: keep only custom-field entries that are still valid —
+// Save-time filter: keep custom-field entries that are still valid —
 // brand-scoped entries (source:'brand' or a known kind) always survive; legacy
-// per-user entries survive only if their def still exists (`userFieldIds`).
+// per-user entries survive if their def still exists (`userFieldIds`).
 // This is what prevents brand-section entries from being wiped on save.
+//
+// CRITICAL (2026-07-03): we ALSO keep any entry that carries content, even if
+// it has no source/kind marker and its per-user def is gone. Reason: an APC
+// once created a per-USER custom field ("paid monthly report" link), which
+// leaked onto every brand's monthly report; when that per-user def was later
+// deleted, this filter silently stripped the FILLED-IN entry from every
+// brand's saved report on their next save — data loss the user never
+// authorized. Never delete a section a human typed into just because its
+// template definition disappeared. An entry is only dropped if it is empty
+// (no value) AND has no marker AND its def is gone — a true orphan.
+function _hasContent(entry) {
+  if (entry == null) return false;
+  if (typeof entry === 'string') return entry.trim() !== '' && entry.trim() !== '<p></p>';
+  if (typeof entry === 'object') {
+    const v = entry.value;
+    if (typeof v === 'string') return v.trim() !== '' && v.trim() !== '<p></p>';
+    if (v != null && typeof v === 'object') return Object.keys(v).length > 0; // table rows
+    return v != null;
+  }
+  return false;
+}
 export function cleanCustomFields(customFields, userFieldIds) {
   const ids = userFieldIds instanceof Set ? userFieldIds : new Set(userFieldIds || []);
   return Object.fromEntries(
@@ -121,6 +142,9 @@ export function cleanCustomFields(customFields, userFieldIds) {
         if (entry.source === 'brand') return true;
         if (entry.kind === 'long_text' || entry.kind === 'table' || entry.kind === 'builtin_extra') return true;
       }
+      // Last resort: keep anything a human actually filled in, even without a
+      // marker — better a harmless orphan than silent deletion of real text.
+      if (_hasContent(entry)) return true;
       return false;
     })
   );

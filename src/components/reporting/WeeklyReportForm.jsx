@@ -1544,7 +1544,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         </>
       )}
 
-      {/* ─── Optional: Custom Fields (per user) ──────────────────────────── */}
+      {/* ─── Custom Fields (per-user, LEGACY — retired add) ────────────────
+          The per-USER mechanism leaked across brands and could silently strip
+          filled-in text on save (see useBrandSections.cleanCustomFields + the
+          monthly form). New sections must use the per-BRAND "Add custom
+          section" block above. We still render EXISTING per-user fields so
+          nothing a user relies on disappears, but the add button is gone and
+          the whole block hides when there are none. */}
+      {customFieldDefs.length > 0 && (<>
       <div className="d-flex align-items-center justify-content-between mb-3 mt-4">
         <div className="d-flex align-items-center gap-2">
           <div className="rounded-2 d-flex align-items-center justify-content-center"
@@ -1552,22 +1559,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: '#8b5cf6' }} />
           </div>
           <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-            My Custom Fields (Optional)
+            My Custom Fields (legacy — personal)
           </h6>
         </div>
-        <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={addCustomField}>
-          <i className="bi bi-plus-circle" /> Add Custom Field
-        </button>
       </div>
-      {customFieldDefs.length === 0 ? (
-        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-          <div className="card-body p-3 text-center text-muted" style={{ fontSize: '0.78rem' }}>
-            No custom fields yet. Click <strong>+ Add Custom Field</strong> to create your own sections.
-            These fields are just for you — other users won't see them.
-          </div>
-        </div>
-      ) : (
+      {(
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
           <div className="card-body p-3">
             {customFieldDefs.map((field, i) => (
@@ -1628,6 +1624,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           </div>
         </div>
       )}
+      </>)}
 
       {/* ─── Save buttons bottom ────────────────────────────────────────── */}
       <div className="d-flex justify-content-end gap-2 mb-4 flex-wrap">

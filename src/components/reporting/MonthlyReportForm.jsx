@@ -1217,19 +1217,22 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         </>
       )}
 
-      {/* ── Section 15: My Custom Fields (per-user, optional) ───────────── */}
-      {sectEnabled.customFields && (
-      <SectionCard icon="bi-sliders" color="#8b5cf6" title="My Custom Fields (Optional)"
-        actions={
-          <button type="button" className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.7rem', padding: '4px 10px' }} onClick={addCustomField}>
-            <i className="bi bi-plus-circle" /> Add Custom Field
-          </button>
-        }>
+      {/* ── Section 15: My Custom Fields (per-user, LEGACY / retired add) ──
+          The per-USER custom-field mechanism leaked: a field added here
+          appeared on EVERY brand's report (per-user, not per-brand) and, once
+          its def was deleted, its filled-in text was silently stripped from
+          every brand's saved report. New sections must use the per-BRAND
+          "Add custom section" block above instead. We KEEP rendering any
+          EXISTING per-user fields so nothing a user already relies on vanishes,
+          but the "Add Custom Field" button is removed so no new leaky ones can
+          be created. When a brand has no legacy per-user fields, this whole
+          section is hidden. */}
+      {sectEnabled.customFields && customFieldDefs.length > 0 && (
+      <SectionCard icon="bi-sliders" color="#8b5cf6" title="My Custom Fields (legacy — personal)">
         {customFieldDefs.length === 0 ? (
           <div className="text-center text-muted py-2" style={{ fontSize: '0.78rem' }}>
-            No custom fields yet. Click <strong>+ Add Custom Field</strong> to create your own sections.
-            These fields are just for you — other users won't see them. Shared with your weekly reports.
+            No personal custom fields. Use <strong>Add custom section</strong> above to add a
+            section for this brand (it stays with this brand and won't appear on other brands' reports).
           </div>
         ) : (
           <div>
