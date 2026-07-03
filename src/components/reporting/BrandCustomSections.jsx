@@ -456,24 +456,37 @@ function AddFieldInline({ onCancel, onSave }) {
 
 /* Inline "add a brand-wide custom section" form. Used at the bottom of the
    Brand Sections block. */
-export function AddCustomSectionInline({ disabled, onAdd }) {
+// `defaultReportType` ('weekly'|'monthly'|'biweekly') seeds the "Appears in"
+// picker so a section created here defaults to the current report's type.
+const APPLIES_LABELS = { weekly: 'Weekly', biweekly: 'Bi-Weekly', monthly: 'Monthly' };
+const APPLIES_ORDER = ['weekly', 'biweekly', 'monthly'];
+export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
   const [open, setOpen]   = useState(false);
   const [name, setName]   = useState('');
   const [kind, setKind]   = useState('long_text');
   const [fields, setFields] = useState([{ label: '', type: 'text', options: '' }]);
+  const [applies, setApplies] = useState(defaultReportType ? [defaultReportType] : ['weekly', 'monthly']);
   const [error, setError] = useState('');
 
   function reset() {
     setOpen(false); setName(''); setKind('long_text');
-    setFields([{ label: '', type: 'text', options: '' }]); setError('');
+    setFields([{ label: '', type: 'text', options: '' }]);
+    setApplies(defaultReportType ? [defaultReportType] : ['weekly', 'monthly']);
+    setError('');
+  }
+
+  function toggleApplies(t) {
+    setApplies((cur) => cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]);
   }
 
   async function submit() {
     setError('');
+    if (!applies.length) { setError('Pick at least one report type this section appears in.'); return; }
     try {
       const payload = {
         name: name.trim(),
         kind,
+        appliesTo: applies,
         fields: kind === 'table'
           ? fields.filter((f) => f.label.trim()).map((f) => ({
               label: f.label.trim(), type: f.type,
@@ -518,6 +531,31 @@ export function AddCustomSectionInline({ disabled, onAdd }) {
           title="Long text" subtitle="Free-form notes / insights" />
         <KindRadio active={kind === 'table'} onClick={() => setKind('table')}
           title="Table" subtitle="Labelled inputs compared period to period" />
+      </div>
+      <div className="mb-2">
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+          Appears in
+        </div>
+        <div className="d-flex gap-2 flex-wrap">
+          {APPLIES_ORDER.map((t) => {
+            const on = applies.includes(t);
+            return (
+              <button key={t} type="button" onClick={() => toggleApplies(t)}
+                style={{
+                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+                  border: on ? '1px solid var(--accent)' : '1px solid var(--border-default)',
+                  background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
+                  color: on ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer',
+                }}
+                title={on ? `Showing in ${APPLIES_LABELS[t]} reports — click to remove` : `Also show in ${APPLIES_LABELS[t]} reports`}>
+                {on ? '✓ ' : ''}{APPLIES_LABELS[t]}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>
+          This section will only appear on the report types you pick here.
+        </div>
       </div>
       {kind === 'table' && (
         <div className="d-flex flex-column gap-2 mb-2">

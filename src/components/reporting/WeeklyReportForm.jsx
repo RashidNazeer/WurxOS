@@ -307,7 +307,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const {
     brandSectionDefs, brandSectionExtras,
     addExtraField, removeExtraField, addBrandCustomSection, deleteBrandCustomSection,
-  } = useBrandSections({ brandId: selectedBrand?.id, setData });
+  } = useBrandSections({ brandId: selectedBrand?.id, setData, reportType: 'weekly' });
   const [reportStatus, setReportStatus] = useState('draft');
   const [rejectionNote, setRejectionNote] = useState('');
   const [importing, setImporting] = useState(false);
@@ -1537,6 +1537,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               <div className="card-body p-3">
                 <AddCustomSectionInline
                   disabled={!selectedBrand?.id}
+                  defaultReportType="weekly"
                   onAdd={addBrandCustomSection} />
               </div>
             </div>

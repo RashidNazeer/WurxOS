@@ -631,7 +631,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const {
     brandSectionDefs, brandSectionExtras,
     addBrandCustomSection, deleteBrandCustomSection,
-  } = useBrandSections({ brandId: selectedBrand?.id, setData });
+  } = useBrandSections({ brandId: selectedBrand?.id, setData, reportType: 'monthly' });
 
   const handleSaveChanges = () => _doSave(reportStatus);
 
@@ -1210,6 +1210,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               <div className="card-body p-3">
                 <AddCustomSectionInline
                   disabled={!selectedBrand?.id}
+                  defaultReportType="monthly"
                   onAdd={addBrandCustomSection} />
               </div>
             </div>

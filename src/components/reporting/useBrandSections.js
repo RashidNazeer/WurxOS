@@ -11,18 +11,24 @@
 // ============================================================
 import { useEffect, useState, useCallback } from 'react';
 import {
-  getBrandSections, normalizeSection,
+  getBrandSections, normalizeSection, sectionAppliesTo,
   getBrandSectionExtras, addBrandSectionExtraField, removeBrandSectionExtraField,
   addBrandSectionRich, removeBrandSection,
 } from '../../lib/brandReportSectionsApi';
 
-export function useBrandSections({ brandId, setData }) {
+// `reportType` ('weekly' | 'biweekly' | 'monthly') scopes which sections this
+// form sees: only sections whose appliesTo includes this type (a section with
+// no appliesTo is legacy → applies to all types). New sections created from
+// this form default to appearing in THIS report type only. Omit reportType to
+// see/create for all types (back-compat).
+export function useBrandSections({ brandId, setData, reportType }) {
   const [brandSectionDefs, setBrandSectionDefs] = useState([]);
   const [brandSectionExtras, setBrandSectionExtras] = useState({});
 
   // Load brand-level custom sections + per-built-in-section extras whenever
   // the selected brand changes. Client-portal sections (addedBy:'client')
   // are excluded — they belong in the read-only Client Sections panel.
+  // Sections are also filtered to those that apply to THIS report type.
   useEffect(() => {
     if (!brandId) { setBrandSectionDefs([]); setBrandSectionExtras({}); return undefined; }
     let cancelled = false;
@@ -31,11 +37,15 @@ export function useBrandSections({ brandId, setData }) {
       getBrandSectionExtras(brandId).catch(() => ({})),
     ]).then(([list, extras]) => {
       if (cancelled) return;
-      setBrandSectionDefs(list.filter((s) => s?.addedBy !== 'client').map(normalizeSection));
+      const scoped = list
+        .filter((s) => s?.addedBy !== 'client')
+        .map(normalizeSection)
+        .filter((s) => !reportType || sectionAppliesTo(s, reportType));
+      setBrandSectionDefs(scoped);
       setBrandSectionExtras(extras || {});
     });
     return () => { cancelled = true; };
-  }, [brandId]);
+  }, [brandId, reportType]);
 
   const addExtraField = useCallback(async (sectionKey, field) => {
     if (!brandId) return;
@@ -64,9 +74,20 @@ export function useBrandSections({ brandId, setData }) {
 
   const addBrandCustomSection = useCallback(async (payload) => {
     if (!brandId) return;
-    const saved = await addBrandSectionRich(brandId, payload);
-    setBrandSectionDefs((prev) => [...prev, normalizeSection(saved)]);
-  }, [brandId]);
+    // Default a new section's report-type scope to THIS form's type unless the
+    // Add UI explicitly chose types (payload.appliesTo). So a section added on
+    // a monthly report is monthly-only by default and won't appear on weekly —
+    // matching "show in which they were created".
+    const finalPayload = (payload?.appliesTo || !reportType)
+      ? payload
+      : { ...payload, appliesTo: [reportType] };
+    const saved = await addBrandSectionRich(brandId, finalPayload);
+    const norm = normalizeSection(saved);
+    // Surface it in this form only if it applies here (respects a multi-type
+    // choice that might exclude this type).
+    setBrandSectionDefs((prev) =>
+      (!reportType || sectionAppliesTo(norm, reportType)) ? [...prev, norm] : prev);
+  }, [brandId, reportType]);
 
   // Permanently delete an APC-created custom section. Removes the brand-level
   // definition (stops appearing on future reports) and strips this report's

@@ -15,6 +15,35 @@ function genId() {
   return `cs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// ── Report-type scoping (appliesTo) ───────────────────────────────────
+// Mirrors brandReportResourcesApi.js exactly so a custom section can be
+// limited to specific report types (e.g. a "Paid monthly report" section
+// that only shows on monthly reports). Storage: an optional `appliesTo`
+// array on each section. A MISSING/empty appliesTo = LEGACY = applies to
+// ALL report types (so existing sections keep showing everywhere — no
+// behavior change until a section is explicitly scoped).
+export const REPORT_TYPES = ['weekly', 'biweekly', 'monthly'];
+// New sections default to weekly+monthly (the two report types that render
+// brand sections today; biweekly has no brand-section UI). The Add UI lets
+// the author narrow it.
+const NEW_SECTION_DEFAULT_APPLIES_TO = ['weekly', 'monthly'];
+
+function _normalizeApplies(appliesTo) {
+  if (!Array.isArray(appliesTo)) return null;
+  const valid = appliesTo.filter((t) => REPORT_TYPES.includes(t));
+  return valid.length ? valid : null;
+}
+
+// True if a section should render in the given report type. Missing/empty
+// appliesTo → legacy → applies to all types.
+export function sectionAppliesTo(section, reportType) {
+  if (!section) return false;
+  if (!REPORT_TYPES.includes(reportType)) return true;
+  const arr = _normalizeApplies(section.appliesTo);
+  if (!arr) return true;        // legacy → all
+  return arr.includes(reportType);
+}
+
 export async function getBrandSections(brandId) {
   if (!brandId) return [];
   const { data, error } = await supabase
@@ -102,11 +131,13 @@ export function normalizeSection(s) {
     type: FIELD_TYPES.includes(f.type) ? f.type : 'text',
     options: Array.isArray(f.options) ? f.options.map(String) : [],
   })) : [];
-  return { ...s, kind, fields };
+  // Canonicalize appliesTo so every read/rewrite auto-heals legacy rows.
+  // null (legacy/invalid) is kept as-is → sectionAppliesTo treats it as all.
+  return { ...s, kind, fields, appliesTo: _normalizeApplies(s.appliesTo) };
 }
 
-export async function addBrandSection(brandId, name, addedByName = '') {
-  return addBrandSectionRich(brandId, { name, kind: 'long_text' }, addedByName);
+export async function addBrandSection(brandId, name, addedByName = '', appliesTo) {
+  return addBrandSectionRich(brandId, { name, kind: 'long_text', appliesTo }, addedByName);
 }
 
 /**
@@ -140,11 +171,22 @@ export async function addBrandSectionRich(brandId, payload, addedByName = '') {
     name,
     kind,
     fields,
+    appliesTo: _normalizeApplies(payload?.appliesTo) || NEW_SECTION_DEFAULT_APPLIES_TO.slice(),
     addedByName: addedByName || '',
     addedAt: Date.now(),
   };
   await writeSections(brandId, [...sections, section]);
   return section;
+}
+
+// Update which report types a section appears in. Must include at least one
+// valid type, else we'd hide the section everywhere.
+export async function setBrandSectionApplies(brandId, sectionId, appliesTo) {
+  const applies = _normalizeApplies(appliesTo);
+  if (!applies) throw new Error('Pick at least one report type.');
+  const sections = (await getBrandSections(brandId)).map(normalizeSection);
+  const updated = sections.map((s) => (s.id === sectionId ? { ...s, appliesTo: applies } : s));
+  await writeSections(brandId, updated);
 }
 
 export async function renameBrandSection(brandId, sectionId, newName) {
