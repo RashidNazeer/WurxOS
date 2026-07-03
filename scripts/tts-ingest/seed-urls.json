@@ -1,44 +1,2033 @@
 {
   "_note": "TikTok Shop Academy article/course URLs to ingest into tts_knowledge. Discovered via `site:seller-us.tiktok.com/university` search across topics. Expand freely — the ingest job dedups by knowledge_id and skips dead/404 IDs, recording them in the failures report. `category` is a coarse label used for filtering/citation; it is not authoritative.",
   "urls": [
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7551634147264311&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5167814973818679&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2065766523094798&lang=en", "category": "Ads / Growth" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2507006000252685&lang=en", "category": "Ads / Getting Started" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6344045887866637&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4222454443099950&lang=en", "category": "Ads / Shop Ads" },
-    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6413325785581326&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6401284790880013&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6397225312110350&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6352193512343310&lang=en", "category": "Ads / GMV Max" },
-    { "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6305659645626125&lang=en", "category": "Ads / GMV Max" },
-
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3177596790916910&lang=en", "category": "Affiliate" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837873164896001&lang=en", "category": "Affiliate" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2273960886011703&lang=en", "category": "Affiliate" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6939143037667118&lang=en", "category": "Affiliate / Creator" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5764641632306946&lang=en", "category": "Affiliate / Samples" },
-
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3238037484275457&lang=en", "category": "Policy" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1399532709988097&lang=en", "category": "Policy" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3719218886117175&lang=en", "category": "Policy" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3196690250417921&lang=en", "category": "Policy" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1411277869713198&lang=en", "category": "Policy / Requirements" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1238551019980586&lang=en", "category": "Policy" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1789325403522858&lang=en", "category": "Policy / Requirements" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2297870046414638&lang=en", "category": "Policy / Requirements" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6747273381791534&lang=en", "category": "Policy / Updates" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1331308753078058&lang=en", "category": "Policy / Terms" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8699321100977966&lang=en", "category": "Policy / Terms" },
-
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7073362639816491&lang=en", "category": "Listings" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1707918207813422&lang=en", "category": "Listings" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3547281111402282&lang=en", "category": "Listings" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837894379964161&lang=en", "category": "Getting Started" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3029412015458091&lang=en", "category": "Shop Setup" },
-
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=969132212504366&lang=en", "category": "LIVE" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5769635937191681&lang=en", "category": "Content" },
-    { "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3547281111746346&lang=en", "category": "Content" }
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7551634147264311&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5167814973818679&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2065766523094798&lang=en",
+      "category": "Ads / Growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2507006000252685&lang=en",
+      "category": "Ads / Getting Started"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6344045887866637&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4222454443099950&lang=en",
+      "category": "Ads / Shop Ads"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6413325785581326&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6401284790880013&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6397225312110350&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6352193512343310&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6305659645626125&lang=en",
+      "category": "Ads / GMV Max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3177596790916910&lang=en",
+      "category": "Affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837873164896001&lang=en",
+      "category": "Affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2273960886011703&lang=en",
+      "category": "Affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6939143037667118&lang=en",
+      "category": "Affiliate / Creator"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5764641632306946&lang=en",
+      "category": "Affiliate / Samples"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3238037484275457&lang=en",
+      "category": "Policy"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1399532709988097&lang=en",
+      "category": "Policy"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3719218886117175&lang=en",
+      "category": "Policy"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3196690250417921&lang=en",
+      "category": "Policy"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1411277869713198&lang=en",
+      "category": "Policy / Requirements"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1238551019980586&lang=en",
+      "category": "Policy"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1789325403522858&lang=en",
+      "category": "Policy / Requirements"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2297870046414638&lang=en",
+      "category": "Policy / Requirements"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6747273381791534&lang=en",
+      "category": "Policy / Updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1331308753078058&lang=en",
+      "category": "Policy / Terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8699321100977966&lang=en",
+      "category": "Policy / Terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7073362639816491&lang=en",
+      "category": "Listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1707918207813422&lang=en",
+      "category": "Listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3547281111402282&lang=en",
+      "category": "Listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837894379964161&lang=en",
+      "category": "Getting Started"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3029412015458091&lang=en",
+      "category": "Shop Setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=969132212504366&lang=en",
+      "category": "LIVE"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5769635937191681&lang=en",
+      "category": "Content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3547281111746346&lang=en",
+      "category": "Content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3638385369450254",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6273848577853197",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7176196564813610&default_language=en",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6401284791207693",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6397225311880974",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6397225312274190",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6397225312519950&content_id=6413325785483022",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6398011023132430",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6306496197789453&lang=en",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6401284790093581",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6398011022640910",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6352193512605454",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6352193512441614",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6273848578295565",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6273848578377485",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6305659645822733",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6252746605496078",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6309638391760653",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6305659645986573",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6264929738016526&content_id=6309638392596237&lang=en",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6414287660697358&content_id=2120705643824942&lang=en",
+      "category": "gmv-max"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837901778585346&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837882170083073&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6170355765593869&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2891398602442542",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4827354015483691&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6371753145599758&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5370507046324010&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=412992543147819",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4215450768590638&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=412992543049515",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6879524818356014&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=642302784751402&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7057402168084270",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1629118999545613&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8399698709727031",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4229022770923307&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1384746773202701&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6398011023722254&content_id=6306496197265165",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5970955314923306&content_id=5970955314661162&lang=en",
+      "category": "ads-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6401096262616878&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2450154734225194&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8280083875170049&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3352441858344747&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4049972027557678&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7349214432020270&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2244964886103809&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=7221835335419690&content_id=2174457721128747",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1746104456447790",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6077860360177451&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6557925297211150&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8510010082461483&default_language=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8874916770678574",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6543118107477774&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=389242963756843&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=85904497526574&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1777027175974698&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3379976401930039&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6760467315590958&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5338028747491115",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837836318263042&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2725932827150123",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=287819077633805&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6115786490283790&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5381191961282317",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2467877215749930&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837838528120577&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=85127246743338&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4308436637255466&lang=en",
+      "category": "affiliate"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=4207977541519146&content_id=2291431574685454",
+      "category": "affiliate-ads"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4123214779467563&lang=en",
+      "category": "affiliate-ads"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7608640301074219",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3753520906340139&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5526872163927850&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3636905401091882",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5904518018549559&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5054301796321070&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7264111224227597&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6191600213133111&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6935729397827330&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3775315155355438",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6063705207195438&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6104700982429483",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7286303504254763&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7568075132946189&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5694209038927617&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=160355525330702&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=256735991727927&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5338028748015403&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1597481526134574&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=442899025315639",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2518990967686958&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7288593467803406&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5579371024893710",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2673207765960490&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5643789953599275&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1617339254703915",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8182993140467499&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837873164781313&default_language=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3947338335504170",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7371703592568618&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837836318213890&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3431256794089259",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3793355357587243&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1906343783008042",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1204142761330474",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6118437723506474&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6918873955796749&lang=en",
+      "category": "creators"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8143608620959531&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8688556508301099&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=813416668546858&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1577309837313805&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7071657567962926&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1601290456188686&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4545471832983342&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2573047829350187&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2977227671324459&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4581457528194817&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6349304365467438&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5182916671129386&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1418345612003114&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5148732765865771&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5176332745885482&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5157695041914666&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6970324132480814&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6970324132710190&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2198673368106794&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5040007258851086&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2274231656367918&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7004721702192939&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1427590502287146&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6623439110063914&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5544428744673066&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7824517176755981&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1411491405465390&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4007545728452407&lang=en",
+      "category": "policy-products"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837901778306818&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4206417796171575&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2918995032442641&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5090656611682090&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2419888845686570&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6256956239595307&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3559518617437965&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5876182352447287&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8208070019516203&default_language=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1631223915710222&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2419888845981482&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2380042836166443&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6750828276418350&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6110391400302350&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3238037484062465&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3638385374070542&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5513514539419405&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7096334743553838&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4101503078876971&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6461913539544875&default_language=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2683575734798126&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6291506660427575&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2415384965285674&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837869503317761&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1208078998800141&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2903157654996737&lang=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5018886219532074&content_id=4350463889966891&default_language=en",
+      "category": "policy-general"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8559051705632567",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7203794766284599",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3274989982091063",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8578632000292663",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=84611377383210",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4134581442070286",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8647312434071351",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1016100419602218",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5138655534483213",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4344056107288366",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2747476243875598",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6884399812937515",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4613202404771597",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4371484668528427",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=26854147802894",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8677033408644877",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3267224767891214",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=4369431258695467&content_id=4304168315569966",
+      "category": "policy-updates"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8331959022847790&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=368451236644622",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6314510387906350&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7824517179639565&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1595905485113102",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2527536160556831",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=162003261359915&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=177312262014766&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=405632742524718",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6865971305678638&default_language=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=905384224393002",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=912720417687339",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3431098618119979&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2602379724769079&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6179104643565326&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1590706729862967&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8368774923650862&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7454760317110062&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3253210454181634&default_language=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837879804970754&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837891779151617&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2963741155624705&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3995852763301633&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6125629963945771&lang=en",
+      "category": "terms"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6581713858676522&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6102275286288183&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=428445525411626&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=481891871868714&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8935690554672939&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2063353003476791&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=240361624880910&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1664446336747310",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6153231994881834&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3909323411703595&default_language=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=886522552157966&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3945538525972266&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=428445524264746&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837894380029697&default_language=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7602299052869431&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=894944353240878&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8347285227390775&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6342841325733675&default_language=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4397205488174903",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4735439547352878&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6037851293763342&content_id=6613772375164686&lang=en",
+      "category": "listings"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3396404588660481&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7741109863761707",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7750756652844842&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5159959451715374&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=248891033372462",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=258395901675310",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3460256793413390",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=244670358554411",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7702279240042295&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=262937551488811",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7763199395645197&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1566828011308842&default_language=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3732713576286007&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3707742691919630&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7667956416530222&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837901778372354&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837907030279937&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2188144434939649",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1394083227141890&default_language=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6184952698373890&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2577734964512558&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6199136838797102&lang=en",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3005954397357832",
+      "category": "shop-setup"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3568088826447662&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5640959860098862&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837838528513793",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3553108060735275",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837903960033026&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5807358577592107",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6195262056810295",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8750609034250026&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3688464537175863&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=633299596756778&content_id=603906625865518&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=633299596756778&content_id=598402934146859&default_language=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6160394680010539&lang=en",
+      "category": "shop-design"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8644984183162670",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6179821974439723&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2552449517291307&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7740101263378189&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8693445092050690&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1830506744514347&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8308896260065025&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3590236559918890&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5369161871132458&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=73206455404290&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837882170001153",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=196358794184494&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2960632903649066&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3985068541478658&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=984433248438058&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6201736389805867&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=462733062424334",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1673379943597879&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2593995973510958&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8280381640656683&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2334828973737741",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837882170099457",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8647312434300727&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3507056320268087&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3801929814214414&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6734735776089869&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1249244591032078",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5524197024859959&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3668989549299511&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=641287495059214",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7671875816589099&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8064131472115499",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6912884789626626",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6912884789675778",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1347196964587277&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4455924967638798&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5569963429185294",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6844594436638466",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1047661675677441",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8942719290853134",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8706274700117762",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3802241234011918&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6099489652459310",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1267080809105194&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7774796412471041&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7947040639371021&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1274968588748558&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=6037851293763342&content_id=4027460732700429&lang=en",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=8680585220458254&content_id=3158393393481486",
+      "category": "fulfillment"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3360165320984366&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6927759780628226&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837836318344962",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4034166325692203&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6500191365269303&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2077848582981422&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6810061071615758&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=463621005051661&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8843457458308910&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7892291050538794&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4039102601512750&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6700885598914346&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7464845486606122&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7629311634736942&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7623932855043882&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7633608399554347&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3553108060210987&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837825177814785&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=657016495343406&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1152287197103915&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6394088836597518&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6702980009903918&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837825178388225&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3175988075644686&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6700885599471402&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2190484644595470&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2571750932727554&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7422866306090798&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7633608400013099&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7629311633164078",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4039102603904814&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4039102603380526&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=34326864283438&content_id=34326864054062&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5542989418907438&content_id=1195537245292331",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=3044648051263246&content_id=8441296932570926",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=3328486891505451&content_id=7798636358223659&default_language=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=34326864283438&content_id=34326863791918&lang=en",
+      "category": "live"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5178002307598122&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1144590806566702&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7203789379143437&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5804034343962411",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=84434503026433&content_id=7319548693186306&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5666160799188782",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1314959099512618&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=1938610296604418&content_id=7319548693792514&default_language=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5687745822394155&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5015540801488686&content_id=4445809487709998&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5686376633042730&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8916273656792845&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4401155330393899&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4963086610204471&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5015540801488686&content_id=6742106066110254&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2816204956665642&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2425038897399595",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5976185461180202&content_id=5976185460786986",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5686376632813354",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3538110403266346&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6866148174104334&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5687745821804331&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5663393169475371",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5687745821706027",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=2520930700379950&content_id=2520930699921198",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=5666160799418158&content_id=5687745821509419",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3106489578538795&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3112450937636654&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=491489038501663&lang=en",
+      "category": "video-content"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1087822610466603&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5833424661628715",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=813364865828654&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4169993017509675&default_language=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8671803954595597&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2461499122992910&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=312137584052023&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6494954580231950",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8785896465221389&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6276577063585582&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7774796411864833",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2891075188115246",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5433741930104590&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8307587214133035&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=117106471061262",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837825178191617&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7464845487671082&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8418309721360171&lang=en",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8670842792888078",
+      "category": "analytics"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7484669667591979",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3106489578587947&default_language=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3873674328753962",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7160023202432811&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8944785117513486",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837875102942977&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5995864732829482&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837877347124993&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6425512537065271&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5084212572276526&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837901778568962&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1193695703959310&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2157976270653230&default_language=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4442975095555886&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1660754646927118&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6000583631226666&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837891779266305&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=529789853501230&default_language=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3130420575504174&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7206961191896878",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6447133188491063&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2325636686071595&default_language=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4443907304163118",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5255175816349486&lang=en",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2969409049151246",
+      "category": "promotions"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2065391502559031&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6028144470935338&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1931289500600119&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2165215329748791&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1572644481369869",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5935433113159470&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4251048265697037&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5424269811697454&lang=en",
+      "category": "growth"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2336057241700098&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8205104048391950&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3995852763531009&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2470273945257771&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2380042835445547&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6108872796768042&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=80339993577259&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5982454398175018&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=77147478607658&default_language=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5988482086864682&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837825177847553",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837891779217153&default_language=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6837838528251649&default_language=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1903367874381610&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4186564050224897&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7989055607670570&lang=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8852596085262123&default_language=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5080349546170155&default_language=en",
+      "category": "payments"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7359788334565162",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=719928765302570&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8541759248729899&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5846413191907074&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5857526216378167&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1877510120654634",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5816703566350126&default_language=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8559051706631991&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2209187228600106&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6599730126833451&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=153963492919083&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=8794641096984333&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=7155328249841421&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4451321470682882&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=743585276938030&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=1845146929383184&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5513129770796813",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2542861906872077",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=4875447742662443&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5513514540189453&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=6567382587836173&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=2204449150469931",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=505578792273677&lang=en",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5403048260945710",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=5653174967437098",
+      "category": "customer"
+    },
+    {
+      "url": "https://seller-us.tiktok.com/university/course?learning_id=7433881557567287&content_id=1113059151578894",
+      "category": "customer"
+    }
   ]
 }
