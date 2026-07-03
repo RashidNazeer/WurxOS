@@ -73,7 +73,22 @@ const KNOWLEDGE_BUDGET = 14000; // chars of WurxOS/SOP knowledge injected per ca
 const TTS_KNOWLEDGE_BUDGET = 9000; // chars of TikTok Shop Academy knowledge (separate budget)
 const HISTORY_CHAR_CAP = 4000;  // cap recent-history chars
 const HISTORY_TURNS = 12;       // most-recent messages considered for memory
-const MAX_COMPLETION_TOKENS = 1000; // output cap (cheap; keeps answers complete)
+// Output cap. GPT-5.x reasoning models spend this budget on BOTH hidden
+// reasoning AND the visible answer, so too small a cap can leave nothing for
+// the answer — a heavy ask ("analyze all of a brand's reports + action plan")
+// once burned the whole 1000 on reasoning and returned EMPTY content (a blank
+// bubble). 2500 is enough for a thorough report analysis + action plan while
+// staying cheap on gpt-5.4-mini (output tokens are the pricey part).
+const MAX_COMPLETION_TOKENS = 2500;
+// Larger cap used ONLY to retry once when the first answer came back empty
+// (reasoning ate the budget) — so a heavy turn still produces something
+// instead of a blank bubble. Rare, so the extra cost is paid rarely.
+const MAX_COMPLETION_TOKENS_RETRY = 6000;
+// TOOL rounds don't need a big output budget — the model is only picking a
+// query and (usually) emitting a short tool call, not prose. Keeping this
+// small stops each of the (up to 4) tool rounds from reserving 2500 tokens of
+// pricey output headroom it never uses.
+const MAX_TOOL_ROUND_TOKENS = 1200;
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -103,7 +118,13 @@ function streamConversation(opts: {
   const { convo, model, isBoss, cid, admin, persist, kbStatus } = opts;
   const enc = new TextEncoder();
   const dec = new TextDecoder();
-  const MAX_TOOL_ROUNDS = 4;
+  // 2 rounds covers the real need: round 1 picks tools (e.g. find brand +
+  // get_reports, which can run together), round 2 lets the model add ONE more
+  // lookup if needed — then it answers. Rounds 3–4 almost never added a new
+  // tool call; they just re-sent the whole (now-large) conversation to the
+  // model again, re-billing every tool payload as input. That re-billing was
+  // the bulk of the per-question cost. Lowering to 2 is the biggest input cut.
+  const MAX_TOOL_ROUNDS = 2;
 
   const out = new ReadableStream({
     async start(controller) {
@@ -122,7 +143,7 @@ function streamConversation(opts: {
 
         // ── Tool-calling rounds (Boss only), emitting a status per tool ──
         for (let round = 0; round < (isBoss ? MAX_TOOL_ROUNDS : 0); round++) {
-          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, tools: TOOLS, tool_choice: 'auto' });
+          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, tools: TOOLS, tool_choice: 'auto' });
           if (!r.ok) {
             const t = await r.text().catch(() => '');
             console.error('model error (stream tool round)', r.status, t.slice(0, 200));
@@ -183,6 +204,21 @@ function streamConversation(opts: {
                 if (delta) { full += delta; emit({ delta }); }
               } catch { /* ignore keep-alive / partial */ }
             }
+          }
+        }
+
+        // Empty answer? On a reasoning model this means reasoning consumed the
+        // whole token budget with nothing left to write (a heavy analytical ask
+        // — "analyze all of a brand's reports + action plan" — does this). Retry
+        // ONCE, non-streamed, with a much larger cap so the user gets a real
+        // answer instead of a blank bubble.
+        if (!full) {
+          emit({ status: 'Composing a detailed answer…' });
+          const r2 = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS_RETRY });
+          if (r2.ok) {
+            let text = '';
+            try { text = JSON.parse(await r2.text())?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+            if (text) { for (let i = 0; i < text.length; i += 24) emit({ delta: text.slice(i, i + 24) }); full = text; }
           }
         }
       } catch (e) {
@@ -990,8 +1026,25 @@ Deno.serve(async (req) => {
         })
       : null;
 
+    // ── Cost guard: skip heavy knowledge retrieval for pure DATA questions ──
+    // The SOP/KB + TikTok-Academy retrieval (an embedding API call, a vector
+    // query, and up to ~23k chars of knowledge text) is pure waste when the
+    // Boss is asking about live OS DATA ("analyze brand X's reports", "who
+    // sold most", "Ali's salary") — those are answered by the tools, not the
+    // knowledge base, and that big block was being RE-SENT as input on every
+    // tool round. Detect a data-style ask and skip the whole block for it.
+    // Conservative: only skips when it clearly looks like data AND clearly does
+    // NOT look like a how-to / TikTok-Shop question (those still need the KB).
+    const callerIsBoss = String(profile.role || '').toLowerCase() === 'boss';
+    const qlc = message.toLowerCase();
+    const looksHowTo = /\b(how (do|to|can)|where (do|is|can)|what page|which page|steps?|guide|policy|sop|set up|setup|configure|enable|submit|apply for|clock|leave request|tiktok|gmv max|affiliate program|creator|violation|listing|promotion|academy|shop health|sps|ahr)\b/.test(qlc);
+    const looksData = callerIsBoss && /\b(report|reports|gmv|orders|sales|revenue|salary|salaries|incentive|bonus|performance|rating|attendance|hours|leave balance|brand|brands|creator[s]? sold|units? sold|action plan|analy[sz]e|analysis|month(ly)?|week(ly)?|june|july|august|q[1-4]|top (creator|product|video)|compare|trend)\b/.test(qlc);
+    const skipKnowledge = looksData && !looksHowTo;
+
     let knowledgeBlock: string;
-    {
+    if (skipKnowledge) {
+      knowledgeBlock = 'No knowledge-base lookup was run for this question (it is a live-data / reporting question — use the data tools).';
+    } else {
       // ── Knowledge (RAG) — pick the docs most relevant to THIS question
       //    and cap the size, so the request stays focused and cheap instead
       //    of stuffing the whole knowledge base into every call. ──
@@ -1194,7 +1247,7 @@ Deno.serve(async (req) => {
     // no user-visible text). The FINAL answer is streamed to the client when
     // requested. Loop is bounded so a misbehaving model can't spin forever.
     const convo: any[] = [{ role: 'system', content: systemPrompt }, ...priorTurns, { role: 'user', content: message }];
-    const MAX_TOOL_ROUNDS = 4;
+    const MAX_TOOL_ROUNDS = 2; // see streamConversation — 2 covers real need; higher just re-bills tool payloads
     const cid = conversationId;
     // Initial status for a non-tool answer (KB/how-to). Reflects whether the
     // knowledge retrieval actually matched something.
@@ -1222,7 +1275,7 @@ Deno.serve(async (req) => {
       const aiRes = await fetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, tools: TOOLS, tool_choice: 'auto' }),
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, tools: TOOLS, tool_choice: 'auto' }),
       });
       const aiText = await aiRes.text();
       if (!aiRes.ok) {
@@ -1265,6 +1318,18 @@ Deno.serve(async (req) => {
     }
     let reply = '';
     try { reply = JSON.parse(aiText)?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+    // Empty answer → reasoning ate the whole budget. Retry once with a larger
+    // cap before giving up, so heavy analytical asks still return something.
+    if (!reply) {
+      const retryRes = await fetch(OPENAI_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS_RETRY }),
+      });
+      if (retryRes.ok) {
+        try { reply = JSON.parse(await retryRes.text())?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+      }
+    }
     if (!reply) reply = 'Sorry, I couldn’t generate a response just now. Please try again.';
     await persist(reply);
     return json({ conversationId, reply });
