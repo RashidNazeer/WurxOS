@@ -1227,48 +1227,35 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           but the "Add Custom Field" button is removed so no new leaky ones can
           be created. When a brand has no legacy per-user fields, this whole
           section is hidden. */}
-      {sectEnabled.customFields && customFieldDefs.length > 0 && (
-      <SectionCard icon="bi-sliders" color="#8b5cf6" title="My Custom Fields (legacy — personal)">
-        {customFieldDefs.length === 0 ? (
-          <div className="text-center text-muted py-2" style={{ fontSize: '0.78rem' }}>
-            No personal custom fields. Use <strong>Add custom section</strong> above to add a
-            section for this brand (it stays with this brand and won't appear on other brands' reports).
-          </div>
-        ) : (
-          <div>
-            {customFieldDefs.map((field, i) => (
-              <div key={field.id} className={i > 0 ? 'mt-3 pt-3' : ''}
-                style={i > 0 ? { borderTop: '1px solid var(--border-subtle)' } : {}}>
-                <div className="d-flex align-items-center justify-content-between mb-1">
-                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
-                    {field.name}
-                  </label>
-                  <div className="d-flex gap-1">
-                    <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
-                      onClick={() => renameCustomField(field.id)} title="Rename">
-                      <i className="bi bi-pencil" />
-                    </button>
-                    <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
-                      onClick={() => deleteCustomField(field.id)} title="Delete from my template">
-                      <i className="bi bi-trash3" />
-                    </button>
-                  </div>
-                </div>
-                <RichTextEditor
-                  value={(() => {
-                    const v = data.customFields?.[field.id];
-                    if (!v) return '';
-                    return typeof v === 'string' ? v : (v.value || '');
-                  })()}
-                  minHeight={120}
-                  placeholder={`Add notes for ${field.name}…`}
-                  onChange={v => setCustomFieldValue(field.id, v, field.name)} />
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
-      )}
+      {sectEnabled.customFields && customFieldDefs.map((field) => (
+        // Each legacy per-user field renders as its OWN section titled by the
+        // field's name — so edit mode matches exactly what the saved view
+        // shows (the view uses the field name as the section header). No more
+        // generic "My Custom Fields (legacy)" wrapper that didn't match.
+        <SectionCard key={field.id} icon="bi-sliders" color="#8b5cf6" title={field.name}
+          actions={
+            <div className="d-flex gap-1">
+              <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                onClick={() => renameCustomField(field.id)} title="Rename">
+                <i className="bi bi-pencil" />
+              </button>
+              <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                onClick={() => deleteCustomField(field.id)} title="Delete from my template">
+                <i className="bi bi-trash3" />
+              </button>
+            </div>
+          }>
+          <RichTextEditor
+            value={(() => {
+              const v = data.customFields?.[field.id];
+              if (!v) return '';
+              return typeof v === 'string' ? v : (v.value || '');
+            })()}
+            minHeight={120}
+            placeholder={`Add notes for ${field.name}…`}
+            onChange={v => setCustomFieldValue(field.id, v, field.name)} />
+        </SectionCard>
+      ))}
 
       {/* Save buttons (bottom) */}
       <div className="d-flex gap-2 justify-content-end mt-4 mb-3">

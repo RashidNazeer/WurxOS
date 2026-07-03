@@ -1549,82 +1549,71 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           filled-in text on save (see useBrandSections.cleanCustomFields + the
           monthly form). New sections must use the per-BRAND "Add custom
           section" block above. We still render EXISTING per-user fields so
-          nothing a user relies on disappears, but the add button is gone and
-          the whole block hides when there are none. */}
-      {customFieldDefs.length > 0 && (<>
-      <div className="d-flex align-items-center justify-content-between mb-3 mt-4">
-        <div className="d-flex align-items-center gap-2">
-          <div className="rounded-2 d-flex align-items-center justify-content-center"
-            style={{ width: 32, height: 32, background: '#8b5cf618' }}>
-            <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: '#8b5cf6' }} />
-          </div>
-          <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-            My Custom Fields (legacy — personal)
-          </h6>
-        </div>
-      </div>
-      {(
-        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+          nothing a user relies on disappears, the add button is gone, and each
+          field renders as its OWN section titled by the field name so edit
+          mode matches the saved view exactly (no generic wrapper header). */}
+      {customFieldDefs.map((field) => (
+        <div key={field.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
           <div className="card-body p-3">
-            {customFieldDefs.map((field, i) => (
-              <div key={field.id} className={i > 0 ? 'mt-3 pt-3' : ''}
-                style={i > 0 ? { borderTop: '1px solid var(--border-subtle)' } : {}}>
-                <div className="d-flex align-items-center justify-content-between mb-1">
-                  <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
-                    {field.name}
-                  </label>
-                  <div className="d-flex gap-1">
-                    <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
-                      onClick={() => renameCustomField(field.id)} title="Rename">
-                      <i className="bi bi-pencil" />
-                    </button>
-                    <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
-                      onClick={() => deleteCustomField(field.id)} title="Delete from my template">
-                      <i className="bi bi-trash3" />
-                    </button>
-                  </div>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <div className="d-flex align-items-center gap-2">
+                <div className="rounded-2 d-flex align-items-center justify-content-center"
+                  style={{ width: 32, height: 32, background: '#8b5cf618' }}>
+                  <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: '#8b5cf6' }} />
                 </div>
-                {(() => {
-                  // Find previous value by id first, then fall back to a
-                  // name match — custom-field templates are per-user and
-                  // ids can rotate when a field is renamed or recreated.
-                  const prevCustom = previousReport?.customFields || {};
-                  const byId = prevCustom[field.id];
-                  const byName = !byId
-                    ? Object.values(prevCustom).find((v) =>
-                        typeof v === 'object' && v?.name && v.name === field.name)
-                    : null;
-                  const prevEntry = byId || byName;
-                  const prevValue = prevEntry == null ? ''
-                    : (typeof prevEntry === 'string' ? prevEntry : (prevEntry.value || ''));
-                  const curEntry = data.customFields?.[field.id];
-                  const curValue = curEntry == null ? ''
-                    : (typeof curEntry === 'string' ? curEntry : (curEntry.value || ''));
-                  return (
-                    <div className="d-flex justify-content-end mb-2">
-                      <FetchPreviousButton
-                        previousValue={prevValue}
-                        currentValue={curValue}
-                        onPaste={(v) => setCustomFieldValue(field.id, v, field.name)}
-                        sourceLabel={previousReport?.weekLabel || 'previous week'} />
-                    </div>
-                  );
-                })()}
-                <RichTextEditor
-                  value={(() => {
-                    const v = data.customFields?.[field.id];
-                    if (!v) return '';
-                    return typeof v === 'string' ? v : (v.value || '');
-                  })()}
-                  onChange={v => setCustomFieldValue(field.id, v, field.name)}
-                  minHeight={120}
-                  placeholder={`Add notes for ${field.name}…`} />
+                <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                  {field.name}
+                </h6>
               </div>
-            ))}
+              <div className="d-flex gap-1">
+                <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                  onClick={() => renameCustomField(field.id)} title="Rename">
+                  <i className="bi bi-pencil" />
+                </button>
+                <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                  onClick={() => deleteCustomField(field.id)} title="Delete from my template">
+                  <i className="bi bi-trash3" />
+                </button>
+              </div>
+            </div>
+            {(() => {
+              // Find previous value by id first, then fall back to a name
+              // match — custom-field templates are per-user and ids can rotate
+              // when a field is renamed or recreated.
+              const prevCustom = previousReport?.customFields || {};
+              const byId = prevCustom[field.id];
+              const byName = !byId
+                ? Object.values(prevCustom).find((v) =>
+                    typeof v === 'object' && v?.name && v.name === field.name)
+                : null;
+              const prevEntry = byId || byName;
+              const prevValue = prevEntry == null ? ''
+                : (typeof prevEntry === 'string' ? prevEntry : (prevEntry.value || ''));
+              const curEntry = data.customFields?.[field.id];
+              const curValue = curEntry == null ? ''
+                : (typeof curEntry === 'string' ? curEntry : (curEntry.value || ''));
+              return (
+                <div className="d-flex justify-content-end mb-2">
+                  <FetchPreviousButton
+                    previousValue={prevValue}
+                    currentValue={curValue}
+                    onPaste={(v) => setCustomFieldValue(field.id, v, field.name)}
+                    sourceLabel={previousReport?.weekLabel || 'previous week'} />
+                </div>
+              );
+            })()}
+            <RichTextEditor
+              value={(() => {
+                const v = data.customFields?.[field.id];
+                if (!v) return '';
+                return typeof v === 'string' ? v : (v.value || '');
+              })()}
+              onChange={v => setCustomFieldValue(field.id, v, field.name)}
+              minHeight={120}
+              placeholder={`Add notes for ${field.name}…`} />
           </div>
         </div>
-      )}
-      </>)}
+      ))}
 
       {/* ─── Save buttons bottom ────────────────────────────────────────── */}
       <div className="d-flex justify-content-end gap-2 mb-4 flex-wrap">
