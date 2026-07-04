@@ -3,9 +3,27 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { getMenuForRole } from './menu';
 import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
+import { listMyEukaBrands } from '../../lib/videoReviewApi';
 
 export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobileClose }) {
-  const menu = getMenuForRole(role);
+  // Whether to show the Video Reviews item: Boss always (static in the menu);
+  // OL/TL/APC only if they actually have a brand on Euka. Boss/OL trivially
+  // have Euka brands, so we only need the lookup for TL/APC.
+  const [hasEukaBrand, setHasEukaBrand] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (role === 'boss' || role === 'ol') { setHasEukaBrand(true); return undefined; }
+    if (role === 'tl' || role === 'apc') {
+      listMyEukaBrands()
+        .then((list) => { if (!cancelled) setHasEukaBrand(list.length > 0); })
+        .catch(() => { if (!cancelled) setHasEukaBrand(false); });
+    } else {
+      setHasEukaBrand(false);
+    }
+    return () => { cancelled = true; };
+  }, [role]);
+
+  const menu = getMenuForRole(role, { hasEukaBrand });
   const [query, setQuery] = useState('');
 
   // v1-style menu filter — substring match against item labels +

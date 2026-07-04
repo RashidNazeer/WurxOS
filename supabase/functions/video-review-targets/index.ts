@@ -31,7 +31,10 @@
 // Day boundaries: midnight-to-midnight in UTC (Euka posted_date is UTC, and
 // the Euka Copilot uses UTC too — confirmed).
 //
-// Boss-only (like euka-api) during pilot. Solid Gold only for now.
+// Brand-aware: the caller passes a `brandId`; the fn resolves it to that
+// brand's euka_store_id + euka_slug (mig 229 backfill) and picks the right
+// Euka key from the slug. AuthZ: Boss/OL for any brand; an APC only for a
+// brand they're assigned to. So an APC generates files for THEIR OWN store.
 // Deploy: supabase functions deploy video-review-targets
 // ============================================================
 
@@ -41,9 +44,14 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const EUKA_BASE = 'https://api.euka.ai/v0';
 
-// Pilot: Solid Gold only. (Later: resolve brand -> key + store like euka-api.)
-const EUKA_KEY = Deno.env.get('EUKA_API_KEY')!;
-const SOLID_GOLD_STORE = 'e9d58f04-dc44-4ab2-adb2-62853a3dbe38';
+// Euka key routing by brand slug (mirrors the euka-api edge fn): a couple of
+// brands have their own dedicated key; everyone else is on the shared account
+// key (and is scoped by store_id, which the shared key can see across stores).
+function eukaKeyForSlug(slug: string): string {
+  if (slug === 'solidgold') return Deno.env.get('EUKA_API_KEY') || '';
+  if (slug === 'innosupps') return Deno.env.get('EUKA_API_KEY_INNOSUPPS') || '';
+  return Deno.env.get('EUKA_SHARED_API_KEY') || '';
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -75,12 +83,12 @@ const maxDate = (...ds: (string | null | undefined)[]) =>
 const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
 
 // ── Euka fetch with light retry (Pakistani ISPs + Euka throttling) ──
-async function eukaGet(path: string): Promise<any> {
+async function eukaGet(path: string, key: string): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const r = await fetch(EUKA_BASE + path, {
-        headers: { Authorization: `Bearer ${EUKA_KEY}`, Accept: 'application/json' },
+        headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
       });
       const text = await r.text();
       let data: any;
@@ -98,7 +106,7 @@ async function eukaGet(path: string): Promise<any> {
 // Full video history for one creator, as of the target date. Chunks 70 days
 // back until we hit the beginning (two empty chunks in a row). Dedups by
 // video_id. Returns posting DAYS oldest-first, filtered to <= target.
-async function fullHistory(handle: string, target: string): Promise<string[]> {
+async function fullHistory(handle: string, target: string, storeId: string, key: string): Promise<string[]> {
   const vids = new Map<string, string>(); // video_id -> posted_date iso
   let end = target;
   let emptyStreak = 0;
@@ -107,8 +115,9 @@ async function fullHistory(handle: string, target: string): Promise<string[]> {
     let rows: any[] = [];
     try {
       const r = await eukaGet(
-        `/data-export?type=creator_video_level&store_id=${SOLID_GOLD_STORE}` +
+        `/data-export?type=creator_video_level&store_id=${storeId}` +
         `&start_date=${start}&end_date=${end}&export_type=json&creator_handle=${encodeURIComponent(handle)}`,
+        key,
       );
       rows = Array.isArray(r?.data) ? r.data : [];
     } catch { rows = []; }
@@ -126,19 +135,21 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    // ── AuthZ: active Boss only (pilot) ──────────────────────────────
+    // ── AuthN ────────────────────────────────────────────────────────
     const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     if (!token) return json({ error: 'unauthenticated' }, 401);
     const { data: userData, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userData?.user) return json({ error: 'unauthenticated' }, 401);
+    const uid = userData.user.id;
     const { data: profile } = await admin
-      .from('profiles').select('role, is_active, display_name').eq('id', userData.user.id).maybeSingle();
-    if (!profile || profile.is_active === false || profile.role !== 'boss') {
-      return json({ error: 'forbidden — Boss only' }, 403);
-    }
+      .from('profiles').select('role, is_active, display_name').eq('id', uid).maybeSingle();
+    if (!profile || profile.is_active === false) return json({ error: 'forbidden' }, 403);
+    const role = String(profile.role || '').toLowerCase();
 
     // ── Parse + validate input ───────────────────────────────────────
     const payload = await req.json().catch(() => ({}));
+    const brandId: string = String(payload?.brandId || '').trim();
+    if (!brandId) return json({ error: 'brandId is required' }, 400);
     const target: string = String(payload?.targetDate || '').trim();
     const missedRaw: unknown = payload?.missedDates;
     if (!isValidDate(target)) return json({ error: 'targetDate must be YYYY-MM-DD' }, 400);
@@ -148,6 +159,27 @@ Deno.serve(async (req) => {
     if (missed.length > 2) return json({ error: 'At most 2 missed dates.' }, 400);
     // A missed date must be on/before the target (can't miss a future run).
     missed = missed.filter((d) => d <= target);
+
+    // ── Resolve the brand → Euka store + slug + key ──────────────────
+    const { data: brand } = await admin
+      .from('brands').select('id, brand_name, owner_id, euka_store_id, euka_slug').eq('id', brandId).maybeSingle();
+    if (!brand) return json({ error: 'brand not found' }, 404);
+    if (!brand.euka_store_id || !brand.euka_slug) {
+      return json({ error: `"${brand.brand_name}" is not linked to a Euka store.` }, 400);
+    }
+    const storeId = String(brand.euka_store_id);
+    const key = eukaKeyForSlug(String(brand.euka_slug));
+    if (!key) return json({ error: `Euka key not configured for "${brand.brand_name}".` }, 500);
+
+    // ── AuthZ: Boss/OL → any brand; otherwise the brand's owner (TL) or an
+    //    assigned APC. So a user only ever runs their OWN store. ──────────
+    let allowed = role === 'boss' || role === 'ol' || brand.owner_id === uid;
+    if (!allowed) {
+      const { data: assign } = await admin
+        .from('brand_assignments').select('brand_id').eq('brand_id', brandId).eq('user_id', uid).maybeSingle();
+      allowed = !!assign;
+    }
+    if (!allowed) return json({ error: 'forbidden — this brand is not yours' }, 403);
 
     // ── Window ───────────────────────────────────────────────────────
     const earliestProcessing = [target, ...missed].sort(cmp)[0];
@@ -159,8 +191,9 @@ Deno.serve(async (req) => {
 
     // ── Step 1: candidates (all posters in window; not GMV-capped) ───
     const cv = await eukaGet(
-      `/data-export?type=creator_videos&store_id=${SOLID_GOLD_STORE}` +
+      `/data-export?type=creator_videos&store_id=${storeId}` +
       `&start_date=${candStart}&end_date=${candEnd}&export_type=json`,
+      key,
     );
     const windowVideos: any[] = Array.isArray(cv?.data) ? cv.data : [];
     const candidateHandles = [...new Set(
@@ -183,7 +216,7 @@ Deno.serve(async (req) => {
       while (idx < candidateHandles.length) {
         const handle = candidateHandles[idx++];
         let hist: string[] = [];
-        try { hist = await fullHistory(handle, target); }
+        try { hist = await fullHistory(handle, target, storeId, key); }
         catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
         if (hist.length === 0) {
           needsManual.push({ handle, note: 'posted in window per creator_videos but per-creator history returned nothing' });
@@ -206,8 +239,8 @@ Deno.serve(async (req) => {
 
     // ── Log the run (best-effort; never block the response) ──────────
     admin.from('video_review_runs').insert({
-      brand_slug: 'solidgold',
-      brand_label: 'Solid Gold Pets',
+      brand_slug: brand.euka_slug,
+      brand_label: brand.brand_name,
       target_date: target,
       missed_dates: missed,
       group1_count: group1.length,
@@ -215,12 +248,12 @@ Deno.serve(async (req) => {
       group3_count: group3.length,
       candidates: candidateHandles.length,
       needs_manual: needsManual.length,
-      run_by: userData.user.id,
+      run_by: uid,
       run_by_name: profile.display_name || null,
     }).then(() => {}, () => {});
 
     return json({
-      brandLabel: 'Solid Gold Pets',
+      brandLabel: brand.brand_name,
       targetDate: target,
       missedDates: missed,
       group1, group2, group3,

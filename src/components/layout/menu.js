@@ -346,7 +346,7 @@ export const MENUS = {
   ],
 };
 
-export function getMenuForRole(role) {
+export function getMenuForRole(role, opts = {}) {
   const base = MENUS[role] || MENUS.apc;
   const out = [...base];
   // AI Assistant is BOSS-ONLY during the test phase (server also enforces this
@@ -354,6 +354,14 @@ export function getMenuForRole(role) {
   if (role === 'boss') {
     const i = out.indexOf(NOTIFS_ITEM);
     out.splice(i >= 0 ? i : out.length, 0, ASSISTANT_ITEM);
+  }
+  // Video Reviews is shown to OL / TL / APC ONLY when they actually have a
+  // brand on Euka (Boss has it statically above). The Sidebar computes
+  // hasEukaBrand from the user's Euka-linked brands. The edge function also
+  // enforces per-brand access, so this is UX, not the security boundary.
+  if (opts.hasEukaBrand && (role === 'ol' || role === 'tl' || role === 'apc')) {
+    const i = out.indexOf(NOTIFS_ITEM);
+    out.splice(i >= 0 ? i : out.length, 0, VIDEO_REVIEWS_ITEM);
   }
   return out;
 }

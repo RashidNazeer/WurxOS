@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   createBrand, updateBrand, setBrandAssignments,
   uploadBrandLogo, removeBrandLogo,
-  listActiveTLs, listAPCsUnderTLWithLoad,
+  listActiveTLs, listAPCsUnderTLWithLoad, listEukaStores,
 } from '../../lib/brandsApi';
 import { useAuth } from '../../contexts/AuthContext';
 import LogoPicker from './LogoPicker';
@@ -41,6 +41,13 @@ export default function BrandForm({ brand, onClose, onSaved }) {
   const [assignedIds, setAssignedIds] = useState(
     (brand?.assignedUsers || []).map((u) => u.id),
   );
+
+  // Euka link — "on Euka" simply means a store is picked. Seeded from the
+  // brand's existing euka_store_id (edit mode).
+  const [onEuka, setOnEuka]           = useState(!!brand?.euka_store_id);
+  const [eukaStoreId, setEukaStoreId] = useState(brand?.euka_store_id || '');
+  const [eukaStores, setEukaStores]   = useState([]);
+  const [loadingStores, setLoadingStores] = useState(false);
 
   // Logo state
   const [logoFile, setLogoFile]   = useState(null);            // staged File
@@ -86,6 +93,21 @@ export default function BrandForm({ brand, onClose, onSaved }) {
     return () => { cancelled = true; };
   }, [ownerId]);
 
+  // Load the Euka store list the first time the brand is marked "on Euka"
+  // (and in edit mode when it already is), so the dropdown can populate.
+  useEffect(() => {
+    if (!onEuka || eukaStores.length) return;
+    let cancelled = false;
+    setLoadingStores(true);
+    listEukaStores()
+      .then((list) => { if (!cancelled) setEukaStores(list); })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoadingStores(false); });
+    return () => { cancelled = true; };
+  }, [onEuka, eukaStores.length]);
+
+  const eukaSlugFor = (storeId) => eukaStores.find((s) => s.store_id === storeId)?.slug || null;
+
   // Partition APCs by current workload. In edit mode, APCs already on
   // this brand will show their total count including this one — that's
   // accurate since they *are* assigned to a brand.
@@ -110,6 +132,12 @@ export default function BrandForm({ brand, onClose, onSaved }) {
     setError('');
     if (!brandName.trim()) return setError('Brand name is required.');
     if (!ownerId)          return setError('Please select a Team Lead to own this brand.');
+    // Euka store is REQUIRED once a brand is marked as being on Euka.
+    if (onEuka && !eukaStoreId) return setError('Pick the Euka store for this brand (or turn off "This brand is on Euka").');
+
+    // Resolve the Euka link to persist. Off → un-link (both null).
+    const eukaStoreToSave = onEuka ? eukaStoreId : null;
+    const eukaSlugToSave  = onEuka ? eukaSlugFor(eukaStoreId) : null;
 
     setSaving(true);
     try {
@@ -127,11 +155,13 @@ export default function BrandForm({ brand, onClose, onSaved }) {
         saved = await updateBrand(brand.id, {
           brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus,
           logoUrl: nextLogoUrl,
+          eukaStoreId: eukaStoreToSave, eukaSlug: eukaSlugToSave,
         });
       } else {
         saved = await createBrand({
           brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus,
           logoUrl: nextLogoUrl,
+          eukaStoreId: eukaStoreToSave, eukaSlug: eukaSlugToSave,
         });
       }
 
@@ -258,6 +288,55 @@ export default function BrandForm({ brand, onClose, onSaved }) {
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 {PAID_COLLAB_STATUSES.find((s) => s.value === paidCollabStatus)?.blurb}
               </div>
+            </div>
+
+            {/* Euka link */}
+            <div style={{ marginBottom: 14 }}>
+              <label className="wx-label" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span>Euka store</span>
+                <span className="form-check form-switch mb-0" style={{ paddingLeft: '2.4em' }}>
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    checked={onEuka}
+                    disabled={saving}
+                    onChange={(e) => {
+                      setOnEuka(e.target.checked);
+                      if (!e.target.checked) setEukaStoreId('');
+                    }}
+                    style={{ cursor: 'pointer' }}
+                    title="Turn on if this brand is on Euka"
+                  />
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>
+                  This brand is on Euka
+                </span>
+              </label>
+              {onEuka && (
+                <>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '2px 0 6px' }}>
+                    Required. Links this brand to its Euka store for analytics and video-review targeting.
+                  </div>
+                  {loadingStores ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      <span className="wx-spinner" style={{ color: 'var(--accent)' }} /> Loading Euka stores…
+                    </div>
+                  ) : (
+                    <select
+                      className="wx-input"
+                      value={eukaStoreId}
+                      onChange={(e) => setEukaStoreId(e.target.value)}
+                      disabled={saving}
+                    >
+                      <option value="">— Select the Euka store —</option>
+                      {eukaStores.map((s) => (
+                        <option key={s.store_id} value={s.store_id}>{s.label}</option>
+                      ))}
+                    </select>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Owner TL */}

@@ -48,7 +48,20 @@ function normalizeBrand(row) {
 // --------------------------------------------------------------
 // Writes (brands)
 // --------------------------------------------------------------
-export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable' }) {
+// The Euka stores available to link a brand to (slug + store_id + label).
+// Read from the euka_stores reference table (mig 229) — non-secret, so any
+// authenticated user (Boss/OL/TL creating a brand) can load it for the picker.
+export async function listEukaStores() {
+  const { data, error } = await supabase
+    .from('euka_stores')
+    .select('store_id, slug, label')
+    .eq('is_active', true)
+    .order('label');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', eukaStoreId = null, eukaSlug = null }) {
   const { data: me } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('brands')
@@ -61,6 +74,8 @@ export async function createBrand({ brandName, clientName, tier, gmv, ownerId, l
       logo_url: logoUrl || null,
       status,
       paid_collab_status: paidCollabStatus,
+      euka_store_id: eukaStoreId || null,
+      euka_slug: eukaSlug || null,
       created_by: me?.user?.id ?? null,
     })
     .select()
@@ -85,6 +100,10 @@ export async function updateBrand(id, patch) {
   if ('logoUrl'    in patch) payload.logo_url    = patch.logoUrl || null;
   if ('status'     in patch) payload.status      = patch.status;
   if ('paidCollabStatus' in patch) payload.paid_collab_status = patch.paidCollabStatus;
+  // Euka link — set both together (store scopes queries, slug picks the key).
+  // Passing null for both un-links the brand from Euka.
+  if ('eukaStoreId' in patch) payload.euka_store_id = patch.eukaStoreId || null;
+  if ('eukaSlug'    in patch) payload.euka_slug     = patch.eukaSlug || null;
 
   const { data, error } = await supabase
     .from('brands')

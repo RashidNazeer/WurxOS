@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { runVideoReviewTargets, downloadHandlesCsv } from '../../lib/videoReviewApi';
+import { useEffect, useMemo, useState } from 'react';
+import { runVideoReviewTargets, downloadHandlesCsv, listMyEukaBrands } from '../../lib/videoReviewApi';
 
 // ── Pakistan-time date helpers ──────────────────────────────────────
 // Default target date = 2 days before TODAY in Pakistan (Asia/Karachi).
@@ -21,7 +21,6 @@ const prettyDate = (ymd) => {
   return d.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-const BRAND_LABEL = 'Solid Gold';
 const FILE_DEFS = [
   { key: 'group1', ord: '1st', title: 'send their 1st video review message' },
   { key: 'group2', ord: '2nd', title: 'send their 2nd video review message' },
@@ -36,6 +35,23 @@ export default function VideoReviewsPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
+  // Which Euka brands this user can run for (Boss/OL: all; APC: their own).
+  const [brands, setBrands] = useState(null);         // null = loading
+  const [brandId, setBrandId] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    listMyEukaBrands()
+      .then((list) => {
+        if (cancelled) return;
+        setBrands(list);
+        if (list.length === 1) setBrandId(list[0].id); // preselect the only one
+      })
+      .catch(() => { if (!cancelled) setBrands([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedBrand = (brands || []).find((b) => b.id === brandId) || null;
+  const brandLabel = selectedBrand?.brand_name || 'Brand';
   const maxDate = pakistanToday();                    // can't target the future
 
   function addMissed() {
@@ -47,16 +63,18 @@ export default function VideoReviewsPage() {
 
   async function generate() {
     setError('');
+    if (!brandId) { setError('Pick a brand first.'); return; }
     const cleanMissed = [...new Set(missed.map((d) => d.trim()).filter(Boolean))]
       .filter((d) => d <= targetDate);
     setStatus('running');
     setResult(null);
     try {
-      const data = await runVideoReviewTargets({ targetDate, missedDates: cleanMissed });
+      const data = await runVideoReviewTargets({ brandId, targetDate, missedDates: cleanMissed });
       setResult(data);
-      // Auto-download the three files immediately.
+      // Auto-download the three files immediately, named by the brand.
+      const label = data.brandLabel || brandLabel;
       for (const def of FILE_DEFS) {
-        downloadHandlesCsv(data[def.key] || [], `${BRAND_LABEL} - ${def.ord} video review creators.csv`);
+        downloadHandlesCsv(data[def.key] || [], `${label} - ${def.ord} video review creators.csv`);
       }
       setStatus('done');
     } catch (e) {
@@ -67,7 +85,8 @@ export default function VideoReviewsPage() {
 
   function redownload(def) {
     if (!result) return;
-    downloadHandlesCsv(result[def.key] || [], `${BRAND_LABEL} - ${def.ord} video review creators.csv`);
+    const label = result.brandLabel || brandLabel;
+    downloadHandlesCsv(result[def.key] || [], `${label} - ${def.ord} video review creators.csv`);
   }
 
   function reset() {
@@ -86,14 +105,46 @@ export default function VideoReviewsPage() {
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>Video Reviews</h1>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Generate today's 1st / 2nd / 3rd video-review creator lists for {BRAND_LABEL}.
+              Generate a brand's 1st / 2nd / 3rd video-review creator lists for a chosen date.
             </div>
           </div>
         </div>
       </div>
 
+      {/* No Euka brand → nothing to run */}
+      {brands !== null && brands.length === 0 && (
+        <div className="wx-card" style={{ padding: 28, textAlign: 'center' }}>
+          <i className="bi bi-camera-video" style={{ fontSize: 30, color: 'var(--text-muted)', opacity: 0.5 }} />
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginTop: 10 }}>
+            No Euka brand to run
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+            None of your brands are linked to a Euka store yet. Ask your Team Lead or the Boss to
+            link the brand to Euka, then this page will let you generate its video-review files.
+          </div>
+        </div>
+      )}
+
       {/* Setup card */}
+      {brands !== null && brands.length > 0 && (
       <div className="wx-card" style={{ padding: 22 }}>
+        {/* Brand picker — dropdown when the user has more than one Euka brand */}
+        {brands.length > 1 ? (
+          <div style={{ marginBottom: 18 }}>
+            <label className="wx-label">Brand</label>
+            <select className="wx-input" value={brandId}
+              onChange={(e) => { setBrandId(e.target.value); reset(); }}
+              disabled={status === 'running'}>
+              <option value="">— Select a brand —</option>
+              {brands.map((b) => (<option key={b.id} value={b.id}>{b.brand_name}</option>))}
+            </select>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="wx-label" style={{ margin: 0 }}>Brand:</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{brandLabel}</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           {/* Target date */}
           <div>
@@ -148,7 +199,7 @@ export default function VideoReviewsPage() {
             Three CSV files download automatically when ready — one per message group.
           </div>
           <button className="wx-btn wx-btn-primary" onClick={generate}
-            disabled={status === 'running' || !targetDate}
+            disabled={status === 'running' || !targetDate || !brandId}
             style={{ padding: '10px 22px', fontSize: 14, fontWeight: 700 }}>
             <i className="bi bi-download me-2" />
             Generate video review files
@@ -162,6 +213,7 @@ export default function VideoReviewsPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Success summary */}
       {status === 'done' && result && (
@@ -172,7 +224,7 @@ export default function VideoReviewsPage() {
               <i className="bi bi-check-lg" style={{ color: 'var(--success, #1a9e54)', fontSize: '1rem' }} />
             </div>
             <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--text-primary)' }}>
-              Video review files for {prettyDate(result.targetDate)} saved to your Downloads folder
+              {result.brandLabel} video review files for {prettyDate(result.targetDate)} saved to your Downloads folder
             </div>
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginLeft: 40, marginBottom: 16 }}>
@@ -195,7 +247,7 @@ export default function VideoReviewsPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {BRAND_LABEL} - {def.ord} video review creators.csv
+                      {result.brandLabel} - {def.ord} video review creators.csv
                     </div>
                     <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Creators to {def.title}</div>
                   </div>
