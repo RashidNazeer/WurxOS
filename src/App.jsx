@@ -99,6 +99,7 @@ const AgendaUpcomingPage    = lazy(() => import('./pages/agenda/AgendaUpcomingPa
 const AgendaOngoingPage     = lazy(() => import('./pages/agenda/AgendaOngoingPage'));
 const AgendaPriorPage       = lazy(() => import('./pages/agenda/AgendaPriorPage'));
 const EukaAnalyticsPage     = lazy(() => import('./pages/euka/EukaAnalyticsPage'));
+const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -252,6 +253,14 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss']}>
                     <EukaAnalyticsPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/video-reviews"
+                element={
+                  <RoleGuard allow={['boss']}>
+                    <VideoReviewsPage />
                   </RoleGuard>
                 }
               />

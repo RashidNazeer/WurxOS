@@ -1,7 +1,7 @@
 import {
   HomeIcon, UsersIcon, ShieldIcon, StoreIcon, ChecklistIcon, SettingsIcon, BellIcon, ReportIcon,
   MegaphoneIcon, ClockIcon, BookmarkIcon, StarIcon, RefreshIcon, DiagramIcon,
-  BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon,
+  BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon, PlayIcon,
 } from '../common/Icon';
 
 // Each role gets its own menu. Structure mirrors v1 layouts:
@@ -23,6 +23,7 @@ import {
 const TASKS_ITEM        = { label: 'Tasks',         icon: ChecklistIcon, to: '/tasks',         category: 'task' };
 const BRAND_ANALYTICS   = { label: 'Brand analytics', icon: ReportIcon, to: '/analytics/brands' };
 const EUKA_ANALYTICS_ITEM = { label: 'Euka Analytics', icon: StoreIcon,  to: '/euka' };
+const VIDEO_REVIEWS_ITEM  = { label: 'Video Reviews', icon: PlayIcon, to: '/video-reviews' };
 const BRAND_SWITCHES    = { label: 'Brand Switcher',  icon: RefreshIcon,  to: '/brand-switcher', category: 'brand' };
 const AUDIT_LOG         = { label: 'Audit log',       icon: ShieldIcon, to: '/audit' };
 const BRANDS_ITEM       = { label: 'Brands',        icon: StoreIcon,     to: '/brands',        category: 'brand' };
@@ -193,6 +194,7 @@ export const MENUS = {
     BRANDS_ITEM,
     BRAND_ANALYTICS,
     EUKA_ANALYTICS_ITEM,
+    VIDEO_REVIEWS_ITEM,
     BRAND_SWITCHES,
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
