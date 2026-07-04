@@ -194,9 +194,7 @@ export const MENUS = {
     BRANDS_ITEM,
     BRAND_ANALYTICS,
     EUKA_ANALYTICS_ITEM,
-    // VIDEO_REVIEWS_ITEM,  // TEMPORARILY HIDDEN from Boss (per request 2026-07-04).
-    // Everything else (route, page, edge fn) stays intact — un-comment this one
-    // line to show it again.
+    VIDEO_REVIEWS_ITEM,
     BRAND_SWITCHES,
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
