@@ -6,20 +6,15 @@ import UnreadDot from './UnreadDot';
 import { listMyEukaBrands } from '../../lib/videoReviewApi';
 
 export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobileClose }) {
-  // Whether to show the Video Reviews item: Boss always (static in the menu);
-  // OL/TL/APC only if they actually have a brand on Euka. Boss/OL trivially
-  // have Euka brands, so we only need the lookup for TL/APC.
+  // Video Reviews is APC-only, and only when the APC has a brand on Euka.
+  // Everyone else never sees it, so we only run the lookup for APCs.
   const [hasEukaBrand, setHasEukaBrand] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    if (role === 'boss' || role === 'ol') { setHasEukaBrand(true); return undefined; }
-    if (role === 'tl' || role === 'apc') {
-      listMyEukaBrands()
-        .then((list) => { if (!cancelled) setHasEukaBrand(list.length > 0); })
-        .catch(() => { if (!cancelled) setHasEukaBrand(false); });
-    } else {
-      setHasEukaBrand(false);
-    }
+    if (role !== 'apc') { setHasEukaBrand(false); return undefined; }
+    listMyEukaBrands()
+      .then((list) => { if (!cancelled) setHasEukaBrand(list.length > 0); })
+      .catch(() => { if (!cancelled) setHasEukaBrand(false); });
     return () => { cancelled = true; };
   }, [role]);
 

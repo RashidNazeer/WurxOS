@@ -259,7 +259,7 @@ export default function App() {
               <Route
                 path="/video-reviews"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc']}>
+                  <RoleGuard allow={['apc']}>
                     <VideoReviewsPage />
                   </RoleGuard>
                 }

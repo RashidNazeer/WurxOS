@@ -194,7 +194,6 @@ export const MENUS = {
     BRANDS_ITEM,
     BRAND_ANALYTICS,
     EUKA_ANALYTICS_ITEM,
-    VIDEO_REVIEWS_ITEM,
     BRAND_SWITCHES,
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
@@ -355,11 +354,11 @@ export function getMenuForRole(role, opts = {}) {
     const i = out.indexOf(NOTIFS_ITEM);
     out.splice(i >= 0 ? i : out.length, 0, ASSISTANT_ITEM);
   }
-  // Video Reviews is shown to OL / TL / APC ONLY when they actually have a
-  // brand on Euka (Boss has it statically above). The Sidebar computes
-  // hasEukaBrand from the user's Euka-linked brands. The edge function also
-  // enforces per-brand access, so this is UX, not the security boundary.
-  if (opts.hasEukaBrand && (role === 'ol' || role === 'tl' || role === 'apc')) {
+  // Video Reviews is an APC-ONLY feature, and only shown to an APC who
+  // actually has a brand on Euka (the Sidebar computes hasEukaBrand from the
+  // user's Euka-linked brands). Boss / OL / TL do not get it. The edge
+  // function also enforces APC + brand access, so this is UX, not security.
+  if (opts.hasEukaBrand && role === 'apc') {
     const i = out.indexOf(NOTIFS_ITEM);
     out.splice(i >= 0 ? i : out.length, 0, VIDEO_REVIEWS_ITEM);
   }

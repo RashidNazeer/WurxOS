@@ -6,30 +6,21 @@
 // caller's session token (same pattern as the AI assistant's streaming call).
 import { supabase } from './supabase';
 
-// The Euka-linked brands the CURRENT user may run video reviews for:
-//   • Boss / OL → every brand that has a Euka store.
-//   • APC       → only their assigned brands that have a Euka store.
-// Returns [{ id, brand_name, euka_slug }] sorted by name. Empty ⇒ the user
-// has no Euka brand (so the menu item / page should be hidden for them).
+// Video Reviews is an APC-only feature: the Euka-linked brands the current APC
+// is ASSIGNED to. Returns [{ id, brand_name, euka_slug }] sorted by name.
+// Empty ⇒ the APC has no Euka brand (so the menu item / page is hidden).
 export async function listMyEukaBrands() {
   const { data: sess } = await supabase.auth.getSession();
   const uid = sess?.session?.user?.id;
   if (!uid) return [];
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
-  const role = String(profile?.role || '').toLowerCase();
 
   const { data, error } = await supabase
     .from('brands')
-    .select('id, brand_name, euka_slug, euka_store_id, owner_id, assignments:brand_assignments(user_id)')
+    .select('id, brand_name, euka_slug, euka_store_id, assignments:brand_assignments(user_id)')
     .not('euka_store_id', 'is', null)
     .order('brand_name');
   if (error) throw new Error(error.message);
-  let rows = data || [];
-  // Boss/OL see all Euka brands; everyone else only brands they OWN (TL) or
-  // are assigned to (APC).
-  if (role !== 'boss' && role !== 'ol') {
-    rows = rows.filter((b) => b.owner_id === uid || (b.assignments || []).some((a) => a.user_id === uid));
-  }
+  const rows = (data || []).filter((b) => (b.assignments || []).some((a) => a.user_id === uid));
   return rows.map((b) => ({ id: b.id, brand_name: b.brand_name, euka_slug: b.euka_slug }));
 }
 

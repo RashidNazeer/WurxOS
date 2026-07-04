@@ -33,8 +33,9 @@
 //
 // Brand-aware: the caller passes a `brandId`; the fn resolves it to that
 // brand's euka_store_id + euka_slug (mig 229 backfill) and picks the right
-// Euka key from the slug. AuthZ: Boss/OL for any brand; an APC only for a
-// brand they're assigned to. So an APC generates files for THEIR OWN store.
+// Euka key from the slug. AuthZ: APC-ONLY — the caller must be an APC assigned
+// to the brand (Boss / OL / TL do not get this feature). So an APC generates
+// files for THEIR OWN store.
 // Deploy: supabase functions deploy video-review-targets
 // ============================================================
 
@@ -160,9 +161,14 @@ Deno.serve(async (req) => {
     // A missed date must be on/before the target (can't miss a future run).
     missed = missed.filter((d) => d <= target);
 
+    // ── AuthZ: Video Reviews is an APC-ONLY feature ──────────────────
+    // Boss / OL / TL do not get it. The caller must be an APC assigned to the
+    // brand, so an APC only ever runs their OWN store.
+    if (role !== 'apc') return json({ error: 'forbidden — Video Reviews is for APCs' }, 403);
+
     // ── Resolve the brand → Euka store + slug + key ──────────────────
     const { data: brand } = await admin
-      .from('brands').select('id, brand_name, owner_id, euka_store_id, euka_slug').eq('id', brandId).maybeSingle();
+      .from('brands').select('id, brand_name, euka_store_id, euka_slug').eq('id', brandId).maybeSingle();
     if (!brand) return json({ error: 'brand not found' }, 404);
     if (!brand.euka_store_id || !brand.euka_slug) {
       return json({ error: `"${brand.brand_name}" is not linked to a Euka store.` }, 400);
@@ -171,15 +177,9 @@ Deno.serve(async (req) => {
     const key = eukaKeyForSlug(String(brand.euka_slug));
     if (!key) return json({ error: `Euka key not configured for "${brand.brand_name}".` }, 500);
 
-    // ── AuthZ: Boss/OL → any brand; otherwise the brand's owner (TL) or an
-    //    assigned APC. So a user only ever runs their OWN store. ──────────
-    let allowed = role === 'boss' || role === 'ol' || brand.owner_id === uid;
-    if (!allowed) {
-      const { data: assign } = await admin
-        .from('brand_assignments').select('brand_id').eq('brand_id', brandId).eq('user_id', uid).maybeSingle();
-      allowed = !!assign;
-    }
-    if (!allowed) return json({ error: 'forbidden — this brand is not yours' }, 403);
+    const { data: assign } = await admin
+      .from('brand_assignments').select('brand_id').eq('brand_id', brandId).eq('user_id', uid).maybeSingle();
+    if (!assign) return json({ error: 'forbidden — this brand is not assigned to you' }, 403);
 
     // ── Window ───────────────────────────────────────────────────────
     const earliestProcessing = [target, ...missed].sort(cmp)[0];
