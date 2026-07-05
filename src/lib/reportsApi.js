@@ -1533,10 +1533,13 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   // visibility (e.g. Abdul Subhan).
   const canViewAll = ['boss','ol','developer'].includes(role)
     || permissions?.canViewAllBrands === true;
+  // euka_slug + euka_store_id let the reporting form know whether a brand is on
+  // Euka (→ show "Auto Generate from Euka"). They flow through BrandsContext's
+  // ...row spread onto selectedBrand automatically.
   if (canViewAll) {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id, client_name')
+      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id')
       .eq('status', 'active')
       .order('brand_name');
     if (error) throw new Error(error.message);
@@ -1545,7 +1548,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   if (role === 'tl') {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id, client_name')
+      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id')
       .eq('status', 'active')
       .eq('owner_id', uid)
       .order('brand_name');
@@ -1555,7 +1558,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   // APC/IPC — use brand_assignments
   const { data, error } = await supabase
     .from('brand_assignments')
-    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name)')
+    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name, euka_slug, euka_store_id)')
     .eq('user_id', uid);
   if (error) throw new Error(error.message);
   return (data || [])

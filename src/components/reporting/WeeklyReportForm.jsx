@@ -17,6 +17,7 @@ import {
   generateAllInsights,
 } from '../../utils/aiInsights';
 import { findPreviousReport } from '../../lib/reportsApi';
+import { runEukaReportAutofill, mergeAutofill } from '../../lib/eukaReportAutofillApi';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
@@ -313,6 +314,15 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const [importing, setImporting] = useState(false);
   const [importToast, setImportToast] = useState(null);
   const pdfInputRef = React.useRef(null);
+
+  // ── Auto Generate from Euka ──────────────────────────────────────
+  // eukaModal: 'period' (pick the 7-day stats window) | 'running' (non-
+  // dismissable progress) | 'done' (success summary) | 'error' (copyable).
+  const [eukaModal, setEukaModal]   = useState(null);
+  const [eukaStart, setEukaStart]   = useState('');   // stats window start (YYYY-MM-DD)
+  const [eukaEnd, setEukaEnd]       = useState('');   // stats window end (start+6)
+  const [eukaResult, setEukaResult] = useState(null); // { meta, period }
+  const [eukaError, setEukaError]   = useState(null); // { message, copyText }
 
   // Step: 0=brand, 1=first-time week pick, 2=form
   const [step, setStep] = useState(editReportId ? 2 : 0);
@@ -787,6 +797,58 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     }
   };
 
+  // ── Auto Generate from Euka ──────────────────────────────────────
+  const brandHasEuka = !!selectedBrand?.euka_store_id;
+
+  const addDaysStr = (d, n) => {
+    const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  // Open the period picker, defaulting the stats window to the report's week.
+  const openEukaAutofill = () => {
+    const s = selectedWeek?.startDate || '';
+    setEukaStart(s);
+    setEukaEnd(s ? addDaysStr(s, 6) : (selectedWeek?.endDate || ''));
+    setEukaError(null);
+    setEukaModal('period');
+  };
+  // Keep the window a 7-day span: end auto-follows the start.
+  const onEukaStartChange = (v) => { setEukaStart(v); if (v) setEukaEnd(addDaysStr(v, 6)); };
+
+  const runEukaAutofill = async () => {
+    if (!brandHasEuka || !eukaStart || !eukaEnd) return;
+    setEukaModal('running');
+    setEukaError(null);
+    try {
+      const res = await runEukaReportAutofill({
+        brandId: selectedBrand.id, startDate: eukaStart, endDate: eukaEnd,
+      });
+      setData((d) => mergeAutofill(d, res.data));
+      setDirty(true);
+      setEukaResult({ meta: res.meta, period: res.period });
+      setEukaModal('done');
+    } catch (err) {
+      // Build a copy-for-Discord block: human message + machine detail.
+      const stamp = new Date().toISOString();
+      const copyText = [
+        'WurxOS · Auto Generate from Euka — error',
+        `Brand: ${brandLabel} (${selectedBrand?.id})`,
+        `Report week: ${selectedWeek?.label || '—'}`,
+        `Stats period: ${eukaStart} → ${eukaEnd}`,
+        `When: ${stamp}`,
+        `Message: ${err?.message || 'unknown'}`,
+        `Detail: ${JSON.stringify(err?.detail ?? null)}`,
+      ].join('\n');
+      setEukaError({ message: err?.message || 'Auto-fill failed.', copyText });
+      setEukaModal('error');
+    }
+  };
+
+  const copyEukaError = () => {
+    if (!eukaError?.copyText) return;
+    try { navigator.clipboard?.writeText(eukaError.copyText); } catch { /* ignore */ }
+  };
+
   const handleGenerateAll = async () => {
     setAiLoading({ all: true });
     try {
@@ -1084,6 +1146,121 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     // collide with it when a text section scrolls up (header z-index 4 > 3).
     <div onInput={() => setDirty(true)} style={rteTopStyle}>
       {guardModal}
+
+      {/* ─── Auto Generate from Euka — modals ──────────────────────────── */}
+      {eukaModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15,18,24,0.55)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          {/* Period picker */}
+          {eukaModal === 'period' && (
+            <div className="wx-card" style={{ padding: 24, width: 460, maxWidth: '92vw' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <i className="bi bi-lightning-charge-fill" style={{ color: '#0f6e6a' }} />
+                <h5 className="fw-bold mb-0" style={{ fontSize: 17 }}>Auto Generate from Euka</h5>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Fetch the exact stats Euka provides for <strong>{brandLabel}</strong> and fill this report. Everything Euka can't verify stays blank for you to enter.
+              </div>
+
+              <label className="wx-label">Stats period (7 days)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="date" className="wx-input" value={eukaStart}
+                  onChange={(e) => onEukaStartChange(e.target.value)} style={{ maxWidth: 190 }} />
+                <span style={{ color: 'var(--text-muted)' }}>→</span>
+                <span className="mono" style={{ fontSize: 13.5, fontWeight: 600 }}>{eukaEnd || '—'}</span>
+              </div>
+
+              {/* Warning shown only when the stats window differs from the report's week */}
+              {(eukaStart !== selectedWeek?.startDate || eukaEnd !== selectedWeek?.endDate) && (
+                <div className="alert d-flex align-items-start gap-2 mt-3 mb-0 py-2"
+                  style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+                  <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
+                  <div style={{ fontSize: 12 }}>
+                    You're pulling stats for a <strong>different</strong> period than this report's week
+                    (<strong>{selectedWeek?.label}</strong>). The numbers will be for the selected days, but
+                    the report stays dated to its own week — only the stats change.
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }}
+                  onClick={() => setEukaModal(null)}>Cancel</button>
+                <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+                  style={{ background: '#0f6e6a', color: 'white', border: 'none', borderRadius: 10 }}
+                  onClick={runEukaAutofill} disabled={!eukaStart || !eukaEnd}>
+                  <i className="bi bi-lightning-charge-fill" /> Fetch &amp; auto-fill
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Running — non-dismissable */}
+          {eukaModal === 'running' && (
+            <div className="wx-card" style={{ padding: 30, width: 380, maxWidth: '90vw', textAlign: 'center' }}>
+              <div className="spinner-border" style={{ color: '#0f6e6a', width: 34, height: 34, marginBottom: 14 }} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+                Fetching stats from Euka…
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                Pulling overall performance, top creators, and product stats. This can take up to a minute — please keep this open.
+              </div>
+            </div>
+          )}
+
+          {/* Done */}
+          {eukaModal === 'done' && eukaResult && (
+            <div className="wx-card" style={{ padding: 24, width: 440, maxWidth: '92vw' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--success-soft)' }}>
+                  <i className="bi bi-check-lg" style={{ color: 'var(--success)' }} />
+                </div>
+                <h5 className="fw-bold mb-0" style={{ fontSize: 16 }}>Auto-filled from Euka</h5>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 14 }}>
+                Filled the exact-match stats for <strong>{eukaResult.period?.startDate} → {eukaResult.period?.endDate}</strong>:
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  <li>Overall: GMV, Affiliate GMV, Orders</li>
+                  <li>{eukaResult.meta?.creatorCount || 0} top creators (handle, videos, GMV)</li>
+                  <li>{eukaResult.meta?.productCount || 0} products (name, ID, units, GMV)</li>
+                </ul>
+                <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+                  Please <strong>verify these</strong> and fill in the remaining fields (ROI, SPS, samples, videos posted, offsite, GMV Max, per-creator units) manually.
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-sm" style={{ background: '#0f6e6a', color: 'white', border: 'none', borderRadius: 10 }}
+                  onClick={() => setEukaModal(null)}>Got it</button>
+              </div>
+            </div>
+          )}
+
+          {/* Error — copyable for Discord */}
+          {eukaModal === 'error' && eukaError && (
+            <div className="wx-card" style={{ padding: 24, width: 480, maxWidth: '92vw' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--danger-soft)' }}>
+                  <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--danger)' }} />
+                </div>
+                <h5 className="fw-bold mb-0" style={{ fontSize: 16 }}>Couldn't auto-fill from Euka</h5>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{eukaError.message}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                If it keeps failing, copy this and send it to the developer on Discord:
+              </div>
+              <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 10, fontSize: 10.5, maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>{eukaError.copyText}</pre>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 16 }}>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 10 }}
+                  onClick={copyEukaError}><i className="bi bi-clipboard" /> Copy for Discord</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setEukaModal(null)}>Close</button>
+                  <button className="btn btn-sm" style={{ background: '#0f6e6a', color: 'white', border: 'none', borderRadius: 10 }} onClick={openEukaAutofill}>Try again</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {onCancel && (
         <button className="btn btn-sm btn-link text-muted p-0 mb-2" onClick={() => guardAction(onCancel)}>
           <i className="bi bi-arrow-left me-1" /> {editReportId ? 'Cancel editing' : 'Back to reports'}
@@ -1121,6 +1298,14 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             {importing ? <><span className="spinner-border spinner-border-sm" /> Reading PDF…</>
               : <><i className="bi bi-file-earmark-pdf-fill" /> Import from PDF</>}
           </button>
+          {brandHasEuka && (
+            <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+              style={{ background: 'var(--surface-1)', color: '#0f6e6a', border: '1px solid color-mix(in srgb, #0f6e6a 40%, transparent)', borderRadius: 10, fontSize: '0.78rem' }}
+              onClick={openEukaAutofill} disabled={saving}
+              title="Fetch this week's exact stats from Euka and auto-fill the form">
+              <i className="bi bi-lightning-charge-fill" /> Auto Generate from Euka
+            </button>
+          )}
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 10, fontSize: '0.78rem', border: 'none' }}
             onClick={handleGenerateAll} disabled={!!aiLoading.all} title="AI generates insights for all 6 sections">
