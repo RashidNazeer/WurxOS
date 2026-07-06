@@ -45,6 +45,21 @@ are deleted. The `euka_shop_metrics` table (mig 183) is LEFT IN PLACE (historica
 snapshots, no data dropped) but is no longer written/read. `EUKA_TOKEN` (the old
 MCP bearer) is now unused.
 
-**Phase-2 ideas:** auto-fill weekly-report fields (top creators/products, GMV)
-from the REST endpoints; CSV export passthrough (currently JSON download only);
-surface `performance-series` outreach analytics + `dailyAdCost`.
+**API is READ-ONLY — confirmed against the live spec (2026-06).** Pulled the
+full OpenAPI doc (`https://api.euka.ai/openapi.json`, OpenAPI 3.1.1, title "Euka
+API"): exactly **20 paths, all reads** — `GET /ping /me /brands /stores
+/data-export` + 15 `POST /dashboard/*` analytics queries. **No PUT/PATCH/DELETE,
+no POST outside /dashboard/**, and NO endpoints to manage/start/stop agents,
+outreach, messaging, campaigns, samples, or automations. (campaign-breakdown /
+creator-outreach-funnel / sample-approval-rate are analytics, not controls.)
+So Euka's automation/"agent" features (auto outreach, sampling, follow-up
+sequences, reactivation, AI copilot — all real in their SaaS UI) are NOT
+controllable via the public API. `GET /me` returns only brand scope
+(`brandAccessMode` + `brandIds`), no read/write scope concept — the key can't
+do writes because the API has none. To ever drive agents from WurxOS we'd need
+Euka to ship write endpoints (ask their support/roadmap); otherwise the only
+"control" path is UI-level (deep-link/embed) or webhooks if they add event push.
+
+**Phase-2 ideas (all READ):** auto-fill weekly-report fields (top creators/
+products, GMV) from the REST endpoints; CSV export passthrough (currently JSON
+download only); surface `performance-series` outreach analytics + `dailyAdCost`.

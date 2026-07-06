@@ -18,6 +18,7 @@ import {
 } from '../../utils/aiInsights';
 import { findPreviousReport } from '../../lib/reportsApi';
 import { runEukaReportAutofill, mergeAutofill } from '../../lib/eukaReportAutofillApi';
+import { productUnitsLabel } from '../../lib/reportUnitsLabel';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { parsePdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
@@ -592,6 +593,12 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // approved report (since the doc ID is `${brandId}_${weekStart}`).
   // pendingPrior remains APC-only as a workflow guard, not a data guard.
   const isApc = userRole === 'apc';
+  // Product figure was "units/items sold" on older reports, "orders" going
+  // forward. Label by when THIS report was authored (new report → 'Orders').
+  const productUnitsLbl = useMemo(() => {
+    const edited = editReportId ? existingReports.find(r => r.id === editReportId) : null;
+    return productUnitsLabel(edited?.createdAt);
+  }, [editReportId, existingReports]);
   const duplicateForThisWeek = useMemo(() => {
     if (!existingReports.length || !selectedWeek) return null;
     return existingReports.find(r =>
@@ -1219,9 +1226,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 14 }}>
                 Filled the exact-match stats for <strong>{eukaResult.period?.startDate} → {eukaResult.period?.endDate}</strong>:
                 <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                  <li>Overall: GMV, Affiliate GMV, Orders</li>
-                  <li>{eukaResult.meta?.creatorCount || 0} top creators (handle, videos, GMV)</li>
-                  <li>{eukaResult.meta?.productCount || 0} products (name, ID, units, GMV)</li>
+                  <li>Overall: GMV, Affiliate GMV, Orders{eukaResult.meta?.mtdGmv != null ? ', GMV Month-to-Date' : ''}</li>
+                  <li>Top {eukaResult.meta?.creatorCount || 0} creators (handle, videos, GMV)</li>
+                  <li>Top {eukaResult.meta?.productCount || 0} products (name, ID, orders, GMV)</li>
                 </ul>
                 <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>
                   Please <strong>verify these</strong> and fill in the remaining fields (ROI, SPS, samples, videos posted, offsite, GMV Max, per-creator units) manually.
@@ -1581,7 +1588,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             fields={[
               { key: 'productId', label: 'Product ID', width: '140px' },
               { key: 'productName', label: 'Product Name', width: '160px' },
-              { key: 'unitsSold', label: 'Units Sold', type: 'number', width: '90px' },
+              { key: 'unitsSold', label: productUnitsLbl, type: 'number', width: '90px' },
               { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
               { key: 'newVideos', label: 'Videos (wk)', type: 'number', width: '90px' },
               { key: 'videosMtd', label: 'Videos MTD', type: 'number', width: '90px' },

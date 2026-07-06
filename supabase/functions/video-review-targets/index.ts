@@ -50,7 +50,10 @@ const EUKA_BASE = 'https://api.euka.ai/v0';
 // key (and is scoped by store_id, which the shared key can see across stores).
 function eukaKeyForSlug(slug: string): string {
   if (slug === 'solidgold') return Deno.env.get('EUKA_API_KEY') || '';
-  if (slug === 'innosupps') return Deno.env.get('EUKA_API_KEY_INNOSUPPS') || '';
+  // Dedicated-key brands by convention: EUKA_API_KEY_<SLUG> (e.g. INNOSUPPS,
+  // BENTGO). A new own-key brand needs only the secret + a euka_stores row.
+  const own = Deno.env.get(`EUKA_API_KEY_${slug.toUpperCase()}`);
+  if (own) return own;
   return Deno.env.get('EUKA_SHARED_API_KEY') || '';
 }
 

@@ -14,6 +14,7 @@ import {
   Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType,
   ShadingType,
 } from 'docx';
+import { productUnitsLabel } from '../lib/reportUnitsLabel';
 
 // --- helpers -----------------------------------------------------------
 
@@ -326,7 +327,7 @@ function buildProductHighlightsTable(report, sym) {
   const header = new TableRow({
     children: [
       cell({ text: 'Product ID + Name (Focus products)', bold: true, header: true }),
-      cell({ text: 'Units Sold', bold: true, header: true, align: AlignmentType.CENTER }),
+      cell({ text: productUnitsLabel(report.createdAt), bold: true, header: true, align: AlignmentType.CENTER }),
       cell({ text: 'GMV', bold: true, header: true, align: AlignmentType.CENTER }),
       cell({ text: 'New Videos', bold: true, header: true, align: AlignmentType.CENTER }),
       cell({ text: 'Notes', bold: true, header: true }),

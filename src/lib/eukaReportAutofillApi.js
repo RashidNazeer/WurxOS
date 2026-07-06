@@ -76,6 +76,10 @@ export function mergeAutofill(current, partial) {
   if (partial.overallPerformance) {
     next.overallPerformance = { ...current.overallPerformance, ...partial.overallPerformance };
   }
+  // MTD GMV lives in overallNotes — deep-merge so manual MTD fields survive.
+  if (partial.overallNotes) {
+    next.overallNotes = { ...current.overallNotes, ...partial.overallNotes };
+  }
   // Arrays: only replace when the autofill supplied rows (else keep manual).
   if (partial.topCreators && partial.topCreators.length) next.topCreators = partial.topCreators;
   else next.topCreators = current.topCreators;

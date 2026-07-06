@@ -11,11 +11,13 @@
 // Exact-match fields filled (everything else left ''):
 //   overallPerformance: gmv (totalShopGMV), affiliateGmv (totalAffiliateGMV),
 //                       orders (totalOrders)
-//   topCreators[]:      name (@handle), videosPosted (videoCount),
-//                       gmv (totalGmv)   [itemsSold left blank]
-//   productHighlights[]: productId, productName (title),
-//                       unitsSold (per-product totalOrders — the report uses
-//                       orders as "units"), gmv (per-product totalAffiliateGMV)
+//   overallNotes:       gmv (Month-to-Date totalShopGMV — 1st of the week's
+//                       end-month through endDate)
+//   topCreators[]:      TOP 3 by GMV — name (@handle), videosPosted (videoCount,
+//                       0 when Euka reports none), gmv (totalGmv) [itemsSold blank]
+//   productHighlights[]: TOP 5 by affiliate GMV — productId, productName (title),
+//                       unitsSold (per-product totalOrders — the report's
+//                       "Orders" column), gmv (per-product totalAffiliateGMV)
 //   overallInsights:    a short auto-generated summary
 //
 // AuthZ: OL/Boss any brand; TL the brand they own; APC/IPC a brand assigned to
@@ -36,7 +38,11 @@ const EUKA_BASE = 'https://api.euka.ai/v0';
 // Euka key routing by brand slug (mirrors euka-api / video-review-targets).
 function eukaKeyForSlug(slug: string): string {
   if (slug === 'solidgold') return Deno.env.get('EUKA_API_KEY') || '';
-  if (slug === 'innosupps') return Deno.env.get('EUKA_API_KEY_INNOSUPPS') || '';
+  // Dedicated-key brands by convention: EUKA_API_KEY_<SLUG> (e.g. INNOSUPPS,
+  // BENTGO). Mirrors euka-api's discovery, so a new own-key brand needs only the
+  // secret + a euka_stores row — no edit here. Falls back to the shared account.
+  const own = Deno.env.get(`EUKA_API_KEY_${slug.toUpperCase()}`);
+  if (own) return own;
   return Deno.env.get('EUKA_SHARED_API_KEY') || '';
 }
 
@@ -153,7 +159,7 @@ Deno.serve(async (req) => {
     try {
       [overview, creatorsResp, prodResp] = await Promise.all([
         eukaPost('/dashboard/performance-overview', { storeId, startDate, endDate }, key),
-        eukaPost('/dashboard/top-creators-by-gmv', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 10 }, key).catch(() => null),
+        eukaPost('/dashboard/top-creators-by-gmv', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 5 }, key).catch(() => null),
         eukaPost('/dashboard/top-products-by-video-revenue', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 10 }, key).catch(() => null),
       ]);
     } catch (e) {
@@ -163,14 +169,32 @@ Deno.serve(async (req) => {
       return errOut('euka-empty', 'Euka returned no performance numbers for this period. Pick a week whose data has settled and try again.', 502, { overview });
     }
 
-    // Top creators — exact fields only (units sold left blank).
-    const topCreators = (creatorsResp?.affiliates || []).map((c: any) => ({
-      name: c.handle ? `@${c.handle}` : '',
-      videosPosted: num(c.videoCount),
-      itemsSold: '',
-      gmv: money(c.totalGmv),
-      notes: '',
-    })).filter((c: any) => c.name);
+    // ── Month-to-Date GMV ─────────────────────────────────────────────
+    // The MTD month is decided by the WEEK'S END DATE: a week ending
+    // 2026-07-04 is July MTD (2026-07-01..04), even though it began in June.
+    // If the week already starts on the 1st, the weekly overview IS the MTD.
+    const mtdStart = endDate.slice(0, 7) + '-01';
+    let mtdOverview: any = overview;
+    if (mtdStart !== startDate) {
+      mtdOverview = await eukaPost('/dashboard/performance-overview', { storeId, startDate: mtdStart, endDate }, key).catch(() => null);
+    }
+    const mtdGmv = money(mtdOverview?.totalShopGMV);
+
+    // Top creators — TOP 3 by GMV; exact fields only (units sold left blank).
+    // videosPosted falls back to 0 (not blank) so "no videos" reads explicitly.
+    const topCreators = (creatorsResp?.affiliates || [])
+      .map((c: any) => {
+        const v = num(c.videoCount);
+        return {
+          name: c.handle ? `@${c.handle}` : '',
+          videosPosted: v === '' ? 0 : v,
+          itemsSold: '',
+          gmv: money(c.totalGmv),
+          notes: '',
+        };
+      })
+      .filter((c: any) => c.name)
+      .slice(0, 3);
 
     // Per-product AFFILIATE GMV + orders (the report's product columns).
     const baseProducts = prodResp?.products || [];
@@ -184,7 +208,7 @@ Deno.serve(async (req) => {
       productHighlights = withGmv
         .filter((p: any) => Number(p.affiliateGmv) > 0)
         .sort((a: any, b: any) => Number(b.affiliateGmv) - Number(a.affiliateGmv))
-        .slice(0, 8)
+        .slice(0, 5)
         .map((p: any) => ({
           productId: p.productId || '',
           productName: p.title || '',
@@ -201,6 +225,8 @@ Deno.serve(async (req) => {
         orders: num(overview.totalOrders),
         samplesApproved: '', roi: '', shopPerformanceScore: '', videosPosted: '',
       },
+      // Only the MTD GMV key — deep-merged so any manual MTD fields are kept.
+      ...(mtdGmv !== '' ? { overallNotes: { gmv: mtdGmv } } : {}),
       overallInsights: insightsHtml(overview, topCreators),
       topCreators: topCreators.length ? topCreators : undefined,
       productHighlights: productHighlights.length ? productHighlights : undefined,
@@ -212,6 +238,8 @@ Deno.serve(async (req) => {
       data,
       meta: {
         filledOverall: true,
+        mtdGmv: mtdGmv !== '' ? mtdGmv : null,
+        mtdPeriod: { startDate: mtdStart, endDate },
         creatorCount: topCreators.length,
         productCount: productHighlights.length,
       },
