@@ -138,7 +138,7 @@ export function requestAppReload(reason) {
     if (reason) sessionStorage.setItem('wx-reload-reason', String(reason));
   } catch { /* sessionStorage unavailable */ }
 
-  window.location.reload();
+  forceFreshReload();
   return true;
 }
 
@@ -147,9 +147,27 @@ export function clearReloadGuard() {
   try { sessionStorage.removeItem('chunk-reload-pending'); } catch { /* noop */ }
 }
 
-/** User clicked "Reload" in the banner — intentional, always allowed. */
-export function reloadNow() {
+/**
+ * Clear the service-worker / cache-storage caches, THEN reload. A plain reload
+ * can be handed a STALE index.html or chunk by the service worker (public/sw.js
+ * caches the app shell + hashed assets) — which is exactly why the "new version"
+ * prompt could survive a reload: the tab kept booting the old build and its
+ * now-deleted chunks 404'd again. Wiping CacheStorage first guarantees the next
+ * load pulls fresh assets from the network, breaking the loop.
+ */
+export async function forceFreshReload() {
+  try {
+    if (typeof caches !== 'undefined' && caches.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch { /* Cache API blocked/unavailable — reload anyway */ }
   if (typeof window !== 'undefined') window.location.reload();
+}
+
+/** User clicked "Reload" — intentional, always allowed. Reloads fresh. */
+export function reloadNow() {
+  forceFreshReload();
 }
 
 // ── Proactive new-deploy detection ──────────────────────────────

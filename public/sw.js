@@ -14,7 +14,7 @@
  */
 
 const SNOOZE_MINUTES = 10;
-const CACHE_VERSION  = 'wurxos-v2-branding';
+const CACHE_VERSION  = 'wurxos-v3-cachefix';
 const SHELL_CACHE    = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE    = `${CACHE_VERSION}-assets`;
 const SHELL_URLS     = ['/', '/Logo.png', '/favicon.ico', '/logo.svg', '/manifest.webmanifest'];

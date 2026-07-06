@@ -1,41 +1,52 @@
 import { reloadNow } from '../../lib/appUpdate';
 
-// Shown in place of a route whose code chunk could not be loaded
-// after a redeploy, when the app chose NOT to auto-reload because
-// the user may have unsaved work elsewhere. Non-destructive: the
-// user reloads on their own terms once their work is safe.
+// Small, NON-blocking inline notice shown inside a route whose code chunk
+// couldn't load after a redeploy. It deliberately does NOT take over the
+// screen — the sidebar and other pages stay usable, and the persistent
+// "new version" banner at the bottom is the primary Reload prompt. The user
+// refreshes on their own terms, once any unsaved work is safe.
 export default function ChunkReloadNotice() {
   return (
-    <div style={{
-      margin: '48px auto', maxWidth: 440, padding: 24,
-      background: 'var(--surface-1)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 16, textAlign: 'center',
-      boxShadow: 'var(--shadow-lg, 0 10px 40px rgba(0,0,0,0.18))',
-    }}>
-      <div style={{
-        width: 48, height: 48, margin: '0 auto 12px',
-        borderRadius: '50%',
-        background: 'var(--info-soft, #e0f2fe)', color: 'var(--info, #0284c7)',
-        display: 'grid', placeItems: 'center', fontSize: 22,
-      }}>
-        <i className="bi bi-arrow-clockwise" />
-      </div>
-      <h2 style={{ margin: '0 0 6px', fontSize: 17, color: 'var(--text-primary)' }}>
-        A new version is available
-      </h2>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: '0 0 18px', lineHeight: 1.55 }}>
-        This page needs a quick refresh to load the latest version of
-        WurxOS. If you have unsaved changes on another tab or page,
-        save them first — then reload.
-      </p>
+    <div
+      role="status"
+      style={{
+        margin: '16px 0',
+        padding: '10px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+        background: 'var(--surface-2, #f9fafb)',
+        border: '1px solid var(--border-subtle, #e5e7eb)',
+        borderRadius: 10,
+        fontSize: 13,
+        color: 'var(--text-secondary)',
+      }}
+    >
+      <i className="bi bi-arrow-clockwise" style={{ color: 'var(--accent)', fontSize: 15 }} />
+      <span style={{ flex: 1, minWidth: 200 }}>
+        A new version is available, so this page needs a quick refresh. You can
+        keep using the rest of the site — reload when your work is saved.
+      </span>
       <button
         type="button"
         onClick={reloadNow}
-        className="wx-btn wx-btn-primary"
-        style={{ width: '100%', justifyContent: 'center' }}
+        style={{
+          flex: '0 0 auto',
+          background: 'var(--accent)',
+          color: 'var(--on-accent)',
+          border: 'none',
+          borderRadius: 8,
+          padding: '6px 12px',
+          fontSize: 12.5,
+          fontWeight: 700,
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
       >
-        <i className="bi bi-arrow-clockwise me-1" /> Reload now
+        <i className="bi bi-arrow-clockwise" /> Reload
       </button>
     </div>
   );
