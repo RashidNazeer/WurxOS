@@ -11,6 +11,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import { num, pctChange, resolveWeeklySectionsEnabled } from '../../utils/reportingService';
+import { productUnitsLabel } from '../../lib/reportUnitsLabel';
 import { formatPctChange } from '../../utils/formatPctChange';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichContent, { isHtml } from '../common/RichContent';
@@ -126,17 +127,22 @@ function posterGradient(seed) {
 }
 
 /* ─── Pieces ──────────────────────────────────────────────────────────── */
-function DeltaPill({ pct, size = 'sm' }) {
+function DeltaPill({ pct, size = 'sm', goodDirection = 'up' }) {
   if (pct === null || pct === undefined || !isFinite(pct)) return null;
   const up = pct >= 0;
+  // Which direction counts as "good" (green): 'up' = higher is better (GMV,
+  // orders…), 'down' = lower is better (CPO), 'neutral' = no value judgement
+  // (spend) → muted. Default 'up' keeps every existing caller unchanged.
+  const good = goodDirection === 'neutral' ? null : goodDirection === 'down' ? !up : up;
   const fontSize = size === 'sm' ? '0.66rem' : '0.74rem';
+  const color = good === null ? C.muted : good ? C.green : C.red;
+  const background = good === null ? C.surfaceAlt : good ? C.greenSoft : C.redSoft;
   return (
     <span
       className="d-inline-flex align-items-center gap-1"
       style={{
         fontSize, fontWeight: 600,
-        color: up ? C.green : C.red,
-        background: up ? C.greenSoft : C.redSoft,
+        color, background,
         padding: '2px 8px', borderRadius: 999, lineHeight: 1.2,
       }}>
       {up ? '▲' : '▼'} {formatPctChange(pct, { withSign: false })}
@@ -225,52 +231,86 @@ function SectionHead({ title, eyebrow, action }) {
   );
 }
 
+// Sum a set of GMV Max rows into one overall, deriving ROI/CPO from the sums
+// (identical math to the Overall card below) so a compared total is consistent
+// with what the block already renders.
+function gmvMaxTotals(rows) {
+  const t = (rows || []).filter(g => g && g.campaign).reduce(
+    (a, g) => ({ spend: a.spend + num(g.spend), gmv: a.gmv + num(g.gmv), orders: a.orders + num(g.orders) }),
+    { spend: 0, gmv: 0, orders: 0 });
+  return { ...t, roi: t.spend > 0 ? t.gmv / t.spend : 0, cpo: t.orders > 0 ? t.spend / t.orders : 0 };
+}
+
 // One GMV Max block — campaign rows + an auto-calculated overall. Shared by
 // the Weekly and Month-to-Date sections so they render identically side by
-// side. `overallSoft` tints the overall card (accent for MTD, neutral for
-// weekly's own overall). Self-contained: derives its money formatters from
-// `currency`.
-function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEfficiency = true, overallLabel = 'Overall' }) {
+// side. Self-contained: derives its money formatters from `currency`. When
+// `compareRows` (the previous report's rows) is passed, each metric also shows
+// a small inline "vs last week" delta; the Weekly caller passes it, MTD doesn't.
+function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEfficiency = true, overallLabel = 'Overall', compareRows = null, prevLabel }) {
   const list = (rows || []).filter(g => g.campaign);
   if (list.length < 1) return null;
+  // Previous report's GMV Max rows, keyed by normalized campaign name, for the
+  // inline deltas. Only rows with real data count — an all-empty prior row
+  // shouldn't make every current campaign look "changed" or "new".
+  const prevRows = (compareRows || []).filter(g => g && g.campaign && (num(g.spend) || num(g.gmv) || num(g.orders)));
+  const showCompare = prevRows.length > 0;
+  const prevByName = new Map(prevRows.map(g => [normName(g.campaign), g]));
   const ms = (v) => fmt$short(v, currency);
   const m  = (v) => fmt$(v, currency);
-  const t = list.reduce((a, g) => ({ spend: a.spend + num(g.spend), gmv: a.gmv + num(g.gmv), orders: a.orders + num(g.orders) }), { spend: 0, gmv: 0, orders: 0 });
-  const roi = t.spend > 0 ? t.gmv / t.spend : 0;
-  const cpo = t.orders > 0 ? t.spend / t.orders : 0;
-  const cellsOf = (g) => [
-    { label: 'Spend', value: ms(g.spend) },
-    { label: 'GMV', value: ms(g.gmv) },
-    { label: 'ROI', value: num(g.roi).toFixed(2) + '×', accent: num(g.roi) >= 1 ? C.green : C.red },
-    { label: 'Orders', value: fmtN(g.orders) },
-    { label: 'CPO', value: m(g.cpo) },
+  const t = gmvMaxTotals(list);
+  // Per-metric config drives both the value and its inline delta. Spend is
+  // neutral (no value judgement), CPO is lower-is-better, the rest higher.
+  const metrics = [
+    { key: 'spend',  label: 'Spend',  fmt: ms,   good: 'neutral' },
+    { key: 'gmv',    label: 'GMV',    fmt: ms,   good: 'up' },
+    { key: 'roi',    label: 'ROI',    fmt: (v) => num(v).toFixed(2) + '×', good: 'up', roi: true },
+    { key: 'orders', label: 'Orders', fmt: fmtN, good: 'up' },
+    { key: 'cpo',    label: 'CPO',    fmt: m,     good: 'down' },
   ];
-  const overallCells = [
-    { label: 'Spend', value: ms(t.spend) },
-    { label: 'GMV', value: ms(t.gmv) },
-    { label: 'ROI', value: roi.toFixed(2) + '×', accent: roi >= 1 ? C.green : C.red },
-    { label: 'Orders', value: fmtN(t.orders) },
-    { label: 'CPO', value: m(cpo) },
-  ];
+  // One row of value cells, each with a small "vs last week" delta beneath.
+  // `prev` null → no deltas (first report, or a campaign new this week).
+  // `overall` switches to the tinted overall styling.
+  const metricCells = (cur, prev, overall) => (
+    <div className="row g-2">
+      {metrics.map((mt) => {
+        const accent = mt.roi ? (num(cur[mt.key]) >= 1 ? C.green : C.red) : null;
+        return (
+          <div className="col-4 col-md" key={mt.label}>
+            <div style={{
+              background: overall ? 'var(--accent-soft)' : C.surfaceAlt,
+              border: overall ? '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' : 'none',
+              borderRadius: 8, padding: '10px 12px', textAlign: 'center', height: '100%',
+            }}>
+              <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{mt.label}</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: overall ? 800 : 700, color: accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{mt.fmt(cur[mt.key])}</div>
+              {prev && (
+                <div className="mt-2 d-flex flex-column align-items-center" style={{ gap: 2 }}>
+                  <DeltaPill pct={pctChange(cur[mt.key], prev[mt.key])} goodDirection={mt.good} />
+                  <span style={{ fontSize: '0.55rem', color: C.muted }}>vs {mt.fmt(prev[mt.key])}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px', height: '100%' }}>
       <SectionHead title={title} eyebrow={eyebrow} />
       {list.map((g, i) => {
         const spend = num(g.spend), gmv = num(g.gmv);
         const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
+        const prev = showCompare ? prevByName.get(normName(g.campaign)) : null;
         return (
           <div key={i} className={i > 0 ? 'mt-3 pt-3' : ''} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : 'none' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: C.ink, marginBottom: 8 }}>{g.campaign}</div>
-            <div className="row g-2">
-              {cellsOf(g).map(c => (
-                <div className="col-4 col-md" key={c.label}>
-                  <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-                  </div>
-                </div>
-              ))}
+            <div className="d-flex align-items-center gap-2" style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: C.ink }}>{g.campaign}</span>
+              {showCompare && !prev && (
+                <span style={{ fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: C.amber, background: C.amberSoft, border: `1px solid ${C.amberLine}`, padding: '1px 7px', borderRadius: 999 }}>New</span>
+              )}
             </div>
+            {metricCells(g, prev, false)}
             {showEfficiency && spend > 0 && gmv > 0 && (
               <div className="mt-3">
                 <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -290,18 +330,9 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
       <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${C.line}` }}>
         <div className="d-flex align-items-center gap-2 mb-2">
           <span style={{ fontSize: '0.7rem', fontWeight: 700, color: C.ink, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{overallLabel}</span>
-          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {list.length} campaign{list.length > 1 ? 's' : ''}</span>
+          <span style={{ fontSize: '0.64rem', color: C.muted }}>auto-calculated · {list.length} campaign{list.length > 1 ? 's' : ''}{showCompare ? ` · ${prevLabel ? `vs ${prevLabel}` : 'vs last week'}` : ''}</span>
         </div>
-        <div className="row g-2">
-          {overallCells.map(c => (
-            <div className="col-4 col-md" key={c.label}>
-              <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {metricCells(t, showCompare ? gmvMaxTotals(prevRows) : null, true)}
       </div>
     </div>
   );
@@ -446,7 +477,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
   );
 }
 
-function ProductRow({ product, rank, gmvShare, isLast, currency = DEFAULT_CURRENCY, goal = 0 }) {
+function ProductRow({ product, rank, gmvShare, isLast, currency = DEFAULT_CURRENCY, goal = 0, unitsLabel = 'Units Sold' }) {
   const gmv = num(product.gmv);
   return (
     <div className="d-flex align-items-center gap-3 px-3 py-3"
@@ -468,7 +499,7 @@ function ProductRow({ product, rank, gmvShare, isLast, currency = DEFAULT_CURREN
           </div>
         )}
         <div className="d-flex align-items-center gap-3 mt-1 flex-wrap" style={{ fontSize: '0.7rem', color: C.inkDim }}>
-          <span>Units <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.unitsSold)}</strong></span>
+          <span>{unitsLabel} <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.unitsSold)}</strong></span>
           <span>Videos <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.newVideos)}</strong>{num(product.videosMtd) > 0 && <span style={{ color: C.muted }}> · MTD {fmtN(product.videosMtd)}</span>}</span>
           {(num(product.samplesApprovedWeek) > 0 || num(product.samplesApprovedMtd) > 0) && (
             <span>Samples <strong style={{ color: C.ink, fontWeight: 600 }}>{fmtN(product.samplesApprovedWeek)}</strong>{num(product.samplesApprovedMtd) > 0 && <span style={{ color: C.muted }}> · MTD {fmtN(product.samplesApprovedMtd)}</span>}</span>
@@ -897,15 +928,20 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
   const productData = (report.productHighlights || []).filter(p => p.productName);
   const totalProductGmv = productData.reduce((s, p) => s + num(p.gmv), 0);
+  // "Orders" for reports authored since 2026-07-06; "Units Sold" for older ones.
+  const productUnitsLbl = productUnitsLabel(report.createdAt);
   // Overall MTD videos: the APC-entered overallNotes.videosMtd if present,
   // else the sum of per-product month-to-date video counts as a fallback.
   const mtdVideos = num(report.overallNotes?.videosMtd) > 0
     ? num(report.overallNotes.videosMtd)
     : productData.reduce((s, p) => s + num(p.videosMtd), 0);
-  // "Share of GMV" denominator: a STABLE store total (affiliate GMV, else total
-  // GMV) so a product's share doesn't shift with how many products are listed.
-  // Falls back to the listed-products sum for older reports without totals.
-  const productShareDenom = num(perf.affiliateGmv) || num(perf.gmv) || totalProductGmv;
+  // "Share of GMV" denominator: the OVERALL shop GMV (the big number in the
+  // header) — the product GMV figures are on that same total-GMV basis, so the
+  // shares add up to ≤100%. (Dividing shop-GMV products by the smaller Affiliate
+  // GMV total made them sum past 100%.) Math.max guards the rare case where the
+  // listed products (incl. an "Others" catch-all) sum slightly above the entered
+  // overall GMV, so a share can never exceed the whole.
+  const productShareDenom = Math.max(num(perf.gmv), totalProductGmv) || totalProductGmv;
   const totalCreatorGmv = (report.topCreators || [])
     .filter(c => c.name).reduce((s, c) => s + num(c.gmv), 0);
   const sortedCreators = [...(report.topCreators || [])].filter(c => c.name).sort((a, b) => num(b.gmv) - num(a.gmv));
@@ -1202,81 +1238,78 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         )}
         </>)}
 
-        {/* ─── Top Creators + Products row ─────────────────────────────── */}
-        {(sectEnabled.topCreators || sectEnabled.productHighlights) && (sortedCreators.length > 0 || sortedProducts.length > 0) && (
-          <div className="row g-3">
-            {/* Creators */}
-            {sectEnabled.topCreators && sortedCreators.length > 0 && (
-              <div className="col-12 col-lg-7">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
-                  <div className="px-3 py-3">
-                    <SectionHead
-                      title="Top creators this week"
-                      eyebrow={`Ranked by GMV · ${sortedCreators.length} creators with data`}
-                    />
-                  </div>
-                  <CreatorHeader />
-                  {sortedCreators.map((c, i) => (
-                    <CreatorRow key={i} creator={c} rank={i + 1} totalGmv={totalCreatorGmv} currency={currency} />
-                  ))}
-                </div>
-                {renderExtraStatCards('topCreators')}
-                <InsightBox text={report.topCreatorsInsights} report={report} fieldKey="topCreatorsInsights"
-                  highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
+        {/* ─── Top creators (full width) ───────────────────────────────── */}
+        {sectEnabled.topCreators && sortedCreators.length > 0 && (
+          <>
+            <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden', marginTop: 12 }}>
+              <div className="px-3 py-3">
+                <SectionHead
+                  title="Top creators this week"
+                  eyebrow={`Ranked by GMV · ${sortedCreators.length} creators with data`}
+                />
               </div>
-            )}
-            {/* Products */}
-            {sectEnabled.productHighlights && sortedProducts.length > 0 && (
-              <div className="col-12 col-lg-5">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
-                  <div className="px-3 py-3">
-                    <SectionHead
-                      title="Products driving GMV"
-                      eyebrow={`Focus SKUs · units & content output`}
-                    />
-                  </div>
-                  {sortedProducts.map((p, i) => (
-                    <ProductRow key={i} product={p} rank={i + 1}
-                      gmvShare={productShareDenom > 0 ? Math.min(100, (num(p.gmv) / productShareDenom) * 100) : 0}
-                      currency={currency} goal={productGoals[normName(p.productName)] || 0} />
-                  ))}
-                  {/* Overall sample goal — sum of per-product MTD approved vs
-                      sum of product goals. Only when at least one goal is set. */}
-                  {(() => {
-                    const totalGoal = sortedProducts.reduce((s, p) => s + (Number(productGoals[normName(p.productName)]) || 0), 0);
-                    if (totalGoal <= 0) return null;
-                    const totalMtd = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedMtd), 0);
-                    return (
-                      <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
-                        <GoalBar approved={totalMtd} goal={totalGoal} label="Overall sample goal (MTD)" />
-                      </div>
-                    );
-                  })()}
-                  {/* Count-validation — per-product weekly sums vs the overall
-                      figures (warn, never block; products are often a subset). */}
-                  {(() => {
-                    const sumSamplesWk = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedWeek), 0);
-                    const sumVideosWk  = sortedProducts.reduce((s, p) => s + num(p.newVideos), 0);
-                    const overallSamples = num(perf.samplesApproved);
-                    const overallVideos  = num(perf.videosPosted);
-                    const sampleMismatch = sumSamplesWk > 0 && overallSamples > 0 && sumSamplesWk !== overallSamples;
-                    const videoMismatch  = sumVideosWk  > 0 && overallVideos  > 0 && sumVideosWk  !== overallVideos;
-                    if (!sampleMismatch && !videoMismatch) return null;
-                    return (
-                      <div className="mx-3 mb-3 rounded-2 px-3 py-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.7rem', color: 'var(--warning)' }}>
-                        <i className="bi bi-exclamation-triangle-fill me-1" />
-                        {sampleMismatch && <div>Per-product samples this week ({sumSamplesWk}) don't match Overall Samples Approved ({overallSamples}).</div>}
-                        {videoMismatch && <div>Per-product videos this week ({sumVideosWk}) don't match Overall Videos Posted ({overallVideos}).</div>}
-                      </div>
-                    );
-                  })()}
-                </div>
-                {renderExtraStatCards('productHighlights')}
-                <InsightBox text={report.productHighlightsInsights} report={report} fieldKey="productHighlightsInsights"
-                  highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
+              <CreatorHeader />
+              {sortedCreators.map((c, i) => (
+                <CreatorRow key={i} creator={c} rank={i + 1} totalGmv={totalCreatorGmv} currency={currency} />
+              ))}
+            </div>
+            {renderExtraStatCards('topCreators')}
+            <InsightBox text={report.topCreatorsInsights} report={report} fieldKey="topCreatorsInsights"
+              highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
+          </>
+        )}
+
+        {/* ─── Products driving GMV (full width) ───────────────────────── */}
+        {sectEnabled.productHighlights && sortedProducts.length > 0 && (
+          <>
+            <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden', marginTop: 12 }}>
+              <div className="px-3 py-3">
+                <SectionHead
+                  title="Products driving GMV"
+                  eyebrow={`Focus SKUs · units & content output`}
+                />
               </div>
-            )}
-          </div>
+              {sortedProducts.map((p, i) => (
+                <ProductRow key={i} product={p} rank={i + 1}
+                  gmvShare={productShareDenom > 0 ? Math.min(100, (num(p.gmv) / productShareDenom) * 100) : 0}
+                  currency={currency} goal={productGoals[normName(p.productName)] || 0}
+                  unitsLabel={productUnitsLbl} />
+              ))}
+              {/* Overall sample goal — sum of per-product MTD approved vs
+                  sum of product goals. Only when at least one goal is set. */}
+              {(() => {
+                const totalGoal = sortedProducts.reduce((s, p) => s + (Number(productGoals[normName(p.productName)]) || 0), 0);
+                if (totalGoal <= 0) return null;
+                const totalMtd = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedMtd), 0);
+                return (
+                  <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+                    <GoalBar approved={totalMtd} goal={totalGoal} label="Overall sample goal (MTD)" />
+                  </div>
+                );
+              })()}
+              {/* Count-validation — per-product weekly sums vs the overall
+                  figures (warn, never block; products are often a subset). */}
+              {(() => {
+                const sumSamplesWk = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedWeek), 0);
+                const sumVideosWk  = sortedProducts.reduce((s, p) => s + num(p.newVideos), 0);
+                const overallSamples = num(perf.samplesApproved);
+                const overallVideos  = num(perf.videosPosted);
+                const sampleMismatch = sumSamplesWk > 0 && overallSamples > 0 && sumSamplesWk !== overallSamples;
+                const videoMismatch  = sumVideosWk  > 0 && overallVideos  > 0 && sumVideosWk  !== overallVideos;
+                if (!sampleMismatch && !videoMismatch) return null;
+                return (
+                  <div className="mx-3 mb-3 rounded-2 px-3 py-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.7rem', color: 'var(--warning)' }}>
+                    <i className="bi bi-exclamation-triangle-fill me-1" />
+                    {sampleMismatch && <div>Per-product samples this week ({sumSamplesWk}) don't match Overall Samples Approved ({overallSamples}).</div>}
+                    {videoMismatch && <div>Per-product videos this week ({sumVideosWk}) don't match Overall Videos Posted ({overallVideos}).</div>}
+                  </div>
+                );
+              })()}
+            </div>
+            {renderExtraStatCards('productHighlights')}
+            <InsightBox text={report.productHighlightsInsights} report={report} fieldKey="productHighlightsInsights"
+              highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
+          </>
         )}
 
         {/* ─── Top Videos (poster cards) ───────────────────────────────── */}
@@ -1306,75 +1339,86 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           const hasWeekly = (report.gmvMax || []).some(g => g.campaign);
           const hasMtd = (report.gmvMaxMtd || []).some(g => g.campaign);
           // Both present → two half-width columns fill the row (no empty
-          // right space). Only one present → it spans wider.
-          const colClass = (hasWeekly && hasMtd) ? 'col-12 col-lg-6' : 'col-12 col-lg-8';
+          // right space). Only one present → it spans the full width.
+          const colClass = (hasWeekly && hasMtd) ? 'col-12 col-lg-6' : 'col-12';
           return (
-            <div className="row g-3 mt-1">
-              {hasWeekly && (
-                <div className={colClass}>
-                  <GmvMaxBlock rows={report.gmvMax} currency={currency}
-                    title="GMV Max performance" eyebrow="Brand-managed campaigns · this week" overallLabel="Overall" />
-                  {renderExtraStatCards('gmvMax')}
-                  <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
-                    highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
-                </div>
-              )}
-              {hasMtd && (
-                <div className={colClass}>
-                  <GmvMaxBlock rows={report.gmvMaxMtd} currency={currency}
-                    title="Month-to-Date GMV Max" eyebrow="Campaigns so far this month" overallLabel="MTD Overall" />
-                </div>
-              )}
-            </div>
+            <>
+              <div className="row g-3 mt-1">
+                {hasWeekly && (
+                  <div className={colClass}>
+                    <GmvMaxBlock rows={report.gmvMax} currency={currency}
+                      compareRows={hasPrev ? (previousReport?.gmvMax || []) : null}
+                      prevLabel={prev?.weekLabel}
+                      title="GMV Max performance" eyebrow="Brand-managed campaigns · this week" overallLabel="Overall" />
+                  </div>
+                )}
+                {hasMtd && (
+                  <div className={colClass}>
+                    <GmvMaxBlock rows={report.gmvMaxMtd} currency={currency}
+                      title="Month-to-Date GMV Max" eyebrow="Campaigns so far this month" overallLabel="MTD Overall" />
+                  </div>
+                )}
+              </div>
+              {/* Extras + insight live BELOW the row, full width — never inside a
+                  flex column with a height:100% GmvMaxBlock (that stretches the
+                  block and pushes the insight out, overlapping the next section). */}
+              {renderExtraStatCards('gmvMax')}
+              <InsightBox text={report.gmvMaxInsights} report={report} fieldKey="gmvMaxInsights"
+                highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
+            </>
           );
         })()}
 
         {/* ─── Offsite performance ─────────────────────────────────────── */}
         {sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
-          <div className="row g-3 mt-1">
-              <div className="col-12 col-lg-5">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px' }}>
-                  <SectionHead title="Offsite performance" eyebrow="Halo from non-TikTok channels" />
-                  <div className="d-flex align-items-center gap-3 mb-3">
-                    <div style={{ width: 110, height: 110, position: 'relative', flexShrink: 0 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={[
-                            { v: Math.max(0, Math.min(100, num(offsite.offsiteEffect))) },
-                            { v: Math.max(0, 100 - num(offsite.offsiteEffect)) },
-                          ]} dataKey="v" cx="50%" cy="50%" innerRadius={36} outerRadius={52}
-                            startAngle={90} endAngle={-270} paddingAngle={0} stroke="none">
-                            <Cell fill={C.amber} />
-                            <Cell fill={C.line} />
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-                        <div style={{ fontSize: '1rem', fontWeight: 700, color: C.ink, lineHeight: 1 }}>{num(offsite.offsiteEffect).toFixed(2)}%</div>
-                        <div style={{ fontSize: '0.55rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 4 }}>Effect</div>
-                      </div>
+          <>
+            <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px', marginTop: 12 }}>
+              <SectionHead title="Offsite performance" eyebrow="Halo from non-TikTok channels" />
+              <div className="d-flex align-items-center gap-4 flex-wrap">
+                <div style={{ width: 110, height: 110, position: 'relative', flexShrink: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={[
+                        { v: Math.max(0, Math.min(100, num(offsite.offsiteEffect))) },
+                        { v: Math.max(0, 100 - num(offsite.offsiteEffect)) },
+                      ]} dataKey="v" cx="50%" cy="50%" innerRadius={36} outerRadius={52}
+                        startAngle={90} endAngle={-270} paddingAngle={0} stroke="none">
+                        <Cell fill={C.amber} />
+                        <Cell fill={C.line} />
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: C.ink, lineHeight: 1 }}>{num(offsite.offsiteEffect).toFixed(2)}%</div>
+                    <div style={{ fontSize: '0.55rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 4 }}>Effect</div>
+                  </div>
+                </div>
+                <div className="flex-grow-1 row g-2" style={{ minWidth: 260 }}>
+                  <div className="col-12 col-md-4">
+                    <div style={{ background: C.surfaceAlt, padding: '12px 16px', borderRadius: 10, height: '100%' }}>
+                      <div style={{ fontSize: '0.74rem', color: C.inkDim, marginBottom: 4 }}>Offsite GMV</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{ms(offsite.offsiteGmv)}</div>
                     </div>
-                    <div className="flex-grow-1 d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between align-items-center" style={{ background: C.surfaceAlt, padding: '10px 14px', borderRadius: 10 }}>
-                        <span style={{ fontSize: '0.78rem', color: C.inkDim }}>Offsite GMV</span>
-                        <span style={{ fontSize: '0.92rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{ms(offsite.offsiteGmv)}</span>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center" style={{ background: C.surfaceAlt, padding: '10px 14px', borderRadius: 10 }}>
-                        <span style={{ fontSize: '0.78rem', color: C.inkDim }}>TikTok Shop GMV</span>
-                        <span style={{ fontSize: '0.92rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{ms(offsite.tiktokShopGmv)}</span>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center" style={{ background: C.hero, padding: '10px 14px', borderRadius: 10 }}>
-                        <span style={{ fontSize: '0.78rem', color: '#a8a29e' }}>Combined reach</span>
-                        <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ms(num(offsite.offsiteGmv) + num(offsite.tiktokShopGmv))}</span>
-                      </div>
+                  </div>
+                  <div className="col-12 col-md-4">
+                    <div style={{ background: C.surfaceAlt, padding: '12px 16px', borderRadius: 10, height: '100%' }}>
+                      <div style={{ fontSize: '0.74rem', color: C.inkDim, marginBottom: 4 }}>TikTok Shop GMV</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{ms(offsite.tiktokShopGmv)}</div>
+                    </div>
+                  </div>
+                  <div className="col-12 col-md-4">
+                    <div style={{ background: C.hero, padding: '12px 16px', borderRadius: 10, height: '100%' }}>
+                      <div style={{ fontSize: '0.74rem', color: '#a8a29e', marginBottom: 4 }}>Combined reach</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ms(num(offsite.offsiteGmv) + num(offsite.tiktokShopGmv))}</div>
                     </div>
                   </div>
                 </div>
-                {renderExtraStatCards('offsitePerformance')}
-                <InsightBox text={report.offsiteInsights} report={report} fieldKey="offsiteInsights"
-                  highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
               </div>
-          </div>
+            </div>
+            {renderExtraStatCards('offsitePerformance')}
+            <InsightBox text={report.offsiteInsights} report={report} fieldKey="offsiteInsights"
+              highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity} />
+          </>
         )}
 
         {/* ─── Trends across reporting weeks ──────────────────────────── */}
