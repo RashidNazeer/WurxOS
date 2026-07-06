@@ -11,6 +11,7 @@ dist-ssr
 .idea
 
 .vercel
+.vercel-token
 
 # Migration helpers — private credentials and run logs
 migration/firebase-admin-key.json
