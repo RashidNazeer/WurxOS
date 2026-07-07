@@ -1231,13 +1231,29 @@ Deno.serve(async (req) => {
       'If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
     ].join('\n') : '';
 
+    // ── System prompt, ORDERED FOR PROMPT-CACHING ──────────────────
+    // OpenAI automatically caches the longest STABLE PREFIX of a request
+    // (system message + tool definitions) and bills those cached tokens at a
+    // large discount on every subsequent call. So everything IDENTICAL across
+    // calls for this role goes FIRST as one stable block — persona, role
+    // capabilities, the page list, and all answer/tool RULES — and the things
+    // that CHANGE go LAST: the per-user name and the per-question retrieved
+    // KNOWLEDGE. Previously the knowledge sat in the MIDDLE, which cut the
+    // prefix short and forced the big rules block (plus the tool definitions,
+    // re-sent on every one of the up-to-2 tool rounds) to be re-billed at full
+    // price every turn. With this order a Boss DATA question — where the name
+    // is constant and the knowledge block is a fixed "skipped" string — has a
+    // byte-identical static half that is fully cached. DO NOT move the dynamic
+    // knowledge/name back above the rules or the cache benefit is lost.
     const systemPrompt = [
+      // —— stable prefix (cached across calls for this role) ——
       persona,
-      `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
       `WHAT THEY CAN DO: ${roleCap}`,
       `PAGES THEY CAN OPEN (use these exact paths for links; never invent one):\n${pageList}`,
-      knowledgeBlock,
       groundingRules + dataToolRules,
+      // —— dynamic tail (changes per user / per question; never cached) ——
+      `WHO YOU ARE HELPING: ${profile.display_name || 'a team member'} — role: ${roleLabel}.`,
+      knowledgeBlock,
     ].join('\n\n');
 
     // ── Call the model (OpenAI), with a tool-calling loop for the Boss ──
