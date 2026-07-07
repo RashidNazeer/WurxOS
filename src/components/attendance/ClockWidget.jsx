@@ -1314,8 +1314,8 @@ export default function ClockWidget() {
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => setShowClockOut(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 16 }}>
             <div className="card-body p-4">
-              <h6 className="fw-bold mb-1">Request Clock Out</h6>
-              <p className="text-muted small mb-3">Your team lead will be notified for approval.</p>
+              <h6 className="fw-bold mb-1">Clock Out</h6>
+              <p className="text-muted small mb-3">This ends your shift for today — you won't be able to clock back in until tomorrow.</p>
               <div className="mb-3">
                 <label className="form-label small fw-semibold">What did you work on today?</label>
                 <textarea
@@ -1333,8 +1333,8 @@ export default function ClockWidget() {
                   onClick={handleRequestClockOut}
                   disabled={action === 'clockout'}
                 >
-                  {action === 'clockout' ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-send" />}
-                  Send Request
+                  {action === 'clockout' ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-box-arrow-right" />}
+                  Clock Out
                 </button>
               </div>
             </div>
