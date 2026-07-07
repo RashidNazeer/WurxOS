@@ -816,15 +816,29 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       .then(({ listProducts }) => listProducts(report.brandId))
       .then((rows) => {
         if (cancelled) return;
+        // Match by TikTok Shop product ID first (report names come from Euka
+        // and differ from the Brands→Products catalog names), then fall back to
+        // a normalized-name match.
         const map = {};
         (rows || []).forEach((p) => {
-          if (p.monthly_sample_goal != null) map[normName(p.product_name)] = p.monthly_sample_goal;
+          if (p.monthly_sample_goal == null) return;
+          const pid = String(p.product_id || '').trim();
+          if (pid) map[pid] = p.monthly_sample_goal;
+          const pname = normName(p.product_name);
+          if (pname) map[pname] = p.monthly_sample_goal;
         });
         setProductGoals(map);
       })
       .catch(() => { if (!cancelled) setProductGoals({}); });
     return () => { cancelled = true; };
   }, [report?.brandId, clientView]);
+  // Resolve a report product's monthly sample goal: match its TikTok Shop
+  // product ID against the catalog first (Euka names differ from catalog
+  // names), then fall back to a normalized-name match.
+  const goalForProduct = (p) => Number(
+    productGoals[String(p?.productId || '').trim()] ??
+    productGoals[normName(p?.productName)] ?? 0,
+  ) || 0;
   // v2 auth shim → v1 shape (v1 destructures `userRole` directly; v2's
   // useAuth returns `{ user, profile }` so we derive role from profile).
   const { profile } = useAuth();
@@ -1201,11 +1215,11 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                   {sortedProducts.map((p, i) => (
                     <ProductRow key={i} product={p} rank={i + 1}
                       gmvShare={totalProductGmv > 0 ? (num(p.gmv) / totalProductGmv) * 100 : 0}
-                      currency={currency} goal={productGoals[normName(p.productName)] || 0} />
+                      currency={currency} goal={goalForProduct(p)} />
                   ))}
                   {/* Overall sample goal — Σ approved vs Σ product goals. */}
                   {(() => {
-                    const totalGoal = sortedProducts.reduce((s, p) => s + (Number(productGoals[normName(p.productName)]) || 0), 0);
+                    const totalGoal = sortedProducts.reduce((s, p) => s + goalForProduct(p), 0);
                     if (totalGoal <= 0) return null;
                     const totalApproved = sortedProducts.reduce((s, p) => s + num(p.samplesApproved), 0);
                     return (

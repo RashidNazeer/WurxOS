@@ -752,9 +752,17 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
       .then(({ listProducts }) => listProducts(report.brandId))
       .then((rows) => {
         if (cancelled) return;
+        // Key goals by TikTok Shop product ID (PRIMARY — report product names
+        // come from Euka and differ from the Brands→Products catalog names, so
+        // a name match silently misses) AND by normalized name (fallback for
+        // catalog products entered without an ID).
         const map = {};
         (rows || []).forEach((p) => {
-          if (p.monthly_sample_goal != null) map[String(p.product_name || '').trim().toLowerCase()] = p.monthly_sample_goal;
+          if (p.monthly_sample_goal == null) return;
+          const pid = String(p.product_id || '').trim();
+          if (pid) map[pid] = p.monthly_sample_goal;
+          const pname = String(p.product_name || '').trim().toLowerCase();
+          if (pname) map[pname] = p.monthly_sample_goal;
         });
         setFetchedGoals(map);
       })
@@ -762,6 +770,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     return () => { cancelled = true; };
   }, [report?.brandId, clientView, productGoalsProp]);
   const productGoals = productGoalsProp || fetchedGoals;
+  // Resolve a report product's monthly sample goal: match its TikTok Shop
+  // product ID against the catalog first (names differ between Euka reports and
+  // the catalog), then fall back to a normalized-name match.
+  const goalForProduct = (p) => Number(
+    productGoals[String(p?.productId || '').trim()] ??
+    productGoals[normName(p?.productName)] ?? 0,
+  ) || 0;
   const [copyState, setCopyState] = React.useState('idle');
   const [highlighterActive, setHighlighterActive] = React.useState(false);
   const { color: highlightColor, setColor: setHighlightColor,
@@ -1272,13 +1287,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
               {sortedProducts.map((p, i) => (
                 <ProductRow key={i} product={p} rank={i + 1}
                   gmvShare={productShareDenom > 0 ? Math.min(100, (num(p.gmv) / productShareDenom) * 100) : 0}
-                  currency={currency} goal={productGoals[normName(p.productName)] || 0}
+                  currency={currency} goal={goalForProduct(p)}
                   unitsLabel={productUnitsLbl} />
               ))}
               {/* Overall sample goal — sum of per-product MTD approved vs
                   sum of product goals. Only when at least one goal is set. */}
               {(() => {
-                const totalGoal = sortedProducts.reduce((s, p) => s + (Number(productGoals[normName(p.productName)]) || 0), 0);
+                const totalGoal = sortedProducts.reduce((s, p) => s + goalForProduct(p), 0);
                 if (totalGoal <= 0) return null;
                 const totalMtd = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedMtd), 0);
                 return (
