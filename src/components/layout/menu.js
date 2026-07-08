@@ -23,6 +23,7 @@ import {
 const TASKS_ITEM        = { label: 'Tasks',         icon: ChecklistIcon, to: '/tasks',         category: 'task' };
 const BRAND_ANALYTICS   = { label: 'Brand analytics', icon: ReportIcon, to: '/analytics/brands' };
 const EUKA_ANALYTICS_ITEM = { label: 'Euka Analytics', icon: StoreIcon,  to: '/euka' };
+const HALO_ITEM           = { label: 'Amazon Halo',    icon: DiagramIcon, to: '/halo' };
 const VIDEO_REVIEWS_ITEM  = { label: 'Video Reviews', icon: PlayIcon, to: '/video-reviews' };
 const BRAND_SWITCHES    = { label: 'Brand Switcher',  icon: RefreshIcon,  to: '/brand-switcher', category: 'brand' };
 const AUDIT_LOG         = { label: 'Audit log',       icon: ShieldIcon, to: '/audit' };
@@ -194,6 +195,7 @@ export const MENUS = {
     BRANDS_ITEM,
     BRAND_ANALYTICS,
     EUKA_ANALYTICS_ITEM,
+    HALO_ITEM,
     BRAND_SWITCHES,
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
