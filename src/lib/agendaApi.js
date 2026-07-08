@@ -506,6 +506,15 @@ export async function stopPresenting(meetingId, apcId) {
   return data;
 }
 
+// OL — reopen a completed ('done') presentation: the APC goes back to
+// 'pending' and can present again (agenda_start_presenting allows it once
+// they're no longer 'done'). Non-destructive — any prior reviews are kept.
+export async function reopenPresentation(meetingId, apcId) {
+  const { data, error } = await supabase.rpc('agenda_reopen_presentation', { p_meeting: meetingId, p_apc: apcId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // OL — the per-APC overall rating + summary on the presentation row.
 export async function updatePresentationReview(presentationId, { rating, summary }) {
   const { data: auth } = await supabase.auth.getUser();

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, listMeetingAttendance, listPresentations,
-  listAgendaTasks, markAttendance, startPresenting, stopPresenting,
+  listAgendaTasks, markAttendance, startPresenting, stopPresenting, reopenPresentation,
   startMeeting, finishMeeting, pauseMeeting, getAgendaSettings, getAgendaTeamSchedules,
   subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt, agendaMeetLinkFor,
 } from '../../lib/agendaApi';
@@ -65,6 +65,8 @@ export default function AgendaOngoingPage() {
   const [loading, setLoading]         = useState(true);
   const [busy, setBusy]               = useState('');
   const [finishModalOpen, setFinishModalOpen] = useState(false);
+  // OL is reviewing an already-presented APC (add remarks without reopening).
+  const [reviewTargetId, setReviewTargetId] = useState(null);
 
   async function refresh() {
     try {
@@ -122,6 +124,7 @@ export default function AgendaOngoingPage() {
   function openRoom(id) {
     selectedRef.current = id || null;
     setSelectedMeetingId(id || null);
+    setReviewTargetId(null);
     refresh();
   }
 
@@ -155,6 +158,14 @@ export default function AgendaOngoingPage() {
     () => presentations.find((p) => p.status === 'presenting') || null,
     [presentations],
   );
+  // OL is adding remarks to an already-presented APC (only valid while 'done').
+  const reviewTarget = useMemo(
+    () => (reviewTargetId && presMap[reviewTargetId]?.status === 'done' ? presMap[reviewTargetId] : null),
+    [reviewTargetId, presMap],
+  );
+  // The presentation the OL's evaluation panel shows: an explicitly-chosen
+  // past presentation takes precedence over the live presenter.
+  const evalPresentation = reviewTarget || activePresentation;
   const presentCount = attendance.filter((a) => a.status === 'present').length;
   const absentCount  = attendance.filter((a) => a.status === 'absent').length;
   // Present APCs who have not presented — flagged before finishing.
@@ -180,6 +191,17 @@ export default function AgendaOngoingPage() {
     setBusy('present');
     try { await stopPresenting(meeting.id, apcId); await refresh(); }
     catch (e) { alert(e.message || 'Failed to stop presenting'); }
+    finally { setBusy(''); }
+  }
+  // OL reopens a done APC: they're marked NOT presented and can present again.
+  async function handleReopen(apcId) {
+    if (!window.confirm('Reopen this APC’s session? They will be marked as NOT presented and can present again.')) return;
+    setBusy(`reopen-${apcId}`);
+    try {
+      await reopenPresentation(meeting.id, apcId);
+      if (reviewTargetId === apcId) setReviewTargetId(null);
+      await refresh();
+    } catch (e) { alert(e.message || 'Failed to reopen the session'); }
     finally { setBusy(''); }
   }
   function handleFinishClick() {
@@ -469,7 +491,11 @@ export default function AgendaOngoingPage() {
       {/* Presentation progress — who has presented / who is pending (read-only;
           OL and all-meeting observers). */}
       {canAttendAll && apcs.length > 0 && (
-        <PresentationProgress apcs={apcs} presMap={presMap} />
+        <PresentationProgress apcs={apcs} presMap={presMap}
+          onReopen={isOL ? handleReopen : null}
+          onRemarks={isOL ? setReviewTargetId : null}
+          reviewTargetId={reviewTargetId}
+          busy={busy} />
       )}
 
       {/* APC presenting controls */}
@@ -489,7 +515,30 @@ export default function AgendaOngoingPage() {
 
       {/* OL evaluation interface */}
       {isOL && (
-        <OngoingEvaluation meeting={meeting} activePresentation={activePresentation} />
+        <>
+          {reviewTarget && (
+            <div className="rounded-3 p-2 mb-2 d-flex align-items-center justify-content-between gap-2 flex-wrap"
+              style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              <span>
+                <i className="bi bi-clock-history text-warning me-1" />
+                Adding remarks for <strong>{reviewTarget.apc?.display_name || 'APC'}</strong> — already presented.
+                Reviews save without changing their status.
+              </span>
+              <div className="d-flex gap-2">
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                  onClick={() => setReviewTargetId(null)}>
+                  <i className="bi bi-x-lg me-1" />{activePresentation ? 'Back to live presenter' : 'Close'}
+                </button>
+                <button className="btn btn-sm btn-outline-danger" style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                  disabled={busy === `reopen-${reviewTarget.apc_id}`}
+                  onClick={() => handleReopen(reviewTarget.apc_id)}>
+                  <i className="bi bi-arrow-counterclockwise me-1" />Reopen so they present again
+                </button>
+              </div>
+            </div>
+          )}
+          <OngoingEvaluation meeting={meeting} activePresentation={evalPresentation} />
+        </>
       )}
 
       {/* TL of THIS team — presenter / OL actions overview */}
@@ -692,7 +741,10 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
 }
 
 // ── Presentation progress (OL) ──────────────────────────────────────────
-function PresentationProgress({ apcs, presMap }) {
+// For a Presented APC the OL gets two actions: "Remarks" (review their tasks
+// without changing status) and "Reopen" (mark not-presented so they can go
+// again). Handlers are null for non-OL observers, hiding the buttons.
+function PresentationProgress({ apcs, presMap, onReopen, onRemarks, reviewTargetId, busy }) {
   const META = {
     done:       { label: 'Presented',  color: 'var(--success)',        bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
     presenting: { label: 'Presenting', color: 'var(--accent)',         bg: 'var(--accent-soft)',  icon: 'bi-easel2-fill' },
@@ -715,14 +767,36 @@ function PresentationProgress({ apcs, presMap }) {
         </div>
         <div className="d-flex flex-wrap gap-2">
           {apcs.map((a) => {
-            const m = META[statusOf(a)];
+            const st = statusOf(a);
+            const m = META[st];
+            const isDone   = st === 'done';
+            const selected = reviewTargetId === a.id;
             return (
               <div key={a.id} className="rounded-2 px-2 py-1 d-flex align-items-center gap-2"
-                style={{ background: m.bg, border: `1px solid color-mix(in srgb, ${m.color} 30%, transparent)` }}>
+                style={{ background: m.bg, border: `1px solid ${selected ? 'var(--accent)' : `color-mix(in srgb, ${m.color} 30%, transparent)`}` }}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{a.display_name}</span>
                 <span className="d-inline-flex align-items-center gap-1" style={{ fontSize: '0.62rem', fontWeight: 700, color: m.color }}>
                   <i className={`bi ${m.icon}`} />{m.label}
                 </span>
+                {isDone && onRemarks && (
+                  <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1" title="Add remarks / review their tasks — no status change"
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
+                      background: selected ? 'var(--accent)' : 'var(--surface-1)',
+                      color: selected ? 'var(--surface-1)' : 'var(--accent)', border: '1px solid var(--accent)' }}
+                    onClick={() => onRemarks(a.id)}>
+                    <i className="bi bi-chat-left-text" />Remarks
+                  </button>
+                )}
+                {isDone && onReopen && (
+                  <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1" title="Reopen — mark not presented so they can present again"
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5, background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid var(--danger)' }}
+                    disabled={busy === `reopen-${a.id}`}
+                    onClick={() => onReopen(a.id)}>
+                    {busy === `reopen-${a.id}`
+                      ? <span className="spinner-border spinner-border-sm" style={{ width: '0.6rem', height: '0.6rem' }} />
+                      : <><i className="bi bi-arrow-counterclockwise" />Reopen</>}
+                  </button>
+                )}
               </div>
             );
           })}
