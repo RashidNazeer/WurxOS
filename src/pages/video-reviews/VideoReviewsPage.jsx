@@ -27,6 +27,26 @@ const FILE_DEFS = [
   { key: 'group3', ord: '3rd', title: 'send their 3rd video review message' },
 ];
 
+// ── Exclude-list helpers ────────────────────────────────────────────
+// Handles are matched case-insensitively, without a leading '@' and trimmed,
+// so an uploaded "@Creator" excludes a generated "creator".
+const normHandle = (h) => String(h ?? '').trim().replace(/^@+/, '').toLowerCase();
+const HEADER_TOKENS = new Set(['handle', 'handles', 'username', 'usernames', 'creator', 'creators']);
+
+// Parse an exclude CSV: a single "Handle" column, one handle per row below it.
+// Tolerant of a header row, quotes, '@' prefixes, blank lines and stray columns.
+function parseExcludeCsv(text) {
+  const set = new Set();
+  for (const line of String(text).split(/\r?\n/)) {
+    const first = (line.split(',')[0] || '').trim().replace(/^"|"$/g, '').trim();
+    if (!first) continue;
+    const n = normHandle(first);
+    if (HEADER_TOKENS.has(n)) continue; // skip the "Handle" header (anywhere)
+    set.add(n);
+  }
+  return set;
+}
+
 export default function VideoReviewsPage() {
   const defaultTarget = useMemo(() => addDays(pakistanToday(), -2), []);
   const [targetDate, setTargetDate] = useState(defaultTarget);
@@ -34,6 +54,31 @@ export default function VideoReviewsPage() {
   const [status, setStatus] = useState('idle');       // idle | running | done | error
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+
+  // Exclude list — creators to strip from ALL three files (optional upload).
+  const [excludeSet, setExcludeSet] = useState(() => new Set());
+  const [excludeName, setExcludeName] = useState('');
+  const [excludeErr, setExcludeErr] = useState('');
+  const applyExclude = (list) => (list || []).filter((h) => !excludeSet.has(normHandle(h)));
+
+  async function onExcludeFile(e) {
+    const f = e.target.files?.[0];
+    e.target.value = ''; // let the same file be re-picked after a clear
+    if (!f) return;
+    setExcludeErr('');
+    try {
+      const set = parseExcludeCsv(await f.text());
+      if (set.size === 0) {
+        setExcludeErr('No handles found. The file needs a "Handle" column with handles listed below it.');
+        return;
+      }
+      setExcludeSet(set);
+      setExcludeName(f.name);
+    } catch {
+      setExcludeErr('Could not read that file. Please upload a .csv.');
+    }
+  }
+  function clearExclude() { setExcludeSet(new Set()); setExcludeName(''); setExcludeErr(''); }
 
   // Which Euka brands this user can run for (Boss/OL: all; APC: their own).
   const [brands, setBrands] = useState(null);         // null = loading
@@ -74,7 +119,7 @@ export default function VideoReviewsPage() {
       // Auto-download the three files immediately, named by the brand.
       const label = data.brandLabel || brandLabel;
       for (const def of FILE_DEFS) {
-        downloadHandlesCsv(data[def.key] || [], `${label} - ${def.ord} video review creators.csv`);
+        downloadHandlesCsv(applyExclude(data[def.key] || []), `${label} - ${def.ord} video review creators.csv`);
       }
       setStatus('done');
     } catch (e) {
@@ -86,7 +131,7 @@ export default function VideoReviewsPage() {
   function redownload(def) {
     if (!result) return;
     const label = result.brandLabel || brandLabel;
-    downloadHandlesCsv(result[def.key] || [], `${label} - ${def.ord} video review creators.csv`);
+    downloadHandlesCsv(applyExclude(result[def.key] || []), `${label} - ${def.ord} video review creators.csv`);
   }
 
   function reset() {
@@ -191,6 +236,43 @@ export default function VideoReviewsPage() {
           </div>
         </div>
 
+        {/* Exclude creators — optional CSV upload */}
+        <div style={{ marginTop: 18 }}>
+          <label className="wx-label">Exclude creators <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8 }}>
+            Upload a CSV with a single <strong>Handle</strong> column. Those creators are removed from all three files.
+          </div>
+          {excludeSet.size === 0 ? (
+            <label className="wx-btn wx-btn-ghost align-self-start" style={{ borderStyle: 'dashed', fontSize: 12.5, cursor: status === 'running' ? 'not-allowed' : 'pointer' }}>
+              <i className="bi bi-upload me-1" /> Upload exclude list (.csv)
+              <input type="file" accept=".csv,text/csv" hidden onChange={onExcludeFile} disabled={status === 'running'} />
+            </label>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600,
+                color: 'var(--text-secondary)', background: 'var(--surface-2)',
+                border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '5px 12px',
+              }}>
+                <i className="bi bi-funnel" style={{ color: 'var(--accent)' }} />
+                {excludeSet.size} creator{excludeSet.size === 1 ? '' : 's'} to exclude
+                {excludeName ? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· {excludeName}</span> : null}
+              </span>
+              <label className="wx-btn wx-btn-ghost" style={{ fontSize: 12, cursor: 'pointer', padding: '4px 10px' }}>
+                Replace
+                <input type="file" accept=".csv,text/csv" hidden onChange={onExcludeFile} disabled={status === 'running'} />
+              </label>
+              <button className="wx-btn wx-btn-ghost" onClick={clearExclude} disabled={status === 'running'}
+                style={{ fontSize: 12, padding: '4px 10px', color: 'var(--danger)' }}>Clear</button>
+            </div>
+          )}
+          {excludeErr && (
+            <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>
+              <i className="bi bi-exclamation-triangle me-1" />{excludeErr}
+            </div>
+          )}
+        </div>
+
         <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '20px 0 16px' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -227,14 +309,23 @@ export default function VideoReviewsPage() {
               {result.brandLabel} video review files for {prettyDate(result.targetDate)} saved to your Downloads folder
             </div>
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginLeft: 40, marginBottom: 16 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginLeft: 40, marginBottom: excludeSet.size > 0 ? 6 : 16 }}>
             {result.meta?.candidates ?? 0} creators posted in the window
             {result.missedDates?.length ? ` · missed dates: ${result.missedDates.join(', ')}` : ''}
           </div>
+          {excludeSet.size > 0 && (() => {
+            const removed = FILE_DEFS.reduce((n, def) => n + ((result[def.key] || []).length - applyExclude(result[def.key] || []).length), 0);
+            return (
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 40, marginBottom: 16 }}>
+                <i className="bi bi-funnel me-1" style={{ color: 'var(--accent)' }} />
+                Excluding {excludeSet.size} uploaded creator{excludeSet.size === 1 ? '' : 's'} — {removed} removed from these files.
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {FILE_DEFS.map((def) => {
-              const count = (result[def.key] || []).length;
+              const count = applyExclude(result[def.key] || []).length;
               return (
                 <div key={def.key} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
@@ -264,16 +355,20 @@ export default function VideoReviewsPage() {
             })}
           </div>
 
-          {result.needsManual?.length > 0 && (
-            <div style={{ marginTop: 14, padding: '12px 14px', border: '1px dashed var(--warning, #d99a2b)', borderRadius: 10, background: 'var(--warning-soft, #fdf6e9)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                <i className="bi bi-flag me-1" /> Needs manual check ({result.needsManual.length})
+          {(() => {
+            const manual = (result.needsManual || []).filter((m) => !excludeSet.has(normHandle(m.handle)));
+            if (manual.length === 0) return null;
+            return (
+              <div style={{ marginTop: 14, padding: '12px 14px', border: '1px dashed var(--warning, #d99a2b)', borderRadius: 10, background: 'var(--warning-soft, #fdf6e9)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  <i className="bi bi-flag me-1" /> Needs manual check ({manual.length})
+                </div>
+                {manual.map((m, i) => (
+                  <div key={i} style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>@{m.handle} — {m.note}</div>
+                ))}
               </div>
-              {result.needsManual.map((m, i) => (
-                <div key={i} style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>@{m.handle} — {m.note}</div>
-              ))}
-            </div>
-          )}
+            );
+          })()}
 
           <button className="wx-btn wx-btn-ghost" onClick={reset} style={{ marginTop: 16, fontSize: 13 }}>
             <i className="bi bi-arrow-repeat me-1" /> Run for another date
