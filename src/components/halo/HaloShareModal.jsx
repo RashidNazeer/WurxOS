@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   listHaloShares, createHaloShare, revokeHaloShare, buildHaloShareUrl,
 } from '../../lib/haloShareApi';
@@ -25,6 +26,13 @@ export default function HaloShareModal({ onClose }) {
   }
   useEffect(() => { load(); }, []);
 
+  // Lock the page behind the modal so it can't scroll under the overlay.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   async function handleCreate() {
     setBusy(true); setErr('');
     try {
@@ -44,11 +52,13 @@ export default function HaloShareModal({ onClose }) {
     catch (e) { setErr(e.message); }
   }
 
-  return (
+  return createPortal(
     <div className="wx-modal-backdrop" onClick={onClose}>
       <div className="wx-modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="wx-modal-header">
-          <div className="wx-modal-title">Share Amazon Halo</div>
+          <div className="wx-modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <LinkIcon width="16" height="16" style={{ color: 'var(--accent)' }} /> Share Amazon Halo
+          </div>
           <button type="button" className="shell-icon-btn" onClick={onClose} aria-label="Close">
             <XIcon width="16" height="16" />
           </button>
@@ -129,7 +139,8 @@ export default function HaloShareModal({ onClose }) {
           <button className="wx-btn wx-btn-ghost" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
