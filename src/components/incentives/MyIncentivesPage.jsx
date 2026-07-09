@@ -26,6 +26,16 @@ function itemSuffix(item) {
   return '';
 }
 
+// Marker for incentive items whose Achieved is auto-filled from attendance.
+function AttendanceBadge() {
+  return (
+    <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
+      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      <i className="bi bi-calendar-check me-1" />Auto
+    </span>
+  );
+}
+
 function calcBreakdown(rec) {
   const incTotal         = (rec.incentives || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const bonTotal         = (rec.bonuses   || []).reduce((s, b) => s + (Number(b.amount) || 0), 0);
@@ -40,36 +50,43 @@ function calcBreakdown(rec) {
 // ── Edit row used inside the progress modal ──────────────────────────────────
 
 function EditProgressRow({ item, cat, onChange }) {
+  const isAtt    = item.source === 'attendance';
   const achieved = item.achievedValue ?? '';
-  const target   = item.targetValue   ?? '';
+  const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
   const p        = pct(achieved, target);
   const done     = p >= 90;
+  const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : '#fafafa', border: `1.5px solid ${done ? '#b7dfc4' : '#e9ecef'}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAtt ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAtt ? '#bfdbfe' : '#e9ecef')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</div>
         </div>
-        <span className="badge rounded-pill flex-shrink-0" style={{ fontSize: '0.6rem', background: done ? '#e6f4ea' : '#fff3e0', color: done ? '#198754' : '#fd7e14' }}>
-          {done ? '✓ Completed' : `${p}%`}
-        </span>
+        <div className="d-flex align-items-center gap-1 flex-shrink-0">
+          {isAtt && <AttendanceBadge />}
+          <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? '#e6f4ea' : '#fff3e0', color: done ? '#198754' : '#fd7e14' }}>
+            {done ? '✓ Completed' : `${p}%`}
+          </span>
+        </div>
       </div>
       <div className="row g-2">
         <div className="col-5">
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Target</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={target}
-              onChange={e => onChange(cat, item.id, 'targetValue', e.target.value)} />
+              onChange={e => onChange(cat, item.id, 'targetValue', e.target.value)}
+              readOnly={isAtt} disabled={isAtt} style={isAtt ? lock : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
         </div>
         <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAtt && <span className="text-muted"> (auto)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
-              onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)} />
+              onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
+              readOnly={isAtt} disabled={isAtt} style={isAtt ? lock : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
         </div>
@@ -77,9 +94,15 @@ function EditProgressRow({ item, cat, onChange }) {
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Unit</label>
           <input type="text" className="form-control form-control-sm" placeholder="%" maxLength={6}
             value={sfx} onChange={e => onChange(cat, item.id, 'suffix', e.target.value)}
-            style={{ textAlign: 'center', fontSize: '0.78rem' }} />
+            readOnly={isAtt} disabled={isAtt}
+            style={{ textAlign: 'center', fontSize: '0.78rem', ...(isAtt ? lock : {}) }} />
         </div>
       </div>
+      {isAtt && (
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
+          <i className="bi bi-calendar-check me-1" />Filled automatically from this month's attendance %.
+        </div>
+      )}
     </div>
   );
 }
@@ -122,6 +145,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
           suffix: itemSuffix(i),
           completed: i.completed || false,
           completedBy: i.completed ? (i.completedBy || myName) : null,
+          ...(i.source ? { source: i.source } : {}),
         })),
         bonuses: items.bonuses.map(b => ({
           id: b.id, text: b.text, amount: b.amount,
@@ -129,6 +153,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
           suffix: itemSuffix(b),
           completed: b.completed || false,
           completedBy: b.completed ? (b.completedBy || myName) : null,
+          ...(b.source ? { source: b.source } : {}),
         })),
       });
       onSaved(items);

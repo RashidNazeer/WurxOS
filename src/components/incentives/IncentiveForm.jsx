@@ -32,9 +32,25 @@ function itemSuffix(item) {
 
 // ── Row editor (incentive or bonus line) ─────────────────────────────────────
 function LineRow({ item, onChange, onRemove, index }) {
-  const suffix = item.suffix ?? (item.unit === 'percent' ? '%' : '');
+  const isAtt  = item.source === 'attendance';
+  const suffix = isAtt ? '%' : (item.suffix ?? (item.unit === 'percent' ? '%' : ''));
+
+  // Toggling attendance mode pins Target=100 and unit=% so the ≥90% rule
+  // means "≥90% attendance". Achieved is then filled from live attendance.
+  function toggleAttendance(on) {
+    if (on) {
+      onChange(index, 'source', 'attendance');
+      onChange(index, 'targetValue', 100);
+      onChange(index, 'suffix', '%');
+    } else {
+      onChange(index, 'source', null);
+    }
+  }
+
+  const lockStyle = isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
+
   return (
-    <div className="rounded-3 p-2 mb-2" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+    <div className="rounded-3 p-2 mb-2" style={{ background: isAtt ? '#eff6ff' : '#f8f9fa', border: `1px solid ${isAtt ? '#bfdbfe' : '#e9ecef'}` }}>
       {/* Description */}
       <div className="d-flex align-items-center gap-2 mb-2">
         <input
@@ -53,11 +69,37 @@ function LineRow({ item, onChange, onRemove, index }) {
           <i className="bi bi-x-lg" />
         </button>
       </div>
+
+      {/* Auto-fill from attendance toggle */}
+      <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
+        <input
+          className="form-check-input flex-shrink-0 mt-0"
+          type="checkbox"
+          role="switch"
+          id={`att-${item.id}`}
+          checked={isAtt}
+          onChange={e => toggleAttendance(e.target.checked)}
+        />
+        <label className="form-check-label" htmlFor={`att-${item.id}`} style={{ fontSize: '0.72rem', color: isAtt ? '#1e40af' : '#6c757d' }}>
+          <i className="bi bi-calendar-check me-1" />
+          Auto-fill “Achieved” from monthly attendance
+        </label>
+      </div>
+      {isAtt && (
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
+          <i className="bi bi-info-circle me-1" />
+          Achieved fills automatically from this person's attendance % — no manual entry.
+          Target is pinned to 100% (≥90% attendance completes it).
+        </div>
+      )}
+
       {/* Target + Compensation on same row */}
       <div className="d-flex gap-2">
         <div className="flex-grow-1">
           <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
-            Target value <span className="text-muted">(suffix optional — e.g. %, $, pts)</span>
+            {isAtt
+              ? <>Target <span className="text-muted">(auto · attendance %)</span></>
+              : <>Target value <span className="text-muted">(suffix optional — e.g. %, $, pts)</span></>}
           </label>
           <div className="input-group input-group-sm">
             <input
@@ -65,8 +107,11 @@ function LineRow({ item, onChange, onRemove, index }) {
               className="form-control"
               placeholder="e.g. 250"
               min="0"
-              value={item.targetValue ?? ''}
+              value={isAtt ? 100 : (item.targetValue ?? '')}
               onChange={e => onChange(index, 'targetValue', e.target.value)}
+              readOnly={isAtt}
+              disabled={isAtt}
+              style={lockStyle}
             />
             <input
               type="text"
@@ -75,7 +120,9 @@ function LineRow({ item, onChange, onRemove, index }) {
               maxLength={6}
               value={suffix}
               onChange={e => onChange(index, 'suffix', e.target.value)}
-              style={{ maxWidth: 60, fontSize: '0.78rem', textAlign: 'center' }}
+              readOnly={isAtt}
+              disabled={isAtt}
+              style={{ maxWidth: 60, fontSize: '0.78rem', textAlign: 'center', ...(lockStyle || {}) }}
               title="Optional unit (e.g. %, $, pts) — leave blank for plain numbers"
             />
           </div>
@@ -293,11 +340,13 @@ export default function IncentiveForm() {
               id: uid4(), text: i.text, amount: i.amount,
               targetValue: i.targetValue ?? '', suffix: itemSuffix(i),
               achievedValue: 0, completed: false, completedBy: null,
+              ...(i.source ? { source: i.source } : {}),
             })));
             setBonuses((prior.bonuses || []).map((b) => ({
               id: uid4(), text: b.text, amount: b.amount,
               targetValue: b.targetValue ?? '', suffix: itemSuffix(b),
               achievedValue: 0, completed: false, completedBy: null,
+              ...(b.source ? { source: b.source } : {}),
             })));
             setCarryoverInfo({ source: 'prior', sourceMonth: prior.month });
           }
@@ -318,11 +367,13 @@ export default function IncentiveForm() {
       id: uid4(), text: i.text, amount: i.amount,
       targetValue: i.targetValue ?? '', suffix: itemSuffix(i),
       achievedValue: 0, completed: false, completedBy: null,
+      ...(i.source ? { source: i.source } : {}),
     })));
     setBonuses((tplData.bonuses || []).map(b => ({
       id: uid4(), text: b.text, amount: b.amount,
       targetValue: b.targetValue ?? '', suffix: itemSuffix(b),
       achievedValue: 0, completed: false, completedBy: null,
+      ...(b.source ? { source: b.source } : {}),
     })));
     setCarryoverInfo({ source: 'template' });
   }
@@ -364,19 +415,25 @@ export default function IncentiveForm() {
       // v2 savePlan handles both update (by id) and upsert on (user_id, month).
       // Items keep v1's per-item shape (achievedValue, completed, completedBy)
       // so the existing rows that other pages read stay compatible.
+      // Attendance-linked items pin Target=100 / unit=% so the ≥90% rule
+      // means "≥90% attendance"; their Achieved is filled at read time.
       const incPayload = incentives.map((i) => ({
         id: i.id, text: i.text, amount: Number(i.amount) || 0,
-        targetValue: Number(i.targetValue) || 0, suffix: itemSuffix(i),
+        targetValue: i.source === 'attendance' ? 100 : (Number(i.targetValue) || 0),
+        suffix: i.source === 'attendance' ? '%' : itemSuffix(i),
         completed: i.completed || false,
         achievedValue: i.achievedValue || 0,
         completedBy: i.completedBy || null,
+        ...(i.source ? { source: i.source } : {}),
       }));
       const bonPayload = bonuses.map((b) => ({
         id: b.id, text: b.text, amount: Number(b.amount) || 0,
-        targetValue: Number(b.targetValue) || 0, suffix: itemSuffix(b),
+        targetValue: b.source === 'attendance' ? 100 : (Number(b.targetValue) || 0),
+        suffix: b.source === 'attendance' ? '%' : itemSuffix(b),
         completed: b.completed || false,
         achievedValue: b.achievedValue || 0,
         completedBy: b.completedBy || null,
+        ...(b.source ? { source: b.source } : {}),
       }));
 
       const saved = await savePlan({

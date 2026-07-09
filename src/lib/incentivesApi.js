@@ -8,6 +8,66 @@ export function autoComplete(item) {
   return (a / t) >= 0.9;
 }
 
+// ── Attendance auto-fill ──────────────────────────────────────────
+// An incentive/bonus line item flagged { source: 'attendance' } gets its
+// achievedValue filled from the user's monthly attendance % (the same
+// figure the Performance attendance pillar uses, via perf_attendance_score)
+// instead of being typed in by hand. This runs at READ time so the number
+// is always current, and — crucially — it produces a plain number that
+// behaves identically to a hand-entered one for every downstream calc
+// (pct/completion ≥90%, earned/potential, verify, payout, rollover).
+// Target is pinned to 100 and the unit to '%', so "≥90% attendance" completes
+// the item under the existing rule with zero special-casing elsewhere.
+export async function fetchAttendancePct(month, userIds) {
+  const ids = Array.from(new Set((userIds || []).filter(Boolean)));
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase.rpc('incentive_attendance_pct', {
+    p_month: month, p_user_ids: ids,
+  });
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  (data || []).forEach((r) => m.set(r.user_id, Number(r.pct) || 0));
+  return m;
+}
+
+function _hasAttendanceItem(row) {
+  return [...(row?.incentives || []), ...(row?.bonuses || [])]
+    .some((it) => it && it.source === 'attendance');
+}
+
+// Patch attendance-linked items on the given normalised rows with live %.
+// No-op (and no network call) when no row has an attendance-linked item, so
+// this is safe to run on every incentives fetch. Fails soft: if the RPC
+// isn't there yet (pre-migration), rows are returned untouched.
+export async function applyAttendanceAutofill(rows, month) {
+  const list = Array.isArray(rows) ? rows : [];
+  const needIds = list.filter(_hasAttendanceItem).map((r) => r.user_id || r.userId).filter(Boolean);
+  if (!needIds.length) return list;
+  let pctByUser;
+  try {
+    pctByUser = await fetchAttendancePct(month, needIds);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('attendance autofill skipped:', e.message);
+    return list;
+  }
+  const patchItem = (it, uid) => {
+    if (!it || it.source !== 'attendance') return it;
+    const val = pctByUser.has(uid) ? pctByUser.get(uid) : (Number(it.achievedValue) || 0);
+    const next = { ...it, achievedValue: val, targetValue: 100, suffix: it.suffix || '%' };
+    next.completed = autoComplete(next);
+    return next;
+  };
+  return list.map((r) => {
+    const uid = r.user_id || r.userId;
+    return {
+      ...r,
+      incentives: (r.incentives || []).map((it) => patchItem(it, uid)),
+      bonuses:    (r.bonuses    || []).map((it) => patchItem(it, uid)),
+    };
+  });
+}
+
 export async function getIncentives(userId, month = currentMonth()) {
   const { data, error } = await supabase
     .from('incentives')
@@ -16,7 +76,9 @@ export async function getIncentives(userId, month = currentMonth()) {
   if (error) throw new Error(error.message);
   // Note: _normRow attaches v1 aliases (basicSalary, userId, payoutCleared,
   // verifiedByName, etc.) so v1 markup reads it without translation.
-  return data ? _normRow(data) : null;
+  if (!data) return null;
+  const [row] = await applyAttendanceAutofill([_normRow(data)], month);
+  return row;
 }
 
 export async function listIncentivesForMonth(month = currentMonth()) {
@@ -238,7 +300,7 @@ export async function listIncentivesMonth(month = currentMonth()) {
     .select('*, user:user_id(id, display_name, email, role, reports_to, is_active), verifier:verified_by(display_name)')
     .eq('month', month);
   if (error) throw new Error(error.message);
-  return (data || []).map(_normRow);
+  return applyAttendanceAutofill((data || []).map(_normRow), month);
 }
 
 // Most recent prior plan for one user (used for ghost auto-carry-forward).
@@ -435,11 +497,13 @@ export async function setIncentivesTemplate({ basicSalary, incentives: inc, bonu
       id: i.id, text: i.text, amount: Number(i.amount) || 0,
       targetValue: Number(i.targetValue) || 0,
       suffix: itemSuffix(i),
+      ...(i.source ? { source: i.source } : {}),
     })),
     bonuses:     (bon || []).map((b) => ({
       id: b.id, text: b.text, amount: Number(b.amount) || 0,
       targetValue: Number(b.targetValue) || 0,
       suffix: itemSuffix(b),
+      ...(b.source ? { source: b.source } : {}),
     })),
     savedByName: savedByName || '',
     savedAt:     new Date().toISOString(),

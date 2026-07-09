@@ -22,6 +22,16 @@ function itemSuffix(item) {
   return '';
 }
 
+// Marker for incentive items whose Achieved is auto-filled from attendance.
+function AttendanceBadge() {
+  return (
+    <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
+      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      <i className="bi bi-calendar-check me-1" />Auto
+    </span>
+  );
+}
+
 // ── View Details Modal (read-only) ────────────────────────────────────────────
 function DetailsModal({ record, items, onClose }) {
   const allItems = [...items.incentives, ...items.bonuses];
@@ -48,16 +58,19 @@ function DetailsModal({ record, items, onClose }) {
               Compensation: <strong style={{ color }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</strong>
             </div>
           </div>
-          <span
-            className="badge rounded-pill flex-shrink-0"
-            style={{
-              background: isCompleted ? '#e6f4ea' : '#fff3e0',
-              color: isCompleted ? '#198754' : '#fd7e14',
-              fontSize: '0.6rem',
-            }}
-          >
-            {isCompleted ? '✓ Completed' : `${p}%`}
-          </span>
+          <div className="d-flex align-items-center gap-1 flex-shrink-0">
+            {item.source === 'attendance' && <AttendanceBadge />}
+            <span
+              className="badge rounded-pill"
+              style={{
+                background: isCompleted ? '#e6f4ea' : '#fff3e0',
+                color: isCompleted ? '#198754' : '#fd7e14',
+                fontSize: '0.6rem',
+              }}
+            >
+              {isCompleted ? '✓ Completed' : `${p}%`}
+            </span>
+          </div>
         </div>
 
         {(item.targetValue > 0 || item.achievedValue > 0) && (
@@ -150,6 +163,7 @@ function EditItemRow({ item, category, onChange }) {
   const unitSfx  = itemSuffix(item);
   const p        = pct(achieved, target);
   const isCompleted = p >= 90;
+  const isAtt    = item.source === 'attendance';
 
   return (
     <div
@@ -166,16 +180,19 @@ function EditItemRow({ item, category, onChange }) {
             Compensation: <strong>+{(Number(item.amount) || 0).toLocaleString()} PKR</strong>
           </div>
         </div>
-        <span
-          className="badge rounded-pill flex-shrink-0"
-          style={{
-            background: isCompleted ? '#e6f4ea' : '#fff3e0',
-            color: isCompleted ? '#198754' : '#fd7e14',
-            fontSize: '0.6rem',
-          }}
-        >
-          {isCompleted ? '✓ Completed' : `${p}%`}
-        </span>
+        <div className="d-flex align-items-center gap-1 flex-shrink-0">
+          {isAtt && <AttendanceBadge />}
+          <span
+            className="badge rounded-pill"
+            style={{
+              background: isCompleted ? '#e6f4ea' : '#fff3e0',
+              color: isCompleted ? '#198754' : '#fd7e14',
+              fontSize: '0.6rem',
+            }}
+          >
+            {isCompleted ? '✓ Completed' : `${p}%`}
+          </span>
+        </div>
       </div>
 
       <div className="row g-2">
@@ -197,13 +214,15 @@ function EditItemRow({ item, category, onChange }) {
         </div>
         <div className="col-6">
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
-            Achieved {target ? <span className="text-muted">/ {Number(target).toLocaleString()}{unitSfx}</span> : ''}
+            Achieved {isAtt ? <span className="text-muted">(auto · attendance)</span> : (target ? <span className="text-muted">/ {Number(target).toLocaleString()}{unitSfx}</span> : '')}
           </label>
           <div className="input-group input-group-sm">
             <input
               type="number" className="form-control"
               placeholder="Your result" min="0" value={achieved}
               onChange={e => onChange(category, item.id, 'achievedValue', e.target.value)}
+              readOnly={isAtt} disabled={isAtt}
+              style={isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined}
             />
             {unitSfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{unitSfx}</span>}
           </div>
@@ -276,26 +295,31 @@ function EditModal({ record, items, onClose, onSaved }) {
         rowId: record.id,
         incentives: editItems.incentives.map(i => {
           const o = origInc.get(i.id) || {};
+          const isAtt = o.source === 'attendance';
           return {
             id: i.id, text: o.text, amount: o.amount,
-            targetValue:   Number(o.targetValue)   || 0,
-            achievedValue: Number(i.achievedValue) || 0,
-            suffix:        itemSuffix(o),
-            completed:     i.completed || false,
-            completedBy:   i.completed ? (apcProfile?.userName || currentUser.uid) : null,
-            completedAt:   i.completed ? new Date().toISOString() : null,
+            targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
+            // Attendance items ignore any typed value — keep the auto figure.
+            achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(i.achievedValue) || 0),
+            suffix:        isAtt ? '%' : itemSuffix(o),
+            completed:     isAtt ? !!o.completed : (i.completed || false),
+            completedBy:   isAtt ? (o.completedBy || null) : (i.completed ? (apcProfile?.userName || currentUser.uid) : null),
+            completedAt:   isAtt ? (o.completedAt || null)  : (i.completed ? new Date().toISOString() : null),
+            ...(o.source ? { source: o.source } : {}),
           };
         }),
         bonuses: editItems.bonuses.map(b => {
           const o = origBon.get(b.id) || {};
+          const isAtt = o.source === 'attendance';
           return {
             id: b.id, text: o.text, amount: o.amount,
-            targetValue:   Number(o.targetValue)   || 0,
-            achievedValue: Number(b.achievedValue) || 0,
-            suffix:        itemSuffix(o),
-            completed:     b.completed || false,
-            completedBy:   b.completed ? (apcProfile?.userName || currentUser.uid) : null,
-            completedAt:   b.completed ? new Date().toISOString() : null,
+            targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
+            achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(b.achievedValue) || 0),
+            suffix:        isAtt ? '%' : itemSuffix(o),
+            completed:     isAtt ? !!o.completed : (b.completed || false),
+            completedBy:   isAtt ? (o.completedBy || null) : (b.completed ? (apcProfile?.userName || currentUser.uid) : null),
+            completedAt:   isAtt ? (o.completedAt || null)  : (b.completed ? new Date().toISOString() : null),
+            ...(o.source ? { source: o.source } : {}),
           };
         }),
       });

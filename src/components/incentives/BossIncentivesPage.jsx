@@ -32,6 +32,16 @@ function itemSuffix(item) {
   if (item?.unit === 'percent') return '%';
   return '';
 }
+
+// Marker for incentive items whose Achieved is auto-filled from attendance.
+function AttendanceBadge() {
+  return (
+    <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
+      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      <i className="bi bi-calendar-check me-1" />Auto
+    </span>
+  );
+}
 function calcBreakdown(rec) {
   if (!rec) return { basic: 0, incTotal: 0, bonTotal: 0, incAchieved: 0, bonAchieved: 0, totalPotential: 0, totalAchieved: 0 };
   const incTotal    = (rec.incentives || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
@@ -72,9 +82,12 @@ function DetailsModal({ rec, userName, onClose }) {
             </div>
             {item.completedBy && <div style={{ fontSize: '0.63rem', color: '#198754' }}><i className="bi bi-person-check me-1" />Marked by {item.completedBy}</div>}
           </div>
-          <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
-            {item.completed ? '✓ Done' : `${p}%`}
-          </span>
+          <div className="d-flex align-items-center gap-1 flex-shrink-0">
+            {item.source === 'attendance' && <AttendanceBadge />}
+            <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
+              {item.completed ? '✓ Done' : `${p}%`}
+            </span>
+          </div>
         </div>
         {item.targetValue > 0 && (
           <div className="mt-1">
