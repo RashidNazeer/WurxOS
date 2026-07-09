@@ -6,6 +6,10 @@ import {
 import {
   XIcon, AlertIcon, CheckIcon, CopyIcon, PlusIcon, LinkIcon,
 } from '../common/Icon';
+// The wx-modal-* overlay styles live in table.css, which is imported per-page.
+// AmazonHaloPage doesn't import it, so bring it in here — otherwise the modal
+// renders unstyled (no fixed overlay) on /halo.
+import '../../styles/table.css';
 
 export default function HaloShareModal({ onClose }) {
   const [shares, setShares]   = useState([]);
