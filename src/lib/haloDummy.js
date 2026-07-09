@@ -16,6 +16,18 @@
 
 import { DUMMY_CAPABLE } from './haloFields';
 
+// Fixed set of realistic dummy keywords the aggregate Keyword Search Volume
+// is split across, each with a stable base share of the day's total. The
+// shares are jittered per day+keyword (deterministic) so every keyword has
+// its own believable daily curve that still sums back to the aggregate.
+export const DUMMY_KEYWORDS = [
+  { kw: 'vitamin c gummies',   w: 0.30 },
+  { kw: 'collagen powder',     w: 0.24 },
+  { kw: 'magnesium glycinate', w: 0.20 },
+  { kw: 'probiotic',           w: 0.15 },
+  { kw: 'immune support',      w: 0.11 },
+];
+
 // mulberry32 seeded from a string → stable pseudo-random in [0,1).
 function seededRand(str) {
   let h = 1779033703 ^ str.length;
@@ -33,6 +45,31 @@ function seededRand(str) {
 // noise multiplier around 1.0, +/- `amp`
 const jitter = (seed, amp) => 1 + (seededRand(seed) * 2 - 1) * amp;
 
+// Split a day's aggregate Keyword Search Volume across the fixed dummy
+// keywords. Base shares are jittered per day+keyword (deterministic) then
+// renormalised; the last keyword absorbs the rounding remainder so the parts
+// sum EXACTLY back to the aggregate. Returns { keyword: dailyVolume }.
+function splitKeywords(agg, date) {
+  if (!agg || agg <= 0) return {};
+  const weighted = DUMMY_KEYWORDS.map(({ kw, w }) => ({
+    kw,
+    w: Math.max(0, w * jitter(date + 'kw' + kw, 0.25)),
+  }));
+  const total = weighted.reduce((s, x) => s + x.w, 0) || 1;
+  const out = {};
+  let assigned = 0;
+  weighted.forEach((x, i) => {
+    if (i < weighted.length - 1) {
+      const v = Math.round((agg * x.w) / total);
+      out[x.kw] = v;
+      assigned += v;
+    } else {
+      out[x.kw] = Math.max(0, agg - assigned); // remainder → exact sum
+    }
+  });
+  return out;
+}
+
 // Is a field effectively empty across the dataset? (present in <10% of rows)
 function isEmptyColumn(rows, key) {
   const present = rows.filter((r) => r.metrics[key] != null).length;
@@ -46,7 +83,7 @@ function isEmptyColumn(rows, key) {
  */
 export function fillDummyColumns(rows, opts = {}) {
   const want = (opts.fields || DUMMY_CAPABLE).filter((k) => isEmptyColumn(rows, k));
-  const out = rows.map((r) => ({ date: r.date, metrics: { ...r.metrics }, dummyFields: [] }));
+  const out = rows.map((r) => ({ date: r.date, metrics: { ...r.metrics }, dummyFields: [], keywords: {} }));
   if (want.length === 0) return { rows: out, filled: [] };
 
   const LAG = 2; // halo delay in days (index-based; sheet is daily)
@@ -58,7 +95,9 @@ export function fillDummyColumns(rows, opts = {}) {
       const reach = (src.unique_impressions ?? src.product_impressions ?? 0);
       const vids = (src.video_per_day ?? 0);
       const base = 0.004 * reach + 8 * vids + 120;
-      m.keyword_search_volume = Math.max(0, Math.round(base * jitter(out[i].date + 'ksv', 0.15)));
+      const agg = Math.max(0, Math.round(base * jitter(out[i].date + 'ksv', 0.15)));
+      m.keyword_search_volume = agg;
+      out[i].keywords = splitKeywords(agg, out[i].date); // per-keyword breakdown
       out[i].dummyFields.push('keyword_search_volume');
     }
     if (want.includes('revenue_per_day')) {

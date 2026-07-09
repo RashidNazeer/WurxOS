@@ -37,6 +37,8 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
   const [lag, setLag] = useState(0);             // halo delay in days
   const [view, setView] = useState('compare');   // compare | heatmap | overlay
   const [range, setRange] = useState({ start: '', end: '' });
+  const [keyword, setKeyword] = useState(null);  // null = "All keywords" (aggregate)
+  const [downloading, setDownloading] = useState(false);
 
   // Keep a valid selection as the dataset list changes.
   useEffect(() => {
@@ -68,11 +70,62 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
     return s;
   }, [rows]);
 
-  const byDate = useMemo(() => indexByDate(rows || []), [rows]);
+  // Union of per-keyword breakdown keys across the dataset (empty for
+  // datasets that have no keyword-level data → picker stays hidden).
+  const keywordList = useMemo(() => {
+    const s = new Set();
+    (rows || []).forEach((r) => Object.keys(r.keywords || {}).forEach((k) => s.add(k)));
+    return [...s].sort();
+  }, [rows]);
+
+  // A newly loaded dataset may not share the previous keyword → reset.
+  useEffect(() => { setKeyword(null); }, [selectedId]);
+  useEffect(() => {
+    if (keyword && !keywordList.includes(keyword)) setKeyword(null);
+  }, [keywordList, keyword]);
+
+  // When a specific keyword is picked, keyword_search_volume resolves to that
+  // keyword's daily number (all other metrics untouched); null = aggregate.
+  const byDate = useMemo(() => {
+    const base = rows || [];
+    if (!keyword) return indexByDate(base);
+    const m = {};
+    for (const r of base) {
+      m[r.date] = { ...r.metrics, keyword_search_volume: r.keywords?.[keyword] ?? 0 };
+    }
+    return m;
+  }, [rows, keyword]);
   const dates = useMemo(() => {
     if (!rows) return [];
     return rows.map((r) => r.date).filter((d) => (!range.start || d >= range.start) && (!range.end || d <= range.end));
   }, [rows, range]);
+
+  // Export the CURRENTLY selected dataset's rows to .xlsx: Date + one column
+  // per HALO_FIELDS (metrics), plus one column per dummy keyword (breakdown).
+  async function downloadXlsx() {
+    if (!rows || !selectedDs || downloading) return;
+    setDownloading(true);
+    try {
+      const XLSX = await import('xlsx'); // heavy — loaded on demand (matches haloParse)
+      const header = ['Date', ...HALO_FIELDS.map((f) => f.label), ...keywordList];
+      const aoa = rows.map((r) => {
+        const row = { Date: r.date };
+        for (const f of HALO_FIELDS) row[f.label] = r.metrics?.[f.key] ?? '';
+        for (const kw of keywordList) row[kw] = r.keywords?.[kw] ?? '';
+        return row;
+      });
+      const ws = XLSX.utils.json_to_sheet(aoa, { header });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Halo');
+      const safe = String(selectedDs.name || 'dataset')
+        .replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'dataset';
+      XLSX.writeFile(wb, `halo-${safe}.xlsx`);
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -85,6 +138,9 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
         selectedId={selectedId}
         onSelect={setSelectedId}
         onDelete={onDelete}
+        onDownload={downloadXlsx}
+        downloading={downloading}
+        canDownload={!!rows && !rowsLoading}
       />
 
       {!selectedId ? (
@@ -103,6 +159,7 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
             range={range} setRange={setRange}
             period={{ start: selectedDs?.period_start, end: selectedDs?.period_end }}
             hasDummy={selectedDs?.has_dummy}
+            keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
           />
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -131,9 +188,10 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
 }
 
 // ============================================================
-// Dataset switcher — Delete button only when onDelete is provided (Boss).
+// Dataset switcher — Download for everyone; Delete only when onDelete is
+// provided (Boss). Download exports the selected dataset to .xlsx.
 // ============================================================
-function DatasetBar({ datasets, selectedId, onSelect, onDelete }) {
+function DatasetBar({ datasets, selectedId, onSelect, onDelete, onDownload, downloading, canDownload }) {
   if (!datasets.length) return null;
   const sel = datasets.find((d) => d.id === selectedId);
   return (
@@ -145,6 +203,13 @@ function DatasetBar({ datasets, selectedId, onSelect, onDelete }) {
           </option>
         ))}
       </select>
+      {sel && onDownload && (
+        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm"
+          disabled={!canDownload || downloading} onClick={onDownload}
+          title="Download this dataset as an Excel sheet">
+          {downloading ? <><span className="wx-spinner" /> Preparing…</> : <><i className="bi bi-download" /> Download</>}
+        </button>
+      )}
       {sel && onDelete && (
         <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => onDelete(sel.id)}>
           Delete
@@ -157,11 +222,35 @@ function DatasetBar({ datasets, selectedId, onSelect, onDelete }) {
 // ============================================================
 // Global filters
 // ============================================================
-function FiltersBar({ gran, setGran, lag, setLag, range, setRange, period, hasDummy }) {
+function FiltersBar({ gran, setGran, lag, setLag, range, setRange, period, hasDummy, keyword, setKeyword, keywordList }) {
   return (
     <div className="wx-card" style={{ padding: 12, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
       <Segmented label="View by" value={gran} onChange={setGran}
         options={[['day', 'Daily'], ['week', 'Weekly'], ['month', 'Monthly']]} />
+
+      {keywordList?.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
+            Keyword
+          </span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select className="wx-input" style={{ maxWidth: 220, height: 30, padding: '2px 8px', fontSize: 12.5 }}
+              value={keyword || ''} onChange={(e) => setKeyword(e.target.value || null)}
+              title="Which keyword's daily search volume feeds Keyword Search Volume">
+              <option value="">All keywords (total)</option>
+              {keywordList.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+            {keyword && (
+              <span style={{
+                background: 'var(--surface-2)', color: 'var(--accent)', borderRadius: 999,
+                padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+              }}>
+                Search volume: {keyword}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 200 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em' }}>

@@ -71,6 +71,7 @@ export async function fetchSharedHaloRows(token, datasetId) {
     date: r.date,
     metrics: r.metrics || {},
     dummyFields: r.dummy_fields || [],
+    keywords: r.keywords || {},
   }));
 }
 

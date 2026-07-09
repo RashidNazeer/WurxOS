@@ -16,22 +16,28 @@ export async function listHaloDatasets() {
 export async function getHaloRows(datasetId) {
   const { data, error } = await supabase
     .from('halo_rows')
-    .select('date, metrics, dummy_fields')
+    .select('date, metrics, dummy_fields, keywords')
     .eq('dataset_id', datasetId)
     .order('date', { ascending: true });
   if (error) throw error;
-  return (data || []).map((r) => ({ date: r.date, metrics: r.metrics || {}, dummyFields: r.dummy_fields || [] }));
+  return (data || []).map((r) => ({
+    date: r.date,
+    metrics: r.metrics || {},
+    dummyFields: r.dummy_fields || [],
+    keywords: r.keywords || {},
+  }));
 }
 
 /**
  * @param {{ name, filename, periodStart, periodEnd, hasDummy,
- *           rows: Array<{date, metrics, dummyFields?}> }} p
+ *           rows: Array<{date, metrics, dummyFields?, keywords?}> }} p
  */
 export async function createHaloDataset(p) {
   const payload = (p.rows || []).map((r) => ({
     date: r.date,
     metrics: r.metrics || {},
     dummy_fields: r.dummyFields || [],
+    keywords: r.keywords || {},
   }));
   const { data, error } = await supabase.rpc('halo_create_dataset', {
     p_name: p.name,
