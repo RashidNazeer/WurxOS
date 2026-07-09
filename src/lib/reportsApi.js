@@ -53,6 +53,13 @@ export const EMPTY_REPORT_DATA = () => ({
   // v1 keeps Action Items separate from Recommendations so APCs can list
   // concrete next steps below the narrative. Optional / free-form.
   actionItems: '',
+  // Single consolidated insights editor (replaces the six per-section
+  // insight fields on the new immersive weekly form). `insightsSingle`
+  // marks a report authored on the new form so the view renders ONE
+  // Insights block at the end instead of the six per-section boxes;
+  // absent/false on legacy reports, which keep their original rendering.
+  reportInsights: '',
+  insightsSingle: true,
   customFields: {},
 });
 
@@ -965,8 +972,15 @@ export function emptyReport() { return EMPTY_REPORT_DATA(); }
 export function emptyBiWeeklyReport() {
   // BiWeekly shape mirrors weekly except topVideos lacks `videoLink` in v1.
   // We keep videoLink optional so v2's view code that reads it still works.
+  //
+  // IMPORTANT: force `insightsSingle` OFF here. The single-insights migration
+  // lives on the WEEKLY form/view only; bi-weekly reuses WeeklyReportView but
+  // keeps its six per-section insight editors. Without this override the
+  // spread of EMPTY_REPORT_DATA() (which sets insightsSingle:true) would make
+  // the shared view suppress bi-weekly's per-section insights.
   return {
     ...EMPTY_REPORT_DATA(),
+    insightsSingle: false,
     topVideos: [{ creatorName: '', itemsSold: '', gmv: '', views: '', productClicks: '', notes: '' }],
   };
 }

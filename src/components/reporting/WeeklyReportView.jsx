@@ -713,6 +713,11 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
 
 function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor, highlightIntensity }) {
   if (!text) return null;
+  // New-era reports (insightsSingle) consolidate every section's insights into
+  // ONE block rendered at the very end of the report — so suppress the six
+  // per-section boxes for them. Legacy reports (flag absent/false) are
+  // untouched and keep rendering their per-section insights exactly as before.
+  if (report?.insightsSingle) return null;
   return (
     <div className="mt-3 mb-4 rounded-3 insight-box" style={{ padding: '14px 16px' }}>
       <div className="d-flex align-items-start gap-2">
@@ -967,6 +972,8 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     const insightFields = [
       report.overallInsights, report.topCreatorsInsights, report.topVideosInsights,
       report.gmvMaxInsights, report.productHighlightsInsights, report.offsiteInsights,
+      // New-era single consolidated insights (appended; empty on legacy reports).
+      report.reportInsights,
     ];
     const insightParts = insightFields.map(v => htmlToPlainText((v || '').toString()).trim()).filter(Boolean);
     const titled = [];
@@ -1622,6 +1629,33 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
               {renderedCustom}
               <BrandReportLinks brandId={report.brandId} knownSectionNames={unmatchedKnown} reportType={reportType} injectedSections={reportLinks} />
             </>
+          );
+        })()}
+
+        {/* ─── Consolidated Insights (new-era reports only) ─────────────────
+            New immersive weekly form writes ONE insights editor. Render it as
+            a single block at the very end. Legacy reports (insightsSingle
+            absent/false) never reach this — they show per-section InsightBoxes
+            above, exactly as before. Falls back to the merged six if the new
+            single field is somehow empty. */}
+        {report.insightsSingle === true && (() => {
+          const single = (report.reportInsights || '').toString();
+          const merged = [
+            report.overallInsights, report.topCreatorsInsights, report.topVideosInsights,
+            report.gmvMaxInsights, report.productHighlightsInsights, report.offsiteInsights,
+          ].filter(s => s && String(s).trim()).join('\n\n');
+          const html = single.trim() ? single : merged;
+          if (!html || !html.trim()) return null;
+          return (
+            <ContentSection
+              icon="bi-stars"
+              color="#7c3aed"
+              title="Insights"
+              eyebrow="The reporter's read on the week across every section">
+              <HighlightableContent html={html} report={report} fieldKey="reportInsights"
+                highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
+                style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
+            </ContentSection>
           );
         })()}
       </div>

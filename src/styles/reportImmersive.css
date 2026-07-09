@@ -1,0 +1,392 @@
+/* ============================================================
+   Weekly Report — Immersive two-pane editor (form only)
+   Layout shell, section nav rail, panels + progress bars.
+   Neutrals/surfaces/text use the app design tokens so both
+   light and dark themes work. Section hues are passed in as
+   an inline --hue custom property and only tint small accents
+   (icon chips, progress bars, the active rail item).
+   Prefix: .wri-  (weekly report immersive)
+   ============================================================ */
+
+.wri-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: flex;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* ── Left rail ─────────────────────────────────────────────── */
+.wri-rail {
+  width: 258px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border-subtle);
+}
+.wri-railtop {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 60px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.wri-brandmark {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+.wri-brandmark i { font-size: 1rem; }
+.wri-railtop .wri-rt-title { font-weight: 700; font-size: 0.82rem; line-height: 1.1; }
+.wri-railtop .wri-rt-sub { font-size: 0.66rem; color: var(--text-muted); }
+
+.wri-navscroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 12px 12px 8px;
+}
+.wri-railcap {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 10px 10px 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wri-railcap::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.wri-navitem {
+  --hue: var(--accent);
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  padding: 9px 11px;
+  border: 0;
+  background: transparent;
+  border-radius: 11px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  transition: background var(--dur-fast) var(--ease-out);
+  font-family: inherit;
+}
+.wri-navitem:hover { background: var(--surface-2); }
+.wri-navitem.active { background: color-mix(in srgb, var(--hue) 13%, transparent); }
+.wri-navitem.active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--hue);
+}
+.wri-chip {
+  grid-row: 1 / 3;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--hue) 16%, transparent);
+  color: var(--hue);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.wri-navitem.active .wri-chip { background: var(--hue); color: #fff; }
+.wri-chip i { font-size: 0.95rem; }
+.wri-nm { font-weight: 600; font-size: 0.81rem; letter-spacing: -0.005em; }
+.wri-track {
+  grid-column: 2 / 3;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--surface-3);
+  margin-top: 5px;
+  overflow: hidden;
+}
+.wri-track > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 99px;
+  background: var(--hue);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.wri-pc {
+  grid-row: 1 / 3;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+}
+.wri-navitem.done .wri-pc { color: var(--success); }
+
+/* ── Pinned action buttons (rail bottom) ───────────────────── */
+.wri-actions {
+  flex: none;
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--surface-1);
+}
+.wri-actrow { display: flex; gap: 7px; }
+.wri-actrow .wri-btn { flex: 1; }
+.wri-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+}
+.wri-btn:hover:not(:disabled) { background: var(--surface-2); }
+.wri-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.wri-btn i { font-size: 0.9rem; }
+.wri-btn-euka {
+  border-color: color-mix(in srgb, #0d9488 45%, var(--border-default));
+  color: #0d9488;
+}
+.wri-btn-euka:hover:not(:disabled) { background: color-mix(in srgb, #0d9488 12%, transparent); }
+.wri-btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+}
+.wri-btn-primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--accent); }
+
+/* ── Main area ─────────────────────────────────────────────── */
+.wri-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.wri-topstrip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  height: 60px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.wri-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.76rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.wri-back:hover { background: var(--surface-2); color: var(--text-primary); }
+.wri-headmeta { min-width: 0; }
+.wri-title { font-weight: 700; font-size: 0.92rem; letter-spacing: -0.01em; line-height: 1.15; }
+.wri-sub {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wri-changeweek {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  font-size: 0.64rem;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+.wri-changeweek:hover { background: var(--surface-2); }
+.wri-topright {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.wri-overall { display: flex; align-items: center; gap: 9px; }
+.wri-overall .lbl {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.wri-obar {
+  width: 110px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.wri-obar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #4f46e5, #0d9488);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.wri-overall .pct {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: right;
+}
+.wri-curr {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  padding: 4px 9px;
+}
+.wri-curr i { color: var(--text-muted); font-size: 0.85rem; }
+.wri-curr select {
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  outline: 0;
+  cursor: pointer;
+  max-width: 190px;
+}
+
+.wri-scroll {
+  --rte-toolbar-top: 0px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 20px 30px 90px 22px;
+  scroll-behavior: smooth;
+}
+
+/* ── Panels ────────────────────────────────────────────────── */
+.wri-panel { animation: wri-enter 0.34s var(--ease-out); }
+@keyframes wri-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.wri-phead {
+  --hue: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 6px;
+}
+.wri-picon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--hue) 15%, transparent);
+  color: var(--hue);
+}
+.wri-picon i { font-size: 1.2rem; }
+.wri-phead h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.wri-meter {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wri-meter .t {
+  width: 90px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.wri-meter .t > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--hue);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.wri-meter b {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.wri-pdesc {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 18px 51px;
+}
+
+/* ── Responsive: collapse rail on narrow viewports ─────────── */
+@media (max-width: 720px) {
+  .wri-rail { width: 210px; }
+  .wri-scroll { padding: 16px 16px 90px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wri-panel { animation: none; }
+  .wri-track > i, .wri-obar > i, .wri-meter .t > i { transition: none; }
+}
