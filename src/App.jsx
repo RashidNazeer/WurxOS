@@ -37,6 +37,7 @@ const PaidCollabVideosPage  = lazy(() => import('./pages/paidCollab/VideosPage')
 const PaidCollabDashboardPage = lazy(() => import('./pages/paidCollab/DashboardPage'));
 const PCTLIPCsPage          = lazy(() => import('./pages/pctl/IPCsPage'));
 const ReportPortalPage      = lazy(() => import('./pages/portal/ReportPortalPage'));
+const HaloPortalPage        = lazy(() => import('./pages/portal/HaloPortalPage'));
 const ClientPortalPage      = lazy(() => import('./pages/portal/ClientPortalPage'));
 const GmvMaxReportingPage   = lazy(() => import('./components/reporting/GmvMaxReportingPage'));
 const WeeklyReportsRouter   = lazy(() => import('./components/reporting/WeeklyReportsRouter'));
@@ -182,6 +183,10 @@ export default function App() {
             <Route
               path="/portal/access/:token"
               element={<Suspense fallback={<PageFallback />}><ClientPortalPage /></Suspense>}
+            />
+            <Route
+              path="/portal/halo/:token"
+              element={<Suspense fallback={<PageFallback />}><HaloPortalPage /></Suspense>}
             />
 
             {/* Protected shell — NotificationsProvider needs an authenticated user.
