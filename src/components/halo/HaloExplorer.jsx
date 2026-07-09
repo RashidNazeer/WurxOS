@@ -159,7 +159,6 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
             range={range} setRange={setRange}
             period={{ start: selectedDs?.period_start, end: selectedDs?.period_end }}
             hasDummy={selectedDs?.has_dummy}
-            keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
           />
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -175,11 +174,14 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
               Not enough days in the selected range to correlate (need at least 3).
             </div>
           ) : view === 'compare' ? (
-            <CompareView byDate={byDate} dates={dates} gran={gran} lag={lag} dummyKeys={dummyKeys} />
+            <CompareView byDate={byDate} dates={dates} gran={gran} lag={lag} dummyKeys={dummyKeys}
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
           ) : view === 'heatmap' ? (
-            <HeatmapView byDate={byDate} dates={dates} gran={gran} lag={lag} />
+            <HeatmapView byDate={byDate} dates={dates} gran={gran} lag={lag}
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
           ) : (
-            <OverlayView byDate={byDate} dates={dates} gran={gran} dummyKeys={dummyKeys} />
+            <OverlayView byDate={byDate} dates={dates} gran={gran} dummyKeys={dummyKeys}
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
           )}
         </>
       )}
@@ -222,35 +224,11 @@ function DatasetBar({ datasets, selectedId, onSelect, onDelete, onDownload, down
 // ============================================================
 // Global filters
 // ============================================================
-function FiltersBar({ gran, setGran, lag, setLag, range, setRange, period, hasDummy, keyword, setKeyword, keywordList }) {
+function FiltersBar({ gran, setGran, lag, setLag, range, setRange, period, hasDummy }) {
   return (
     <div className="wx-card" style={{ padding: 12, display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
       <Segmented label="View by" value={gran} onChange={setGran}
         options={[['day', 'Daily'], ['week', 'Weekly'], ['month', 'Monthly']]} />
-
-      {keywordList?.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
-            Keyword
-          </span>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="wx-input" style={{ maxWidth: 220, height: 30, padding: '2px 8px', fontSize: 12.5 }}
-              value={keyword || ''} onChange={(e) => setKeyword(e.target.value || null)}
-              title="Which keyword's daily search volume feeds Keyword Search Volume">
-              <option value="">All keywords (total)</option>
-              {keywordList.map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
-            {keyword && (
-              <span style={{
-                background: 'var(--surface-2)', color: 'var(--accent)', borderRadius: 999,
-                padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-              }}>
-                Search volume: {keyword}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 200 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
@@ -311,10 +289,35 @@ function FieldSelect({ value, onChange, dummyKeys }) {
   );
 }
 
+const KSV = 'keyword_search_volume';
+
+// Scopes Keyword Search Volume to a single keyword. Rendered only where KSV is
+// actually in play (a Compare field, an Overlay chip, the Heatmap's KSV row) —
+// it does nothing to any other metric, so it's hidden when KSV isn't in view.
+function KeywordPicker({ keyword, setKeyword, keywordList }) {
+  if (!keywordList?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Keyword</span>
+      <select className="wx-input" style={{ maxWidth: 220, height: 30, padding: '2px 8px', fontSize: 12.5 }}
+        value={keyword || ''} onChange={(e) => setKeyword(e.target.value || null)}
+        title="Which keyword's daily search volume feeds Keyword Search Volume">
+        <option value="">All keywords (total)</option>
+        {keywordList.map((k) => <option key={k} value={k}>{k}</option>)}
+      </select>
+      {keyword && (
+        <span style={{ background: 'var(--surface-2)', color: 'var(--accent)', borderRadius: 999, padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+          Search volume: {keyword}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ============================================================
 // Compare view
 // ============================================================
-function CompareView({ byDate, dates, gran, lag, dummyKeys }) {
+function CompareView({ byDate, dates, gran, lag, dummyKeys, keyword, setKeyword, keywordList }) {
   const [a, setA] = useState('video_per_day');
   const [b, setB] = useState('keyword_search_volume');
   const fa = FIELD_BY_KEY[a], fb = FIELD_BY_KEY[b];
@@ -329,6 +332,9 @@ function CompareView({ byDate, dates, gran, lag, dummyKeys }) {
           <span style={{ color: 'var(--text-muted)' }}>vs</span>
           <FieldSelect value={b} onChange={setB} dummyKeys={dummyKeys} />
           <RBadge r={r} />
+          {(a === KSV || b === KSV) && (
+            <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+          )}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{directionSentence(a, b, r)}</div>
 
@@ -391,7 +397,7 @@ function RBadge({ r }) {
 // ============================================================
 // Heatmap view
 // ============================================================
-function HeatmapView({ byDate, dates, gran, lag }) {
+function HeatmapView({ byDate, dates, gran, lag, keyword, setKeyword, keywordList }) {
   const [full, setFull] = useState(false);
   const rowFields = full ? HALO_FIELDS : AMAZON_FIELDS;
   const colFields = full ? HALO_FIELDS : TIKTOK_FIELDS;
@@ -406,9 +412,12 @@ function HeatmapView({ byDate, dates, gran, lag }) {
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           Correlation (r) of each <strong>{full ? 'metric' : 'Amazon'}</strong> row against each column. Green = positive, red = negative, stronger = more saturated.
         </div>
-        <label style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Show all fields
-        </label>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+          <label style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Show all fields
+          </label>
+        </div>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
@@ -456,7 +465,7 @@ function HeatmapView({ byDate, dates, gran, lag }) {
 // ============================================================
 // Overlay view
 // ============================================================
-function OverlayView({ byDate, dates, gran, dummyKeys }) {
+function OverlayView({ byDate, dates, gran, dummyKeys, keyword, setKeyword, keywordList }) {
   const [keys, setKeys] = useState(['video_per_day', 'keyword_search_volume', 'ntb']);
   const data = useMemo(() => overlaySeries(byDate, dates, keys, gran), [byDate, dates, keys, gran]);
 
@@ -482,6 +491,9 @@ function OverlayView({ byDate, dates, gran, dummyKeys }) {
           );
         })}
       </div>
+      {keys.includes(KSV) && (
+        <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+      )}
       <div style={{ width: '100%', height: 320 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
