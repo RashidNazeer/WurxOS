@@ -20,12 +20,16 @@ import { DUMMY_CAPABLE } from './haloFields';
 // is split across, each with a stable base share of the day's total. The
 // shares are jittered per day+keyword (deterministic) so every keyword has
 // its own believable daily curve that still sums back to the aggregate.
+// Realistic dummy search terms for a pain-relief brand (Penetrex). The first
+// is the branded query (steadiest, biggest share); the rest are generic
+// category terms. Swap this list per brand if you test another one.
 export const DUMMY_KEYWORDS = [
-  { kw: 'vitamin c gummies',   w: 0.30 },
-  { kw: 'collagen powder',     w: 0.24 },
-  { kw: 'magnesium glycinate', w: 0.20 },
-  { kw: 'probiotic',           w: 0.15 },
-  { kw: 'immune support',      w: 0.11 },
+  { kw: 'penetrex',               w: 0.28 },
+  { kw: 'pain relief cream',      w: 0.22 },
+  { kw: 'muscle and joint cream', w: 0.18 },
+  { kw: 'arthritis pain relief',  w: 0.14 },
+  { kw: 'back pain relief cream', w: 0.10 },
+  { kw: 'nerve pain cream',       w: 0.08 },
 ];
 
 // mulberry32 seeded from a string → stable pseudo-random in [0,1).
@@ -53,7 +57,7 @@ function splitKeywords(agg, date) {
   if (!agg || agg <= 0) return {};
   const weighted = DUMMY_KEYWORDS.map(({ kw, w }) => ({
     kw,
-    w: Math.max(0, w * jitter(date + 'kw' + kw, 0.25)),
+    w: Math.max(0, w * jitter(date + 'kw' + kw, 0.32)),
   }));
   const total = weighted.reduce((s, x) => s + x.w, 0) || 1;
   const out = {};
