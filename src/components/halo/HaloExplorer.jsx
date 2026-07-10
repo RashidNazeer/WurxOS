@@ -37,7 +37,8 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
   const [lag, setLag] = useState(0);             // halo delay in days
   const [view, setView] = useState('compare');   // compare | heatmap | overlay
   const [range, setRange] = useState({ start: '', end: '' });
-  const [keyword, setKeyword] = useState(null);  // null = "All keywords" (aggregate)
+  const [keyword, setKeyword] = useState(null);       // null = "All keywords" (volume total)
+  const [rankKeyword, setRankKeyword] = useState(null); // null = "All keywords" (avg rank)
   const [downloading, setDownloading] = useState(false);
 
   // Keep a valid selection as the dataset list changes.
@@ -71,30 +72,43 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
   }, [rows]);
 
   // Union of per-keyword breakdown keys across the dataset (empty for
-  // datasets that have no keyword-level data → picker stays hidden).
+  // datasets that have no keyword-level data → picker stays hidden). Volume
+  // and rank keep separate lists (a sheet may list different keywords in each).
   const keywordList = useMemo(() => {
     const s = new Set();
     (rows || []).forEach((r) => Object.keys(r.keywords || {}).forEach((k) => s.add(k)));
     return [...s].sort();
   }, [rows]);
+  const rankKeywordList = useMemo(() => {
+    const s = new Set();
+    (rows || []).forEach((r) => Object.keys(r.keywordRanks || {}).forEach((k) => s.add(k)));
+    return [...s].sort();
+  }, [rows]);
 
   // A newly loaded dataset may not share the previous keyword → reset.
-  useEffect(() => { setKeyword(null); }, [selectedId]);
+  useEffect(() => { setKeyword(null); setRankKeyword(null); }, [selectedId]);
   useEffect(() => {
     if (keyword && !keywordList.includes(keyword)) setKeyword(null);
   }, [keywordList, keyword]);
+  useEffect(() => {
+    if (rankKeyword && !rankKeywordList.includes(rankKeyword)) setRankKeyword(null);
+  }, [rankKeywordList, rankKeyword]);
 
   // When a specific keyword is picked, keyword_search_volume resolves to that
-  // keyword's daily number (all other metrics untouched); null = aggregate.
+  // keyword's daily number; keyword_search_rank likewise resolves to the picked
+  // rank keyword. Other metrics untouched; null pickers = the stored aggregate.
   const byDate = useMemo(() => {
     const base = rows || [];
-    if (!keyword) return indexByDate(base);
+    if (!keyword && !rankKeyword) return indexByDate(base);
     const m = {};
     for (const r of base) {
-      m[r.date] = { ...r.metrics, keyword_search_volume: r.keywords?.[keyword] ?? 0 };
+      const metrics = { ...r.metrics };
+      if (keyword) metrics.keyword_search_volume = r.keywords?.[keyword] ?? 0;
+      if (rankKeyword) metrics.keyword_search_rank = r.keywordRanks?.[rankKeyword] ?? null;
+      m[r.date] = metrics;
     }
     return m;
-  }, [rows, keyword]);
+  }, [rows, keyword, rankKeyword]);
   const dates = useMemo(() => {
     if (!rows) return [];
     return rows.map((r) => r.date).filter((d) => (!range.start || d >= range.start) && (!range.end || d <= range.end));
@@ -107,14 +121,25 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
     setDownloading(true);
     try {
       const XLSX = await import('xlsx'); // heavy — loaded on demand (matches haloParse)
-      const header = ['Date', ...HALO_FIELDS.map((f) => f.label), ...keywordList];
-      const aoa = rows.map((r) => {
-        const row = { Date: r.date };
-        for (const f of HALO_FIELDS) row[f.label] = r.metrics?.[f.key] ?? '';
-        for (const kw of keywordList) row[kw] = r.keywords?.[kw] ?? '';
-        return row;
-      });
-      const ws = XLSX.utils.json_to_sheet(aoa, { header });
+      // Mirror the UPLOAD layout so a downloaded sheet re-imports cleanly:
+      // Date | …fixed… | NTB | <volume keyword cols> | Revenue/Day |
+      // <rank keyword cols> | Product clicks | … Duplicate keyword names across
+      // volume & rank are fine because we build an array-of-arrays, not an
+      // object (which would collapse same-named keys).
+      const cols = [{ label: 'Date', get: (r) => r.date }];
+      for (const f of HALO_FIELDS) {
+        if (f.key === 'keyword_search_volume') {
+          if (keywordList.length) keywordList.forEach((kw) => cols.push({ label: kw, get: (r) => r.keywords?.[kw] ?? '' }));
+          else cols.push({ label: f.label, get: (r) => r.metrics?.[f.key] ?? '' });
+        } else if (f.key === 'keyword_search_rank') {
+          if (rankKeywordList.length) rankKeywordList.forEach((kw) => cols.push({ label: kw, get: (r) => r.keywordRanks?.[kw] ?? '' }));
+          else cols.push({ label: f.label, get: (r) => r.metrics?.[f.key] ?? '' });
+        } else {
+          cols.push({ label: f.label, get: (r) => r.metrics?.[f.key] ?? '' });
+        }
+      }
+      const aoa = [cols.map((c) => c.label), ...rows.map((r) => cols.map((c) => c.get(r)))];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Halo');
       const safe = String(selectedDs.name || 'dataset')
@@ -175,13 +200,16 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
             </div>
           ) : view === 'compare' ? (
             <CompareView byDate={byDate} dates={dates} gran={gran} lag={lag} dummyKeys={dummyKeys}
-              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
+              rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
           ) : view === 'heatmap' ? (
             <HeatmapView byDate={byDate} dates={dates} gran={gran} lag={lag}
-              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
+              rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
           ) : (
             <OverlayView byDate={byDate} dates={dates} gran={gran} dummyKeys={dummyKeys}
-              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
+              rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
           )}
         </>
       )}
@@ -290,34 +318,49 @@ function FieldSelect({ value, onChange, dummyKeys }) {
 }
 
 const KSV = 'keyword_search_volume';
+const KSR = 'keyword_search_rank';
 
-// Scopes Keyword Search Volume to a single keyword. Rendered only where KSV is
-// actually in play (a Compare field, an Overlay chip, the Heatmap's KSV row) —
-// it does nothing to any other metric, so it's hidden when KSV isn't in view.
-function KeywordPicker({ keyword, setKeyword, keywordList }) {
+// Scopes a per-keyword Amazon metric (Search Volume or Search Rank) to a single
+// keyword. Rendered only where that metric is actually in play (a Compare field,
+// an Overlay chip, the Heatmap's row) — it does nothing to other metrics, so it
+// stays hidden when its metric isn't in view (or the dataset has no keywords).
+function KeywordPicker({
+  keyword, setKeyword, keywordList,
+  label = 'Keyword', allLabel = 'All keywords (total)', badge = 'Search volume', title,
+}) {
   if (!keywordList?.length) return null;
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Keyword</span>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>{label}</span>
       <select className="wx-input" style={{ maxWidth: 220, height: 30, padding: '2px 8px', fontSize: 12.5 }}
-        value={keyword || ''} onChange={(e) => setKeyword(e.target.value || null)}
-        title="Which keyword's daily search volume feeds Keyword Search Volume">
-        <option value="">All keywords (total)</option>
+        value={keyword || ''} onChange={(e) => setKeyword(e.target.value || null)} title={title}>
+        <option value="">{allLabel}</option>
         {keywordList.map((k) => <option key={k} value={k}>{k}</option>)}
       </select>
       {keyword && (
         <span style={{ background: 'var(--surface-2)', color: 'var(--accent)', borderRadius: 999, padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
-          Search volume: {keyword}
+          {badge}: {keyword}
         </span>
       )}
     </div>
   );
 }
 
+// The rank-flavoured picker (its own keyword list + "avg" wording).
+function RankKeywordPicker({ rankKeyword, setRankKeyword, rankKeywordList }) {
+  return (
+    <KeywordPicker
+      keyword={rankKeyword} setKeyword={setRankKeyword} keywordList={rankKeywordList}
+      label="Rank keyword" allLabel="All keywords (avg)" badge="Search rank"
+      title="Which keyword's daily search rank feeds Keyword Search Rank"
+    />
+  );
+}
+
 // ============================================================
 // Compare view
 // ============================================================
-function CompareView({ byDate, dates, gran, lag, dummyKeys, keyword, setKeyword, keywordList }) {
+function CompareView({ byDate, dates, gran, lag, dummyKeys, keyword, setKeyword, keywordList, rankKeyword, setRankKeyword, rankKeywordList }) {
   const [a, setA] = useState('video_per_day');
   const [b, setB] = useState('keyword_search_volume');
   const fa = FIELD_BY_KEY[a], fb = FIELD_BY_KEY[b];
@@ -334,6 +377,9 @@ function CompareView({ byDate, dates, gran, lag, dummyKeys, keyword, setKeyword,
           <RBadge r={r} />
           {(a === KSV || b === KSV) && (
             <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+          )}
+          {(a === KSR || b === KSR) && (
+            <RankKeywordPicker rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
           )}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{directionSentence(a, b, r)}</div>
@@ -385,8 +431,19 @@ function CompareView({ byDate, dates, gran, lag, dummyKeys, keyword, setKeyword,
 }
 
 function RBadge({ r }) {
-  const bg = r == null ? 'var(--surface-2)' : Math.abs(r) >= 0.6 ? 'rgba(34,197,94,.18)' : Math.abs(r) >= 0.3 ? 'rgba(245,158,11,.18)' : 'var(--surface-2)';
-  const fg = r == null ? 'var(--text-muted)' : Math.abs(r) >= 0.6 ? '#22c55e' : Math.abs(r) >= 0.3 ? '#f59e0b' : 'var(--text-muted)';
+  // Colour by SIGN first: a negative correlation is the opposite of the halo
+  // hypothesis, so ANY negative reads red — even a weak one (matches the
+  // heatmap's corrColor semantics). Magnitude only controls tint saturation;
+  // positive stays green (strong) / amber (moderate) / neutral (little/none).
+  const a = r == null ? 0 : Math.abs(r);
+  let bg = 'var(--surface-2)', fg = 'var(--text-muted)';
+  if (r != null && r < 0) {
+    bg = a >= 0.6 ? 'rgba(239,68,68,.20)' : a >= 0.3 ? 'rgba(239,68,68,.14)' : 'rgba(239,68,68,.10)';
+    fg = '#ef4444';
+  } else if (r != null) {
+    bg = a >= 0.6 ? 'rgba(34,197,94,.18)' : a >= 0.3 ? 'rgba(245,158,11,.18)' : 'var(--surface-2)';
+    fg = a >= 0.6 ? '#22c55e' : a >= 0.3 ? '#f59e0b' : 'var(--text-muted)';
+  }
   return (
     <span style={{ background: bg, color: fg, borderRadius: 999, padding: '4px 12px', fontWeight: 700, fontSize: 13 }}>
       r = {r == null ? '—' : r.toFixed(2)} · {strengthLabel(r)}
@@ -397,7 +454,7 @@ function RBadge({ r }) {
 // ============================================================
 // Heatmap view
 // ============================================================
-function HeatmapView({ byDate, dates, gran, lag, keyword, setKeyword, keywordList }) {
+function HeatmapView({ byDate, dates, gran, lag, keyword, setKeyword, keywordList, rankKeyword, setRankKeyword, rankKeywordList }) {
   const [full, setFull] = useState(false);
   const rowFields = full ? HALO_FIELDS : AMAZON_FIELDS;
   const colFields = full ? HALO_FIELDS : TIKTOK_FIELDS;
@@ -414,6 +471,7 @@ function HeatmapView({ byDate, dates, gran, lag, keyword, setKeyword, keywordLis
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+          <RankKeywordPicker rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
           <label style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Show all fields
           </label>
@@ -465,7 +523,7 @@ function HeatmapView({ byDate, dates, gran, lag, keyword, setKeyword, keywordLis
 // ============================================================
 // Overlay view
 // ============================================================
-function OverlayView({ byDate, dates, gran, dummyKeys, keyword, setKeyword, keywordList }) {
+function OverlayView({ byDate, dates, gran, dummyKeys, keyword, setKeyword, keywordList, rankKeyword, setRankKeyword, rankKeywordList }) {
   const [keys, setKeys] = useState(['video_per_day', 'keyword_search_volume', 'ntb']);
   const data = useMemo(() => overlaySeries(byDate, dates, keys, gran), [byDate, dates, keys, gran]);
 
@@ -493,6 +551,9 @@ function OverlayView({ byDate, dates, gran, dummyKeys, keyword, setKeyword, keyw
       </div>
       {keys.includes(KSV) && (
         <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />
+      )}
+      {keys.includes(KSR) && (
+        <RankKeywordPicker rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
       )}
       <div style={{ width: '100%', height: 320 }}>
         <ResponsiveContainer width="100%" height="100%">

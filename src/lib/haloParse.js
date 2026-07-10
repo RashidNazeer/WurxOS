@@ -86,6 +86,39 @@ function buildColumnMap(headerCells) {
   return map;
 }
 
+// A keyword slot header is a "template placeholder" (empty, or the sheet's
+// "[Input Keyword Name & Add Volume Below]" prompt) — not a real keyword. Such
+// columns carry no data and are skipped so the dummy filler can seed them.
+function isPlaceholderHeader(cell) {
+  const s = String(cell ?? '').trim();
+  if (!s) return true;
+  if (/\binput\b/i.test(s)) return true;      // "[Input Keyword Name …]"
+  if (/^\[.*\]$/.test(s)) return true;         // any fully-bracketed prompt
+  return false;
+}
+
+// Discover the dynamic keyword columns that sit BETWEEN two anchor columns.
+// Header text = the keyword name. Columns already mapped to a fixed field
+// (incl. a literal aggregate "Keyword Search Volume/Rank" column, old format)
+// and placeholder slots are excluded. Returns [{ idx, name }] left→right.
+function keywordColumnsBetween(headerCells, colMap, startIdx, endIdx) {
+  if (startIdx == null || endIdx == null || endIdx <= startIdx + 1) return [];
+  const out = [];
+  const seen = new Set();
+  for (let idx = startIdx + 1; idx < endIdx; idx++) {
+    if (colMap[idx]) continue;                 // a recognised fixed/aggregate column
+    if (isPlaceholderHeader(headerCells[idx])) continue;
+    let name = String(headerCells[idx]).trim();
+    if (seen.has(name)) name = `${name} (${idx})`; // de-collide duplicate headers
+    seen.add(name);
+    out.push({ idx, name });
+  }
+  return out;
+}
+
+const sum = (arr) => arr.reduce((s, x) => s + x, 0);
+const avg = (arr) => (arr.length ? sum(arr) / arr.length : null);
+
 /**
  * Parse an uploaded sheet.
  * @param {ArrayBuffer} arrayBuffer
@@ -106,12 +139,38 @@ export async function parseHaloSheet(arrayBuffer, opts = {}) {
     throw new Error('Could not find the header row (needs a "Date" column plus metrics like GMV, Orders, ROI).');
   }
 
-  const colMap = buildColumnMap(grid[headerIdx]);
+  const headerCells = grid[headerIdx];
+  const colMap = buildColumnMap(headerCells);
   const dateCol = Object.keys(colMap).find((idx) => colMap[idx] === 'date');
   if (dateCol == null) throw new Error('No "Date" column found in the header.');
 
+  // Anchor columns that bracket the dynamic keyword regions. The sheet layout
+  // is: … NTB | <keyword-volume cols…> | Revenue/Day | <keyword-rank cols…> |
+  // Product clicks … So keyword-VOLUME columns live between NTB and Revenue/Day,
+  // and keyword-RANK columns between Revenue/Day and Product clicks. Each such
+  // column's header is a keyword; the cells below are that keyword's daily
+  // volume / rank. There can be any number (0..N) of them.
+  const idxOf = (k) => {
+    const hit = Object.keys(colMap).find((i) => colMap[i] === k);
+    return hit == null ? null : Number(hit);
+  };
+  const ntbIdx = idxOf('ntb');
+  const revIdx = idxOf('revenue_per_day');
+  const pcIdx = idxOf('product_clicks');
+
+  const volKwCols = keywordColumnsBetween(headerCells, colMap, ntbIdx, revIdx);
+  const rankKwCols = keywordColumnsBetween(headerCells, colMap, revIdx, pcIdx);
+  if (ntbIdx != null && revIdx == null) {
+    warnings.push('No "Revenue/Day" column found — keyword volume columns could not be located.');
+  }
+  if (revIdx != null && pcIdx == null) {
+    warnings.push('No "Product clicks" column found — keyword rank columns could not be located.');
+  }
+
   const defaultYear = opts.defaultYear || new Date().getFullYear();
   const foundKeys = new Set(Object.values(colMap).filter((k) => k !== 'date'));
+  if (volKwCols.length) foundKeys.add('keyword_search_volume');
+  if (rankKwCols.length) foundKeys.add('keyword_search_rank');
 
   const rows = [];
   let prevM0 = null;
@@ -139,10 +198,31 @@ export async function parseHaloSheet(arrayBuffer, opts = {}) {
       const n = parseNum(cells[idx]);
       if (n != null) metrics[key] = n;
     }
-    // Ignore an all-empty row that happened to have a stray date.
-    if (Object.keys(metrics).length === 0) continue;
 
-    rows.push({ date: iso, metrics });
+    // Per-keyword breakdowns from the dynamic columns, plus derived aggregates
+    // (volume sums, rank averages) — unless the sheet already had a literal
+    // aggregate column mapped above.
+    const keywords = {};
+    for (const { idx, name } of volKwCols) {
+      const n = parseNum(cells[idx]);
+      if (n != null) keywords[name] = n;
+    }
+    const keywordRanks = {};
+    for (const { idx, name } of rankKwCols) {
+      const n = parseNum(cells[idx]);
+      if (n != null) keywordRanks[name] = n;
+    }
+    const volVals = Object.values(keywords);
+    if (volVals.length && metrics.keyword_search_volume == null) metrics.keyword_search_volume = sum(volVals);
+    const rankVals = Object.values(keywordRanks);
+    if (rankVals.length && metrics.keyword_search_rank == null) {
+      metrics.keyword_search_rank = Math.round(avg(rankVals) * 100) / 100;
+    }
+
+    // Ignore an all-empty row that happened to have a stray date.
+    if (Object.keys(metrics).length === 0 && volVals.length === 0 && rankVals.length === 0) continue;
+
+    rows.push({ date: iso, metrics, keywords, keywordRanks });
   }
 
   if (rows.length === 0) throw new Error('No data rows found under the header.');
@@ -153,6 +233,10 @@ export async function parseHaloSheet(arrayBuffer, opts = {}) {
     periodStart: rows[0].date,
     periodEnd: rows[rows.length - 1].date,
     foundKeys: [...foundKeys],
+    keywordColumns: {
+      volume: volKwCols.map((c) => c.name),
+      rank: rankKwCols.map((c) => c.name),
+    },
     warnings,
   };
 }

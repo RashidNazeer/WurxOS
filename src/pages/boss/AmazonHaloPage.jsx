@@ -154,6 +154,20 @@ function UploadPanel({ onUploaded, dummyDefault }) {
             Parsed <strong style={{ color: 'var(--text-primary)' }}>{parsed.rows.length}</strong> days
             ({parsed.periodStart} → {parsed.periodEnd}) · {parsed.foundKeys.length} columns recognised.
           </div>
+          {(parsed.keywordColumns?.volume?.length || parsed.keywordColumns?.rank?.length) ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Keyword columns —{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>volume:</strong>{' '}
+              {parsed.keywordColumns.volume.length ? parsed.keywordColumns.volume.join(', ') : '—'}
+              {'  ·  '}
+              <strong style={{ color: 'var(--text-primary)' }}>rank:</strong>{' '}
+              {parsed.keywordColumns.rank.length ? parsed.keywordColumns.rank.join(', ') : '—'}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              No named keyword columns found (blank/placeholder headers) — test data will seed keywords if enabled.
+            </div>
+          )}
           <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             Dataset name
             <input className="wx-input" style={{ marginTop: 4 }} value={name} onChange={(e) => setName(e.target.value)} />
@@ -161,7 +175,7 @@ function UploadPanel({ onUploaded, dummyDefault }) {
           <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
             <input type="checkbox" checked={fillDummy} onChange={(e) => setFillDummy(e.target.checked)} style={{ marginTop: 2 }} />
             <span>
-              Fill empty Amazon columns (Keyword Search Volume, Revenue/Day) with <strong>meaningful test data</strong> so
+              Fill empty Amazon columns (Keyword Search Volume, Keyword Search Rank, Revenue/Day) with <strong>meaningful test data</strong> so
               the graphs show a signal now. Clearly badged as test; replace by uploading a sheet with real values.
             </span>
           </label>

@@ -26,6 +26,10 @@ export const HALO_FIELDS = [
   { key: 'ntb',                 label: 'NTB (units sold)',     group: 'amazon', agg: 'sum', fmt: 'int'   },
   { key: 'keyword_search_volume', label: 'Keyword Search Volume', group: 'amazon', agg: 'sum', fmt: 'int' },
   { key: 'revenue_per_day',     label: 'Revenue/Day',          group: 'amazon', agg: 'sum', fmt: 'money' },
+  // Keyword Search Rank — per-keyword search-result position (1 = top). Lower
+  // is better, so it rolls up as an average (not a sum) and correlates
+  // INVERSELY with reach (more TikTok reach → better/lower rank).
+  { key: 'keyword_search_rank', label: 'Keyword Search Rank',  group: 'amazon', agg: 'avg', fmt: 'num'   },
   { key: 'product_clicks',      label: 'Product clicks',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_clicks',       label: 'Unique clicks',        group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'cost',                label: 'Cost',                 group: 'tiktok', agg: 'sum', fmt: 'money' },
@@ -41,7 +45,7 @@ export const TIKTOK_FIELDS = HALO_FIELDS.filter((f) => f.group === 'tiktok');
 
 // Amazon columns that are empty in the real sheet today and may be seeded
 // with meaningful test data until the real values arrive.
-export const DUMMY_CAPABLE = ['keyword_search_volume', 'revenue_per_day'];
+export const DUMMY_CAPABLE = ['keyword_search_volume', 'keyword_search_rank', 'revenue_per_day'];
 
 // Normalise a header cell to match against the synonym table:
 // lowercase, drop everything that isn't a letter or digit.
@@ -64,6 +68,8 @@ const HEADER_SYNONYMS = {
   keywordsearchvolume: 'keyword_search_volume',
   revenueday: 'revenue_per_day',
   revenueperday: 'revenue_per_day',
+  keywordsearchrank: 'keyword_search_rank',
+  keywordrank: 'keyword_search_rank',
   productclicks: 'product_clicks',
   uniqueclicks: 'unique_clicks',
   cost: 'cost',

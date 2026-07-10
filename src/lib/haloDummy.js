@@ -23,13 +23,17 @@ import { DUMMY_CAPABLE } from './haloFields';
 // Realistic dummy search terms for a pain-relief brand (Penetrex). The first
 // is the branded query (steadiest, biggest share); the rest are generic
 // category terms. Swap this list per brand if you test another one.
+//   w = share of the day's total search VOLUME (biggest for the branded term)
+//   r = the keyword's baseline search RANK (1 = top of results). Branded terms
+//       rank best; broad terms rank worse. Daily rank improves (drops) on
+//       high-reach days, so rank correlates INVERSELY with TikTok reach.
 export const DUMMY_KEYWORDS = [
-  { kw: 'penetrex',               w: 0.28 },
-  { kw: 'pain relief cream',      w: 0.22 },
-  { kw: 'muscle and joint cream', w: 0.18 },
-  { kw: 'arthritis pain relief',  w: 0.14 },
-  { kw: 'back pain relief cream', w: 0.10 },
-  { kw: 'nerve pain cream',       w: 0.08 },
+  { kw: 'penetrex',               w: 0.28, r: 3  },
+  { kw: 'pain relief cream',      w: 0.22, r: 12 },
+  { kw: 'muscle and joint cream', w: 0.18, r: 18 },
+  { kw: 'arthritis pain relief',  w: 0.14, r: 23 },
+  { kw: 'back pain relief cream', w: 0.10, r: 29 },
+  { kw: 'nerve pain cream',       w: 0.08, r: 35 },
 ];
 
 // mulberry32 seeded from a string → stable pseudo-random in [0,1).
@@ -48,6 +52,7 @@ function seededRand(str) {
 
 // noise multiplier around 1.0, +/- `amp`
 const jitter = (seed, amp) => 1 + (seededRand(seed) * 2 - 1) * amp;
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
 // Split a day's aggregate Keyword Search Volume across the fixed dummy
 // keywords. Base shares are jittered per day+keyword (deterministic) then
@@ -87,7 +92,15 @@ function isEmptyColumn(rows, key) {
  */
 export function fillDummyColumns(rows, opts = {}) {
   const want = (opts.fields || DUMMY_CAPABLE).filter((k) => isEmptyColumn(rows, k));
-  const out = rows.map((r) => ({ date: r.date, metrics: { ...r.metrics }, dummyFields: [], keywords: {} }));
+  // Preserve any REAL per-keyword breakdowns already parsed from the sheet —
+  // dummy only ever fills columns that were empty across the dataset.
+  const out = rows.map((r) => ({
+    date: r.date,
+    metrics: { ...r.metrics },
+    dummyFields: [],
+    keywords: { ...(r.keywords || {}) },
+    keywordRanks: { ...(r.keywordRanks || {}) },
+  }));
   if (want.length === 0) return { rows: out, filled: [] };
 
   const LAG = 2; // halo delay in days (index-based; sheet is daily)
@@ -103,6 +116,22 @@ export function fillDummyColumns(rows, opts = {}) {
       m.keyword_search_volume = agg;
       out[i].keywords = splitKeywords(agg, out[i].date); // per-keyword breakdown
       out[i].dummyFields.push('keyword_search_volume');
+    }
+    if (want.includes('keyword_search_rank')) {
+      // Per-keyword rank IMPROVES (drops toward 1) as lagged TikTok reach rises,
+      // so keyword rank correlates inversely with reach. reachScore ∈ [0,1].
+      const reach = (src.unique_impressions ?? src.product_impressions ?? 0);
+      const vids = (src.video_per_day ?? 0);
+      const reachScore = clamp01(0.55 * (reach / 80000) + 0.45 * (vids / 40));
+      const ranks = {};
+      for (const { kw, r } of DUMMY_KEYWORDS) {
+        const improved = r * (1 - 0.55 * reachScore);
+        ranks[kw] = Math.max(1, Math.round(improved * jitter(out[i].date + 'rank' + kw, 0.18)));
+      }
+      out[i].keywordRanks = ranks;
+      const vals = Object.values(ranks);
+      m.keyword_search_rank = Math.round((vals.reduce((s, x) => s + x, 0) / vals.length) * 100) / 100;
+      out[i].dummyFields.push('keyword_search_rank');
     }
     if (want.includes('revenue_per_day')) {
       const ntb = (m.ntb ?? 0);
