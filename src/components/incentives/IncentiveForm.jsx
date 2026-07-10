@@ -31,9 +31,16 @@ function itemSuffix(item) {
 }
 
 // ── Row editor (incentive or bonus line) ─────────────────────────────────────
+// The attendance auto-fill toggle only belongs on the attendance / punctuality
+// line — it makes no sense on a metric like "Onboarding L3+ Creators". Reveal
+// it only when the row is already attendance-linked or its text names
+// attendance / punctuality / absence(s).
+const looksLikeAttendance = (text) => /attendance|punctual|absence/i.test(text || '');
+
 function LineRow({ item, onChange, onRemove, index }) {
   const isAtt  = item.source === 'attendance';
   const suffix = isAtt ? '%' : (item.suffix ?? (item.unit === 'percent' ? '%' : ''));
+  const showAttToggle = isAtt || looksLikeAttendance(item.text);
 
   // Toggling attendance mode pins Target=100 and unit=% so the ≥90% rule
   // means "≥90% attendance". Achieved is then filled from live attendance.
@@ -70,21 +77,23 @@ function LineRow({ item, onChange, onRemove, index }) {
         </button>
       </div>
 
-      {/* Auto-fill from attendance toggle */}
-      <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
-        <input
-          className="form-check-input flex-shrink-0 mt-0"
-          type="checkbox"
-          role="switch"
-          id={`att-${item.id}`}
-          checked={isAtt}
-          onChange={e => toggleAttendance(e.target.checked)}
-        />
-        <label className="form-check-label" htmlFor={`att-${item.id}`} style={{ fontSize: '0.72rem', color: isAtt ? '#1e40af' : '#6c757d' }}>
-          <i className="bi bi-calendar-check me-1" />
-          Auto-fill “Achieved” from monthly attendance
-        </label>
-      </div>
+      {/* Auto-fill from attendance toggle — only on the attendance line */}
+      {showAttToggle && (
+        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
+          <input
+            className="form-check-input flex-shrink-0 mt-0"
+            type="checkbox"
+            role="switch"
+            id={`att-${item.id}`}
+            checked={isAtt}
+            onChange={e => toggleAttendance(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor={`att-${item.id}`} style={{ fontSize: '0.72rem', color: isAtt ? '#1e40af' : '#6c757d' }}>
+            <i className="bi bi-calendar-check me-1" />
+            Auto-fill “Achieved” from monthly attendance
+          </label>
+        </div>
+      )}
       {isAtt && (
         <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
           <i className="bi bi-info-circle me-1" />
