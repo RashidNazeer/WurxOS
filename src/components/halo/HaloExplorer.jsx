@@ -189,7 +189,7 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
           />
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {[['compare', 'Compare two'], ['heatmap', 'Correlation heatmap'], ['overlay', 'Multi-metric overlay']].map(([k, label]) => (
+            {[['compare', 'Compare two'], ['heatmap', 'Correlation heatmap'], ['overlay', 'Multi-metric overlay'], ['lagfinder', 'Lag finder']].map(([k, label]) => (
               <button key={k} type="button"
                 className={`wx-btn ${view === k ? 'wx-btn-primary' : 'wx-btn-ghost'} wx-btn-sm`}
                 onClick={() => setView(k)}>{label}</button>
@@ -208,8 +208,12 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
             <HeatmapView byDate={byDate} dates={dates} gran={gran} lag={lag}
               keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
               rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
-          ) : (
+          ) : view === 'overlay' ? (
             <OverlayView byDate={byDate} dates={dates} gran={gran} dummyKeys={dummyKeys}
+              keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
+              rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
+          ) : (
+            <LagFinderView byDate={byDate} dates={dates} gran={gran}
               keyword={keyword} setKeyword={setKeyword} keywordList={keywordList}
               rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />
           )}
@@ -575,6 +579,144 @@ function OverlayView({ byDate, dates, gran, dummyKeys, keyword, setKeyword, keyw
             ))}
           </LineChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Lag finder view — sweep ALL TikTok metrics against ONE Amazon metric
+// across every halo lag (0..14 days) and surface where the correlation
+// peaks. Answers "which TikTok metric drives this Amazon metric, and after
+// how many days?". Self-contained; sweeps its own lags (ignores the global
+// lag slider). Cycle the Amazon metric to analyse each in turn.
+// ============================================================
+const LAGS = Array.from({ length: 15 }, (_, i) => i); // 0..14 days
+
+function LagFinderView({ byDate, dates, gran, keyword, setKeyword, keywordList, rankKeyword, setRankKeyword, rankKeywordList }) {
+  const [amazonKey, setAmazonKey] = useState(AMAZON_FIELDS[0].key);
+  const [rankBy, setRankBy] = useState('positive'); // 'positive' = highest r | 'magnitude' = largest |r|
+
+  const amazonField = FIELD_BY_KEY[amazonKey];
+
+  // grid[row] = { field, cells:[{lag,r}], best:{lag,r} }
+  const grid = useMemo(() => TIKTOK_FIELDS.map((tf) => {
+    const cells = LAGS.map((L) => ({ lag: L, r: pairSeries(byDate, dates, tf.key, amazonKey, L, gran).r }));
+    const valid = cells.filter((c) => c.r != null);
+    let best = null;
+    if (valid.length) {
+      best = rankBy === 'magnitude'
+        ? valid.reduce((a, b) => (Math.abs(b.r) > Math.abs(a.r) ? b : a))
+        : valid.reduce((a, b) => (b.r > a.r ? b : a));
+    }
+    return { field: tf, cells, best };
+  }), [byDate, dates, gran, amazonKey, rankBy]);
+
+  const topSignals = useMemo(() => {
+    const all = [];
+    grid.forEach((row) => row.cells.forEach((c) => { if (c.r != null) all.push({ field: row.field, lag: c.lag, r: c.r }); }));
+    all.sort((a, b) => (rankBy === 'magnitude' ? Math.abs(b.r) - Math.abs(a.r) : b.r - a.r));
+    return all.slice(0, 6);
+  }, [grid, rankBy]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="wx-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Every TikTok metric vs</span>
+          <select className="wx-input" style={{ maxWidth: 240 }} value={amazonKey} onChange={(e) => setAmazonKey(e.target.value)}>
+            {AMAZON_FIELDS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+          </select>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>across halo lag 0–14 days</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+            {[['positive', 'Strongest positive'], ['magnitude', 'Strongest (any)']].map(([k, l]) => (
+              <button key={k} type="button" className={`wx-btn wx-btn-sm ${rankBy === k ? 'wx-btn-primary' : 'wx-btn-ghost'}`}
+                onClick={() => setRankBy(k)} title="How the peak lag per row and the top-signals list are ranked">{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {amazonKey === KSV && <KeywordPicker keyword={keyword} setKeyword={setKeyword} keywordList={keywordList} />}
+        {amazonKey === KSR && <RankKeywordPicker rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} rankKeywordList={rankKeywordList} />}
+
+        <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+          Each cell is Pearson <strong>r</strong> between that TikTok metric (the cause) and <strong>{amazonField?.label}</strong> sampled
+          that many days later. Green = positive, red = negative, stronger = more saturated. The <strong>peak lag per row</strong> is
+          outlined. {amazonKey === KSR && <em>Note: rank is inverse — a strong NEGATIVE r (red) is the good signal (more reach → better rank).</em>}
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th style={{ position: 'sticky', left: 0, background: 'var(--surface-1)', zIndex: 1, textAlign: 'left', padding: '4px 8px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  TikTok metric
+                </th>
+                <th colSpan={LAGS.length} style={{ padding: '2px 6px', color: 'var(--text-muted)', fontWeight: 600, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                  Halo lag (days)
+                </th>
+                <th style={{ padding: '4px 8px', color: 'var(--text-muted)', fontWeight: 600 }}>Peak</th>
+              </tr>
+              <tr>
+                <th style={{ position: 'sticky', left: 0, background: 'var(--surface-1)', zIndex: 1 }} />
+                {LAGS.map((L) => (
+                  <th key={L} style={{ padding: '3px 6px', color: 'var(--text-muted)', fontWeight: 600, minWidth: 34, textAlign: 'center' }}>{L}</th>
+                ))}
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {grid.map((row) => (
+                <tr key={row.field.key}>
+                  <td style={{ padding: '4px 8px', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--surface-1)' }}>
+                    {row.field.label}
+                  </td>
+                  {row.cells.map((c) => {
+                    const isPeak = row.best && c.lag === row.best.lag;
+                    return (
+                      <td key={c.lag}
+                        title={`${row.field.label} → ${amazonField?.label} @ lag ${c.lag}d: r=${c.r == null ? 'n/a' : c.r.toFixed(2)}`}
+                        style={{
+                          padding: '5px 6px', textAlign: 'center', minWidth: 34,
+                          background: corrColor(c.r),
+                          color: 'var(--text-primary)',
+                          fontWeight: isPeak ? 800 : (c.r != null && Math.abs(c.r) >= 0.6 ? 700 : 400),
+                          outline: isPeak ? '2px solid var(--accent)' : 'none',
+                          outlineOffset: -2, borderRadius: 3,
+                        }}>
+                        {c.r == null ? '·' : c.r.toFixed(2)}
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: '4px 8px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
+                    {row.best ? <>lag <strong style={{ color: 'var(--text-primary)' }}>{row.best.lag}d</strong> · r <strong style={{ color: 'var(--text-primary)' }}>{row.best.r.toFixed(2)}</strong></> : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="wx-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+          Strongest signals for {amazonField?.label}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {topSignals.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Not enough overlapping data to correlate yet.</div>
+          ) : topSignals.map((s, i) => (
+            <div key={`${s.field.key}-${s.lag}`} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{ width: 18, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: corrColor(s.r), flex: '0 0 auto', outline: '1px solid var(--border-subtle)' }} />
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.field.label}</span>
+              <span style={{ color: 'var(--text-muted)' }}>at <strong style={{ color: 'var(--text-primary)' }}>lag {s.lag} day{s.lag === 1 ? '' : 's'}</strong></span>
+              <span style={{ marginLeft: 'auto', fontWeight: 700, color: s.r < 0 ? '#ef4444' : (s.r >= 0.3 ? '#22c55e' : 'var(--text-muted)') }}>
+                r = {s.r.toFixed(2)} · {strengthLabel(s.r)}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
