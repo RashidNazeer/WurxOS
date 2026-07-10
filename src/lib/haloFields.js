@@ -65,11 +65,13 @@ const HEADER_SYNONYMS = {
   productimpressions: 'product_impressions',
   uniqueimpressions: 'unique_impressions',
   ntb: 'ntb',
+  ntbunitssold: 'ntb',          // our own export writes the label "NTB (units sold)"
   keywordsearchvolume: 'keyword_search_volume',
   revenueday: 'revenue_per_day',
   revenueperday: 'revenue_per_day',
   keywordsearchrank: 'keyword_search_rank',
   keywordrank: 'keyword_search_rank',
+  gmvmaxorders: 'gmvmax_orders', // our own export writes the label "GMV Max Orders"
   productclicks: 'product_clicks',
   uniqueclicks: 'unique_clicks',
   cost: 'cost',
