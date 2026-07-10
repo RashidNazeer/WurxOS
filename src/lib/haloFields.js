@@ -23,7 +23,7 @@ export const HALO_FIELDS = [
   { key: 'video_per_day',       label: 'Video/Day',            group: 'tiktok', agg: 'avg', fmt: 'num'   },
   { key: 'product_impressions', label: 'Product impressions',  group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_impressions',  label: 'Unique impressions',   group: 'tiktok', agg: 'sum', fmt: 'int'   },
-  { key: 'ntb',                 label: 'NTB (units sold)',     group: 'amazon', agg: 'sum', fmt: 'int'   },
+  { key: 'ntb',                 label: 'NTB',                  group: 'amazon', agg: 'sum', fmt: 'int'   },
   { key: 'keyword_search_volume', label: 'Keyword Search Volume', group: 'amazon', agg: 'sum', fmt: 'int' },
   { key: 'revenue_per_day',     label: 'Revenue/Day',          group: 'amazon', agg: 'sum', fmt: 'money' },
   // Keyword Search Rank — per-keyword search-result position (1 = top). Lower
@@ -33,7 +33,9 @@ export const HALO_FIELDS = [
   { key: 'product_clicks',      label: 'Product clicks',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_clicks',       label: 'Unique clicks',        group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'cost',                label: 'Cost',                 group: 'tiktok', agg: 'sum', fmt: 'money' },
-  { key: 'gmvmax_orders',       label: 'GMV Max Orders',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
+  // Display label stays clearer ("GMV Max Orders") but the sheet/export header
+  // matches the source sheet's lowercase "orders" (the 2nd Orders column).
+  { key: 'gmvmax_orders',       label: 'GMV Max Orders', sheetHeader: 'orders', group: 'tiktok', agg: 'sum', fmt: 'int' },
   { key: 'cpo',                 label: 'CPO',                  group: 'tiktok', agg: 'avg', fmt: 'money' },
   { key: 'gross_revenue',       label: 'Gross revenue',        group: 'tiktok', agg: 'sum', fmt: 'money' },
   { key: 'roi',                 label: 'ROI',                  group: 'tiktok', agg: 'avg', fmt: 'num'   },

@@ -154,6 +154,32 @@ function UploadPanel({ onUploaded, dummyDefault }) {
             Parsed <strong style={{ color: 'var(--text-primary)' }}>{parsed.rows.length}</strong> days
             ({parsed.periodStart} → {parsed.periodEnd}) · {parsed.foundKeys.length} columns recognised.
           </div>
+
+          {parsed.missingColumns?.length > 0 && (
+            <div style={{
+              border: `1px solid ${parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)'}`,
+              background: parsed.missingAnchors?.length ? 'rgba(239,68,68,.10)' : 'rgba(245,158,11,.10)',
+              borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: 13,
+              display: 'flex', flexDirection: 'column', gap: 6,
+            }}>
+              <strong style={{ color: parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)' }}>
+                ⚠ {parsed.missingAnchors?.length ? 'Required columns not recognised' : 'Some standard columns not recognised'}
+              </strong>
+              <span style={{ color: 'var(--text-muted)' }}>
+                These expected columns weren't found — did you rename or remove them? Renamed columns won't be read.
+              </span>
+              <span>
+                Not found: <strong>{parsed.missingColumns.map((m) => m.label).join(', ')}</strong>
+              </span>
+              {parsed.missingAnchors?.length > 0 && (
+                <span style={{ color: 'var(--danger, #ef4444)' }}>
+                  <strong>NTB</strong>, <strong>Revenue/Day</strong> and <strong>Product clicks</strong> are the anchors that locate your
+                  keyword columns — if one is renamed, your <em>keyword</em> columns will be skipped. Rename it back to the exact
+                  name and re-upload.
+                </span>
+              )}
+            </div>
+          )}
           {(parsed.keywordColumns?.volume?.length || parsed.keywordColumns?.rank?.length) ? (
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               Keyword columns —{' '}

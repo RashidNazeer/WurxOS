@@ -12,7 +12,7 @@
 // year), so we infer the year (rolling it forward if the month wraps).
 // ============================================================
 
-import { headerKey } from './haloFields';
+import { headerKey, HALO_FIELDS } from './haloFields';
 
 const MONTHS = {
   jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3,
@@ -172,6 +172,19 @@ export async function parseHaloSheet(arrayBuffer, opts = {}) {
   if (volKwCols.length) foundKeys.add('keyword_search_volume');
   if (rankKwCols.length) foundKeys.add('keyword_search_rank');
 
+  // Validate the FIXED columns against the expected format so the UI can warn
+  // when a standard column looks renamed/removed. Keyword columns are exempt
+  // (they're free-form keyword names). Missing ANCHORS (NTB / Revenue/Day /
+  // Product clicks) are the serious ones — without them the keyword regions
+  // can't be located, so keyword columns get silently skipped.
+  const KW_AGG = new Set(['keyword_search_volume', 'keyword_search_rank']);
+  const presentKeys = new Set(Object.values(colMap));
+  const missingColumns = HALO_FIELDS
+    .filter((f) => f.key !== 'date' && !KW_AGG.has(f.key) && !presentKeys.has(f.key))
+    .map((f) => ({ key: f.key, label: f.label }));
+  const ANCHOR_KEYS = ['ntb', 'revenue_per_day', 'product_clicks'];
+  const missingAnchors = missingColumns.filter((m) => ANCHOR_KEYS.includes(m.key));
+
   const rows = [];
   let prevM0 = null;
   let year = defaultYear;
@@ -237,6 +250,8 @@ export async function parseHaloSheet(arrayBuffer, opts = {}) {
       volume: volKwCols.map((c) => c.name),
       rank: rankKwCols.map((c) => c.name),
     },
+    missingColumns,
+    missingAnchors,
     warnings,
   };
 }

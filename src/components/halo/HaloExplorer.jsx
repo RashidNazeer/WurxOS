@@ -135,7 +135,9 @@ export default function HaloExplorer({ datasets, loadRows, onDelete, initialData
           if (rankKeywordList.length) rankKeywordList.forEach((kw) => cols.push({ label: kw, get: (r) => r.keywordRanks?.[kw] ?? '' }));
           else cols.push({ label: f.label, get: (r) => r.metrics?.[f.key] ?? '' });
         } else {
-          cols.push({ label: f.label, get: (r) => r.metrics?.[f.key] ?? '' });
+          // Use the sheet header (matches the source sheet's exact column name,
+          // e.g. "NTB", "orders") so a downloaded sheet re-imports identically.
+          cols.push({ label: f.sheetHeader || f.label, get: (r) => r.metrics?.[f.key] ?? '' });
         }
       }
       const aoa = [cols.map((c) => c.label), ...rows.map((r) => cols.map((c) => c.get(r)))];
