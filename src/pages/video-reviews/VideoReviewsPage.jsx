@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { runVideoReviewTargets, downloadHandlesCsv, listMyEukaBrands } from '../../lib/videoReviewApi';
 
 // ── Pakistan-time date helpers ──────────────────────────────────────
-// Default target date = 2 days before TODAY in Pakistan (Asia/Karachi).
+// Default target date = 3 days before TODAY in Pakistan (Asia/Karachi).
 // We format "now" in Karachi, then subtract days on that calendar date.
 function pakistanToday() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -94,7 +94,9 @@ function CenteredCard({ children }) {
 }
 
 export default function VideoReviewsPage() {
-  const defaultTarget = useMemo(() => addDays(pakistanToday(), -2), []);
+  // Default 3 days back so Euka has finished ingesting that day's creators/videos
+  // (it lags ~2-3 days; running sooner undercounts the review groups).
+  const defaultTarget = useMemo(() => addDays(pakistanToday(), -3), []);
   const [targetDate, setTargetDate] = useState(defaultTarget);
   const [missed, setMissed] = useState([]);          // up to 2 YYYY-MM-DD
   const [status, setStatus] = useState('idle');       // idle | running | done | error
@@ -258,7 +260,7 @@ export default function VideoReviewsPage() {
                 background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
                 {prettyDate(targetDate)}
               </span>
-              <span>Defaults to 2 days ago · PKT</span>
+              <span>Defaults to 3 days ago · PKT (lets Euka finish ingesting that day)</span>
             </div>
           </Step>
 
