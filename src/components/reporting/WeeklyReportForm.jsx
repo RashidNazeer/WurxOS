@@ -20,7 +20,8 @@ import { findPreviousReport } from '../../lib/reportsApi';
 import { runEukaReportAutofill, mergeAutofill } from '../../lib/eukaReportAutofillApi';
 import { productUnitsLabel } from '../../lib/reportUnitsLabel';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
-import { parsePdfToReport } from '../../utils/pdfReportParser';
+// parsePdfToReport pulls in pdfjs (~424 KB) — imported dynamically inside the
+// "Import from PDF" click handler so it never loads unless someone uses it.
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
 import ReportReturnNotice from './ReportReturnNotice';
@@ -784,6 +785,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     setImporting(true);
     setImportToast(null);
     try {
+      const { parsePdfToReport } = await import('../../utils/pdfReportParser');
       const parsed = await parsePdfToReport(file);
       const diag = parsed.__diagnostics || {};
       delete parsed.__diagnostics;

@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Inter is already loaded via the font <link> in index.html — a duplicate CSS
+   @import here just adds a render-blocking, serialized request chain. */
 @import './tokens.css';
 
 *,

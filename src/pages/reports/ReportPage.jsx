@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { getReport, listReportsForBrandTrend, reportPermissions } from '../../lib/reportsApi';
 import { getBrand } from '../../lib/brandsApi';
-import ReportForm from '../../components/reports/ReportForm';
 import ReportView from '../../components/reports/ReportView';
 import { AlertIcon } from '../../components/common/Icon';
+
+// Editor is only needed when creating/editing — lazy so people who merely OPEN
+// a report to VIEW it don't download the rich-text editor + PDF-import library
+// (~800 KB combined) they'll never touch.
+const ReportForm = lazy(() => import('../../components/reports/ReportForm'));
 
 /**
  * Full-page Report view/edit.
@@ -153,18 +157,20 @@ export default function ReportPage() {
 
   if (finalShowForm) {
     return (
-      <ReportForm
-        brand={brand || report?.brand}
-        period={period}
-        type={type}
-        report={report || null}
-        onClose={() => { setForceEdit(false); navigate('/reports'); }}
-        onSaved={(saved) => {
-          if (isNew && saved?.id) navigate(`/reports/${saved.id}`, { replace: true });
-          // Stay in edit mode after subsequent saves; user can tap Back / Close.
-          qc.invalidateQueries({ queryKey: ['report', saved?.id] });
-        }}
-      />
+      <Suspense fallback={<div className="wx-empty"><span className="wx-spinner" /> Loading editor…</div>}>
+        <ReportForm
+          brand={brand || report?.brand}
+          period={period}
+          type={type}
+          report={report || null}
+          onClose={() => { setForceEdit(false); navigate('/reports'); }}
+          onSaved={(saved) => {
+            if (isNew && saved?.id) navigate(`/reports/${saved.id}`, { replace: true });
+            // Stay in edit mode after subsequent saves; user can tap Back / Close.
+            qc.invalidateQueries({ queryKey: ['report', saved?.id] });
+          }}
+        />
+      </Suspense>
     );
   }
 

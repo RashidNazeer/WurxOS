@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { parsePdfToReport } from '../../utils/pdfReportParser';
+// parsePdfToReport pulls in pdfjs (~424 KB) — imported dynamically inside the
+// "Import from PDF" click handler so it never loads unless someone uses it.
 import { getBrandSections } from '../../lib/brandReportSectionsApi';
 import RichTextEditor from '../common/RichTextEditor';
 import {
@@ -197,6 +198,7 @@ export default function ReportForm({ brand, period, type, report, onClose, onSav
     setImporting(true);
     setImportToast(null);
     try {
+      const { parsePdfToReport } = await import('../../utils/pdfReportParser');
       const parsed = await parsePdfToReport(file);
       const diag = parsed.__diagnostics || {};
       delete parsed.__diagnostics;
