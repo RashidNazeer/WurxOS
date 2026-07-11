@@ -43,11 +43,20 @@ function _normBrand(row) {
 }
 
 export function useBrands() {
-  // If a parent <BrandsProvider> wrapped us, use its value.
+  // If a parent <BrandsProvider> wrapped us, use its shared value (one fetch +
+  // one realtime channel for the whole app). Otherwise fall back to a
+  // per-consumer standalone fetch. fromCtx is stable for a given mount (a
+  // component is either under the provider or not, always), so the conditional
+  // hook call below is safe in practice.
   const fromCtx = useContext(BrandsCtx);
   if (fromCtx) return fromCtx;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useBrandsStandalone();
+}
 
-  // Standalone fallback: each component that calls useBrands() fetches once.
+// The actual fetch + realtime + state. Used by BrandsProvider (once, shared)
+// and as the standalone fallback inside useBrands().
+function useBrandsStandalone() {
   const { user, profile } = useAuth();
   const uid = user?.id;
   const role = profile?.role;
@@ -114,19 +123,27 @@ export function useBrands() {
 
     // Realtime: refetch on any brands-table change. Channel name is
     // unique per hook instance so multiple consumers don't collide.
+    // A burst of row changes (e.g. a brand swap that touches several rows,
+    // or a bulk edit) is COALESCED into a single refetch via a short debounce
+    // so one action doesn't trigger a storm of identical list re-downloads.
+    let refetchTimer = null;
     const ch = supabase
       .channel(`brands-ctx-${uid}-${instanceIdRef.current}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, async () => {
-        try {
-          const rows = await listBrandsForReporting({ role, uid, permissions });
-          if (!cancelled) setBrands((rows || []).map(_normBrand));
-        } catch { /* ignore */ }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
+        if (refetchTimer) clearTimeout(refetchTimer);
+        refetchTimer = setTimeout(async () => {
+          try {
+            const rows = await listBrandsForReporting({ role, uid, permissions });
+            if (!cancelled) setBrands((rows || []).map(_normBrand));
+          } catch { /* ignore */ }
+        }, 400);
       })
       .subscribe();
 
     return () => {
       cancelled = true;
       clearTimeout(safetyTimer);
+      if (refetchTimer) clearTimeout(refetchTimer);
       supabase.removeChannel(ch);
     };
   // canViewAllBrands flipping should re-fetch with the broader query.
@@ -144,13 +161,13 @@ export function useBrands() {
 }
 
 /**
- * Optional provider — if you want a single fetch shared across the tree
- * instead of one fetch per useBrands() consumer, wrap your subtree in
- * <BrandsProvider>. Otherwise the hook works standalone.
+ * Provider — runs the brand fetch + realtime subscription ONCE and shares the
+ * result with every useBrands() consumer in the tree. Wrapping the app in this
+ * collapses what used to be 13 independent brand fetches + 13 realtime channels
+ * (and 2 identical ones per report screen) down to a single fetch + channel.
+ * Consumers rendered OUTSIDE the provider still work via the standalone fallback.
  */
 export function BrandsProvider({ children }) {
-  // Re-use the standalone hook logic by NOT providing a context value.
-  // (Skipping the provider entirely would be cleaner but breaks v1
-  // imports that destructure from `BrandsProvider`.)
-  return <BrandsCtx.Provider value={null}>{children}</BrandsCtx.Provider>;
+  const value = useBrandsStandalone();
+  return <BrandsCtx.Provider value={value}>{children}</BrandsCtx.Provider>;
 }

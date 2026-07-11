@@ -7,6 +7,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorReporterProvider } from './contexts/ErrorReporterContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
+import { BrandsProvider } from './contexts/BrandsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
 import AppShell from './components/layout/AppShell';
@@ -194,9 +195,11 @@ export default function App() {
                 stay rendered while a route's chunk loads. */}
             <Route element={
               <ProtectedRoute>
-                <NotificationsProvider>
-                  <AppShell />
-                </NotificationsProvider>
+                <BrandsProvider>
+                  <NotificationsProvider>
+                    <AppShell />
+                  </NotificationsProvider>
+                </BrandsProvider>
               </ProtectedRoute>
             }>
               <Route path="/"          element={<Navigate to="/dashboard" replace />} />
