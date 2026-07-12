@@ -281,7 +281,7 @@ function buildGmvMaxTable(report, sym) {
   const header = new TableRow({
     children: [
       cell({ text: 'Campaign', bold: true, header: true }),
-      cell({ text: 'Spend', bold: true, header: true, align: AlignmentType.CENTER }),
+      cell({ text: 'Cost', bold: true, header: true, align: AlignmentType.CENTER }),
       cell({ text: 'ROI', bold: true, header: true, align: AlignmentType.CENTER }),
       cell({ text: 'Orders', bold: true, header: true, align: AlignmentType.CENTER }),
       cell({ text: 'CPO', bold: true, header: true, align: AlignmentType.CENTER }),

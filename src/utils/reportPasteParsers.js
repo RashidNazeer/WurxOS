@@ -187,11 +187,12 @@ const stripUsd = v => (v == null ? '' : String(v).replace(/USD/i, '').replace(/[
  * Parse the "GMV Max" campaign-list copy-paste (Product or LIVE GMV Max).
  *
  * TikTok's export dumps each campaign's columns top-to-bottom. Column meaning is
- * pinned by arithmetic (verified against real data): the USD value right after
- * the "N recommendation(s)" line is Cost/Spend (= CPO × orders); after the
+ * pinned by position + arithmetic (verified against real data): Cost/Spend is the
+ * 2nd bare "X USD" line in the header (the 1st is the campaign budget; the
+ * "N recommendation(s)" line between them is NOT always present). After the
  * start-time + schedule come the per-period metrics, where the lone bare integer
  * is Orders, the next USD is Cost-per-order, the USD after that is GMV, and the
- * bare decimal after GMV is ROI (= GMV ÷ Spend). Everything else (budgets, ROI
+ * bare decimal after GMV is ROI (= GMV ÷ Cost). Everything else (budgets, ROI
  * target, ROI-protection, gross revenue) is read past.
  *
  *   <name>
@@ -232,16 +233,25 @@ export function parseGmvMaxText(raw) {
     if (nIdx < 0) continue;
     const campaign = lines[nIdx];
 
-    // Spend = first USD after the "recommendation(s)" line, within the header.
+    // Cost column (report "Spend"). TikTok column order is: Campaign budget →
+    // Recommendations → Cost. The header's bare "X USD" lines are exactly
+    // [campaign budget, cost] — "Daily budget:"/"Base budget:" sublabels don't
+    // match USD_VALUE_RE (whole-line anchored). The "N recommendation(s)" line is
+    // NOT always present (a campaign can have 0 / "-"), so we can't rely on it:
+    // prefer the first bare USD AFTER it when present, else fall back to the 2nd
+    // bare USD (i.e. skip the campaign budget, which is always the 1st).
     let spend = '';
+    const headerUsd = [];
+    let recIdx = -1;
     for (let k = nIdx + 1; k < dt; k++) {
-      if (/recommendation/i.test(lines[k])) {
-        for (let j = k + 1; j < dt; j++) {
-          if (USD_VALUE_RE.test(lines[j])) { spend = stripUsd(lines[j]); break; }
-        }
-        break;
-      }
+      if (recIdx < 0 && /recommendation/i.test(lines[k])) recIdx = k;
+      if (USD_VALUE_RE.test(lines[k])) headerUsd.push({ k, v: lines[k] });
     }
+    if (recIdx >= 0) {
+      const afterRec = headerUsd.find(u => u.k > recIdx);
+      if (afterRec) spend = stripUsd(afterRec.v);
+    }
+    if (!spend && headerUsd.length > 1) spend = stripUsd(headerUsd[1].v);
 
     // Tail metrics live between this start-time and the next campaign's name.
     const tailEnd = c + 1 < dts.length ? nameIdx[c + 1] : lines.length;

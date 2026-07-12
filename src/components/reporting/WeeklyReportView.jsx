@@ -261,7 +261,7 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
   // Per-metric config drives both the value and its inline delta. Spend is
   // neutral (no value judgement), CPO is lower-is-better, the rest higher.
   const metrics = [
-    { key: 'spend',  label: 'Spend',  fmt: ms,   good: 'neutral' },
+    { key: 'spend',  label: 'Cost',   fmt: ms,   good: 'neutral' },
     { key: 'gmv',    label: 'GMV',    fmt: ms,   good: 'up' },
     { key: 'roi',    label: 'ROI',    fmt: (v) => num(v).toFixed(2) + '×', good: 'up', roi: true },
     { key: 'orders', label: 'Orders', fmt: fmtN, good: 'up' },
@@ -314,7 +314,7 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
             {showEfficiency && spend > 0 && gmv > 0 && (
               <div className="mt-3">
                 <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  <span>Spend efficiency</span>
+                  <span>Cost efficiency</span>
                   <span>$1 → ${(gmv / spend).toFixed(2)}</span>
                 </div>
                 <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>

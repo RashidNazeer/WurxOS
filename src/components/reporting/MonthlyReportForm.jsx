@@ -1122,7 +1122,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           setItems={(items) => setData(d => ({ ...d, gmvMax: items }))}
           fields={[
             { key: 'campaign', label: 'Campaign', width: '30%', placeholder: 'GMV Max_NuDerma Clinical' },
-            { key: 'spend', label: `Spend (${curSym})`, type: 'number', width: '110px', placeholder: '51187.03' },
+            { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '110px', placeholder: '51187.03' },
             { key: 'roi', label: 'ROI', type: 'number', width: '90px', placeholder: '3.05' },
             { key: 'orders', label: 'Orders', type: 'number', width: '100px', placeholder: '1234' },
             { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '100px', placeholder: '41.48' },

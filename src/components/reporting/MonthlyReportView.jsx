@@ -759,7 +759,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
   const ms = (v) => fmt$short(v, currency);
   const m = (v) => fmt$(v, currency);
   const cells = [
-    { label: 'Spend', value: ms(row.spend) },
+    { label: 'Cost', value: ms(row.spend) },
     { label: 'GMV', value: ms(row.gmv) },
     { label: 'ROI', value: num(row.roi) ? num(row.roi).toFixed(2) + '×' : '—', accent: num(row.roi) >= 1 ? C.green : C.red },
     { label: 'Orders', value: fmtN(row.orders) },
@@ -785,7 +785,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
       {spend > 0 && gmv > 0 && (
         <div className="mt-3">
           <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            <span>Spend efficiency</span>
+            <span>Cost efficiency</span>
             <span>$1 → ${(gmv / spend).toFixed(2)}</span>
           </div>
           <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
@@ -1330,7 +1330,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
               <div className="d-flex flex-wrap align-items-center gap-3 mt-3 p-3 rounded-3"
                 style={{ background: 'var(--warning-soft)', border: `1px solid ${C.amberLine}` }}>
                 <span style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Overall</span>
-                <span style={{ fontSize: '0.82rem', color: C.ink }}>Spend <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{ms(sum.spend)}</strong></span>
+                <span style={{ fontSize: '0.82rem', color: C.ink }}>Cost <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{ms(sum.spend)}</strong></span>
                 <span style={{ fontSize: '0.82rem', color: C.ink }}>ROI <strong style={{ color: overallRoi >= 1 ? C.green : C.red, fontVariantNumeric: 'tabular-nums' }}>{overallRoi.toFixed(2)}×</strong></span>
                 <span style={{ fontSize: '0.82rem', color: C.ink }}>Orders <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtN(sum.orders)}</strong></span>
                 <span style={{ fontSize: '0.82rem', color: C.ink }}>CPO <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{m(overallCpo)}</strong></span>

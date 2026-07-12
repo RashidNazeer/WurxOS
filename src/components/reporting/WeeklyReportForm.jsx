@@ -1707,7 +1707,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             addLabel="Add Campaign"
             fields={[
               { key: 'campaign', label: 'Campaign', width: '130px' },
-              { key: 'spend', label: `Spend (${curSym})`, type: 'number', width: '100px' },
+              { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '100px' },
               { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
               { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
               { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
@@ -1750,7 +1750,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             addLabel="Add MTD Campaign"
             fields={[
               { key: 'campaign', label: 'Campaign', width: '130px' },
-              { key: 'spend', label: `Spend (${curSym})`, type: 'number', width: '100px' },
+              { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '100px' },
               { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
               { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
               { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
