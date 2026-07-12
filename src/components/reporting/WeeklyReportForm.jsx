@@ -564,6 +564,17 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const weeklyVideos = Number(data.overallPerformance.videosPosted) || 0;
   const autoTotalVideos = hasPrevAllTime ? prevAllTimeVideos + weeklyVideos : null;
 
+  // Seller ROI is auto-derived from THIS WEEK'S GMV Max campaigns (never the
+  // month-to-date ones): total campaign GMV ÷ total campaign Cost. Same formula
+  // the view's GMV Max OVERALL card uses (gmvMaxTotals). Computed for display +
+  // injected into overallPerformance.roi at save (like autoTotalVideos), never
+  // written live so loading a report doesn't falsely mark the form dirty.
+  const weeklyGmvMaxRows = (data.gmvMax || []).filter(g => g && g.campaign && String(g.campaign).trim());
+  const weeklyGmvMaxSpend = weeklyGmvMaxRows.reduce((s, g) => s + (Number(g.spend) || 0), 0);
+  const weeklyGmvMaxGmv = weeklyGmvMaxRows.reduce((s, g) => s + (Number(g.gmv) || 0), 0);
+  const weeklyRoi = weeklyGmvMaxSpend > 0 ? weeklyGmvMaxGmv / weeklyGmvMaxSpend : null;
+  const weeklyRoiStr = weeklyRoi != null ? weeklyRoi.toFixed(2) : '';
+
   // Pre-fill Product Highlights from the most recent prior report that
   // actually has products (new-report path only — never on edit). Walk
   // back through history because the immediately previous report may
@@ -741,9 +752,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     const en = resolveWeeklySectionsEnabled(data.sectionsEnabled);
     if (en.overallPerformance) {
       const op = data.overallPerformance || {};
+      // ROI intentionally omitted — it's auto-derived from this week's GMV Max
+      // campaigns (see weeklyRoi), not a manually-required field.
       const opRequired = {
         gmv: 'GMV', affiliateGmv: 'Affiliate GMV', orders: 'Orders',
-        samplesApproved: 'Samples Approved', roi: 'ROI',
+        samplesApproved: 'Samples Approved',
         shopPerformanceScore: 'Shop Performance Score', videosPosted: 'Videos Posted',
       };
       Object.entries(opRequired).forEach(([k, label]) => {
@@ -942,6 +955,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       if (hasPrevAllTime) {
         cleanedData.overallNotes = { ...(data.overallNotes || {}), videosPosted: autoTotalVideos };
       }
+      // Seller ROI is derived from this week's GMV Max campaigns, not entered by
+      // hand — persist the computed value so the view's ROI card reads it.
+      cleanedData.overallPerformance = { ...(data.overallPerformance || {}), roi: weeklyRoiStr };
       const savedId = await saveReport({
         brandId: selectedBrand.id,
         brandName,
@@ -1185,7 +1201,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const _ratio = (reqs) => (reqs.length ? Math.round(reqs.filter(Boolean).length / reqs.length * 100) : 100);
 
   const sellerReqs = [];
-  if (sectEnabled.overallPerformance) sellerReqs.push(_filled(_op.gmv), _filled(_op.orders), _filled(_op.samplesApproved), _filled(_on.gmv), _filled(_op.roi), _filled(_op.shopPerformanceScore), _filled(_on.samplesApproved));
+  if (sectEnabled.overallPerformance) sellerReqs.push(_filled(_op.gmv), _filled(_op.orders), _filled(_op.samplesApproved), _filled(_on.gmv), _filled(_op.shopPerformanceScore), _filled(_on.samplesApproved));
   if (sectEnabled.gmvMax) sellerReqs.push((data.gmvMax || []).some(g => g.campaign && g.campaign.trim()));
   if (sectEnabled.productHighlights) sellerReqs.push((data.productHighlights || []).some(p => p.productName && p.productName.trim()));
   if (sectEnabled.upcomingCampaigns) sellerReqs.push(!isHtmlEmpty(data.upcomingCampaigns));
@@ -1554,7 +1570,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <Field label="Samples Approved (This week)" value={data.overallPerformance.samplesApproved} onChange={v => setPerf('samplesApproved', v)} type="number" placeholder="488" />
           </div>
           <div className="d-flex flex-wrap gap-2 mb-2">
-            <Field label="ROI" value={data.overallPerformance.roi} onChange={v => setPerf('roi', v)} type="number" placeholder="2.76" />
+            <Field label="ROI (auto)" value={weeklyRoi != null ? weeklyRoi.toFixed(2) + '×' : '—'} readOnly
+              note={weeklyGmvMaxRows.length
+                ? `Auto from this week's ${weeklyGmvMaxRows.length} GMV Max campaign${weeklyGmvMaxRows.length === 1 ? '' : 's'} (GMV ÷ Cost)`
+                : "Add this week's GMV Max campaigns below — ROI calculates automatically"} />
             <Field label="Shop Performance Score" value={data.overallPerformance.shopPerformanceScore} onChange={v => setPerf('shopPerformanceScore', v)} type="number" placeholder="4.7" />
           </div>
           <div className="d-flex flex-wrap gap-2">
