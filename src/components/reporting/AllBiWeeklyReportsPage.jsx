@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getAllBiWeeklyReports, deleteBiWeeklyReport,
   REPORT_STATUSES, getReportStatus, updateReportStatus,
@@ -32,10 +34,9 @@ export default function AllBiWeeklyReportsPage() {
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
-  const { brands } = useBrands();
+  const { brands, loading: brandsLoading } = useBrands();
 
   const [rawReports, setRawReports] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Bulk selection — Boss/OL only.
   const [selected, setSelected] = useState(() => new Set());
@@ -69,26 +70,30 @@ export default function AllBiWeeklyReportsPage() {
   const [reportActions, setReportActions] = useState(null);
   const [editDatesReport, setEditDatesReport] = useState(null);
 
-  const loadReports = async () => {
-    try {
-      let data;
-      if (userRole === 'tl') {
-        // useBrands() already returns brands owned by this TL (role-scoped in v2)
-        const brandIds = (brands || []).map((b) => b.id);
-        const all = await getAllBiWeeklyReports();
-        data = all.filter(r => brandIds.includes(r.brandId));
-      } else {
-        data = await getAllBiWeeklyReports();
-      }
-      setRawReports(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Cached load + live-sync — same pattern as the weekly/monthly lists. The
+  // bi-weekly fetch always pulls all reports then filters to the TL's brands
+  // client-side (as before); the query re-runs when this TL's brands change.
+  const isTL = userRole === 'tl';
+  const brandIds = useMemo(() => (brands || []).map((b) => b.id).sort(), [brands]);
+  const {
+    data: queryReports, isLoading, error: queryError, refetch,
+  } = useQuery({
+    queryKey: ['reports-list', 'biweekly', 'all', userRole, currentUser?.uid, isTL ? brandIds.join(',') : ''],
+    queryFn: async () => {
+      const all = await getAllBiWeeklyReports();
+      return isTL ? all.filter((r) => brandIds.includes(r.brandId)) : all;
+    },
+    enabled: !!currentUser?.uid && !!userRole && (!isTL || !brandsLoading),
+    staleTime: 30_000,
+    refetchOnMount: true,
+  });
+  useEffect(() => { if (queryReports) setRawReports(queryReports); }, [queryReports]);
+  useEffect(() => { if (queryError) setError(queryError.message || 'Failed to load reports'); }, [queryError]);
+  const loading = (isLoading || (isTL && brandsLoading)) && rawReports.length === 0;
+  const loadReports = refetch; // legacy callers below just want a refresh
 
-  useEffect(() => { loadReports(); /* eslint-disable-next-line */ }, [currentUser.uid, userRole]);
+  // Live-sync: auto-refresh when any report changes (status/new/deleted).
+  useReportsRealtime(refetch, { enabled: !!currentUser?.uid });
 
   // Overwrite stored brandName with the CURRENT brand name so renames/switches propagate to report UI
   const reports = useMemo(() => {

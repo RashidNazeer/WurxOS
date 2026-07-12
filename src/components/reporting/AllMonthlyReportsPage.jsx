@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getAllMonthlyReports, getMonthlyReportsForTL, deleteMonthlyReport,
   REPORT_STATUSES, getReportStatus, updateReportStatus,
@@ -36,10 +38,9 @@ export default function AllMonthlyReportsPage() {
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
-  const { brands } = useBrands();
+  const { brands, loading: brandsLoading } = useBrands();
 
   const [rawReports, setRawReports] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Bulk selection — Boss/OL only.
   const [selected, setSelected] = useState(() => new Set());
@@ -70,25 +71,27 @@ export default function AllMonthlyReportsPage() {
   const [reportActions, setReportActions] = useState(null);
   const [editDatesReport, setEditDatesReport] = useState(null);
 
-  const loadReports = async () => {
-    try {
-      let data;
-      if (userRole === 'tl') {
-        // useBrands() already returns brands owned by this TL (role-scoped in v2)
-        const brandIds = (brands || []).map((b) => b.id);
-        data = await getMonthlyReportsForTL(brandIds);
-      } else {
-        data = await getAllMonthlyReports();
-      }
-      setRawReports(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Cached load + live-sync — identical pattern to the weekly list: paint
+  // instantly from cache on revisit (no spinner) with a background refetch to
+  // stay fresh; optimistic mutations still patch rawReports locally below.
+  const isTL = userRole === 'tl';
+  const brandIds = useMemo(() => (brands || []).map((b) => b.id).sort(), [brands]);
+  const {
+    data: queryReports, isLoading, error: queryError, refetch,
+  } = useQuery({
+    queryKey: ['reports-list', 'monthly', 'all', userRole, currentUser?.uid, isTL ? brandIds.join(',') : ''],
+    queryFn: () => (isTL ? getMonthlyReportsForTL(brandIds) : getAllMonthlyReports()),
+    enabled: !!currentUser?.uid && !!userRole && (!isTL || !brandsLoading),
+    staleTime: 30_000,
+    refetchOnMount: true,
+  });
+  useEffect(() => { if (queryReports) setRawReports(queryReports); }, [queryReports]);
+  useEffect(() => { if (queryError) setError(queryError.message || 'Failed to load reports'); }, [queryError]);
+  const loading = (isLoading || (isTL && brandsLoading)) && rawReports.length === 0;
+  const loadReports = refetch; // legacy callers below just want a refresh
 
-  useEffect(() => { loadReports(); /* eslint-disable-next-line */ }, [currentUser.uid, userRole]);
+  // Live-sync: auto-refresh when any report changes (status/new/deleted).
+  useReportsRealtime(refetch, { enabled: !!currentUser?.uid });
 
   const reports = useMemo(() => {
     const nameById = new Map(brands.map(b => [b.id, b.brandName || b.name]));
