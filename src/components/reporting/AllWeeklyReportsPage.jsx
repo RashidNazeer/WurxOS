@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getAllReports, getReportsForTL, findPreviousReport, num,
   getWeeksForMonth, getAnchorDate,
@@ -149,6 +150,10 @@ export default function AllWeeklyReportsPage() {
   // Spinner only on the very first load (no cached data yet); revisits skip it.
   const loading = (isLoading || (isTL && brandsLoading)) && rawReports.length === 0;
   const loadReports = refetch; // legacy callers below just want a refresh
+
+  // Live-sync: when any report changes (status, new, deleted) — by anyone —
+  // the list auto-refreshes in the background, no manual refresh needed.
+  useReportsRealtime(refetch, { enabled: !!currentUser?.uid });
 
   // Overwrite stored brandName with the CURRENT brand name so renames/switches propagate to report UI
   const reports = useMemo(() => {
