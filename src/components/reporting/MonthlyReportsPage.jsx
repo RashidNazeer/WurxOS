@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getMonthlyReportsForBrand, getMonthlyReportsForTL, deleteMonthlyReport,
   REPORT_STATUSES, getReportStatus, updateReportStatus,
@@ -68,6 +69,10 @@ export default function MonthlyReportsPage() {
     const data = await getMonthlyReportsForTL(myBrands.map(b => b.id));
     setReports(data);
   };
+
+  // Live-sync: reload in the background when any report changes (status/new/
+  // deleted) — no manual refresh, no spinner.
+  useReportsRealtime(refresh, { enabled: (myBrands || []).length > 0 });
 
   // Filters
   const now = new Date();

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getReportsForBrand, getReportsForTL, deleteReport, findPreviousReport, num,
   getWeeksForMonth, getAnchorDate, detectNextWeek, getFirstTimeWeekOptions,
@@ -89,6 +90,15 @@ export default function WeeklyReportsPage() {
       loadBrandReports(selectedBrandId);
     }
   }, [view, selectedBrandId, loadBrandReports]);
+
+  // Live-sync: when any report changes (status/new/deleted) — by anyone — quietly
+  // reload the visible lists in the background (no spinner, no manual refresh).
+  const liveRefresh = useCallback(() => {
+    const brandIds = (myBrands || []).map((b) => b.id);
+    if (brandIds.length) getReportsForTL(brandIds).then(setAllReports).catch(() => {});
+    if (view === 'brand' && selectedBrandId) getReportsForBrand(selectedBrandId).then(setBrandReports).catch(() => {});
+  }, [myBrands, view, selectedBrandId]);
+  useReportsRealtime(liveRefresh, { enabled: (myBrands || []).length > 0 });
 
   // Anchor + weeks for current calendar month (in brand detail view)
   const anchor = useMemo(() => getAnchorDate(brandReports), [brandReports]);

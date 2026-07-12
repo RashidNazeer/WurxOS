@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getBiWeeklyReportsForBrand, getBiWeeklyReportsForTL, getAllBiWeeklyReports,
   deleteBiWeeklyReport, getBiWeeklyAnchor,
@@ -85,6 +86,15 @@ export default function BiWeeklyReportsPage() {
       loadBrandReports(selectedBrandId);
     }
   }, [view, selectedBrandId, loadBrandReports]);
+
+  // Live-sync: quietly reload the visible lists when any report changes
+  // (status/new/deleted) — no manual refresh, no spinner.
+  const liveRefresh = useCallback(() => {
+    const brandIds = (myBrands || []).map((b) => b.id);
+    if (brandIds.length) getBiWeeklyReportsForTL(brandIds).then(setAllReports).catch(() => {});
+    if (view === 'brand' && selectedBrandId) getBiWeeklyReportsForBrand(selectedBrandId).then(setBrandReports).catch(() => {});
+  }, [myBrands, view, selectedBrandId]);
+  useReportsRealtime(liveRefresh, { enabled: (myBrands || []).length > 0 });
 
   // Filtered brand reports for selected month
   const filteredReports = useMemo(() => {
