@@ -2,7 +2,7 @@
 // the weekly report form uses. Best-effort: the UI always falls back to manual
 // entry, so these tolerate missing columns rather than throwing.
 //
-// Currently implemented: Top Videos, Top Creators.  (GMV Max to follow.)
+// Currently implemented: Top Videos, Top Creators, GMV Max.
 
 const NOISE_TOP_VIDEOS = /^(video thumbnail|top\s*\d*\s*videos?\s*:?|creator\b.*|product info.*|video information.*)$/i;
 const DATE_RE = /^\d{1,2}\/\d{1,2}\/\d{4}\b/;          // 10/18/2025 16:53
@@ -160,4 +160,109 @@ export function parseTopCreatorsText(raw) {
   }
 
   return creators;
+}
+
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;   // 2026-02-13 06:58:53
+const USD_VALUE_RE = /^\$?\s*[\d,]+(?:\.\d+)?\s*USD$/i;           // 160.00 USD, 3,197.20 USD
+const PURE_INT_RE = /^\d{1,3}(?:,\d{3})*$|^\d+$/;                 // 61, 1,234
+const PURE_DECIMAL_RE = /^\d+\.\d+$/;                             // 0.77, 1.50
+
+// Header lines to skip when walking UP from a campaign's start-time to find its
+// name. (The name is the first line above that matches none of these.)
+function isGmvHeaderNoise(l) {
+  return USD_VALUE_RE.test(l)
+    || /^base budget:/i.test(l)
+    || /^daily budget:/i.test(l)
+    || /recommendation/i.test(l)
+    || /roi protection/i.test(l)
+    || /^(active|inactive|paused|not delivering|delivering)$/i.test(l)
+    || /^-+$/.test(l)
+    || /^(analytics|edit)$/i.test(l)
+    || DATETIME_RE.test(l);
+}
+
+const stripUsd = v => (v == null ? '' : String(v).replace(/USD/i, '').replace(/[$,\s]/g, ''));
+
+/**
+ * Parse the "GMV Max" campaign-list copy-paste (Product or LIVE GMV Max).
+ *
+ * TikTok's export dumps each campaign's columns top-to-bottom. Column meaning is
+ * pinned by arithmetic (verified against real data): the USD value right after
+ * the "N recommendation(s)" line is Cost/Spend (= CPO × orders); after the
+ * start-time + schedule come the per-period metrics, where the lone bare integer
+ * is Orders, the next USD is Cost-per-order, the USD after that is GMV, and the
+ * bare decimal after GMV is ROI (= GMV ÷ Spend). Everything else (budgets, ROI
+ * target, ROI-protection, gross revenue) is read past.
+ *
+ *   <name>
+ *   [Analytics] [Edit]          (row buttons — noise)
+ *   Active
+ *   <campaign budget> USD / Daily budget: … USD
+ *   N recommendation(s)
+ *   <Spend> USD                 ← Cost
+ *   [Base budget: … USD] / ROI protection eligible / - / -
+ *   <YYYY-MM-DD HH:MM:SS>       ← start time (per-campaign anchor)
+ *   Continuously
+ *   … <Orders> <CPO USD> <GMV USD> <ROI> [Base budget: <n>]
+ *
+ * Applies equally to weekly and month-to-date — the user just changes the date
+ * filter in TikTok Shop and re-pastes.
+ *
+ * @param {string} raw
+ * @returns {Array<{campaign,spend,roi,orders,cpo,gmv,notes}>}
+ */
+export function parseGmvMaxText(raw) {
+  if (!raw || !raw.trim()) return [];
+  const lines = raw.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+
+  const dts = [];
+  for (let i = 0; i < lines.length; i++) if (DATETIME_RE.test(lines[i])) dts.push(i);
+
+  // Campaign name = first non-noise line above each start-time.
+  const nameIdx = dts.map(dt => {
+    let k = dt - 1;
+    while (k >= 0 && isGmvHeaderNoise(lines[k])) k--;
+    return k;
+  });
+
+  const rows = [];
+  for (let c = 0; c < dts.length; c++) {
+    const dt = dts[c];
+    const nIdx = nameIdx[c];
+    if (nIdx < 0) continue;
+    const campaign = lines[nIdx];
+
+    // Spend = first USD after the "recommendation(s)" line, within the header.
+    let spend = '';
+    for (let k = nIdx + 1; k < dt; k++) {
+      if (/recommendation/i.test(lines[k])) {
+        for (let j = k + 1; j < dt; j++) {
+          if (USD_VALUE_RE.test(lines[j])) { spend = stripUsd(lines[j]); break; }
+        }
+        break;
+      }
+    }
+
+    // Tail metrics live between this start-time and the next campaign's name.
+    const tailEnd = c + 1 < dts.length ? nameIdx[c + 1] : lines.length;
+    let orders = '', cpo = '', gmv = '', roi = '';
+    let ordersIdx = -1;
+    for (let k = dt + 1; k < tailEnd; k++) {
+      if (PURE_INT_RE.test(lines[k]) && !USD_VALUE_RE.test(lines[k])) { orders = lines[k].replace(/,/g, ''); ordersIdx = k; break; }
+    }
+    if (ordersIdx >= 0) {
+      const usds = [];
+      for (let k = ordersIdx + 1; k < tailEnd; k++) if (USD_VALUE_RE.test(lines[k])) usds.push({ k, v: lines[k] });
+      if (usds[0]) cpo = stripUsd(usds[0].v);
+      if (usds[1]) gmv = stripUsd(usds[1].v);
+      const afterGmv = usds[1] ? usds[1].k : ordersIdx;
+      for (let k = afterGmv + 1; k < tailEnd; k++) {
+        if (PURE_DECIMAL_RE.test(lines[k])) { roi = lines[k]; break; }
+      }
+    }
+
+    rows.push({ campaign, spend, roi, orders, cpo, gmv, notes: '' });
+  }
+
+  return rows;
 }

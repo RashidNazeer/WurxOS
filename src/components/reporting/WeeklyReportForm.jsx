@@ -32,7 +32,7 @@ import {
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';
-import { parseTopVideosText, parseTopCreatorsText } from '../../utils/reportPasteParsers';
+import { parseTopVideosText, parseTopCreatorsText, parseGmvMaxText } from '../../utils/reportPasteParsers';
 import '../../styles/reportImmersive.css';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
@@ -1691,6 +1691,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {sectEnabled.gmvMax && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          <PasteParsePanel
+            noun="campaign"
+            accent="#ef4444"
+            parse={parseGmvMaxText}
+            onApply={rows => setData(d => {
+              const isReal = g => (g.campaign && g.campaign.trim())
+                || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
+              const kept = (d.gmvMax || []).filter(isReal);
+              return { ...d, gmvMax: [...kept, ...rows] };
+            })}
+            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this week</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
+          />
           <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
             addLabel="Add Campaign"
             fields={[
@@ -1722,6 +1734,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
             Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically, like the weekly section above.
           </p>
+          <PasteParsePanel
+            noun="campaign"
+            accent="#ef4444"
+            parse={parseGmvMaxText}
+            onApply={rows => setData(d => {
+              const isReal = g => (g.campaign && g.campaign.trim())
+                || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
+              const kept = (d.gmvMaxMtd || []).filter(isReal);
+              return { ...d, gmvMaxMtd: [...kept, ...rows] };
+            })}
+            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the weekly box above.</>}
+          />
           <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
             addLabel="Add MTD Campaign"
             fields={[
