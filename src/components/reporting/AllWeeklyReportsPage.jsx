@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -90,10 +91,9 @@ export default function AllWeeklyReportsPage() {
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
-  const { brands } = useBrands();
+  const { brands, loading: brandsLoading } = useBrands();
 
   const [rawReports, setRawReports] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // Bulk selection — Boss/OL only.
   const [selected, setSelected] = useState(() => new Set());
@@ -127,25 +127,28 @@ export default function AllWeeklyReportsPage() {
   // sit in the sticky bar's "Other options" menu while reviewing.
   const [reportActions, setReportActions] = useState(null);
 
-  const loadReports = async () => {
-    try {
-      let data;
-      if (userRole === 'tl') {
-        // useBrands() already returns brands owned by this TL (role-scoped in v2)
-        const brandIds = (brands || []).map((b) => b.id);
-        data = await getReportsForTL(brandIds);
-      } else {
-        data = await getAllReports();
-      }
-      setRawReports(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadReports(); /* eslint-disable-next-line */ }, [currentUser.uid, userRole]);
+  // Cached load: on revisit the list paints INSTANTLY from cache (no spinner),
+  // while a background refetch runs to keep it fresh — so it self-heals even if
+  // a report was created/edited from another page. Optimistic status mutations
+  // still patch `rawReports` locally below; the query only supplies the
+  // initial/refreshed data. (TL branch keys by brand list — the query re-runs
+  // when this TL's owned brands change.)
+  const isTL = userRole === 'tl';
+  const brandIds = useMemo(() => (brands || []).map((b) => b.id).sort(), [brands]);
+  const {
+    data: queryReports, isLoading, error: queryError, refetch,
+  } = useQuery({
+    queryKey: ['reports-list', 'weekly', 'all', userRole, currentUser?.uid, isTL ? brandIds.join(',') : ''],
+    queryFn: () => (isTL ? getReportsForTL(brandIds) : getAllReports()),
+    enabled: !!currentUser?.uid && !!userRole && (!isTL || !brandsLoading),
+    staleTime: 30_000,
+    refetchOnMount: true,
+  });
+  useEffect(() => { if (queryReports) setRawReports(queryReports); }, [queryReports]);
+  useEffect(() => { if (queryError) setError(queryError.message || 'Failed to load reports'); }, [queryError]);
+  // Spinner only on the very first load (no cached data yet); revisits skip it.
+  const loading = (isLoading || (isTL && brandsLoading)) && rawReports.length === 0;
+  const loadReports = refetch; // legacy callers below just want a refresh
 
   // Overwrite stored brandName with the CURRENT brand name so renames/switches propagate to report UI
   const reports = useMemo(() => {
