@@ -32,7 +32,7 @@ import {
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';
-import { parseTopVideosText } from '../../utils/reportPasteParsers';
+import { parseTopVideosText, parseTopCreatorsText } from '../../utils/reportPasteParsers';
 import '../../styles/reportImmersive.css';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
@@ -1611,6 +1611,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {sectEnabled.topCreators && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          <PasteParsePanel
+            noun="creator"
+            accent="#f59e0b"
+            parse={parseTopCreatorsText}
+            onApply={rows => setData(d => {
+              const isReal = c => (c.name && c.name.trim())
+                || (c.gmv != null && String(c.gmv).trim()) || (c.itemsSold != null && String(c.itemsSold).trim());
+              const kept = (d.topCreators || []).filter(isReal);
+              return { ...d, topCreators: [...kept, ...rows] };
+            })}
+            hint={<>Copy the <b>Top Creators</b> table from TikTok Shop (creator handle, Affiliate GMV, items sold &amp; the change chips) and paste it here. We&apos;ll pull the creator, GMV, items sold, and use the last column (shoppable videos) as videos posted.</>}
+          />
           <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
             addLabel="Add Creator"
             fields={[

@@ -2,7 +2,7 @@
 // the weekly report form uses. Best-effort: the UI always falls back to manual
 // entry, so these tolerate missing columns rather than throwing.
 //
-// Currently implemented: Top Videos.  (Top Creators + GMV Max to follow.)
+// Currently implemented: Top Videos, Top Creators.  (GMV Max to follow.)
 
 const NOISE_TOP_VIDEOS = /^(video thumbnail|top\s*\d*\s*videos?\s*:?|creator\b.*|product info.*|video information.*)$/i;
 const DATE_RE = /^\d{1,2}\/\d{1,2}\/\d{4}\b/;          // 10/18/2025 16:53
@@ -95,4 +95,69 @@ export function parseTopVideosText(raw) {
   }
 
   return videos;
+}
+
+const HANDLE_RE = /^@\S+/;                              // @legendarylootfinds
+const DELTA_RE = /^[+\-]\d[\d.,]*%$/;                   // +8.37%, -60%, +0%  (WoW change chips)
+
+/**
+ * Parse the "Top Creators" copy-paste from TikTok Shop's creator-performance table.
+ *
+ * Each creator lays out as:
+ *   @handle
+ *   Followers
+ *   <followers value>
+ *   $<Affiliate GMV>              ← the ONLY money value not followed by a delta
+ *   <NN>% of total GMV
+ *   $<Est. commission>   <delta>
+ *   <items sold>         <delta>
+ *   <affiliate orders>   <delta>
+ *   <avg customers>      <delta>
+ *   <CTR%>               <delta>
+ *   <affiliate followers><delta>
+ *   <LIVE streams>       <delta>
+ *   <shoppable videos>   <delta>  ← rightmost value = videos posted
+ *
+ * Every metric value is immediately followed by its own +/-% change chip, so we
+ * collect "line whose next line is a delta" in order: [0]=commission,
+ * [1]=items sold, and the last = shoppable videos posted. Affiliate GMV is the
+ * exception (followed by "% of total GMV"), so it's read as the first $ value.
+ *
+ * @param {string} raw
+ * @returns {Array<{name,videosPosted,itemsSold,gmv,notes}>}
+ */
+export function parseTopCreatorsText(raw) {
+  if (!raw || !raw.trim()) return [];
+  const lines = raw.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+
+  const starts = [];
+  for (let i = 0; i < lines.length; i++) if (HANDLE_RE.test(lines[i])) starts.push(i);
+
+  const strip = v => (v == null ? '' : String(v).replace(/[$,%\s]/g, ''));
+  const creators = [];
+
+  for (let s = 0; s < starts.length; s++) {
+    const i = starts[s];
+    const end = s + 1 < starts.length ? starts[s + 1] : lines.length;
+    const block = lines.slice(i, end);
+    const name = block[0].replace(/^@/, '').trim();
+
+    // Affiliate GMV = first money value in the block.
+    let gmv = '';
+    for (let k = 1; k < block.length; k++) {
+      if (MONEY_RE.test(block[k])) { gmv = strip(block[k]); break; }
+    }
+
+    // Ordered metric values = a line whose NEXT line is a delta chip.
+    const values = [];
+    for (let k = 0; k < block.length - 1; k++) {
+      if (!DELTA_RE.test(block[k]) && DELTA_RE.test(block[k + 1])) values.push(block[k]);
+    }
+    const itemsSold = values.length > 1 ? strip(values[1]) : '';
+    const videosPosted = values.length ? strip(values[values.length - 1]) : '';
+
+    creators.push({ name, videosPosted, itemsSold, gmv, notes: '' });
+  }
+
+  return creators;
 }
