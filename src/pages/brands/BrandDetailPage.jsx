@@ -6,6 +6,7 @@ import { getBrand } from '../../lib/brandsApi';
 import { listTasks } from '../../lib/tasksApi';
 import { listReports } from '../../lib/reportsApi';
 import { listProducts } from '../../lib/productsApi';
+import { useReportsRealtime } from '../../lib/useReportsRealtime';
 
 const REPORT_STATUS_TONE = {
   draft:     { fg: 'var(--text-muted)', label: 'Draft' },
@@ -85,11 +86,14 @@ export default function BrandDetailPage() {
     enabled: !!id && !!brand,
   });
 
-  const { data: reports = [] } = useQuery({
+  const { data: reports = [], refetch: refetchReports } = useQuery({
     queryKey: ['brand-reports', id],
     queryFn: () => listReports({ brandId: id }),
     enabled: !!id && !!brand,
   });
+  // Live-sync: this brand's report list auto-updates when any report changes
+  // (status flips, new/deleted) — no manual refresh.
+  useReportsRealtime(refetchReports, { enabled: !!id && !!brand });
 
   const { data: resourceCount = 0 } = useQuery({
     queryKey: ['brand-resource-count', id],
