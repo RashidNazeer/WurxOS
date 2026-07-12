@@ -31,6 +31,8 @@ import {
   SectionHeader, BrandSectionsBlock, BuiltinExtras, AddCustomSectionInline,
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
+import PasteParsePanel from './PasteParsePanel';
+import { parseTopVideosText } from '../../utils/reportPasteParsers';
 import '../../styles/reportImmersive.css';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
@@ -1633,6 +1635,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {sectEnabled.topVideos && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          <PasteParsePanel
+            noun="video"
+            accent="#8b5cf6"
+            parse={parseTopVideosText}
+            onApply={rows => setData(d => {
+              const isReal = v => (v.creatorName && v.creatorName.trim()) || (v.videoLink && v.videoLink.trim())
+                || (v.gmv != null && String(v.gmv).trim()) || (v.itemsSold != null && String(v.itemsSold).trim());
+              const kept = (d.topVideos || []).filter(isReal);
+              return { ...d, topVideos: [...kept, ...rows] };
+            })}
+            hint={<>Copy the <b>Top Videos</b> table from TikTok Shop (each video's caption, ID, creator &amp; metrics) and paste it here. We&apos;ll pull the creator, GMV &amp; items sold and build each video link automatically. Views &amp; product clicks aren&apos;t in that export — add those manually or via Euka.</>}
+          />
           <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
             addLabel="Add Video"
             fields={[
