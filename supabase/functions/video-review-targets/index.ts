@@ -238,48 +238,63 @@ Deno.serve(async (req) => {
     if (!assign) return json({ error: 'forbidden — this brand is not assigned to you' }, 403);
 
     // ── Window ───────────────────────────────────────────────────────
+    // LOOKBACK was 2 days. That is the single reason a late Euka video was lost
+    // forever: run Jul 13 and we were only LOOKING at Jul 11-13, so a Jul 10
+    // video that Euka delivered late was invisible no matter how good the logic.
+    // 14 days covers Euka's real lag (Cutler's Jul 10 was still half-ingested
+    // four days later) with room to spare. It costs 306 candidates instead of 26
+    // — affordable only because the ledger below skips settled creators for free.
+    const LOOKBACK_DAYS = 14;
     const earliestProcessing = [target, ...missed].sort(cmp)[0];
-    const candStart = addDays(earliestProcessing, -2);
+    const candStart = addDays(earliestProcessing, -LOOKBACK_DAYS);
     const candEnd = target;
 
     const isMissed = (d: string) => missed.includes(d);
     const firstRunDateOnOrAfter = (d: string) => { let x = d; while (isMissed(x)) x = addDays(x, 1); return x; };
 
-    // ── Step 1: candidates (all posters in window; not GMV-capped) ───
+    // ── Step 1: everyone who posted in the window (not GMV-capped) ───
     const cv = await eukaGet(
       `/data-export?type=creator_videos&store_id=${storeId}` +
       `&start_date=${candStart}&end_date=${candEnd}&export_type=json`,
       key,
     );
     const windowVideos: any[] = Array.isArray(cv?.data) ? cv.data : [];
-    const candidateHandles = [...new Set(
-      windowVideos
-        .filter((v) => { const d = dayOf(v?.posted_date || ''); return d >= candStart && d <= candEnd; })
-        .map((v) => v?.creator_handle)
-        .filter(Boolean),
-    )] as string[];
+    // This ONE call already gives creator_handle + posted_date for every video in
+    // the window — which is why a creator we have already walked never needs
+    // another Euka call: their new videos are right here.
+    const windowDays = new Map<string, string[]>();
+    for (const v of windowVideos) {
+      const h = v?.creator_handle;
+      const d = v?.posted_date ? dayOf(v.posted_date) : '';
+      if (!h || !d || d < candStart || d > candEnd) continue;
+      if (!windowDays.has(h)) windowDays.set(h, []);
+      windowDays.get(h)!.push(d);
+    }
+    const candidateHandles = [...windowDays.keys()];
 
-    // ── Steps 2–5: per-candidate history → send dates → grouping ─────
+    // ── Step 2: the ledger — what has each creator ALREADY been sent? ─
+    const { data: stateRows } = await admin
+      .from('video_review_state')
+      .select('creator_handle, video_days, msgs_sent, last_sent_on, walked_at')
+      .eq('brand_id', brandId);
+    const state = new Map<string, any>();
+    for (const r of (stateRows || [])) state.set(r.creator_handle, r);
+
     const group1: string[] = [];
     const group2: string[] = [];
     const group3: string[] = [];
     const needsManual: { handle: string; note: string }[] = [];
+    const caughtUp: { handle: string; messageNo: number; dueOn: string }[] = [];
+    const upserts: any[] = [];
+    let settledSkipped = 0;
+    let walked = 0;
 
-    // Bounded concurrency so we don't hammer Euka (or hit its throttle).
-    //
-    // Was 4, which timed out (504) and then got resource-killed (546) on
-    // Cutler Nutritions. The cost is candidates x up-to-13 sequential Euka calls,
-    // so wall clock is set by how SLOW a store's Euka responses are, not by how
-    // many creators it has: Cutler had only 24 candidates (vs Bentgo's 69) but
-    // ~1.8s per chunk on the throttled shared key. Measured against the real
-    // Euka API with Cutler's own key: 4 -> ~144s (at the ~150s ceiling),
-    // 10 -> 25.1s across 136 calls. Euka accepted 10-way with no throttling.
     const CONCURRENCY = 12;
 
-    // Wall-clock budget. Even with headroom, a pathologically slow store must
-    // DEGRADE rather than 504: past the budget we stop starting new candidates
-    // and hand the rest back as "check manually", so the APC still gets the
-    // CSVs we did compute instead of a bare gateway error.
+    // Wall-clock budget: a pathologically slow store must DEGRADE rather than
+    // 504. Past the budget we stop starting new candidates and hand the rest
+    // back as "check manually" — and because the ledger now catches up anything
+    // overdue, they are simply picked up on the next run rather than lost.
     const startedAt = Date.now();
     const BUDGET_MS = 110_000;
     const outOfTime = () => Date.now() - startedAt > BUDGET_MS;
@@ -288,35 +303,139 @@ Deno.serve(async (req) => {
     async function worker() {
       while (idx < candidateHandles.length) {
         const handle = candidateHandles[idx++];
-        if (outOfTime()) {
-          needsManual.push({ handle, note: 'timed out before this creator could be checked — run again or check manually' });
-          continue;
+        const st = state.get(handle);
+
+        // (a) All three messages already sent → done forever. Zero Euka calls.
+        //     This is what pays for the 14-day lookback.
+        if (st && st.msgs_sent >= 3) { settledSkipped++; continue; }
+
+        // (b) Establish this creator's video days, ONE ENTRY PER VIDEO, oldest
+        //     first. Three videos on one day = three entries = three messages on
+        //     three days, which is the rule the Boss confirmed.
+        let days: string[];
+        if (st?.walked_at) {
+          // Already walked once — never walk again. Merge what the ledger stored
+          // with this window's videos (free — they came from the fetch above).
+          //
+          // Merge by COUNT PER DAY, taking the max from either source, because
+          // video_days holds one entry per video and the two sources overlap:
+          // concatenating would double-count a video present in both, and that
+          // would invent an extra message. Taking the max also lets a video Euka
+          // delivered LATE (a day we already had, now with more videos on it)
+          // correctly increase the count.
+          const perDay = new Map<string, number>();
+          const bump = (list: string[], take: (a: number, b: number) => number) => {
+            const c = new Map<string, number>();
+            for (const d of list) if (d <= target) c.set(d, (c.get(d) || 0) + 1);
+            for (const [d, n] of c) perDay.set(d, take(perDay.get(d) || 0, n));
+          };
+          bump(st.video_days || [], Math.max);
+          bump(windowDays.get(handle) || [], Math.max);
+
+          days = [];
+          for (const [d, n] of [...perDay.entries()].sort((a, b) => cmp(a[0], b[0]))) {
+            for (let i = 0; i < n; i++) days.push(d);
+          }
+        } else {
+          // (c) Never seen → the ONE expensive walk this creator will ever cost.
+          if (outOfTime()) {
+            needsManual.push({ handle, note: 'ran out of time before this creator could be checked — the next run will pick them up' });
+            continue;
+          }
+          let res: { skip: boolean; days: string[] };
+          try { res = await fullHistory(handle, target, candStart, storeId, key); }
+          catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
+          walked++;
+          if (res.skip) {
+            // 3+ videos predate a 14-day window ⇒ all three messages fell due
+            // more than two weeks ago ⇒ before the seed cutoff ⇒ already handled
+            // by hand. Record that so they are never walked or considered again.
+            upserts.push({
+              brand_id: brandId, creator_handle: handle,
+              video_days: [], video_count: 0, msgs_sent: 3,
+              source: 'seed', walked_at: new Date().toISOString(),
+            });
+            settledSkipped++;
+            continue;
+          }
+          days = res.days;
+          if (days.length === 0) {
+            needsManual.push({ handle, note: 'posted in window per creator_videos but per-creator history returned nothing' });
+            continue;
+          }
         }
-        let res: { skip: boolean; days: string[] };
-        try { res = await fullHistory(handle, target, candStart, storeId, key); }
-        catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
-        // Ruled out: 3+ videos predate the window, so all three messages already
-        // went out. Nothing due — NOT a manual case.
-        if (res.skip) continue;
-        const hist = res.days;
-        if (hist.length === 0) {
-          needsManual.push({ handle, note: 'posted in window per creator_videos but per-creator history returned nothing' });
-          continue;
-        }
-        const D1 = hist[0], D2 = hist[1], D3 = hist[2];
-        const s1 = D1 ? firstRunDateOnOrAfter(D1) : null;
-        const s2 = D2 ? firstRunDateOnOrAfter(maxDate(D2, addDays(s1!, 1))) : null;
-        const s3 = D3 ? firstRunDateOnOrAfter(maxDate(D3, addDays(s2!, 1))) : null;
-        if (s1 === target) group1.push(handle);
-        else if (s2 === target) group2.push(handle);
-        else if (s3 === target) group3.push(handle);
-        // else: nothing due today
+
+        if (days.length === 0) continue;
+        const sent = st?.msgs_sent || 0;
+
+        // Remember what we learned so this creator is never walked again.
+        upserts.push({
+          brand_id: brandId, creator_handle: handle,
+          video_days: days.slice(0, 3), video_count: days.length,
+          walked_at: new Date().toISOString(),
+        });
+
+        // (d) What do they still owe? Messages are capped at 3, and a creator
+        //     cannot be owed a message for a video they have not posted.
+        const next = sent + 1;
+        if (next > 3 || days.length < next) continue;
+
+        // (e) Its due date: the later of that video's date and the day after
+        //     their previous message (one message per creator per day), then
+        //     rolled forward past any missed day.
+        const vidDay = days[next - 1];
+        const floor = st?.last_sent_on ? addDays(st.last_sent_on, 1) : vidDay;
+        const due = firstRunDateOnOrAfter(maxDate(vidDay, floor));
+
+        // (f) THE FIX. Fire when due is on or BEFORE the target — not only when
+        //     it equals it. An overdue message (Euka delivered the video late, a
+        //     day was skipped) catches up here instead of vanishing forever.
+        if (due > target) continue;
+
+        if (due < target) caughtUp.push({ handle, messageNo: next, dueOn: due });
+        if (next === 1) group1.push(handle);
+        else if (next === 2) group2.push(handle);
+        else group3.push(handle);
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
+    // Persist what we learned (video days / walked_at / settled). This does NOT
+    // mark anything as SENT — that happens only when the APC downloads the CSV.
+    for (let i = 0; i < upserts.length; i += 500) {
+      await admin.from('video_review_state')
+        .upsert(upserts.slice(i, i + 500), { onConflict: 'brand_id,creator_handle', ignoreDuplicates: false })
+        .then(() => {}, () => {});
+    }
+
     // Stable, friendly ordering (alphabetical within a group).
     group1.sort(); group2.sort(); group3.sort();
+    caughtUp.sort((a, b) => cmp(a.dueOn, b.dueOn));
+
+    // ── Freshness check ──────────────────────────────────────────────
+    // Euka's ingestion for some stores lags well past our 3-day buffer, and a
+    // half-loaded day is INDISTINGUISHABLE from a quiet day — the tool would
+    // hand over a confident, wrong, short list (exactly what happened on Jul 10:
+    // 69 videos against ~150 on its neighbours). Compare the target day against
+    // the median of the surrounding days and say so out loud.
+    const perDay = new Map<string, number>();
+    for (const v of windowVideos) {
+      const d = v?.posted_date ? dayOf(v.posted_date) : '';
+      if (d) perDay.set(d, (perDay.get(d) || 0) + 1);
+    }
+    const others = [...perDay.entries()]
+      .filter(([d]) => d < target && d >= addDays(target, -10))
+      .map(([, n]) => n).sort((a, b) => a - b);
+    const median = others.length ? others[Math.floor(others.length / 2)] : 0;
+    const targetCount = perDay.get(target) || 0;
+    const freshness = (median >= 10 && targetCount < median * 0.6)
+      ? {
+          stale: true, targetVideos: targetCount, typicalVideos: median,
+          message: `Euka has only ${targetCount} videos for ${target}, against a typical ${median} on nearby days. `
+                 + `Its data for this date looks INCOMPLETE, so this list is probably short. `
+                 + `Anyone missing will be caught up automatically once Euka delivers them — just re-run in a day or two.`,
+        }
+      : { stale: false, targetVideos: targetCount, typicalVideos: median };
 
     // ── Log the run (best-effort; never block the response) ──────────
     admin.from('video_review_runs').insert({
@@ -339,9 +458,17 @@ Deno.serve(async (req) => {
       missedDates: missed,
       group1, group2, group3,
       needsManual,
+      // Messages that were OVERDUE and are being caught up now — the whole point
+      // of the ledger. Surfaced so the APC can see why someone from last week is
+      // suddenly on today's list.
+      caughtUp,
+      freshness,
       meta: {
         candidates: candidateHandles.length,
         candidateWindow: { start: candStart, end: candEnd },
+        lookbackDays: LOOKBACK_DAYS,
+        settledSkipped,   // already had all 3 — cost zero Euka calls
+        walked,           // creators seen for the first time (the expensive ones)
         dayBoundary: 'UTC',
       },
     });

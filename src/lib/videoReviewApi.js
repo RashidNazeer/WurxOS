@@ -49,9 +49,32 @@ export async function runVideoReviewTargets({ brandId, targetDate, missedDates =
   return data;
 }
 
+// Record a group's messages as SENT.
+//
+// Downloading the CSV is the commitment point — the file goes straight up to
+// Euka, so the messages go out. Recording it here is what stops the same creator
+// being messaged again tomorrow, and what lets the run fire OVERDUE messages
+// without spamming: the ledger knows who has already had which message.
+//
+// Idempotent server-side (greatest() on msgs_sent), so downloading the same CSV
+// twice can never advance a creator to their next message.
+export async function markGroupSent({ brandId, handles, messageNo, sentOn }) {
+  if (!brandId || !messageNo || !(handles || []).length) return 0;
+  const { data, error } = await supabase.rpc('video_review_mark_sent', {
+    p_brand: brandId,
+    p_handles: handles,
+    p_msg_no: messageNo,
+    p_sent_on: sentOn,
+  });
+  if (error) throw new Error(error.message);
+  return data || 0;
+}
+
 // Build a one-column CSV ("Usernames" header) from a list of handles, and
 // trigger a browser download. Handles are written WITHOUT the leading '@'
 // (they're pasted straight into TikTok/Euka which don't want the '@').
+// ONE COLUMN ONLY — Euka's uploader rejects anything else, so never add
+// columns here; extra context belongs in the UI panel.
 export function downloadHandlesCsv(handles, filename) {
   const header = 'Usernames';
   const body = (handles || []).map((h) => String(h).replace(/^@/, '')).join('\r\n');
