@@ -5,6 +5,7 @@ import { useReportLeaveGuard } from './useReportLeaveGuard';
 import { useStickyHeaderOffset } from '../../hooks/useStickyHeaderOffset';
 import { useBrandSections, cleanCustomFields } from './useBrandSections';
 import { BrandSectionsBlock, AddCustomSectionInline } from './BrandCustomSections';
+import { useSectionPresets } from './SectionPresetBar';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
@@ -632,6 +633,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     brandSectionDefs, brandSectionExtras,
     addBrandCustomSection, deleteBrandCustomSection,
   } = useBrandSections({ brandId: selectedBrand?.id, setData, reportType: 'monthly' });
+  // Save/restore per-section presets (shared per brand).
+  const presets = useSectionPresets({ brandId: selectedBrand?.id, reportType: 'monthly', data, setData, uid: currentUser?.uid });
 
   const handleSaveChanges = () => _doSave(reportStatus);
 
@@ -1024,6 +1027,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ── Section 5: Top Creators ─────────────────────────────────────── */}
       {sectEnabled.topCreators && (
       <SectionCard icon="bi-people-fill" color="#ec4899" title="Top Creators">
+        {presets.bar('topCreators', '#ec4899')}
         <ArraySection items={data.topCreators}
           setItems={(items) => setData(d => ({ ...d, topCreators: items }))}
           fields={[
@@ -1037,6 +1041,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ── Section 6: Top Videos ───────────────────────────────────────── */}
       {sectEnabled.topVideos && (
       <SectionCard icon="bi-play-circle-fill" color="#f59e0b" title="Top Videos">
+        {presets.bar('topVideos', '#f59e0b')}
         <ArraySection items={data.topVideos}
           setItems={(items) => setData(d => ({ ...d, topVideos: items }))}
           fields={[
@@ -1102,6 +1107,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ── Section 9: Product Analytics ────────────────────────────────── */}
       {sectEnabled.productAnalytics && (
       <SectionCard icon="bi-box-seam" color="#0d9488" title="Product Analytics">
+        {presets.bar('productAnalytics', '#0d9488')}
         <ArraySection items={data.productAnalytics}
           setItems={(items) => setData(d => ({ ...d, productAnalytics: items }))}
           fields={[
@@ -1118,6 +1124,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ── Section 10: GMV Max Performance ─────────────────────────────── */}
       {sectEnabled.gmvMax && (
       <SectionCard icon="bi-rocket-takeoff-fill" color="#ef4444" title="GMV Max Performance">
+        {presets.bar('gmvMax', '#ef4444')}
         <ArraySection items={data.gmvMax}
           setItems={(items) => setData(d => ({ ...d, gmvMax: items }))}
           fields={[
@@ -1165,6 +1172,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               : <><i className="bi bi-stars" /> Generate with AI</>}
           </button>
         }>
+        {presets.bar('keyWinsInsights', '#eab308')}
         <RichTextEditor value={data.keyWinsInsights || ''}
           minHeight={220}
           placeholder="Write the narrative summary of this month — key wins, milestones, MoM movements. Or click ✨ to auto-generate from your data."
@@ -1175,6 +1183,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ── Section 13: Campaigns (free text) ───────────────────────────── */}
       {sectEnabled.campaignsText && (
       <SectionCard icon="bi-megaphone-fill" color="#f97316" title="Campaigns">
+        {presets.bar('campaignsText', '#f97316')}
         <RichTextEditor value={data.campaignsText || ''}
           minHeight={140}
           placeholder="Notes about active and upcoming campaigns, eligibility, registration, discount ranges, etc."
@@ -1185,6 +1194,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ── Section 14: Recommendations & Action Items ──────────────────── */}
       {sectEnabled.recommendations && (
       <SectionCard icon="bi-lightbulb-fill" color="#f59e0b" title="Recommendations & Action Items">
+        {presets.bar('recommendations', '#f59e0b')}
         <RichTextEditor value={data.recommendations || ''}
           minHeight={160}
           placeholder="Share your recommendations and action items for next month."
@@ -1203,7 +1213,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               previousReport={previousReport}
               sectEnabled={sectEnabled}
               toggleSection={toggleBrandSection}
-              onDelete={deleteBrandCustomSection} />
+              onDelete={deleteBrandCustomSection}
+              renderPreset={presets.custom} />
           )}
           {selectedBrand?.id && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed' }}>

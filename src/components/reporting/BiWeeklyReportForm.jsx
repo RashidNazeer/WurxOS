@@ -22,6 +22,7 @@ import { findPreviousReport } from '../../lib/reportsApi';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichTextEditor from '../shared/RichTextEditor';
+import { useSectionPresets } from './SectionPresetBar';
 import ReportReturnNotice from './ReportReturnNotice';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 
@@ -250,6 +251,8 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
   const [selectedPeriod, setSelectedPeriod] = useState(null);
   const [existingReports, setExistingReports] = useState([]);
   const [data, setData] = useState(emptyBiWeeklyReport());
+  // Save/restore per-section presets (shared per brand).
+  const presets = useSectionPresets({ brandId: selectedBrand?.id, reportType: 'biweekly', data, setData, uid: currentUser?.uid });
 
   // Auto-save to localStorage every 30s for both new and edit modes.
   // Same pattern as WeeklyReportForm — see that file for rationale.
@@ -1099,6 +1102,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.topCreators && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('topCreators', '#f59e0b')}
           <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
             addLabel="Add Creator"
             fields={[
@@ -1121,6 +1125,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.topVideos && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('topVideos', '#8b5cf6')}
           <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
             addLabel="Add Video"
             fields={[
@@ -1145,6 +1150,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.gmvMax && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('gmvMax', '#ef4444')}
           <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
             addLabel="Add Campaign"
             fields={[
@@ -1174,6 +1180,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
             Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically.
           </p>
+          {presets.bar('gmvMaxMtd', '#ef4444')}
           <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
             addLabel="Add MTD Campaign"
             fields={[
@@ -1195,6 +1202,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.productHighlights && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('productHighlights', '#06b6d4')}
           <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
             addLabel="Add Product"
             fields={[
@@ -1239,6 +1247,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.upcomingCampaigns && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('upcomingCampaigns', '#ec4899')}
           <div className="d-flex justify-content-end mb-2">
             <FetchPreviousButton
               previousValue={previousReport?.upcomingCampaigns}
@@ -1260,6 +1269,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.operationalUpdates && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('operationalUpdates', '#6366f1')}
           <div className="d-flex justify-content-end mb-2">
             <FetchPreviousButton
               previousValue={previousReport?.operationalUpdates}
@@ -1281,6 +1291,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {sectEnabled.recommendations && (
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
+          {presets.bar('recommendations', '#f59e0b')}
           <div className="d-flex justify-content-end mb-2">
             <FetchPreviousButton
               previousValue={previousReport?.recommendations}

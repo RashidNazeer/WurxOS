@@ -5,6 +5,9 @@ import {
   removeBrandSection, updateBrandSectionFields, normalizeSection,
 } from '../../lib/brandReportSectionsApi';
 import {
+  countSectionPresetsForSection, deleteSectionPresetsForSection,
+} from '../../lib/reportSectionPresetsApi';
+import {
   PlusIcon, PencilIcon, TrashIcon, AlertIcon,
 } from '../common/Icon';
 
@@ -53,12 +56,25 @@ export default function BrandReportSectionsPanel({ brandId, brandName }) {
   }
 
   async function handleRemove(section) {
+    // Presets are tied to the section's id and can't be a DB cascade (sections
+    // live in a jsonb blob), so delete them here too — and warn how many go.
+    // Recreating a same-named section gets a fresh id, so they never come back.
+    let presetCount = 0;
+    try { presetCount = await countSectionPresetsForSection(brandId, section.id); } catch { /* non-fatal */ }
+    const presetWarning = presetCount > 0
+      ? `\n\nThis will ALSO permanently delete ${presetCount} saved preset${presetCount === 1 ? '' : 's'} for this section. `
+        + 'Recreating a section with the same name will NOT bring them back.'
+      : '';
     const ok = window.confirm(
       `Remove section "${section.name}"?\n\nNew reports for this brand won't show this section anymore. Existing reports keep whatever values they already have.`
+      + presetWarning
     );
     if (!ok) return;
-    try { await removeBrandSection(brandId, section.id); reload(); }
-    catch (err) { setError(err.message || 'Remove failed.'); }
+    try {
+      await removeBrandSection(brandId, section.id);
+      if (presetCount > 0) await deleteSectionPresetsForSection(brandId, section.id);
+      reload();
+    } catch (err) { setError(err.message || 'Remove failed.'); }
   }
 
   async function handleSaveFields(sectionId, fields) {

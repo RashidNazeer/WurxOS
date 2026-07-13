@@ -86,7 +86,7 @@ export function SectionHeader({ icon, title, color, required, enabled = true, on
 
 /* Standalone brand custom sections (long_text or table). Each respects the
    per-report visibility toggle, exactly like built-in sections. */
-export function BrandSectionsBlock({ sections, data, setData, previousReport, sectEnabled, toggleSection, onDelete }) {
+export function BrandSectionsBlock({ sections, data, setData, previousReport, sectEnabled, toggleSection, onDelete, renderPreset }) {
   function setCustomEntry(id, entry) {
     setData((d) => ({
       ...d,
@@ -122,11 +122,12 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
         );
         if (section.kind === 'table') {
           return (
-            <div key={section.id}>
+            <div key={section.id} id={`sec-cs-${section.id}`} style={{ scrollMarginTop: 12 }}>
               {header}
               {enabled && (
               <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
                 <div className="card-body p-3">
+                  {renderPreset?.(section)}
                   <div className="d-flex flex-column gap-3">
                     {section.fields.map((field) => {
                       const entry  = data.customFields?.[field.id];
@@ -162,11 +163,12 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
         const entry = data.customFields?.[section.id];
         const value = typeof entry === 'string' ? entry : (entry?.value || '');
         return (
-          <div key={section.id}>
+          <div key={section.id} id={`sec-cs-${section.id}`} style={{ scrollMarginTop: 12 }}>
             {header}
             {enabled && (
             <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
               <div className="card-body p-3">
+                {renderPreset?.(section)}
                 <RichTextEditor
                   value={value}
                   onChange={(v) => setCustomEntry(section.id, {
@@ -340,8 +342,8 @@ export function BuiltinExtras({
           }} />
       ) : (
         <button type="button"
-          className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 8, fontSize: '0.72rem', borderStyle: 'dashed' }}
+          className="btn btn-sm d-inline-flex align-items-center gap-1"
+          style={{ borderRadius: 9, fontSize: '0.74rem', fontWeight: 600, marginTop: 10, border: '1px solid var(--border-default)', background: 'var(--surface-1)', color: 'var(--text-secondary)' }}
           disabled={disabled}
           title={disabled ? 'Select a brand first' : 'Add a custom field to this section'}
           onClick={() => setAdding(true)}>

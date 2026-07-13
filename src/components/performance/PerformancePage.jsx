@@ -32,8 +32,9 @@ const METRICS = [
     description: 'How well daily tasks are completed — accuracy, attention to detail, and whether the output actually meets the brief without needing rework.' },
   { key: 'reporting',         label: 'Reporting',             icon: 'bi-file-earmark-text',
     description: 'Quality and timeliness of weekly, bi-weekly, and monthly reports — submitted on time, complete sections, useful insights vs. filler.' },
-  { key: 'punctuality',       label: 'Punctuality',           icon: 'bi-clock',
-    description: 'Clocking in on shift time consistently and not leaving early — reflects reliability beyond just being present.' },
+  // Punctuality was removed (mig 243): it double-counted. Attendance is its own
+  // auto-fetched pillar, and the incentive items already cover punctuality —
+  // rating it by hand a third time just diluted the other five metrics.
   { key: 'overallWorkflow',   label: 'Overall Workflow',      icon: 'bi-diagram-3',
     description: 'How organized and process-driven the person is — following SOPs, keeping their work area tidy, and managing their day without constant supervision.' },
   { key: 'responseTime',      label: 'Response Time',         icon: 'bi-chat-dots',

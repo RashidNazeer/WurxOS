@@ -390,3 +390,234 @@
   .wri-panel { animation: none; }
   .wri-track > i, .wri-obar > i, .wri-meter .t > i { transition: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Redesign: collapsible nav submenus, group dividers, and the
+   unified section card (header + options + divider + gradient body).
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Nav: group tile + expand arrow + section submenu ─────────── */
+.wri-navgroup { margin-bottom: 3px; }
+.wri-navrow { display: flex; align-items: center; gap: 2px; }
+.wri-navrow > .wri-navitem { flex: 1; min-width: 0; }
+.wri-arrow {
+  flex: none;
+  width: 28px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  border-radius: 9px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.wri-arrow:hover { background: var(--surface-2); color: var(--text-secondary); }
+.wri-arrow i { font-size: 0.8rem; transition: transform var(--dur-fast) var(--ease-out); }
+.wri-arrow.open i { transform: rotate(90deg); }
+.wri-submenu {
+  padding: 3px 0 5px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.wri-subitem {
+  --hue: var(--accent);
+  text-align: left;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.wri-subitem::before {
+  content: "";
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--border-default);
+  flex: none;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.wri-subitem:hover { background: var(--surface-2); color: var(--text-primary); }
+.wri-subitem.active { color: var(--hue); font-weight: 700; }
+.wri-subitem.active::before { background: var(--hue); }
+
+/* ── Group divider (between Seller / Affiliate / Custom / Wrap Up) ─ */
+.wri-groupdiv {
+  --hue: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 30px 2px 14px;
+  scroll-margin-top: 10px;
+}
+.wri-groupdiv:first-of-type { margin-top: 4px; }
+.wri-gd-icon {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--hue);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.wri-gd-icon i { font-size: 0.9rem; }
+.wri-gd-title {
+  font-size: 1.16rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.wri-gd-rule {
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 45%, transparent), transparent);
+}
+.wri-gd-meter { display: flex; align-items: center; gap: 9px; flex: none; }
+.wri-gd-meter .t {
+  width: 84px; height: 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.wri-gd-meter .t > i {
+  display: block; height: 100%;
+  border-radius: 99px;
+  background: var(--hue);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.wri-gd-meter b {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* ── Unified section card ─────────────────────────────────────── */
+.wri-section {
+  --hue: var(--accent);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  margin-bottom: 14px;
+  /* light hue-tinted gradient over the base surface — comfortable, not dense */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--hue) 7%, transparent), color-mix(in srgb, var(--hue) 1.5%, transparent) 160px, transparent 320px),
+    var(--surface-1);
+  box-shadow: var(--shadow-sm);
+  scroll-margin-top: 12px;
+}
+.wri-section.off {
+  background: var(--surface-1);
+  border-style: dashed;
+}
+.wri-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  min-height: 34px;
+}
+.wri-sec-icon {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--hue) 16%, transparent);
+  color: var(--hue);
+}
+.wri-section.off .wri-sec-icon { background: var(--surface-2); color: var(--text-muted); }
+.wri-sec-icon i { font-size: 1rem; }
+.wri-sec-name {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.wri-section.off .wri-sec-name { color: var(--text-muted); text-decoration: line-through; }
+.wri-sec-req { color: var(--danger); margin-left: 3px; font-weight: 700; }
+.wri-sec-hidden {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+.wri-sec-opts {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wri-sec-del {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 7px;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.wri-sec-del:hover { background: var(--danger-soft); color: var(--danger); }
+.wri-sec-divider { height: 1px; background: var(--border-subtle); margin: 0 16px; }
+.wri-sec-body { padding: 16px; }
+
+/* Bolder, more prominent field labels + roomier inputs inside cards. */
+.wri-sec-body .form-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.003em;
+  margin-bottom: 5px;
+}
+.wri-sec-body .form-control,
+.wri-sec-body .form-select {
+  padding: 8px 12px;
+  font-size: 0.83rem;
+  min-height: 38px;
+}
+.wri-sec-body .form-control-sm,
+.wri-sec-body .form-select-sm {
+  padding: 7px 11px;
+  font-size: 0.82rem;
+}
+
+/* Add-field button: solid, visible, with breathing room above it. */
+.wri-addfield {
+  margin-top: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  border-radius: 9px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.wri-addfield:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent); color: var(--text-primary); }
+.wri-addfield:disabled { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 720px) {
+  .wri-gd-title { font-size: 1.02rem; }
+  .wri-sec-body { padding: 13px; }
+}

@@ -1,9 +1,12 @@
 import { supabase } from './supabase';
 
+// 5 metrics. Punctuality was dropped (mig 243) — attendance is already its own
+// auto-fetched pillar and the incentive items cover it, so rating it here was a
+// third count of the same thing. `overall_score` is a generated column averaging
+// exactly these keys; keep the two in sync.
 export const METRICS = [
   { key: 'dailyTasksQuality', label: 'Daily task quality' },
   { key: 'reporting',         label: 'Reporting' },
-  { key: 'punctuality',       label: 'Punctuality' },
   { key: 'overallWorkflow',   label: 'Overall workflow' },
   { key: 'responseTime',      label: 'Response time' },
   { key: 'tasksProcessing',   label: 'Tasks processing' },
@@ -152,7 +155,6 @@ export async function updateConfig(cfg) {
 export const V1_METRICS = [
   { key: 'dailyTasksQuality', label: 'Daily Tasks Quality',  icon: 'bi-check2-all' },
   { key: 'reporting',         label: 'Reporting',             icon: 'bi-file-earmark-text' },
-  { key: 'punctuality',       label: 'Punctuality',           icon: 'bi-clock' },
   { key: 'overallWorkflow',   label: 'Overall Workflow',      icon: 'bi-diagram-3' },
   { key: 'responseTime',      label: 'Response Time',         icon: 'bi-chat-dots' },
   { key: 'tasksProcessing',   label: 'Tasks Processing',      icon: 'bi-list-task' },

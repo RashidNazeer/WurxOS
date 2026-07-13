@@ -48,6 +48,16 @@ export default function ReassignApcLeadTab() {
   const selectedTL = tls.find(t => t.id === selectedTLId) || null;
   const sameTl = selectedApc && selectedTL && selectedApc.ownerId === selectedTL.id;
 
+  // APCs sit under TLs, IPCs under PCTLs (team_move_apc_to_tl accepts either,
+  // so only offer the valid ones — otherwise an APC could be parked under a
+  // paid-collab lead by mistake). Falls back to the full list if none match.
+  const eligibleTls = useMemo(() => {
+    if (!selectedApc) return tls;
+    const want = selectedApc.role === 'ipc' ? 'pctl' : 'tl';
+    const scoped = tls.filter(t => t.role === want);
+    return scoped.length ? scoped : tls;
+  }, [tls, selectedApc]);
+
   async function handleReassign() {
     if (!selectedApc || !selectedTL) return;
     if (sameTl) { setError('That APC is already on this TL.'); return; }
@@ -58,11 +68,12 @@ export default function ReassignApcLeadTab() {
         apcName: selectedApc.name,
         oldTLId: selectedApc.ownerId,
         newTL: selectedTL,
+        brandCount: (selectedApc.assignedBrands || []).length,
         actor: { uid: currentUser?.uid, name: userName },
       });
       setSuccess(
         `${selectedApc.name} moved to ${selectedTL.name}. ` +
-        `${result.changed} brand${result.changed === 1 ? '' : 's'} reassigned.`
+        `${result.changed} brand${result.changed === 1 ? '' : 's'} moved with them.`
       );
       setSelectedApcId('');
       setSelectedTLId('');
@@ -164,7 +175,10 @@ export default function ReassignApcLeadTab() {
                   <div className="text-muted small text-center py-4">Select an APC first.</div>
                 ) : (
                   <div className="d-flex flex-column gap-1" style={{ maxHeight: 360, overflowY: 'auto' }}>
-                    {tls.map(t => {
+                    {eligibleTls.length === 0 && (
+                      <div className="text-muted text-center py-3 small">No eligible team leads found.</div>
+                    )}
+                    {eligibleTls.map(t => {
                       const isSel = t.id === selectedTLId;
                       const isCurrent = t.id === selectedApc.ownerId;
                       return (
@@ -255,7 +269,7 @@ export default function ReassignApcLeadTab() {
                   <div><strong>From TL:</strong> {selectedApc.ownerName || '—'}</div>
                   <div><strong>To TL:</strong> {selectedTL.name}</div>
                   <div className="mt-1 text-muted">
-                    {(selectedApc.assignedBrands || []).length} brand{(selectedApc.assignedBrands || []).length === 1 ? '' : 's'} will be reassigned to {selectedTL.name}.
+                    {(selectedApc.assignedBrands || []).length} brand{(selectedApc.assignedBrands || []).length === 1 ? '' : 's'} will move with them to {selectedTL.name}.
                     The APC, old TL, and new TL will all be notified.
                   </div>
                 </div>

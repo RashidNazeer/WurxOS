@@ -32,6 +32,7 @@ import {
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';
+import { useSectionPresets } from './SectionPresetBar';
 import { parseTopVideosText, parseTopCreatorsText, parseGmvMaxText } from '../../utils/reportPasteParsers';
 import '../../styles/reportImmersive.css';
 
@@ -67,8 +68,8 @@ function Field({ label, value, onChange, type = 'text', placeholder, note, width
   // Live-clean via cleanNumericInput so currency, commas, and % drop out.
   const isNum = type === 'number';
   return (
-    <div style={{ flex: width ? `0 0 ${width}` : '1 1 140px', minWidth: 100 }}>
-      <label className="form-label mb-1" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
+    <div style={{ flex: width ? `0 0 ${width}` : '1 1 150px', minWidth: 110 }}>
+      <label className="form-label">{label}</label>
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
         readOnly={readOnly}
@@ -227,6 +228,62 @@ function ArraySection({ items, setItems, fields, addLabel }) {
   );
 }
 
+/* Prominent divider between the major report groups (Seller / Affiliate /
+   Custom / Wrap Up). Also the scroll anchor (id) the nav jumps to. */
+function GroupDivider({ id, hue, icon, title, pct }) {
+  return (
+    <div id={id} className="wri-groupdiv" style={{ '--hue': hue }}>
+      <span className="wri-gd-icon"><i className={`bi ${icon}`} /></span>
+      <span className="wri-gd-title">{title}</span>
+      <span className="wri-gd-rule" />
+      {pct != null && (
+        <span className="wri-gd-meter">
+          <span className="t"><i style={{ width: `${pct}%` }} /></span>
+          <b>{pct}%</b>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* One unified card per section: prominent name on the left, options on the
+   right (show/hide toggle, delete for custom), a divider, then the fields.
+   `id` is the scroll anchor for the section nav. When toggled off the body
+   collapses and only the header stays. The Presets control is rendered as the
+   first child in the body. */
+function SectionCard({ id, hue = 'var(--accent)', icon, title, required, enabled = true, onToggle, onDelete, children }) {
+  return (
+    <section id={id} className={`wri-section${enabled ? '' : ' off'}`} style={{ '--hue': hue }}>
+      <div className="wri-sec-head">
+        <span className="wri-sec-icon"><i className={`bi ${icon}`} /></span>
+        <h3 className="wri-sec-name">{title}{required && enabled && <span className="wri-sec-req">*</span>}</h3>
+        {!enabled && <span className="wri-sec-hidden">Hidden</span>}
+        <div className="wri-sec-opts">
+          {onDelete && (
+            <button type="button" className="wri-sec-del" onClick={onDelete} title="Delete this custom section">
+              <i className="bi bi-trash3" />
+            </button>
+          )}
+          {onToggle && (
+            <div className="form-check form-switch mb-0" style={{ paddingLeft: '2.4em' }}>
+              <input className="form-check-input" type="checkbox" role="switch"
+                checked={!!enabled} onChange={(e) => onToggle(e.target.checked)}
+                title={enabled ? 'Hide this section in the report' : 'Show this section in the report'}
+                style={{ cursor: 'pointer' }} />
+            </div>
+          )}
+        </div>
+      </div>
+      {enabled && (
+        <>
+          <div className="wri-sec-divider" />
+          <div className="wri-sec-body">{children}</div>
+        </>
+      )}
+    </section>
+  );
+}
+
 /* ── Main Form ────────────────────────────────────────────────────────────── */
 
 export default function WeeklyReportForm({ editReportId, onSaved, onCancel, prefillBrandId = null }) {
@@ -318,6 +375,48 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     brandSectionDefs, brandSectionExtras,
     addExtraField, removeExtraField, addBrandCustomSection, deleteBrandCustomSection,
   } = useBrandSections({ brandId: selectedBrand?.id, setData, reportType: 'weekly' });
+  // Save/restore per-section presets (shared per brand). `bar(key, accent)`
+  // renders the control for a hardcoded section; `custom(section, accent)` for
+  // a brand custom section.
+  const presets = useSectionPresets({ brandId: selectedBrand?.id, reportType: 'weekly', data, setData, uid: currentUser?.uid });
+  // Continuous-scroll nav: scroll container ref, which group is in view
+  // (scroll-spy → activeSection), which nav submenus are expanded, and a
+  // smooth scroll-to for the section anchors.
+  const scrollRef = React.useRef(null);       // the .wri-scroll node (set by the callback ref below)
+  const scrollCleanup = React.useRef(null);
+  const [openGroups, setOpenGroups] = useState(() => new Set(['seller']));
+  const toggleGroup = (key) => setOpenGroups((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const scrollToId = React.useCallback((anchorId, openKey) => {
+    if (openKey) setOpenGroups((s) => (s.has(openKey) ? s : new Set(s).add(openKey)));
+    const root = scrollRef.current;
+    const el = document.getElementById(anchorId);
+    if (!root || !el) return;
+    const top = root.scrollTop + (el.getBoundingClientRect().top - root.getBoundingClientRect().top) - 14;
+    root.scrollTo({ top, behavior: 'smooth' });
+  }, []);
+  // Scroll-spy via a CALLBACK REF so the scroll listener attaches exactly when
+  // the .wri-scroll container mounts — regardless of which render/step that
+  // is. (A plain useEffect+deps missed the new-report flow, where the
+  // container first mounts on a later commit that changes neither the brand
+  // nor editReportId, so the effect never re-ran and the nav highlight froze.)
+  const bindScroll = React.useCallback((node) => {
+    if (scrollCleanup.current) { scrollCleanup.current(); scrollCleanup.current = null; }
+    scrollRef.current = node;
+    if (!node) return;
+    const onScroll = () => {
+      const keys = ['seller', 'affiliate', 'custom', 'wrapup'].filter((k) => document.getElementById(`grp-${k}`));
+      const rootTop = node.getBoundingClientRect().top;
+      let cur = keys[0];
+      for (const k of keys) {
+        const el = document.getElementById(`grp-${k}`);
+        if (el && (el.getBoundingClientRect().top - rootTop) <= 150) cur = k;
+      }
+      if (cur) setActiveSection((prev) => (prev === cur ? prev : cur));
+    };
+    node.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    scrollCleanup.current = () => node.removeEventListener('scroll', onScroll);
+  }, []);
   const [reportStatus, setReportStatus] = useState('draft');
   const [rejectionNote, setRejectionNote] = useState('');
   const [importing, setImporting] = useState(false);
@@ -1228,26 +1327,40 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
   const showCustom = brandSectionDefs.length > 0 || !!selectedBrand?.id || customFieldDefs.length > 0;
   // Fall back to Seller if the Custom nav disappears while it's active.
-  const active = (activeSection === 'custom' && !showCustom) ? 'seller' : activeSection;
+  const active = activeSection; // scroll-spy group key: seller | affiliate | custom | wrapup
 
-  const SECTION_HUES = { seller: '#4f46e5', affiliate: '#0d9488', custom: '#475569', operational: '#d97706', recommendations: '#e11d48', insights: '#7c3aed' };
+  // Group hues drive the nav tiles + the in-scroll group dividers.
+  const GROUP_HUES = { seller: '#4f46e5', affiliate: '#0d9488', custom: '#475569', wrapup: '#d97706' };
+  // Wrap Up merges the three closing sections into one group.
+  const wrapupPct = Math.round((operationalPct + recommendationsPct + insightsPct) / 3);
+  // Each group tile expands to a submenu of its sections; the `id`s match the
+  // SectionCard anchors in the scroll body so clicking jumps straight there.
   const navGroups = [
-    { cap: 'Report sections', items: [
-      { key: 'seller', name: 'Seller Center', icon: 'bi-bag-check-fill', pct: sellerPct },
-      { key: 'affiliate', name: 'Affiliate Center', icon: 'bi-people-fill', pct: affiliatePct },
+    { key: 'seller', name: 'Seller Center', icon: 'bi-bag-check-fill', pct: sellerPct, subs: [
+      { id: 'sec-sellerOverview', name: 'Seller Overview' },
+      { id: 'sec-gmvMax', name: 'GMV Max Performance' },
+      { id: 'sec-gmvMaxMtd', name: 'Month-to-Date GMV Max' },
+      { id: 'sec-productHighlights', name: 'Product Highlights' },
+      { id: 'sec-offsitePerformance', name: 'Offsite Performance' },
+      { id: 'sec-upcomingCampaigns', name: 'Current & Upcoming Campaigns' },
     ] },
-    ...(showCustom ? [{ cap: 'Custom', items: [
-      { key: 'custom', name: 'Custom Sections', icon: 'bi-grid-1x2-fill', pct: customPct },
+    { key: 'affiliate', name: 'Affiliate Center', icon: 'bi-people-fill', pct: affiliatePct, subs: [
+      { id: 'sec-affiliateOverview', name: 'Affiliate Overview' },
+      { id: 'sec-topCreators', name: 'Top Creators' },
+      { id: 'sec-topVideos', name: 'Top Videos' },
+    ] },
+    ...(showCustom ? [{ key: 'custom', name: 'Custom Sections', icon: 'bi-grid-1x2-fill', pct: customPct, subs: [
+      ...brandSectionDefs.map((s) => ({ id: `sec-cs-${s.id}`, name: s.name })),
+      ...(selectedBrand?.id ? [{ id: 'sec-cs-add', name: '+ Add a section' }] : []),
     ] }] : []),
-    { cap: 'Wrap up', items: [
-      { key: 'operational', name: 'Operational Updates', icon: 'bi-gear-fill', pct: operationalPct },
-      { key: 'recommendations', name: 'Recommendations', icon: 'bi-lightbulb-fill', pct: recommendationsPct },
-      { key: 'insights', name: 'Insights', icon: 'bi-stars', pct: insightsPct },
+    { key: 'wrapup', name: 'Wrap Up', icon: 'bi-check2-square', pct: wrapupPct, subs: [
+      { id: 'sec-operationalUpdates', name: 'Operational Updates' },
+      { id: 'sec-recommendations', name: 'Recommendations' },
+      { id: 'sec-insights', name: 'Insights' },
     ] },
   ];
   const _overallList = [sellerPct, affiliatePct, operationalPct, recommendationsPct, insightsPct, ...(showCustom ? [customPct] : [])];
   const overallPct = Math.round(_overallList.reduce((a, b) => a + b, 0) / _overallList.length);
-  const panelHue = SECTION_HUES[active] || 'var(--accent)';
 
   return (
     // Immersive full-viewport editor — a fixed shell (z-1200) covering the
@@ -1382,22 +1495,42 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           </div>
         </div>
         <div className="wri-navscroll">
-          {navGroups.map((grp) => (
-            <React.Fragment key={grp.cap}>
-              <div className="wri-railcap">{grp.cap}</div>
-              {grp.items.map((it) => (
-                <button key={it.key} type="button"
-                  className={`wri-navitem${active === it.key ? ' active' : ''}${it.pct === 100 ? ' done' : ''}`}
-                  style={{ '--hue': SECTION_HUES[it.key] }}
-                  onClick={() => setActiveSection(it.key)}>
-                  <span className="wri-chip"><i className={`bi ${it.icon}`} /></span>
-                  <span className="wri-nm">{it.name}</span>
-                  <span className="wri-track"><i style={{ width: `${it.pct}%` }} /></span>
-                  <span className="wri-pc">{it.pct}%</span>
-                </button>
-              ))}
-            </React.Fragment>
-          ))}
+          {navGroups.map((grp) => {
+            const isOpen = openGroups.has(grp.key);
+            return (
+              <div className="wri-navgroup" key={grp.key}>
+                <div className="wri-navrow">
+                  <button type="button"
+                    className={`wri-navitem${active === grp.key ? ' active' : ''}${grp.pct === 100 ? ' done' : ''}`}
+                    style={{ '--hue': GROUP_HUES[grp.key] }}
+                    onClick={() => scrollToId(`grp-${grp.key}`, grp.key)}>
+                    <span className="wri-chip"><i className={`bi ${grp.icon}`} /></span>
+                    <span className="wri-nm">{grp.name}</span>
+                    <span className="wri-track"><i style={{ width: `${grp.pct}%` }} /></span>
+                    <span className="wri-pc">{grp.pct}%</span>
+                  </button>
+                  {grp.subs.length > 0 && (
+                    <button type="button" className={`wri-arrow${isOpen ? ' open' : ''}`}
+                      onClick={() => toggleGroup(grp.key)}
+                      title={isOpen ? 'Hide sections' : 'Show sections'} aria-expanded={isOpen}>
+                      <i className="bi bi-chevron-right" />
+                    </button>
+                  )}
+                </div>
+                {isOpen && grp.subs.length > 0 && (
+                  <div className="wri-submenu">
+                    {grp.subs.map((s) => (
+                      <button key={s.id} type="button" className="wri-subitem"
+                        style={{ '--hue': GROUP_HUES[grp.key] }}
+                        onClick={() => scrollToId(s.id)}>
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="wri-actions">
           <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
@@ -1471,7 +1604,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           </div>
         </div>
 
-        <div className="wri-scroll">
+        <div className="wri-scroll" ref={bindScroll}>
           {/* ─── Duplicate week guard ─────────────────────────────────────── */}
           {duplicateForThisWeek && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
@@ -1531,420 +1664,271 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         </div>
       )}
 
-      {/* ─── Panel header (only the active section's header renders) ───── */}
-      {(() => {
-        const heads = {
-          seller:         { icon: 'bi-bag-check-fill', title: 'Seller Center',                  pct: sellerPct,         desc: <>Everything from TikTok Shop <b>Seller Center</b> — fill it all here without switching tabs.</> },
-          affiliate:      { icon: 'bi-people-fill',    title: 'Affiliate Center',               pct: affiliatePct,      desc: <>Everything from TikTok Shop <b>Affiliate Center</b> — creators, videos and affiliate GMV.</> },
-          custom:         { icon: 'bi-grid-1x2-fill',  title: 'Custom Sections',                pct: customPct,         desc: <>Brand-specific sections and your own custom fields for this report.</> },
-          operational:    { icon: 'bi-gear-fill',      title: 'Operational Updates',            pct: operationalPct,    desc: <>What changed this week behind the scenes — staffing, blockers, process.</> },
-          recommendations:{ icon: 'bi-lightbulb-fill', title: 'Recommendations & Action Items', pct: recommendationsPct, desc: <>Where to focus next — recommendations and concrete action items.</> },
-          insights:       { icon: 'bi-stars',          title: 'Insights',                       pct: insightsPct,       desc: <>Write your read on the whole week here — cover every section in your own words, all in one place.</> },
-        };
-        const h = heads[active];
-        if (!h) return null;
-        return (
-          <>
-            <div className="wri-phead" style={{ '--hue': panelHue }}>
-              <span className="wri-picon"><i className={`bi ${h.icon}`} /></span>
-              <h1>{h.title}</h1>
-              <div className="wri-meter"><span className="t"><i style={{ width: `${h.pct}%` }} /></span><b>{h.pct}%</b></div>
-            </div>
-            {h.desc && <p className="wri-pdesc">{h.desc}</p>}
-          </>
-        );
-      })()}
-
       {/* ═══ SELLER CENTER ══════════════════════════════════════════════ */}
-      {/* ─── Seller Overview (Seller-Center half of the old Overall card) ─ */}
-      {active === 'seller' && (
-      <>
-      <SectionHeader icon="bi-bag-check-fill" title="Seller Overview" color="#4f46e5" required
-        enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')} />
-      {sectEnabled.overallPerformance && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex flex-wrap gap-2 mb-2">
-            <Field label={`GMV ${curSym} (This Week)`} value={data.overallPerformance.gmv} onChange={v => setPerf('gmv', v)} type="number" placeholder="55834.62" />
-            <Field label="Orders" value={data.overallPerformance.orders} onChange={v => setPerf('orders', v)} type="number" placeholder="813" />
-            <Field label="Samples Approved (This week)" value={data.overallPerformance.samplesApproved} onChange={v => setPerf('samplesApproved', v)} type="number" placeholder="488" />
-          </div>
-          <div className="d-flex flex-wrap gap-2 mb-2">
-            <Field label="ROI (auto)" value={weeklyRoi != null ? weeklyRoi.toFixed(2) + '×' : '—'} readOnly
-              note={weeklyGmvMaxRows.length
-                ? `Auto from this week's ${weeklyGmvMaxRows.length} GMV Max campaign${weeklyGmvMaxRows.length === 1 ? '' : 's'} (GMV ÷ Cost)`
-                : "Add this week's GMV Max campaigns below — ROI calculates automatically"} />
-            <Field label="Shop Performance Score" value={data.overallPerformance.shopPerformanceScore} onChange={v => setPerf('shopPerformanceScore', v)} type="number" placeholder="4.7" />
-          </div>
-          <div className="d-flex flex-wrap gap-2">
-            <Field label={`GMV Month-to-Date (${curSym})`} value={data.overallNotes.gmv || ''} onChange={v => setPerfNote('gmv', v)} type="number" placeholder="231714.01" width="240px" />
-            <Field label="Sample Approved (month to date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
-          </div>
-          <BuiltinExtras sectionKey="overallPerformance" sectionTitle="Overall Performance"
-            fields={brandSectionExtras.overallPerformance || []}
-            data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport}
-            disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('overallPerformance', f)}
-            onRemoveField={(id) => removeExtraField('overallPerformance', id)} />
+      <GroupDivider id="grp-seller" hue="#4f46e5" icon="bi-bag-check-fill" title="Seller Center" pct={sellerPct} />
+
+      <SectionCard id="sec-sellerOverview" hue="#4f46e5" icon="bi-bag-check-fill" title="Seller Overview" required
+        enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')}>
+        <div className="d-flex flex-wrap gap-2 mb-2">
+          <Field label={`GMV ${curSym} (This Week)`} value={data.overallPerformance.gmv} onChange={v => setPerf('gmv', v)} type="number" placeholder="55834.62" />
+          <Field label="Orders" value={data.overallPerformance.orders} onChange={v => setPerf('orders', v)} type="number" placeholder="813" />
+          <Field label="Samples Approved (This week)" value={data.overallPerformance.samplesApproved} onChange={v => setPerf('samplesApproved', v)} type="number" placeholder="488" />
         </div>
-      </div>
-      )}
-      </>
-      )}
-
-      {/* ═══ AFFILIATE CENTER ═══════════════════════════════════════════ */}
-      {/* ─── Affiliate Overview (Affiliate-Center half of old Overall) ──── */}
-      {active === 'affiliate' && (
-      <>
-      <SectionHeader icon="bi-people-fill" title="Affiliate Overview" color="#0d9488" required
-        enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')} />
-      {sectEnabled.overallPerformance && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex flex-wrap gap-2 mb-2">
-            <Field label={`Affiliate GMV (${curSym})`} value={data.overallPerformance.affiliateGmv} onChange={v => setPerf('affiliateGmv', v)} type="number" placeholder="49494.24" />
-            <Field label="Video Posted (This week)" value={data.overallPerformance.videosPosted} onChange={v => setPerf('videosPosted', v)} type="number" placeholder="1377" />
-          </div>
-          <div className="d-flex flex-wrap gap-2">
-            <Field label="Videos Posted (Month-to-Date)" value={data.overallNotes.videosMtd || ''} onChange={v => setPerfNote('videosMtd', v)} type="number" placeholder="2140" width="240px" />
-            {hasPrevAllTime ? (
-              <Field label="Total Videos (all-time)" value={autoTotalVideos} type="number" width="220px" readOnly
-                note={`Auto: ${prevAllTimeVideos.toLocaleString()} previous + ${weeklyVideos.toLocaleString()} this week`} />
-            ) : (
-              <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px"
-                note="First report: enter the all-time total. Future weeks add automatically." />
-            )}
-          </div>
+        <div className="d-flex flex-wrap gap-2 mb-2">
+          <Field label="ROI (auto)" value={weeklyRoi != null ? weeklyRoi.toFixed(2) + '×' : '—'} readOnly
+            note={weeklyGmvMaxRows.length
+              ? `Auto from this week's ${weeklyGmvMaxRows.length} GMV Max campaign${weeklyGmvMaxRows.length === 1 ? '' : 's'} (GMV ÷ Cost)`
+              : "Add this week's GMV Max campaigns below — ROI calculates automatically"} />
+          <Field label="Shop Performance Score" value={data.overallPerformance.shopPerformanceScore} onChange={v => setPerf('shopPerformanceScore', v)} type="number" placeholder="4.7" />
         </div>
-      </div>
-      )}
-      </>
-      )}
-
-      {active === 'affiliate' && (
-      <>
-      {/* ─── Top Creators ───────────────────────────────────────────────── */}
-      <SectionHeader icon="bi-star-fill" title="Top Creators" color="#f59e0b" required
-        enabled={sectEnabled.topCreators} onToggle={toggleSection('topCreators')} />
-      {sectEnabled.topCreators && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <PasteParsePanel
-            noun="creator"
-            accent="#f59e0b"
-            parse={parseTopCreatorsText}
-            onApply={rows => setData(d => {
-              const isReal = c => (c.name && c.name.trim())
-                || (c.gmv != null && String(c.gmv).trim()) || (c.itemsSold != null && String(c.itemsSold).trim());
-              const kept = (d.topCreators || []).filter(isReal);
-              return { ...d, topCreators: [...kept, ...rows] };
-            })}
-            hint={<>Copy the <b>Top Creators</b> table from TikTok Shop (creator handle, Affiliate GMV, items sold &amp; the change chips) and paste it here. We&apos;ll pull the creator, GMV, items sold, and use the last column (shoppable videos) as videos posted.</>}
-          />
-          <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
-            addLabel="Add Creator"
-            fields={[
-              { key: 'name', label: 'Creator Name', width: '160px' },
-              { key: 'videosPosted', label: 'Videos', type: 'number', width: '80px' },
-              { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
-              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
-              { key: 'notes', label: 'Notes', width: '140px' },
-            ]} />
-          <BuiltinExtras sectionKey="topCreators" sectionTitle="Top Creators"
-            fields={brandSectionExtras.topCreators || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('topCreators', f)}
-            onRemoveField={(id) => removeExtraField('topCreators', id)} />
+        <div className="d-flex flex-wrap gap-2">
+          <Field label={`GMV Month-to-Date (${curSym})`} value={data.overallNotes.gmv || ''} onChange={v => setPerfNote('gmv', v)} type="number" placeholder="231714.01" width="240px" />
+          <Field label="Sample Approved (month to date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
         </div>
-      </div>
-      )}
+        <BuiltinExtras sectionKey="overallPerformance" sectionTitle="Overall Performance"
+          fields={brandSectionExtras.overallPerformance || []}
+          data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport}
+          disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('overallPerformance', f)}
+          onRemoveField={(id) => removeExtraField('overallPerformance', id)} />
+      </SectionCard>
 
-      {/* ─── Top Videos ─────────────────────────────────────────────────── */}
-      <SectionHeader icon="bi-play-circle-fill" title="Top Videos" color="#8b5cf6" required
-        enabled={sectEnabled.topVideos} onToggle={toggleSection('topVideos')} />
-      {sectEnabled.topVideos && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <PasteParsePanel
-            noun="video"
-            accent="#8b5cf6"
-            parse={parseTopVideosText}
-            onApply={rows => setData(d => {
-              const isReal = v => (v.creatorName && v.creatorName.trim()) || (v.videoLink && v.videoLink.trim())
-                || (v.gmv != null && String(v.gmv).trim()) || (v.itemsSold != null && String(v.itemsSold).trim());
-              const kept = (d.topVideos || []).filter(isReal);
-              return { ...d, topVideos: [...kept, ...rows] };
-            })}
-            hint={<>Copy the <b>Top Videos</b> table from TikTok Shop (each video's caption, ID, creator &amp; metrics) and paste it here. We&apos;ll pull the creator, GMV &amp; items sold and build each video link automatically. Views &amp; product clicks aren&apos;t in that export — add those manually or via Euka.</>}
-          />
-          <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
-            addLabel="Add Video"
-            fields={[
-              { key: 'creatorName', label: 'Creator', width: '140px' },
-              { key: 'videoLink', label: 'Video Link *', type: 'url', width: '220px', placeholder: 'https://www.tiktok.com/@user/video/...' },
-              { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
-              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
-              { key: 'views', label: 'Views', type: 'number', width: '90px' },
-              { key: 'productClicks', label: 'Product Clicks', width: '110px', placeholder: '3.97K or 3970' },
-              { key: 'notes', label: 'Notes', width: '120px' },
-            ]} />
-          <BuiltinExtras sectionKey="topVideos" sectionTitle="Top Videos"
-            fields={brandSectionExtras.topVideos || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('topVideos', f)}
-            onRemoveField={(id) => removeExtraField('topVideos', id)} />
+      {/* Affiliate Center group is rendered below, after the Seller sections. */}
+
+      <SectionCard id="sec-gmvMax" hue="#ef4444" icon="bi-rocket-takeoff-fill" title="GMV Max Performance" required
+        enabled={sectEnabled.gmvMax} onToggle={toggleSection('gmvMax')}>
+        {presets.bar('gmvMax', '#ef4444')}
+        <PasteParsePanel
+          noun="campaign"
+          accent="#ef4444"
+          parse={parseGmvMaxText}
+          onApply={rows => setData(d => {
+            const isReal = g => (g.campaign && g.campaign.trim())
+              || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
+            const kept = (d.gmvMax || []).filter(isReal);
+            return { ...d, gmvMax: [...kept, ...rows] };
+          })}
+          hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this week</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
+        />
+        <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
+          addLabel="Add Campaign"
+          fields={[
+            { key: 'campaign', label: 'Campaign', width: '130px' },
+            { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '100px' },
+            { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
+            { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
+            { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
+            { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+            { key: 'notes', label: 'Notes', width: '140px' },
+          ]} />
+        <BuiltinExtras sectionKey="gmvMax" sectionTitle="GMV Max Performance"
+          fields={brandSectionExtras.gmvMax || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('gmvMax', f)}
+          onRemoveField={(id) => removeExtraField('gmvMax', id)} />
+      </SectionCard>
+
+      <SectionCard id="sec-gmvMaxMtd" hue="#ef4444" icon="bi-calendar-range-fill" title="Month-to-Date GMV Max"
+        enabled={sectEnabled.gmvMax}>
+        <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
+          Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically, like the weekly section above.
+        </p>
+        {presets.bar('gmvMaxMtd', '#ef4444')}
+        <PasteParsePanel
+          noun="campaign"
+          accent="#ef4444"
+          parse={parseGmvMaxText}
+          onApply={rows => setData(d => {
+            const isReal = g => (g.campaign && g.campaign.trim())
+              || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
+            const kept = (d.gmvMaxMtd || []).filter(isReal);
+            return { ...d, gmvMaxMtd: [...kept, ...rows] };
+          })}
+          hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the weekly box above.</>}
+        />
+        <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
+          addLabel="Add MTD Campaign"
+          fields={[
+            { key: 'campaign', label: 'Campaign', width: '130px' },
+            { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '100px' },
+            { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
+            { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
+            { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
+            { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+          ]} />
+      </SectionCard>
+
+      <SectionCard id="sec-productHighlights" hue="#06b6d4" icon="bi-box-seam-fill" title="Product Highlights" required
+        enabled={sectEnabled.productHighlights} onToggle={toggleSection('productHighlights')}>
+        {presets.bar('productHighlights', '#06b6d4')}
+        <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
+          addLabel="Add Product"
+          fields={[
+            { key: 'productId', label: 'Product ID', width: '140px' },
+            { key: 'productName', label: 'Product Name', width: '160px' },
+            { key: 'unitsSold', label: productUnitsLbl, type: 'number', width: '90px' },
+            { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+            { key: 'newVideos', label: 'Videos (wk)', type: 'number', width: '90px' },
+            { key: 'videosMtd', label: 'Videos MTD', type: 'number', width: '90px' },
+            { key: 'samplesApprovedWeek', label: 'Samples (wk)', type: 'number', width: '95px' },
+            { key: 'samplesApprovedMtd', label: 'Samples MTD', type: 'number', width: '95px' },
+            { key: 'notes', label: 'Notes', width: '130px' },
+          ]} />
+        <BuiltinExtras sectionKey="productHighlights" sectionTitle="Product Highlights"
+          fields={brandSectionExtras.productHighlights || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('productHighlights', f)}
+          onRemoveField={(id) => removeExtraField('productHighlights', id)} />
+      </SectionCard>
+
+      <SectionCard id="sec-offsitePerformance" hue="#10b981" icon="bi-globe2" title="Offsite Performance"
+        enabled={sectEnabled.offsitePerformance} onToggle={toggleSection('offsitePerformance')}>
+        <div className="d-flex flex-wrap gap-2 mb-2">
+          <Field label={`Offsite GMV (${curSym})`} value={data.offsitePerformance.offsiteGmv} onChange={v => setOffsite('offsiteGmv', v)} type="number" placeholder="1725.49" />
+          <Field label={`TikTok Shop GMV (${curSym})`} value={data.offsitePerformance.tiktokShopGmv} onChange={v => setOffsite('tiktokShopGmv', v)} type="number" placeholder="55834.62" />
+          <Field label="Off-site Effect (%)" value={data.offsitePerformance.offsiteEffect} onChange={v => setOffsite('offsiteEffect', v)} type="number" placeholder="3.09" />
         </div>
-      </div>
-      )}
-      </>
-      )}
+        <BuiltinExtras sectionKey="offsitePerformance" sectionTitle="Offsite Performance"
+          fields={brandSectionExtras.offsitePerformance || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('offsitePerformance', f)}
+          onRemoveField={(id) => removeExtraField('offsitePerformance', id)} />
+      </SectionCard>
 
-      {active === 'seller' && (
-      <>
-      {/* ─── GMV Max Performance (Seller Center) ─────────────────────────── */}
-
-      {/* ─── Section 4: GMV Max Performance ─────────────────────────────── */}
-      <SectionHeader icon="bi-rocket-takeoff-fill" title="GMV Max Performance" color="#ef4444" required
-        enabled={sectEnabled.gmvMax} onToggle={toggleSection('gmvMax')} />
-      {sectEnabled.gmvMax && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <PasteParsePanel
-            noun="campaign"
-            accent="#ef4444"
-            parse={parseGmvMaxText}
-            onApply={rows => setData(d => {
-              const isReal = g => (g.campaign && g.campaign.trim())
-                || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
-              const kept = (d.gmvMax || []).filter(isReal);
-              return { ...d, gmvMax: [...kept, ...rows] };
-            })}
-            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this week</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
-          />
-          <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
-            addLabel="Add Campaign"
-            fields={[
-              { key: 'campaign', label: 'Campaign', width: '130px' },
-              { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '100px' },
-              { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
-              { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
-              { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
-              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
-              { key: 'notes', label: 'Notes', width: '140px' },
-            ]} />
-          <BuiltinExtras sectionKey="gmvMax" sectionTitle="GMV Max Performance"
-            fields={brandSectionExtras.gmvMax || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('gmvMax', f)}
-            onRemoveField={(id) => removeExtraField('gmvMax', id)} />
+      <SectionCard id="sec-upcomingCampaigns" hue="#ec4899" icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" required
+        enabled={sectEnabled.upcomingCampaigns} onToggle={toggleSection('upcomingCampaigns')}>
+        {presets.bar('upcomingCampaigns', '#ec4899')}
+        <div className="d-flex justify-content-end mb-2">
+          <FetchPreviousButton
+            previousValue={previousReport?.upcomingCampaigns}
+            currentValue={data.upcomingCampaigns}
+            onPaste={(v) => setData(d => ({ ...d, upcomingCampaigns: v }))}
+            sourceLabel={previousReport?.weekLabel || 'previous week'} />
         </div>
-      </div>
-      )}
+        <RichTextEditor value={data.upcomingCampaigns || ''}
+          onChange={v => setData(d => ({ ...d, upcomingCampaigns: v }))}
+          minHeight={140}
+          placeholder="List any upcoming campaigns, launches or planned promotions" />
+        <BuiltinExtras sectionKey="upcomingCampaigns" sectionTitle="Current & Upcoming Campaigns"
+          fields={brandSectionExtras.upcomingCampaigns || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('upcomingCampaigns', f)}
+          onRemoveField={(id) => removeExtraField('upcomingCampaigns', id)} />
+      </SectionCard>
 
-      {/* ─── Month-to-Date GMV Max (same shape; app auto-calcs MTD overall) ── */}
-      {sectEnabled.gmvMax && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <i className="bi bi-calendar-range-fill" style={{ color: '#ef4444' }} />
-            <span className="fw-semibold" style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Month-to-Date GMV Max Campaigns</span>
-          </div>
-          <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
-            Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically, like the weekly section above.
-          </p>
-          <PasteParsePanel
-            noun="campaign"
-            accent="#ef4444"
-            parse={parseGmvMaxText}
-            onApply={rows => setData(d => {
-              const isReal = g => (g.campaign && g.campaign.trim())
-                || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
-              const kept = (d.gmvMaxMtd || []).filter(isReal);
-              return { ...d, gmvMaxMtd: [...kept, ...rows] };
-            })}
-            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the weekly box above.</>}
-          />
-          <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
-            addLabel="Add MTD Campaign"
-            fields={[
-              { key: 'campaign', label: 'Campaign', width: '130px' },
-              { key: 'spend', label: `Cost (${curSym})`, type: 'number', width: '100px' },
-              { key: 'roi', label: 'ROI', type: 'number', width: '70px' },
-              { key: 'orders', label: 'Orders', type: 'number', width: '80px' },
-              { key: 'cpo', label: `CPO (${curSym})`, type: 'number', width: '80px' },
-              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
-              { key: 'notes', label: 'Notes', width: '140px' },
-            ]} />
+      {/* ═══ AFFILIATE CENTER ══════════════════════════════════════════ */}
+      <GroupDivider id="grp-affiliate" hue="#0d9488" icon="bi-people-fill" title="Affiliate Center" pct={affiliatePct} />
+
+      <SectionCard id="sec-affiliateOverview" hue="#0d9488" icon="bi-people-fill" title="Affiliate Overview" required
+        enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')}>
+        <div className="d-flex flex-wrap gap-2 mb-2">
+          <Field label={`Affiliate GMV (${curSym})`} value={data.overallPerformance.affiliateGmv} onChange={v => setPerf('affiliateGmv', v)} type="number" placeholder="49494.24" />
+          <Field label="Video Posted (This week)" value={data.overallPerformance.videosPosted} onChange={v => setPerf('videosPosted', v)} type="number" placeholder="1377" />
         </div>
-      </div>
-      )}
-
-      {/* ─── Section 5: Product Highlights ──────────────────────────────── */}
-      <SectionHeader icon="bi-box-seam-fill" title="Product Highlights" color="#06b6d4" required
-        enabled={sectEnabled.productHighlights} onToggle={toggleSection('productHighlights')} />
-      {sectEnabled.productHighlights && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
-            addLabel="Add Product"
-            fields={[
-              { key: 'productId', label: 'Product ID', width: '140px' },
-              { key: 'productName', label: 'Product Name', width: '160px' },
-              { key: 'unitsSold', label: productUnitsLbl, type: 'number', width: '90px' },
-              { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
-              { key: 'newVideos', label: 'Videos (wk)', type: 'number', width: '90px' },
-              { key: 'videosMtd', label: 'Videos MTD', type: 'number', width: '90px' },
-              { key: 'samplesApprovedWeek', label: 'Samples (wk)', type: 'number', width: '95px' },
-              { key: 'samplesApprovedMtd', label: 'Samples MTD', type: 'number', width: '95px' },
-              { key: 'notes', label: 'Notes', width: '130px' },
-            ]} />
-          <BuiltinExtras sectionKey="productHighlights" sectionTitle="Product Highlights"
-            fields={brandSectionExtras.productHighlights || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('productHighlights', f)}
-            onRemoveField={(id) => removeExtraField('productHighlights', id)} />
-        </div>
-      </div>
-      )}
-
-      {/* ─── Section 6: Offsite Performance (optional) ──────────────────── */}
-      <SectionHeader icon="bi-globe2" title="Offsite Performance" color="#10b981"
-        enabled={sectEnabled.offsitePerformance} onToggle={toggleSection('offsitePerformance')} />
-      {sectEnabled.offsitePerformance && (
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex flex-wrap gap-2 mb-2">
-            <Field label={`Offsite GMV (${curSym})`} value={data.offsitePerformance.offsiteGmv} onChange={v => setOffsite('offsiteGmv', v)} type="number" placeholder="1725.49" />
-            <Field label={`TikTok Shop GMV (${curSym})`} value={data.offsitePerformance.tiktokShopGmv} onChange={v => setOffsite('tiktokShopGmv', v)} type="number" placeholder="55834.62" />
-            <Field label="Off-site Effect (%)" value={data.offsitePerformance.offsiteEffect} onChange={v => setOffsite('offsiteEffect', v)} type="number" placeholder="3.09" />
-          </div>
-          <BuiltinExtras sectionKey="offsitePerformance" sectionTitle="Offsite Performance"
-            fields={brandSectionExtras.offsitePerformance || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('offsitePerformance', f)}
-            onRemoveField={(id) => removeExtraField('offsitePerformance', id)} />
-        </div>
-      </div>
-      )}
-
-      {/* ─── Current & Upcoming Campaigns (mandatory) ───────────────────── */}
-      <SectionHeader icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" color="#ec4899" required
-        enabled={sectEnabled.upcomingCampaigns} onToggle={toggleSection('upcomingCampaigns')} />
-      {sectEnabled.upcomingCampaigns && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex justify-content-end mb-2">
-            <FetchPreviousButton
-              previousValue={previousReport?.upcomingCampaigns}
-              currentValue={data.upcomingCampaigns}
-              onPaste={(v) => setData(d => ({ ...d, upcomingCampaigns: v }))}
-              sourceLabel={previousReport?.weekLabel || 'previous week'} />
-          </div>
-          <RichTextEditor value={data.upcomingCampaigns || ''}
-            onChange={v => setData(d => ({ ...d, upcomingCampaigns: v }))}
-            minHeight={140}
-            placeholder="List any upcoming campaigns, launches or planned promotions" />
-          <BuiltinExtras sectionKey="upcomingCampaigns" sectionTitle="Current & Upcoming Campaigns"
-            fields={brandSectionExtras.upcomingCampaigns || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('upcomingCampaigns', f)}
-            onRemoveField={(id) => removeExtraField('upcomingCampaigns', id)} />
-        </div>
-      </div>
-      )}
-      </>
-      )}
-
-      {/* ═══ WRAP UP ═════════════════════════════════════════════════════ */}
-      {active === 'operational' && (
-      <>
-      {/* ─── Operational Updates (mandatory) ─────────────────────────────── */}
-      <SectionHeader icon="bi-gear-fill" title="Operational Updates" color="#6366f1" required
-        enabled={sectEnabled.operationalUpdates} onToggle={toggleSection('operationalUpdates')} />
-      {sectEnabled.operationalUpdates && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex justify-content-end mb-2">
-            <FetchPreviousButton
-              previousValue={previousReport?.operationalUpdates}
-              currentValue={data.operationalUpdates}
-              onPaste={(v) => setData(d => ({ ...d, operationalUpdates: v }))}
-              sourceLabel={previousReport?.weekLabel || 'previous week'} />
-          </div>
-          <RichTextEditor value={data.operationalUpdates || ''}
-            onChange={v => setData(d => ({ ...d, operationalUpdates: v }))}
-            minHeight={140}
-            placeholder="Describe the workflow and operational tasks completed this week" />
-          <BuiltinExtras sectionKey="operationalUpdates" sectionTitle="Operational Updates"
-            fields={brandSectionExtras.operationalUpdates || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('operationalUpdates', f)}
-            onRemoveField={(id) => removeExtraField('operationalUpdates', id)} />
-        </div>
-      </div>
-      )}
-      </>
-      )}
-
-      {active === 'recommendations' && (
-      <>
-      {/* ─── Recommendations & Action Items (optional) ───────────────────── */}
-      <SectionHeader icon="bi-lightbulb-fill" title="Recommendations & Action Items" color="#f59e0b"
-        enabled={sectEnabled.recommendations} onToggle={toggleSection('recommendations')} />
-      {sectEnabled.recommendations && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex justify-content-end mb-2">
-            <FetchPreviousButton
-              previousValue={previousReport?.recommendations}
-              currentValue={data.recommendations}
-              onPaste={(v) => setData(d => ({ ...d, recommendations: v }))}
-              sourceLabel={previousReport?.weekLabel || 'previous week'} />
-          </div>
-          <RichTextEditor value={data.recommendations || ''}
-            onChange={v => setData(d => ({ ...d, recommendations: v }))}
-            minHeight={160}
-            placeholder="Share your recommendations and action items for next steps" />
-          <BuiltinExtras sectionKey="recommendations" sectionTitle="Recommendations & Action Items"
-            fields={brandSectionExtras.recommendations || []} data={data} setData={setData} curSym={curSym}
-            previousReport={previousReport} disabled={!selectedBrand?.id}
-            onAddField={(f) => addExtraField('recommendations', f)}
-            onRemoveField={(id) => removeExtraField('recommendations', id)} />
-        </div>
-      </div>
-      )}
-      </>
-      )}
-
-      {active === 'custom' && (
-      <>
-      {/* ─── Brand Sections (custom per-brand, defined on the brand page) ── */}
-      {(brandSectionDefs.length > 0 || selectedBrand?.id) && (
-        <>
-          <SectionHeader icon="bi-pin-fill" title="Brand Sections" color="#0ea5e9" />
-          {brandSectionDefs.length > 0 && (
-            <BrandSectionsBlock
-              sections={brandSectionDefs}
-              data={data}
-              setData={setData}
-              previousReport={previousReport}
-              sectEnabled={sectEnabled}
-              toggleSection={toggleSection}
-              onDelete={deleteBrandCustomSection}
-            />
+        <div className="d-flex flex-wrap gap-2">
+          <Field label="Videos Posted (Month-to-Date)" value={data.overallNotes.videosMtd || ''} onChange={v => setPerfNote('videosMtd', v)} type="number" placeholder="2140" width="240px" />
+          {hasPrevAllTime ? (
+            <Field label="Total Videos (all-time)" value={autoTotalVideos} type="number" width="220px" readOnly
+              note={`Auto: ${prevAllTimeVideos.toLocaleString()} previous + ${weeklyVideos.toLocaleString()} this week`} />
+          ) : (
+            <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px"
+              note="First report: enter the all-time total. Future weeks add automatically." />
           )}
-          {selectedBrand?.id && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed' }}>
-              <div className="card-body p-3">
-                <AddCustomSectionInline
-                  disabled={!selectedBrand?.id}
-                  defaultReportType="weekly"
-                  onAdd={addBrandCustomSection} />
-              </div>
-            </div>
-          )}
-        </>
+        </div>
+      </SectionCard>
+
+      <SectionCard id="sec-topCreators" hue="#f59e0b" icon="bi-star-fill" title="Top Creators" required
+        enabled={sectEnabled.topCreators} onToggle={toggleSection('topCreators')}>
+        {presets.bar('topCreators', '#f59e0b')}
+        <PasteParsePanel
+          noun="creator"
+          accent="#f59e0b"
+          parse={parseTopCreatorsText}
+          onApply={rows => setData(d => {
+            const isReal = c => (c.name && c.name.trim())
+              || (c.gmv != null && String(c.gmv).trim()) || (c.itemsSold != null && String(c.itemsSold).trim());
+            const kept = (d.topCreators || []).filter(isReal);
+            return { ...d, topCreators: [...kept, ...rows] };
+          })}
+          hint={<>Copy the <b>Top Creators</b> table from TikTok Shop (creator handle, Affiliate GMV, items sold &amp; the change chips) and paste it here. We&apos;ll pull the creator, GMV, items sold, and use the last column (shoppable videos) as videos posted.</>}
+        />
+        <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
+          addLabel="Add Creator"
+          fields={[
+            { key: 'name', label: 'Creator Name', width: '160px' },
+            { key: 'videosPosted', label: 'Videos', type: 'number', width: '80px' },
+            { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
+            { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+            { key: 'notes', label: 'Notes', width: '140px' },
+          ]} />
+        <BuiltinExtras sectionKey="topCreators" sectionTitle="Top Creators"
+          fields={brandSectionExtras.topCreators || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('topCreators', f)}
+          onRemoveField={(id) => removeExtraField('topCreators', id)} />
+      </SectionCard>
+
+      <SectionCard id="sec-topVideos" hue="#8b5cf6" icon="bi-play-circle-fill" title="Top Videos" required
+        enabled={sectEnabled.topVideos} onToggle={toggleSection('topVideos')}>
+        {presets.bar('topVideos', '#8b5cf6')}
+        <PasteParsePanel
+          noun="video"
+          accent="#8b5cf6"
+          parse={parseTopVideosText}
+          onApply={rows => setData(d => {
+            const isReal = v => (v.creatorName && v.creatorName.trim()) || (v.videoLink && v.videoLink.trim())
+              || (v.gmv != null && String(v.gmv).trim()) || (v.itemsSold != null && String(v.itemsSold).trim());
+            const kept = (d.topVideos || []).filter(isReal);
+            return { ...d, topVideos: [...kept, ...rows] };
+          })}
+          hint={<>Copy the <b>Top Videos</b> table from TikTok Shop (each video's caption, ID, creator &amp; metrics) and paste it here. We&apos;ll pull the creator, GMV &amp; items sold and build each video link automatically. Views &amp; product clicks aren&apos;t in that export — add those manually or via Euka.</>}
+        />
+        <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
+          addLabel="Add Video"
+          fields={[
+            { key: 'creatorName', label: 'Creator', width: '140px' },
+            { key: 'videoLink', label: 'Video Link *', type: 'url', width: '220px', placeholder: 'https://www.tiktok.com/@user/video/...' },
+            { key: 'itemsSold', label: 'Items Sold', type: 'number', width: '90px' },
+            { key: 'gmv', label: `GMV (${curSym})`, type: 'number', width: '100px' },
+            { key: 'views', label: 'Views', type: 'number', width: '90px' },
+            { key: 'productClicks', label: 'Product Clicks', width: '110px', placeholder: '3.97K or 3970' },
+            { key: 'notes', label: 'Notes', width: '120px' },
+          ]} />
+        <BuiltinExtras sectionKey="topVideos" sectionTitle="Top Videos"
+          fields={brandSectionExtras.topVideos || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('topVideos', f)}
+          onRemoveField={(id) => removeExtraField('topVideos', id)} />
+      </SectionCard>
+
+      {/* Operational Updates & Recommendations are rendered in the Wrap Up group below. */}
+
+      {/* ═══ CUSTOM SECTIONS ══════════════════════════════════════════ */}
+      {showCustom && (
+      <>
+      <GroupDivider id="grp-custom" hue="#475569" icon="bi-grid-1x2-fill" title="Custom Sections" pct={customPct} />
+      {brandSectionDefs.length > 0 && (
+        <BrandSectionsBlock
+          sections={brandSectionDefs}
+          data={data}
+          setData={setData}
+          previousReport={previousReport}
+          sectEnabled={sectEnabled}
+          toggleSection={toggleSection}
+          onDelete={deleteBrandCustomSection}
+          renderPreset={presets.custom}
+        />
+      )}
+      {selectedBrand?.id && (
+        <div id="sec-cs-add" className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed', scrollMarginTop: 12 }}>
+          <div className="card-body p-3">
+            <AddCustomSectionInline
+              disabled={!selectedBrand?.id}
+              defaultReportType="weekly"
+              onAdd={addBrandCustomSection} />
+          </div>
+        </div>
       )}
 
       {/* ─── Custom Fields (per-user, LEGACY — retired add) ────────────────
@@ -2020,24 +2004,65 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       </>
       )}
 
-      {/* ─── Insights (single consolidated editor — Wrap up) ─────────────── */}
-      {active === 'insights' && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-        <div className="card-body p-3">
-          <div className="d-flex justify-content-end mb-2">
-            <FetchPreviousButton
-              previousValue={previousReport?.reportInsights}
-              currentValue={data.reportInsights}
-              onPaste={(v) => setData(d => ({ ...d, reportInsights: v }))}
-              sourceLabel={previousReport?.weekLabel || 'previous week'} />
-          </div>
-          <RichTextEditor value={data.reportInsights || ''}
-            onChange={v => setData(d => ({ ...d, reportInsights: v }))}
-            minHeight={320}
-            placeholder="Write your insights for the whole report here — cover every section in your own words. What drove performance across Seller and Affiliate this week: the wins, the misses, standout creators and videos, product movement, ad efficiency, and anything the team should act on." />
+      {/* ═══ WRAP UP ══════════════════════════════════════════════════ */}
+      <GroupDivider id="grp-wrapup" hue="#d97706" icon="bi-check2-square" title="Wrap Up" pct={wrapupPct} />
+
+      <SectionCard id="sec-operationalUpdates" hue="#6366f1" icon="bi-gear-fill" title="Operational Updates" required
+        enabled={sectEnabled.operationalUpdates} onToggle={toggleSection('operationalUpdates')}>
+        {presets.bar('operationalUpdates', '#6366f1')}
+        <div className="d-flex justify-content-end mb-2">
+          <FetchPreviousButton
+            previousValue={previousReport?.operationalUpdates}
+            currentValue={data.operationalUpdates}
+            onPaste={(v) => setData(d => ({ ...d, operationalUpdates: v }))}
+            sourceLabel={previousReport?.weekLabel || 'previous week'} />
         </div>
-      </div>
-      )}
+        <RichTextEditor value={data.operationalUpdates || ''}
+          onChange={v => setData(d => ({ ...d, operationalUpdates: v }))}
+          minHeight={140}
+          placeholder="Describe the workflow and operational tasks completed this week" />
+        <BuiltinExtras sectionKey="operationalUpdates" sectionTitle="Operational Updates"
+          fields={brandSectionExtras.operationalUpdates || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('operationalUpdates', f)}
+          onRemoveField={(id) => removeExtraField('operationalUpdates', id)} />
+      </SectionCard>
+
+      <SectionCard id="sec-recommendations" hue="#f59e0b" icon="bi-lightbulb-fill" title="Recommendations & Action Items"
+        enabled={sectEnabled.recommendations} onToggle={toggleSection('recommendations')}>
+        {presets.bar('recommendations', '#f59e0b')}
+        <div className="d-flex justify-content-end mb-2">
+          <FetchPreviousButton
+            previousValue={previousReport?.recommendations}
+            currentValue={data.recommendations}
+            onPaste={(v) => setData(d => ({ ...d, recommendations: v }))}
+            sourceLabel={previousReport?.weekLabel || 'previous week'} />
+        </div>
+        <RichTextEditor value={data.recommendations || ''}
+          onChange={v => setData(d => ({ ...d, recommendations: v }))}
+          minHeight={160}
+          placeholder="Share your recommendations and action items for next steps" />
+        <BuiltinExtras sectionKey="recommendations" sectionTitle="Recommendations & Action Items"
+          fields={brandSectionExtras.recommendations || []} data={data} setData={setData} curSym={curSym}
+          previousReport={previousReport} disabled={!selectedBrand?.id}
+          onAddField={(f) => addExtraField('recommendations', f)}
+          onRemoveField={(id) => removeExtraField('recommendations', id)} />
+      </SectionCard>
+
+      <SectionCard id="sec-insights" hue="#7c3aed" icon="bi-stars" title="Insights">
+        {presets.bar('reportInsights', '#7c3aed')}
+        <div className="d-flex justify-content-end mb-2">
+          <FetchPreviousButton
+            previousValue={previousReport?.reportInsights}
+            currentValue={data.reportInsights}
+            onPaste={(v) => setData(d => ({ ...d, reportInsights: v }))}
+            sourceLabel={previousReport?.weekLabel || 'previous week'} />
+        </div>
+        <RichTextEditor value={data.reportInsights || ''}
+          onChange={v => setData(d => ({ ...d, reportInsights: v }))}
+          minHeight={320}
+          placeholder="Write your insights for the whole report here — cover every section in your own words. What drove performance across Seller and Affiliate this week: the wins, the misses, standout creators and videos, product movement, ad efficiency, and anything the team should act on." />
+      </SectionCard>
 
         </div>{/* .wri-scroll */}
       </div>{/* .wri-main */}

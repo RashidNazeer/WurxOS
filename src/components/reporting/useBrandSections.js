@@ -15,6 +15,9 @@ import {
   getBrandSectionExtras, addBrandSectionExtraField, removeBrandSectionExtraField,
   addBrandSectionRich, removeBrandSection,
 } from '../../lib/brandReportSectionsApi';
+import {
+  countSectionPresetsForSection, deleteSectionPresetsForSection,
+} from '../../lib/reportSectionPresetsApi';
 
 // `reportType` ('weekly' | 'biweekly' | 'monthly') scopes which sections this
 // form sees: only sections whose appliesTo includes this type (a section with
@@ -95,14 +98,25 @@ export function useBrandSections({ brandId, setData, reportType }) {
   // saved keep their data.
   const deleteBrandCustomSection = useCallback(async (section) => {
     if (!brandId || !section?.id) return;
+    // Presets are tied to the section's id and can't be a DB cascade (sections
+    // aren't rows), so we delete them here — and warn how many will be lost.
+    // Recreating a same-named section gets a fresh id, so they never come back.
+    let presetCount = 0;
+    try { presetCount = await countSectionPresetsForSection(brandId, section.id); } catch { /* non-fatal */ }
+    const presetWarning = presetCount > 0
+      ? `\n\nThis will ALSO permanently delete ${presetCount} saved preset${presetCount === 1 ? '' : 's'} for this section. `
+        + 'Recreating a section with the same name will NOT bring them back.'
+      : '';
     const ok = window.confirm(
       `Delete the custom section "${section.name}"?\n\n`
       + "It will be removed from this brand and won't appear on future "
-      + 'reports. Reports already saved keep whatever they had.',
+      + 'reports. Reports already saved keep whatever they had.'
+      + presetWarning,
     );
     if (!ok) return;
     try {
       await removeBrandSection(brandId, section.id);
+      if (presetCount > 0) await deleteSectionPresetsForSection(brandId, section.id);
     } catch (err) {
       alert('Failed to delete the section: ' + (err?.message || 'unknown error'));
       return;

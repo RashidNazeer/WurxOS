@@ -167,16 +167,21 @@ const USD_VALUE_RE = /^\$?\s*[\d,]+(?:\.\d+)?\s*USD$/i;           // 160.00 USD,
 const PURE_INT_RE = /^\d{1,3}(?:,\d{3})*$|^\d+$/;                 // 61, 1,234
 const PURE_DECIMAL_RE = /^\d+\.\d+$/;                             // 0.77, 1.50
 
-// Header lines to skip when walking UP from a campaign's start-time to find its
-// name. (The name is the first line above that matches none of these.)
-function isGmvHeaderNoise(l) {
+// A campaign's metrics TAIL (everything between its start-time and the NEXT
+// campaign's name) is only value-like lines — this small, well-defined set. We
+// use it to find each campaign name by scanning DOWN from the previous
+// campaign's start-time: the first line that is NOT tail noise is the next
+// campaign's name (the name always leads a block). This is far more robust than
+// blacklisting the header's status/recommendation TEXT above the start-time,
+// which varies wildly ("Not delivering", "Budget fully spent", "Campaign
+// inactive", "Consider increasing", a bare "-", …) and broke name detection.
+function isGmvTailNoise(l) {
   return USD_VALUE_RE.test(l)
-    || /^base budget:/i.test(l)
-    || /^daily budget:/i.test(l)
-    || /recommendation/i.test(l)
-    || /roi protection/i.test(l)
-    || /^(active|inactive|paused|not delivering|delivering)$/i.test(l)
+    || PURE_DECIMAL_RE.test(l)
+    || PURE_INT_RE.test(l)
     || /^-+$/.test(l)
+    || /^(base|daily) budget:/i.test(l)
+    || /^continuously$/i.test(l)
     || /^(analytics|edit)$/i.test(l)
     || DATETIME_RE.test(l);
 }
@@ -219,11 +224,18 @@ export function parseGmvMaxText(raw) {
   const dts = [];
   for (let i = 0; i < lines.length; i++) if (DATETIME_RE.test(lines[i])) dts.push(i);
 
-  // Campaign name = first non-noise line above each start-time.
-  const nameIdx = dts.map(dt => {
-    let k = dt - 1;
-    while (k >= 0 && isGmvHeaderNoise(lines[k])) k--;
-    return k;
+  // Campaign name = the FIRST line of each campaign block. Find it by scanning
+  // DOWN from the previous campaign's start-time (or the top of the paste for
+  // the first one) to the first line that isn't metrics-tail noise — the name
+  // always leads a block, before its status / budget / recommendation lines.
+  // Scanning down past the well-defined value tail is robust to the arbitrary
+  // status/recommendation text that a walk-UP would trip over.
+  const nameIdx = dts.map((dt, c) => {
+    const start = c === 0 ? 0 : dts[c - 1] + 1;
+    for (let k = start; k < dt; k++) {
+      if (!isGmvTailNoise(lines[k])) return k;
+    }
+    return -1;
   });
 
   const rows = [];

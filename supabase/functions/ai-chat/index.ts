@@ -90,6 +90,33 @@ const MAX_COMPLETION_TOKENS_RETRY = 6000;
 // pricey output headroom it never uses.
 const MAX_TOOL_ROUND_TOKENS = 1200;
 
+// ── Cost controls (see below) ──────────────────────────────────────
+// A single question must NEVER run away in cost, no matter how much data or
+// history it touches. Three guards work together:
+//
+//  1) COST_CEILING_TOKENS — a hard per-request backstop. We sum the tokens
+//     OpenAI reports across EVERY model call in one question; once we cross
+//     this ceiling we stop making further calls (no extra tool round, no big
+//     retry) and answer with what we already have. This is what guarantees a
+//     heavy/pathological question can't cost dollars. ~60k total tokens is only
+//     a few cents on gpt-5.4-mini even in the worst case, yet far above a
+//     normal question (a few k), so it only ever trips on a runaway.
+//  2) REASONING_EFFORT — gpt-5.x are REASONING models: they spend hidden
+//     "thinking" tokens you pay for as output, and an open-ended ask ("analyze
+//     all of a brand's reports and say why sales dropped") makes them think a
+//     LOT. This assistant rarely needs deep reasoning — tool rounds just pick a
+//     query, and answers summarise data the tools already computed. Keeping
+//     effort LOW is the single biggest cost lever, and it ALSO reduces the
+//     empty-answer retries (less reasoning = less chance reasoning eats the
+//     whole token budget and returns a blank). Raise to 'medium' if depth ever
+//     suffers.
+//  3) TOOL_RESULT_CHAR_CAP — hard bound on how much a single tool result can
+//     add to the conversation (which gets re-sent as input on later rounds), so
+//     a data-heavy answer can't balloon the prompt as the DB grows.
+const COST_CEILING_TOKENS = 60000;
+const REASONING_EFFORT = 'low';
+const TOOL_RESULT_CHAR_CAP = 6000;
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -136,6 +163,7 @@ function streamConversation(opts: {
       });
       let full = '';
       let answered = false;
+      let tokensUsed = 0; // running total across every model call this request (cost backstop)
 
       try {
         // Initial status while we figure out what to do.
@@ -143,16 +171,20 @@ function streamConversation(opts: {
 
         // ── Tool-calling rounds (Boss only), emitting a status per tool ──
         for (let round = 0; round < (isBoss ? MAX_TOOL_ROUNDS : 0); round++) {
-          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, tools: TOOLS, tool_choice: 'auto' });
+          // Cost backstop: if earlier rounds already spent the ceiling, stop
+          // fetching more data and go straight to writing the answer.
+          if (tokensUsed >= COST_CEILING_TOKENS) break;
+          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, reasoning_effort: REASONING_EFFORT, tools: TOOLS, tool_choice: 'auto' });
           if (!r.ok) {
             const t = await r.text().catch(() => '');
             console.error('model error (stream tool round)', r.status, t.slice(0, 200));
             emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}).` });
             controller.close(); return;
           }
-          let choice: any = null;
-          try { choice = JSON.parse(await r.text())?.choices?.[0]; } catch { /* ignore */ }
-          const m = choice?.message;
+          let parsed: any = null;
+          try { parsed = JSON.parse(await r.text()); } catch { /* ignore */ }
+          tokensUsed += Number(parsed?.usage?.total_tokens) || 0;
+          const m = parsed?.choices?.[0]?.message;
           const toolCalls = m?.tool_calls;
           if (toolCalls && toolCalls.length) {
             // Show the user what we're fetching (first tool's label is enough).
@@ -162,7 +194,7 @@ function streamConversation(opts: {
               let a: any = {};
               try { a = JSON.parse(tc.function?.arguments || '{}'); } catch { /* ignore */ }
               const result = await runTool(admin, tc.function?.name, a);
-              convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
+              convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, TOOL_RESULT_CHAR_CAP) });
             }
             continue;
           }
@@ -179,7 +211,7 @@ function streamConversation(opts: {
         // ── Final streamed answer (if not already produced) ──
         if (!answered) {
           emit({ status: 'Writing the answer…' });
-          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, stream: true });
+          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, reasoning_effort: REASONING_EFFORT, stream: true, stream_options: { include_usage: true } });
           if (!r.ok || !r.body) {
             const t = await r.text().catch(() => '');
             console.error('model error (stream final)', r.status, t.slice(0, 200));
@@ -200,8 +232,11 @@ function streamConversation(opts: {
               const payload = s.slice(5).trim();
               if (payload === '[DONE]') continue;
               try {
-                const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
+                const j = JSON.parse(payload);
+                const delta = j?.choices?.[0]?.delta?.content;
                 if (delta) { full += delta; emit({ delta }); }
+                // Final usage chunk (include_usage) has empty choices — capture it.
+                if (j?.usage) tokensUsed += Number(j.usage.total_tokens) || 0;
               } catch { /* ignore keep-alive / partial */ }
             }
           }
@@ -212,12 +247,17 @@ function streamConversation(opts: {
         // — "analyze all of a brand's reports + action plan" — does this). Retry
         // ONCE, non-streamed, with a much larger cap so the user gets a real
         // answer instead of a blank bubble.
-        if (!full) {
+        // Only pay for the larger retry if we're still under the cost ceiling.
+        if (!full && tokensUsed < COST_CEILING_TOKENS) {
           emit({ status: 'Composing a detailed answer…' });
-          const r2 = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS_RETRY });
+          const r2 = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS_RETRY, reasoning_effort: REASONING_EFFORT });
           if (r2.ok) {
             let text = '';
-            try { text = JSON.parse(await r2.text())?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+            try {
+              const j2 = JSON.parse(await r2.text());
+              tokensUsed += Number(j2?.usage?.total_tokens) || 0;
+              text = j2?.choices?.[0]?.message?.content || '';
+            } catch { /* ignore */ }
             if (text) { for (let i = 0; i < text.length; i += 24) emit({ delta: text.slice(i, i + 24) }); full = text; }
           }
         }
@@ -227,6 +267,7 @@ function streamConversation(opts: {
         controller.close(); return;
       }
 
+      console.log('ai-chat tokens (stream)', tokensUsed);
       if (!full) full = 'Sorry, I couldn’t generate a response just now. Please try again.';
       try { await persist(full); } catch (e) { console.error('persist after stream failed', e); }
       emit({ done: true, conversationId: cid });
@@ -411,7 +452,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_performance',
-      description: "Get monthly performance ratings (0-100 per area: punctuality, reporting, response time, daily-task quality, task processing, overall workflow, plus overall score) for one employee, or for ALL employees ranked by overall score when no name is given. Also returns that person's performance flags (green = positive note, red = concern) and any warnings. Month format YYYY-MM; omit for the latest month with data.",
+      description: "Get monthly performance ratings (0-100 per area: reporting, response time, daily-task quality, task processing, overall workflow, plus overall score) for one employee, or for ALL employees ranked by overall score when no name is given. Also returns that person's performance flags (green = positive note, red = concern) and any warnings. Month format YYYY-MM; omit for the latest month with data.",
       parameters: {
         type: 'object',
         properties: {
@@ -488,6 +529,11 @@ const htmlToText = (s: unknown) => String(s || '')
   .replace(/<[^>]+>/g, '')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"')
   .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+// Cap any single free-text field so one long report note / insight can't bloat
+// the tool payload (which is re-sent as input on later rounds). Summaries, not
+// raw blobs — keeps token use flat no matter how much an APC typed in.
+const clip = (s: string, n = 500) => (s.length > n ? s.slice(0, n).trimEnd() + '…' : s);
 
 const has = (v: unknown) => v != null && v !== '' && v !== 'N/A';
 
@@ -733,7 +779,7 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
           ['topVideosInsights', 'Top videos'], ['productHighlightsInsights', 'Products'], ['offsiteInsights', 'Offsite'],
           ['keyWinsInsights', 'Key wins'],
         ];
-        const out = keys.map(([k, lbl]) => { const t = htmlToText(d[k]); return t && t.length > 3 ? `  ${lbl}: ${t}` : null; }).filter(Boolean);
+        const out = keys.map(([k, lbl]) => { const t = clip(htmlToText(d[k])); return t && t.length > 3 ? `  ${lbl}: ${t}` : null; }).filter(Boolean);
         return out.length ? '\n  Insights:\n' + out.join('\n') : '';
       };
 
@@ -742,7 +788,7 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
           ['recommendations', 'Recommendations'], ['actionItems', 'Action items'],
           ['upcomingCampaigns', 'Upcoming campaigns'], ['operationalUpdates', 'Operational updates'], ['campaignsText', 'Campaigns'],
         ];
-        const out = keys.map(([k, lbl]) => { const t = htmlToText(d[k]); return t && t.length > 3 ? `  ${lbl}: ${t}` : null; }).filter(Boolean);
+        const out = keys.map(([k, lbl]) => { const t = clip(htmlToText(d[k])); return t && t.length > 3 ? `  ${lbl}: ${t}` : null; }).filter(Boolean);
         return out.length ? '\n  Written sections:\n' + out.join('\n') : '';
       };
 
@@ -795,8 +841,11 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
       const roleOf = new Map((profs || []).map((p: any) => [p.id, p.role]));
 
+      // 5 metrics — punctuality was dropped (mig 243). Old rows still carry a
+      // punctuality value in metrics jsonb; it no longer counts toward
+      // overall_score, so don't report it either.
       const metricLabel: Record<string, string> = {
-        punctuality: 'Punctuality', reporting: 'Reporting', responseTime: 'Response time',
+        reporting: 'Reporting', responseTime: 'Response time',
         dailyTasksQuality: 'Daily-task quality', tasksProcessing: 'Task processing', overallWorkflow: 'Overall workflow',
       };
       const fmtRating = (r: any) => {
@@ -1286,12 +1335,14 @@ Deno.serve(async (req) => {
 
     // ── Non-streaming path (fallback / older clients) ──────────────
     let toolError: Response | null = null;
+    let tokensUsed = 0; // running total across every model call this request (cost backstop)
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (!isBoss) break; // only the Boss has tools; go straight to the answer
+      if (tokensUsed >= COST_CEILING_TOKENS) break; // cost backstop: stop fetching, go answer
       const aiRes = await fetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, tools: TOOLS, tool_choice: 'auto' }),
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, reasoning_effort: REASONING_EFFORT, tools: TOOLS, tool_choice: 'auto' }),
       });
       const aiText = await aiRes.text();
       if (!aiRes.ok) {
@@ -1301,9 +1352,10 @@ Deno.serve(async (req) => {
           : json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
         break;
       }
-      let choice: any = null;
-      try { choice = JSON.parse(aiText)?.choices?.[0]; } catch { /* ignore */ }
-      const m = choice?.message;
+      let parsed: any = null;
+      try { parsed = JSON.parse(aiText); } catch { /* ignore */ }
+      tokensUsed += Number(parsed?.usage?.total_tokens) || 0;
+      const m = parsed?.choices?.[0]?.message;
       const toolCalls = m?.tool_calls;
       if (toolCalls && toolCalls.length) {
         convo.push({ role: 'assistant', content: m.content ?? null, tool_calls: toolCalls });
@@ -1311,12 +1363,12 @@ Deno.serve(async (req) => {
           let a: any = {};
           try { a = JSON.parse(tc.function?.arguments || '{}'); } catch { /* ignore */ }
           const result = await runTool(admin, tc.function?.name, a);
-          convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, 8000) });
+          convo.push({ role: 'tool', tool_call_id: tc.id, content: result.slice(0, TOOL_RESULT_CHAR_CAP) });
         }
         continue;
       }
       const direct = m?.content || '';
-      if (direct) { await persist(direct); return json({ conversationId, reply: direct }); }
+      if (direct) { console.log('ai-chat tokens', tokensUsed); await persist(direct); return json({ conversationId, reply: direct }); }
       break;
     }
     if (toolError) return toolError;
@@ -1324,7 +1376,7 @@ Deno.serve(async (req) => {
     const aiRes = await fetch(OPENAI_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS }),
+      body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS, reasoning_effort: REASONING_EFFORT }),
     });
     const aiText = await aiRes.text();
     if (!aiRes.ok) {
@@ -1333,20 +1385,30 @@ Deno.serve(async (req) => {
       return json({ error: `AI service error (${aiRes.status}): ${aiText.slice(0, 180)}`, conversationId }, 502);
     }
     let reply = '';
-    try { reply = JSON.parse(aiText)?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+    try {
+      const jf = JSON.parse(aiText);
+      tokensUsed += Number(jf?.usage?.total_tokens) || 0;
+      reply = jf?.choices?.[0]?.message?.content || '';
+    } catch { /* ignore */ }
     // Empty answer → reasoning ate the whole budget. Retry once with a larger
-    // cap before giving up, so heavy analytical asks still return something.
-    if (!reply) {
+    // cap before giving up, so heavy analytical asks still return something —
+    // but only while we're still under the per-request cost ceiling.
+    if (!reply && tokensUsed < COST_CEILING_TOKENS) {
       const retryRes = await fetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS_RETRY }),
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_COMPLETION_TOKENS_RETRY, reasoning_effort: REASONING_EFFORT }),
       });
       if (retryRes.ok) {
-        try { reply = JSON.parse(await retryRes.text())?.choices?.[0]?.message?.content || ''; } catch { /* ignore */ }
+        try {
+          const jr = JSON.parse(await retryRes.text());
+          tokensUsed += Number(jr?.usage?.total_tokens) || 0;
+          reply = jr?.choices?.[0]?.message?.content || '';
+        } catch { /* ignore */ }
       }
     }
     if (!reply) reply = 'Sorry, I couldn’t generate a response just now. Please try again.';
+    console.log('ai-chat tokens', tokensUsed);
     await persist(reply);
     return json({ conversationId, reply });
   } catch (err) {
