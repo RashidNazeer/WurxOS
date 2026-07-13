@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { applyAttendanceAutofill } from './incentivesApi';
 
 // 5 metrics. Punctuality was dropped (mig 243) — attendance is already its own
 // auto-fetched pillar and the incentive items cover it, so rating it here was a
@@ -588,19 +589,29 @@ export async function listEvaluableUsers({ uid, viewerRole }) {
 // Bulk fetch: incentives rows for a month — v2 has a single
 // `incentives` table; we hand v1's UI the same shape it expects
 // (record.incentives[], record.bonuses[]).
+//
+// The attendance auto-fill (mig 235) is a READ-TIME overlay: an item flagged
+// { source: 'attendance' } keeps achievedValue 0 / completed false in the DB by
+// design, and gets its real value computed on every read. The Incentives page
+// applies it (via getIncentives / listIncentivesMonth); this function did not —
+// so the Performance page's Bonus & Incentives pillar counted an auto-filled
+// item as INCOMPLETE and scored people below what Incentives showed (and paid
+// out on) for the same month. Apply the same overlay here so the two pages can
+// never disagree. No-op and no extra network call when no item uses the toggle.
 export async function listAllIncentivesForMonth(month) {
   const { data, error } = await supabase
     .from('incentives')
     .select('*')
     .eq('month', month);
   if (error) throw new Error(error.message);
-  return (data || []).map((r) => ({
+  const rows = (data || []).map((r) => ({
     ...r,
     userId:     r.user_id,
     apcId:      r.user_id, // v1 used apcId for APC rows; same source
     incentives: r.incentives || [],
     bonuses:    r.bonuses || [],
   }));
+  return applyAttendanceAutofill(rows, month);
 }
 
 // ── Attendance bulk fetch (already used by RosterTab) ─────────
