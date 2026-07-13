@@ -273,12 +273,47 @@ Deno.serve(async (req) => {
     const candidateHandles = [...windowDays.keys()];
 
     // ── Step 2: the ledger — what has each creator ALREADY been sent? ─
-    const { data: stateRows } = await admin
+    //
+    // REFUSE TO RUN ON AN UNSEEDED BRAND. An empty ledger means "nobody has ever
+    // been messaged", so every creator with an old first video looks overdue and
+    // the tool catches them ALL up — blasting duplicate 1st-review messages to
+    // people who were messaged months ago.
+    //
+    // This is not hypothetical: on 2026-07-13 an APC ran Biostime 0.4 SECONDS
+    // before the seed script wrote its ledger, and ~54 creators were re-sent a
+    // 1st review whose real due date was back in February. The run was correct
+    // given what it knew; it simply must not be allowed to know nothing.
+    //
+    // A brand-new Euka brand would hit exactly the same trap, so this is a
+    // permanent guard, not a one-off cleanup. Seed the brand first:
+    //   POST /functions/v1/video-review-seed { brandId, cutoff }
+    const { count: ledgerRows } = await admin
       .from('video_review_state')
-      .select('creator_handle, video_days, msgs_sent, last_sent_on, walked_at')
+      .select('*', { count: 'exact', head: true })
       .eq('brand_id', brandId);
+    if (!ledgerRows) {
+      return json({
+        error: `"${brand.brand_name}" has no video-review history yet, so the tool cannot tell who has already `
+             + `been messaged. Running now would re-send a 1st review to every creator who ever posted. `
+             + `Ask an admin to seed this brand before using Video Reviews.`,
+      }, 409);
+    }
+
+    // Page past PostgREST's 1000-row default — a big store has thousands of
+    // creators, and a truncated ledger reads as "never messaged" for everyone
+    // past row 1000, which is the very bug this guard exists to prevent.
     const state = new Map<string, any>();
-    for (const r of (stateRows || [])) state.set(r.creator_handle, r);
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await admin
+        .from('video_review_state')
+        .select('creator_handle, video_days, msgs_sent, last_sent_on, walked_at')
+        .eq('brand_id', brandId)
+        .order('creator_handle')
+        .range(from, from + 999);
+      if (!page || page.length === 0) break;
+      for (const r of page) state.set(r.creator_handle, r);
+      if (page.length < 1000) break;
+    }
 
     const group1: string[] = [];
     const group2: string[] = [];
