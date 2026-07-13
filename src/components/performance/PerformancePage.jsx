@@ -108,6 +108,16 @@ function calcMetricsAvg(metrics) {
   return Math.round(vals.reduce((a, b) => a + b, 0) / METRICS.length);
 }
 
+// An incentive/bonus line item stores its name under `text` (see
+// incentivesApi.setIncentivesTemplate) — NOT `title`/`label`, and there is no
+// `description`. This page used to read those, so every item rendered as the
+// generic word "Incentive" with no detail. Same helper as ApcIncentivesPage.
+function itemSuffix(item) {
+  if (item?.suffix != null && item.suffix !== '') return item.suffix;
+  if (item?.unit === 'percent') return '%';
+  return '';
+}
+
 function calcIncentiveScore(incRecord) {
   if (!incRecord) return null;
   const items = [...(incRecord.incentives || []), ...(incRecord.bonuses || [])];
@@ -950,19 +960,29 @@ function PillarDetail({ pillarKey, ctx }) {
               style={{ fontSize: '0.8rem', marginTop: 2 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="fw-semibold" style={{ color: 'var(--text-primary)' }}>
-                {it.title || it.label || (it._kind === 'bonus' ? 'Bonus' : 'Incentive')}
+                {it.text || (it._kind === 'bonus' ? 'Bonus' : 'Incentive')}
                 <span className="text-muted ms-1" style={{ fontSize: '0.6rem', fontWeight: 500 }}>
                   · {it._kind}
                 </span>
               </div>
-              {it.amount != null && it.amount !== '' && (
-                <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-                  {Number(it.amount).toLocaleString('en-US')} PKR
-                </div>
-              )}
-              {it.description && (
-                <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>{it.description}</div>
-              )}
+              <div className="d-flex flex-wrap align-items-center gap-2 text-muted"
+                style={{ fontSize: '0.68rem', marginTop: 2 }}>
+                {it.amount != null && it.amount !== '' && (
+                  <span>{Number(it.amount).toLocaleString('en-US')} PKR</span>
+                )}
+                {(Number(it.targetValue) > 0 || Number(it.achievedValue) > 0) && (
+                  <span>
+                    Achieved{' '}
+                    <strong style={{ color: 'var(--text-secondary)' }}>
+                      {Number(it.achievedValue || 0).toLocaleString('en-US')}{itemSuffix(it)}
+                    </strong>
+                    {' / '}
+                    <strong style={{ color: 'var(--text-secondary)' }}>
+                      {Number(it.targetValue || 0).toLocaleString('en-US')}{itemSuffix(it)}
+                    </strong>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
