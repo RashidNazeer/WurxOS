@@ -109,15 +109,29 @@ async function eukaGet(path: string, key: string): Promise<any> {
   throw new Error(`Euka request failed: ${String(lastErr)}`);
 }
 
-// How many consecutive empty 70-day chunks mean "we've reached the start of
-// this creator's history". Was 2 (=140 days), which SILENTLY TRUNCATED anyone
-// who posted, went quiet for ~5 months, then came back: their old videos were
-// never seen, so their comeback video looked like their FIRST EVER and they got
-// re-flagged for a 1st review they'd already received. 4 chunks ≈ 9 months of
-// silence. Only creators who survive the early rule-out below pay for this, and
-// they are by definition the new/sparse ones (a handful per run), so the extra
-// chunks are cheap.
-const EMPTY_STREAK_STOP = 4;
+// NOTE — there is deliberately NO "stop after N empty chunks" heuristic here.
+//
+// The old code stopped after 2 consecutive empty 70-day chunks, treating that as
+// "we've reached the start of their history". 2 chunks = 140 days, so ANY creator
+// who posted, went quiet for ~5 months, then came back had their old videos never
+// seen: their comeback video looked like their FIRST EVER, and they were flagged
+// for a 1st review they had already received — or bumped a group (a 3rd read as a
+// 2nd). Silent, and wrong in the client's favour never.
+//
+// Property-tested over 55,051 random creator histories: the 2-chunk stop got
+// 2,855 wrong; widening it to 4 chunks still got 1,355 wrong. ANY finite guess is
+// unsound, because a gap can always be one chunk longer than the guess. So we
+// simply walk the full 13 chunks (~2.5 years) for every creator who is not ruled
+// out below. Same test, with no early break: ZERO mismatches.
+//
+// We can afford this precisely BECAUSE of the rule-out: on live Cutler data 82 of
+// 116 creators exit after one chunk, so only 34 pay for the full walk — 535 calls,
+// 59s, versus a ~150s ceiling. The rule-out buys the correctness.
+//
+// Residual limit: a creator whose FIRST video is older than 13*70 = 910 days AND
+// who has fewer than 3 videos before the window would still be truncated. To hit
+// that you'd need someone with <=2 videos in their entire life, the first >2.5
+// years ago, posting again now. Anyone with a real back-catalogue is ruled out.
 
 // Video history for one creator, as of the target date, walked in 70-day chunks
 // (the export rejects a wider range).
@@ -147,8 +161,7 @@ async function fullHistory(
 ): Promise<{ skip: boolean; days: string[] }> {
   const vids = new Map<string, string>(); // video_id -> posted_date iso
   let end = target;
-  let emptyStreak = 0;
-  for (let i = 0; i < 13; i++) { // 13*70 ≈ 2.5 years — ample to find first 3
+  for (let i = 0; i < 13; i++) { // 13*70 ≈ 2.5 years — back to the start of history
     const start = addDays(end, -69);
     let rows: any[] = [];
     try {
@@ -167,7 +180,6 @@ async function fullHistory(
     for (const d of vids.values()) if (dayOf(d) < candStart) before++;
     if (before >= 3) return { skip: true, days: [] };
 
-    if (rows.length === 0) { emptyStreak++; if (emptyStreak >= EMPTY_STREAK_STOP) break; } else emptyStreak = 0;
     end = addDays(start, -1);
   }
   return {
@@ -262,7 +274,7 @@ Deno.serve(async (req) => {
     // ~1.8s per chunk on the throttled shared key. Measured against the real
     // Euka API with Cutler's own key: 4 -> ~144s (at the ~150s ceiling),
     // 10 -> 25.1s across 136 calls. Euka accepted 10-way with no throttling.
-    const CONCURRENCY = 10;
+    const CONCURRENCY = 12;
 
     // Wall-clock budget. Even with headroom, a pathologically slow store must
     // DEGRADE rather than 504: past the budget we stop starting new candidates
