@@ -268,7 +268,7 @@ export default function App() {
               <Route
                 path="/halo"
                 element={
-                  <RoleGuard allow={['boss']}>
+                  <RoleGuard allow={['boss', 'ol']}>
                     <AmazonHaloPage />
                   </RoleGuard>
                 }

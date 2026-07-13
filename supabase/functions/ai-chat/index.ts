@@ -344,6 +344,7 @@ const PAGES: Page[] = [
   { path: '/pctl/ipcs', label: 'My IPCs', purpose: 'IPCs you manage', roles: ['pctl'] },
   { path: '/tl/team', label: 'My Team', purpose: 'your team members', roles: ['tl'] },
   { path: '/euka', label: 'Euka Analytics', purpose: 'TikTok Shop analytics', roles: ['boss'] },
+  { path: '/halo', label: 'Amazon Halo Effect', purpose: 'correlate TikTok vs Amazon daily metrics (halo lag, heatmap, overlay)', roles: ['boss', 'ol'] },
   { path: '/client-access', label: 'Client Access', purpose: 'client portal access', roles: ['boss', 'ol', 'developer'] },
   { path: '/team-management', label: 'Team Management', purpose: 'team switching & APC leads', roles: ['boss', 'ol', 'developer'] },
   { path: '/team-hierarchy', label: 'Team Hierarchy', purpose: 'org chart', roles: ['boss', 'ol', 'developer'] },
