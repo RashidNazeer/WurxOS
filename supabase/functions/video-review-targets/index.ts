@@ -213,11 +213,32 @@ Deno.serve(async (req) => {
     const needsManual: { handle: string; note: string }[] = [];
 
     // Bounded concurrency so we don't hammer Euka (or hit its throttle).
-    const CONCURRENCY = 4;
+    //
+    // Was 4, which timed out (504) and then got resource-killed (546) on
+    // Cutler Nutritions. The cost is candidates x up-to-13 sequential Euka calls,
+    // so wall clock is set by how SLOW a store's Euka responses are, not by how
+    // many creators it has: Cutler had only 24 candidates (vs Bentgo's 69) but
+    // ~1.8s per chunk on the throttled shared key. Measured against the real
+    // Euka API with Cutler's own key: 4 -> ~144s (at the ~150s ceiling),
+    // 10 -> 25.1s across 136 calls. Euka accepted 10-way with no throttling.
+    const CONCURRENCY = 10;
+
+    // Wall-clock budget. Even with headroom, a pathologically slow store must
+    // DEGRADE rather than 504: past the budget we stop starting new candidates
+    // and hand the rest back as "check manually", so the APC still gets the
+    // CSVs we did compute instead of a bare gateway error.
+    const startedAt = Date.now();
+    const BUDGET_MS = 110_000;
+    const outOfTime = () => Date.now() - startedAt > BUDGET_MS;
+
     let idx = 0;
     async function worker() {
       while (idx < candidateHandles.length) {
         const handle = candidateHandles[idx++];
+        if (outOfTime()) {
+          needsManual.push({ handle, note: 'timed out before this creator could be checked — run again or check manually' });
+          continue;
+        }
         let hist: string[] = [];
         try { hist = await fullHistory(handle, target, storeId, key); }
         catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
