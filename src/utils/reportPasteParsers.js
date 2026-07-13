@@ -99,6 +99,8 @@ export function parseTopVideosText(raw) {
 
 const HANDLE_RE = /^@\S+/;                              // @legendarylootfinds
 const DELTA_RE = /^[+\-]\d[\d.,]*%$/;                   // +8.37%, -60%, +0%  (WoW change chips)
+const TOTAL_GMV_RE = /%\s*of\s*total\s*gmv/i;           // "43.08% of total GMV"
+const CREATOR_VALUE_RE = /^\$?\s*\d[\d,]*(?:\.\d+)?\s*[KMB%]?$/i;  // $608.12 · 61 · 6.43 · 2.38% · 33.07K
 
 /**
  * Parse the "Top Creators" copy-paste from TikTok Shop's creator-performance table.
@@ -107,21 +109,30 @@ const DELTA_RE = /^[+\-]\d[\d.,]*%$/;                   // +8.37%, -60%, +0%  (W
  *   @handle
  *   Followers
  *   <followers value>
- *   $<Affiliate GMV>              ← the ONLY money value not followed by a delta
+ *   $<Affiliate GMV>              ← first money value
  *   <NN>% of total GMV
- *   $<Est. commission>   <delta>
- *   <items sold>         <delta>
- *   <affiliate orders>   <delta>
- *   <avg customers>      <delta>
- *   <CTR%>               <delta>
- *   <affiliate followers><delta>
- *   <LIVE streams>       <delta>
- *   <shoppable videos>   <delta>  ← rightmost value = videos posted
+ *   $<Est. commission>
+ *   <items sold>
+ *   <affiliate orders>
+ *   <avg customers>               ← decimal
+ *   <CTR%>
+ *   <affiliate followers>         ← 33.07K
+ *   <LIVE streams>
+ *   <shoppable videos>            ← rightmost value = videos posted
  *
- * Every metric value is immediately followed by its own +/-% change chip, so we
- * collect "line whose next line is a delta" in order: [0]=commission,
- * [1]=items sold, and the last = shoppable videos posted. Affiliate GMV is the
- * exception (followed by "% of total GMV"), so it's read as the first $ value.
+ * The change-chip trap: when the period-comparison toggle is ON, TikTok emits a
+ * +/-% chip after every metric. The original parser anchored on exactly that
+ * ("line whose next line is a delta"), so a brand whose export had comparison
+ * OFF — same columns, no chips — parsed GMV fine but left items sold and videos
+ * BLANK, silently. Both layouts are live, so key on the column ORDER instead
+ * (identical in both) and treat the chips as noise to skip.
+ *
+ * Within a creator's metric run, values are collected in order and the two we
+ * want are picked by TYPE, not by index: items sold is the FIRST integer (the
+ * commission before it is money; orders after it is also an integer but comes
+ * later) and shoppable videos is the LAST integer (avg-customers is a decimal,
+ * CTR a percent, followers a K/M value — none are integers). That survives both
+ * layouts and any column TikTok hides.
  *
  * @param {string} raw
  * @returns {Array<{name,videosPosted,itemsSold,gmv,notes}>}
@@ -134,6 +145,7 @@ export function parseTopCreatorsText(raw) {
   for (let i = 0; i < lines.length; i++) if (HANDLE_RE.test(lines[i])) starts.push(i);
 
   const strip = v => (v == null ? '' : String(v).replace(/[$,%\s]/g, ''));
+  const isInt = v => INT_RE.test(String(v).trim());
   const creators = [];
 
   for (let s = 0; s < starts.length; s++) {
@@ -142,19 +154,29 @@ export function parseTopCreatorsText(raw) {
     const block = lines.slice(i, end);
     const name = block[0].replace(/^@/, '').trim();
 
-    // Affiliate GMV = first money value in the block.
-    let gmv = '';
+    // Affiliate GMV = first money value in the block. Everything to its right is
+    // the metric run.
+    let gmvIdx = -1, gmv = '';
     for (let k = 1; k < block.length; k++) {
-      if (MONEY_RE.test(block[k])) { gmv = strip(block[k]); break; }
+      if (MONEY_RE.test(block[k])) { gmvIdx = k; gmv = strip(block[k]); break; }
     }
 
-    // Ordered metric values = a line whose NEXT line is a delta chip.
+    // Metric values right of GMV, in column order. Delta chips and the
+    // "% of total GMV" label are skipped; any non-value line (a stray header,
+    // pagination, a caption) ENDS the run so trailing junk can't be read as a
+    // metric.
     const values = [];
-    for (let k = 0; k < block.length - 1; k++) {
-      if (!DELTA_RE.test(block[k]) && DELTA_RE.test(block[k + 1])) values.push(block[k]);
+    for (let k = gmvIdx + 1; gmvIdx >= 0 && k < block.length; k++) {
+      const l = block[k];
+      if (DELTA_RE.test(l) || TOTAL_GMV_RE.test(l)) continue;
+      if (!CREATOR_VALUE_RE.test(l)) break;
+      values.push(l);
     }
-    const itemsSold = values.length > 1 ? strip(values[1]) : '';
-    const videosPosted = values.length ? strip(values[values.length - 1]) : '';
+
+    const ints = values.filter(isInt);
+    const itemsSold = ints.length ? strip(ints[0]) : '';
+    // Distinct from items sold — a run with a single integer has no videos column.
+    const videosPosted = ints.length > 1 ? strip(ints[ints.length - 1]) : '';
 
     creators.push({ name, videosPosted, itemsSold, gmv, notes: '' });
   }
