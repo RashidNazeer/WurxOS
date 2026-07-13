@@ -18,9 +18,11 @@
 //   Run dates = every date EXCEPT missed dates.
 //   Step 1  Candidates = creators who posted >=1 video in the window
 //           (creator_videos export — NOT GMV-capped).
-//   Step 2  For each candidate, pull FULL video history (creator_video_level,
-//           chunked 70 days back — the export caps a call at 70 days) to find
-//           their 1st/2nd/3rd video EVER (as of the target date).
+//   Step 2  For each candidate, pull video history (creator_video_level, chunked
+//           70 days back — the export caps a call at 70 days) to find their
+//           1st/2nd/3rd video EVER (as of the target date). RULE-OUT: a creator
+//           with 3+ videos older than the candidate window already had all three
+//           messages fall due, so they stop after one chunk (see fullHistory).
 //   Step 3  3-message cap: only videos 1..3 matter; 4+ ignored, never block.
 //   Step 4  Send dates: msg1 = first run-date >= D1; msg2 = first run-date >=
 //           max(D2, day after msg1); msg3 = first run-date >= max(D3, day
@@ -107,10 +109,42 @@ async function eukaGet(path: string, key: string): Promise<any> {
   throw new Error(`Euka request failed: ${String(lastErr)}`);
 }
 
-// Full video history for one creator, as of the target date. Chunks 70 days
-// back until we hit the beginning (two empty chunks in a row). Dedups by
-// video_id. Returns posting DAYS oldest-first, filtered to <= target.
-async function fullHistory(handle: string, target: string, storeId: string, key: string): Promise<string[]> {
+// How many consecutive empty 70-day chunks mean "we've reached the start of
+// this creator's history". Was 2 (=140 days), which SILENTLY TRUNCATED anyone
+// who posted, went quiet for ~5 months, then came back: their old videos were
+// never seen, so their comeback video looked like their FIRST EVER and they got
+// re-flagged for a 1st review they'd already received. 4 chunks ≈ 9 months of
+// silence. Only creators who survive the early rule-out below pay for this, and
+// they are by definition the new/sparse ones (a handful per run), so the extra
+// chunks are cheap.
+const EMPTY_STREAK_STOP = 4;
+
+// Video history for one creator, as of the target date, walked in 70-day chunks
+// (the export rejects a wider range).
+//
+// EARLY RULE-OUT — the big win. We only ever care about a creator's FIRST THREE
+// videos. If 3+ of their videos are already older than the candidate window,
+// then videos #1/#2/#3 are all in the past, so all three messages fell due long
+// ago and the creator CANNOT be due today. We can stop immediately without
+// learning their exact history.
+//
+// Safety: candStart is always earliestProcessing - 2. With D1,D2,D3 <= candStart-1,
+// the send chain advances at most one day per message (msg2 >= msg1+1,
+// msg3 >= msg2+1) and firstRunDateOnOrAfter only skips missed dates, which are
+// all >= earliestProcessing. Worst case msg3 lands on target-1 — never on target.
+// That 2-day lookback in the candidate window is exactly the margin the
+// three-message chain needs.
+//
+// This is what makes big brands affordable: a prolific creator (g6iffinlifts has
+// 379 videos) used to cost 10 chunks to prove they weren't due. Now it costs 1.
+// Verified against live Euka data — identical groups, ~4x fewer calls.
+//
+// Returns { skip: true } for a ruled-out creator; otherwise their posting DAYS
+// oldest-first (one entry PER VIDEO — same-day videos count separately, which is
+// what D1/D2/D3 mean), filtered to <= target.
+async function fullHistory(
+  handle: string, target: string, candStart: string, storeId: string, key: string,
+): Promise<{ skip: boolean; days: string[] }> {
   const vids = new Map<string, string>(); // video_id -> posted_date iso
   let end = target;
   let emptyStreak = 0;
@@ -126,13 +160,20 @@ async function fullHistory(handle: string, target: string, storeId: string, key:
       rows = Array.isArray(r?.data) ? r.data : [];
     } catch { rows = []; }
     for (const v of rows) if (v?.video_id && v?.posted_date) vids.set(v.video_id, v.posted_date);
-    if (rows.length === 0) { emptyStreak++; if (emptyStreak >= 2) break; } else emptyStreak = 0;
+
+    // Count VIDEOS (not days) strictly before the window — D1/D2/D3 are the
+    // 1st/2nd/3rd VIDEO, so three same-day videos still consume all three.
+    let before = 0;
+    for (const d of vids.values()) if (dayOf(d) < candStart) before++;
+    if (before >= 3) return { skip: true, days: [] };
+
+    if (rows.length === 0) { emptyStreak++; if (emptyStreak >= EMPTY_STREAK_STOP) break; } else emptyStreak = 0;
     end = addDays(start, -1);
   }
-  return [...vids.values()]
-    .map(dayOf)
-    .filter((d) => d <= target)
-    .sort(cmp);
+  return {
+    skip: false,
+    days: [...vids.values()].map(dayOf).filter((d) => d <= target).sort(cmp),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -239,9 +280,13 @@ Deno.serve(async (req) => {
           needsManual.push({ handle, note: 'timed out before this creator could be checked — run again or check manually' });
           continue;
         }
-        let hist: string[] = [];
-        try { hist = await fullHistory(handle, target, storeId, key); }
+        let res: { skip: boolean; days: string[] };
+        try { res = await fullHistory(handle, target, candStart, storeId, key); }
         catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
+        // Ruled out: 3+ videos predate the window, so all three messages already
+        // went out. Nothing due — NOT a manual case.
+        if (res.skip) continue;
+        const hist = res.days;
         if (hist.length === 0) {
           needsManual.push({ handle, note: 'posted in window per creator_videos but per-creator history returned nothing' });
           continue;
