@@ -38,8 +38,32 @@ function genId(prefix = 'p') {
   return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
 }
 
+// Promotions are stored in JSONB with SNAKE_CASE dates (start_date / end_date —
+// see saveProductCampaign below), but the ported v1 markup reads startDate /
+// endDate everywhere: the two <input type="date"> fields, the "· ends <date>"
+// line on the card, and the expiry/urgency badge.
+//
+// This used to only stamp a missing id and pass the row straight through, so
+// p.startDate was ALWAYS undefined. Consequences, all silent:
+//   * both date pickers opened BLANK even though the DB held the dates,
+//   * no "ends" line and no expiry badge ever rendered, so a promo never looked
+//     expired,
+//   * and worst — the edit modal rebuilds the promo from that blank form state,
+//     so pressing Save wrote start_date/end_date back as NULL. Opening a campaign
+//     and saving anything DESTROYED its dates.
+//
+// Map to camelCase for the UI and KEEP the snake_case keys, so the write path
+// (which reads `p.startDate || p.start_date`) is correct from either shape.
 function ensurePromoIds(promos) {
-  return (promos || []).map(p => (p && p.id) ? p : { ...(p || {}), id: genId('promo') });
+  return (promos || []).map((p) => {
+    const src = p || {};
+    return {
+      ...src,
+      id: src.id || genId('promo'),
+      startDate: src.startDate || src.start_date || '',
+      endDate: src.endDate || src.end_date || '',
+    };
+  });
 }
 
 // SKUs in v2 brand_products are { id, sku_name, retail_price }.
