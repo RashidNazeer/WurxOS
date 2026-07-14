@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   getIncentives, updateIncentivesProgress, notifyIncentiveEmployee,
 } from '../../lib/incentivesApi';
+import { listBrandsForApc } from '../../lib/agendaApi';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -452,6 +453,20 @@ export default function ApcIncentivesPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [showEdit,    setShowEdit]    = useState(false);
 
+  // The card header used to read record.brandNames — a v1 field the `incentives`
+  // table has never had, so it was always undefined and the header always showed
+  // a bare "—". An APC's brands live in brand_assignments (never brands.owner_id,
+  // which is the TL). Fetched once per user: brands don't change month to month.
+  const [brandNames, setBrandNames] = useState([]);
+  useEffect(() => {
+    if (!currentUser?.uid) { setBrandNames([]); return undefined; }
+    let cancelled = false;
+    listBrandsForApc(currentUser.uid)
+      .then((list) => { if (!cancelled) setBrandNames((list || []).map((b) => b.brand_name).filter(Boolean)); })
+      .catch(() => { if (!cancelled) setBrandNames([]); });
+    return () => { cancelled = true; };
+  }, [currentUser?.uid]);
+
   useEffect(() => {
     if (!currentUser) return;
     async function load() {
@@ -560,7 +575,8 @@ export default function ApcIncentivesPage() {
             <div className="flex-grow-1">
               <div className="fw-bold">{apcProfile?.userName}</div>
               <div style={{ fontSize: '0.72rem', opacity: 0.7 }}>
-                {getMonthLabel(month)} · {(record.brandNames || []).join(', ') || '—'}
+                {getMonthLabel(month)}
+                {brandNames.length > 0 && ` · ${brandNames.join(', ')}`}
               </div>
             </div>
             {record.verified && (
