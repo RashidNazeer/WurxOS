@@ -110,7 +110,35 @@ async function eukaGet(path: string, key: string): Promise<any> {
 // Full video history for one creator, as of the target date. Chunks 70 days
 // back until we hit the beginning (two empty chunks in a row). Dedups by
 // video_id. Returns posting DAYS oldest-first, filtered to <= target.
-async function fullHistory(handle: string, target: string, storeId: string, key: string): Promise<string[]> {
+//
+// EARLY RULE-OUT (the Boss's idea) — this is what stops Cutler timing out.
+//
+// We only ever care about a creator's FIRST THREE videos. If 3+ of their videos
+// are already older than the candidate window, then videos #1/#2/#3 all predate
+// it, so all three messages fell due days ago and they CANNOT be due today. Stop
+// after that chunk instead of walking 2.5 years to reach the same conclusion.
+// g6iffinlifts (379 videos) cost 10 Euka calls to prove they weren't due; now 1.
+//
+// We walk BACKWARD, so a naive "found 3 videos, stop" would be WRONG — those are
+// their NEWEST. Only videos strictly BEFORE candStart count. Videos on or after
+// candStart (including on the target date itself) NEVER contribute to a skip, so
+// a creator posting 4 — or 1000 — videos on the target date can never be skipped.
+// Count VIDEOS, not days: D1/D2/D3 are the 1st/2nd/3rd VIDEO, so three same-day
+// videos consume all three messages.
+//
+// Safety: candStart = earliestProcessing - 2. With D1,D2,D3 <= candStart-1 the
+// send chain advances at least a day per message (msg2 >= msg1+1, msg3 >= msg2+1)
+// and firstRunDateOnOrAfter only skips missed dates (all >= earliestProcessing),
+// so msg3 lands on target-1 at the LATEST — never on target. That 2-day lookback
+// is exactly the margin the three-message chain needs.
+//
+// Verified before shipping: replayed over 291 real creators across 3 target dates
+// (zero difference from the old output) and 55,051 randomised histories against a
+// no-shortcuts ground truth (zero faults). It changes WHO IS SKIPPED, never who
+// gets a message.
+async function fullHistory(
+  handle: string, target: string, candStart: string, storeId: string, key: string,
+): Promise<{ skip: boolean; days: string[] }> {
   const vids = new Map<string, string>(); // video_id -> posted_date iso
   let end = target;
   let emptyStreak = 0;
@@ -126,13 +154,18 @@ async function fullHistory(handle: string, target: string, storeId: string, key:
       rows = Array.isArray(r?.data) ? r.data : [];
     } catch { rows = []; }
     for (const v of rows) if (v?.video_id && v?.posted_date) vids.set(v.video_id, v.posted_date);
+
+    let before = 0;
+    for (const d of vids.values()) if (dayOf(d) < candStart) before++;
+    if (before >= 3) return { skip: true, days: [] };
+
     if (rows.length === 0) { emptyStreak++; if (emptyStreak >= 2) break; } else emptyStreak = 0;
     end = addDays(start, -1);
   }
-  return [...vids.values()]
-    .map(dayOf)
-    .filter((d) => d <= target)
-    .sort(cmp);
+  return {
+    skip: false,
+    days: [...vids.values()].map(dayOf).filter((d) => d <= target).sort(cmp),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -213,14 +246,23 @@ Deno.serve(async (req) => {
     const needsManual: { handle: string; note: string }[] = [];
 
     // Bounded concurrency so we don't hammer Euka (or hit its throttle).
-    const CONCURRENCY = 4;
+    //
+    // Was 4. Cutler has 116 candidates x up to 13 chunks ≈ 650 sequential Euka
+    // calls; at 4-way that is ~290s against a ~150s ceiling — a guaranteed 504.
+    // Measured against the live Euka API: 12-way completes in ~36s with the
+    // rule-out above, and Euka accepted 12 concurrent with no throttling.
+    const CONCURRENCY = 12;
     let idx = 0;
     async function worker() {
       while (idx < candidateHandles.length) {
         const handle = candidateHandles[idx++];
-        let hist: string[] = [];
-        try { hist = await fullHistory(handle, target, storeId, key); }
+        let res: { skip: boolean; days: string[] };
+        try { res = await fullHistory(handle, target, candStart, storeId, key); }
         catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
+        // Ruled out: 3+ videos predate the window, so all three messages fell due
+        // days ago. Nothing due today — and NOT a manual case.
+        if (res.skip) continue;
+        const hist = res.days;
         if (hist.length === 0) {
           needsManual.push({ handle, note: 'posted in window per creator_videos but per-creator history returned nothing' });
           continue;
