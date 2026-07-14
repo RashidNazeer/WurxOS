@@ -1545,7 +1545,11 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   // the same brand visibility as Boss/OL/Developer to any role.
   // Used for special-case TL/PCTL accounts that need org-wide
   // visibility (e.g. Abdul Subhan).
-  const canViewAll = ['boss','ol','developer'].includes(role)
+  // PCTL is here by the Boss's ruling (mig 247): they see every brand. Before,
+  // 'pctl' matched no branch at all — it fell through to the APC/IPC
+  // brand_assignments path, where a PCTL has no rows, so the brand picker was
+  // silently EMPTY.
+  const canViewAll = ['boss','ol','developer','pctl'].includes(role)
     || permissions?.canViewAllBrands === true;
   // euka_slug + euka_store_id let the reporting form know whether a brand is on
   // Euka (→ show "Auto Generate from Euka"). They flow through BrandsContext's

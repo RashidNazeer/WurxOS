@@ -234,7 +234,12 @@ export async function listAssignableUsers({ creatorRole, creatorId, brandId }) {
   //   * Brand selected — narrow to the people actually managing the
   //     brand: its owner (the TL), everyone in brand_assignments
   //     (APCs / IPCs), and any PCTL who selected the brand.
-  if (creatorRole === 'boss' || creatorRole === 'ol' || creatorRole === 'developer') {
+  // PCTL is in this branch by the Boss's ruling: they assign to ANYONE, including
+  // OL and TL. They used to be limited to "IPCs who report to me" — a frontend
+  // restriction only; can_create_tasks (mig 022) already returned true for pctl
+  // and tasks_insert never gated who the assignee could be.
+  if (creatorRole === 'boss' || creatorRole === 'ol' || creatorRole === 'developer'
+      || creatorRole === 'pctl') {
     if (!brandId) {
       const { data, error } = await supabase
         .from('profiles')
@@ -298,17 +303,8 @@ export async function listAssignableUsers({ creatorRole, creatorId, brandId }) {
     return list;
   }
 
-  // PCTL assigns to IPCs that report to them
-  if (creatorRole === 'pctl') {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, display_name, email, role')
-      .eq('role', 'ipc')
-      .eq('is_active', true)
-      .eq('reports_to', creatorId);
-    if (error) throw new Error(error.message);
-    return data || [];
-  }
+  // (PCTL used to be limited to "IPCs that report to me" here — now handled in
+  // the Boss/OL branch above, so they can assign to anyone.)
 
   // APCs always self-assign.
   if (creatorRole === 'apc') {
@@ -354,15 +350,16 @@ export async function listAssignableUsers({ creatorRole, creatorId, brandId }) {
 }
 
 // Brands the creator can use when assigning a task.
-//   Boss/OL/Developer: all active brands
-//   TL:                 brands they own
-//   APC/IPC:            brands they're assigned to via brand_assignments
-//                       (so they can attach a self-assigned task to a
-//                       brand they actually work on, without being able
-//                       to assign work to anyone else)
-//   PCTL:               brands they've selected via pctl_brand_selections
+//   Boss/OL/Developer/PCTL: all active brands
+//   TL:                     brands they own
+//   APC/IPC:                brands they're assigned to via brand_assignments
+//                           (so they can attach a self-assigned task to a
+//                           brand they actually work on, without being able
+//                           to assign work to anyone else)
 export async function listBrandsForTaskCreate({ creatorRole, creatorId }) {
-  if (['boss', 'ol', 'developer', 'tl'].includes(creatorRole)) {
+  // PCTL sees every brand (mig 247). It used to read pctl_brand_selections, which
+  // is EMPTY in prod — so the brand picker was silently blank for both PCTLs.
+  if (['boss', 'ol', 'developer', 'tl', 'pctl'].includes(creatorRole)) {
     let q = supabase
       .from('brands')
       .select('id, brand_name, logo_url, owner_id')
@@ -380,18 +377,6 @@ export async function listBrandsForTaskCreate({ creatorRole, creatorId }) {
       .from('brand_assignments')
       .select('brand:brand_id (id, brand_name, logo_url, owner_id, status)')
       .eq('user_id', creatorId);
-    if (error) throw new Error(error.message);
-    return (data || [])
-      .map((r) => r.brand)
-      .filter((b) => b && b.status === 'active')
-      .sort((a, b) => (a.brand_name || '').localeCompare(b.brand_name || ''));
-  }
-
-  if (creatorRole === 'pctl') {
-    const { data, error } = await supabase
-      .from('pctl_brand_selections')
-      .select('brand:brand_id (id, brand_name, logo_url, owner_id, status)')
-      .eq('pctl_id', creatorId);
     if (error) throw new Error(error.message);
     return (data || [])
       .map((r) => r.brand)
