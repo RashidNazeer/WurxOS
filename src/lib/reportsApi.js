@@ -609,6 +609,20 @@ export async function listSiblingReports({ brandId, type, excludeId }) {
 // --------------------------------------------------------------
 // Bi-weekly anchors
 // --------------------------------------------------------------
+// The row is snake_case (anchor_start); BiWeeklyReportForm reads anchor.anchorStart.
+// Both functions returned the RAW row, so anchorStart was always undefined:
+//   * detectNextBiWeeklyPeriod(reports, undefined) — with no anchor to count from
+//     it re-anchors on the latest report, so EVERY new report came out labelled
+//     "Period 2", forever, and that number was written to the DB (prod
+//     period_number distribution: {"1":1, "2":2, null:2} across 5 reports).
+//   * getBiWeeklyPeriodsFromAnchor(undefined, 1) — the first report after setting
+//     an anchor opened with a BLANK period, and Save silently did nothing.
+// Expose camelCase and keep the snake_case keys.
+function _normAnchor(row) {
+  if (!row) return row;
+  return { ...row, brandId: row.brand_id, anchorStart: row.anchor_start || '' };
+}
+
 export async function getBiWeeklyAnchor(brandId) {
   const { data, error } = await supabase
     .from('bi_weekly_anchors')
@@ -616,7 +630,7 @@ export async function getBiWeeklyAnchor(brandId) {
     .eq('brand_id', brandId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data;
+  return _normAnchor(data);
 }
 
 export async function setBiWeeklyAnchor(brandId, anchorStart) {
@@ -627,7 +641,7 @@ export async function setBiWeeklyAnchor(brandId, anchorStart) {
     .upsert({ brand_id: brandId, anchor_start: anchorStart, set_by: me, set_at: new Date().toISOString() })
     .select().single();
   if (error) throw new Error(error.message);
-  return data;
+  return _normAnchor(data);
 }
 
 // --------------------------------------------------------------

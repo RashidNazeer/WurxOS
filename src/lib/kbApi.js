@@ -29,7 +29,7 @@ export const KB_VISIBILITIES = [
 export async function listArticles({ category = null, onlyLatest = true, status = 'approved' } = {}) {
   let q = supabase
     .from('kb_articles')
-    .select('*, created_by_profile:created_by(id, display_name, role, avatar_url)')
+    .select('*, created_by_profile:created_by(id, display_name, role, avatar_url), updater:updated_by(id, display_name)')
     .order('updated_at', { ascending: false });
   if (category) q = q.eq('category', category);
   if (status)   q = q.eq('approval_status', status);
@@ -213,6 +213,26 @@ function fsTs(value) {
   };
 }
 
+// ── Visibility: the v1 UI and the DB disagree on TWO of the four names ────
+// The UI works in { everyone | roles | users | private }.
+// kb_articles.visibility is a CHECK constraint over ('private','office','role',
+// 'users') — 'office' not 'everyone', and 'role' SINGULAR not 'roles'.
+//
+// 'everyone' → 'office' was already translated. **'roles' → 'role' was NOT**, so
+// choosing "By Role" in the Boss KB and pressing Save sent visibility='roles',
+// the CHECK constraint rejected the write, the error was swallowed, and NOTHING
+// HAPPENED — no article, no message. Verified against prod: inserting 'roles' is
+// rejected by the constraint; 'role' is accepted. Cruelly, 'users' IS a legal
+// value, which is why "By User" worked and only "By Role" was broken.
+//
+// And on the way back, a stored 'role' was handed to the UI as-is while the UI
+// compares against 'roles' — so the 25 role-restricted articles already in prod
+// showed no "By Role" badge and didn't preselect their mode when edited.
+const VIS_TO_DB = { everyone: 'office', roles: 'role' };
+const VIS_TO_UI = { office: 'everyone', role: 'roles' };
+const visToDb = (t) => VIS_TO_DB[t] || t || 'office';
+const visToUi = (t) => VIS_TO_UI[t] || t || 'everyone';
+
 // Map a v2 kb_articles row (snake_case + joined profile) into the
 // v1 doc shape that BossKnowledgeBasePage / KnowledgeBasePage expect.
 export function _normRow(row) {
@@ -235,7 +255,7 @@ export function _normRow(row) {
     approvalStatus:     row.approval_status || 'approved',
     rejectionReason:    row.rejection_reason || '',
     visibility: {
-      type:    visType === 'office' ? 'everyone' : visType,
+      type:    visToUi(visType),
       roles:   row.visible_to_roles || [],
       userIds: row.visible_to_users || [],
     },
@@ -250,7 +270,10 @@ export function _normRow(row) {
     submittedAt:        fsTs(row.submitted_at),
     approvedAt:         fsTs(row.approved_at),
     updatedAt:          fsTs(row.updated_at),
-    updatedByName:      row.updated_by_name || '',
+    // Was `row.updated_by_name` — a column kb_articles never had, so "Updated by
+    // X" NEVER rendered on either KB page. mig 248 adds a real updated_by (stamped
+    // by trigger from auth.uid(), backfilled to the creator) and we join it.
+    updatedByName:      row.updater?.display_name || row.created_by_profile?.display_name || '',
     tags:               row.tags || [],
     _raw:               row,
   };
@@ -266,7 +289,7 @@ export function _normRow(row) {
 export async function listAllArticles() {
   const { data, error } = await supabase
     .from('kb_articles')
-    .select('*, created_by_profile:created_by(id, display_name, role, avatar_url), submitter:submitted_by(id, display_name, role, avatar_url)')
+    .select('*, created_by_profile:created_by(id, display_name, role, avatar_url), submitter:submitted_by(id, display_name, role, avatar_url), updater:updated_by(id, display_name)')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map(_normRow);
@@ -385,7 +408,7 @@ export function subscribeComments(articleId, onChange) {
 //   { title, url, description, tab, version, visibility:{type,roles,userIds}, sopGroupId? }
 // Boss is admin → auto_approve = true. Returns the normalized row.
 export async function bossSaveArticle(payload) {
-  const visType = payload.visibility?.type === 'everyone' ? 'office' : (payload.visibility?.type || 'office');
+  const visType = visToDb(payload.visibility?.type);
   const data = await proposeArticle({
     title:           payload.title,
     body:            '',
@@ -428,7 +451,7 @@ export async function userProposeArticle(payload) {
 // Boss approve: sets visibility + flips status. Uses kb_approve, then
 // patches visibility (not auth-gated by the RPC; UPDATE policy allows boss).
 export async function bossApprove(articleId, visibility) {
-  const visType = visibility?.type === 'everyone' ? 'office' : (visibility?.type || 'office');
+  const visType = visToDb(visibility?.type);
   // Approve first
   await approveArticle(articleId);
   // Then patch visibility (kb_approve doesn't take it)
@@ -449,8 +472,9 @@ export async function bossReject(articleId, reason) {
 // Boss inline-edit existing article (after it's already approved). v1
 // just updateDoc()s any subset of fields. Map to v2 column names.
 export async function bossUpdateArticle(articleId, payload) {
-  const visType = payload.visibility?.type === 'everyone' ? 'office'
-                : (payload.visibility?.type || undefined);
+  // undefined when the caller isn't patching visibility — don't default it here,
+  // or a partial update would silently reset the article to "everyone".
+  const visType = payload.visibility?.type ? visToDb(payload.visibility.type) : undefined;
   const patch = {};
   if (payload.title       !== undefined) patch.title        = payload.title;
   if (payload.url         !== undefined) patch.url          = payload.url;
@@ -462,7 +486,6 @@ export async function bossUpdateArticle(articleId, payload) {
     patch.visible_to_roles = payload.visibility?.roles || [];
     patch.visible_to_users = payload.visibility?.userIds || [];
   }
-  if (payload.updatedByName !== undefined) patch.updated_by_name = payload.updatedByName;
   patch.updated_at = new Date().toISOString();
   const data = await updateArticleFields(articleId, patch);
   return _normRow(data);
