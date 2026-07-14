@@ -6,6 +6,7 @@ import {
   listAgendaTasks, markAttendance, startPresenting, stopPresenting, reopenPresentation,
   startMeeting, finishMeeting, pauseMeeting, getAgendaSettings, getAgendaTeamSchedules,
   subscribeAgendaMeetings, subscribeAgendaRoom, agendaMeetingStartAt, agendaMeetLinkFor,
+  getMyGuestTeams, listAgendaGuestTeams, isGuestOf,
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 import { useNow } from '../../hooks/useNow';
@@ -41,11 +42,19 @@ export default function AgendaOngoingPage() {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
-  // View/join every team's meeting (Paid Media lead etc.) without OL controls.
-  // Mirrors canViewAllBrands — view-only; never grants start/finish/evaluate.
-  const canAttendAll = isOL || role === 'pctl' || role === 'ipc' || profile?.permissions?.canAttendAllMeetings === true;
   const uid = user?.id;
   const location = useLocation();
+
+  // Guest teams (mig 249). A guest attends the meetings an OL ticked them
+  // into — no more, no less. RLS already hides the rest, so every meeting
+  // list on this page is pre-filtered to what this viewer may attend; these
+  // slugs only decide how the page is SHAPED (room picker vs own-team pin)
+  // and let us name the team they're attending as.
+  const [myGuestSlugs, setMyGuestSlugs] = useState([]);
+  const [guestTeamLabels, setGuestTeamLabels] = useState({});
+  const isGuest = myGuestSlugs.length > 0;
+  // Anyone who chooses a room from a list, rather than being pinned to one.
+  const canSeeRooms = isOL || isGuest;
 
   const [meeting, setMeeting]         = useState(null);
   const [activeMeetings, setActiveMeetings] = useState([]);  // ongoing + paused (team-active)
@@ -53,6 +62,11 @@ export default function AgendaOngoingPage() {
   // Ref mirror so the mount-once realtime callback reads the latest selection
   // without re-subscribing.
   const selectedRef = useRef(location.state?.meetingId || null);
+  // A guest with exactly one live room drops straight into it — but ONLY on
+  // arrival. Re-running it on every refresh would bounce them back in after
+  // "Back to rooms", and would silently teleport them into a different team's
+  // room the moment the OL finished the one they were actually in.
+  const firstLoadRef = useRef(true);
   const [team, setTeam]               = useState(null);   // { tl, apcs }
   const [attendance, setAttendance]   = useState([]);
   const [presentations, setPresentations] = useState([]);
@@ -70,16 +84,25 @@ export default function AgendaOngoingPage() {
 
   async function refresh() {
     try {
-      const [active, upcoming, teams, settings, sched] = await Promise.all([
+      const [active, upcoming, teams, settings, sched, mySlugs, allGuestTeams] = await Promise.all([
         listAgendaMeetings({ statuses: ['ongoing', 'paused'] }),
         listAgendaMeetings({ status: 'upcoming' }),
         listAgendaTeams(),
         getAgendaSettings(),
         getAgendaTeamSchedules(),
+        getMyGuestTeams(),
+        listAgendaGuestTeams(),
       ]);
       setAllTeams(teams);
       setMeetLink(settings?.google_meet_link || '');
       setSchedules(sched || []);
+      setMyGuestSlugs(mySlugs || []);
+      setGuestTeamLabels(Object.fromEntries((allGuestTeams || []).map((g) => [g.slug, g.label])));
+      // Read guest state from THIS fetch, not from React state — on the first
+      // refresh the state hasn't landed yet, and the room-selection branch
+      // below would take the wrong path for a guest.
+      const guest = (mySlugs || []).length > 0;
+
       // Only surface meetings whose TL is still an active team (deleted/
       // deactivated users can leave orphaned rows behind).
       const activeTlIds = new Set((teams || []).map((t) => t.tl.id));
@@ -89,18 +112,30 @@ export default function AgendaOngoingPage() {
       setActiveMeetings(activeRooms);
       setWeekUpcoming(upcomingActive.filter((m) => m.week_start === wk));
 
-      // Role-aware room selection. TL/APC always land on THEIR OWN team's
-      // active (ongoing/paused) room — never another team's, even when several
-      // run in parallel. OL/Boss pick from the list; default to no room (the
-      // list view) and keep their selection while it stays active.
+      // Room selection. A TL/APC lands on THEIR OWN team's live room — even if
+      // they're also a guest elsewhere, because their own team comes first.
+      // Only once their own team isn't live do they get the guest picker.
+      // OL and guests pick from the list, which RLS has already narrowed to
+      // the meetings they may attend — so a guest with no invite gets an empty
+      // list and the honest "no meeting" state.
+      const myTlId = isTL ? uid : (isApc ? (profile?.reports_to || null) : null);
+      const myTeamRoom = myTlId ? activeRooms.find((m) => m.tl_id === myTlId) : null;
+
       let targetId;
-      if ((isTL || isApc) && !canAttendAll) {
-        const myTlId = isTL ? uid : (profile?.reports_to || null);
-        targetId = (activeRooms.find((m) => m.tl_id === myTlId) || null)?.id || null;
+      if (myTeamRoom && !guest) {
+        targetId = myTeamRoom.id;
+      } else if (myTeamRoom && guest && firstLoadRef.current) {
+        targetId = myTeamRoom.id;          // own team wins on arrival
+      } else if (!isOL && !guest) {
+        targetId = null;                   // plain TL/APC, own team not live
       } else {
-        // OL and all-meeting attendees pick from the rooms list (default none).
         targetId = selectedRef.current;
         if (targetId && !activeRooms.some((m) => m.id === targetId)) targetId = null;
+        // Exactly one room and nothing chosen: a guest is here for that room.
+        // Only on arrival — see firstLoadRef.
+        if (!targetId && guest && !isOL && firstLoadRef.current && activeRooms.length === 1) {
+          targetId = activeRooms[0].id;
+        }
       }
       selectedRef.current = targetId;
       setSelectedMeetingId(targetId);
@@ -120,8 +155,9 @@ export default function AgendaOngoingPage() {
     } catch { /* keep last good state */ }
   }
 
-  // OL opens a specific room from the list (or backs out with null).
+  // OL/guest opens a specific room from the list (or backs out with null).
   function openRoom(id) {
+    firstLoadRef.current = false;
     selectedRef.current = id || null;
     setSelectedMeetingId(id || null);
     setReviewTargetId(null);
@@ -129,7 +165,7 @@ export default function AgendaOngoingPage() {
   }
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
+    refresh().finally(() => { firstLoadRef.current = false; setLoading(false); });
     const unsub = subscribeAgendaMeetings(refresh);   // catches start/finish
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -249,8 +285,13 @@ export default function AgendaOngoingPage() {
   if (!meeting) {
     const teamsById = {};
     allTeams.forEach((t) => { teamsById[t.tl.id] = t; });
-    const hasActive  = canAttendAll && activeMeetings.length > 0;
+    const hasActive  = canSeeRooms && activeMeetings.length > 0;
     const showNextUp = isOL && weekUpcoming.length > 0;  // Start buttons — OL only
+    // What a guest is waiting for: the meetings they were invited to but that
+    // haven't started. Naming them beats a bare "nothing here".
+    const myGuestUpcoming = isGuest && !isOL
+      ? weekUpcoming.filter((m) => isGuestOf(m.guest_teams, myGuestSlugs))
+      : [];
     return (
       <div style={{ padding: '32px 32px 48px' }}>
         <div className="mb-4">
@@ -289,15 +330,43 @@ export default function AgendaOngoingPage() {
         )}
 
         {!hasActive && !showNextUp && (
-          <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="d-flex flex-column align-items-center justify-content-center py-5 px-3 text-center" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
             <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
               <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
             </div>
             <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
-            <p className="text-muted small mb-2">
-              {canAttendAll ? 'No active or scheduled meetings for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
-            </p>
-            {canAttendAll && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
+            {isGuest && !isOL ? (
+              myGuestUpcoming.length > 0 ? (
+                <>
+                  <p className="text-muted small mb-2" style={{ maxWidth: 420 }}>
+                    Nothing live yet. You’re attending {myGuestUpcoming.length === 1 ? 'this meeting' : 'these meetings'} this week —
+                    we’ll notify you the moment {myGuestUpcoming.length === 1 ? 'it starts' : 'each one starts'}.
+                  </p>
+                  <div className="d-flex flex-column gap-1 mb-3">
+                    {myGuestUpcoming
+                      .sort((a, b) => `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`))
+                      .map((m) => (
+                        <div key={m.id} className="rounded-2 px-3 py-1" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem' }}>
+                          <strong style={{ color: 'var(--text-primary)' }}>
+                            {teamsById[m.tl_id]?.tl?.display_name || m.tl?.display_name || 'Team'}
+                          </strong>
+                          <span className="text-muted"> · {fmtDate(m.meeting_date)} at {fmtTime(m.meeting_time)} PKT</span>
+                        </div>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted small mb-2" style={{ maxWidth: 420 }}>
+                  You’re not attending any meeting this week. An Operation Lead adds your team to a meeting
+                  under Settings → Schedules, and you’ll be notified when they do.
+                </p>
+              )
+            ) : (
+              <p className="text-muted small mb-2">
+                {isOL ? 'No active or scheduled meetings for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
+              </p>
+            )}
+            {canSeeRooms && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
           </div>
         )}
       </div>
@@ -307,14 +376,24 @@ export default function AgendaOngoingPage() {
   const teamName = team?.tl?.display_name || meeting.tl?.display_name || 'Team';
   const paused = meeting.status === 'paused';
   const joinLink = agendaMeetLinkFor(meeting, schedules, meetLink);
-  // Is this the viewer's OWN team's meeting? Own-team controls (attendance)
-  // only apply there; an all-meeting attendee views other rooms as an observer.
+  // Is this the viewer's OWN team's meeting? Attendance controls are the TL's
+  // alone (isMyTeam). But "am I here as a GUEST or as a member of this team?"
+  // is a wider question — an APC on a guest team sitting in their own team's
+  // room is a member, not an observer, and must not be told otherwise.
   const isMyTeam = isTL && meeting.tl_id === uid;
+  const myTlId   = isTL ? uid : (isApc ? (profile?.reports_to || null) : null);
+  const inOwnTeamRoom = !!myTlId && meeting.tl_id === myTlId;
+  const hereAsGuest   = isGuest && !isOL && !inOwnTeamRoom;
+  // The guest team(s) that got this viewer into THIS room — worth naming, so
+  // an IPC sitting in four different teams' meetings knows which hat they wear.
+  const myLabelsHere = (meeting.guest_teams || [])
+    .filter((s) => myGuestSlugs.includes(s))
+    .map((s) => guestTeamLabels[s] || s);
 
   return (
     <div style={{ padding: '32px 32px 48px' }}>
-      {/* Back to the rooms list — anyone with a multi-room list (OL or all-meeting attendee) */}
-      {canAttendAll && (
+      {/* Back to the rooms list — anyone who picks from one (OL or guest) */}
+      {canSeeRooms && (
         <button type="button" onClick={() => openRoom(null)}
           className="btn btn-sm btn-link text-decoration-none px-0 mb-2"
           style={{ fontSize: '0.78rem' }}>
@@ -489,8 +568,8 @@ export default function AgendaOngoingPage() {
       </div>
 
       {/* Presentation progress — who has presented / who is pending (read-only;
-          OL and all-meeting observers). */}
-      {canAttendAll && apcs.length > 0 && (
+          OL and guest observers). */}
+      {canSeeRooms && apcs.length > 0 && (
         <PresentationProgress apcs={apcs} presMap={presMap}
           onReopen={isOL ? handleReopen : null}
           onRemarks={isOL ? setReviewTargetId : null}
@@ -551,12 +630,14 @@ export default function AgendaOngoingPage() {
         </div>
       )}
 
-      {/* All-meeting attendee viewing ANOTHER team's room — observer only */}
-      {canAttendAll && !isOL && !isMyTeam && (
+      {/* Guest sitting in on another team's room — observer only */}
+      {hereAsGuest && (
         <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
           <div className="card-body p-3 text-muted small">
             <i className="bi bi-eye me-1" />
-            You’re attending this meeting as an observer. The team’s own Team Lead marks attendance and the OL runs the review.
+            You’re attending {teamName}’s meeting
+            {myLabelsHere.length > 0 && <> as <strong style={{ color: 'var(--text-primary)' }}>{myLabelsHere.join(' + ')}</strong></>}.
+            The team’s own Team Lead marks attendance and the OL runs the review.
           </div>
         </div>
       )}

@@ -340,13 +340,18 @@ export async function getAgendaTeamSchedules() {
   return data || [];
 }
 
-export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime, meetLink = '') {
+// Guest slugs are stored sorted. The DB compares the old and new invite lists
+// to decide who is NEWLY invited and therefore worth notifying; unsorted
+// arrays would read as "changed" every time the OL merely re-ticked a box.
+const sortSlugs = (s) => [...new Set(s || [])].sort();
+
+export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime, meetLink = '', guestTeams = []) {
   const { data: auth } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('agenda_team_schedules')
     .upsert(
       { tl_id: tlId, meeting_day: meetingDay, meeting_time: meetingTime,
-        meet_link: (meetLink || '').trim(),
+        meet_link: (meetLink || '').trim(), guest_teams: sortSlugs(guestTeams),
         updated_by: auth?.user?.id || null, updated_at: new Date().toISOString() },
       { onConflict: 'tl_id' },
     )
@@ -354,6 +359,113 @@ export async function upsertAgendaTeamSchedule(tlId, meetingDay, meetingTime, me
     .single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+// --------------------------------------------------------------
+// Guest teams (mig 249)
+//
+// A guest team joins another team's meeting by invitation. Membership is
+// the union of two rules: by role (Paid Collab = every pctl + ipc) and by
+// explicit member row (Paid Media = a hand-picked list — it isn't a role
+// yet). The OL ticks which guest teams join each team, on the recurring
+// schedule; that choice is snapshotted onto the meeting when the week is
+// notified, and can still be overridden for a single week.
+// --------------------------------------------------------------
+
+export async function listAgendaGuestTeams() {
+  const { data, error } = await supabase
+    .from('agenda_guest_teams')
+    .select('slug, label, member_roles, sort_order')
+    .order('sort_order');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Everyone in each guest team, role-derived members and explicit ones alike,
+// so the OL can see who an invite actually reaches before sending it.
+export async function listAgendaGuestMembers() {
+  const [teamsRes, explicitRes, peopleRes] = await Promise.all([
+    supabase.from('agenda_guest_teams').select('slug, label, member_roles, sort_order').order('sort_order'),
+    supabase.from('agenda_guest_team_members').select('team_slug, user_id'),
+    supabase.from('profiles')
+      .select('id, display_name, email, role, avatar_url')
+      .eq('is_active', true).is('deleted_at', null),
+  ]);
+  for (const r of [teamsRes, explicitRes, peopleRes]) {
+    if (r.error) throw new Error(r.error.message);
+  }
+  const people   = peopleRes.data || [];
+  const explicit = explicitRes.data || [];
+  return (teamsRes.data || []).map((t) => {
+    const byRole = people.filter((p) => (t.member_roles || []).includes(p.role));
+    const byRow  = explicit
+      .filter((m) => m.team_slug === t.slug)
+      .map((m) => people.find((p) => p.id === m.user_id))
+      .filter(Boolean)
+      .filter((p) => !byRole.some((r) => r.id === p.id));
+    return { ...t, roleMembers: byRole, explicitMembers: byRow };
+  });
+}
+
+// Everyone who could be put on a guest team. Boss excluded — they already see
+// every meeting and are nobody's guest.
+export async function listAgendaPeople() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, email, role, avatar_url')
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .neq('role', 'boss')
+    .order('display_name');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Goes through the RPC, not a plain insert, because joining a guest team
+// grants access to meetings it was already invited to — and being let into a
+// meeting nobody told you about is the exact thing this feature exists to fix.
+// The RPC notifies the new member of everything they just joined.
+export async function addAgendaGuestMember(teamSlug, userId) {
+  const { error } = await supabase.rpc('agenda_add_guest_member', {
+    p_slug: teamSlug, p_user: userId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeAgendaGuestMember(teamSlug, userId) {
+  const { error } = await supabase
+    .from('agenda_guest_team_members')
+    .delete()
+    .eq('team_slug', teamSlug)
+    .eq('user_id', userId);
+  if (error) throw new Error(error.message);
+}
+
+// The guest teams the CURRENT user belongs to. Empty ⇒ not a guest, and the
+// meeting lists they can read are their own team's, exactly as before.
+export async function getMyGuestTeams() {
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user?.id;
+  if (!me) return [];
+  const { data, error } = await supabase.rpc('agenda_guest_teams_for', { p_uid: me });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// OL — change ONE meeting's guests without touching the standing schedule.
+// Only newly-invited guests are notified.
+export async function setMeetingGuests(meetingId, slugs) {
+  const { data, error } = await supabase.rpc('agenda_set_meeting_guests', {
+    p_meeting: meetingId, p_slugs: sortSlugs(slugs),
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Does this viewer's guest membership cover this meeting/schedule's invite?
+export function isGuestOf(guestTeams, myGuestSlugs) {
+  if (!myGuestSlugs?.length || !guestTeams?.length) return false;
+  return guestTeams.some((s) => myGuestSlugs.includes(s));
 }
 
 // Resolve the Google Meet link to open for a meeting: the meeting team's
@@ -416,10 +528,16 @@ export async function notifyWeek(weekStart) {
   return data;
 }
 
-// OL only — apply the latest schedules to a week's still-upcoming
-// meetings (silent; used when the OL edits schedules mid-week).
-export async function resyncWeek(weekStart) {
-  const { data, error } = await supabase.rpc('agenda_resync_week', { p_week_start: weekStart });
+// OL only — apply the latest schedules to a week's still-upcoming meetings.
+// `tlIds` scopes it to the teams the OL actually edited: resyncing every team
+// would revert an unrelated team's per-week guest override (and silently
+// re-invite the people the OL had just removed). Newly-invited guests are
+// notified; nobody else is.
+export async function resyncWeek(weekStart, tlIds = null) {
+  const { data, error } = await supabase.rpc('agenda_resync_week', {
+    p_week_start: weekStart,
+    p_tl_ids: tlIds && tlIds.length ? tlIds : null,
+  });
   if (error) throw new Error(error.message);
   return data;
 }

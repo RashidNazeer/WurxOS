@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { getAgendaSettings, updateAgendaSettings } from '../../lib/agendaApi';
 import AgendaSchedulesTab from '../../components/agenda/AgendaSchedulesTab';
+import AgendaGuestTeamsTab from '../../components/agenda/AgendaGuestTeamsTab';
 
 // Weekly Agenda Meetings — settings (OL / Boss only).
-// Tabbed: General (Meet link + default day) · Schedules (per-team slot).
+// Tabbed: General (Meet link) · Schedules (per-team slot + guests) ·
+// Guest teams (who Paid Collab / Paid Media actually are).
 
 const TABS = [
-  { key: 'general',   label: 'General',   icon: 'bi-sliders' },
-  { key: 'schedules', label: 'Schedules', icon: 'bi-calendar2-week' },
+  { key: 'general',   label: 'General',     icon: 'bi-sliders' },
+  { key: 'schedules', label: 'Schedules',   icon: 'bi-calendar2-week' },
+  { key: 'guests',    label: 'Guest teams', icon: 'bi-person-plus' },
 ];
 
 export default function AgendaSettingsPage() {
@@ -41,6 +44,7 @@ export default function AgendaSettingsPage() {
 
       {tab === 'general'   && <GeneralTab />}
       {tab === 'schedules' && <AgendaSchedulesTab />}
+      {tab === 'guests'    && <AgendaGuestTeamsTab />}
     </div>
   );
 }

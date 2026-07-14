@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   listAgendaMeetings, listAgendaTeams, getAgendaTeamSchedules,
   notifyWeek, startMeeting, subscribeAgendaMeetings, agendaMeetingStartAt,
+  getMyGuestTeams, listAgendaGuestTeams, setMeetingGuests, isGuestOf,
 } from '../../lib/agendaApi';
 import { useNow } from '../../hooks/useNow';
 
@@ -45,9 +46,17 @@ export default function AgendaUpcomingPage() {
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isTL  = role === 'tl';
   const isApc = role === 'apc';
-  // All-meeting attendees (e.g. Paid Media lead) see every team's row, like an OL.
-  const canAttendAll = isOL || role === 'pctl' || role === 'ipc' || profile?.permissions?.canAttendAllMeetings === true;
-  const myTeamTlId = canAttendAll ? null : (isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null));
+
+  // Guest teams (mig 249). Being a guest ADDS the meetings you were invited
+  // to — it never replaces your own team's. Abdul Subhan is a TL and a guest;
+  // if the two were exclusive he'd lose his own team the day Paid Media grows
+  // a second member, and an APC on a guest team would lose theirs.
+  const [myGuestSlugs, setMyGuestSlugs] = useState([]);
+  const [guestTeams, setGuestTeams]     = useState([]);   // [{ slug, label }]
+  const isGuest = myGuestSlugs.length > 0;
+  const myTeamTlId = isOL
+    ? null
+    : (isTL ? user?.id : (isApc ? (profile?.reports_to || null) : null));
 
   const [meetings, setMeetings]   = useState([]);
   const [teams, setTeams]         = useState([]);
@@ -56,6 +65,7 @@ export default function AgendaUpcomingPage() {
   const [notifying, setNotifying] = useState(false);
   const [busyId, setBusyId]       = useState(null);
   const [flash, setFlash]         = useState('');
+  const [guestEdit, setGuestEdit] = useState(null);   // the meeting whose guests the OL is changing
 
   function reloadMeetings() {
     listAgendaMeetings().then(setMeetings).catch(() => {});
@@ -63,16 +73,31 @@ export default function AgendaUpcomingPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listAgendaMeetings(), listAgendaTeams(), getAgendaTeamSchedules()])
-      .then(([m, t, s]) => {
+    Promise.all([
+      listAgendaMeetings(), listAgendaTeams(), getAgendaTeamSchedules(),
+      getMyGuestTeams(), listAgendaGuestTeams(),
+    ])
+      .then(([m, t, s, mine, gt]) => {
         if (cancelled) return;
         setMeetings(m || []); setTeams(t || []); setSchedules(s || []);
+        setMyGuestSlugs(mine || []); setGuestTeams(gt || []);
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     const unsub = subscribeAgendaMeetings(reloadMeetings);
     return () => { cancelled = true; unsub(); };
   }, []);
+
+  const guestLabels = useMemo(
+    () => Object.fromEntries(guestTeams.map((g) => [g.slug, g.label])),
+    [guestTeams],
+  );
+
+  async function saveGuests(meetingId, slugs) {
+    await setMeetingGuests(meetingId, slugs);
+    setGuestEdit(null);
+    reloadMeetings();
+  }
 
   const today = ymd(new Date());
   const currentWeekStart = ymd(mondayOf(new Date()));
@@ -119,6 +144,10 @@ export default function AgendaUpcomingPage() {
           apcs: team?.apcs || [],
           meetingDate: meeting?.meeting_date || mDate,
           meetingTime: meeting?.meeting_time || s.meeting_time,
+          // Once a week is notified its meeting carries the invite snapshot —
+          // including an explicit empty one, which must beat the schedule. An
+          // un-notified future week can only forecast from the schedule.
+          guestTeams: meeting?.guest_teams || s.guest_teams || [],
           meeting,
         };
       }).sort((a, b) => a.tlName.localeCompare(b.tlName));
@@ -218,27 +247,121 @@ export default function AgendaUpcomingPage() {
               <WeekCard
                 card={card}
                 isOL={isOL}
-                canViewAll={canAttendAll}
+                isGuest={isGuest}
+                myGuestSlugs={myGuestSlugs}
+                guestLabels={guestLabels}
                 myTeamTlId={myTeamTlId}
                 today={today}
                 now={now}
                 busyId={busyId}
                 onStart={goLive}
                 onOpen={openRoom}
+                onEditGuests={setGuestEdit}
               />
             </div>
           ))}
         </div>
       )}
+
+      {guestEdit && (
+        <GuestEditModal
+          meeting={guestEdit}
+          teams={guestTeams}
+          tlName={teamsById.get(guestEdit.tl_id)?.tl?.display_name || 'this team'}
+          onClose={() => setGuestEdit(null)}
+          onSave={saveGuests}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Per-week guest override (OL) ────────────────────────────────────────
+// Changes THIS meeting's guests only; the recurring schedule is untouched.
+// Newly-invited guests get notified, already-invited ones don't.
+function GuestEditModal({ meeting, teams, tlName, onClose, onSave }) {
+  const [slugs, setSlugs] = useState(meeting.guest_teams || []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  function toggle(slug) {
+    setSlugs((s) => (s.includes(slug) ? s.filter((x) => x !== slug) : [...s, slug]));
+  }
+  async function handleSave() {
+    setSaving(true); setError('');
+    try { await onSave(meeting.id, slugs); }
+    catch (e) { setError(e.message || 'Failed to save.'); setSaving(false); }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-start gap-3 mb-3">
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--accent-soft)' }}>
+              <i className="bi bi-person-plus text-primary" style={{ fontSize: '1rem' }} />
+            </div>
+            <div>
+              <p className="fw-semibold mb-0 small">Guests for {tlName}’s meeting</p>
+              <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
+                {fmtDate(meeting.meeting_date)} at {fmtTime(meeting.meeting_time)} PKT. This changes
+                <strong> this week only</strong> — the recurring schedule stays as it is.
+              </p>
+            </div>
+          </div>
+
+          {error && <div className="alert alert-danger py-2 small">{error}</div>}
+
+          <div className="d-flex flex-column gap-2 mb-3">
+            {teams.map((g) => {
+              const on = slugs.includes(g.slug);
+              return (
+                <label key={g.slug} className="d-flex align-items-center gap-2 rounded-2 px-3 py-2"
+                  style={{ cursor: 'pointer',
+                    background: on ? 'var(--accent-soft)' : 'var(--surface-2)',
+                    border: `1px solid ${on ? 'color-mix(in srgb, var(--accent) 45%, transparent)' : 'var(--border-subtle)'}` }}>
+                  <input type="checkbox" className="form-check-input mt-0" checked={on} onChange={() => toggle(g.slug)} />
+                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: on ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                    {g.label}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="d-flex gap-2 justify-content-end">
+            <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+              {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save guests</>}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, canViewAll, myTeamTlId, today, now, busyId, onStart, onOpen }) {
-  const rows = myTeamTlId
-    ? card.rows.filter((r) => r.tlId === myTeamTlId)
-    : card.rows;
+function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, today, now, busyId, onStart, onOpen, onEditGuests }) {
+  // Who sees which rows. An OL sees every team. Everyone else sees the UNION
+  // of their own team and the teams they were invited to sit in on — so a TL
+  // who is also a guest keeps their own meeting. Anyone who is neither sees
+  // nothing: the filter fails closed.
+  //
+  // For a week that's already been notified, a guest's row must come from a
+  // real meeting, not the schedule. Schedules are world-readable, so falling
+  // back to one would resurrect a meeting the OL had just un-invited them
+  // from — RLS hides the meeting, the stale schedule still says "you're in",
+  // and Upcoming would contradict Ongoing. An un-notified future week has no
+  // meeting to override, so there the schedule IS the truth.
+  const guestSees = (r) => (card.isPast || card.isCurrent)
+    ? (!!r.meeting && isGuestOf(r.meeting.guest_teams, myGuestSlugs))
+    : isGuestOf(r.guestTeams, myGuestSlugs);
+
+  const rows = isOL
+    ? card.rows
+    : card.rows.filter((r) => (myTeamTlId && r.tlId === myTeamTlId) || (isGuest && guestSees(r)));
 
   const notifiedRows = card.rows.filter((r) => r.meeting);
   const allDone = notifiedRows.length > 0 && notifiedRows.every((r) => r.meeting.status === 'completed');
@@ -302,16 +425,20 @@ function WeekCard({ card, isOL, canViewAll, myTeamTlId, today, now, busyId, onSt
         <div className="d-flex flex-column gap-2" style={{ flexGrow: 1 }}>
           {rows.length === 0 ? (
             <div className="text-muted small" style={{ fontSize: '0.74rem' }}>
-              {myTeamTlId ? 'No meeting scheduled for your team.' : 'No teams scheduled.'}
+              {isOL ? 'No teams scheduled.'
+                : myTeamTlId ? 'No meeting scheduled for your team.'
+                : isGuest ? 'You’re not attending a meeting this week.'
+                : 'Nothing scheduled for you.'}
             </div>
           ) : rows.map((r) => {
             const mStatus = r.meeting?.status || 'not_notified';
             // OL actions are available on the CURRENT week regardless of how
             // far the flow has gone — so a completed meeting can be reopened.
             const olCurrent = card.isCurrent && isOL && !!r.meeting;
-            // All-meeting attendees can OPEN (join) a live room, but never
-            // start/resume/reopen/notify (those stay OL-only via olCurrent).
-            const canOpenRoom = card.isCurrent && canViewAll && !!r.meeting;
+            // Guests can OPEN (join) a live room they were invited to, but
+            // never start/resume/reopen/notify (those stay OL-only).
+            const canOpenRoom = card.isCurrent && (isOL || isGuest) && !!r.meeting;
+            const rowGuests = (r.guestTeams || []).map((s) => guestLabels[s] || s);
             const canStart  = olCurrent && mStatus === 'upcoming' && startable(r.meeting);
             const waitTime  = olCurrent && mStatus === 'upcoming' && !startable(r.meeting);
             const meetingBusy = r.meeting && busyId === r.meeting.id;
@@ -330,6 +457,33 @@ function WeekCard({ card, isOL, canViewAll, myTeamTlId, today, now, busyId, onSt
                 {r.apcs.length > 0 && (
                   <div className="text-muted mt-1 text-truncate" style={{ fontSize: '0.64rem' }}>
                     {r.apcs.map((a) => a.display_name).filter(Boolean).join(', ')}
+                  </div>
+                )}
+                {/* Who else sits in on this meeting. The OL can change it for
+                    this week alone once the meeting exists. */}
+                {(rowGuests.length > 0 || olCurrent) && (
+                  <div className="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                    {rowGuests.length > 0 ? (
+                      <>
+                        <i className="bi bi-person-plus text-muted" style={{ fontSize: '0.62rem' }} />
+                        {rowGuests.map((g) => (
+                          <span key={g} className="rounded-pill px-2"
+                            style={{ background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: '0.58rem', fontWeight: 700 }}>
+                            {g}
+                          </span>
+                        ))}
+                      </>
+                    ) : (
+                      <span className="text-muted" style={{ fontSize: '0.6rem' }}>No guests</span>
+                    )}
+                    {olCurrent && (
+                      <button className="btn btn-sm p-0 px-1 ms-auto d-inline-flex align-items-center"
+                        title="Change guests for this week only"
+                        style={{ fontSize: '0.58rem', fontWeight: 700, borderRadius: 5, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+                        onClick={() => onEditGuests(r.meeting)}>
+                        <i className="bi bi-pencil" />
+                      </button>
+                    )}
                   </div>
                 )}
                 {canStart && (

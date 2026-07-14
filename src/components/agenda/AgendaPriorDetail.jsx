@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   listMeetingAttendance, listPresentations, listTaskReviews, listAgendaTeams,
+  getMyGuestTeams, isGuestOf,
 } from '../../lib/agendaApi';
 
 // Prior Meetings — a single completed meeting's record. Role-based:
@@ -54,9 +55,17 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
   const role = profile?.role || '';
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
   const isApc = role === 'apc';
-  // All-meeting attendees see the full read-only record of any team's meeting.
-  const canViewAll = isOL || role === 'pctl' || role === 'ipc' || profile?.permissions?.canAttendAllMeetings === true;
   const uid = user?.id;
+
+  // A guest who sat in on THIS meeting sees its full read-only record — they
+  // watched it happen. But guest membership must not upgrade what they see of
+  // their OWN team's meeting: an APC on a guest team still gets the APC view
+  // there (their own evaluation), not their teammates' timeline.
+  const [myGuestSlugs, setMyGuestSlugs] = useState([]);
+  const myTlId = role === 'tl' ? uid : (isApc ? (profile?.reports_to || null) : null);
+  const inOwnTeamMeeting = !!myTlId && meeting.tl_id === myTlId;
+  const canViewAll = isOL
+    || (!inOwnTeamMeeting && isGuestOf(meeting.guest_teams, myGuestSlugs));
 
   const [attendance, setAttendance]   = useState([]);
   const [presentations, setPresentations] = useState([]);
@@ -71,12 +80,14 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
       listPresentations(meeting.id),
       listTaskReviews(meeting.id),
       listAgendaTeams(),
+      getMyGuestTeams(),
     ])
-      .then(([att, pres, rev, teams]) => {
+      .then(([att, pres, rev, teams, mine]) => {
         if (cancelled) return;
         setAttendance(att || []);
         setPresentations(pres || []);
         setReviews(rev || []);
+        setMyGuestSlugs(mine || []);
         setTeam((teams || []).find((t) => t.tl.id === meeting.tl_id) || null);
       })
       .catch(() => {})
