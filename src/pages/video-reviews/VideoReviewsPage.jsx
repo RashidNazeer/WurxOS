@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { runVideoReviewTargets, downloadHandlesCsv, markGroupSent, listMyEukaBrands } from '../../lib/videoReviewApi';
+import { runVideoReviewTargets, downloadHandlesCsv, listMyEukaBrands } from '../../lib/videoReviewApi';
 
 // ── Pakistan-time date helpers ──────────────────────────────────────
 // Default target date = 3 days before TODAY in Pakistan (Asia/Karachi).
@@ -25,9 +25,9 @@ const prettyDate = (ymd) => {
 const MONO = "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 
 const FILE_DEFS = [
-  { key: 'group1', no: 1, ord: '1st', title: 'send their 1st video review message' },
-  { key: 'group2', no: 2, ord: '2nd', title: 'send their 2nd video review message' },
-  { key: 'group3', no: 3, ord: '3rd', title: 'send their 3rd video review message' },
+  { key: 'group1', ord: '1st', title: 'send their 1st video review message' },
+  { key: 'group2', ord: '2nd', title: 'send their 2nd video review message' },
+  { key: 'group3', ord: '3rd', title: 'send their 3rd video review message' },
 ];
 
 // ── Exclude-list helpers ────────────────────────────────────────────
@@ -102,7 +102,6 @@ export default function VideoReviewsPage() {
   const [status, setStatus] = useState('idle');       // idle | running | done | error
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [sentErr, setSentErr] = useState('');         // ledger write failed (files still fine)
 
   // Exclude list — creators to strip from ALL three files (optional upload).
   const [excludeSet, setExcludeSet] = useState(() => new Set());
@@ -169,27 +168,6 @@ export default function VideoReviewsPage() {
       const label = data.brandLabel || brandLabel;
       for (const def of FILE_DEFS) {
         downloadHandlesCsv(applyExclude(data[def.key] || []), `${label} - ${def.ord} video review creators.csv`);
-      }
-      // Record the messages as SENT. The files go straight up to Euka, so this
-      // is the commitment point — and it's what stops the same creator being
-      // messaged again tomorrow now that overdue messages catch themselves up.
-      // Excluded creators are deliberately NOT recorded: the APC removed them,
-      // so they were never messaged and are still owed.
-      try {
-        for (const def of FILE_DEFS) {
-          const handles = applyExclude(data[def.key] || []);
-          if (handles.length) {
-            await markGroupSent({
-              brandId, handles, messageNo: def.no, sentOn: data.targetDate || targetDate,
-            });
-          }
-        }
-        setSentErr('');
-      } catch (e) {
-        // The files are already downloaded and usable — never fail the run over
-        // this. But say so loudly: an unrecorded send means these creators WILL
-        // reappear on the next run.
-        setSentErr(e?.message || 'Could not record these as sent.');
       }
       setStatus('done');
     } catch (e) {
@@ -387,45 +365,6 @@ export default function VideoReviewsPage() {
                 })()}
               </div>
 
-              {/* ── Euka freshness warning ──────────────────────────────
-                  A half-ingested day looks exactly like a quiet day, so without
-                  this the tool hands over a confident, short list and the APC has
-                  no reason to doubt it. That is what happened on Jul 10. */}
-              {result.freshness?.stale && (
-                <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 14,
-                  background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)' }}>
-                  <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--warning)', fontSize: '1.05rem', flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Euka&apos;s data for this date looks incomplete
-                    </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5 }}>
-                      Only <strong>{result.freshness.targetVideos}</strong> videos for {prettyDate(result.targetDate)},
-                      against a typical <strong>{result.freshness.typicalVideos}</strong> on nearby days — so this list is
-                      probably short. Nobody is lost: anyone Euka delivers late is caught up automatically on a later run.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Ledger write failed ─────────────────────────────────
-                  The files are fine, but an unrecorded send means these creators
-                  reappear tomorrow. Never silent. */}
-              {sentErr && (
-                <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 14,
-                  background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 40%, transparent)' }}>
-                  <i className="bi bi-x-octagon-fill" style={{ color: 'var(--danger)', fontSize: '1.05rem', flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Files are ready, but these sends were NOT recorded
-                    </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5 }}>
-                      {sentErr} — these creators will appear again on your next run. Tell an admin.
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* summary stat strip */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {FILE_DEFS.map((def) => {
@@ -439,39 +378,6 @@ export default function VideoReviewsPage() {
                   );
                 })}
               </div>
-
-              {/* ── Catch-ups ───────────────────────────────────────────
-                  Overdue messages being rescued now — the entire point of the
-                  ledger. Shown so a creator from last week appearing on today's
-                  list is explained, not mysterious. */}
-              {(result.caughtUp || []).length > 0 && (
-                <div style={{ padding: '14px 16px', borderRadius: 14,
-                  background: 'var(--info-soft, var(--surface-2))', border: '1px solid color-mix(in srgb, var(--info, #0d6efd) 30%, transparent)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <i className="bi bi-arrow-counterclockwise" style={{ color: 'var(--info, #0d6efd)', fontSize: '1rem' }} />
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {result.caughtUp.length} caught-up message{result.caughtUp.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '4px 0 10px', lineHeight: 1.5 }}>
-                    These were due earlier but never went out — usually because Euka delivered the video late.
-                    They&apos;re included in today&apos;s files so nobody is missed.
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {result.caughtUp.slice(0, 12).map((c) => (
-                      <div key={`${c.handle}-${c.messageNo}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                        <span style={{ fontFamily: MONO, color: 'var(--text-primary)', fontWeight: 600 }}>{c.handle}</span>
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          {c.messageNo === 1 ? '1st' : c.messageNo === 2 ? '2nd' : '3rd'} message · was due {c.dueOn}
-                        </span>
-                      </div>
-                    ))}
-                    {result.caughtUp.length > 12 && (
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>…and {result.caughtUp.length - 12} more</div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* file rows */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
