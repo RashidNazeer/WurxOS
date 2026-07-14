@@ -18,16 +18,26 @@ export async function listNotifications({ limit = 100, onlyUnread = false } = {}
 // Lightweight — just enough for the bell badge + sidebar dots.
 // Returns: { total, byCategory: { task: N, brand: N, ... } }
 export async function fetchUnreadCounts() {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('category')
-    .is('read_at', null);
-  if (error) throw new Error(error.message);
+  // PostgREST caps every select at 1000 rows. This counts the rows it gets back,
+  // so at 1001 unread the badge would silently under-report and the per-category
+  // dots would go wrong — no error, just a quietly false number. Nobody is near
+  // that today (worst case in prod is 73), but "silently wrong at scale" is
+  // exactly the bug class this codebase keeps getting bitten by, so page it.
   const byCategory = {};
-  (data || []).forEach((r) => {
-    byCategory[r.category] = (byCategory[r.category] || 0) + 1;
-  });
-  return { total: (data || []).length, byCategory };
+  let total = 0;
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('category')
+      .is('read_at', null)
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    rows.forEach((r) => { byCategory[r.category] = (byCategory[r.category] || 0) + 1; });
+    total += rows.length;
+    if (rows.length < 1000) break;
+  }
+  return { total, byCategory };
 }
 
 // --------------------------------------------------------------
