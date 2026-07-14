@@ -101,6 +101,18 @@ const HANDLE_RE = /^@\S+/;                              // @legendarylootfinds
 const DELTA_RE = /^[+\-]\d[\d.,]*%$/;                   // +8.37%, -60%, +0%  (WoW change chips)
 const TOTAL_GMV_RE = /%\s*of\s*total\s*gmv/i;           // "43.08% of total GMV"
 const CREATOR_VALUE_RE = /^\$?\s*\d[\d,]*(?:\.\d+)?\s*[KMB%]?$/i;  // $608.12 · 61 · 6.43 · 2.38% · 33.07K
+// TikTok renders an empty cell as a dash, and a brand-new creator's comparison
+// chip as a dash or "New" (there is no previous period to compare against).
+const CREATOR_DASH_RE = /^(-{1,2}|—|–|new)$/i;
+const isCreatorCell = (l) => CREATOR_VALUE_RE.test(l) || CREATOR_DASH_RE.test(l);
+// A chip sits AFTER a metric when the comparison toggle is on: normally a signed
+// percent, but a dash / "New" for a creator with no prior period.
+const isCreatorChip = (l) => DELTA_RE.test(l) || CREATOR_DASH_RE.test(l);
+
+// The metric run right of Affiliate GMV, in TikTok's fixed column order.
+const CREATOR_COLS = 8;   // commission, items, orders, avgCustomers, CTR, followers, LIVE, videos
+const COL_ITEMS_SOLD = 1;
+const COL_VIDEOS = 7;     // rightmost column = shoppable videos
 
 /**
  * Parse the "Top Creators" copy-paste from TikTok Shop's creator-performance table.
@@ -146,6 +158,8 @@ export function parseTopCreatorsText(raw) {
 
   const strip = v => (v == null ? '' : String(v).replace(/[$,%\s]/g, ''));
   const isInt = v => INT_RE.test(String(v).trim());
+  // A dash cell means zero (no LIVE streams, no videos) — not "unknown".
+  const cellInt = (v) => (v == null ? '' : CREATOR_DASH_RE.test(v) ? '0' : isInt(v) ? strip(v) : '');
   const creators = [];
 
   for (let s = 0; s < starts.length; s++) {
@@ -154,29 +168,41 @@ export function parseTopCreatorsText(raw) {
     const block = lines.slice(i, end);
     const name = block[0].replace(/^@/, '').trim();
 
-    // Affiliate GMV = first money value in the block. Everything to its right is
-    // the metric run.
-    let gmvIdx = -1, gmv = '';
+    // Affiliate GMV = first money value; Est. commission = the second. The
+    // commission is where the metric run begins.
+    let gmvIdx = -1, commIdx = -1, gmv = '';
     for (let k = 1; k < block.length; k++) {
-      if (MONEY_RE.test(block[k])) { gmvIdx = k; gmv = strip(block[k]); break; }
+      if (!MONEY_RE.test(block[k])) continue;
+      if (gmvIdx < 0) { gmvIdx = k; gmv = strip(block[k]); }
+      else { commIdx = k; break; }
     }
 
-    // Metric values right of GMV, in column order. Delta chips and the
-    // "% of total GMV" label are skipped; any non-value line (a stray header,
-    // pagination, a caption) ENDS the run so trailing junk can't be read as a
-    // metric.
-    const values = [];
-    for (let k = gmvIdx + 1; gmvIdx >= 0 && k < block.length; k++) {
+    // Is the comparison toggle on? If so EVERY metric is trailed by a chip, so
+    // the values sit at every OTHER line. Decide by looking at the line right
+    // after the commission: with chips it's a chip, without it's items sold (an
+    // integer). Stepping by 2 in chip mode also means a metric whose own value is
+    // a dash (0 LIVE streams) is read as a value, not mistaken for a chip.
+    const chipMode = commIdx >= 0 && commIdx + 1 < block.length
+      && isCreatorChip(block[commIdx + 1]);
+    const step = chipMode ? 2 : 1;
+
+    // Walk the fixed column order. Capping at CREATOR_COLS is what stops trailing
+    // junk — pagination page-numbers ("1 2 3"), a rows-per-page "50" — from being
+    // read as a metric: they fall outside the 8 real columns and are never seen.
+    const cells = [];
+    for (let k = commIdx; commIdx >= 0 && k < block.length && cells.length < CREATOR_COLS; k += step) {
       const l = block[k];
-      if (DELTA_RE.test(l) || TOTAL_GMV_RE.test(l)) continue;
-      if (!CREATOR_VALUE_RE.test(l)) break;
-      values.push(l);
+      if (TOTAL_GMV_RE.test(l)) continue;
+      if (!isCreatorCell(l)) break;      // real text (a header, a caption) ends the run
+      cells.push(l);
     }
 
-    const ints = values.filter(isInt);
-    const itemsSold = ints.length ? strip(ints[0]) : '';
-    // Distinct from items sold — a run with a single integer has no videos column.
-    const videosPosted = ints.length > 1 ? strip(ints[ints.length - 1]) : '';
+    // Read by POSITION, never by "the last integer" — that rule silently reported
+    // the AFFILIATE ORDERS column as videos whenever anything truncated the run.
+    // A short run means the layout isn't the one we know, so leave the field BLANK
+    // for manual entry: a wrong number in a client report is far worse than a gap.
+    const itemsSold = cells.length > COL_ITEMS_SOLD ? cellInt(cells[COL_ITEMS_SOLD]) : '';
+    const videosPosted = cells.length === CREATOR_COLS ? cellInt(cells[COL_VIDEOS]) : '';
 
     creators.push({ name, videosPosted, itemsSold, gmv, notes: '' });
   }
