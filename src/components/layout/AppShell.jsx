@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import NotificationToaster from './NotificationToaster';
+import ClockInReminder from '../attendance/ClockInReminder';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
@@ -148,6 +149,8 @@ export default function AppShell() {
       <UpdateAvailableBanner />
       {/* Top-right popup queue for incoming notifications. */}
       <NotificationToaster />
+      {/* "You forgot to clock in" reminder — silent unless a shift start is set. */}
+      <ClockInReminder />
     </div>
   );
 }
