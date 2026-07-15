@@ -13,14 +13,14 @@ import {
   getEffectiveStatus, forceCloseSession,
   getAdjustmentsForMonth, createAttendanceAdjustment,
   updateAttendanceAdjustment, deleteAttendanceAdjustment,
-  computeMonthlyDays, missedWeekdayDatesFor, bulkMarkMissedAsPresent,
-  // v2-only helpers replacing v1's inline Firestore reads:
-  listApprovedLeaveDatesForMonth, fetchRosterMonth,
+  bulkMarkMissedAsPresent,
+  // Attendance coverage now comes from ONE server-side source of truth
+  // (mig 252) — no formula lives in this file any more.
+  fetchAttendanceBreakdown, fetchAttendanceBreakdownBulk,
+  fetchRosterMonth,
   listExpectedMembers, getLeaveQuotaDefault, setLeaveQuotaDefault,
   scanLeaveQuotaConflicts,
-  expandLeaveWeekdays,
 } from '../../lib/attendanceApi';
-import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 
 const ROLE_OPTIONS = [
   { key: 'tl',   label: 'Team Lead' },
@@ -132,130 +132,71 @@ function BreakDetailsModal({ record, onClose }) {
 function MyMonthlyAttendance({ userId, displayName }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setErr('');
       try {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth(); // 0-based
-        const monthStart = new Date(year, month, 1);
-        const monthEnd   = new Date(year, month + 1, 0);
         const pad = n => String(n).padStart(2, '0');
-        const startStr = `${year}-${pad(month + 1)}-01`;
-        const endStr   = `${year}-${pad(month + 1)}-${pad(monthEnd.getDate())}`;
-
-        // Days elapsed in the month — this is the denominator.
-        // Current month: today (inclusive). Past month: full month.
-        // Using elapsed days (not the full month) prevents the score
-        // from claiming credit for tomorrow's weekend / a future
-        // holiday / a future approved-leave day before they happen.
-        const isCurrentMonth = (now.getFullYear() === year && now.getMonth() === month);
-        const cutoffDate = isCurrentMonth ? new Date(year, month, now.getDate()) : monthEnd;
-        const cutoffYmd  = `${cutoffDate.getFullYear()}-${pad(cutoffDate.getMonth() + 1)}-${pad(cutoffDate.getDate())}`;
-        const workingDays = cutoffDate.getDate();
-        // Past-only weekend set — only Sat/Sun dates that have
-        // already elapsed get the auto-credit.
-        const weekendDates = new Set();
-        for (let d = new Date(monthStart); d <= cutoffDate; d.setDate(d.getDate() + 1)) {
-          const dow = d.getDay();
-          if (dow === 0 || dow === 6) {
-            weekendDates.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-          }
-        }
-
-        // Attendance for this user
-        const history = await getUserHistory(userId, startStr, endStr);
-        const presentDates = new Set();
-        let totalWorkMs = 0;
-        history.forEach(r => {
-          if (r.clockIn) presentDates.add(r.date);
-          totalWorkMs += calcTimes(r).totalWorkMs || 0;
-        });
-
-        // Manager-applied manual adjustments (source-of-truth for the
-        // displayed Days count) for this month.
         const monthStrKey = `${year}-${pad(month + 1)}`;
-        let adjustments = [];
-        try {
-          adjustments = (await getAdjustmentsForMonth(monthStrKey)).filter(a => a.userId === userId);
-        } catch { /* non-fatal — fall back to actual */ }
+        const startStr = `${monthStrKey}-01`;
+        const endStr   = `${monthStrKey}-${pad(new Date(year, month + 1, 0).getDate())}`;
 
-        // Company holidays in the month — clipped to past so a
-        // future holiday doesn't pre-credit the score today.
-        let holidaySetAll = new Set();
-        try { holidaySetAll = await listHolidayDatesForMonth(monthStrKey); }
-        catch { /* non-fatal */ }
-        const holidaySet = new Set([...holidaySetAll].filter(d => d <= cutoffYmd));
-
-        // Approved leaves overlapping this month, expanded day-by-
-        // day (Mon-Fri only). WFH is excluded (remote work is not
-        // an absence); holidays are excluded so they don't double-
-        // count against the separate holiday tally. Past-only too.
-        let leaveDatesAll = new Set();
-        try {
-          leaveDatesAll = await listApprovedLeaveDatesForMonth(userId, monthStrKey, { holidaySet: holidaySetAll });
-        } catch { /* non-fatal */ }
-        const leaveDates = new Set([...leaveDatesAll].filter(d => d <= cutoffYmd));
-
-        // Effective present days = union of actual present dates and any
-        // dates manually marked by Boss/OL. Same math as the Roster tab.
-        const effectiveSet = new Set(presentDates);
-        adjustments.forEach(a => { if (a.date) effectiveSet.add(a.date); });
-        const effectivePresent = effectiveSet.size;
-
-        // A day is "covered" if the user clocked in, was on approved
-        // leave, it was a company holiday, OR it was a weekend.
-        // Set-union (not a sum) so a day that falls into more than
-        // one bucket is counted once. This matches the Performance
-        // attendance score so the two views never disagree.
-        const accountedDates = new Set([
-          ...effectiveSet, ...leaveDates, ...holidaySet, ...weekendDates,
+        // Coverage (days elapsed / present / leave / holidays / weekends /
+        // missed) all come from one server-side breakdown. Hours worked is
+        // the only figure it doesn't carry, so history is still fetched.
+        const [history, b] = await Promise.all([
+          getUserHistory(userId, startStr, endStr),
+          fetchAttendanceBreakdown(userId, monthStrKey),
         ]);
-        // "Missed" = past days that aren't covered — weekends and
-        // holidays are always covered so a missed day can only be a
-        // weekday the user was expected to clock in on and didn't.
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const missedList = [];
-        for (let d = new Date(monthStart); d <= monthEnd && d < today; d.setDate(d.getDate() + 1)) {
-          const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-          if (!accountedDates.has(ds)) missedList.push(ds);
-        }
+        const totalWorkMs = history.reduce((sum, r) => sum + (calcTimes(r).totalWorkMs || 0), 0);
 
-        if (!cancelled) {
-          setStats({
-            workingDays,
-            presentDays: effectivePresent,
-            actualPresentDays: presentDates.size,
-            hasOverride: adjustments.length > 0,
-            leaveDays: leaveDates.size,
-            holidayDays: holidaySet.size,
-            weekendDays: weekendDates.size,
-            accountedDays: accountedDates.size,
-            missedDays: missedList.length,
-            // Surface the actual dates so the UI can show WHICH days were
-            // missed, not just the count. Reported 2026-06-08: a user
-            // could see "1 day missed" but had to scroll the History view
-            // to find the date.
-            missedDates: missedList,
-            totalWorkMs,
-            monthLabel: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-          });
+        if (cancelled) return;
+        if (!b) {
+          setErr('No coverage data was returned for your account.');
           setLoading(false);
+          return;
         }
+        setStats({
+          workingDays: b.daysThisMonth,
+          // This card has always counted weekend clock-ins / weekend
+          // adjustments, unlike the Roster's weekday-only tiles.
+          presentDays: b.daysPresentAll,
+          actualPresentDays: b.daysClockedInAll,
+          hasOverride: b.adjustedDates.length > 0,
+          leaveDays: b.approvedLeaveDays,
+          holidayDays: b.holidayDays,
+          weekendDays: b.weekendDays,
+          accountedDays: b.coveredDays,
+          // Today is exempt here (you can still clock in) — unlike the
+          // Roster / bulk-mark set, which counts today.
+          missedDays: b.missedDatesPast.length,
+          missedDates: b.missedDatesPast,
+          pct: b.daysThisMonth > 0 ? b.pct : 0,
+          totalWorkMs,
+          monthLabel: now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+        });
+        setLoading(false);
       } catch (e) {
         console.warn('MyMonthlyAttendance load error:', e);
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setErr(e?.message || 'Failed to load your monthly attendance.');
+        setLoading(false);
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, reloadKey]);
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="rounded-3 mb-3 p-3 d-flex align-items-center gap-2 text-muted"
         style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.82rem' }}>
@@ -264,7 +205,23 @@ function MyMonthlyAttendance({ userId, displayName }) {
     );
   }
 
-  const pct = stats.workingDays > 0 ? Math.round((stats.accountedDays / stats.workingDays) * 100) : 0;
+  // A failed / empty breakdown must be VISIBLE, not an eternal spinner.
+  if (!stats) {
+    return (
+      <div className="rounded-3 mb-3 p-3 d-flex align-items-center justify-content-between gap-2"
+        style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.82rem' }}>
+        <span className="text-muted">
+          <i className="bi bi-exclamation-triangle me-2" style={{ color: 'var(--warning)' }} />
+          Couldn't load your monthly attendance.{err ? ` (${err})` : ''}
+        </span>
+        <button className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+          style={{ fontSize: '0.72rem' }}
+          onClick={() => setReloadKey(k => k + 1)}>Retry</button>
+      </div>
+    );
+  }
+
+  const pct = stats.pct;
   const hrsTotal = Math.floor(stats.totalWorkMs / 3600000);
   const minsTotal = Math.floor((stats.totalWorkMs % 3600000) / 60000);
 
@@ -801,12 +758,12 @@ function TodayTimeline({ record }) {
 }
 
 /* ── Roster tab: per-user monthly summary with manual override ─────────────── */
-function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
+function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membersLoading, membersError }) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
-  const [leaves, setLeaves] = useState([]);
-  const [holidaySet, setHolidaySet] = useState(() => new Set());
+  const [breakdowns, setBreakdowns] = useState(() => new Map());
+  const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
@@ -816,143 +773,100 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null);
 
-  // Pull attendance records, adjustments, and approved leaves for the month.
+  const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
+
+  // The coverage RPC is keyed on the member IDs, which arrive asynchronously
+  // from the parent. Without this in the effect deps the tab would fetch with
+  // an empty ID list on first mount and never re-fetch.
+  const memberIds = useMemo(
+    () => expectedMembers.map(u => u.id).filter(Boolean).sort().join(','),
+    [expectedMembers],
+  );
+
+  // Raw records (hours + calendar) and adjustment rows (the modal's Remove
+  // buttons) still come from the tables; every coverage number comes from the
+  // single-source breakdown RPC.
   useEffect(() => {
+    if (!expectedMembers.length) {
+      // Parent still fetching => spinner. Parent finished with none (or failed)
+      // => the render below shows an explicit empty/error state, never a hang.
+      setLoading(!!membersLoading);
+      setRecords([]); setAdjustments([]); setBreakdowns(new Map()); setLoadError('');
+      return;
+    }
     let cancelled = false;
     async function load() {
       setLoading(true);
+      // Drop the previous month's data IMMEDIATELY. Everything derived from it
+      // (the working-days counter, the bulk button's day count, each row's
+      // missedDates) is month-specific; leaving it up during the fetch let the
+      // Boss open the bulk modal on the NEW month while it previewed — and
+      // wrote — the OLD month's dates.
+      setRecords([]); setAdjustments([]); setBreakdowns(new Map()); setLoadError('');
       try {
-        const [{ records: rec, leaves: lv }, adjList, hSet] = await Promise.all([
+        const ids = expectedMembers.map(u => u.id).filter(Boolean);
+        const [{ records: rec }, adjList, bMap] = await Promise.all([
           fetchRosterMonth(month),
           getAdjustmentsForMonth(month),
-          listHolidayDatesForMonth(month).catch(() => new Set()),
+          fetchAttendanceBreakdownBulk(month, ids),
         ]);
         if (cancelled) return;
         setRecords(rec);
         setAdjustments(adjList);
-        setLeaves(lv);
-        setHolidaySet(hSet);
+        setBreakdowns(bMap);
+        setLoadError('');
       } catch (err) {
+        if (cancelled) return;
         // eslint-disable-next-line no-console
         console.error('roster load failed', err);
+        setBreakdowns(new Map());
+        setLoadError(err.message || 'Failed to load attendance coverage.');
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [month, reloadKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, reloadKey, memberIds, membersLoading]);
 
-  // Total days in month up to today (or month end if past). Every
-  // day must be "covered" — weekends, holidays and approved leaves
-  // are auto-credited so only weekdays the user was expected to
-  // clock in on and didn't pull the score down.
+  // Elapsed days in the month — identical on every breakdown row.
   const workingDaysInMonth = useMemo(() => {
-    const [y, m] = month.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    const today = new Date();
-    return (today.getFullYear() === y && today.getMonth() + 1 === m) ? today.getDate() : lastDay;
-  }, [month]);
-  // Set of weekend (Sat/Sun) YYYY-MM-DD strings up to the same
-  // cutoff — joined into the coverage set below.
-  const weekendDatesInMonth = useMemo(() => {
-    const [y, m] = month.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    const today = new Date();
-    const cutoff = (today.getFullYear() === y && today.getMonth() + 1 === m) ? today.getDate() : lastDay;
-    const pad = (n) => String(n).padStart(2, '0');
-    const out = new Set();
-    for (let d = 1; d <= cutoff; d++) {
-      const dow = new Date(y, m - 1, d).getDay();
-      if (dow === 0 || dow === 6) out.add(`${y}-${pad(m)}-${pad(d)}`);
-    }
-    return out;
-  }, [month]);
-  // Inclusive cutoff "YYYY-MM-DD" — every credit-set in the rows
-  // memo is filtered against this so future holidays / leaves can't
-  // pre-credit a user's coverage before the day actually happens.
-  const cutoffYmd = useMemo(() => {
-    const [y, m] = month.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    const today = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    if (today.getFullYear() === y && today.getMonth() + 1 === m) {
-      return `${y}-${pad(m)}-${pad(today.getDate())}`;
-    }
-    return `${y}-${pad(m)}-${pad(lastDay)}`;
-  }, [month]);
-
-  // Month bounds for clipping leave ranges that extend past the month edges.
-  const monthBounds = useMemo(() => {
-    const [yy, mm] = month.split('-').map(Number);
-    const start = `${yy}-${String(mm).padStart(2, '0')}-01`;
-    const lastDay = new Date(yy, mm, 0).getDate();
-    const end = `${yy}-${String(mm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    return { start, end };
-  }, [month]);
+    const first = breakdowns.values().next().value;
+    return first ? first.daysThisMonth : 0;
+  }, [breakdowns]);
 
   // Build per-user summary
   const rows = useMemo(() => {
-    const pad = n => String(n).padStart(2, '0');
     const list = expectedMembers.map(u => {
-      const { actualDays, effectiveDays, adjustments: userAdj } = computeMonthlyDays(u.id, records, adjustments);
+      const b = breakdowns.get(u.id) || null;
       const userRecords = records.filter(r => r.userId === u.id);
       const totalHoursMs = userRecords.reduce((sum, r) => sum + (calcTimes(r).totalWorkMs || 0), 0);
-      const userLeaves = leaves.filter(l => l.requestedBy === u.id);
-
-      // Set of dates the user clocked in this month.
-      const presentDateSet = new Set();
-      userRecords.forEach(r => { if (r.date && r.clockIn) presentDateSet.add(r.date); });
-
-      // Set of every approved leave date this month — Mon-Fri only,
-      // weekend/holiday dates inside the range excluded so a Fri+Mon
-      // leave is 2 days not 4, and a leave overlapping Eid doesn't
-      // double-charge. Used for the per-row "Leaves" tile and as part
-      // of the coverage union.
-      const leaveDateSet = new Set();
-      userLeaves.forEach(l => {
-        const days = expandLeaveWeekdays(
-          l.startDate, l.endDate,
-          { mStart: monthBounds.start, mEnd: monthBounds.end, holidaySet },
-        );
-        days.forEach((d) => leaveDateSet.add(d));
-      });
-      // Clip leaves and holidays to days that have actually
-      // elapsed — future credits don't inflate the score.
-      const pastLeaveSet = new Set([...leaveDateSet].filter((d) => d <= cutoffYmd));
-      const pastHolidaySet = new Set([...holidaySet].filter((d) => d <= cutoffYmd));
-      const leaveDays = pastLeaveSet.size;
-      // Days where leave overlaps with a clock-in (informational; calendar
-      // shows them with a small blue dot on the green tile).
-      const leaveOverlapCount = [...leaveDateSet].filter(d => presentDateSet.has(d)).length;
-
-      // Coverage = union of (effective present days, leave days, holidays)
-      // — no double-counting when a leave overlaps a clock-in, and holidays
-      // give credit even when the user didn't clock in.
-      const presentForCoverage = new Set([
-        ...presentDateSet,
-        ...userAdj.map(a => a.date).filter(Boolean),
-      ]);
-      const coverageSet = new Set([
-        ...presentForCoverage, ...pastLeaveSet, ...pastHolidaySet, ...weekendDatesInMonth,
-      ]);
-      const covered = coverageSet.size;
-      let health = 'green';
-      if (covered < workingDaysInMonth - 5) health = 'red';
-      else if (covered < workingDaysInMonth - 2) health = 'yellow';
+      const userAdj = adjustments.filter(a => a.userId === u.id);
+      // A missing breakdown must NOT read as a healthy zero: the health rule is
+      // an absolute day gap, so 0 covered would score green "On track".
+      let health = 'unknown';
+      if (b) {
+        health = b.coveredDays < b.daysThisMonth - 5 ? 'red'
+          : b.coveredDays < b.daysThisMonth - 2 ? 'yellow' : 'green';
+      }
       return {
         user: u,
-        actualDays,
-        effectiveDays,
-        leaveDays,
-        leaveOverlapCount,
-        coveredDays: covered,
+        available: !!b,
+        actualDays:     b ? b.daysClockedIn : 0,
+        effectiveDays:  b ? b.daysPresent : 0,
+        leaveDays:      b ? b.approvedLeaveDays : 0,
+        coveredDays:    b ? b.coveredDays : 0,
+        daysNotCovered: b ? b.daysNotCovered : 0,
+        missedDates:    b ? b.missedDates : [],   // today INCLUDED — the bulk-mark set
+        pct:            b ? b.pct : null,
+        presentDates:   b ? b.presentDates : [],
+        leaveDateSet:   new Set(b ? b.leaveDates : []),
+        holidaySet:     new Set(b ? b.holidayDates : []),
         totalHoursMs,
         adjustments: userAdj,
         health,
         userRecords,
-        userLeaves,
-        leaveDateSet,
       };
     });
     let filtered = list;
@@ -962,7 +876,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     }
     if (filterRole) filtered = filtered.filter(r => (r.user.role || '').toLowerCase() === filterRole);
     return filtered.sort((a, b) => (a.user.name || '').localeCompare(b.user.name || ''));
-  }, [expectedMembers, records, adjustments, leaves, holidaySet, weekendDatesInMonth, cutoffYmd, monthBounds, workingDaysInMonth, search, filterRole]);
+  }, [expectedMembers, records, adjustments, breakdowns, search, filterRole]);
 
   function canEdit(targetUser) {
     if (isBoss) return true;
@@ -974,24 +888,18 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
     return false;
   }
 
-  // Eligible bulk targets — same per-user permission rules as the per-row Adjust panel.
-  const bulkTargets = useMemo(() => {
-    return rows
-      .filter(r => canEdit(r.user))
-      .map(r => r.user);
+  // Eligible bulk targets — same per-user permission rules as the per-row
+  // Adjust panel, derived from the SEARCH/ROLE-FILTERED rows so the button's
+  // count always matches what actually gets written.
+  const bulkRows = useMemo(() => {
+    return rows.filter(r => r.available && canEdit(r.user));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, isBoss, isOL, currentUser?.uid]);
 
-  // Total missed days across all bulk targets (preview number on the button).
-  const bulkMissedTotal = useMemo(() => {
-    let n = 0;
-    rows.forEach(r => {
-      if (!canEdit(r.user)) return;
-      n += missedWeekdayDatesFor(r.user.id, month, records, adjustments, leaves).length;
-    });
-    return n;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, month, records, adjustments, leaves, isBoss, isOL, currentUser?.uid]);
+  const bulkMissedTotal = useMemo(
+    () => bulkRows.reduce((n, r) => n + r.daysNotCovered, 0),
+    [bulkRows],
+  );
 
   return (
     <div>
@@ -999,7 +907,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
       <div className="d-flex flex-wrap gap-3 align-items-end mb-3">
         <div>
           <label className="small text-muted d-block mb-1" style={{ fontSize: '0.7rem', fontWeight: 600 }}>Month</label>
-          <input type="month" className="form-control form-control-sm" value={month} onChange={e => setMonth(e.target.value)} style={{ maxWidth: 160 }} />
+          <input type="month" className="form-control form-control-sm" value={month} max={currentMonthStr} onChange={e => setMonth(e.target.value)} style={{ maxWidth: 160 }} />
         </div>
         <div className="input-group input-group-sm" style={{ maxWidth: 240 }}>
           <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
@@ -1009,7 +917,10 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
           <option value="">All Roles</option>
           {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
         </select>
-        {bulkMissedTotal > 0 && (
+        {/* NEVER render the bulk button while a month's data is in flight: it
+            carries per-row missedDates and would preview/write the previous
+            month's dates against the newly-selected month. */}
+        {!loading && bulkMissedTotal > 0 && (
           <button className="btn btn-sm btn-outline-primary rounded-pill px-3"
             disabled={!!bulkRunning}
             onClick={() => setBulkOpen(true)}
@@ -1019,18 +930,14 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
           </button>
         )}
         <div className="ms-auto text-muted small" style={{ fontSize: '0.72rem' }}>
-          Working days so far: <strong>{workingDaysInMonth}</strong> · Showing {rows.length} of {expectedMembers.length}
+          Working days so far: <strong>{loading ? '—' : workingDaysInMonth}</strong> · Showing {loading ? '—' : rows.length} of {expectedMembers.length}
         </div>
       </div>
 
-      {bulkOpen && (
+      {bulkOpen && !loading && (
         <BulkMarkConfirmModal
           monthStr={month}
-          targetUsers={bulkTargets}
-          monthRecords={records}
-          monthAdjusts={adjustments}
-          monthLeaves={leaves}
-          actor={{ uid: currentUser.uid, name: currentUser.displayName || currentUser.email, role: userRole }}
+          targetRows={bulkRows}
           running={bulkRunning}
           progress={bulkProgress}
           onRun={async (note) => {
@@ -1039,10 +946,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
             try {
               const res = await bulkMarkMissedAsPresent({
                 monthStr: month,
-                targetUsers: bulkTargets,
-                monthRecords: records,
-                monthAdjusts: adjustments,
-                monthLeaves: leaves,
+                targetUsers: bulkRows.map(r => r.user),
                 note,
                 actor: { uid: currentUser.uid, name: currentUser.displayName || currentUser.email, role: userRole },
                 onProgress: (p) => setBulkProgress(p),
@@ -1065,16 +969,27 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
 
       {loading ? (
         <div className="text-center text-muted py-5"><div className="spinner-border spinner-border-sm me-2" />Loading…</div>
+      ) : (membersError || loadError || (expectedMembers.length > 0 && breakdowns.size === 0)) ? (
+        <div className="rounded-3 p-4 text-center" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
+          <div className="fw-semibold mb-1" style={{ color: 'var(--danger)' }}>
+            <i className="bi bi-exclamation-triangle me-2" />
+            {membersError ? "Couldn't load the team roster" : "Couldn't load attendance coverage"}
+          </div>
+          <div className="text-muted mb-3" style={{ fontSize: '0.78rem' }}>{membersError || loadError || 'The server returned no coverage data.'}</div>
+          <button className="btn btn-sm btn-outline-danger rounded-pill px-3" onClick={() => setReloadKey(k => k + 1)}>Retry</button>
+        </div>
+      ) : expectedMembers.length === 0 ? (
+        <div className="text-center text-muted py-5">No employees to show.</div>
       ) : rows.length === 0 ? (
         <div className="text-center text-muted py-5">No employees match the current filter.</div>
       ) : (
         <div className="row g-3">
           {rows.map(r => {
-            const editable = canEdit(r.user);
+            const editable = r.available && canEdit(r.user);
             const hasOverride = r.adjustments.length > 0;
-            const healthColor = r.health === 'green' ? 'var(--success)' : r.health === 'yellow' ? 'var(--warning)' : 'var(--danger)';
-            const healthBg    = r.health === 'green' ? 'var(--success-soft)' : r.health === 'yellow' ? 'var(--warning-soft)' : 'var(--danger-soft)';
-            const healthLabel = r.health === 'green' ? 'On track' : r.health === 'yellow' ? 'Watch' : 'Behind';
+            const healthColor = !r.available ? 'var(--text-muted)' : r.health === 'green' ? 'var(--success)' : r.health === 'yellow' ? 'var(--warning)' : 'var(--danger)';
+            const healthBg    = !r.available ? 'var(--surface-2)' : r.health === 'green' ? 'var(--success-soft)' : r.health === 'yellow' ? 'var(--warning-soft)' : 'var(--danger-soft)';
+            const healthLabel = !r.available ? 'Unavailable' : r.health === 'green' ? 'On track' : r.health === 'yellow' ? 'Watch' : 'Behind';
             return (
               <div key={r.user.id} className="col-12 col-md-6 col-xl-4">
                 <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14 }}>
@@ -1102,17 +1017,17 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
                       <div title="Working days the user clocked in or was manually marked present (does not include leaves)">
                         <div className="text-muted" style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 600 }}>Present</div>
                         <div className="fw-bold" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>
-                          {r.effectiveDays}
-                          {hasOverride && r.actualDays !== r.effectiveDays && (
+                          {r.available ? r.effectiveDays : '—'}
+                          {r.available && hasOverride && r.actualDays !== r.effectiveDays && (
                             <span className="text-muted ms-1" style={{ fontSize: '0.66rem', fontWeight: 500 }}>
                               (actual {r.actualDays})
                             </span>
                           )}
                         </div>
                       </div>
-                      <div title={`${r.leaveDays} approved medical / emergency leave day${r.leaveDays === 1 ? '' : 's'} this month (WFH days don't count here — they show as Present)`}>
+                      <div title={`${r.leaveDays} approved leave day${r.leaveDays === 1 ? '' : 's'} this month (medical / emergency / half-day / other; WFH days show as Present)`}>
                         <div className="text-muted" style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 600 }}>Leaves</div>
-                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{r.leaveDays}</div>
+                        <div className="fw-bold" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{r.available ? r.leaveDays : '—'}</div>
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.62rem', textTransform: 'uppercase', fontWeight: 600 }}>Hours</div>
@@ -1131,7 +1046,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
 
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-muted" style={{ fontSize: '0.66rem' }}>
-                        {workingDaysInMonth > 0 ? `${Math.round((r.coveredDays / workingDaysInMonth) * 100)}% of ${workingDaysInMonth} wd` : ''}
+                        {r.available && workingDaysInMonth > 0 ? `${r.pct}% of ${workingDaysInMonth} wd` : ''}
                       </span>
                       {editable ? (
                         <button className="btn btn-sm btn-outline-primary rounded-pill px-3" style={{ fontSize: '0.7rem' }}
@@ -1167,21 +1082,16 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers }) {
 
 /* Bulk-confirm modal: shows the per-user breakdown of missed days that
    will be marked present, then runs the bulk job with a live progress bar. */
-function BulkMarkConfirmModal({
-  monthStr, targetUsers, monthRecords, monthAdjusts, monthLeaves,
-  actor, running, progress, onRun, onClose,
-}) {
+function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, onClose }) {
   const [note, setNote] = useState('');
-  // Per-user preview, sorted by descending missed count
+  // Per-user preview, sorted by descending missed count. These are the exact
+  // dates the server will insert (same breakdown), so preview and write agree.
   const preview = useMemo(() => {
-    return targetUsers
-      .map(u => ({
-        user: u,
-        dates: missedWeekdayDatesFor(u.id, monthStr, monthRecords, monthAdjusts, monthLeaves),
-      }))
+    return targetRows
+      .map(r => ({ user: r.user, dates: r.missedDates }))
       .filter(p => p.dates.length > 0)
       .sort((a, b) => b.dates.length - a.dates.length);
-  }, [targetUsers, monthStr, monthRecords, monthAdjusts, monthLeaves]);
+  }, [targetRows]);
 
   const totalDays = preview.reduce((n, p) => n + p.dates.length, 0);
   const monthLabel = (() => {
@@ -1250,9 +1160,11 @@ function BulkMarkConfirmModal({
                 <div key={p.user.id} className="d-flex align-items-center justify-content-between rounded-2 p-2"
                   style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem' }}>
                   <div className="text-truncate me-2" style={{ minWidth: 0 }}>
-                    <span className="fw-semibold" style={{ color: 'var(--text-primary)' }}>{p.user.userName || p.user.displayName || p.user.email}</span>
+                    {/* listExpectedMembers returns { id, name, role, email } —
+                        userName/displayName/userType never existed here. */}
+                    <span className="fw-semibold" style={{ color: 'var(--text-primary)' }}>{p.user.name || p.user.email}</span>
                     <span className="text-muted ms-2" style={{ fontSize: '0.66rem' }}>
-                      {(p.user.userType || p.user.role || 'apc').toUpperCase()}
+                      {(p.user.role || 'apc').toUpperCase()}
                     </span>
                   </div>
                   <span className="rounded-pill px-2 flex-shrink-0" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.66rem', fontWeight: 700 }}>
@@ -1295,32 +1207,14 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
 
-  // Build per-day map. row.adjustments are now per-day records: { date, ... }
+  // Build per-day map. Every credit set comes from the breakdown RPC, so the
+  // calendar can never disagree with the card beside it. Adjustment ROWS still
+  // come from the table — the Remove buttons need their ids.
   const days_ = useMemo(() => {
     const out = [];
-    // Same rule as the card / Roster / computeMonthlyDays: any date with a
-    // clock-in counts as present, regardless of auto-close status. Forgetting
-    // to clock out doesn't strip the day from the present set.
-    const presentSet = new Set();
-    (row.userRecords || []).forEach(r => {
-      if (!r.date) return;
-      if (r.clockIn) presentSet.add(r.date);
-    });
-    // Full set of approved leave dates for the month. Same set the card's
-    // Leaves count is derived from, so card and calendar always agree.
-    const leaveSet = row.leaveDateSet || (() => {
-      const s = new Set();
-      (row.userLeaves || []).forEach(l => {
-        if (!l.startDate || !l.endDate) return;
-        const a = new Date(l.startDate + 'T00:00:00').getTime();
-        const b = new Date(l.endDate + 'T00:00:00').getTime();
-        for (let t = a; t <= b; t += 86400000) {
-          const d = new Date(t);
-          s.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-        }
-      });
-      return s;
-    })();
+    const presentSet = new Set(row.presentDates || []);
+    const leaveSet = row.leaveDateSet || new Set();
+    const holidaySet = row.holidaySet || new Set();
     const adjMap = new Map(); // date -> adjustment doc
     (row.adjustments || []).forEach(a => { if (a.date) adjMap.set(a.date, a); });
 
@@ -1330,15 +1224,15 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
       const isWeekend = dow === 0 || dow === 6;
       const isFuture = ds > today;
       // Real clock-in wins; an amber dot surfaces a redundant manual
-      // adjustment on a day the user actually clocked in. WFH is no
-      // longer treated as a leave so there's no leave/present overlap
-      // to worry about — leaves only appear on days the user was
-      // genuinely absent (medical / emergency).
+      // adjustment on a day the user actually clocked in. A company holiday
+      // gets its own non-clickable kind — it is already credited, and marking
+      // an "adjustment" on Eid is meaningless.
       let kind = 'missed';
       if (isFuture) kind = 'future';
       else if (presentSet.has(ds)) kind = 'present';
       else if (adjMap.has(ds)) kind = 'adjusted';
       else if (leaveSet.has(ds)) kind = 'leave';
+      else if (holidaySet.has(ds)) kind = 'holiday';
       else if (isWeekend) kind = 'weekend';
       const hasRedundantAdj = kind === 'present' && adjMap.has(ds);
       out.push({ ds, day, kind, dow, adjustment: adjMap.get(ds) || null, hasRedundantAdj });
@@ -1347,7 +1241,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
   }, [row, y, m, lastDay, today]);
 
   const summary = useMemo(() => {
-    const s = { present: 0, leave: 0, adjusted: 0, missed: 0, weekend: 0, future: 0 };
+    const s = { present: 0, leave: 0, adjusted: 0, missed: 0, weekend: 0, holiday: 0, future: 0 };
     days_.forEach(d => { s[d.kind] = (s[d.kind] || 0) + 1; });
     return s;
   }, [days_]);
@@ -1517,6 +1411,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
               <DayLegend color="var(--warning)" label={`Adjusted ${summary.adjusted}`} />
               <DayLegend color="var(--danger)" label={`Missed ${summary.missed}`} />
               <DayLegend color="var(--border-default)" label={`Weekend ${summary.weekend}`} />
+              {summary.holiday > 0 && <DayLegend color="var(--purple)" label={`Holiday ${summary.holiday}`} />}
               {summary.future > 0 && <DayLegend color="var(--border-subtle)" label={`Future ${summary.future}`} />}
             </div>
             <div className="d-grid gap-1" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
@@ -1533,6 +1428,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                   adjusted: { bg: 'var(--warning-soft)', fg: 'var(--warning)', border: 'var(--warning)' },
                   missed:   { bg: 'var(--danger-soft)', fg: 'var(--danger)', border: 'var(--danger)' },
                   weekend:  { bg: 'var(--surface-0)', fg: 'var(--text-muted)', border: 'var(--border-subtle)' },
+                  holiday:  { bg: 'var(--purple-soft)', fg: 'var(--purple)', border: 'var(--purple)' },
                   future:   { bg: 'var(--surface-1)',    fg: 'var(--text-muted)', border: 'var(--border-subtle)' },
                 }[d.kind];
                 const clickable = d.kind === 'missed' || d.kind === 'adjusted' || d.kind === 'weekend';
@@ -1543,6 +1439,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                   adjusted:`Manually marked present${d.adjustment?.note ? ' · ' + d.adjustment.note : ''}`,
                   missed:  'Missed — tap to mark present',
                   weekend: 'Weekend — tap if user worked',
+                  holiday: 'Company holiday — already credited',
                   future:  'Future date',
                 }[d.kind];
                 const isAnchor = lastTappedDate === d.ds;
@@ -1738,6 +1635,8 @@ export default function AttendancePage() {
   const [pendingEditOutRequests, setPendingEditOutRequests] = useState([]);
   const [myTodayRecord, setMyTodayRecord] = useState(null);
   const [expectedMembers, setExpectedMembers] = useState([]); // people who should be clocked in
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState('');
 
   // Leave quota management (boss only)
   const [quotaMedical, setQuotaMedical] = useState(1);
@@ -1793,17 +1692,28 @@ export default function AttendancePage() {
   // Load expected members list (for "Missing today" detection).
   // Boss/OL → everyone (users + teamUsers). TL → only their teamUsers.
   useEffect(() => {
-    if (!canSeeTeam) return;
+    if (!canSeeTeam) { setMembersLoading(false); return; }
     let cancelled = false;
     async function loadExpected() {
+      setMembersLoading(true);
       try {
         // v2: profiles already carries every clock-in role — no
         // separate `users` / `teamUsers` collections to merge.
         const members = await listExpectedMembers({
           uid: currentUser.uid, isBoss, isOL, isTL,
         });
-        if (!cancelled) setExpectedMembers(members);
-      } catch { /* ignore */ }
+        if (cancelled) return;
+        setExpectedMembers(members);
+        setMembersError('');
+      } catch (err) {
+        // Do NOT swallow: an empty member list is otherwise indistinguishable
+        // from "still loading" and the Roster would spin forever.
+        if (cancelled) return;
+        setExpectedMembers([]);
+        setMembersError(err?.message || 'Failed to load team members.');
+      } finally {
+        if (!cancelled) setMembersLoading(false);
+      }
     }
     loadExpected();
     return () => { cancelled = true; };
@@ -2468,6 +2378,8 @@ export default function AttendancePage() {
           currentUser={currentUser}
           userRole={userRole}
           expectedMembers={expectedMembers}
+          membersLoading={membersLoading}
+          membersError={membersError}
         />
       )}
 

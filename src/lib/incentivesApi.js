@@ -2,6 +2,17 @@ import { supabase } from './supabase';
 
 export function currentMonth() { return new Date().toISOString().slice(0, 7); }
 
+// The business month, in the timezone the DB is locked to. Used ONLY to decide
+// whether a month is CLOSED (see applyAttendanceAutofill) — never for display.
+export function karachiMonth(d = new Date()) {
+  const p = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit',
+  }).formatToParts(d);
+  const y = p.find((x) => x.type === 'year')?.value;
+  const m = p.find((x) => x.type === 'month')?.value;
+  return `${y}-${m}`;
+}
+
 export function autoComplete(item) {
   const t = Number(item.targetValue), a = Number(item.achievedValue);
   if (!t || t <= 0) return !!item.completed;
@@ -51,11 +62,23 @@ export async function applyAttendanceAutofill(rows, month) {
     console.warn('attendance autofill skipped:', e.message);
     return list;
   }
+  // MONEY GATE. incentive_attendance_pct returns coverage SO FAR: its
+  // denominator is least(today, month_end). Mid-month that number is
+  // provisional — and on the 1st of a month that starts on a Saturday it is
+  // 100% for everyone, including someone who has never clocked in (the single
+  // elapsed day is a weekend, and weekends are covered). Under the old
+  // hardcoded /22 formula reaching 90% before ~day 20 was arithmetically
+  // impossible, so the item could never read "earned" early. It can now.
+  //
+  // So: keep showing the running % (that is what the Boss asked for), but only
+  // let it COMPLETE — i.e. count toward Earned / become payable — once the
+  // month is CLOSED and the figure is final.
+  const isFinalMonth = String(month) < karachiMonth();
   const patchItem = (it, uid) => {
     if (!it || it.source !== 'attendance') return it;
     const val = pctByUser.has(uid) ? pctByUser.get(uid) : (Number(it.achievedValue) || 0);
     const next = { ...it, achievedValue: val, targetValue: 100, suffix: it.suffix || '%' };
-    next.completed = autoComplete(next);
+    next.completed = isFinalMonth ? autoComplete(next) : false;
     return next;
   };
   return list.map((r) => {

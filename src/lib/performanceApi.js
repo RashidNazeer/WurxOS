@@ -201,23 +201,6 @@ export function calcIncentiveScore(incRecord) {
   return Math.round((completed / items.length) * 100);
 }
 
-export function calcAttendanceScore(coveredDays, workingDays) {
-  if (!workingDays || workingDays <= 0) return 100;
-  return Math.min(100, Math.round((coveredDays / workingDays) * 100));
-}
-
-export function workingDaysInMonth(monthStr) {
-  if (!monthStr) return 0;
-  const [y, m] = monthStr.split('-').map(Number);
-  const last = new Date(y, m, 0).getDate();
-  let n = 0;
-  for (let d = 1; d <= last; d++) {
-    const dow = new Date(y, m - 1, d).getDay();
-    if (dow !== 0 && dow !== 6) n++;
-  }
-  return n;
-}
-
 // Flag scoring (verbatim from v1): base 80 · +10 per green · −20 per red.
 // Severity (low/medium/high/critical) is a label only and does NOT affect
 // the score — it's there for at-a-glance triage.
@@ -614,13 +597,16 @@ export async function listAllIncentivesForMonth(month) {
   return applyAttendanceAutofill(rows, month);
 }
 
-// ── Attendance bulk fetch (already used by RosterTab) ─────────
-// Re-exported here for the Performance Team tab — saves a separate
-// import path. The attendance API already filters WFH from leaves
-// and exposes computeMonthlyDays().
+// ── Attendance ────────────────────────────────────────────────
+// Re-exported here for the Performance page — saves a separate import
+// path. The coverage %/breakdown is computed in SQL (mig 252), not JS;
+// fetchRosterMonth / getAdjustmentsForMonth remain for the raw rows the
+// Roster needs (hours, calendar, adjustment Remove buttons).
 export {
   fetchRosterMonth,
-  computeMonthlyDays,
   getAdjustmentsForMonth,
+  fetchAttendanceBreakdown,
+  fetchAttendanceBreakdownBulk,
+  ATTENDANCE_BREAKDOWN_ZERO,
 } from './attendanceApi';
 

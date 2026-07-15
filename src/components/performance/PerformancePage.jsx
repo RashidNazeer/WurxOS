@@ -9,11 +9,9 @@ import {
   // Flag removal request flow
   requestFlagRemoval, decideFlagRemoval, removeFlagDirect,
   listFlagRemovalRequests,
-  // Attendance helpers (re-exported from attendanceApi for parity)
-  fetchRosterMonth, computeMonthlyDays, getAdjustmentsForMonth,
+  // Attendance — single source of truth (SQL). Never recompute here.
+  fetchAttendanceBreakdown, fetchAttendanceBreakdownBulk,
 } from '../../lib/performanceApi';
-import { expandLeaveWeekdays } from '../../lib/attendanceApi';
-import { listHolidayDatesForMonth } from '../../lib/holidaysApi';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,82 +126,14 @@ function calcIncentiveScore(incRecord) {
 }
 
 /**
- * Calculate attendance score from effective days (real clock-ins + manager
- * adjustments) divided by working days (Mon-Fri) of the month.
+ * Attendance pillar score from an AttendanceBreakdown (the SQL RPC).
+ *   • null breakdown  → null ("—"). NEVER 0: a failed/missing row must not
+ *     render as a real, terrible score, and calcComposite drops null pillars.
+ *   • daysThisMonth 0 (future month) → 100, matching the old zero-guard.
  */
-function calcAttendanceScore(coveredDays, workingDays) {
-  if (!workingDays || workingDays <= 0) return 100;
-  return Math.min(100, Math.round((coveredDays / workingDays) * 100));
-}
-
-/**
- * Days elapsed in the month — the attendance-score denominator.
- *   • Current month → today's day-of-month (inclusive).
- *   • Past months   → the full month's last day.
- *   • Future months → 0 (nothing has happened).
- *
- * Using elapsed days (not full month) prevents the score from
- * claiming credit for future weekends / holidays / leaves before
- * they have actually occurred.
- */
-function workingDaysInMonth(monthStr) {
-  if (!monthStr) return 0;
-  const [y, m] = monthStr.split('-').map(Number);
-  const today = new Date();
-  const firstOfMonth = new Date(y, m - 1, 1);
-  if (today < firstOfMonth) return 0;
-  if (today.getFullYear() === y && today.getMonth() + 1 === m) return today.getDate();
-  return new Date(y, m, 0).getDate();
-}
-
-/** "YYYY-MM-DD" string for the inclusive end of the elapsed window. */
-function cutoffYmdForMonth(monthStr) {
-  if (!monthStr) return '0000-01-01';
-  const [y, m] = monthStr.split('-').map(Number);
-  const today = new Date();
-  const firstOfMonth = new Date(y, m - 1, 1);
-  const pad = (n) => String(n).padStart(2, '0');
-  if (today < firstOfMonth) return '0000-01-01';
-  if (today.getFullYear() === y && today.getMonth() + 1 === m) {
-    return `${y}-${pad(m)}-${pad(today.getDate())}`;
-  }
-  const lastDay = new Date(y, m, 0).getDate();
-  return `${y}-${pad(m)}-${pad(lastDay)}`;
-}
-
-/** Keep only dates on or before the cutoff (inclusive). */
-function clipDateSet(set, cutoffYmd) {
-  const out = new Set();
-  if (!cutoffYmd || !set) return out;
-  for (const d of set) if (d <= cutoffYmd) out.add(d);
-  return out;
-}
-
-/** Count of Sat + Sun in a month — auto-credited toward "covered". */
-function weekendDaysInMonth(monthStr) {
-  if (!monthStr) return 0;
-  const [y, m] = monthStr.split('-').map(Number);
-  const last = new Date(y, m, 0).getDate();
-  let n = 0;
-  for (let d = 1; d <= last; d++) {
-    const dow = new Date(y, m - 1, d).getDay();
-    if (dow === 0 || dow === 6) n++;
-  }
-  return n;
-}
-
-/** Set of every Sat/Sun YYYY-MM-DD in a month — joins the coverage union. */
-function weekendDateSetInMonth(monthStr) {
-  const out = new Set();
-  if (!monthStr) return out;
-  const [y, m] = monthStr.split('-').map(Number);
-  const last = new Date(y, m, 0).getDate();
-  const pad = (n) => String(n).padStart(2, '0');
-  for (let d = 1; d <= last; d++) {
-    const dow = new Date(y, m - 1, d).getDay();
-    if (dow === 0 || dow === 6) out.add(`${y}-${pad(m)}-${pad(d)}`);
-  }
-  return out;
+function attendanceScoreFrom(b) {
+  if (!b) return null;
+  return b.daysThisMonth > 0 ? b.pct : 100;
 }
 
 // Flag scoring: base 80, every green flag adds 10, every red flag
@@ -886,10 +816,7 @@ function PillarBar({ pillar, score, weight, detail }) {
 // key events only — no raw dumps. Each block knows how to handle
 // missing data ("Not rated yet", "No incentives", etc.).
 function PillarDetail({ pillarKey, ctx }) {
-  const {
-    myRecord, myIncRecord, myAttendanceDays, myFlags, month,
-    workingDays,
-  } = ctx;
+  const { myRecord, myIncRecord, myAttendanceDays, myFlags, month } = ctx;
 
   if (pillarKey === 'performance') {
     const metrics = myRecord?.metrics || null;
@@ -992,23 +919,26 @@ function PillarDetail({ pillarKey, ctx }) {
   }
 
   if (pillarKey === 'attendance') {
-    const effective   = myAttendanceDays.effective || 0;
-    const leaveDays   = myAttendanceDays.leaveDays || 0;
-    const holidayDays = myAttendanceDays.holidayDays || 0;
-    const weekendDays = myAttendanceDays.weekendDays || weekendDaysInMonth(month);
-    // Set-union covered — a clock-in that also falls on a holiday
-    // or weekend is counted once, so the score can never be padded
-    // beyond reality.
-    const covered     = myAttendanceDays.coveredDays || 0;
-    const wd          = workingDays;
-    const pct         = wd > 0 ? Math.round((covered / wd) * 100) : 100;
-    const missed      = Math.max(0, wd - covered);
+    const b = myAttendanceDays;
+    if (!b) {
+      return <div className="text-muted small">Attendance data unavailable.</div>;
+    }
+    const effective   = b.daysPresent;
+    const leaveDays   = b.approvedLeaveDays;
+    const holidayDays = b.holidayDays;
+    const weekendDays = b.weekendDays;
+    // coveredDays is the SQL set-union (clock-ins ∪ adjustments ∪ leave ∪
+    // holidays ∪ weekends) — an overlap is counted once, so the score can
+    // never be padded beyond reality.
+    const covered     = b.coveredDays;
+    const wd          = b.daysThisMonth;
+    const missed      = b.daysNotCovered;
     return (
       <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
         <div className="text-muted" style={{ fontSize: '0.68rem' }}>
           Score = covered days / total days in the month. Weekends,
-          company holidays and any approved leave (medical,
-          emergency, other) are auto-credited &mdash; only weekdays
+          company holidays and any approved leave (medical, emergency,
+          half-day, other) are auto-credited &mdash; only weekdays
           you were expected to work but didn&apos;t clock in count
           against the score. WFH days are treated as present.
         </div>
@@ -1049,7 +979,7 @@ function PillarDetail({ pillarKey, ctx }) {
         <div className="d-flex justify-content-between rounded-2 p-2 fw-bold"
           style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           <span>Covered ({covered} / {wd})</span>
-          <span>{pct}%</span>
+          <span>{wd > 0 ? `${b.pct}%` : '—'}</span>
         </div>
       </div>
     );
@@ -1126,7 +1056,15 @@ export default function PerformancePage() {
   const [myRecord, setMyRecord]       = useState(null);
   const [myFlags, setMyFlags]         = useState([]);
   const [myWarnings, setMyWarnings]   = useState(0);
-  const [myAttendanceDays, setMyAttendanceDays] = useState({ actual: 0, effective: 0, leaveDays: 0, holidayDays: 0 });
+  // AttendanceBreakdown | null. null = not loaded / not available — it must
+  // render as '—', never as a zeroed (and therefore terrible-looking) score.
+  const [myAttendanceDays, setMyAttendanceDays] = useState(null);
+  // A FAILED attendance fetch is not the same as "no data". calcComposite
+  // re-normalises the weights over the non-null pillars, so a swallowed error
+  // would silently drop the attendance pillar and still render a confident
+  // (wrong) composite. When this is set we refuse to show a composite at all.
+  const [attError, setAttError] = useState('');
+  const [attReloadKey, setAttReloadKey] = useState(0);
   const [myIncRecord, setMyIncRecord] = useState(null);
   // myLeaveCount removed — now using myAttendanceDays from attendance collection
 
@@ -1161,13 +1099,22 @@ export default function PerformancePage() {
 
   // ── Load ──
   useEffect(() => {
+    // Stale-response guard: on a flaky connection a month switch can let the
+    // PREVIOUS month's slower response land last and overwrite the new month's
+    // attendance — the header would say June while the pillar showed July.
+    let cancelled = false;
     async function load() {
       if (!currentUser) return;
       setLoading(true);
+      setAttError('');
 
       // Pillar weights (Boss-editable). v2 stores per-pillar columns
       // and getV1Weights converts to the v1 {performance,...} shape.
-      try { setWeights(await getV1Weights()); } catch { /* keep defaults */ }
+      try {
+        const w = await getV1Weights();
+        if (cancelled) return;
+        setWeights(w);
+      } catch { /* keep defaults */ }
 
       // My performance (non-boss).
       if (effectiveRole !== 'boss') {
@@ -1176,6 +1123,7 @@ export default function PerformancePage() {
           listFlagsForUser(currentUser.uid),
           countWarningsForUser(currentUser.uid),
         ]);
+        if (cancelled) return;
         setMyRecord(myRec);
         setMyFlags(myFlagsList);
         setMyWarnings(myWarnCount);
@@ -1183,64 +1131,20 @@ export default function PerformancePage() {
         // My incentives for the month — server filters by user.
         const myIncRows = (await listAllIncentivesForMonth(month))
           .filter((r) => r.userId === currentUser.uid);
+        if (cancelled) return;
         setMyIncRecord(myIncRows[0] || null);
 
-        // My attendance for the month — same helpers the Roster tab uses
-        // so the per-user widget can never disagree with the Performance score.
-        const { records: monthRecords } = await fetchRosterMonth(month);
-        const myAdjList = await getAdjustmentsForMonth(month).catch(() => []);
-        // listApprovedLeaveDatesForMonth lives in attendanceApi (re-export
-        // not added here); compute leave days inline from fetchRosterMonth
-        // which already returns leaves filtered to medical/emergency only.
-        const myMonth = monthRecords.filter((r) => r.user_id === currentUser.uid || r.userId === currentUser.uid);
-        const { actualDays: myActual, effectiveDays: myEffective, effectiveSet: myEffectiveSet } =
-          computeMonthlyDays(currentUser.uid, myMonth, myAdjList);
-
-        // For leave days, use the rosterMonth.leaves payload (already
-        // medical/emergency only, intersected with month).
-        const { leaves: myLeavesAll } = await fetchRosterMonth(month);
-        const myLeaves = myLeavesAll.filter((l) => l.requestedBy === currentUser.uid);
-        const [yLm, mLm] = month.split('-').map(Number);
-        const lastDay = new Date(yLm, mLm, 0).getDate();
-        const mStartDate = `${yLm}-${String(mLm).padStart(2, '0')}-01`;
-        const mEndDate = `${yLm}-${String(mLm).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-        // Company holidays inside the month (Mon-Fri only). Used as both the
-        // "exclude from leave count" set and the "counts as covered" set.
-        const myHolidaySet = await listHolidayDatesForMonth(month).catch(() => new Set());
-        const myLeaveDates = new Set();
-        myLeaves.forEach((l) => {
-          const days = expandLeaveWeekdays(
-            l.startDate || l.start_date,
-            l.endDate   || l.end_date,
-            { mStart: mStartDate, mEnd: mEndDate, holidaySet: myHolidaySet },
-          );
-          days.forEach((d) => myLeaveDates.add(d));
-        });
-        // Clip every credit-set to days that have actually elapsed.
-        // For the current month, that's today inclusive; for past
-        // months the whole month is elapsed; for future months
-        // nothing has elapsed. This prevents the score from
-        // claiming credit for tomorrow's weekend / next week's
-        // holiday / a future approved-leave day.
-        const cutoffYmd = cutoffYmdForMonth(month);
-        const myWeekendSet = clipDateSet(weekendDateSetInMonth(month), cutoffYmd);
-        const myHolidayClipped = clipDateSet(myHolidaySet, cutoffYmd);
-        const myLeaveClipped   = clipDateSet(myLeaveDates, cutoffYmd);
-        // Set-union of every "covered" date — clock-ins, approved
-        // leaves, holidays, weekends. Counts each date once so a
-        // clock-in on a holiday (or any other overlap) is not
-        // counted twice and cannot inflate the score.
-        const myCoveredSet = new Set([
-          ...myEffectiveSet, ...myLeaveClipped, ...myHolidayClipped, ...myWeekendSet,
-        ]);
-        setMyAttendanceDays({
-          actual: myActual,
-          effective: myEffective,
-          leaveDays: myLeaveClipped.size,
-          holidayDays: myHolidayClipped.size,
-          weekendDays: myWeekendSet.size,
-          coveredDays: myCoveredSet.size,
-        });
+        // My attendance for the month — one SQL RPC, the single source of
+        // truth shared with the Roster tab and the incentive auto-fill.
+        let myAtt = null;
+        try {
+          myAtt = await fetchAttendanceBreakdown(currentUser.uid, month);
+        } catch (err) {
+          console.warn('[attendance-breakdown]', err);
+          if (!cancelled) setAttError(err?.message || 'Attendance coverage failed to load.');
+        }
+        if (cancelled) return;
+        setMyAttendanceDays(myAtt);
       }
 
       // Team data.
@@ -1248,23 +1152,29 @@ export default function PerformancePage() {
         const users = await listEvaluableUsers({
           uid: currentUser.uid, viewerRole: effectiveRole,
         });
+        if (cancelled) return;
         setTeamUsers(users);
         const userIds = users.map((u) => u.id);
         const idSet = new Set(userIds);
 
-        // 7 parallel reads — performance / flags / warnings / incentives /
-        // attendance / adjustments / approved-leaves — same as v1.
-        const [perfList, flagList, warnList, incList, rosterMonthData, adjList] =
+        // 5 parallel reads — performance / flags / warnings / incentives /
+        // attendance. Attendance is ONE batch RPC for the whole team (never
+        // one call per employee — most users are on flaky Pakistan ISPs).
+        const [perfList, flagList, warnList, incList, attByUser] =
           await Promise.all([
             listAllRatingsForMonth(month),
             listAllFlags(),
             listAllWarnings(),
             listAllIncentivesForMonth(month),
-            fetchRosterMonth(month),
-            getAdjustmentsForMonth(month).catch(() => []),
+            fetchAttendanceBreakdownBulk(month, userIds).catch((err) => {
+              console.warn('[attendance-breakdown]', err);
+              // Do NOT let this degrade quietly into "every pillar is null":
+              // the banner + composite suppression below depend on attError.
+              if (!cancelled) setAttError(err?.message || 'Attendance coverage failed to load.');
+              return new Map();
+            }),
           ]);
-        const monthRecords = rosterMonthData.records;
-        const monthLeaves  = rosterMonthData.leaves;
+        if (cancelled) return;
 
         const recMap = {}, flagMap = {}, warnMap = {}, incMap = {}, attMap = {};
         perfList.forEach((x) => { if (idSet.has(x.userId)) recMap[x.userId] = x; });
@@ -1276,47 +1186,9 @@ export default function PerformancePage() {
         warnList.forEach((x) => { if (idSet.has(x.userId)) warnMap[x.userId] = (warnMap[x.userId] || 0) + 1; });
         incList.forEach((x) => { const uid = x.userId; if (uid && idSet.has(uid)) incMap[uid] = x; });
 
-        const [yr, mo] = month.split('-').map(Number);
-        const mLastDay = new Date(yr, mo, 0).getDate();
-        const mStart = `${yr}-${String(mo).padStart(2, '0')}-01`;
-        const mEnd   = `${yr}-${String(mo).padStart(2, '0')}-${String(mLastDay).padStart(2, '0')}`;
-
-        const teamHolidaySet = await listHolidayDatesForMonth(month).catch(() => new Set());
-
-        // Clip credit-sets to days that have elapsed in `month`, so
-        // future weekends / holidays / leaves don't pre-credit the
-        // score during the current month.
-        const teamCutoffYmd = cutoffYmdForMonth(month);
-        const teamWeekendSet = clipDateSet(weekendDateSetInMonth(month), teamCutoffYmd);
-        const teamHolidayClipped = clipDateSet(teamHolidaySet, teamCutoffYmd);
-        userIds.forEach((uid) => {
-          const { actualDays, effectiveDays, effectiveSet } =
-            computeMonthlyDays(uid, monthRecords, adjList);
-          const userLeaves = monthLeaves.filter((l) => l.requestedBy === uid);
-          const leaveDates = new Set();
-          userLeaves.forEach((l) => {
-            const days = expandLeaveWeekdays(
-              l.startDate || l.start_date,
-              l.endDate   || l.end_date,
-              { mStart, mEnd, holidaySet: teamHolidaySet },
-            );
-            days.forEach((d) => leaveDates.add(d));
-          });
-          const leaveClipped = clipDateSet(leaveDates, teamCutoffYmd);
-          // Set-union dedupes overlaps (e.g. clock-in on a holiday)
-          // so a missed weekday cannot be hidden by double-counting.
-          const coveredSet = new Set([
-            ...effectiveSet, ...leaveClipped, ...teamHolidayClipped, ...teamWeekendSet,
-          ]);
-          attMap[uid] = {
-            actualDays,
-            effectiveDays,
-            leaveDays: leaveClipped.size,
-            holidayDays: teamHolidayClipped.size,
-            weekendDays: teamWeekendSet.size,
-            coveredDays: coveredSet.size,
-          };
-        });
+        // A Map miss is NOT a zero — it stays null so the card renders '—'
+        // rather than a fabricated (and healthy-looking) score.
+        userIds.forEach((uid) => { attMap[uid] = attByUser.get(uid) ?? null; });
 
         setTeamRecords(recMap);
         setTeamFlags(flagMap);
@@ -1332,6 +1204,7 @@ export default function PerformancePage() {
       // - Boss (sees everything in their approval queue)
       try {
         const pendingList = await listFlagRemovalRequests({ status: 'pending' });
+        if (cancelled) return;
         const map = {};
         pendingList.forEach((p) => { map[p.flagId] = p; });
         setPendingRemovals(map);
@@ -1339,13 +1212,15 @@ export default function PerformancePage() {
       } catch {
         // RLS may reject for users not involved in any request — that
         // just means no pending state to show. Silent fallback.
+        if (cancelled) return;
         setPendingRemovals({});
         setPendingRemovalRequests([]);
       }
 
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
     load();
+    return () => { cancelled = true; };
   // Include effectiveRole — on first render the profile may not be
   // loaded yet, so userRole='' and effectiveRole defaults to 'apc'.
   // Once the profile resolves and effectiveRole becomes 'ol'/'boss'/
@@ -1353,7 +1228,7 @@ export default function PerformancePage() {
   // the OL hits the page, the load runs with hasTeamTab=false, then
   // never re-fires — Team tab shows empty until a hard refresh.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, currentUser?.uid, effectiveRole]);
+  }, [month, currentUser?.uid, effectiveRole, attReloadKey]);
 
   // Re-fetch flags + pending removals after a mutation (Boss direct
   // remove, OL request, Boss approve/reject). Keeps the modal + main
@@ -1406,13 +1281,9 @@ export default function PerformancePage() {
       const rec = teamRecords[u.id];
       const perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
-      const attData = teamAttendance[u.id] || { actualDays: 0, effectiveDays: 0, leaveDays: 0, holidayDays: 0 };
-      const wd = workingDaysInMonth(month);
-      // attData.coveredDays is the set-union (clock-ins ∪ leaves ∪
-      // holidays ∪ weekends), so an overlap (e.g. clock-in on a
-      // holiday) is counted once — no inflated score.
-      const covered = attData.coveredDays || 0;
-      const attScore = calcAttendanceScore(covered, wd);
+      const attData = teamAttendance[u.id] || null;
+      const wd = attData ? attData.daysThisMonth : 0;
+      const attScore = attendanceScoreFrom(attData);
       const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
       const pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
       const composite = calcComposite(pillarScores, weights);
@@ -1433,13 +1304,15 @@ export default function PerformancePage() {
     return list;
   }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month]);
 
+  // The attendance pillar failed to load → calcComposite silently re-weights
+  // over the remaining pillars. Refuse to show a composite rather than show a
+  // plausible-looking wrong one.
+  const compositeOk = !attError;
+
   // My pillar scores
   const myPerfScore = myRecord ? calcMetricsAvg(myRecord.metrics) : null;
   const myIncScore  = calcIncentiveScore(myIncRecord);
-  const myAttScore  = calcAttendanceScore(
-    myAttendanceDays.coveredDays || 0,
-    workingDaysInMonth(month),
-  );
+  const myAttScore  = attendanceScoreFrom(myAttendanceDays);
   const myFlagScore = calcFlagsScore(myFlags, month);
   const myPillarScores = { performance: myPerfScore, incentives: myIncScore, attendance: myAttScore, flags: myFlagScore };
   const myComposite = calcComposite(myPillarScores, weights);
@@ -1479,6 +1352,7 @@ export default function PerformancePage() {
         </div>
         <div className="d-flex align-items-center gap-2">
           <input type="month" className="form-control form-control-sm" value={month}
+            max={getCurrentMonth()}
             onChange={e => setMonth(e.target.value)} style={{ width: 160 }} />
           {isBoss && (
             <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
@@ -1522,6 +1396,23 @@ export default function PerformancePage() {
         </div>
       )}
 
+      {!loading && attError && (
+        <div className="rounded-3 p-3 mb-3 d-flex align-items-center justify-content-between gap-3"
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)' }}>
+          <div style={{ fontSize: '0.8rem' }}>
+            <span className="fw-semibold" style={{ color: 'var(--danger)' }}>
+              <i className="bi bi-exclamation-triangle me-2" />Attendance coverage failed to load
+            </span>
+            <span className="text-muted ms-2">
+              Composite scores are hidden because they would silently exclude the attendance pillar. ({attError})
+            </span>
+          </div>
+          <button className="btn btn-sm btn-outline-danger rounded-pill px-3 flex-shrink-0"
+            style={{ fontSize: '0.72rem' }}
+            onClick={() => setAttReloadKey(k => k + 1)}>Retry</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-muted small d-flex align-items-center gap-2"><span className="spinner-border spinner-border-sm" /> Loading…</div>
       ) : mainTab === 'my' ? (
@@ -1531,7 +1422,7 @@ export default function PerformancePage() {
               a performance entry for this month. Auto-calculated pillars
               (incentives/attendance/flags) would otherwise produce a
               misleading partial composite at the start of the month. */}
-          {myPerfScore === null ? (
+          {myPerfScore === null || !compositeOk ? (
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ height: 4, background: 'linear-gradient(90deg,var(--border-strong),var(--border-default))' }} />
               <div className="card-body p-4 text-center">
@@ -1540,9 +1431,15 @@ export default function PerformancePage() {
                   <i className="bi bi-hourglass-split" style={{ fontSize: '1.8rem', color: 'var(--text-secondary)' }} />
                 </div>
                 <div className="d-flex align-items-center justify-content-center gap-1 mb-1">
-                  <span className="fw-bold" style={{ color: 'var(--text-secondary)' }}>Not Rated Yet</span>
+                  <span className="fw-bold" style={{ color: 'var(--text-secondary)' }}>
+                    {!compositeOk ? 'Score Unavailable' : 'Not Rated Yet'}
+                  </span>
                 </div>
-                <p className="text-muted small mb-0">Performance is rated at the end of {getMonthLabel(month)}</p>
+                <p className="text-muted small mb-0">
+                  {!compositeOk
+                    ? 'Attendance coverage failed to load — the composite would be misleading.'
+                    : `Performance is rated at the end of ${getMonthLabel(month)}`}
+                </p>
               </div>
             </div>
           ) : (
@@ -1581,14 +1478,7 @@ export default function PerformancePage() {
                 detail={
                   <PillarDetail
                     pillarKey={p.key}
-                    ctx={{
-                      myRecord,
-                      myIncRecord,
-                      myAttendanceDays,
-                      myFlags,
-                      month,
-                      workingDays: workingDaysInMonth(month),
-                    }}
+                    ctx={{ myRecord, myIncRecord, myAttendanceDays, myFlags, month }}
                   />
                 }
               />
@@ -1718,7 +1608,10 @@ export default function PerformancePage() {
           ) : (
             <div className="row g-3">
               {filteredTeam.map(u => {
-                const isRated = u.perfScore !== null;
+                // `compositeOk` false = the attendance RPC failed. calcComposite
+                // would re-normalise over the surviving pillars and print a
+                // plausible-but-wrong number, so we print nothing instead.
+                const isRated = u.perfScore !== null && compositeOk;
                 const level = getLevel(u.composite);
                 // When not rated, dim the top stripe + show "Not Rated Yet"
                 // pill in place of the composite number. Auto-calculated
@@ -1753,7 +1646,9 @@ export default function PerformancePage() {
                               </>
                             ) : (
                               <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.6rem', padding: '6px 10px' }}>
-                                <i className="bi bi-hourglass-split me-1" />Not Rated Yet
+                                {!compositeOk
+                                  ? <><i className="bi bi-exclamation-triangle me-1" />Score Unavailable</>
+                                  : <><i className="bi bi-hourglass-split me-1" />Not Rated Yet</>}
                               </span>
                             )}
                           </div>
@@ -1765,22 +1660,24 @@ export default function PerformancePage() {
                             const s = u.pillarScores[p.key];
                             const lv = s !== null ? getLevel(s) : null;
                             const isAtt = p.key === 'attendance';
-                            const adj = isAtt && u.attData ? (u.attData.effectiveDays - u.attData.actualDays) : 0;
-                            const leaveD = isAtt && u.attData ? (u.attData.leaveDays || 0) : 0;
-                            const holD = isAtt && u.attData ? (u.attData.holidayDays || 0) : 0;
-                            const weekendD = isAtt && u.attData ? (u.attData.weekendDays || 0) : 0;
-                            // Use the deduped set-union count so an
-                            // overlap (e.g. clock-in on a holiday)
-                            // isn't double-counted in the tooltip.
-                            const coveredD = isAtt && u.attData ? (u.attData.coveredDays || 0) : 0;
+                            const b = isAtt ? u.attData : null;
+                            const clockedD = b ? b.daysClockedIn : 0;
+                            const adj = b ? b.adjustedDays : 0;
+                            const leaveD = b ? b.approvedLeaveDays : 0;
+                            const holD = b ? b.holidayDays : 0;
+                            const weekendD = b ? b.weekendDays : 0;
+                            // The deduped set-union count, so an overlap
+                            // (e.g. clock-in on a holiday) isn't
+                            // double-counted in the tooltip.
+                            const coveredD = b ? b.coveredDays : 0;
                             return (
                               <div key={p.key}>
                                 <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.68rem' }}>
                                   <span className="text-muted d-flex align-items-center gap-1">
                                     <i className={`bi ${p.icon}`} style={{ color: p.color, fontSize: '0.7rem' }} />{p.label}
-                                    {isAtt && u.attData && (
+                                    {b && (
                                       <span className="text-muted" style={{ fontSize: '0.6rem' }}
-                                        title={`${u.attData.actualDays} clocked-in${adj > 0 ? ` + ${adj} manager-adjusted` : ''}${leaveD > 0 ? ` + ${leaveD} approved leave` : ''}${holD > 0 ? ` + ${holD} holiday` : ''} + ${weekendD} weekend = ${coveredD} of ${u.workingDays} days`}>
+                                        title={`${clockedD} clocked-in${adj > 0 ? ` + ${adj} manager-adjusted` : ''}${leaveD > 0 ? ` + ${leaveD} approved leave` : ''}${holD > 0 ? ` + ${holD} holiday` : ''} + ${weekendD} weekend = ${coveredD} of ${u.workingDays} days`}>
                                         · {coveredD}/{u.workingDays} days
                                         {adj > 0 && <span style={{ color: 'var(--warning)' }}> (+{adj} adj)</span>}
                                         {leaveD > 0 && <span style={{ color: 'var(--info)' }}> (+{leaveD} leave)</span>}

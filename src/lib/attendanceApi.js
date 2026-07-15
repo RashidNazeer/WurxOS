@@ -908,11 +908,6 @@ export async function listAdjustmentsForMonth(monthStr) {
   return (data || []).map((a) => ({ ...a, userId: a.user_id, addedBy: a.created_by, addedAt: a.created_at }));
 }
 
-export async function listAdjustmentsForUserMonth(userId, monthStr) {
-  const all = await listAdjustmentsForMonth(monthStr);
-  return all.filter((a) => a.user_id === userId);
-}
-
 // v1 alias — same shape.
 export const getAdjustmentsForMonth = listAdjustmentsForMonth;
 
@@ -995,217 +990,116 @@ export async function bulkMarkMissedAsPresent(arg) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Roster maths — unchanged from v1 (pure JS)
+// Attendance coverage — SINGLE SOURCE OF TRUTH (mig 252)
+//
+// The percentage / missed-days / coverage maths used to live here in
+// JS *and* in perf_attendance_score (SQL) *and* in two dead pages —
+// three formulas that disagreed, and the SQL one (the only consumer
+// the incentive auto-fill reads) silently underpaid people. It is now
+// computed exactly once, in SQL, in Asia/Karachi:
+//   attendance_month_breakdown(_bulk).
+//
+// Everything below is a thin boundary: fetch, normalise snake→camel,
+// hand back the ONE shape every screen renders.
 // ────────────────────────────────────────────────────────────
 
-// True if `ds` (YYYY-MM-DD) is a Sat/Sun in the local calendar. Used
-// to ensure weekend dates never count for or against attendance.
-export function isWeekendDate(ds) {
-  if (!ds) return false;
-  const [y, m, d] = ds.split('-').map(Number);
-  const dow = new Date(y, m - 1, d).getDay();
-  return dow === 0 || dow === 6;
-}
+/**
+ * @typedef {Object} AttendanceBreakdown
+ * @property {boolean}      available          always true on a real row
+ * @property {string}       userId
+ * @property {string}       month              'YYYY-MM'
+ * @property {string|null}  cutoff             'YYYY-MM-DD' | null (future month)
+ * @property {number}       daysThisMonth      elapsed CALENDAR days — the denominator (the UI calls this "working days"/"wd")
+ * @property {number}       daysClockedIn      weekday-only clock-ins
+ * @property {number}       daysPresent        weekday-only clock-ins ∪ adjustments
+ * @property {number}       adjustedDays       daysPresent - daysClockedIn
+ * @property {number}       daysClockedInAll   UNFILTERED clock-ins (personal card only)
+ * @property {number}       daysPresentAll     UNFILTERED clock-ins ∪ adjustments (personal card only)
+ * @property {number}       weekendDays
+ * @property {number}       holidayDays        weekday-only
+ * @property {number}       approvedLeaveDays  weekday-only, holiday-subtracted
+ * @property {number}       coveredDays
+ * @property {number}       daysNotCovered     === missedDates.length (TODAY INCLUDED)
+ * @property {number|null}  pct                INTEGER 0..100; null when daysThisMonth === 0
+ * @property {number|null}  pctExact           1-dp numeric (what the incentive pays on); null likewise
+ * @property {string[]}     missedDates        <= cutoff, TODAY INCLUDED (Roster + bulk-mark)
+ * @property {string[]}     missedDatesPast    strictly < today (personal card)
+ * @property {string[]}     presentDates       FULL month (calendar)
+ * @property {string[]}     adjustedDates      FULL month (hasOverride = length > 0)
+ * @property {string[]}     leaveDates         FULL month, UNCLIPPED — the calendar paints FUTURE leave blue
+ * @property {string[]}     holidayDates       FULL month, weekday-only
+ */
 
-// Expand a leave range into a Set of YYYY-MM-DD strings, skipping
-// Sat/Sun and any date present in `holidaySet` (a Set of YYYY-MM-DD
-// holiday dates). Optionally clip to [mStart, mEnd]. Use this anywhere
-// you previously expanded a leave range by adding every calendar day —
-// a Fri+Mon leave is 2 days, not 4, and a leave that overlaps a
-// company holiday should not double-count those days either.
-export function expandLeaveWeekdays(startDate, endDate, { mStart, mEnd, holidaySet } = {}) {
-  const out = new Set();
-  if (!startDate || !endDate) return out;
-  const pad = (n) => String(n).padStart(2, '0');
-  const a = new Date(startDate + 'T00:00:00').getTime();
-  const b = new Date(endDate   + 'T00:00:00').getTime();
-  for (let t = a; t <= b; t += 86400000) {
-    const d = new Date(t);
-    const dow = d.getDay();
-    if (dow === 0 || dow === 6) continue;
-    const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    if (mStart && ds < mStart) continue;
-    if (mEnd   && ds > mEnd)   continue;
-    if (holidaySet && holidaySet.has(ds)) continue;
-    out.add(ds);
-  }
-  return out;
-}
+// Render placeholder ONLY. A missing row is not a zero: the Roster health rule is
+// an absolute day gap (covered < wd - 5), so a zeroed row scores GREEN "On track" —
+// an auth/RPC failure would render as a perfectly healthy employee. `available: false`
+// must drive an explicit "unavailable" UI.
+export const ATTENDANCE_BREAKDOWN_ZERO = Object.freeze({
+  available: false,
+  userId: '', month: '', cutoff: null,
+  daysThisMonth: 0, daysClockedIn: 0, daysPresent: 0, adjustedDays: 0,
+  daysClockedInAll: 0, daysPresentAll: 0,
+  weekendDays: 0, holidayDays: 0, approvedLeaveDays: 0,
+  coveredDays: 0, daysNotCovered: 0, pct: null, pctExact: null,
+  missedDates: [], missedDatesPast: [], presentDates: [],
+  adjustedDates: [], leaveDates: [], holidayDates: [],
+});
 
-export function missedWeekdayDatesFor(userId, monthStr, monthRecords, monthAdjusts, monthLeaves) {
-  const [y, m] = monthStr.split('-').map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  const today = _ymd(new Date());
-
-  const userRecords = (monthRecords || []).filter((r) => (r.userId || r.user_id) === userId);
-  const userAdjusts = (monthAdjusts || []).filter((a) => (a.userId || a.user_id) === userId);
-  const userLeaves  = (monthLeaves  || []).filter(
-    (l) => (l.requestedBy || l.requester_id) === userId &&
-           (l.category === 'leave'
-             || ['medical', 'emergency', 'half_leave', 'other'].includes(l.type)),
-  );
-
-  const presentSet = new Set();
-  userRecords.forEach((r) => { if (r.date && (r.clockIn || r.clock_in)) presentSet.add(r.date); });
-  const adjustedSet = new Set(userAdjusts.map((a) => a.date).filter(Boolean));
-  const leaveSet = new Set();
-  userLeaves.forEach((l) => {
-    const startDate = l.startDate || l.start_date;
-    const endDate   = l.endDate   || l.end_date;
-    if (!startDate || !endDate) return;
-    const a = new Date(startDate + 'T00:00:00').getTime();
-    const b = new Date(endDate   + 'T00:00:00').getTime();
-    for (let t = a; t <= b; t += 86400000) leaveSet.add(_ymd(new Date(t)));
-  });
-
-  const missed = [];
-  for (let day = 1; day <= lastDay; day++) {
-    const ds = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    if (ds > today) continue;
-    const dow = new Date(y, m - 1, day).getDay();
-    if (dow === 0 || dow === 6) continue;
-    if (presentSet.has(ds))  continue;
-    if (adjustedSet.has(ds)) continue;
-    if (leaveSet.has(ds))    continue;
-    missed.push(ds);
-  }
-  return missed;
-}
-
-export function computeMonthlyDays(userId, monthRecords, monthAdjusts) {
-  const userRecords = (monthRecords || []).filter((r) => (r.userId || r.user_id) === userId);
-  const userAdjusts = (monthAdjusts || []).filter((a) => (a.userId || a.user_id) === userId);
-  // Weekend clock-ins / adjustments are ignored for performance scoring —
-  // Sat/Sun are not working days, so they cannot compensate for missed
-  // weekdays (which would otherwise let someone hit 100% by working two
-  // Saturdays while skipping two Mon-Fri).
-  const actualDateSet = new Set();
-  userRecords.forEach((r) => {
-    if (!r.date) return;
-    if (isWeekendDate(r.date)) return;
-    if (r.clockIn || r.clock_in) actualDateSet.add(r.date);
-  });
-  const effectiveSet = new Set(actualDateSet);
-  userAdjusts.forEach((a) => {
-    if (!a.date || isWeekendDate(a.date)) return;
-    effectiveSet.add(a.date);
-  });
-  // Return the underlying Set too — callers that need to dedupe
-  // overlaps with leave/holiday/weekend sets (e.g. a clock-in on
-  // an Eid day) must do set-union, not integer sum.
+function _normalizeBreakdown(r) {
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  // pct/pctExact are NULL for a future month (elapsed = 0) — preserve the null
+  // rather than coercing to 0; each consumer applies its own zero-guard.
+  const num = (v) => (v == null ? null : Number(v));
   return {
-    actualDays: actualDateSet.size,
-    effectiveDays: effectiveSet.size,
-    effectiveSet,
-    adjustments: userAdjusts,
+    available: true,
+    userId: r.user_id, month: r.month, cutoff: r.cutoff_date ?? null,
+    daysThisMonth:     Number(r.elapsed_days)        || 0,
+    daysClockedIn:     Number(r.days_clocked_in)     || 0,
+    daysPresent:       Number(r.days_present)        || 0,
+    adjustedDays:      Number(r.adjusted_days)       || 0,
+    daysClockedInAll:  Number(r.days_clocked_in_all) || 0,
+    daysPresentAll:    Number(r.days_present_all)    || 0,
+    weekendDays:       Number(r.weekend_days)        || 0,
+    holidayDays:       Number(r.holiday_days)        || 0,
+    approvedLeaveDays: Number(r.leave_days)          || 0,
+    coveredDays:       Number(r.covered_days)        || 0,
+    daysNotCovered:    Number(r.days_not_covered)    || 0,
+    pct:      num(r.pct_display),
+    pctExact: num(r.pct),
+    missedDates:     arr(r.missed_dates),
+    missedDatesPast: arr(r.missed_dates_past),
+    presentDates:    arr(r.present_dates),
+    adjustedDates:   arr(r.adjusted_dates),
+    leaveDates:      arr(r.leave_dates),
+    holidayDates:    arr(r.holiday_dates),
   };
 }
 
-// Same shape as v1's; preserved for the v2 widget.
-// Optional `holidayDates` is a Set of YYYY-MM-DD strings inside the month;
-// holiday weekdays count as accounted (present-equivalent) so users get
-// credit for company-wide off days without needing a clock-in.
-export function summarizeMonth({ rows, adjustments, leaveDates, holidayDates, monthStr, today = new Date() }) {
-  const [y, m] = monthStr.split('-').map(Number);
-  const monthStart = new Date(y, m - 1, 1);
-  const monthEnd   = new Date(y, m, 0);
-
-  let workingDays = 0;
-  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) workingDays++;
-  }
-
-  // Weekend clock-ins are ignored — see computeMonthlyDays for rationale.
-  const presentDates = new Set();
-  let totalWorkMs = 0;
-  (rows || []).forEach((r) => {
-    if (!r.date) return;
-    const ds = String(r.date);
-    if (ds.slice(0, 7) !== monthStr) return;
-    if (isWeekendDate(ds)) {
-      // Hours worked stat still totals every row so the "Hours worked this
-      // month" tile reflects actual time. Only the present-day count skips.
-      totalWorkMs += r.total_work_ms || r.totalWorkMs || 0;
-      return;
-    }
-    if (r.clock_in || r.clockIn) presentDates.add(ds);
-    totalWorkMs += r.total_work_ms || r.totalWorkMs || 0;
+// One user. Returns null when the RPC yields no row (not visible to the caller,
+// or a malformed month) — callers must handle the miss, not fabricate a zero.
+export async function fetchAttendanceBreakdown(userId, monthStr) {
+  const { data, error } = await supabase.rpc('attendance_month_breakdown', {
+    p_user: userId, p_month: monthStr,
   });
-
-  const adjustedDates = new Set(
-    (adjustments || []).map((a) => a.date).filter((d) => d && !isWeekendDate(d)),
-  );
-  const leaveSet   = leaveDates   instanceof Set ? leaveDates   : new Set(leaveDates   || []);
-  const holidaySet = holidayDates instanceof Set ? holidayDates : new Set(holidayDates || []);
-  const accountedDates = new Set([...presentDates, ...adjustedDates, ...leaveSet, ...holidaySet]);
-
-  const todayMid = new Date(today); todayMid.setHours(0, 0, 0, 0);
-  let missed = 0;
-  for (let d = new Date(monthStart); d <= monthEnd && d < todayMid; d.setDate(d.getDate() + 1)) {
-    const dow = d.getDay();
-    if (dow === 0 || dow === 6) continue;
-    const ds = _ymd(d);
-    if (!accountedDates.has(ds)) missed++;
-  }
-  return {
-    workingDays,
-    presentDays:   presentDates.size,
-    leaveDays:     leaveSet.size,
-    holidayDays:   holidaySet.size,
-    adjustedDays:  adjustedDates.size,
-    accountedDays: accountedDates.size,
-    missedDays:    missed,
-    totalWorkMs,
-    presentDates,
-    adjustedDates,
-    leaveDates:    leaveSet,
-    holidayDates:  holidaySet,
-  };
-}
-
-// Approved-leave dates for one user inside a month, expanded
-// day-by-day (weekends excluded). WFH excluded — remote work is
-// not an absence. Every other approved leave type (medical,
-// emergency, half_leave, other) counts; the original code dropped
-// "other" / "half_leave" silently, which made approved wedding /
-// bereavement leaves disappear from the attendance numbers.
-// Optionally pass `holidaySet` so company-holiday dates are
-// removed too, preventing double-counting against a separate
-// holiday tally on the calling side.
-export async function listApprovedLeaveDatesForMonth(userId, monthStr, { holidaySet } = {}) {
-  const [y, m] = monthStr.split('-').map(Number);
-  const start = `${y}-${String(m).padStart(2, '0')}-01`;
-  const last  = new Date(y, m, 0).getDate();
-  const end   = `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-  const { data, error } = await supabase
-    .from('leave_requests')
-    .select('start_date, end_date')
-    .eq('requester_id', userId)
-    .eq('status', 'approved')
-    .in('type', ['medical', 'emergency', 'half_leave', 'other'])
-    .lte('start_date', end)
-    .gte('end_date',   start);
   if (error) throw new Error(error.message);
-  const out = new Set();
-  (data || []).forEach((lv) => {
-    const cur  = new Date(lv.start_date + 'T00:00:00');
-    const stop = new Date(lv.end_date   + 'T00:00:00');
-    while (cur <= stop) {
-      const dow = cur.getDay();
-      if (dow !== 0 && dow !== 6) {
-        const ds = _ymd(cur);
-        if (ds >= start && ds <= end && !(holidaySet && holidaySet.has(ds))) out.add(ds);
-      }
-      cur.setDate(cur.getDate() + 1);
-    }
-  });
-  return out;
+  // Set-returning RPC → PostgREST hands back an ARRAY.
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? _normalizeBreakdown(row) : null;
 }
 
-function _ymd(d) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// Batch. Always a Map keyed by userId; users the caller can't see are simply absent.
+export async function fetchAttendanceBreakdownBulk(monthStr, userIds) {
+  const ids = Array.from(new Set((userIds || []).filter(Boolean)));
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase.rpc('attendance_month_breakdown_bulk', {
+    p_month: monthStr, p_user_ids: ids,
+  });
+  if (error) throw new Error(error.message);
+  const map = new Map((data || []).map((r) => [r.user_id, _normalizeBreakdown(r)]));
+  if (map.size < ids.length) {
+    console.warn(`[attendance] breakdown returned ${map.size} of ${ids.length} requested users`);
+  }
+  return map;
 }
 
 // ────────────────────────────────────────────────────────────
