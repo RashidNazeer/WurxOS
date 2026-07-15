@@ -934,12 +934,20 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       const LEVEL_LABEL: Record<string, string> = { promotion: 'Promotion', good: 'Good', warning: 'Warning', termination: 'Termination' };
       const headlineOf = (uid: string): string | null => {
         const c = compMap.get(uid);
-        if (!c || c.composite_score == null) return null;
+        if (!c) return null;
+        // The composite is withheld until the OL verifies the incentive plan
+        // (mig 257) — report that, NOT the raw metrics average, or the assistant
+        // would silently disagree with the Performance page (which shows a badge).
+        if (c.level === 'pending_verification') {
+          return 'composite withheld — incentive plan not yet verified by the OL';
+        }
+        if (c.composite_score == null) return null;   // not rated yet
         const lvl = c.level ? (LEVEL_LABEL[String(c.level)] || String(c.level)) : '';
         return `composite ${Number(c.composite_score).toFixed(1)}/100${lvl ? ` — ${lvl}` : ''}`;
       };
       const compScoreOf = (r: any) => {
         const c = compMap.get(r.user_id);
+        if (c && c.level === 'pending_verification') return -1;   // unverified → rank last
         return c && c.composite_score != null ? Number(c.composite_score) : (Number(r.overall_score) || 0);
       };
 

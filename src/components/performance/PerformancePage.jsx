@@ -124,6 +124,15 @@ function calcIncentiveScore(incRecord) {
   return Math.round((completed / items.length) * 100);
 }
 
+// The composite is withheld until the OL has VERIFIED the incentive plan (mig 257):
+// self-reported item completion must not move the score before an OL confirms it.
+// A plan that EXISTS but isn't verified => pending. No plan => nothing to verify.
+function isIncPending(incRecord) {
+  if (!incRecord) return false;
+  const items = [...(incRecord.incentives || []), ...(incRecord.bonuses || [])];
+  return items.length > 0 && !incRecord.verified;
+}
+
 /**
  * Attendance pillar score from an AttendanceBreakdown (the SQL RPC).
  *   • null breakdown  → null ("—"). NEVER 0: a failed/missing row must not
@@ -1295,6 +1304,7 @@ export default function PerformancePage() {
       const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
       const pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
       const composite = calcComposite(pillarScores, weights);
+      const incPending = isIncPending(teamIncentives[u.id]);
       const gCount = (teamFlags[u.id] || []).filter(f => f.type === 'green').length;
       const rCount = (teamFlags[u.id] || []).filter(f => f.type === 'red').length;
       const wCount = teamWarnings[u.id] || 0;
@@ -1302,7 +1312,7 @@ export default function PerformancePage() {
       // so the "apcs" tab — which holds both APCs (TL view) and IPCs
       // (PCTL view) — gates each row by who can actually rate it.
       const canEdit = canRate(effectiveRole, u.role || u.userRole || 'apc');
-      return { ...u, name, rec, perfScore, incScore, attScore, flagScore, pillarScores, composite, gCount, rCount, wCount, canEdit, attData, workingDays: wd };
+      return { ...u, name, rec, perfScore, incScore, attScore, flagScore, pillarScores, composite, incPending, gCount, rCount, wCount, canEdit, attData, workingDays: wd };
     });
     if (search) { const s = search.toLowerCase(); list = list.filter(u => u.name.toLowerCase().includes(s)); }
     if (levelFilter !== 'all') {
@@ -1312,7 +1322,7 @@ export default function PerformancePage() {
       // composite (auto pillars, or 0 when all null → 'Termination'). no_data =
       // genuinely no rating row.
       if (levelFilter === 'no_data') list = list.filter(u => !u.rec);
-      else list = list.filter(u => u.rec && !attError
+      else list = list.filter(u => u.rec && !attError && !u.incPending
         && getLevel(u.composite).label.toLowerCase() === levelFilter);
     }
     return list;
@@ -1326,6 +1336,7 @@ export default function PerformancePage() {
   // My pillar scores
   const myPerfScore = myRecord ? calcMetricsAvg(myRecord.metrics) : null;
   const myIncScore  = calcIncentiveScore(myIncRecord);
+  const myIncPending = isIncPending(myIncRecord);
   const myAttScore  = attendanceScoreFrom(myAttendanceDays);
   const myFlagScore = calcFlagsScore(myFlags, month);
   const myPillarScores = { performance: myPerfScore, incentives: myIncScore, attendance: myAttScore, flags: myFlagScore };
@@ -1436,23 +1447,25 @@ export default function PerformancePage() {
               a performance entry for this month. Auto-calculated pillars
               (incentives/attendance/flags) would otherwise produce a
               misleading partial composite at the start of the month. */}
-          {myPerfScore === null || !compositeOk ? (
+          {!compositeOk || myPerfScore === null || myIncPending ? (
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ height: 4, background: 'linear-gradient(90deg,var(--border-strong),var(--border-default))' }} />
               <div className="card-body p-4 text-center">
                 <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
                   style={{ width: 100, height: 100, background: 'var(--surface-2)', border: '3px solid var(--border-default)' }}>
-                  <i className="bi bi-hourglass-split" style={{ fontSize: '1.8rem', color: 'var(--text-secondary)' }} />
+                  <i className={`bi ${myPerfScore !== null && compositeOk && myIncPending ? 'bi-shield-check' : 'bi-hourglass-split'}`} style={{ fontSize: '1.8rem', color: 'var(--text-secondary)' }} />
                 </div>
                 <div className="d-flex align-items-center justify-content-center gap-1 mb-1">
                   <span className="fw-bold" style={{ color: 'var(--text-secondary)' }}>
-                    {!compositeOk ? 'Score Unavailable' : 'Not Rated Yet'}
+                    {!compositeOk ? 'Score Unavailable' : myPerfScore === null ? 'Not Rated Yet' : 'Not Yet Verified by OL'}
                   </span>
                 </div>
                 <p className="text-muted small mb-0">
                   {!compositeOk
                     ? 'Attendance coverage failed to load — the composite would be misleading.'
-                    : `Performance is rated at the end of ${getMonthLabel(month)}`}
+                    : myPerfScore === null
+                      ? `Performance is rated at the end of ${getMonthLabel(month)}`
+                      : 'Your incentives must be verified by your OL before the composite score is calculated.'}
                 </p>
               </div>
             </div>
@@ -1625,7 +1638,7 @@ export default function PerformancePage() {
                 // `compositeOk` false = the attendance RPC failed. calcComposite
                 // would re-normalise over the surviving pillars and print a
                 // plausible-but-wrong number, so we print nothing instead.
-                const isRated = u.perfScore !== null && compositeOk;
+                const isRated = u.perfScore !== null && compositeOk && !u.incPending;
                 const level = getLevel(u.composite);
                 // When not rated, dim the top stripe + show "Not Rated Yet"
                 // pill in place of the composite number. Auto-calculated
@@ -1659,10 +1672,13 @@ export default function PerformancePage() {
                                 </span>
                               </>
                             ) : (
-                              <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.6rem', padding: '6px 10px' }}>
+                              <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.6rem', padding: '6px 10px' }}
+                                title={u.perfScore !== null && compositeOk && u.incPending ? 'Composite is withheld until the OL verifies this incentive plan' : undefined}>
                                 {!compositeOk
                                   ? <><i className="bi bi-exclamation-triangle me-1" />Score Unavailable</>
-                                  : <><i className="bi bi-hourglass-split me-1" />Not Rated Yet</>}
+                                  : u.perfScore === null
+                                    ? <><i className="bi bi-hourglass-split me-1" />Not Rated Yet</>
+                                    : <><i className="bi bi-shield-check me-1" />Not Verified</>}
                               </span>
                             )}
                           </div>

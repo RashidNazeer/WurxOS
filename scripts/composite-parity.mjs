@@ -39,7 +39,7 @@ let totalMismatch = 0;
 for (const month of months) {
   const [{ data: ratings }, { data: incs }, { data: flags }] = await Promise.all([
     sb.from('performance_ratings').select('user_id,overall_score,metrics').eq('month', month),
-    sb.from('incentives').select('user_id,incentives,bonuses,payout_cleared').eq('month', month),
+    sb.from('incentives').select('user_id,incentives,bonuses,payout_cleared,verified').eq('month', month),
     sb.from('performance_flags').select('user_id,type,created_at'),
   ]);
   const ratingOf = new Map((ratings || []).map((r) => [r.user_id, r]));
@@ -75,9 +75,12 @@ for (const month of months) {
     const r = fCount.length - g;
     const flg = clamp(80 + g * 10 - r * 20);
 
+    // A plan that exists but isn't OL-verified withholds the composite (mig 257).
+    const planPending = incHas && !(ir?.verified);
     // ---- composite, both sides (weighted mean over present pillars) ----
     const comp = (perf, inc) => {
-      if (perf == null) return null;
+      if (perf == null) return null;      // not rated
+      if (planPending) return null;       // pending OL verification
       let num = perf * W.performance, den = W.performance;
       if (inc != null) { num += inc * W.incentives; den += W.incentives; }
       num += attP * W.attendance; den += W.attendance;
