@@ -99,8 +99,12 @@ export default function ClockInReminder() {
   };
 
   return createPortal(
+    // z-index sits ABOVE normal app content but BELOW the app's content modals
+    // (1050–1080): a reminder that fires while someone is mid-edit in a modal
+    // waits politely behind it and re-appears (still rendered, just occluded)
+    // the moment they close it, rather than covering their work.
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1200, display: 'flex',
+      position: 'fixed', inset: 0, zIndex: 1045, display: 'flex',
       alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
       <div
