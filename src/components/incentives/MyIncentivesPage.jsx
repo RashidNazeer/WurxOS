@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getIncentives, updateIncentivesProgress,
+  getIncentives, updateIncentivesProgress, autoComplete,
 } from '../../lib/incentivesApi';
 
 function getMonthLabel(ym) {
@@ -54,8 +54,8 @@ function EditProgressRow({ item, cat, onChange }) {
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
-  const p        = pct(achieved, target);
-  const done     = p >= 90;
+  const p        = pct(achieved, target);          // display % only (rounded, capped 100)
+  const done     = autoComplete({ ...item, achievedValue: achieved, targetValue: target }); // single rule: raw ratio >= 0.9
   const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
     <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAtt ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAtt ? '#bfdbfe' : '#e9ecef')}` }}>
@@ -127,8 +127,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
       [cat]: prev[cat].map(it => {
         if (it.id !== itemId) return it;
         const updated = { ...it, [field]: value };
-        const p = pct(field === 'achievedValue' ? value : updated.achievedValue, field === 'targetValue' ? value : updated.targetValue);
-        return { ...updated, completed: p >= 90 };
+        return { ...updated, completed: autoComplete(updated) };
       }),
     }));
   }

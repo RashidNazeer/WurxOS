@@ -237,9 +237,11 @@ export function canRate(viewer, target) {
   if (viewer === 'boss' && target === 'ol') return true;
   if (viewer === 'ol' && (target === 'tl' || target === 'apc')) return true;
   if (viewer === 'tl' && target === 'apc') return true;
-  // PCTL is the IPCs direct manager (profiles.reports_to), so they
-  // rate / flag IPCs the same way a TL rates / flags APCs.
-  if (viewer === 'pctl' && target === 'ipc') return true;
+  // PCTL is the IPCs' direct manager (profiles.reports_to), so they
+  // rate / flag IPCs the same way a TL rates / flags APCs. A PCTL can also
+  // pick up APC direct reports — RLS/can_eval_perf backs pctl->apc for any
+  // target whose reports_to = the PCTL, so allow the Rate button too.
+  if (viewer === 'pctl' && (target === 'ipc' || target === 'apc')) return true;
   return false;
 }
 

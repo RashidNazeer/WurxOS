@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { karachiYmd, karachiMonth } from '../../lib/serverTime';
 import ClockWidget from './ClockWidget';
 import {
   onTeamToday, onAllToday, onPendingApprovals, onActiveRecord,
@@ -196,6 +198,28 @@ function MyMonthlyAttendance({ userId, displayName }) {
     return () => { cancelled = true; };
   }, [userId, reloadKey]);
 
+  // Live-refresh the coverage card when this user clocks in / out (or a
+  // manager marks them present). Debounced so a burst of writes triggers one
+  // reload; same channel pattern as attendanceApi's realtime listeners.
+  useEffect(() => {
+    if (!userId) return;
+    let timer = null;
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setReloadKey(k => k + 1), 1000);
+    };
+    const ch = supabase
+      .channel(`my-att-${userId}-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'attendance', filter: `user_id=eq.${userId}` },
+          bump)
+      .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'attendance_adjustments', filter: `user_id=eq.${userId}` },
+          bump)
+      .subscribe();
+    return () => { clearTimeout(timer); supabase.removeChannel(ch); };
+  }, [userId]);
+
   if (loading) {
     return (
       <div className="rounded-3 mb-3 p-3 d-flex align-items-center gap-2 text-muted"
@@ -247,7 +271,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
       </div>
 
       <div className="row g-2 mb-2">
-        <MyAttTile dot="var(--success)" label="Days present"
+        <MyAttTile dot="var(--success)" label="Days present (incl. weekends worked)"
           value={stats.presentDays}
           sub={stats.hasOverride && stats.actualPresentDays !== stats.presentDays
             ? `actual ${stats.actualPresentDays} · manager-adjusted`
@@ -759,7 +783,7 @@ function TodayTimeline({ record }) {
 
 /* ── Roster tab: per-user monthly summary with manual override ─────────────── */
 function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membersLoading, membersError }) {
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => karachiMonth());
   const [records, setRecords] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
   const [breakdowns, setBreakdowns] = useState(() => new Map());
@@ -773,7 +797,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membe
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null);
 
-  const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const currentMonthStr = useMemo(() => karachiMonth(), []);
 
   // The coverage RPC is keyed on the member IDs, which arrive asynchronously
   // from the parent. Without this in the effect deps the tab would fetch with
@@ -830,6 +854,24 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, reloadKey, memberIds, membersLoading]);
 
+  // Live-refresh coverage/health when anyone clocks in/out or an adjustment
+  // lands (own Adjust panel, another manager, or the bulk job). RLS scopes the
+  // stream to rows this manager can see; debounced so a burst = one reload.
+  // Same channel pattern as attendanceApi's realtime listeners.
+  useEffect(() => {
+    let timer = null;
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setReloadKey(k => k + 1), 1000);
+    };
+    const ch = supabase
+      .channel(`roster-att-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_adjustments' }, bump)
+      .subscribe();
+    return () => { clearTimeout(timer); supabase.removeChannel(ch); };
+  }, []);
+
   // Elapsed days in the month — identical on every breakdown row.
   const workingDaysInMonth = useMemo(() => {
     const first = breakdowns.values().next().value;
@@ -857,8 +899,11 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membe
         effectiveDays:  b ? b.daysPresent : 0,
         leaveDays:      b ? b.approvedLeaveDays : 0,
         coveredDays:    b ? b.coveredDays : 0,
-        daysNotCovered: b ? b.daysNotCovered : 0,
-        missedDates:    b ? b.missedDates : [],   // today INCLUDED — the bulk-mark set
+        // Past-only: the server (att_adjust_bulk_mark_missed) stamps missed
+        // PAST days only — today is never written — so the bulk-mark preview
+        // count/label must exclude today to match what actually gets saved.
+        daysNotCovered: b ? b.missedDatesPast.length : 0,
+        missedDates:    b ? b.missedDatesPast : [],
         pct:            b ? b.pct : null,
         presentDates:   b ? b.presentDates : [],
         leaveDateSet:   new Set(b ? b.leaveDates : []),
@@ -1202,10 +1247,9 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
   const [y, m] = month.split('-').map(Number);
   const monthStart = `${y}-${String(m).padStart(2, '0')}-01`;
   const lastDay = new Date(y, m, 0).getDate();
-  const today = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  })();
+  // Karachi business day (server-anchored) — a browser-local "today" would
+  // mislabel the first ~5h of every UTC day and flip future/missed at the edge.
+  const today = karachiYmd();
 
   // Build per-day map. Every credit set comes from the breakdown RPC, so the
   // calendar can never disagree with the card beside it. Adjustment ROWS still
@@ -1234,6 +1278,12 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
       else if (leaveSet.has(ds)) kind = 'leave';
       else if (holidaySet.has(ds)) kind = 'holiday';
       else if (isWeekend) kind = 'weekend';
+      // TODAY is never "missed": the server (att_adjust_bulk_mark_missed) and the
+      // row chip both use missed_dates_past, which EXCLUDES today. A day only
+      // becomes missable once it has fully elapsed, so a still-attendable day can
+      // never be stamped present. Treat an uncovered today as non-actionable so
+      // summary.missed / markAllMissed / shift-range match the row + team bulk.
+      else if (ds === today) kind = 'future';
       const hasRedundantAdj = kind === 'present' && adjMap.has(ds);
       out.push({ ds, day, kind, dow, adjustment: adjMap.get(ds) || null, hasRedundantAdj });
     }
@@ -1257,7 +1307,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
       const hi = lastTappedDate < d.ds ? d.ds : lastTappedDate;
       const targets = days_.filter(x =>
         x.ds >= lo && x.ds <= hi
-        && (x.kind === 'missed' || x.kind === 'weekend')
+        && x.kind === 'missed'   // weekends are always credited; the server rejects them
       );
       if (targets.length === 0) return;
       setBulkSaving(true);
@@ -1291,7 +1341,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
     try {
       if (d.kind === 'adjusted' && d.adjustment) {
         await deleteAttendanceAdjustment(d.adjustment.id);
-      } else if (d.kind === 'missed' || d.kind === 'weekend') {
+      } else if (d.kind === 'missed') {
         await createAttendanceAdjustment({
           userId: row.user.id,
           userName: row.user.name,
@@ -1431,14 +1481,14 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                   holiday:  { bg: 'var(--purple-soft)', fg: 'var(--purple)', border: 'var(--purple)' },
                   future:   { bg: 'var(--surface-1)',    fg: 'var(--text-muted)', border: 'var(--border-subtle)' },
                 }[d.kind];
-                const clickable = d.kind === 'missed' || d.kind === 'adjusted' || d.kind === 'weekend';
+                const clickable = d.kind === 'missed' || d.kind === 'adjusted';
                 const isPending = pendingDate === d.ds;
                 const titleByKind = {
                   present: 'Present (real clock-in)',
                   leave:   'Approved leave',
                   adjusted:`Manually marked present${d.adjustment?.note ? ' · ' + d.adjustment.note : ''}`,
                   missed:  'Missed — tap to mark present',
-                  weekend: 'Weekend — tap if user worked',
+                  weekend: 'Weekend — always credited',
                   holiday: 'Company holiday — already credited',
                   future:  'Future date',
                 }[d.kind];

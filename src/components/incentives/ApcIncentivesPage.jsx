@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getIncentives, updateIncentivesProgress, notifyIncentiveEmployee,
+  getIncentives, updateIncentivesProgress, notifyIncentiveEmployee, autoComplete,
 } from '../../lib/incentivesApi';
 import { listBrandsForApc } from '../../lib/agendaApi';
 
@@ -162,8 +162,8 @@ function EditItemRow({ item, category, onChange }) {
   const achieved = item.achievedValue ?? '';
   const target   = item.targetValue   ?? '';
   const unitSfx  = itemSuffix(item);
-  const p        = pct(achieved, target);
-  const isCompleted = p >= 90;
+  const p        = pct(achieved, target);          // display % only (rounded, capped 100)
+  const isCompleted = autoComplete(item);           // completion = raw ratio >= 0.9 (single rule)
   const isAtt    = item.source === 'attendance';
 
   return (
@@ -243,7 +243,7 @@ function EditItemRow({ item, category, onChange }) {
             />
           </div>
           <div className="text-end mt-1" style={{ fontSize: '0.63rem', color: isCompleted ? '#198754' : '#6c757d' }}>
-            {p}% {p >= 90 ? '— Completed! 🎉' : p >= 60 ? '— Getting close' : '— In progress'}
+            {p}% {isCompleted ? '— Completed! 🎉' : p >= 60 ? '— Getting close' : '— In progress'}
           </div>
         </div>
       )}
@@ -274,11 +274,7 @@ function EditModal({ record, items, onClose, onSaved }) {
       [category]: prev[category].map(it => {
         if (it.id !== itemId) return it;
         const updated = { ...it, [field]: value };
-        const p = pct(
-          field === 'achievedValue' ? value : updated.achievedValue,
-          field === 'targetValue'   ? value : updated.targetValue,
-        );
-        return { ...updated, completed: p >= 90 };
+        return { ...updated, completed: autoComplete(updated) };
       }),
     }));
   }

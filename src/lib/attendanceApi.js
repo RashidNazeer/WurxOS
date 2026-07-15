@@ -19,6 +19,15 @@
 import { supabase } from './supabase';
 import { getNow } from './serverTime';
 
+// The current shift day ('YYYY-MM-DD'), server-clock anchored, matching how the
+// DB stamps attendance.date: shift day rolls at 3pm PKT, i.e. UTC+5 minus a 15h
+// offset === subtract 10h from the UTC instant before taking the date. Using a
+// plain `new Date().toISOString().slice(0,10)` here reads the BROWSER clock in
+// UTC, which drifts off the shift day for anyone whose clock is wrong or who is
+// in the last/first hours of the shift window — the "today" tab then queries the
+// wrong date and shows nothing.
+const karachiShiftDay = () => new Date(getNow() - 10 * 3600000).toISOString().slice(0, 10);
+
 // ────────────────────────────────────────────────────────────
 // Row shape adapter
 // ────────────────────────────────────────────────────────────
@@ -130,7 +139,11 @@ export function calcTimes(record) {
     if (bStart === null || bStart >= endMs) return;
     const bEndRaw = b.end ? _ms(b.end) : nowMs;
     const bEnd = Math.min(bEndRaw, endMs);
-    totalBreakMs += Math.max(0, bEnd - bStart);
+    // Floor the break's start to clock-in so an approved break-edit whose start
+    // predates clock-in (or a cross-midnight break) can't subtract time that was
+    // never on the clock and drive totalWorkMs artificially low.
+    const bs = Math.max(bStart, clockInMs);
+    totalBreakMs += Math.max(0, bEnd - bs);
   });
 
   let requestTimeMs = 0;
@@ -279,7 +292,7 @@ export async function getActiveRecord(uid) {
   //    show the accurate "last clock-in" stats and offer the
   //    "Resume shift" recovery (mig 173). Shift day rolls at 3pm PKT;
   //    `date` on the row is already the shift day (set by att_clock_in).
-  const shiftDay = new Date(getNow() - 10 * 3600000).toISOString().slice(0, 10);
+  const shiftDay = karachiShiftDay();
   const { data: todayRow, error: e2 } = await supabase
     .from('attendance')
     .select(SELECT_WITH_USER_AND_EDITS)
@@ -331,9 +344,45 @@ export function onActiveRecord(uid, callback) {
   return unsubscribe;
 }
 
+// --------------------------------------------------------------
+// Clock-in reminder (mig 254)
+// --------------------------------------------------------------
+
+// The caller's own shift start ('HH:MM:SS' PKT) or null if unset. Read from the
+// profile the app already holds; this is a fallback for when it isn't handy.
+export async function getMyShiftStart() {
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth?.user?.id;
+  if (!me) return null;
+  const { data, error } = await supabase
+    .from('profiles').select('shift_start_time').eq('id', me).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.shift_start_time || null;
+}
+
+// Set (or clear) the caller's own shift start. `timeStr` is 'HH:MM' understood
+// as Pakistan time; '' or null turns the reminder off. Goes through the RPC so
+// the write is validated and scoped to the caller.
+export async function setMyShiftStart(timeStr) {
+  const { error } = await supabase.rpc('att_set_my_shift_start', {
+    p_time: timeStr ? timeStr : null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+// The one verdict the reminder popup needs. All the PKT / shift-day / leave /
+// holiday math lives in the DB (mig 254); this just unwraps the single row.
+// Returns { remind, reason, shift_start, shift_day, starts_at }.
+export async function shouldRemindClockIn() {
+  const { data, error } = await supabase.rpc('attendance_should_remind_clock_in');
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return row || { remind: false, reason: 'no-row' };
+}
+
 // Today / Team / All — used by v1's manager dashboards.
 export async function getTodayRecord(uid) {
-  const d = new Date().toISOString().slice(0, 10);
+  const d = karachiShiftDay();
   const { data, error } = await supabase
     .from('attendance')
     .select(SELECT_WITH_USER_AND_EDITS)
@@ -353,7 +402,7 @@ export const getToday = getTodayActiveOrToday;
 const OPEN_STATUSES = ['clocked-in', 'on-break', 'pending-approval'];
 
 async function _fetchTeamToday(ownerId) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = karachiShiftDay();
   // Two queries — today's records + open records from any date —
   // merged by id so a night shift that started yesterday and is
   // still open shows up on today's team view.
@@ -872,7 +921,7 @@ export async function listTeamHistory({ from, to } = {}) {
   return getAllHistory(from, to);
 }
 export async function listToday() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = karachiShiftDay();
   const { data, error } = await supabase.from('attendance')
     .select(SELECT_WITH_USER_AND_EDITS)
     .eq('date', today)
@@ -1103,44 +1152,37 @@ export async function fetchAttendanceBreakdownBulk(monthStr, userIds) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Roster bulk fetch — every attendance row + every approved
-// leave overlapping the given month. v1 used two parallel
-// Firestore reads; v2 mirrors it via two parallel Supabase
-// queries. RLS scopes the result for non-Boss/OL callers.
+// Roster bulk fetch — every attendance row overlapping the given
+// month. RLS scopes the result for non-Boss/OL callers. Coverage /
+// leave / holiday maths is the SQL breakdown's job (mig 252); this
+// only supplies the raw rows the Roster renders (hours, calendar,
+// adjustment controls), so the leave query that used to ride along
+// is gone.
 // ────────────────────────────────────────────────────────────
 export async function fetchRosterMonth(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
   const start = `${y}-${String(m).padStart(2, '0')}-01`;
   const last  = new Date(y, m, 0).getDate();
   const end   = `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-  const [attQ, leaveQ] = await Promise.all([
-    supabase.from('attendance').select(SELECT_WITH_USER).gte('date', start).lte('date', end),
-    supabase.from('leave_requests')
-      .select('id, requester_id, type, status, start_date, end_date')
-      .eq('status', 'approved')
-      // Every non-WFH approved leave counts toward "covered" days.
-      // Previously this dropped "other" / "half_leave" entries.
-      .in('type', ['medical', 'emergency', 'half_leave', 'other'])
-      .lte('start_date', end).gte('end_date', start),
-  ]);
-  if (attQ.error)   throw new Error(attQ.error.message);
-  if (leaveQ.error) throw new Error(leaveQ.error.message);
-  // Map leave rows to v1 shape: { requestedBy, category, startDate, endDate }.
-  const leaves = (leaveQ.data || []).map((l) => ({
-    id: l.id,
-    requestedBy: l.requester_id,
-    requester_id: l.requester_id,
-    category: 'leave',
-    type: l.type,
-    startDate: l.start_date,
-    endDate:   l.end_date,
-    start_date: l.start_date,
-    end_date:   l.end_date,
-  }));
-  return {
-    records: _normalizeAll(attQ.data),
-    leaves,
-  };
+  // PostgREST caps an unbounded select at 1000 rows silently. A full month across
+  // ~30+ staff already approaches that and will trip it as headcount grows, so
+  // page through with a stable order until a short page comes back.
+  const PAGE = 1000;
+  const records = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('attendance')
+      .select(SELECT_WITH_USER)
+      .gte('date', start).lte('date', end)
+      .order('date', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const page = data || [];
+    records.push(...page);
+    if (page.length < PAGE) break;
+  }
+  return { records: _normalizeAll(records) };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1284,7 +1326,7 @@ export async function checkApcDailyTasks(uid) {
 // so we look it up by (user_id, date) first.
 // ────────────────────────────────────────────────────────────
 async function _todayRow(uid) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = karachiShiftDay();
   const { data, error } = await supabase
     .from('attendance').select('id')
     .eq('user_id', uid).eq('date', today).maybeSingle();

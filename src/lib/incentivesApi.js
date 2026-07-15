@@ -1,17 +1,10 @@
 import { supabase } from './supabase';
+// Server-anchored Karachi calendar month — the single source for "is this month
+// CLOSED" (the money gate). Do NOT reintroduce a local new Date() month here: it
+// drifts for the first ~5h of every UTC day and at every month boundary.
+import { karachiMonth } from './serverTime';
 
 export function currentMonth() { return new Date().toISOString().slice(0, 7); }
-
-// The business month, in the timezone the DB is locked to. Used ONLY to decide
-// whether a month is CLOSED (see applyAttendanceAutofill) — never for display.
-export function karachiMonth(d = new Date()) {
-  const p = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit',
-  }).formatToParts(d);
-  const y = p.find((x) => x.type === 'year')?.value;
-  const m = p.find((x) => x.type === 'month')?.value;
-  return `${y}-${m}`;
-}
 
 export function autoComplete(item) {
   const t = Number(item.targetValue), a = Number(item.achievedValue);
@@ -46,13 +39,37 @@ function _hasAttendanceItem(row) {
     .some((it) => it && it.source === 'attendance');
 }
 
-// Patch attendance-linked items on the given normalised rows with live %.
-// No-op (and no network call) when no row has an attendance-linked item, so
-// this is safe to run on every incentives fetch. Fails soft: if the RPC
-// isn't there yet (pre-migration), rows are returned untouched.
+// A payout_cleared row is FROZEN: the % the payout was based on is snapshotted
+// into the JSONB server-side at clear time. Never re-overlay it — the live
+// figure could drift (backdated leave/adjustment edits to a past month) and
+// silently move an already-paid number. Handles raw (payout_cleared) and
+// normalised (payoutCleared) rows.
+function _isPaid(row) {
+  return !!(row && (row.payout_cleared || row.payoutCleared));
+}
+
+// Attendance items are auto-filled at READ time, so their achievedValue/completed
+// must never be persisted as a frozen literal by an edit funnel (a mid-month
+// 40.9% would get baked into data-at-rest and every non-overlay consumer —
+// ai-chat, backups — would read the stale number). Strip the derived fields on
+// save; keep the source flag + Target=100 + suffix invariant. The paid-time
+// snapshot is written server-side at payout-clear, not here.
+function stripAttendanceForSave(items) {
+  return (items || []).map((it) => {
+    if (!it || it.source !== 'attendance') return it;
+    return { ...it, achievedValue: null, completed: false, completedBy: null, targetValue: 100, suffix: it.suffix || '%' };
+  });
+}
+
+// Patch attendance-linked items on the given rows with live %.
+// No-op (and no network call) when no non-paid row has an attendance-linked
+// item, so this is safe to run on every incentives fetch. Fails soft: if the
+// RPC isn't there yet (pre-migration), rows are returned untouched.
 export async function applyAttendanceAutofill(rows, month) {
   const list = Array.isArray(rows) ? rows : [];
-  const needIds = list.filter(_hasAttendanceItem).map((r) => r.user_id || r.userId).filter(Boolean);
+  const needIds = list
+    .filter((r) => !_isPaid(r) && _hasAttendanceItem(r))
+    .map((r) => r.user_id || r.userId).filter(Boolean);
   if (!needIds.length) return list;
   let pctByUser;
   try {
@@ -82,6 +99,10 @@ export async function applyAttendanceAutofill(rows, month) {
     return next;
   };
   return list.map((r) => {
+    // FREEZE: a payout_cleared row keeps the % the payout was based on (snapshotted
+    // into the JSONB server-side at clear time). Return it untouched so it reads the
+    // FROZEN achievedValue + completed verbatim — never re-overlay a paid figure.
+    if (_isPaid(r)) return r;
     const uid = r.user_id || r.userId;
     return {
       ...r,
@@ -110,14 +131,22 @@ export async function listIncentivesForMonth(month = currentMonth()) {
     .select('*, user:user_id(id, display_name, role)')
     .eq('month', month).order('updated_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return data || [];
+  // Overlay attendance-linked items even though this loader has no live consumer
+  // today — cheap safety so a future rewire can't silently bypass the overlay.
+  return applyAttendanceAutofill(data || [], month);
 }
 
 export async function upsertIncentives(userId, month, patch) {
   const { data: me } = await supabase.auth.getUser();
+  // Never freeze a read-time attendance % at rest — strip on any patch that
+  // carries items (keeps this generic funnel consistent with savePlan).
+  const items = {};
+  if (patch && 'incentives' in patch) items.incentives = stripAttendanceForSave(patch.incentives);
+  if (patch && 'bonuses'    in patch) items.bonuses    = stripAttendanceForSave(patch.bonuses);
   const payload = {
     user_id: userId, month,
     ...patch,
+    ...items,
     last_updated_by: me?.user?.id,
     updated_at: new Date().toISOString(),
   };
@@ -199,7 +228,9 @@ export async function listIncentivesForRole(role, month = currentMonth()) {
     .select('*, user:user_id(id, display_name, email, role, reports_to, is_active)')
     .eq('month', month);
   if (error) throw new Error(error.message);
-  return (data || []).filter((r) => r.user?.role === role);
+  // Overlay attendance-linked items (cheap no-op when none present) so this loader
+  // stays consistent with the read paths if it is ever wired to a live surface.
+  return applyAttendanceAutofill((data || []).filter((r) => r.user?.role === role), month);
 }
 
 // Month view scoped to a manager's direct-report team (for OL viewing APCs).
@@ -209,7 +240,9 @@ export async function listIncentivesForMyTeam(managerId, month = currentMonth())
     .select('*, user:user_id(id, display_name, email, role, reports_to, is_active)')
     .eq('month', month);
   if (error) throw new Error(error.message);
-  return (data || []).filter((r) => r.user?.reports_to === managerId);
+  // Overlay attendance-linked items (cheap no-op when none present) so this loader
+  // stays consistent with the read paths if it is ever wired to a live surface.
+  return applyAttendanceAutofill((data || []).filter((r) => r.user?.reports_to === managerId), month);
 }
 
 // All months that have any incentive row — for the month picker.
@@ -444,8 +477,9 @@ export async function updateIncentivesProgress({
   const { data, error } = await supabase
     .from('incentives')
     .update({
-      incentives,
-      bonuses,
+      // Attendance items are read-time-derived; never freeze the overlaid % at rest.
+      incentives: stripAttendanceForSave(incentives),
+      bonuses:    stripAttendanceForSave(bonuses),
       last_updated_by: me?.user?.id,
       updated_at: new Date().toISOString(),
     })
@@ -470,8 +504,8 @@ export async function savePlan({
       .from('incentives')
       .update({
         basic_salary: Number(basicSalary) || 0,
-        incentives: inc || [],
-        bonuses:    bon || [],
+        incentives: stripAttendanceForSave(inc || []),
+        bonuses:    stripAttendanceForSave(bon || []),
         last_updated_by: me?.user?.id,
         updated_at: new Date().toISOString(),
       })
@@ -487,8 +521,8 @@ export async function savePlan({
       user_id: userId,
       month,
       basic_salary: Number(basicSalary) || 0,
-      incentives: inc || [],
-      bonuses:    bon || [],
+      incentives: stripAttendanceForSave(inc || []),
+      bonuses:    stripAttendanceForSave(bon || []),
       last_updated_by: me?.user?.id,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,month' })

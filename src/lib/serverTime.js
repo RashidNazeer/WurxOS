@@ -14,6 +14,34 @@ export function getNowDate() {
   return new Date(getNow());
 }
 
+// ── Asia/Karachi calendar helpers ─────────────────────────────
+// The DB is Asia/Karachi-locked (mig 095) but the cluster runs UTC and browsers
+// are local, so "what day/month is it" must be asked in Karachi or it is wrong
+// for the first ~5h of every UTC day and at every month boundary. These derive
+// the Karachi calendar date from the SERVER-anchored clock (getNow), so a user
+// with a wrong system clock still gets the right business day. Use these instead
+// of new Date().toISOString().slice(...) or getFullYear()/getMonth() anywhere a
+// business "today"/"this month" is needed (attendance, incentives, performance).
+const _KARACHI_PARTS = (ms) => {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(ms));
+  const get = (t) => p.find((x) => x.type === t)?.value;
+  return { y: get('year'), m: get('month'), d: get('day') };
+};
+
+// 'YYYY-MM-DD' for the Karachi business day.
+export function karachiYmd(ms = getNow()) {
+  const { y, m, d } = _KARACHI_PARTS(ms);
+  return `${y}-${m}-${d}`;
+}
+
+// 'YYYY-MM' for the Karachi business month.
+export function karachiMonth(ms = getNow()) {
+  const { y, m } = _KARACHI_PARTS(ms);
+  return `${y}-${m}`;
+}
+
 export function hasSyncedServerTime() {
   return synced;
 }

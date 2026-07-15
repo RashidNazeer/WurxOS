@@ -453,7 +453,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_performance',
-      description: "Get monthly performance ratings (0-100 per area: reporting, response time, daily-task quality, task processing, overall workflow, plus overall score) for one employee, or for ALL employees ranked by overall score when no name is given. Also returns that person's performance flags (green = positive note, red = concern) and any warnings. Month format YYYY-MM; omit for the latest month with data.",
+      description: "Get monthly performance for one employee, or for ALL employees ranked when no name is given. The HEADLINE is the composite score + level (the same number the Performance page shows — a weighted blend of the manager-metrics pillar, incentives, attendance and flags). Also returns the 5 manager metrics (reporting, response time, daily-task quality, task processing, overall workflow) as supporting detail, plus that person's performance flags (green = positive note, red = concern) and any warnings. Month format YYYY-MM; omit for the latest month with data.",
       parameters: {
         type: 'object',
         properties: {
@@ -467,7 +467,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_attendance',
-      description: "Get attendance for one employee, or a team summary when no name is given. Returns a SUMMARY by default (days present, total & average hours worked, break time). Set detail=true ONLY when the user wants the individual day-by-day log. Month format YYYY-MM; omit for the current/most-recent month with data.",
+      description: "Get attendance for one employee, or a team summary when no name is given. Returns a SUMMARY by default: the canonical attendance % (the same figure the Roster/Performance pages show — it folds in approved leave, holidays and manager adjustments, so it is NOT a raw clock-in count), days present, coverage, and hours worked. Set detail=true ONLY when the user wants the individual day-by-day log. For the current month the % is coverage so far. Month format YYYY-MM; omit for the current/most-recent month with data.",
       parameters: {
         type: 'object',
         properties: {
@@ -550,6 +550,22 @@ const hms = (ms: unknown) => {
   return `${h}h${m ? ` ${m}m` : ''}`;
 };
 
+// The business "this month" in Asia/Karachi — the SINGLE source for the money
+// gate "is this month CLOSED" (mirror of src/lib/serverTime.karachiMonth). The
+// cluster runs UTC, so a raw new Date() month drifts for the first ~5h of every
+// UTC day and at every month boundary; convert through Karachi explicitly.
+const karachiMonthNow = (): string => {
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit' }).formatToParts(new Date());
+  const y = p.find((x) => x.type === 'year')?.value ?? '';
+  const m = p.find((x) => x.type === 'month')?.value ?? '';
+  return `${y}-${m}`;
+};
+
+// Clock timestamps are stored UTC; the office runs on Pakistan time. Format
+// clock-in/out in Asia/Karachi so the assistant states real local times.
+const pktTimeFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', hour12: false });
+const pktTime = (ts: unknown) => (ts ? pktTimeFmt.format(new Date(ts as string)) : '—');
+
 // YYYY-MM → {gte, lt} date-range strings for created_at/date filtering.
 const monthToRange = (month: string) => {
   if (!/^\d{4}-\d{2}$/.test(month)) return null;
@@ -589,6 +605,59 @@ function fmtIncentiveRow(name: string, row: any): string {
   if (inc.length) { lines.push('  Incentives:'); inc.forEach((g) => lines.push(goalLine(g))); }
   if (bon.length) { lines.push('  Bonuses:'); bon.forEach((g) => lines.push(goalLine(g))); }
   return lines.join('\n');
+}
+
+// ── Attendance-linked incentive overlay (cross-owner contract C1+C2) ──
+// An item flagged { source:'attendance' } stores achievedValue null/0 and
+// completed=false BY DESIGN; its real value is derived at READ time from the
+// live monthly attendance %. This is the EXACT Deno mirror of
+// src/lib/incentivesApi.applyAttendanceAutofill + autoComplete — two
+// hand-maintained copies of the same rule; keep them in lock-step or the Boss
+// assistant and the Incentives page diverge. Rules:
+//   • achievedValue = incentive_attendance_pct(month,user); targetValue = 100;
+//     suffix = it.suffix||'%'. Fallback to the stored value when the RPC has no
+//     row for a user (missing/pre-migration pct must not zero a real number).
+//   • completed ONLY when the month is CLOSED (month < Karachi this-month — the
+//     money gate) AND raw ratio achievedValue/targetValue >= 0.9 (C2). Mid-month
+//     the running % still SHOWS, but completed stays false.
+//   • A payout_cleared row is FROZEN: its paid % was snapshotted server-side at
+//     clear time — never re-overlay it; use the stored values verbatim.
+const attAutoComplete = (achieved: number, target: number) => (target > 0 ? (achieved / target) >= 0.9 : false);
+const hasAttendanceItem = (row: any) =>
+  [...(Array.isArray(row?.incentives) ? row.incentives : []), ...(Array.isArray(row?.bonuses) ? row.bonuses : [])]
+    .some((it: any) => it && it.source === 'attendance');
+
+async function overlayAttendanceIncentives(admin: any, rows: any[], month: string): Promise<any[]> {
+  const list = Array.isArray(rows) ? rows : [];
+  // Only non-paid rows with an attendance item need the live pct (paid = frozen).
+  const needIds = [...new Set(list.filter((r) => !r?.payout_cleared && hasAttendanceItem(r)).map((r) => r.user_id).filter(Boolean))];
+  if (!needIds.length) return list;
+  const pctByUser = new Map<string, number>();
+  try {
+    const { data, error } = await admin.rpc('incentive_attendance_pct', { p_month: month, p_user_ids: needIds });
+    if (error) throw error;
+    (data || []).forEach((r: any) => pctByUser.set(r.user_id, Number(r.pct) || 0));
+  } catch (e) {
+    // Fail soft — leave items untouched (stored values) rather than zeroing real
+    // numbers, exactly like applyAttendanceAutofill's catch.
+    console.warn('ai-chat attendance overlay skipped:', String((e as Error)?.message || e).slice(0, 150));
+    return list;
+  }
+  const monthClosed = String(month) < karachiMonthNow();
+  const patch = (it: any, uid: string) => {
+    if (!it || it.source !== 'attendance') return it;
+    const val = pctByUser.has(uid) ? (pctByUser.get(uid) as number) : (Number(it.achievedValue) || 0);
+    return { ...it, achievedValue: val, targetValue: 100, suffix: it.suffix || '%', completed: monthClosed ? attAutoComplete(val, 100) : false };
+  };
+  return list.map((r) => {
+    if (r?.payout_cleared) return r; // frozen — stored values verbatim
+    const uid = r.user_id;
+    return {
+      ...r,
+      incentives: (Array.isArray(r.incentives) ? r.incentives : []).map((it: any) => patch(it, uid)),
+      bonuses: (Array.isArray(r.bonuses) ? r.bonuses : []).map((it: any) => patch(it, uid)),
+    };
+  });
 }
 
 // Run a tool. Returns a compact text block for the model. Boss-only (checked by caller).
@@ -671,14 +740,19 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       if (userIds) query = query.in('user_id', userIds);
       const { data: rows } = await query;
       if (!rows || !rows.length) return `No incentive records for ${label} in ${month || '(no data)'}.`;
+      // Overlay attendance-linked items with the live % + money gate so the AI
+      // agrees with the Incentives page (contract C1+C2). fmtIncentiveRow then
+      // recomputes "Earned" from the OVERLAID completed flags, not the stale
+      // stored ones.
+      const orows = await overlayAttendanceIncentives(admin, rows, month);
       // attach names
-      const ids = [...new Set(rows.map((r: any) => r.user_id))];
+      const ids = [...new Set(orows.map((r: any) => r.user_id))];
       const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);
       const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
-      const blocks = rows
+      const blocks = orows
         .sort((a: any, b: any) => String(nameOf.get(a.user_id)).localeCompare(String(nameOf.get(b.user_id))))
         .map((r: any) => fmtIncentiveRow(nameOf.get(r.user_id) || 'Unknown', r));
-      return `Incentives for ${month} (${rows.length} record(s)):\n\n` + blocks.join('\n\n');
+      return `Incentives for ${month} (${orows.length} record(s)):\n\n` + blocks.join('\n\n');
     }
 
     if (name === 'get_salary') {
@@ -842,6 +916,33 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
       const roleOf = new Map((profs || []).map((p: any) => [p.id, p.role]));
 
+      // Composite headline (contract C3): report the SAME number + level the
+      // Performance page shows (calcComposite), via the now-corrected RPC — NOT
+      // performance_ratings.overall_score, which is only the manager-metrics
+      // pillar and crosses the Good/Warning boundary against the composite.
+      // get_performance_composite is SECURITY DEFINER + service-callable, so the
+      // admin client can read it. Fetch per resolved user (single → one call;
+      // everyone → one per rated user, bounded by staff count).
+      const compUserIds = userIds || [...new Set((ratings || []).map((r: any) => r.user_id))].filter(Boolean);
+      const compMap = new Map<string, any>();
+      await Promise.all(compUserIds.map(async (uid: string) => {
+        try {
+          const { data: c } = await admin.rpc('get_performance_composite', { p_user: uid, p_month: month });
+          if (Array.isArray(c) && c.length) compMap.set(uid, c[0]);
+        } catch { /* fall back to metrics avg headline */ }
+      }));
+      const LEVEL_LABEL: Record<string, string> = { promotion: 'Promotion', good: 'Good', warning: 'Warning', termination: 'Termination' };
+      const headlineOf = (uid: string): string | null => {
+        const c = compMap.get(uid);
+        if (!c || c.composite_score == null) return null;
+        const lvl = c.level ? (LEVEL_LABEL[String(c.level)] || String(c.level)) : '';
+        return `composite ${Number(c.composite_score).toFixed(1)}/100${lvl ? ` — ${lvl}` : ''}`;
+      };
+      const compScoreOf = (r: any) => {
+        const c = compMap.get(r.user_id);
+        return c && c.composite_score != null ? Number(c.composite_score) : (Number(r.overall_score) || 0);
+      };
+
       // 5 metrics — punctuality was dropped (mig 243). Old rows still carry a
       // punctuality value in metrics jsonb; it no longer counts toward
       // overall_score, so don't report it either.
@@ -853,7 +954,10 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
         const m = r.metrics || {};
         const parts = Object.keys(metricLabel).filter((k) => m[k] != null).map((k) => `${metricLabel[k]} ${m[k]}`);
         const ov = r.overall_score != null ? Number(r.overall_score).toFixed(1) : '?';
-        return `${nameOf.get(r.user_id) || 'Unknown'} — overall ${ov}/100${parts.length ? ` (${parts.join(', ')})` : ''}`;
+        const nm = nameOf.get(r.user_id) || 'Unknown';
+        const head = headlineOf(r.user_id);
+        const detail = `manager-metrics avg ${ov}/100${parts.length ? `; ${parts.join(', ')}` : ''}`;
+        return head ? `${nm} — ${head} (${detail})` : `${nm} — ${detail}`;
       };
 
       // Flags + warnings. Scoped to the person if named. When a month is in
@@ -888,10 +992,14 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       const whoLabel = month ? ` in ${month}` : '';
       let out = '';
       if (ratings && ratings.length) {
-        const sorted = ratings.slice().sort((a: any, b: any) => (Number(b.overall_score) || 0) - (Number(a.overall_score) || 0));
-        out += `Performance ratings for ${month} (${ratings.length}):\n` + sorted.map((r: any) => `- ${fmtRating(r)}`).join('\n');
+        // Rank by the composite (the page's headline), not the metrics-avg pillar.
+        const sorted = ratings.slice().sort((a: any, b: any) => compScoreOf(b) - compScoreOf(a));
+        out += `Performance for ${month} (${ratings.length}; headline = composite score / level, same as the Performance page):\n` + sorted.map((r: any) => `- ${fmtRating(r)}`).join('\n');
       } else {
-        out += `No performance ratings for ${single ? single.display_name : 'anyone'}${whoLabel || ' (no data)'}.`;
+        const head = single && userIds ? headlineOf(userIds[0]) : null;
+        out += head
+          ? `${single.display_name} — ${head}${whoLabel} (no manager-metric ratings recorded, so the metrics pillar is not rated yet).`
+          : `No performance ratings for ${single ? single.display_name : 'anyone'}${whoLabel || ' (no data)'}.`;
       }
 
       if (flags && flags.length) {
@@ -922,48 +1030,93 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
         const { data: mx } = await admin.from('attendance').select('date').order('date', { ascending: false }).limit(1);
         month = mx?.[0]?.date ? String(mx[0].date).slice(0, 7) : '';
       }
+
+      // The attendance % is the ONE canonical number every UI surface shows —
+      // sourced from attendance_month_breakdown_bulk (mig 252), NOT a raw
+      // row-count. That engine folds in approved leave, company holidays and
+      // manager adjustments and returns pct = covered/elapsed, so a raw count of
+      // `attendance` rows (which ignores all three) is a different, wrong number.
+      // The RPC needs an EXPLICIT id array — it can't do "everyone" implicitly —
+      // so for the team case we enumerate the active clock-role staff (everyone
+      // but the Boss, who has no personal attendance).
+      let rpcIds: string[] = userIds || [];
+      if (!userIds) {
+        const { data: team } = await admin.from('profiles')
+          .select('id').is('deleted_at', null).eq('is_active', true).neq('role', 'boss').limit(300);
+        rpcIds = (team || []).map((p: any) => p.id);
+      }
+      let breakdown: any[] = [];
+      try {
+        const { data: bd, error } = await admin.rpc('attendance_month_breakdown_bulk', { p_month: month, p_user_ids: rpcIds });
+        if (error) throw error;
+        breakdown = bd || [];
+      } catch (e) {
+        console.warn('ai-chat attendance breakdown failed:', String((e as Error)?.message || e).slice(0, 150));
+      }
+      const bdOf = new Map(breakdown.map((b: any) => [b.user_id, b]));
+
+      // Raw `attendance` rows are still needed — but ONLY for hours worked / break
+      // time / the day-by-day log. The RPC returns coverage %, not hours.
       const range = monthToRange(month);
       let q = admin.from('attendance').select('user_id, date, clock_in, clock_out, total_work_ms, total_break_ms, status').order('date', { ascending: false });
       if (userIds) q = q.in('user_id', userIds);
       if (range) q = q.gte('date', range.gte).lt('date', range.lt);
-      q = q.limit(userIds ? 60 : 1500); // one person's month, or team month
+      const RAW_CAP = userIds ? 60 : 1500; // one person's month, or team month
+      q = q.limit(RAW_CAP);
       const { data: att } = await q;
-      if (!att || !att.length) return `No attendance records for ${single ? single.display_name : 'anyone'} in ${month || '(no data)'}.`;
+      const rows = att || [];
+      const hoursTruncated = !userIds && rows.length >= RAW_CAP; // team hours may be partial
 
-      // names
-      const ids = [...new Set(att.map((a: any) => a.user_id))];
-      const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);
+      // names — everyone in the roster we might print, plus any raw-row owners
+      const ids = [...new Set([...rpcIds, ...rows.map((a: any) => a.user_id)])].filter(Boolean);
+      const { data: profs } = ids.length ? await admin.from('profiles').select('id, display_name').in('id', ids) : { data: [] };
       const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
 
-      // aggregate per user
+      // hours aggregate (from raw rows)
       const agg = new Map<string, { days: number; work: number; brk: number }>();
-      for (const a of att) {
+      for (const a of rows) {
         const cur = agg.get(a.user_id) || { days: 0, work: 0, brk: 0 };
         cur.days += 1; cur.work += Number(a.total_work_ms) || 0; cur.brk += Number(a.total_break_ms) || 0;
         agg.set(a.user_id, cur);
       }
 
+      const open = String(month) >= karachiMonthNow(); // current/future month → pct is "so far"
+      const soFar = open ? ' (so far this month)' : '';
+      const pctPhrase = (uid: string): string | null => {
+        const b = bdOf.get(uid);
+        if (!b) return null;
+        return `${b.pct_display}% attendance (${b.days_present} present of ${b.covered_days} covered, ${b.elapsed_days} elapsed days)`;
+      };
+
       if (userIds && args?.detail) {
-        // day-by-day for the single person (capped)
-        const lines = att.slice(0, 40).map((a: any) => {
-          const ci = a.clock_in ? new Date(a.clock_in).toISOString().slice(11, 16) : '—';
-          const co = a.clock_out ? new Date(a.clock_out).toISOString().slice(11, 16) : '—';
-          return `  - ${a.date}: ${hms(a.total_work_ms)} worked (in ${ci}, out ${co}${Number(a.total_break_ms) > 0 ? `, break ${hms(a.total_break_ms)}` : ''})`;
-        });
-        const s = agg.get(userIds[0])!;
-        return `Attendance for ${single.display_name} — ${month} (${s.days} days, ${hms(s.work)} total, avg ${hms(Math.round(s.work / Math.max(1, s.days)))}/day):\n${lines.join('\n')}` + (att.length > 40 ? `\n  …and ${att.length - 40} more days.` : '');
+        // day-by-day for the single person (capped). Clock times are Pakistan time.
+        const lines = rows.slice(0, 40).map((a: any) =>
+          `  - ${a.date}: ${hms(a.total_work_ms)} worked (in ${pktTime(a.clock_in)}, out ${pktTime(a.clock_out)}${Number(a.total_break_ms) > 0 ? `, break ${hms(a.total_break_ms)}` : ''})`);
+        const s = agg.get(userIds[0]) || { days: 0, work: 0, brk: 0 };
+        const pl = pctPhrase(userIds[0]);
+        return `Attendance for ${single.display_name} — ${month}${soFar}${pl ? ` — ${pl}` : ''} (hours: ${hms(s.work)} total, avg ${hms(Math.round(s.work / Math.max(1, s.days)))}/day). Clock times below are Pakistan time (PKT).\n${lines.join('\n')}` + (rows.length > 40 ? `\n  …and ${rows.length - 40} more days.` : '');
       }
 
-      // summary (default). Note: clock-in/out times are UTC in the DB.
-      const summ = [...agg.entries()]
-        .map(([uid, s]) => ({ name: nameOf.get(uid) || 'Unknown', ...s, avg: Math.round(s.work / Math.max(1, s.days)) }))
-        .sort((a, b) => b.work - a.work);
       if (userIds) {
-        const s = summ[0];
-        return `Attendance for ${s.name} — ${month}: ${s.days} days present, ${hms(s.work)} total worked (avg ${hms(s.avg)}/day), ${hms(s.brk)} on breaks.`;
+        const s = agg.get(userIds[0]) || { days: 0, work: 0, brk: 0 };
+        const pl = pctPhrase(userIds[0]);
+        if (!pl && !rows.length) return `No attendance data for ${single.display_name} in ${month || '(no data)'}.`;
+        return `Attendance for ${single.display_name} — ${month}${soFar}: ${pl || 'no coverage data'}. Hours: ${hms(s.work)} total worked (avg ${hms(Math.round(s.work / Math.max(1, s.days)))}/day), ${hms(s.brk)} on breaks.`;
       }
-      return `Team attendance summary — ${month} (${summ.length} employees):\n` +
-        summ.map((s) => `- ${s.name}: ${s.days} days, ${hms(s.work)} (avg ${hms(s.avg)}/day)`).join('\n');
+
+      // team summary — ranked by attendance % (the canonical number)
+      const teamRows = rpcIds
+        .map((uid) => {
+          const b = bdOf.get(uid);
+          const s = agg.get(uid) || { days: 0, work: 0, brk: 0 };
+          return { name: nameOf.get(uid) || 'Unknown', pct: b ? Number(b.pct) : null, pctDisp: b ? b.pct_display : null, present: b ? b.days_present : s.days, work: s.work };
+        })
+        .filter((r) => r.pct != null || r.work > 0)
+        .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+      if (!teamRows.length) return `No attendance data for ${month || '(no data)'}.`;
+      return `Team attendance summary — ${month}${soFar} (${teamRows.length} employees, ranked by attendance %):\n` +
+        teamRows.map((r) => `- ${r.name}: ${r.pctDisp != null ? `${r.pctDisp}%` : 'n/a'} (${r.present} present), ${hms(r.work)} worked`).join('\n') +
+        (hoursTruncated ? '\n\n(Results may be truncated: the hours query hit its 1500-row limit for this month, so some employees\' hours could be understated. The attendance % is from the canonical engine and is complete.)' : '');
     }
 
     if (name === 'get_leave') {
@@ -983,9 +1136,11 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       if (args?.type) q = q.eq('type', String(args.type));
       const range = args?.month ? monthToRange(String(args.month)) : null;
       if (range) q = q.gte('start_date', range.gte).lt('start_date', range.lt);
-      q = q.limit(60);
+      const LEAVE_CAP = 60;
+      q = q.limit(LEAVE_CAP);
       const { data: lv } = await q;
       if (!lv || !lv.length) return `No leave requests found${single ? ` for ${single.display_name}` : ''}${args?.status ? ` (${args.status})` : ''}${args?.type ? ` of type ${args.type}` : ''}${args?.month ? ` in ${args.month}` : ''}.`;
+      const leaveTruncated = lv.length >= LEAVE_CAP;
       const ids = [...new Set(lv.map((l: any) => l.requester_id))];
       const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);
       const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
@@ -996,7 +1151,8 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       };
       const lines = lv.map((l: any) =>
         `- ${nameOf.get(l.requester_id) || 'Unknown'} · ${l.type === 'half_leave' ? 'half leave' : l.type}${l.other_title ? ` (${l.other_title})` : ''} · ${span(l)} · ${l.status}${paid(l)}${l.reason ? ` — ${String(l.reason).slice(0, 120)}` : ''}`);
-      return `Leave requests (${lv.length}):\n` + lines.join('\n');
+      return `Leave requests (${lv.length}):\n` + lines.join('\n') +
+        (leaveTruncated ? `\n\n(Results may be truncated at ${LEAVE_CAP} requests — narrow by person, status, type or month for a complete list; do not treat this as the full total.)` : '');
     }
 
     if (name === 'list_brands') {
@@ -1276,7 +1432,7 @@ Deno.serve(async (req) => {
     const dataToolRules = isBoss ? [
       '',
       'LIVE DATA (Boss only): You also have TOOLS to look up real WurxOS data — the employee directory (roles, manager, employment type, start date, responsibilities), incentives & bonuses, salaries, performance ratings/flags/warnings, attendance, leave requests, client reports (weekly/biweekly/monthly), and brands. For "who is X / tell me about X" use find_person; for lists like "all employees" or "who are the APCs" use get_employees. For a rich "tell me everything about X", combine find_person with their salary/incentives/performance tools. When the question is about actual data (e.g. "what were Ali\'s incentives in June?", "who earned the most bonus?", "how is Ali performing?", "how many hours did Ali work in June?", "who is on leave / show pending leave requests", "GMV for Solid Gold last week?", "give me the full report for X", "what is Y\'s salary?"), CALL THE RELEVANT TOOL and answer from what it returns — do NOT guess numbers or names. Resolve people by name with the tools. Money is PKR; ratings are out of 100.',
-      'ATTENDANCE: get_attendance returns a SUMMARY (days present, total & average hours) by default — only pass detail=true if the user wants the day-by-day log. Clock times from the tool are in UTC; the office runs on Pakistan time (PKT = UTC+5), so add 5 hours if you state a clock time, or just report hours worked (which need no conversion).',
+      'ATTENDANCE: get_attendance returns a SUMMARY by default — the canonical attendance % (the same figure the Roster and Performance pages show), days present, coverage, and hours worked — only pass detail=true if the user wants the day-by-day log. The headline is the % (it already accounts for approved leave, holidays and manager adjustments); report it, not a raw day count. Any clock times from the tool are ALREADY in Pakistan time (PKT) — state them as-is, do NOT add hours. For the current month the % is "so far this month" (coverage to date), which is expected.',
       'REPORTS — be token-smart: get_reports takes a `sections` list. Request ONLY what the question needs: just a metric ("GMV for X") → sections=["metrics"]; the written analysis → ["insights"]; top creators/videos/campaigns/products → the matching section; the whole/full report for a specific brand+period → ["all"]. Do not pull insights or tables when only a number was asked. When they want a full report, name the brand AND period so it returns that one report completely.',
       'If a tool says a person is ambiguous or not found, ask the user to clarify. If the data genuinely isn\'t returned, say so plainly. For pure how-to/SOP questions, do NOT call tools — answer from the KNOWLEDGE above.',
     ].join('\n') : '';

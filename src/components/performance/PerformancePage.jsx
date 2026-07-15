@@ -11,14 +11,13 @@ import {
   listFlagRemovalRequests,
   // Attendance — single source of truth (SQL). Never recompute here.
   fetchAttendanceBreakdown, fetchAttendanceBreakdownBulk,
+  // Shared role/rating helpers — single source, no local copies.
+  ROLE_LABEL, canRate,
 } from '../../lib/performanceApi';
+import { karachiMonth } from '../../lib/serverTime';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function getCurrentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
 function getMonthLabel(ym) {
   if (!ym) return '';
   const [y, m] = ym.split('-');
@@ -133,7 +132,11 @@ function calcIncentiveScore(incRecord) {
  */
 function attendanceScoreFrom(b) {
   if (!b) return null;
-  return b.daysThisMonth > 0 ? b.pct : 100;
+  // Use the 1-dp EXACT coverage (pctExact), NOT the integer-rounded pct_display,
+  // so this pillar == the incentive auto-fill == the SQL composite. The two
+  // surfaces score the same underlying coverage; a rounded-vs-exact split could
+  // differ by ~0.5 and straddle the incentive's completion boundary.
+  return b.daysThisMonth > 0 ? b.pctExact : 100;
 }
 
 // Flag scoring: base 80, every green flag adds 10, every red flag
@@ -146,11 +149,16 @@ const FLAG_BASE_SCORE  = 80;
 const FLAG_GREEN_DELTA = 10;
 const FLAG_RED_DELTA   = -20;
 
+// Bucket each flag by its Asia/Karachi month (the DB business zone), NOT the
+// browser-local month — so the flags pillar matches get_performance_composite's
+// Karachi-windowed count for a viewer in any timezone. No-op for PKT browsers.
+const _KHI_YM = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit' });
 function calcFlagsScore(flags, month) {
   const monthFlags = flags.filter(f => {
     if (!f.createdAt) return false;
     const d = f.createdAt.toDate ? f.createdAt.toDate() : new Date(f.createdAt);
-    const fm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const p = _KHI_YM.formatToParts(d);
+    const fm = `${p.find(x => x.type === 'year').value}-${p.find(x => x.type === 'month').value}`;
     return fm === month;
   });
   let score = FLAG_BASE_SCORE;
@@ -170,15 +178,10 @@ function calcComposite(pillarScores, weights) {
   return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
 }
 
-const ROLE_LABEL = { apc: 'APC', tl: 'Team Lead', ol: 'Operation Lead', boss: 'Boss' };
-
-function canRate(viewer, target) {
-  if (viewer === 'boss' && target === 'ol') return true;
-  if (viewer === 'ol' && (target === 'tl' || target === 'apc')) return true;
-  if (viewer === 'tl' && target === 'apc') return true;
-  if (viewer === 'pctl' && (target === 'ipc' || target === 'apc')) return true;
-  return false;
-}
+// ROLE_LABEL (complete apc/ipc/tl/pctl/ol/boss/developer map) and canRate are
+// imported from performanceApi so this page and the API can never drift — the
+// old local ROLE_LABEL was missing pctl/ipc (blank role on IPC rows) and the
+// local canRate diverged from the exported one.
 
 // ── Rate Modal (Performance Tracking pillar) ─────────────────────────────────
 
@@ -307,7 +310,12 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
             </div>
           </div>
           <div className="mb-3">
-            <label className="form-label small fw-semibold mb-1">Weightage</label>
+            <label className="form-label small fw-semibold mb-1 d-flex align-items-center gap-1">
+              Severity
+              <span className="text-muted fw-normal" style={{ fontSize: '0.68rem' }}>
+                (triage only — does not affect the score)
+              </span>
+            </label>
             <div className="d-flex gap-2 flex-wrap">
               {WEIGHTAGES.map(w => (
                 <button key={w.key} type="button" className="btn btn-sm px-3"
@@ -979,7 +987,7 @@ function PillarDetail({ pillarKey, ctx }) {
         <div className="d-flex justify-content-between rounded-2 p-2 fw-bold"
           style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           <span>Covered ({covered} / {wd})</span>
-          <span>{wd > 0 ? `${b.pct}%` : '—'}</span>
+          <span>{wd > 0 ? `${b.pctExact}%` : '—'}</span>
         </div>
       </div>
     );
@@ -1047,7 +1055,7 @@ export default function PerformancePage() {
   const isBoss = effectiveRole === 'boss';
   const hasTeamTab = effectiveRole !== 'apc';
 
-  const [month, setMonth]     = useState(getCurrentMonth());
+  const [month, setMonth]     = useState(karachiMonth());
   const [mainTab, setMainTab] = useState(hasTeamTab ? 'team' : 'my');
   const [loading, setLoading] = useState(true);
   const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
@@ -1298,11 +1306,17 @@ export default function PerformancePage() {
     });
     if (search) { const s = search.toLowerCase(); list = list.filter(u => u.name.toLowerCase().includes(s)); }
     if (levelFilter !== 'all') {
+      // Gate the level buckets on the SAME rated predicate the card uses
+      // (rating row present AND attendance loaded). Without this, a never-rated
+      // user — whose card says 'Not Rated Yet' — gets bucketed by a fabricated
+      // composite (auto pillars, or 0 when all null → 'Termination'). no_data =
+      // genuinely no rating row.
       if (levelFilter === 'no_data') list = list.filter(u => !u.rec);
-      else list = list.filter(u => getLevel(u.composite).label.toLowerCase() === levelFilter);
+      else list = list.filter(u => u.rec && !attError
+        && getLevel(u.composite).label.toLowerCase() === levelFilter);
     }
     return list;
-  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month]);
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError]);
 
   // The attendance pillar failed to load → calcComposite silently re-weights
   // over the remaining pillars. Refuse to show a composite rather than show a
@@ -1352,7 +1366,7 @@ export default function PerformancePage() {
         </div>
         <div className="d-flex align-items-center gap-2">
           <input type="month" className="form-control form-control-sm" value={month}
-            max={getCurrentMonth()}
+            max={karachiMonth()}
             onChange={e => setMonth(e.target.value)} style={{ width: 160 }} />
           {isBoss && (
             <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"

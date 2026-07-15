@@ -5,7 +5,8 @@ import {
   getIncentives, getMostRecentPriorPlan,
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
-  verifyIncentives, notifyIncentiveEmployee,
+  verifyIncentives, notifyIncentiveEmployee, autoComplete,
+  applyAttendanceAutofill,
 } from '../../lib/incentivesApi';
 
 function getCurrentMonth() {
@@ -91,8 +92,8 @@ function EditRow({ item, cat, onChange }) {
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
-  const p        = pct(achieved, target);
-  const done     = p >= 90;
+  const p        = pct(achieved, target);          // display % only (rounded, capped 100)
+  const done     = autoComplete({ ...item, achievedValue: achieved, targetValue: target }); // single rule: raw ratio >= 0.9
   const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
     <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAtt ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAtt ? '#bfdbfe' : '#e9ecef')}` }}>
@@ -162,8 +163,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
       [cat]: prev[cat].map(it => {
         if (it.id !== itemId) return it;
         const updated = { ...it, [field]: value };
-        const p = pct(field === 'achievedValue' ? value : updated.achievedValue, field === 'targetValue' ? value : updated.targetValue);
-        return { ...updated, completed: p >= 90 };
+        return { ...updated, completed: autoComplete(updated) };
       }),
     }));
   }
@@ -266,8 +266,7 @@ function UserDetailsModal({ rec, user, onClose, onToggleItem, onVerify, onUnveri
       [cat]: prev[cat].map(it => {
         if (it.id !== itemId) return it;
         const updated = { ...it, [field]: value };
-        const p = pct(field === 'achievedValue' ? value : updated.achievedValue, field === 'targetValue' ? value : updated.targetValue);
-        return { ...updated, completed: p >= 90 };
+        return { ...updated, completed: autoComplete(updated) };
       }),
     }));
   }
@@ -665,6 +664,12 @@ export default function OLIncentivesPage() {
           incentives: sanitize(editsPayload.editedItems.incentives),
           bonuses:    sanitize(editsPayload.editedItems.bonuses),
         });
+        // updateIncentivesProgress strips { source:'attendance' } items server-side
+        // (achievedValue:null, completed:false). Re-apply the read-time overlay so
+        // the row we write to state shows the live % / completion instead of the
+        // stripped nulls (otherwise the Earned total visibly drops until reload).
+        const [overlaid] = await applyAttendanceAutofill([savedRec], rec.month);
+        savedRec = overlaid;
       }
 
       // Flip verified via the SECURITY DEFINER RPC. The server stamps
