@@ -357,11 +357,11 @@ export function getMenuForRole(role, opts = {}) {
     const i = out.indexOf(NOTIFS_ITEM);
     out.splice(i >= 0 ? i : out.length, 0, ASSISTANT_ITEM);
   }
-  // Video Reviews is an APC-ONLY feature, and only shown to an APC who
-  // actually has a brand on Euka (the Sidebar computes hasEukaBrand from the
-  // user's Euka-linked brands). Boss / OL / TL do not get it. The edge
-  // function also enforces APC + brand access, so this is UX, not security.
-  if (opts.hasEukaBrand && role === 'apc') {
+  // Video Reviews is APC-only. It now has two modes: the Euka generator and a
+  // file-based one (upload the TikTok export — no Euka needed), so every APC
+  // sees it, not only those with a Euka-linked brand. Boss / OL / TL don't get
+  // it. Server-side RLS + the edge fn still enforce access, so this is UX only.
+  if (role === 'apc') {
     const i = out.indexOf(NOTIFS_ITEM);
     out.splice(i >= 0 ? i : out.length, 0, VIDEO_REVIEWS_ITEM);
   }

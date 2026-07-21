@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { runVideoReviewTargets, downloadHandlesCsv, listMyEukaBrands } from '../../lib/videoReviewApi';
+import FileMode from './FileMode';
 
 // ── Pakistan-time date helpers ──────────────────────────────────────
 // Default target date = 3 days before TODAY in Pakistan (Asia/Karachi).
@@ -93,7 +94,7 @@ function CenteredCard({ children }) {
   );
 }
 
-export default function VideoReviewsPage() {
+function EukaMode() {
   // Default 3 days back so Euka has finished ingesting that day's creators/videos
   // (it lags ~2-3 days; running sooner undercounts the review groups).
   const defaultTarget = useMemo(() => addDays(pakistanToday(), -3), []);
@@ -466,5 +467,40 @@ export default function VideoReviewsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Two ways to build the same 1st/2nd/3rd review lists: the original Euka
+// generator, and a file-based mode (upload the TikTok export, queue-tracked).
+// The toggle lets each APC pick which they trust; both are always available.
+const MODES = [
+  { key: 'euka', label: 'Euka', icon: 'bi-cloud-fill' },
+  { key: 'file', label: 'TikTok file', icon: 'bi-filetype-xlsx' },
+];
+
+export default function VideoReviewsPage() {
+  const [mode, setMode] = useState('euka');
+  return (
+    <>
+      <style>{SHELL_CSS}</style>
+      <div style={{ padding: '4px 2px 2px' }}>
+        <div style={{ display: 'inline-flex', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 4, gap: 4 }}>
+          {MODES.map((m) => {
+            const active = mode === m.key;
+            return (
+              <button key={m.key} onClick={() => setMode(m.key)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  padding: '7px 16px', borderRadius: 9, border: 'none',
+                  background: active ? 'var(--surface-1)' : 'transparent',
+                  color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'background .12s, color .12s' }}>
+                <i className={`bi ${m.icon}`} /> {m.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {mode === 'euka' ? <EukaMode /> : <FileMode />}
+    </>
   );
 }

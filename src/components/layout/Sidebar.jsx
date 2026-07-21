@@ -3,22 +3,10 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { getMenuForRole } from './menu';
 import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
-import { listMyEukaBrands } from '../../lib/videoReviewApi';
 
 export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobileClose }) {
-  // Video Reviews is APC-only, and only when the APC has a brand on Euka.
-  // Everyone else never sees it, so we only run the lookup for APCs.
-  const [hasEukaBrand, setHasEukaBrand] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    if (role !== 'apc') { setHasEukaBrand(false); return undefined; }
-    listMyEukaBrands()
-      .then((list) => { if (!cancelled) setHasEukaBrand(list.length > 0); })
-      .catch(() => { if (!cancelled) setHasEukaBrand(false); });
-    return () => { cancelled = true; };
-  }, [role]);
-
-  const menu = getMenuForRole(role, { hasEukaBrand });
+  // Video Reviews is shown to every APC (it has a Euka mode and a file mode).
+  const menu = getMenuForRole(role);
   const [query, setQuery] = useState('');
 
   // v1-style menu filter — substring match against item labels +
