@@ -155,6 +155,94 @@ export function directionSentence(fx, fy, r) {
   return `${strengthLabel(r)} (r = ${r.toFixed(2)}): higher ${lx} tends to go with ${dir} ${ly}.`;
 }
 
+// ============================================================
+// Weekly-native "search demand" correlation.
+//
+// Keyword Search Volume is only available WEEKLY (the Branded Demand subsheet,
+// Week Ending = a Saturday). Correlating a weekly series against daily TikTok
+// activity at a daily lag would be dishonest, so instead we roll the TikTok side
+// up to the SAME Sun–Sat weeks and correlate week-over-week (lag in WEEKS). Only
+// weeks with enough daily coverage count, so a half-populated edge week can't
+// distort a sum. This lives apart from the daily pairSeries above.
+// ============================================================
+
+// The Sun–Sat week's ending SATURDAY for a date (matches the subsheet's
+// "Week Ending" column). getUTCDay: Sun=0 … Sat=6, so add (6 - dow) days.
+export function weekEndingOf(dateStr) {
+  const dt = parseISO(dateStr);
+  const dow = dt.getUTCDay();
+  dt.setUTCDate(dt.getUTCDate() + (6 - dow));
+  return isoOf(dt);
+}
+
+// Roll daily rows up into Sun–Sat weeks keyed by their ending Saturday.
+// Returns [{ week_ending, days, metrics:{field:aggregated} }] sorted ascending.
+// `days` = how many daily rows fell in the week (used to drop partial weeks).
+export function rollupWeeklyTikTok(rows, fields) {
+  const buckets = new Map(); // week_ending -> { acc:{field:[]}, days }
+  for (const r of rows || []) {
+    const wk = weekEndingOf(r.date);
+    if (!buckets.has(wk)) buckets.set(wk, { acc: {}, days: 0 });
+    const slot = buckets.get(wk);
+    slot.days += 1;
+    for (const f of fields) {
+      const v = r.metrics?.[f];
+      if (v == null) continue;
+      (slot.acc[f] = slot.acc[f] || []).push(v);
+    }
+  }
+  const reduce = (arr, agg) => (agg === 'avg' ? arr.reduce((s, v) => s + v, 0) / arr.length : arr.reduce((s, v) => s + v, 0));
+  const out = [];
+  for (const [week_ending, slot] of buckets) {
+    const metrics = {};
+    for (const f of fields) {
+      metrics[f] = slot.acc[f]?.length ? reduce(slot.acc[f], FIELD_BY_KEY[f]?.agg || 'sum') : null;
+    }
+    out.push({ week_ending, days: slot.days, metrics });
+  }
+  out.sort((a, b) => (a.week_ending < b.week_ending ? -1 : 1));
+  return out;
+}
+
+// A week's branded search volume for one keyword, or the sum of ALL keywords
+// when keyword is null. For the all-keywords total we require every EXPECTED
+// keyword (allKeywords) to be present that week: the parser drops blank cells,
+// so summing only the present keys would understate the total and fake a dip —
+// an incomplete week returns null instead, so it's skipped rather than
+// distorting the correlation. (Falls back to the present keys if no expected
+// set is supplied.)
+export function ksvWeekValue(keywordsObj, keyword, allKeywords) {
+  if (!keywordsObj) return null;
+  if (keyword) return keywordsObj[keyword] ?? null;
+  const keys = allKeywords && allKeywords.length ? allKeywords : Object.keys(keywordsObj);
+  if (!keys.length) return null;
+  let sum = 0;
+  for (const k of keys) {
+    const v = keywordsObj[k];
+    if (v == null) return null; // missing a component → can't total this week
+    sum += v;
+  }
+  return sum;
+}
+
+// Pair weekly TikTok (rolled up) against weekly branded search, offset by
+// `weekLag` weeks (TikTok week W → search week W+lag). Only weeks with
+// >= minDays of daily coverage are used. `allKeywords` is the expected keyword
+// set for the "All keywords" total. Returns { points:[{label,x,y}], r, n }.
+export function weeklySearchPairs({ weeklyTikTok, ksvByWeek, tiktokKey, keyword, weekLag, minDays = 5, allKeywords }) {
+  const points = [];
+  for (const wk of weeklyTikTok) {
+    if (wk.days < minDays) continue;
+    const x = wk.metrics?.[tiktokKey];
+    if (x == null) continue;
+    const searchWeek = addDays(wk.week_ending, weekLag * 7);
+    const y = ksvWeekValue(ksvByWeek.get(searchWeek), keyword, allKeywords);
+    if (y == null) continue;
+    points.push({ label: `wk ${wk.week_ending.slice(5)}`, x, y, week_ending: wk.week_ending });
+  }
+  return { points, r: pearson(points.map((p) => p.x), points.map((p) => p.y)), n: points.length };
+}
+
 // r in [-1,1] -> a red↔neutral↔green colour for the heatmap.
 export function corrColor(r) {
   if (r == null) return 'var(--surface-2, #2a2a33)';

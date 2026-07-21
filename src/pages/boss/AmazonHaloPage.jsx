@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseHaloSheet } from '../../lib/haloParse';
-import { fillDummyColumns } from '../../lib/haloDummy';
 import {
   listHaloDatasets, getHaloRows, createHaloDataset, deleteHaloDataset,
 } from '../../lib/haloApi';
@@ -40,10 +39,10 @@ export default function AmazonHaloPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Amazon Halo Effect</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '4px 0 0', maxWidth: 720 }}>
-            Upload a daily performance sheet and explore how TikTok activity drives Amazon demand.
-            Correlate any two metrics, browse the full correlation heatmap, and shift the{' '}
-            <strong>halo lag</strong> to see the delayed spillover (TikTok today → Amazon a few days later).
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '4px 0 0', maxWidth: 760 }}>
+            Upload the whole performance workbook (both tabs) and explore how TikTok activity drives Amazon demand.
+            The <strong>daily</strong> views correlate TikTok against Amazon revenue with a day-lag; the{' '}
+            <strong>Search demand (weekly)</strong> view correlates TikTok against branded search volume week over week.
           </p>
         </div>
         <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setShareOpen(true)}>
@@ -51,27 +50,18 @@ export default function AmazonHaloPage() {
         </button>
       </div>
 
-      {error && (
-        <div className="wx-alert wx-alert-danger"><span>{error}</span></div>
-      )}
+      {error && <div className="wx-alert wx-alert-danger"><span>{error}</span></div>}
 
-      <UploadPanel dummyDefault onUploaded={(id) => { setSelectedId(id); refreshDatasets(); }} />
+      <UploadPanel onUploaded={(id) => { setSelectedId(id); refreshDatasets(); }} />
 
       {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          <span className="wx-spinner" /> Loading datasets…
-        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}><span className="wx-spinner" /> Loading datasets…</div>
       ) : !datasets.length ? (
         <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-          No dataset yet. Upload a sheet above to get started.
+          No dataset yet. Upload a workbook above to get started.
         </div>
       ) : (
-        <HaloExplorer
-          datasets={datasets}
-          loadRows={getHaloRows}
-          onDelete={handleDelete}
-          initialDatasetId={selectedId}
-        />
+        <HaloExplorer datasets={datasets} loadRows={getHaloRows} onDelete={handleDelete} initialDatasetId={selectedId} />
       )}
 
       {shareOpen && <HaloShareModal onClose={() => setShareOpen(false)} />}
@@ -80,13 +70,12 @@ export default function AmazonHaloPage() {
 }
 
 // ============================================================
-// Upload
+// Upload — reads the daily tab + the weekly "Branded Demand" tab in one file.
 // ============================================================
-function UploadPanel({ onUploaded, dummyDefault }) {
+function UploadPanel({ onUploaded }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [name, setName] = useState('');
-  const [fillDummy, setFillDummy] = useState(!!dummyDefault);
   const [parsed, setParsed] = useState(null);
   const [parseErr, setParseErr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -107,17 +96,11 @@ function UploadPanel({ onUploaded, dummyDefault }) {
     if (!parsed) return;
     setSaving(true); setParseErr('');
     try {
-      let outRows = parsed.rows.map((r) => ({ ...r, dummyFields: [] }));
-      let hasDummy = false;
-      if (fillDummy) {
-        const res = fillDummyColumns(parsed.rows);
-        outRows = res.rows;
-        hasDummy = res.filled.length > 0;
-      }
       const ds = await createHaloDataset({
         name, filename: file?.name,
         periodStart: parsed.periodStart, periodEnd: parsed.periodEnd,
-        rows: outRows, hasDummy,
+        currency: parsed.currency, weeklyKeywords: parsed.weeklyKeywords,
+        rows: parsed.rows,
       });
       setOpen(false); setFile(null); setParsed(null); setName('');
       if (inputRef.current) inputRef.current.value = '';
@@ -130,7 +113,7 @@ function UploadPanel({ onUploaded, dummyDefault }) {
     return (
       <div>
         <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setOpen(true)}>
-          ⬆ Upload sheet
+          ⬆ Upload workbook
         </button>
       </div>
     );
@@ -139,8 +122,14 @@ function UploadPanel({ onUploaded, dummyDefault }) {
   return (
     <div className="wx-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>Upload performance sheet</strong>
+        <strong>Upload performance workbook</strong>
         <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setOpen(false)}>Close</button>
+      </div>
+
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+        Download the whole Google Sheet as <strong>.xlsx</strong> (File → Download → Microsoft Excel) so both the daily tab and
+        the weekly <strong>“Branded Demand”</strong> tab come in one file. A single daily .csv also works, but the weekly search
+        view will be empty.
       </div>
 
       <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input"
@@ -152,59 +141,49 @@ function UploadPanel({ onUploaded, dummyDefault }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Parsed <strong style={{ color: 'var(--text-primary)' }}>{parsed.rows.length}</strong> days
-            ({parsed.periodStart} → {parsed.periodEnd}) · {parsed.foundKeys.length} columns recognised.
+            ({parsed.periodStart} → {parsed.periodEnd}) · {parsed.foundKeys.length} columns recognised · currency <strong style={{ color: 'var(--text-primary)' }}>{parsed.currency}</strong>.
           </div>
 
           {parsed.missingColumns?.length > 0 && (
             <div style={{
               border: `1px solid ${parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)'}`,
               background: parsed.missingAnchors?.length ? 'rgba(239,68,68,.10)' : 'rgba(245,158,11,.10)',
-              borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: 13,
-              display: 'flex', flexDirection: 'column', gap: 6,
+              borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6,
             }}>
               <strong style={{ color: parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)' }}>
-                ⚠ {parsed.missingAnchors?.length ? 'Required columns not recognised' : 'Some standard columns not recognised'}
+                ⚠ {parsed.missingAnchors?.length ? 'Required column not recognised' : 'Some standard columns not recognised'}
               </strong>
-              <span style={{ color: 'var(--text-muted)' }}>
-                These expected columns weren't found — did you rename or remove them? Renamed columns won't be read.
-              </span>
-              <span>
-                Not found: <strong>{parsed.missingColumns.map((m) => m.label).join(', ')}</strong>
-              </span>
+              <span style={{ color: 'var(--text-muted)' }}>These expected columns weren't found — did you rename or remove them?</span>
+              <span>Not found: <strong>{parsed.missingColumns.map((m) => m.label).join(', ')}</strong></span>
               {parsed.missingAnchors?.length > 0 && (
                 <span style={{ color: 'var(--danger, #ef4444)' }}>
-                  <strong>NTB</strong>, <strong>Revenue/Day</strong> and <strong>Product clicks</strong> are the anchors that locate your
-                  keyword columns — if one is renamed, your <em>keyword</em> columns will be skipped. Rename it back to the exact
-                  name and re-upload.
+                  <strong>Total Revenue/Day</strong> anchors the per-product Amazon revenue columns — without it, revenue and
+                  the product breakdown are dropped. Rename it back and re-upload.
                 </span>
               )}
             </div>
           )}
-          {(parsed.keywordColumns?.volume?.length || parsed.keywordColumns?.rank?.length) ? (
+
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Products (Amazon revenue): <strong style={{ color: 'var(--text-primary)' }}>{parsed.products?.length ? parsed.products.join(', ') : '—'}</strong>
+          </div>
+
+          {parsed.weeklyKeywords?.length ? (
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Keyword columns —{' '}
-              <strong style={{ color: 'var(--text-primary)' }}>volume:</strong>{' '}
-              {parsed.keywordColumns.volume.length ? parsed.keywordColumns.volume.join(', ') : '—'}
-              {'  ·  '}
-              <strong style={{ color: 'var(--text-primary)' }}>rank:</strong>{' '}
-              {parsed.keywordColumns.rank.length ? parsed.keywordColumns.rank.join(', ') : '—'}
+              Weekly branded search: <strong style={{ color: 'var(--text-primary)' }}>{parsed.weeklyKeywords.length} weeks</strong> ·
+              keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.keywords?.join(', ') || '—'}</strong>
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              No named keyword columns found (blank/placeholder headers) — test data will seed keywords if enabled.
+            <div style={{ fontSize: 12, color: 'var(--warning)' }}>
+              ⚠ No weekly “Branded Demand” tab found — the Search demand (weekly) view will be empty. Upload the full .xlsx, not just the daily sheet.
             </div>
           )}
+
           <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             Dataset name
             <input className="wx-input" style={{ marginTop: 4 }} value={name} onChange={(e) => setName(e.target.value)} />
           </label>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12.5 }}>
-            <input type="checkbox" checked={fillDummy} onChange={(e) => setFillDummy(e.target.checked)} style={{ marginTop: 2 }} />
-            <span>
-              Fill empty Amazon columns (Keyword Search Volume, Keyword Search Rank, Revenue/Day) with <strong>meaningful test data</strong> so
-              the graphs show a signal now. Clearly badged as test; replace by uploading a sheet with real values.
-            </span>
-          </label>
+
           <div>
             <button type="button" className="wx-btn wx-btn-primary" disabled={saving} onClick={save}>
               {saving ? 'Saving…' : 'Save dataset'}
