@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  listMyReviewBrands, getBaseline, setBaseline, fetchTracker, markSent,
+  listMyReviewBrands, fetchTracker, markSent,
   downloadHandlesCsv, creatorKey,
 } from '../../lib/videoReviewFileApi';
 import { buildDueLists, markSentUpdates } from '../../lib/videoReviewQueue';
@@ -67,11 +67,6 @@ export default function FileMode() {
   const selectedBrand = (brands || []).find((b) => b.id === brandId) || null;
   const brandLabel = selectedBrand?.brand_name || 'Brand';
 
-  // baseline ("the line")
-  const [baseline, setBaselineState] = useState(null);  // 'YYYY-MM-DD' | null
-  const [baselineInput, setBaselineInput] = useState(pakistanToday());
-  const [baselineBusy, setBaselineBusy] = useState(false);
-
   // parsed file
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState(null);           // { creators, stats }
@@ -101,26 +96,12 @@ export default function FileMode() {
     return () => { cancelled = true; };
   }, []);
 
-  // Load the brand's baseline whenever the brand changes; clear prior run AND
-  // the parsed file (a file uploaded for one brand must not generate another's).
+  // Switching brand clears the prior run AND the parsed file (a file uploaded
+  // for one brand must not generate another's).
   useEffect(() => {
     setResult(null); setGenErr(''); setSentGroups(new Set());
     setParsed(null); setFileName(''); setParseErr('');
-    if (!brandId) { setBaselineState(null); return undefined; }
-    let cancelled = false;
-    getBaseline(brandId)
-      .then((d) => { if (cancelled) return; setBaselineState(d); if (d) setBaselineInput(d); })
-      .catch(() => { if (!cancelled) setBaselineState(null); });
-    return () => { cancelled = true; };
   }, [brandId]);
-
-  async function saveBaseline() {
-    if (!brandId || !baselineInput) return;
-    setBaselineBusy(true);
-    try { await setBaseline(brandId, baselineInput); setBaselineState(baselineInput); setResult(null); }
-    catch (e) { setGenErr(e?.message || 'Could not save the start date.'); }
-    finally { setBaselineBusy(false); }
-  }
 
   function onFile(e) {
     const f = e.target.files?.[0];
@@ -150,19 +131,20 @@ export default function FileMode() {
   async function generate() {
     setGenErr('');
     if (!brandId) { setGenErr('Pick a brand first.'); return; }
-    if (!baseline) { setGenErr('Set the start date first.'); return; }
     if (!parsed) { setGenErr('Upload the TikTok video file first.'); return; }
     setGenerating(true); setResult(null); setSentGroups(new Set());
     try {
       const tracker = await fetchTracker(brandId);
       trackerRef.current = tracker;
-      // Clip each creator's videos to those on/before the run date.
+      // ONE date does both jobs: we clip each creator's videos to on/before it,
+      // and it's the baseline too — videos before it are prior history (counted,
+      // treated as already reviewed), a video ON it can make a creator due.
       const creators = [];
       for (const c of parsed.creators) {
         const days = c.days.filter((d) => cmp(d, runDate) <= 0);
         if (days.length) creators.push({ creator: c.creator, days });
       }
-      const lists = buildDueLists({ creators, startDate: baseline, runDate, tracker, keyOf: (c) => creatorKey(c.creator) });
+      const lists = buildDueLists({ creators, startDate: runDate, runDate, tracker, keyOf: (c) => creatorKey(c.creator) });
       setResult(lists);
     } catch (e) {
       setGenErr(e?.message || 'Something went wrong.');
@@ -190,7 +172,7 @@ export default function FileMode() {
     if (!group.length) { setSentGroups((s) => new Set(s).add(def.key)); return; }
     try {
       const updates = markSentUpdates({
-        creators: clippedCreators, group, runDate, startDate: baseline,
+        creators: clippedCreators, group, runDate, startDate: runDate,
         tracker: trackerRef.current, keyOf: (c) => creatorKey(c.creator),
       });
       await markSent(brandId, updates);
@@ -252,34 +234,8 @@ export default function FileMode() {
             )}
           </Step>
 
-          {/* Step 2 · Baseline */}
-          {brandId && (
-            <Step n={2} title="Start date" hint="the line">
-              {baseline && baseline === baselineInput ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ padding: '5px 11px', borderRadius: 8, fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                    background: 'var(--success-soft)', color: 'var(--success)' }}>{prettyDate(baseline)}</span>
-                  <button className="wx-btn wx-btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }}
-                    onClick={() => setBaselineInput('')}>Change</button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input type="date" className="wx-input" value={baselineInput} max={maxDate}
-                      onChange={(e) => setBaselineInput(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
-                    <button className="wx-btn wx-btn-primary" onClick={saveBaseline} disabled={baselineBusy || !baselineInput}
-                      style={{ padding: '0 14px' }}>{baselineBusy ? '…' : 'Save'}</button>
-                  </div>
-                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    Everything a creator posted <strong>before</strong> this date counts as already reviewed. Set once when you start.
-                  </span>
-                </div>
-              )}
-            </Step>
-          )}
-
-          {/* Step 3 · Upload file */}
-          <Step n={3} title="Upload TikTok video file" hint=".xlsx / .csv">
+          {/* Step 2 · Upload file */}
+          <Step n={2} title="Upload TikTok video file" hint=".xlsx / .csv">
             <label className="wx-btn wx-btn-ghost vrx-filerow" style={{ borderStyle: 'dashed', fontSize: 12.5, cursor: parsing ? 'wait' : 'pointer', justifyContent: 'center', padding: '12px' }}>
               {parsing ? (<><span className="wx-spinner" style={{ width: 15, height: 15 }} /> Reading file…</>)
                 : (<><i className="bi bi-upload me-1" /> {parsed ? 'Replace file' : 'Choose file'}</>)}
@@ -295,15 +251,17 @@ export default function FileMode() {
             {parseErr && <div style={{ fontSize: 12, color: 'var(--danger)' }}><i className="bi bi-exclamation-triangle me-1" />{parseErr}</div>}
           </Step>
 
-          {/* Step 4 · Run date */}
-          <Step n={4} title="Send date">
+          {/* Step 3 · Date */}
+          <Step n={3} title="Sending reviews for">
             <input type="date" className="wx-input" value={runDate} max={maxDate} disabled={generating}
               onChange={(e) => { setRunDate(e.target.value); setResult(null); setSentGroups(new Set()); }} />
-            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Who is due a message on this day. Defaults to today (PKT).</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              The day you're sending reviews for. We read each creator's full history to place them; videos before this day just count toward where they stand. Defaults to today (PKT).
+            </span>
           </Step>
 
-          {/* Step 5 · Exclude (optional) */}
-          <Step n={5} title="Exclude creators" hint="optional">
+          {/* Step 4 · Exclude (optional) */}
+          <Step n={4} title="Exclude creators" hint="optional">
             {excludeSet.size === 0 ? (
               <label className="wx-btn wx-btn-ghost" style={{ borderStyle: 'dashed', fontSize: 12.5, cursor: 'pointer' }}>
                 <i className="bi bi-upload me-1" /> Upload exclude list (.csv)
@@ -321,7 +279,7 @@ export default function FileMode() {
             )}
           </Step>
 
-          <button className="vrx-cta" onClick={generate} disabled={generating || !brandId || !baseline || !parsed}
+          <button className="vrx-cta" onClick={generate} disabled={generating || !brandId || !parsed}
             style={{ marginTop: 'auto', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               fontSize: 15, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 13, cursor: 'pointer',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
@@ -404,7 +362,7 @@ export default function FileMode() {
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-secondary)' }}>No lists yet</div>
                 <div style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 4, maxWidth: 360 }}>
-                  Pick a brand, set your start date, upload the TikTok video file, then generate the three review lists.
+                  Pick a brand, upload the TikTok video file, choose the day (usually today), then generate the three review lists.
                 </div>
               </div>
             </div>

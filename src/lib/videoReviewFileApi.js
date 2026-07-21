@@ -26,28 +26,8 @@ export async function listMyReviewBrands() {
   return rows.map((b) => ({ id: b.id, brand_name: b.brand_name }));
 }
 
-// The per-brand baseline ("the line"). Returns 'YYYY-MM-DD' or null.
-export async function getBaseline(brandId) {
-  const { data, error } = await supabase
-    .from('video_review_settings')
-    .select('start_date')
-    .eq('brand_id', brandId)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data?.start_date || null;
-}
-
-export async function setBaseline(brandId, startDate) {
-  const { data: sess } = await supabase.auth.getSession();
-  const uid = sess?.session?.user?.id || null;
-  const { error } = await supabase
-    .from('video_review_settings')
-    .upsert(
-      { brand_id: brandId, start_date: startDate, updated_at: new Date().toISOString(), updated_by: uid },
-      { onConflict: 'brand_id' },
-    );
-  if (error) throw new Error(error.message);
-}
+// (The single "sending reviews for" date does the baseline's job now, so the
+// per-brand baseline table video_review_settings is no longer read/written.)
 
 // All tracker rows for a brand -> Map(creatorKey -> { sentCount, lastSentDate }).
 // Paginated: completed creators (sent_count=3) stay forever, so a brand can
