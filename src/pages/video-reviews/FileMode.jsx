@@ -166,21 +166,34 @@ export default function FileMode() {
     downloadHandlesCsv(applyExclude(result[def.key] || []), `${brandLabel} - ${def.ord} video review creators.csv`);
   }
 
-  async function markGroupSent(def) {
-    if (!result) return;
-    const group = applyExclude(result[def.key] || []);   // only creators we actually messaged
-    if (!group.length) { setSentGroups((s) => new Set(s).add(def.key)); return; }
+  const [markingSent, setMarkingSent] = useState(false);
+  const allSent = result && FILE_DEFS.every((def) => sentGroups.has(def.key));
+
+  // APCs always send all three lists, so it's one action: advance every creator
+  // shown (across all three lists, minus excludes) by one message in a single write.
+  async function markAllSent() {
+    if (!result || allSent) return;
+    setMarkingSent(true);
     try {
-      const updates = markSentUpdates({
-        creators: clippedCreators, group, runDate, startDate: runDate,
-        tracker: trackerRef.current, keyOf: (c) => creatorKey(c.creator),
-      });
-      await markSent(brandId, updates);
-      // reflect locally so a re-generate won't re-show them today
-      for (const u of updates) trackerRef.current.set(u.key, { sentCount: u.sentCount, lastSentDate: u.lastSentDate });
-      setSentGroups((s) => new Set(s).add(def.key));
+      const updates = [];
+      for (const def of FILE_DEFS) {
+        const group = applyExclude(result[def.key] || []);   // only creators we actually messaged
+        if (!group.length) continue;
+        updates.push(...markSentUpdates({
+          creators: clippedCreators, group, runDate, startDate: runDate,
+          tracker: trackerRef.current, keyOf: (c) => creatorKey(c.creator),
+        }));
+      }
+      if (updates.length) {
+        await markSent(brandId, updates);
+        // reflect locally so a re-generate won't re-show them today
+        for (const u of updates) trackerRef.current.set(u.key, { sentCount: u.sentCount, lastSentDate: u.lastSentDate });
+      }
+      setSentGroups(new Set(FILE_DEFS.map((def) => def.key)));
     } catch (e) {
       setGenErr(e?.message || 'Could not mark as sent.');
+    } finally {
+      setMarkingSent(false);
     }
   }
 
@@ -333,12 +346,8 @@ export default function FileMode() {
                         <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>creator{count === 1 ? '' : 's'}</div>
                       </div>
                       <button className="wx-btn wx-btn-ghost" onClick={() => download(def)} disabled={count === 0} title="Download CSV"
-                        style={{ flexShrink: 0, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13 }}>
+                        style={{ flexShrink: 0, padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13 }}>
                         <i className="bi bi-download" /> CSV
-                      </button>
-                      <button className={`wx-btn ${sent ? 'wx-btn-ghost' : 'wx-btn-primary'}`} onClick={() => markGroupSent(def)} disabled={sent || count === 0}
-                        style={{ flexShrink: 0, padding: '7px 12px', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                        {sent ? <><i className="bi bi-check-lg" /> Sent</> : 'Mark sent'}
                       </button>
                     </div>
                   );
@@ -347,12 +356,20 @@ export default function FileMode() {
 
               <div style={{ padding: '11px 14px', border: '1px dashed var(--border-default)', borderRadius: 12, background: 'var(--surface-2)', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <i className="bi bi-info-circle me-1" style={{ color: 'var(--accent)' }} />
-                Send each list, then hit <strong>Mark sent</strong>. Creators who posted several new videos get their next message on the following day, so run again tomorrow with a fresh file.
+                Download all three lists and send them, then hit <strong>Mark all as sent</strong>. Creators who posted several new videos get their next message the following day, so run again tomorrow with a fresh file.
               </div>
 
-              <button className="wx-btn wx-btn-ghost align-self-start" onClick={() => { setResult(null); setSentGroups(new Set()); }} style={{ fontSize: 13 }}>
-                <i className="bi bi-arrow-repeat me-1" /> Clear results
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button className="wx-btn wx-btn-primary" onClick={markAllSent} disabled={allSent || markingSent || totalDue === 0}
+                  style={{ padding: '10px 18px', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
+                  {allSent ? <><i className="bi bi-check-lg" /> All marked sent</>
+                    : markingSent ? <><span className="wx-spinner" style={{ width: 15, height: 15 }} /> Saving…</>
+                    : <><i className="bi bi-check2-all" /> Mark all as sent</>}
+                </button>
+                <button className="wx-btn wx-btn-ghost" onClick={() => { setResult(null); setSentGroups(new Set()); }} style={{ fontSize: 13 }}>
+                  <i className="bi bi-arrow-repeat me-1" /> Clear results
+                </button>
+              </div>
             </div>
           ) : (
             <div style={{ minHeight: '58vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, textAlign: 'center' }}>
