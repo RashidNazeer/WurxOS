@@ -185,7 +185,24 @@ function _pakistanTodayUTC() {
   return new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
 }
 
+const _parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+
+// Today (YYYY-MM-DD) on the Pakistan calendar.
+export function todayISO() { return _isoOf(_pakistanTodayUTC()); }
+
+// Snap `dateStr` onto a brand's reporting-week grid (weeks step 7 days from
+// `anchor`, the brand's first report start) → the start of the grid-week that
+// contains `dateStr`. This is what keeps a checkpoint's week_start identical to
+// the weekly report's period_start so the two join cleanly for auto-fetch.
+export function alignToGrid(anchor, dateStr) {
+  const a = _parse(anchor), d = _parse(dateStr);
+  const weeks = Math.floor(Math.round((d - a) / 86400000) / 7);
+  const dt = new Date(a); dt.setUTCDate(dt.getUTCDate() + weeks * 7);
+  return _isoOf(dt);
+}
+
 // Monday (YYYY-MM-DD) of the week containing `dateStr` (default: today, PK).
+// Fallback week grid for brands with no weekly reports yet (no anchor).
 export function mondayOf(dateStr) {
   let dt;
   if (dateStr) { const [y, m, d] = dateStr.split('-').map(Number); dt = new Date(Date.UTC(y, m - 1, d)); }

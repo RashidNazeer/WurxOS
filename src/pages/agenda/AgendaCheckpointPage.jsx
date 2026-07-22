@@ -14,10 +14,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { listBrands } from '../../lib/brandsApi';
 import {
   EMPTY_CHECKPOINT, defaultReviewWeekStart, weekLabelForStart, addWeeks,
+  alignToGrid, todayISO,
 } from '../../lib/checkpointModel';
 import { carryForward } from '../../lib/checkpointCarry';
 import {
-  listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint,
+  listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks,
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, hydrate } from '../../lib/checkpointDraft';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
@@ -73,6 +74,33 @@ export default function AgendaCheckpointPage() {
   });
   const weeksSet = useMemo(() => new Set(weeks.map((w) => w.week_start)), [weeks]);
   const hasPrev = useMemo(() => weeks.some((w) => w.week_start < weekStart), [weeks, weekStart]);
+
+  // The brand's WEEKLY report weeks — the checkpoint aligns its week grid to
+  // these so week_start == the report's period_start (clean auto-fetch join).
+  const reportWeeksQuery = useQuery({
+    queryKey: ['checkpoint', 'reportweeks', brandId],
+    queryFn: () => listReportWeeks(brandId),
+    enabled: !!brandId,
+  });
+  const reportStarts = useMemo(() => (reportWeeksQuery.data || []).map((r) => r.period_start), [reportWeeksQuery.data]);
+  const reportSet = useMemo(() => new Set(reportStarts), [reportStarts]);
+  const anchor = useMemo(() => (reportStarts.length ? reportStarts.reduce((a, b) => (a < b ? a : b)) : null), [reportStarts]);
+  // Default week = the last completed reporting week (grid-aligned to the brand),
+  // or fixed-Monday last week if the brand has no reports yet.
+  const alignedDefault = useMemo(
+    () => (anchor ? addWeeks(alignToGrid(anchor, todayISO()), -1) : defaultReviewWeekStart()),
+    [anchor],
+  );
+  const reportForWeek = reportSet.has(weekStart);
+
+  // apply the brand's aligned default once its report weeks have loaded
+  const defaultAppliedRef = useRef(null);
+  useEffect(() => {
+    if (!brandId || !reportWeeksQuery.isSuccess) return;
+    if (defaultAppliedRef.current === brandId) return;
+    defaultAppliedRef.current = brandId;
+    setWeekStart(alignedDefault);
+  }, [brandId, reportWeeksQuery.isSuccess, alignedDefault]);
 
   // reset when the brand+week key changes
   useEffect(() => { setData(null); loadedRef.current = false; baselineRef.current = ''; setSaveState('idle'); }, [brandId, weekStart]);
@@ -186,7 +214,7 @@ export default function AgendaCheckpointPage() {
     : saveState === 'saved' ? `Saved${savedAt ? ` ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`
     : saveState === 'local' ? 'Saved locally (offline) — will sync'
     : '';
-  const isThisWeekReview = weekStart === defaultReviewWeekStart();
+  const isThisWeekReview = weekStart === alignedDefault;
 
   return (
     <>
@@ -223,13 +251,17 @@ export default function AgendaCheckpointPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button className="wx-btn wx-btn-ghost" style={{ padding: '8px 11px' }} title="Previous week"
             onClick={() => setWeekStart((w) => addWeeks(w, -1))}><i className="bi bi-chevron-left" /></button>
-          <div style={{ minWidth: 172, textAlign: 'center' }}>
+          <div style={{ minWidth: 188, textAlign: 'center' }}>
             <div style={{ fontWeight: 800, fontSize: 14.5, color: 'var(--text-primary)' }}>Week of {weekLabel}</div>
-            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
               {isThisWeekReview ? 'Last week' : (
-                <button className="wx-btn-link" onClick={() => setWeekStart(defaultReviewWeekStart())}
+                <button className="wx-btn-link" onClick={() => setWeekStart(alignedDefault)}
                   style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontSize: 10.5 }}>Jump to last week</button>
               )}
+              <span title="Whether a weekly report exists for this exact week (used for auto-fetch)" style={{
+                fontWeight: 700,
+                color: reportForWeek ? 'var(--success)' : 'var(--text-muted)',
+              }}>· {reportForWeek ? 'report ✓' : 'no report'}</span>
               {weeksSet.has(weekStart) ? null : <span style={{ opacity: .6 }}>· no checkpoint</span>}
             </div>
           </div>

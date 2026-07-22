@@ -71,3 +71,18 @@ export async function deleteCheckpoint(id) {
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+// The brand's WEEKLY report weeks (period_start + label), newest first. Used to
+// align the checkpoint's week grid to reporting (so week_start == period_start)
+// and to show whether a report exists for the selected week (auto-fetch ready).
+// Light query — no report `data`. RLS on `reports` still applies.
+export async function listReportWeeks(brandId) {
+  const { data, error } = await supabase
+    .from('reports')
+    .select('period_start, period_label')
+    .eq('brand_id', brandId)
+    .eq('type', 'weekly')
+    .order('period_start', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
