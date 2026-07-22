@@ -14,9 +14,9 @@
 //
 // 2026-07 format change: the sheet dropped NTB and Keyword Search Rank, split
 // Amazon Revenue into per-PRODUCT columns plus a "Total Revenue/Day", and moved
-// Keyword Search Volume to a WEEKLY subsheet (see KSV_META + haloParse's weekly
-// tab). So the only DAILY Amazon field left here is revenue_per_day; keyword
-// search volume is handled weekly-native, outside HALO_FIELDS.
+// Keyword Search Volume to a WEEKLY subsheet. It's still a HALO_FIELD but marked
+// `weeklyOnly` (see below) — the math injects it into the weekly/monthly buckets
+// from weekly_keywords, and it's hidden at Daily granularity.
 // ============================================================
 
 export const HALO_FIELDS = [
@@ -31,6 +31,11 @@ export const HALO_FIELDS = [
   // Amazon side (daily) — the branded revenue the halo drives. The sheet calls
   // this "Total Revenue/Day" (= sum of the per-product Revenue (Amazon) cols).
   { key: 'revenue_per_day',     label: 'Amazon Revenue', sheetHeader: 'Total Revenue/Day', group: 'amazon', agg: 'sum', fmt: 'money' },
+  // Amazon branded search demand — WEEKLY-ONLY (Branded Demand subsheet). It's a
+  // normal selectable metric, but only exists at Weekly/Monthly granularity
+  // (weeklyOnly hides it at Daily). Its values come from dataset.weekly_keywords,
+  // injected into the weekly/monthly buckets by the math — never from daily rows.
+  { key: 'keyword_search_volume', label: 'Branded Search Volume', group: 'amazon', agg: 'sum', fmt: 'int', weeklyOnly: true },
   { key: 'product_clicks',      label: 'Product clicks',      group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_clicks',       label: 'Unique clicks',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'cost',                label: 'Cost',                group: 'tiktok', agg: 'sum', fmt: 'money' },
@@ -44,14 +49,21 @@ export const FIELD_BY_KEY = Object.fromEntries(HALO_FIELDS.map((f) => [f.key, f]
 export const AMAZON_FIELDS = HALO_FIELDS.filter((f) => f.group === 'amazon');
 export const TIKTOK_FIELDS = HALO_FIELDS.filter((f) => f.group === 'tiktok');
 
-// Keyword Search Volume — weekly-only branded search demand from the subsheet.
-// Not a daily HALO_FIELD; the Search-demand view handles it weekly-native.
-export const KSV_META = { key: 'keyword_search_volume', label: 'Branded Search Volume', fmt: 'int' };
+// The weekly-only branded search metric key (lives in weekly_keywords).
+export const KSV_KEY = 'keyword_search_volume';
 
 // The daily Amazon field that carries a per-PRODUCT breakdown (Revenue (Amazon)
 // columns). "All products" = the stored total (revenue_per_day); a single
 // product = that product's daily revenue.
 export const PRODUCT_REVENUE_FIELD = 'revenue_per_day';
+
+// Fields selectable at a given granularity. Weekly-only fields (branded search)
+// are hidden at Daily because there's no daily data for them.
+export function fieldsForGran(gran) {
+  return HALO_FIELDS.filter((f) => gran !== 'day' || !f.weeklyOnly);
+}
+export const AMAZON_FIELDS_FOR = (gran) => fieldsForGran(gran).filter((f) => f.group === 'amazon');
+export const TIKTOK_FIELDS_FOR = (gran) => fieldsForGran(gran).filter((f) => f.group === 'tiktok');
 
 // ---- currency ---------------------------------------------------------------
 // The sheet may be in $, £ or €. parseHaloSheet detects it and stores it on the
