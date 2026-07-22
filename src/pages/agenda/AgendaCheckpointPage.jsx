@@ -5,7 +5,7 @@
 // clicks "Generate PDF" to download a polished 12-slide landscape deck. Drafts
 // autosave to localStorage per brand + week. No auto-fetch yet.
 // ============================================================
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { listBrands } from '../../lib/brandsApi';
@@ -21,13 +21,27 @@ import '../../styles/checkpoint.css';
 const SLIDE_COUNT = 12;
 const PREVIEW_GAP = 28;
 
+// Memoized so the heavy 12-slide deck only re-renders when the (debounced)
+// preview data actually changes — keeps typing in the form smooth.
+const MemoDeck = memo(CheckpointDeck);
+const raf = () => new Promise((r) => requestAnimationFrame(r));
+
 export default function AgendaCheckpointPage() {
   const { profile } = useAuth();
   const [brandId, setBrandId] = useState('');
   const [week, setWeek] = useState(currentWeekLabel);
   const [data, setData] = useState(EMPTY_CHECKPOINT);
+  const [previewData, setPreviewData] = useState(data);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
+
+  // Debounce the deck preview: form stays instant, the heavy deck re-renders a
+  // beat after you stop typing.
+  useEffect(() => {
+    const id = setTimeout(() => setPreviewData(data), 180);
+    return () => clearTimeout(id);
+  }, [data]);
 
   const deckRef = useRef(null);
   const previewColRef = useRef(null);
@@ -90,9 +104,13 @@ export default function AgendaCheckpointPage() {
 
   async function onGenerate() {
     setBusy(true);
+    setProgress({ i: 0, total: SLIDE_COUNT });
+    setPreviewData(data);            // flush any pending debounce so we capture latest
+    await raf(); await raf();        // let React commit + browser lay out
     try {
       await exportCheckpointToPdf(deckRef.current, {
         title: `${data.cover.brandName || 'Brand'} — Weekly Checkpoint ${week}`,
+        onProgress: (i, total) => setProgress({ i, total }),
       });
     } catch (e) {
       // surface as alert rather than silent failure
@@ -100,6 +118,7 @@ export default function AgendaCheckpointPage() {
       alert(`Couldn't generate the PDF: ${e?.message || e}`);
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -113,7 +132,9 @@ export default function AgendaCheckpointPage() {
           <p className="page-subtitle">Fill in last week's numbers and story, then generate a polished PDF for Tuesday's meeting.</p>
         </div>
         <button className="wx-btn wx-btn-primary" disabled={!brandId || busy} onClick={onGenerate}>
-          {busy ? <><span className="wx-spinner" /> Generating…</> : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
+          {busy
+            ? <><span className="wx-spinner" /> {progress ? `Rendering ${progress.i}/${progress.total}…` : 'Generating…'}</>
+            : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
         </button>
       </div>
 
@@ -159,7 +180,7 @@ export default function AgendaCheckpointPage() {
             <div className="ck-preview-hint">Live preview · this is exactly what the PDF will look like</div>
             <div className="ckpt-preview" style={{ height: unscaledH * scale }}>
               <div style={{ width: 1280, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                <CheckpointDeck data={data} ref={deckRef} />
+                <MemoDeck data={previewData} ref={deckRef} />
               </div>
             </div>
           </div>
