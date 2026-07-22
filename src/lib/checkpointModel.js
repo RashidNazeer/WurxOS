@@ -174,17 +174,40 @@ export function fmtKpi(fmtType, v, sym = '$') {
   }
 }
 
-// The current Monday→Sunday week as "Mmm D–D, YYYY" (Pakistan calendar).
-export function currentWeekLabel() {
+// ── week helpers (weeks are Monday→Sunday; keyed by the Monday date) ──
+const _p2 = (n) => String(n).padStart(2, '0');
+const _isoOf = (dt) => `${dt.getUTCFullYear()}-${_p2(dt.getUTCMonth() + 1)}-${_p2(dt.getUTCDate())}`;
+function _pakistanTodayUTC() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit',
   }).formatToParts(new Date());
   const get = (t) => Number(parts.find((p) => p.type === t).value);
-  const today = new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
-  const dow = today.getUTCDay(); // 0=Sun
-  const monday = new Date(today); monday.setUTCDate(today.getUTCDate() - ((dow + 6) % 7));
-  const sunday = new Date(monday); sunday.setUTCDate(monday.getUTCDate() + 6);
-  return weekLabelFrom(monday, sunday);
+  return new Date(Date.UTC(get('year'), get('month') - 1, get('day')));
+}
+
+// Monday (YYYY-MM-DD) of the week containing `dateStr` (default: today, PK).
+export function mondayOf(dateStr) {
+  let dt;
+  if (dateStr) { const [y, m, d] = dateStr.split('-').map(Number); dt = new Date(Date.UTC(y, m - 1, d)); }
+  else dt = _pakistanTodayUTC();
+  dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
+  return _isoOf(dt);
+}
+export function addWeeks(weekStart, n) {
+  const [y, m, d] = weekStart.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n * 7);
+  return _isoOf(dt);
+}
+// The week just ended (Tuesday's meeting reviews last week): last week's Monday.
+export function defaultReviewWeekStart() { return addWeeks(mondayOf(), -1); }
+
+// "Mmm D–D, YYYY" label for a Monday week-start.
+export function weekLabelForStart(weekStart) {
+  const [y, m, d] = weekStart.split('-').map(Number);
+  const s = new Date(Date.UTC(y, m - 1, d));
+  const e = new Date(s); e.setUTCDate(s.getUTCDate() + 6);
+  return weekLabelFrom(s, e);
 }
 export function weekLabelFrom(start, end) {
   const mo = (d) => d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short' });
@@ -194,3 +217,5 @@ export function weekLabelFrom(start, end) {
   }
   return `${mo(start)} ${start.getUTCDate()} – ${mo(end)} ${end.getUTCDate()}, ${y}`;
 }
+// Back-compat: the current Monday→Sunday week label.
+export function currentWeekLabel() { return weekLabelForStart(mondayOf()); }

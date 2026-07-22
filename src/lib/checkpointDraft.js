@@ -12,9 +12,10 @@ const PREFIX = 'wurxos.checkpoint.';
 const keyFor = (brandId, weekLabel) =>
   `${PREFIX}${brandId || 'nobrand'}::${(weekLabel || '').trim() || 'nodate'}`;
 
-// Deep-merge a saved draft over a fresh empty template so older drafts that
-// predate a new field still load with that field defaulted (never undefined).
-function hydrate(saved) {
+// Deep-merge a saved payload over a fresh empty template so older data that
+// predates a new field still loads with that field defaulted (never undefined).
+// Exported so DB-loaded checkpoints get the same safety.
+export function hydrate(saved) {
   const base = EMPTY_CHECKPOINT();
   if (!saved || typeof saved !== 'object') return base;
   const merge = (b, s) => {
