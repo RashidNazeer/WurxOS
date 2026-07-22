@@ -61,3 +61,20 @@ export const PAID_COLLAB_STATUSES = [
 
 export const paidCollabStatusLabel = (v) =>
   PAID_COLLAB_STATUSES.find((s) => s.value === v)?.label || v;
+
+// GMV Max (paid ads) posture of a brand — same four buckets as paid collab,
+// but about who runs the brand's GMV Max campaigns. Drives whether the GMV Max
+// Budget and Target ROI goal cards show in Brand Analytics (mig 263).
+export const GMV_MAX_STATUSES = [
+  { value: 'not_applicable',     label: 'Not applicable',     blurb: 'No GMV Max campaigns on this brand.' },
+  { value: 'managed_by_brand',   label: 'Managed by brand',   blurb: 'Brand runs their own GMV Max.' },
+  { value: 'managed_internally', label: 'Managed internally', blurb: 'We run this brand’s GMV Max.' },
+  { value: 'hybrid',             label: 'Hybrid',             blurb: 'Shared between brand and our team.' },
+];
+
+export const gmvMaxStatusLabel = (v) =>
+  GMV_MAX_STATUSES.find((s) => s.value === v)?.label || v;
+
+// A managed-status ('paid_collab_status' / 'gmv_max_status') means WE handle it
+// when it's run internally or shared. Used to gate the per-brand goal cards.
+export const isManagedByUs = (v) => v === 'managed_internally' || v === 'hybrid';

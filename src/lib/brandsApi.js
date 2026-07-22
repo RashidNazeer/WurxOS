@@ -61,7 +61,7 @@ export async function listEukaStores() {
   return data || [];
 }
 
-export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', eukaStoreId = null, eukaSlug = null }) {
+export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', eukaStoreId = null, eukaSlug = null }) {
   const { data: me } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('brands')
@@ -74,6 +74,7 @@ export async function createBrand({ brandName, clientName, tier, gmv, ownerId, l
       logo_url: logoUrl || null,
       status,
       paid_collab_status: paidCollabStatus,
+      gmv_max_status: gmvMaxStatus,
       euka_store_id: eukaStoreId || null,
       euka_slug: eukaSlug || null,
       created_by: me?.user?.id ?? null,
@@ -100,6 +101,7 @@ export async function updateBrand(id, patch) {
   if ('logoUrl'    in patch) payload.logo_url    = patch.logoUrl || null;
   if ('status'     in patch) payload.status      = patch.status;
   if ('paidCollabStatus' in patch) payload.paid_collab_status = patch.paidCollabStatus;
+  if ('gmvMaxStatus'     in patch) payload.gmv_max_status     = patch.gmvMaxStatus;
   // Euka link — set both together (store scopes queries, slug picks the key).
   // Passing null for both un-links the brand from Euka.
   if ('eukaStoreId' in patch) payload.euka_store_id = patch.eukaStoreId || null;

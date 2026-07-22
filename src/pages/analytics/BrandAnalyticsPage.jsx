@@ -5,6 +5,7 @@ import { AlertIcon } from '../../components/common/Icon';
 import {
   listActiveBrands, getBrandMonthlyMetrics, saveBrandMonthlyMetrics, listMonthsWithData,
 } from '../../lib/brandMetricsApi';
+import { isManagedByUs } from '../../lib/roles';
 
 // ── The 5 metrics (each a target/achieved pair) ─────────────────────
 const METRICS = [
@@ -47,6 +48,21 @@ function pctOf(target, achieved) {
   return (Number(achieved) || 0) / t * 100;
 }
 
+// Which of the 5 goal cards apply to a brand. Paid Collab shows only when WE
+// manage the brand's paid collab; GMV Max Budget AND Target ROI show only when
+// WE run the brand's GMV Max (Target ROI is meaningless if we don't run the
+// campaigns). GMV & Samples always apply. Managed status is set per-brand in
+// the Brand form (paid_collab_status / gmv_max_status, mig 016 / 263).
+function visibleMetricsFor(brand) {
+  const paidOk = isManagedByUs(brand?.paid_collab_status);
+  const gmvMaxOk = isManagedByUs(brand?.gmv_max_status);
+  return METRICS.filter((m) => {
+    if (m.key === 'paidCollab') return paidOk;
+    if (m.key === 'gmvMax' || m.key === 'roi') return gmvMaxOk;
+    return true;
+  });
+}
+
 export default function BrandAnalyticsPage() {
   const qc = useQueryClient();
   const [brandId, setBrandId] = useState('');
@@ -74,7 +90,16 @@ export default function BrandAnalyticsPage() {
     queryFn: () => listMonthsWithData(brandId),
     enabled: !!brandId,
   });
-  const hasAny = METRICS.some((m) => data && (data[m.tCol] != null || data[m.aCol] != null));
+  // Only the goal cards that apply to this brand (based on who manages paid
+  // collab / GMV Max). GMV & Samples always; the other three are gated.
+  const visibleMetrics = useMemo(() => visibleMetricsFor(selectedBrand), [selectedBrand]);
+  const hiddenGroups = useMemo(() => {
+    const groups = [];
+    if (!isManagedByUs(selectedBrand?.paid_collab_status)) groups.push('Paid Collab');
+    if (!isManagedByUs(selectedBrand?.gmv_max_status)) groups.push('GMV Max & Target ROI');
+    return groups;
+  }, [selectedBrand]);
+  const hasAny = visibleMetrics.some((m) => data && (data[m.tCol] != null || data[m.aCol] != null));
 
   const err = brandsErr?.message || error?.message || '';
   const thisMonth = pakistanMonth();
@@ -156,10 +181,19 @@ export default function BrandAnalyticsPage() {
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
-            {METRICS.map((m) => (
+            {visibleMetrics.map((m) => (
               <MetricCard key={m.key} metric={m} target={data?.[m.tCol]} achieved={data?.[m.aCol]} />
             ))}
           </div>
+          {hiddenGroups.length > 0 && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+              <i className="bi bi-info-circle" style={{ marginTop: 1 }} />
+              <span>
+                Hidden for {selectedBrand?.brand_name}: <strong>{hiddenGroups.join(' · ')}</strong> — we don’t manage {hiddenGroups.length > 1 ? 'these' : 'this'} for this brand.
+                Change the brand’s status in <strong>Brands</strong> to track {hiddenGroups.length > 1 ? 'them' : 'it'}.
+              </span>
+            </div>
+          )}
           {data?.updated_at && (
             <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12 }}>
               Last updated {new Date(data.updated_at).toLocaleString()}
@@ -173,6 +207,7 @@ export default function BrandAnalyticsPage() {
           brand={selectedBrand}
           month={month}
           data={data}
+          metrics={visibleMetrics}
           onClose={() => setEditing(false)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
@@ -233,7 +268,11 @@ function MetricCard({ metric, target, achieved }) {
 }
 
 // ── Edit modal (centered overlay) ───────────────────────────────────
-function EditModal({ brand, month, data, onClose, onSaved }) {
+// `metrics` = the goal cards that apply to this brand (the ones shown as
+// inputs). We still SEED the form from ALL metric columns so a hidden metric's
+// stored value is carried through the save untouched (saveBrandMonthlyMetrics
+// writes the whole row), never silently nulled.
+function EditModal({ brand, month, data, metrics = METRICS, onClose, onSaved }) {
   const [form, setForm] = useState(() => {
     const f = {};
     for (const m of METRICS) {
@@ -275,7 +314,7 @@ function EditModal({ brand, month, data, onClose, onSaved }) {
         </div>
 
         <div style={{ padding: '16px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {METRICS.map((m) => (
+          {metrics.map((m) => (
             <div key={m.key}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <i className={`bi ${m.icon}`} style={{ color: m.tint }} />

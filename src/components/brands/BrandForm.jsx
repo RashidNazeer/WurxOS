@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import LogoPicker from './LogoPicker';
 import { XIcon, AlertIcon, ShieldIcon } from '../common/Icon';
-import { PAID_COLLAB_STATUSES } from '../../lib/roles';
+import { PAID_COLLAB_STATUSES, GMV_MAX_STATUSES, isManagedByUs } from '../../lib/roles';
 import BrandCustomFieldsPanel from './BrandCustomFieldsPanel';
 import BrandActivityPanel from './BrandActivityPanel';
 import BrandResourcesPanel from './BrandResourcesPanel';
@@ -36,6 +36,9 @@ export default function BrandForm({ brand, onClose, onSaved }) {
   const [status, setStatus]         = useState(brand?.status      || 'active');
   const [paidCollabStatus, setPaidCollabStatus] = useState(
     brand?.paid_collab_status || 'not_applicable',
+  );
+  const [gmvMaxStatus, setGmvMaxStatus] = useState(
+    brand?.gmv_max_status || 'not_applicable',
   );
   const [ownerId, setOwnerId]       = useState(brand?.owner_id    || lockedOwner || '');
   const [assignedIds, setAssignedIds] = useState(
@@ -153,13 +156,13 @@ export default function BrandForm({ brand, onClose, onSaved }) {
       let saved;
       if (isEdit) {
         saved = await updateBrand(brand.id, {
-          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus,
+          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus, gmvMaxStatus,
           logoUrl: nextLogoUrl,
           eukaStoreId: eukaStoreToSave, eukaSlug: eukaSlugToSave,
         });
       } else {
         saved = await createBrand({
-          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus,
+          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus, gmvMaxStatus,
           logoUrl: nextLogoUrl,
           eukaStoreId: eukaStoreToSave, eukaSlug: eukaSlugToSave,
         });
@@ -287,6 +290,28 @@ export default function BrandForm({ brand, onClose, onSaved }) {
               </select>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 {PAID_COLLAB_STATUSES.find((s) => s.value === paidCollabStatus)?.blurb}
+              </div>
+            </div>
+
+            {/* GMV Max status — who runs the brand's paid ads. Drives whether the
+                GMV Max Budget + Target ROI cards show in Brand Analytics. */}
+            <div style={{ marginBottom: 14 }}>
+              <label className="wx-label">GMV Max status</label>
+              <select
+                className="wx-input"
+                value={gmvMaxStatus}
+                onChange={(e) => setGmvMaxStatus(e.target.value)}
+                disabled={saving}
+              >
+                {GMV_MAX_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                {GMV_MAX_STATUSES.find((s) => s.value === gmvMaxStatus)?.blurb}
+                {isManagedByUs(gmvMaxStatus)
+                  ? ' Its GMV Max Budget & Target ROI goals will show in Brand Analytics.'
+                  : ''}
               </div>
             </div>
 

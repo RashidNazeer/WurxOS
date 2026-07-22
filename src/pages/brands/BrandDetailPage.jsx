@@ -16,7 +16,7 @@ const REPORT_STATUS_TONE = {
   rejected:  { fg: 'var(--danger)',     label: 'Rejected' },
 };
 import { supabase } from '../../lib/supabase';
-import { paidCollabStatusLabel } from '../../lib/roles';
+import { paidCollabStatusLabel, gmvMaxStatusLabel } from '../../lib/roles';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import BrandForm from '../../components/brands/BrandForm';
 import SwitchApcModal from '../../components/brands/SwitchApcModal';
@@ -467,6 +467,7 @@ function OverviewPanel({
               <dt>Tier</dt><dd>{brand.tier || '—'}</dd>
               <dt>GMV · 30 day</dt><dd>{brand.gmv != null ? formatMoney(brand.gmv) : '—'}</dd>
               <dt>Paid Collab</dt><dd>{paidCollabStatusLabel(brand.paid_collab_status)}</dd>
+              <dt>GMV Max</dt><dd>{gmvMaxStatusLabel(brand.gmv_max_status)}</dd>
               <dt>Status</dt><dd style={{ textTransform: 'capitalize' }}>{brand.status}</dd>
               <dt>Created</dt><dd>{new Date(brand.created_at).toLocaleDateString()}</dd>
             </dl>
