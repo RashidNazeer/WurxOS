@@ -1,0 +1,275 @@
+/* ============================================================
+   Weekly Performance Checkpoint — deck design system.
+
+   Scoped entirely under .ckpt-deck. Slides are authored at a fixed
+   1280×720 (16:9) so what you preview is exactly what the PDF captures.
+   This is a self-contained DOCUMENT: it carries its own light palette and
+   fonts on purpose (a report shouldn't flip with the app's dark mode), so
+   the hardcoded colours here are intentional, not a token violation.
+   ============================================================ */
+
+.ckpt-deck {
+  --ck-ink:      #0f172a;
+  --ck-ink-2:    #334155;
+  --ck-ink-3:    #64748b;
+  --ck-muted:    #94a3b8;
+  --ck-line:     #e6e9f0;
+  --ck-line-2:   #eef1f6;
+  --ck-bg:       #ffffff;
+  --ck-panel:    #f7f9fc;
+  --ck-panel-2:  #eef2f9;
+  --ck-accent:   #4f46e5;
+  --ck-accent-2: #6366f1;
+  --ck-accent-soft:#eef0fe;
+  --ck-pos:      #15a34a;
+  --ck-pos-soft: #e6f7ec;
+  --ck-neg:      #dc2626;
+  --ck-neg-soft: #fdeaea;
+  --ck-warn:     #d97706;
+  --ck-warn-soft:#fdf1e0;
+
+  color: var(--ck-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+.ckpt-deck * { box-sizing: border-box; }
+
+/* ── the slide ─────────────────────────────────────────────── */
+.ckpt-slide {
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  background: var(--ck-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 44px 56px 60px;
+  --slide-accent: var(--ck-accent);
+}
+/* chrome only in the on-screen preview (box-shadow lives outside the node so it
+   isn't captured; no border, to avoid a hairline in the PDF) */
+.ckpt-preview .ckpt-deck { display: flex; flex-direction: column; gap: 28px; }
+.ckpt-preview .ckpt-slide { border-radius: 14px; box-shadow: 0 10px 30px rgba(15,23,42,.10); }
+
+/* top hairline accent */
+.ckpt-slide::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+  background: linear-gradient(90deg, var(--slide-accent), color-mix(in srgb, var(--slide-accent) 45%, #ffffff));
+}
+
+/* ── header ────────────────────────────────────────────────── */
+.ck-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.ck-num {
+  flex: none; width: 40px; height: 40px; border-radius: 11px;
+  background: var(--slide-accent); color: #fff;
+  display: grid; place-items: center; font-weight: 800; font-size: 17px;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--slide-accent) 40%, transparent);
+}
+.ck-head-txt { flex: 1; min-width: 0; }
+.ck-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--slide-accent); }
+.ck-title { font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 3px 0 0; color: var(--ck-ink); }
+.ck-sub { font-size: 14.5px; color: var(--ck-ink-3); margin-top: 6px; }
+.ck-head-meta { flex: none; text-align: right; font-size: 12.5px; color: var(--ck-muted); padding-top: 4px; }
+.ck-status {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800;
+  padding: 6px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em;
+}
+.ck-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+.ck-status.on_track  { background: var(--ck-pos-soft); color: var(--ck-pos); }
+.ck-status.watch     { background: var(--ck-warn-soft); color: var(--ck-warn); }
+.ck-status.off_track { background: var(--ck-neg-soft); color: var(--ck-neg); }
+.ck-status.on_track .dot  { background: var(--ck-pos); }
+.ck-status.watch .dot     { background: var(--ck-warn); }
+.ck-status.off_track .dot { background: var(--ck-neg); }
+
+.ck-body { flex: 1; min-height: 0; }
+
+/* ── footer ────────────────────────────────────────────────── */
+.ck-foot {
+  position: absolute; left: 56px; right: 56px; bottom: 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11.5px; color: var(--ck-muted); border-top: 1px solid var(--ck-line-2); padding-top: 10px;
+}
+.ck-foot b { color: var(--ck-ink-3); font-weight: 700; }
+
+/* ── generic bits ──────────────────────────────────────────── */
+.ck-sectlabel { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ck-muted); margin-bottom: 12px; }
+.ck-panel { background: var(--ck-panel); border: 1px solid var(--ck-line); border-radius: 14px; padding: 18px 20px; }
+.ck-note {
+  background: var(--ck-panel); border-left: 3px solid var(--slide-accent); border-radius: 10px;
+  padding: 12px 16px; font-size: 14px; color: var(--ck-ink-2); line-height: 1.5;
+}
+.ck-note .k { font-weight: 800; color: var(--ck-ink); }
+.ck-cols { display: grid; gap: 20px; }
+
+/* ── stat card ─────────────────────────────────────────────── */
+.ck-stat { background: var(--ck-bg); border: 1px solid var(--ck-line); border-radius: 13px; padding: 15px 17px; }
+.ck-stat .lbl { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ck-ink-3); }
+.ck-stat .val { font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; line-height: 1; color: var(--ck-ink); }
+.ck-stat .val.sm { font-size: 22px; }
+.ck-stat .foot { margin-top: 8px; font-size: 12.5px; color: var(--ck-muted); }
+
+/* delta badge */
+.ck-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+.ck-delta.up   { background: var(--ck-pos-soft); color: var(--ck-pos); }
+.ck-delta.down { background: var(--ck-neg-soft); color: var(--ck-neg); }
+.ck-delta.flat { background: var(--ck-panel-2); color: var(--ck-ink-3); }
+.ck-delta .ar { font-size: 11px; }
+
+/* KPI grid (snapshot) */
+.ck-kpigrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+/* ── funnel ────────────────────────────────────────────────── */
+.ck-funnel { display: flex; flex-direction: column; gap: 9px; }
+.ck-funnel-row { display: grid; grid-template-columns: 168px 1fr; align-items: center; gap: 14px; }
+.ck-funnel-row .fl { font-size: 13.5px; font-weight: 700; color: var(--ck-ink-2); text-align: right; }
+.ck-funnel-bar { position: relative; height: 40px; border-radius: 9px; background: var(--ck-panel-2); overflow: hidden; }
+.ck-funnel-fill { position: absolute; inset: 0; width: var(--w,100%); border-radius: 9px;
+  background: linear-gradient(90deg, var(--slide-accent), color-mix(in srgb, var(--slide-accent) 60%, #ffffff)); }
+.ck-funnel-val { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; gap: 10px;
+  font-weight: 800; font-size: 15px; color: #fff; }
+.ck-funnel-conv { font-size: 12px; font-weight: 700; color: var(--ck-ink-3); }
+.ck-arrowdown { text-align: center; color: var(--ck-muted); font-size: 13px; }
+
+/* horizontal mini bars (tiers, reach) */
+.ck-bars { display: flex; flex-direction: column; gap: 8px; }
+.ck-bar-row { display: grid; grid-template-columns: 120px 1fr 64px; align-items: center; gap: 12px; font-size: 13px; }
+.ck-bar-row .bl { font-weight: 700; color: var(--ck-ink-2); }
+.ck-bar-track { height: 12px; border-radius: 999px; background: var(--ck-panel-2); overflow: hidden; }
+.ck-bar-fill { height: 100%; border-radius: 999px; background: var(--slide-accent); width: var(--w,0%); }
+.ck-bar-row .bv { text-align: right; font-weight: 800; color: var(--ck-ink); }
+
+/* ── table ─────────────────────────────────────────────────── */
+.ck-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ck-table th { text-align: left; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ck-muted); padding: 0 12px 9px; border-bottom: 2px solid var(--ck-line); }
+.ck-table td { padding: 11px 12px; border-bottom: 1px solid var(--ck-line-2); color: var(--ck-ink-2); }
+.ck-table td.num, .ck-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ck-table tr:last-child td { border-bottom: none; }
+.ck-table .strong { font-weight: 800; color: var(--ck-ink); }
+
+/* verdict / status pills */
+.ck-pill { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 7px; }
+.ck-pill.scale, .ck-pill.done        { background: var(--ck-pos-soft); color: var(--ck-pos); }
+.ck-pill.hold,  .ck-pill.in_progress { background: var(--ck-warn-soft); color: var(--ck-warn); }
+.ck-pill.test,  .ck-pill.open        { background: var(--ck-accent-soft); color: var(--ck-accent); }
+.ck-pill.kill                        { background: var(--ck-neg-soft); color: var(--ck-neg); }
+
+/* chips */
+.ck-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ck-chip { font-size: 13px; font-weight: 700; padding: 6px 13px; border-radius: 999px;
+  background: var(--ck-panel); border: 1px solid var(--ck-line); color: var(--ck-ink-2); }
+.ck-chip.warn { background: var(--ck-warn-soft); border-color: transparent; color: var(--ck-warn); }
+
+/* numbered list (research / suggestions) */
+.ck-list { display: flex; flex-direction: column; gap: 11px; }
+.ck-listitem { display: flex; gap: 13px; align-items: flex-start; }
+.ck-listitem .idx { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--ck-accent-soft);
+  color: var(--ck-accent); font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+.ck-listitem .body { font-size: 14px; color: var(--ck-ink-2); line-height: 1.45; }
+.ck-listitem .body .impact { color: var(--ck-ink-3); font-size: 13px; }
+
+/* break-even compare bars (paid slide) */
+.ck-compare { display: flex; flex-direction: column; gap: 12px; }
+.ck-compare-row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: 14px; }
+.ck-compare-row .cl { font-size: 12.5px; font-weight: 700; color: var(--ck-ink-3); }
+.ck-compare-track { height: 26px; border-radius: 8px; background: var(--ck-panel-2); overflow: hidden; }
+.ck-compare-fill { height: 100%; border-radius: 8px; width: var(--w,0%); }
+.ck-compare-fill.target { background: var(--ck-pos); }
+.ck-compare-fill.actual { background: var(--ck-neg); }
+.ck-compare-fill.actual.ok { background: var(--ck-pos); }
+.ck-compare-row .cv { font-weight: 800; font-size: 15px; color: var(--ck-ink); min-width: 56px; text-align: right; }
+
+/* cover slide */
+.ck-cover { height: 100%; display: flex; flex-direction: column; justify-content: center; }
+.ck-cover .kicker { font-size: 14px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; color: var(--ck-accent); }
+.ck-cover h1 { font-size: 76px; font-weight: 850; letter-spacing: -.03em; line-height: .98; margin: 16px 0 0; color: var(--ck-ink); }
+.ck-cover h1 .thin { font-weight: 350; color: var(--ck-ink-3); }
+.ck-cover .lede { font-size: 17px; color: var(--ck-ink-3); margin-top: 20px; max-width: 62ch; line-height: 1.5; }
+.ck-cover-meta { display: flex; gap: 46px; margin-top: 48px; }
+.ck-cover-meta .m .k { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ck-muted); }
+.ck-cover-meta .m .v { font-size: 22px; font-weight: 800; color: var(--ck-ink); margin-top: 4px; }
+.ck-cover-brandmark { position: absolute; top: 44px; right: 56px; display: flex; align-items: center; gap: 12px; }
+.ck-cover-brandmark .logo { width: 52px; height: 52px; border-radius: 13px; object-fit: cover; border: 1px solid var(--ck-line); background: #fff; }
+
+/* screenshot embed */
+.ck-shot { border: 1px solid var(--ck-line); border-radius: 12px; overflow: hidden; background: var(--ck-panel); height: 100%; display: grid; place-items: center; }
+.ck-shot img { max-width: 100%; max-height: 100%; display: block; }
+.ck-shot .ph { color: var(--ck-muted); font-size: 13px; font-weight: 600; }
+
+/* empty-value guard so nothing prints as literal blank */
+.ck-empty { color: var(--ck-muted); }
+
+/* ============================================================
+   BUILDER PAGE + FORM (app UI — uses app theme tokens, with hex
+   fallbacks so it's never invisible if a token is absent).
+   ============================================================ */
+.ck-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 560px);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1180px) {
+  .ck-builder { grid-template-columns: 1fr; }
+  .ck-builder-preview { order: -1; }
+  .ck-preview-sticky { position: static !important; }
+}
+.ck-preview-sticky { position: sticky; top: 12px; }
+.ck-preview-hint { font-size: 11.5px; color: var(--text-muted, #94a3b8); margin-bottom: 8px; text-align: center; }
+.ckpt-preview { width: 100%; overflow: hidden; }
+
+.ck-form { display: flex; flex-direction: column; gap: 16px; }
+
+.ck-sec {
+  background: var(--surface-1, #ffffff);
+  border: 1px solid var(--border-subtle, #e6e9f0);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+.ck-sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+.ck-sec-num { flex: none; width: 26px; height: 26px; border-radius: 7px; color: #fff; font-weight: 800; font-size: 12px; display: grid; place-items: center; }
+.ck-sec-title { font-size: 15px; font-weight: 800; margin: 0; color: var(--text-primary, #0f172a); }
+.ck-sec-body { display: block; }
+
+.ck-grid { display: grid; gap: 12px; margin-bottom: 12px; }
+.ck-field { display: flex; flex-direction: column; gap: 5px; }
+.ck-field .wx-label { margin: 0; }
+.ck-sublabel { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted, #94a3b8); margin: 8px 0 9px; }
+
+.ck-pfx { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #94a3b8); font-size: 13px; pointer-events: none; }
+.ck-sfx { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text-muted, #94a3b8); font-size: 13px; pointer-events: none; }
+
+.ck-kpi-form { display: grid; gap: 8px; margin: 12px 0 4px; }
+.ck-kpi-form-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; align-items: center; }
+.ck-kpi-name { font-size: 13px; font-weight: 700; color: var(--text-secondary, #334155); }
+
+.ck-roweditor { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.ck-roweditor-fields { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.ck-roweditor-fields .wx-input { flex: 1 1 130px; min-width: 0; }
+.ck-row-x {
+  flex: none; width: 36px; height: 36px; border-radius: 9px; cursor: pointer;
+  display: grid; place-items: center; color: var(--text-muted, #94a3b8);
+  background: var(--surface-2, #f1f5f9); border: 1px solid var(--border-subtle, #e6e9f0);
+  transition: all .15s;
+}
+.ck-row-x:hover { color: var(--danger, #dc2626); border-color: var(--danger, #dc2626); }
+.ck-add-btn {
+  align-self: flex-start; margin: 2px 0 10px; padding: 7px 14px; border-radius: 9px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: var(--accent, #4f46e5); background: transparent;
+  border: 1px dashed var(--accent, #4f46e5);
+  transition: all .15s;
+}
+.ck-add-btn:hover { background: color-mix(in srgb, var(--accent, #4f46e5) 8%, transparent); }
+
+.ck-chips-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.ck-chip-btn {
+  padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: var(--text-secondary, #334155); background: var(--surface-1, #fff);
+  border: 1px solid var(--border-default, #d6dae4); transition: all .15s;
+}
+.ck-chip-btn.on { color: #fff; background: var(--accent, #4f46e5); border-color: var(--accent, #4f46e5); }

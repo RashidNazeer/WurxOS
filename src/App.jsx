@@ -100,6 +100,7 @@ const AgendaSettingsPage    = lazy(() => import('./pages/agenda/AgendaSettingsPa
 const AgendaUpcomingPage    = lazy(() => import('./pages/agenda/AgendaUpcomingPage'));
 const AgendaOngoingPage     = lazy(() => import('./pages/agenda/AgendaOngoingPage'));
 const AgendaPriorPage       = lazy(() => import('./pages/agenda/AgendaPriorPage'));
+const AgendaCheckpointPage  = lazy(() => import('./pages/agenda/AgendaCheckpointPage'));
 const EukaAnalyticsPage     = lazy(() => import('./pages/euka/EukaAnalyticsPage'));
 const AmazonHaloPage        = lazy(() => import('./pages/boss/AmazonHaloPage'));
 const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
@@ -278,6 +279,14 @@ export default function App() {
                 element={
                   <RoleGuard allow={['apc']}>
                     <VideoReviewsPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/agenda/checkpoint"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
+                    <AgendaCheckpointPage />
                   </RoleGuard>
                 }
               />
