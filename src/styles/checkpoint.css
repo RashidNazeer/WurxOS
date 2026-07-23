@@ -9,47 +9,54 @@
    ============================================================ */
 
 .ckpt-deck {
-  --ck-ink:      #0f172a;
-  --ck-ink-2:    #334155;
-  --ck-ink-3:    #64748b;
-  --ck-muted:    #94a3b8;
-  --ck-line:     #e6e9f0;
-  --ck-line-2:   #eef1f6;
+  /* "Ink & Ivory" — warm ink on barely-warm paper, deepened indigo + brass. */
+  --ck-ink:      #14121c;
+  --ck-ink-2:    #3b3746;
+  --ck-ink-3:    #6b6676;
+  --ck-muted:    #9d98a8;
+  --ck-line:     #e8e5de;
+  --ck-line-2:   #f2f0ea;
   --ck-bg:       #ffffff;
-  --ck-panel:    #f7f9fc;
-  --ck-panel-2:  #eef2f9;
-  --ck-accent:   #4f46e5;
-  --ck-accent-2: #6366f1;
-  --ck-accent-soft:#eef0fe;
-  --ck-pos:      #15a34a;
-  --ck-pos-soft: #e6f7ec;
-  --ck-neg:      #dc2626;
-  --ck-neg-soft: #fdeaea;
-  --ck-warn:     #d97706;
-  --ck-warn-soft:#fdf1e0;
+  --ck-panel:    #f8f7f3;
+  --ck-panel-2:  #efece6;
+  --ck-accent:   #4739c9;
+  --ck-accent-2: #7c5cf0;
+  --ck-accent-soft:#edecfb;
+  --ck-gold:     #b0833c;
+  --ck-gold-soft:#f6efe1;
+  --ck-pos:      #12813f;
+  --ck-pos-soft: #e7f4ec;
+  --ck-neg:      #b42318;
+  --ck-neg-soft: #fbeae7;
+  --ck-warn:     #b45309;
+  --ck-warn-soft:#fbf0e0;
 
-  /* Typographic identity: a geometric display face + a clean humanist body.
-     Both are already loaded app-wide (index.html Google Fonts) and embed
-     reliably into the PDF capture. */
+  /* Typographic identity: an editorial serif for titles (Lora), a geometric
+     display face for figures/labels (Outfit), a clean humanist body (Manrope).
+     All loaded app-wide and embed reliably into the PDF capture. */
   --ck-display: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
   --ck-body:    'Manrope', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ck-serif:   'Lora', Georgia, 'Times New Roman', serif;
 
   color: var(--ck-ink);
   font-family: var(--ck-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   font-variant-numeric: tabular-nums;
 }
 
 .ckpt-deck * { box-sizing: border-box; }
 
-/* display face for headings, labels, and the headline figures */
-.ckpt-deck .ck-eyebrow, .ckpt-deck .ck-title, .ckpt-deck .ck-num,
+/* display face for labels + the headline FIGURES (tabular numerals stay here —
+   never move numbers to serif); editorial serif for the prose titles */
+.ckpt-deck .ck-eyebrow, .ckpt-deck .ck-num,
 .ckpt-deck .ck-status, .ckpt-deck .ck-sectlabel, .ckpt-deck .ck-cover .kicker,
-.ckpt-deck .ck-cover h1, .ckpt-deck .ck-cover-meta .m .v,
+.ckpt-deck .ck-cover-meta .m .v,
 .ckpt-deck .ck-stat .val, .ckpt-deck .ck-funnel-val, .ckpt-deck .ck-bar-row .bv,
 .ckpt-deck .ck-compare-row .cv, .ckpt-deck .ck-cover-meta .m .k {
   font-family: var(--ck-display);
 }
+.ckpt-deck .ck-title, .ckpt-deck .ck-cover h1 { font-family: var(--ck-serif); }
 
 /* ── the slide ─────────────────────────────────────────────── */
 .ckpt-slide {
@@ -71,11 +78,11 @@
 /* top hairline accent */
 .ckpt-slide::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 6px;
-  background: linear-gradient(90deg, var(--slide-accent), color-mix(in srgb, var(--slide-accent) 45%, #ffffff));
+  background: linear-gradient(90deg, var(--slide-accent), color-mix(in srgb, var(--slide-accent) 60%, var(--ck-gold)));
 }
 
 /* ── header ────────────────────────────────────────────────── */
-.ck-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.ck-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
 .ck-num {
   flex: none; width: 40px; height: 40px; border-radius: 11px;
   background: var(--slide-accent); color: #fff;
@@ -83,9 +90,9 @@
   box-shadow: 0 6px 16px color-mix(in srgb, var(--slide-accent) 40%, transparent);
 }
 .ck-head-txt { flex: 1; min-width: 0; }
-.ck-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--slide-accent); }
-.ck-title { font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 3px 0 0; color: var(--ck-ink); }
-.ck-sub { font-size: 14.5px; color: var(--ck-ink-3); margin-top: 6px; }
+.ck-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--slide-accent); }
+.ck-title { font-size: 31px; font-weight: 600; letter-spacing: -.015em; line-height: 1.1; margin: 3px 0 0; color: var(--ck-ink); }
+.ck-sub { font-size: 14.5px; color: var(--ck-ink-2); margin-top: 6px; }
 .ck-head-meta { flex: none; text-align: right; font-size: 12.5px; color: var(--ck-muted); padding-top: 4px; }
 .ck-status {
   display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800;
@@ -104,27 +111,33 @@
 /* ── footer ────────────────────────────────────────────────── */
 .ck-foot {
   position: absolute; left: 56px; right: 56px; bottom: 22px;
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 11.5px; color: var(--ck-muted); border-top: 1px solid var(--ck-line-2); padding-top: 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  font-size: 11.5px; color: var(--ck-ink-3); border-top: 1px solid var(--ck-line-2); padding-top: 10px;
 }
-.ck-foot b { color: var(--ck-ink-3); font-weight: 700; }
+.ck-foot b { color: var(--ck-ink-2); font-weight: 700; }
+.ck-foot > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ck-foot > span:last-child { flex: none; max-width: 55%; }
 
 /* ── generic bits ──────────────────────────────────────────── */
-.ck-sectlabel { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ck-muted); margin-bottom: 12px; }
+.ck-sectlabel { font-size: 11.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; color: var(--ck-ink-3); margin-bottom: 12px; }
 .ck-panel { background: var(--ck-panel); border: 1px solid var(--ck-line); border-radius: 14px; padding: 18px 20px; }
+.ck-panel--fill { display: flex; flex-direction: column; }
+.ck-panel--fill .ck-bars { flex: 1; justify-content: space-around; }
 .ck-note {
   background: var(--ck-panel); border-left: 3px solid var(--slide-accent); border-radius: 10px;
   padding: 12px 16px; font-size: 14px; color: var(--ck-ink-2); line-height: 1.5;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden;
 }
+.ck-note.roomy { -webkit-line-clamp: 6; }
 .ck-note .k { font-weight: 800; color: var(--ck-ink); }
 .ck-cols { display: grid; gap: 20px; }
 
 /* ── stat card ─────────────────────────────────────────────── */
-.ck-stat { background: var(--ck-bg); border: 1px solid var(--ck-line); border-radius: 13px; padding: 15px 17px; }
+.ck-stat { background: var(--ck-bg); border: 1px solid var(--ck-line); border-radius: 13px; padding: 15px 17px; display: flex; flex-direction: column; }
 .ck-stat .lbl { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ck-ink-3); }
 .ck-stat .val { font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin-top: 6px; line-height: 1; color: var(--ck-ink); }
 .ck-stat .val.sm { font-size: 22px; }
-.ck-stat .foot { margin-top: 8px; font-size: 12.5px; color: var(--ck-muted); }
+.ck-stat .foot { margin-top: auto; padding-top: 8px; font-size: 12.5px; color: var(--ck-ink-3); }
 
 /* delta badge */
 .ck-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
@@ -134,19 +147,50 @@
 .ck-delta .ar { font-size: 11px; }
 
 /* KPI grid (snapshot) */
-.ck-kpigrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.ck-kpigrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 
-/* ── funnel ────────────────────────────────────────────────── */
-.ck-funnel { display: flex; flex-direction: column; gap: 9px; }
-.ck-funnel-row { display: grid; grid-template-columns: 168px 1fr; align-items: center; gap: 14px; }
-.ck-funnel-row .fl { font-size: 13.5px; font-weight: 700; color: var(--ck-ink-2); text-align: right; }
-.ck-funnel-bar { position: relative; height: 40px; border-radius: 9px; background: var(--ck-panel-2); overflow: hidden; }
-.ck-funnel-fill { position: absolute; inset: 0; width: var(--w,100%); border-radius: 9px;
-  background: linear-gradient(90deg, var(--slide-accent), color-mix(in srgb, var(--slide-accent) 60%, #ffffff)); }
-.ck-funnel-val { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; gap: 10px;
-  font-weight: 800; font-size: 15px; color: #fff; }
-.ck-funnel-conv { font-size: 12px; font-weight: 700; color: var(--ck-ink-3); }
-.ck-arrowdown { text-align: center; color: var(--ck-muted); font-size: 13px; }
+/* ── funnel (value on its own ink rail; conversion = connector pill) ── */
+.ck-funnel { display: flex; flex-direction: column; }
+.ck-funnel-row {
+  display: grid; grid-template-columns: 150px minmax(0,1fr) 104px;
+  align-items: center; gap: 16px;
+}
+.ck-funnel-row .fl {
+  font-size: 13.5px; font-weight: 700; line-height: 1.2;
+  color: var(--ck-ink-2); text-align: right;
+}
+.ck-funnel-bar {
+  position: relative; height: 38px; border-radius: 9px;
+  background: var(--ck-panel-2);
+  box-shadow: inset 0 0 0 1px rgba(20,18,28,.05);
+  overflow: hidden;
+}
+.ck-funnel-fill {
+  position: absolute; top: 0; bottom: 0; left: 0; width: var(--w,0%);
+  border-radius: 9px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--slide-accent) 82%, #0d0620), var(--slide-accent));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+}
+.ck-funnel-val {
+  font-size: 17px; font-weight: 800; letter-spacing: -.01em;
+  color: var(--ck-ink); text-align: right;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ck-funnel-conn {
+  display: grid; grid-template-columns: 150px minmax(0,1fr) 104px;
+  gap: 16px; padding: 5px 0;
+}
+.ck-funnel-conn > * { grid-column: 2; align-self: center; }
+.ck-funnel-conv {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: max-content; max-width: 100%;
+  font-family: var(--ck-body); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .01em; color: var(--ck-ink-3);
+  background: var(--ck-panel); border: 1px solid var(--ck-line);
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+}
+.ck-funnel-conv .ar { color: var(--ck-muted); font-size: 11px; font-weight: 800; }
+.ck-funnel-tick { color: var(--ck-muted); font-size: 13px; line-height: 1; }
 
 /* horizontal mini bars (tiers, reach) */
 .ck-bars { display: flex; flex-direction: column; gap: 8px; }
@@ -159,11 +203,14 @@
 /* ── table ─────────────────────────────────────────────────── */
 .ck-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ck-table th { text-align: left; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--ck-muted); padding: 0 12px 9px; border-bottom: 2px solid var(--ck-line); }
+  color: var(--ck-ink-3); padding: 0 12px 9px; border-bottom: 2px solid var(--ck-line); }
 .ck-table td { padding: 11px 12px; border-bottom: 1px solid var(--ck-line-2); color: var(--ck-ink-2); }
 .ck-table td.num, .ck-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .ck-table tr:last-child td { border-bottom: none; }
 .ck-table .strong { font-weight: 800; color: var(--ck-ink); }
+.ck-table.dense th { padding: 0 12px 7px; }
+.ck-table.dense td { padding: 7px 12px; }
+.ck-table .more td { text-align: center; color: var(--ck-ink-3); font-weight: 700; }
 
 /* verdict / status pills */
 .ck-pill { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 800; letter-spacing: .04em;
@@ -180,7 +227,7 @@
 .ck-chip.warn { background: var(--ck-warn-soft); border-color: transparent; color: var(--ck-warn); }
 
 /* numbered list (research / suggestions) */
-.ck-list { display: flex; flex-direction: column; gap: 11px; }
+.ck-list { display: flex; flex-direction: column; gap: 12px; max-height: 100%; overflow: hidden; }
 .ck-listitem { display: flex; gap: 13px; align-items: flex-start; }
 .ck-listitem .idx { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--ck-accent-soft);
   color: var(--ck-accent); font-weight: 800; font-size: 13px; display: grid; place-items: center; }
@@ -198,15 +245,17 @@
 .ck-compare-fill.actual.ok { background: var(--ck-pos); }
 .ck-compare-row .cv { font-weight: 800; font-size: 15px; color: var(--ck-ink); min-width: 56px; text-align: right; }
 
-/* cover slide */
-.ck-cover { height: 100%; display: flex; flex-direction: column; justify-content: center; }
+/* cover slide — headline anchored top, meta pinned to a baseline rule */
+.ck-cover { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 0 6px; }
+.ck-cover-top { display: flex; flex-direction: column; }
 .ck-cover .kicker { font-size: 14px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; color: var(--ck-accent); }
-.ck-cover h1 { font-size: 76px; font-weight: 850; letter-spacing: -.03em; line-height: .98; margin: 16px 0 0; color: var(--ck-ink); }
-.ck-cover h1 .thin { font-weight: 350; color: var(--ck-ink-3); }
+.ck-cover h1 { font-family: var(--ck-serif); font-size: 74px; font-weight: 600; letter-spacing: -.02em; line-height: 1.0; margin: 16px 0 0; color: var(--ck-ink); }
+.ck-cover h1 .thin { font-style: italic; font-weight: 500; color: var(--ck-accent); }
 .ck-cover .lede { font-size: 17px; color: var(--ck-ink-3); margin-top: 20px; max-width: 62ch; line-height: 1.5; }
-.ck-cover-meta { display: flex; gap: 46px; margin-top: 48px; }
-.ck-cover-meta .m .k { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ck-muted); }
-.ck-cover-meta .m .v { font-size: 22px; font-weight: 800; color: var(--ck-ink); margin-top: 4px; }
+.ck-cover-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 24px; border-top: 1px solid var(--ck-line); padding-top: 22px; }
+.ck-cover-meta .m { min-width: 0; }
+.ck-cover-meta .m .k { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ck-ink-3); }
+.ck-cover-meta .m .v { font-size: 19px; font-weight: 700; letter-spacing: -.01em; color: var(--ck-ink); margin-top: 4px; overflow-wrap: anywhere; }
 .ck-cover-brandmark { position: absolute; top: 44px; right: 56px; display: flex; align-items: center; gap: 12px; }
 .ck-cover-brandmark .logo { width: 52px; height: 52px; border-radius: 13px; object-fit: cover; border: 1px solid var(--ck-line); background: #fff; }
 
