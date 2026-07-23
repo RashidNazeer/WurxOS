@@ -76,22 +76,23 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
   if (wk) {
     const op = wk.overallPerformance || {};
     const on = wk.overallNotes || {};
-    const orders = asNum(op.orders);
     const hasGmvMax = Array.isArray(wk.gmvMax) && wk.gmvMax.length > 0;
     const gmvMaxSpend = sumBy(wk.gmvMax, 'spend');
     const gmvMaxGmv = sumBy(wk.gmvMax, 'gmv');
+    const gmvMaxOrders = sumBy(wk.gmvMax, 'orders');
 
     // §01 Affiliate funnel — recruit + produce
     set('funnel.approved', op.samplesApproved);
     set('funnel.videosLive', op.videosPosted);
 
     // §04 Performance snapshot — THIS-WEEK values (last-week from carry-forward).
-    // Cost/order = GMV Max spend ÷ SKU orders (matches the PPT example).
+    // Cost/order comes from the report: GMV Max spend ÷ GMV Max orders (the same
+    // basis the report's per-campaign cost-per-order uses).
     set('snapshot.kpis.gmv.cur', op.gmv);
     if (hasGmvMax) set('snapshot.kpis.gmvMaxSpend.cur', round(gmvMaxSpend, 2));
     set('snapshot.kpis.roi.cur', op.roi);
     set('snapshot.kpis.orders.cur', op.orders);
-    if (hasGmvMax && orders) set('snapshot.kpis.costPerOrder.cur', round(gmvMaxSpend / orders, 2));
+    if (hasGmvMax && gmvMaxOrders) set('snapshot.kpis.costPerOrder.cur', round(gmvMaxSpend / gmvMaxOrders, 2));
     set('snapshot.kpis.videosLive.cur', op.videosPosted);
     // ctor + avg rating stay manual — not in the weekly report
 
@@ -115,14 +116,15 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
       .map((v) => ({ creator: v.creatorName || '', angle: '', gmv: (v.gmv === '' || v.gmv == null) ? '' : String(v.gmv) }));
     if (topVideos.length) { arrays['traffic.topVideos'] = topVideos; meta.filled++; }
 
-    // §08 GMV Max & paid — spend + gross revenue + SKU orders from the weekly
-    // GMV Max table (targetRoi / ROI-protection / mode carried forward;
-    // decision + screenshot manual). ROI & cost/order derive in the deck.
+    // §08 GMV Max & paid — spend + gross revenue + GMV Max orders straight from
+    // the weekly GMV Max table, so the deck's ROI (=grossRev÷spend) and
+    // cost/order (=spend÷orders) reproduce the report's own values. (targetRoi /
+    // ROI-protection / mode carried forward; decision + screenshot manual.)
     if (hasGmvMax) {
       set('paid.spend', round(gmvMaxSpend, 2));
       set('paid.grossRevenue', round(gmvMaxGmv, 2));
+      set('paid.skuOrders', gmvMaxOrders);
     }
-    set('paid.skuOrders', op.orders);
   }
 
   // §1 Produce — Approved · Wk N-2, and §05 sample→video N-2 (needs both weeks)
