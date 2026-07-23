@@ -363,3 +363,10 @@
 .ck-topbar-title { font-size: 14px; color: var(--text-secondary, #334155); flex: 1; min-width: 0; }
 .ck-topbar-title strong { color: var(--text-primary, #0f172a); }
 .ck-view-stage { overflow-x: auto; }
+
+.ck-card-del { flex: none; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; cursor: pointer; color: var(--text-muted, #94a3b8); background: transparent; border: 1px solid transparent; transition: all .15s; }
+.ck-card-del:hover { color: var(--danger, #dc2626); background: color-mix(in srgb, var(--danger, #dc2626) 10%, transparent); border-color: color-mix(in srgb, var(--danger, #dc2626) 30%, transparent); }
+.ck-card-confirm { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 8px 10px; border-radius: 9px;
+  background: var(--danger-soft, #fbeae7); border: 1px solid color-mix(in srgb, var(--danger, #dc2626) 25%, transparent); font-size: 12.5px; font-weight: 600; color: var(--danger, #dc2626); }
+.ck-btn-danger { padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: #fff; background: var(--danger, #dc2626); border: 1px solid var(--danger, #dc2626); }
+.ck-btn-danger:disabled { opacity: .6; cursor: default; }

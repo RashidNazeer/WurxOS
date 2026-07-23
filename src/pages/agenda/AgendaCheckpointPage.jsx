@@ -23,9 +23,9 @@ import {
 } from '../../lib/checkpointModel';
 import { carryForward } from '../../lib/checkpointCarry';
 import {
-  listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks,
+  listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks, deleteCheckpoint,
 } from '../../lib/checkpointsApi';
-import { loadDraft, saveDraft, hydrate } from '../../lib/checkpointDraft';
+import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
@@ -56,6 +56,13 @@ export default function AgendaCheckpointPage() {
   const [autofillMsg, setAutofillMsg] = useState('');
   const [saveState, setSaveState] = useState('idle');  // idle|saving|saved|local
   const [savedAt, setSavedAt] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null); // week_start pending confirm (cards)
+  const [deleting, setDeleting] = useState(false);
+  const [viewDelete, setViewDelete] = useState(false);      // view-mode confirm
+
+  // Who may delete a checkpoint (RLS is the real gate — mig 264
+  // checkpoint_can_write = Boss/OL/dev, the brand's owner TL, or an assigned APC/IPC).
+  const canManage = ['boss', 'ol', 'developer', 'tl', 'apc', 'ipc'].includes(profile?.role);
 
   const deckRef = useRef(null);
   const viewColRef = useRef(null);
@@ -82,6 +89,7 @@ export default function AgendaCheckpointPage() {
 
   useEffect(() => { if (!brandId && brands.length) setBrandId(brands[0].id); }, [brands, brandId]);
   useEffect(() => { setMode('list'); }, [brandId]);      // brand change → back to list
+  useEffect(() => { setPendingDelete(null); setViewDelete(false); }, [mode, brandId, weekStart]); // clear delete confirms
 
   const existing = useQuery({
     queryKey: ['checkpoint', 'one', brandId, weekStart],
@@ -230,6 +238,21 @@ export default function AgendaCheckpointPage() {
   function openWeek(ws) { setWeekStart(ws); setMode('view'); }
   async function onDone() { await saveNow(); setMode('view'); }
 
+  async function removeCheckpoint(id, ws, after) {
+    setDeleting(true);
+    try {
+      await deleteCheckpoint(id);
+      if (ws === weekStart) { setData(null); setDirty(false); loadedRef.current = false; baselineRef.current = ''; }
+      clearDraft(brandId, ws); // clear any local mirror for that week
+      qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
+      qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, ws] });
+      after?.();
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert(`Couldn't delete this checkpoint: ${e?.message || e}`);
+    } finally { setDeleting(false); }
+  }
+
   // view-mode preview scale
   const [scale, setScale] = useState(0.5);
   useEffect(() => {
@@ -308,14 +331,33 @@ export default function AgendaCheckpointPage() {
           ) : (
             <div className="ck-card-grid">
               {weeks.map((w) => (
-                <button key={w.week_start} className="ck-card" onClick={() => openWeek(w.week_start)}>
+                <div key={w.week_start} className="ck-card" role="button" tabIndex={0}
+                  onClick={() => { if (pendingDelete !== w.week_start) openWeek(w.week_start); }}
+                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && pendingDelete !== w.week_start) openWeek(w.week_start); }}>
                   <div className="ck-card-top">
                     <span className="ck-card-week">Week of {weekLabelForStart(w.week_start)}</span>
-                    <span className={`ck-card-badge ${w.status === 'final' ? 'final' : 'draft'}`}>{w.status === 'final' ? 'Final' : 'Draft'}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className={`ck-card-badge ${w.status === 'final' ? 'final' : 'draft'}`}>{w.status === 'final' ? 'Final' : 'Draft'}</span>
+                      {canManage && (
+                        <button type="button" className="ck-card-del" title="Delete checkpoint"
+                          onClick={(e) => { e.stopPropagation(); setPendingDelete(w.week_start); }}>
+                          <i className="bi bi-trash3" />
+                        </button>
+                      )}
+                    </span>
                   </div>
                   <div className="ck-card-brand">{selectedBrand && <BrandAvatar brand={selectedBrand} size={22} radius={6} />}<span>{brandName}</span></div>
                   <div className="ck-card-updated">Updated {new Date(w.updated_at).toLocaleDateString()}</div>
-                </button>
+                  {pendingDelete === w.week_start && (
+                    <div className="ck-card-confirm" onClick={(e) => e.stopPropagation()}>
+                      <span>Delete this checkpoint?</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" className="ck-btn-danger" disabled={deleting} onClick={() => removeCheckpoint(w.id, w.week_start, () => setPendingDelete(null))}>{deleting ? '…' : 'Delete'}</button>
+                        <button type="button" className="wx-btn wx-btn-ghost" style={{ padding: '5px 10px' }} disabled={deleting} onClick={() => setPendingDelete(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -328,7 +370,16 @@ export default function AgendaCheckpointPage() {
           <div className="ck-topbar">
             <button className="wx-btn wx-btn-ghost" onClick={() => setMode('list')}><i className="bi bi-arrow-left me-1" /> Back</button>
             <div className="ck-topbar-title"><strong>{brandName}</strong> · Week of {weekLabel}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {canManage && (viewDelete ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Delete?</span>
+                  <button className="ck-btn-danger" disabled={deleting} onClick={() => removeCheckpoint(weeks.find((w) => w.week_start === weekStart)?.id || existing.data?.id, weekStart, () => { setViewDelete(false); setMode('list'); })}>{deleting ? '…' : 'Yes'}</button>
+                  <button className="wx-btn wx-btn-ghost" style={{ padding: '6px 10px' }} disabled={deleting} onClick={() => setViewDelete(false)}>No</button>
+                </span>
+              ) : (
+                <button className="wx-btn wx-btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => setViewDelete(true)}><i className="bi bi-trash3 me-1" /> Delete</button>
+              ))}
               <button className="wx-btn wx-btn-ghost" disabled={!data} onClick={() => setMode('edit')}><i className="bi bi-pencil-square me-1" /> Edit</button>
               <button className="wx-btn wx-btn-primary" disabled={!data || busy} onClick={onGenerate}>
                 {busy ? <><span className="wx-spinner" /> {progress ? `Rendering ${progress.i}/${progress.total}…` : 'Generating…'}</> : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
