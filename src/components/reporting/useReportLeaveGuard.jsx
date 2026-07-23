@@ -27,7 +27,7 @@ import { setReportLeaveGuard, clearReportLeaveGuard } from '../../lib/reportLeav
  * navigating, and resolve to `false` only on a hard save failure (so we
  * don't navigate away on a failed save and lose the work).
  */
-export function useReportLeaveGuard({ dirty, onSaveDraft }) {
+export function useReportLeaveGuard({ dirty, onSaveDraft, noun = 'report' }) {
   const navigate = useNavigate();
   const [pending, setPending] = useState(null); // { run } | null
   const [saving, setSaving] = useState(false);
@@ -103,13 +103,13 @@ export function useReportLeaveGuard({ dirty, onSaveDraft }) {
   }, []);
 
   const guardModal = pending ? (
-    <LeaveReportModal saving={saving} onLeave={onLeave} onStay={onStay} onDiscard={onDiscard} />
+    <LeaveReportModal saving={saving} onLeave={onLeave} onStay={onStay} onDiscard={onDiscard} noun={noun} />
   ) : null;
 
   return { guardModal, guardAction };
 }
 
-function LeaveReportModal({ saving, onLeave, onStay, onDiscard }) {
+function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' }) {
   // Discarding loses the user's edits, so require a second click to confirm.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   return (
@@ -130,11 +130,10 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard }) {
           </div>
           <div>
             <div className="fw-bold" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
-              Leave this report?
+              Leave this {noun}?
             </div>
             <div className="text-muted" style={{ fontSize: '0.82rem', marginTop: 2 }}>
-              You’re in the middle of a report. We’ll <strong>save it as a draft</strong> so nothing
-              is lost — it’ll be waiting for you under Reports.
+              You’re in the middle of a {noun}. We’ll <strong>save it first</strong> so nothing is lost.
             </div>
           </div>
         </div>

@@ -1,12 +1,16 @@
 // ============================================================
-// Weekly Performance Checkpoint builder (APC).
+// Weekly Performance Checkpoint (APC) — reports-style flow.
 //
-// Tracked server-side (weekly_checkpoints, mig 264): one row per brand per week.
-// Navigate weeks; a week with no checkpoint offers "Create — pre-fill from last
-// week" (carry-forward moves last week's numbers into this week's "previous"
-// columns + non-stat config + open actions; NEVER N-2 or current stats) or
-// "Start blank". Edits autosave to the DB (with a localStorage safety mirror
-// for flaky connections). Generate → polished 12-slide landscape PDF.
+// Modes: LIST (cards of the brand's checkpoints + create) → VIEW (read-only
+// deck preview + Edit / Generate PDF) → EDIT (the form; NO live preview —
+// the deck is only shown after saving). Tracked server-side (weekly_checkpoints,
+// mig 264), week grid aligned to the brand's reporting weeks.
+//
+// Safety (same as the report forms): edits autosave to the DB (+ a localStorage
+// mirror), and while there are unsaved edits `useUnsavedGuard` arms a
+// beforeunload prompt + suppresses the stale-deploy auto-reload, while
+// `useReportLeaveGuard` intercepts in-app navigation with a Save/Stay/Discard
+// modal.
 // ============================================================
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -28,6 +32,8 @@ import CheckpointForm from '../../components/checkpoint/CheckpointForm';
 import CheckpointDeck from '../../components/checkpoint/CheckpointDeck';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import { AlertIcon } from '../../components/common/Icon';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useReportLeaveGuard } from '../../components/reporting/useReportLeaveGuard';
 import '../../styles/checkpoint.css';
 
 const SLIDE_COUNT = 12;
@@ -40,146 +46,133 @@ export default function AgendaCheckpointPage() {
   const qc = useQueryClient();
   const [brandId, setBrandId] = useState('');
   const [weekStart, setWeekStart] = useState(defaultReviewWeekStart);
-  const [data, setData] = useState(null);            // null = no checkpoint loaded/created
-  const [previewData, setPreviewData] = useState(EMPTY_CHECKPOINT);
+  const [mode, setMode] = useState('list');            // list | view | edit
+  const [data, setData] = useState(null);
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const [creating, setCreating] = useState(false);
   const [autofilling, setAutofilling] = useState(false);
   const [autofillMsg, setAutofillMsg] = useState('');
-  const [saveState, setSaveState] = useState('idle'); // idle|saving|saved|local|error
+  const [saveState, setSaveState] = useState('idle');  // idle|saving|saved|local
   const [savedAt, setSavedAt] = useState(null);
 
   const deckRef = useRef(null);
-  const previewColRef = useRef(null);
+  const viewColRef = useRef(null);
   const loadedRef = useRef(false);
   const baselineRef = useRef('');
 
   const weekLabel = useMemo(() => weekLabelForStart(weekStart), [weekStart]);
 
   const { data: brands = [], isLoading: brandsLoading, error: brandsErr } = useQuery({
-    queryKey: ['checkpoint', 'brands'],
-    queryFn: () => listBrands({ status: 'active' }),
+    queryKey: ['checkpoint', 'brands'], queryFn: () => listBrands({ status: 'active' }),
   });
   const selectedBrand = brands.find((b) => b.id === brandId) || null;
   const brandName = selectedBrand?.brand_name || '';
 
-  // Team lead for the cover ("Team <name>"): the brand's owner TL, falling back
-  // to the current user's manager (reports_to) when the brand owner isn't
-  // resolvable (e.g. no owner set / soft-deleted).
   const { data: manager } = useQuery({
     queryKey: ['checkpoint', 'manager', profile?.reports_to],
     queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('display_name').eq('id', profile.reports_to).maybeSingle();
-      return data || null;
+      const { data: m } = await supabase.from('profiles').select('display_name').eq('id', profile.reports_to).maybeSingle();
+      return m || null;
     },
     enabled: !!profile?.reports_to,
   });
   const teamLeadName = selectedBrand?.owner?.display_name || manager?.display_name || '';
 
   useEffect(() => { if (!brandId && brands.length) setBrandId(brands[0].id); }, [brands, brandId]);
+  useEffect(() => { setMode('list'); }, [brandId]);      // brand change → back to list
 
   const existing = useQuery({
     queryKey: ['checkpoint', 'one', brandId, weekStart],
-    queryFn: () => getCheckpoint(brandId, weekStart),
-    enabled: !!brandId,
+    queryFn: () => getCheckpoint(brandId, weekStart), enabled: !!brandId,
   });
   const { data: weeks = [] } = useQuery({
-    queryKey: ['checkpoint', 'weeks', brandId],
-    queryFn: () => listCheckpoints(brandId),
-    enabled: !!brandId,
+    queryKey: ['checkpoint', 'weeks', brandId], queryFn: () => listCheckpoints(brandId), enabled: !!brandId,
   });
   const weeksSet = useMemo(() => new Set(weeks.map((w) => w.week_start)), [weeks]);
   const hasPrev = useMemo(() => weeks.some((w) => w.week_start < weekStart), [weeks, weekStart]);
 
-  // The brand's WEEKLY report weeks — the checkpoint aligns its week grid to
-  // these so week_start == the report's period_start (clean auto-fetch join).
   const reportWeeksQuery = useQuery({
-    queryKey: ['checkpoint', 'reportweeks', brandId],
-    queryFn: () => listReportWeeks(brandId),
-    enabled: !!brandId,
+    queryKey: ['checkpoint', 'reportweeks', brandId], queryFn: () => listReportWeeks(brandId), enabled: !!brandId,
   });
   const reportStarts = useMemo(() => (reportWeeksQuery.data || []).map((r) => r.period_start), [reportWeeksQuery.data]);
   const reportSet = useMemo(() => new Set(reportStarts), [reportStarts]);
   const anchor = useMemo(() => (reportStarts.length ? reportStarts.reduce((a, b) => (a < b ? a : b)) : null), [reportStarts]);
-  // Default week = the last completed reporting week (grid-aligned to the brand),
-  // or fixed-Monday last week if the brand has no reports yet.
   const alignedDefault = useMemo(
-    () => (anchor ? addWeeks(alignToGrid(anchor, todayISO()), -1) : defaultReviewWeekStart()),
-    [anchor],
-  );
+    () => (anchor ? addWeeks(alignToGrid(anchor, todayISO()), -1) : defaultReviewWeekStart()), [anchor]);
   const reportForWeek = reportSet.has(weekStart);
+  const existsForWeek = weeksSet.has(weekStart);
 
-  // apply the brand's aligned default once its report weeks have loaded
   const defaultAppliedRef = useRef(null);
   useEffect(() => {
-    if (!brandId || !reportWeeksQuery.isSuccess) return;
-    if (defaultAppliedRef.current === brandId) return;
+    if (!brandId || !reportWeeksQuery.isSuccess || defaultAppliedRef.current === brandId) return;
     defaultAppliedRef.current = brandId;
     setWeekStart(alignedDefault);
   }, [brandId, reportWeeksQuery.isSuccess, alignedDefault]);
 
-  // reset when the brand+week key changes
-  useEffect(() => { setData(null); loadedRef.current = false; baselineRef.current = ''; setSaveState('idle'); }, [brandId, weekStart]);
+  // reset the loaded checkpoint on key change
+  useEffect(() => { setData(null); setDirty(false); loadedRef.current = false; baselineRef.current = ''; setSaveState('idle'); }, [brandId, weekStart]);
 
-  // load the checkpoint once the query settles (DB row → local recovery → empty)
+  // load once the query settles (DB row → local recovery → none)
   useEffect(() => {
     if (!brandId || !existing.isSuccess || loadedRef.current) return;
     loadedRef.current = true;
     if (existing.data) {
       const d = hydrate(existing.data.data);
       d.cover = { ...d.cover, brandName, weekLabel };
-      setData(d);
-      baselineRef.current = JSON.stringify(d);
-      setSaveState('saved');
+      setData(d); baselineRef.current = JSON.stringify(d); setSaveState('saved');
     } else {
-      const local = loadDraft(brandId, weekStart);   // recover unsynced offline work
-      if (local) {
-        local.cover = { ...local.cover, brandName, weekLabel };
-        setData(local);
-        baselineRef.current = '';                      // force a re-save
-        setSaveState('local');
-      } else {
-        setData(null);                                 // → empty state
-      }
+      const local = loadDraft(brandId, weekStart);
+      if (local) { local.cover = { ...local.cover, brandName, weekLabel }; setData(local); baselineRef.current = ''; setSaveState('local'); }
+      else setData(null);
     }
   }, [existing.isSuccess, existing.data, brandId, weekStart, brandName, weekLabel]);
 
-  // keep cover in sync if brand name / team lead resolve after load. Team is
-  // ALWAYS derived as "Team <lead>" so a stale/blank stored value self-corrects.
+  // keep cover brand/team in sync (self-correct stale "Team"); null-guard the updater
   useEffect(() => {
     if (!data || !selectedBrand) return;
     const nextTeam = teamLeadName ? `Team ${teamLeadName}` : data.cover.team;
     if (data.cover.brandName !== selectedBrand.brand_name || data.cover.weekLabel !== weekLabel || data.cover.team !== nextTeam) {
-      // Guard `d` inside the updater: the reset effect (week change) can set data
-      // to null before this queued update runs, and `d.cover` would throw.
       setData((d) => (d ? { ...d, cover: { ...d.cover, brandName: selectedBrand.brand_name, weekLabel, team: teamLeadName ? `Team ${teamLeadName}` : d.cover.team } } : d));
     }
   }, [selectedBrand, weekLabel, data, teamLeadName]);
 
-  // debounce preview
-  useEffect(() => { if (data) { const id = setTimeout(() => setPreviewData(data), 180); return () => clearTimeout(id); } }, [data]);
-
-  // autosave (DB) + instant local mirror
+  // autosave (DB) + instant local mirror + dirty tracking
   useEffect(() => {
     if (!data || !brandId) return;
     const snapshot = JSON.stringify(data);
-    if (snapshot === baselineRef.current) return;
-    saveDraft(brandId, weekStart, data);              // instant offline backup
+    if (snapshot === baselineRef.current) { setDirty(false); return; }
+    setDirty(true);
+    saveDraft(brandId, weekStart, data);
     setSaveState('saving');
     const id = setTimeout(async () => {
       try {
         await saveCheckpoint({ brandId, weekStart, weekLabel, data });
-        baselineRef.current = snapshot;
-        setSaveState('saved'); setSavedAt(Date.now());
+        baselineRef.current = snapshot; setDirty(false); setSaveState('saved'); setSavedAt(Date.now());
         qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
-      } catch {
-        setSaveState('local');                         // kept in localStorage
-      }
+      } catch { setSaveState('local'); }
     }, 1200);
     return () => clearTimeout(id);
   }, [data, brandId, weekStart, weekLabel, qc]);
 
+  // ── unsaved-work protection (same plumbing as the report forms) ─────
+  useUnsavedGuard(dirty);
+  async function saveNow() {
+    if (!data || !brandId) return true;
+    const snapshot = JSON.stringify(data);
+    saveDraft(brandId, weekStart, data);
+    try {
+      await saveCheckpoint({ brandId, weekStart, weekLabel, data });
+      baselineRef.current = snapshot; setDirty(false); setSaveState('saved'); setSavedAt(Date.now());
+      qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
+      qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, weekStart] });
+      return true;
+    } catch { setSaveState('local'); return false; }
+  }
+  const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft: saveNow, noun: 'checkpoint' });
+
+  // ── actions ─────────────────────────────────────────────────────────
   async function createNew(fromLast) {
     setCreating(true);
     try {
@@ -192,36 +185,18 @@ export default function AgendaCheckpointPage() {
       }
       const teamName = teamLeadName ? `Team ${teamLeadName}` : (d.cover.team || '');
       d.cover = { brandName, apcName: profile?.display_name || '', team: teamName, weekLabel };
-      // Auto-fill sections 1–8 from the weekly report (+ Euka if linked). Best
-      // effort — carry-forward already set the "last week" columns; this fills
-      // the "this week" numbers. Never blocks creation.
-      try {
-        const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
-        d = mirrorTargetInvites(applyAutofillPatch(d, patch));
-      } catch { /* non-fatal */ }
+      try { d = mirrorTargetInvites(applyAutofillPatch(d, await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand }))); } catch { /* best effort */ }
       loadedRef.current = true;
       setData(d);
-      saveDraft(brandId, weekStart, d);
       try {
         await saveCheckpoint({ brandId, weekStart, weekLabel, data: d });
-        baselineRef.current = JSON.stringify(d);
-        setSaveState('saved'); setSavedAt(Date.now());
+        baselineRef.current = JSON.stringify(d); setDirty(false); setSaveState('saved'); setSavedAt(Date.now());
         qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
         qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, weekStart] });
       } catch { setSaveState('local'); }
+      setMode('edit');
     } finally { setCreating(false); }
   }
-
-  // responsive preview scale
-  const [scale, setScale] = useState(0.5);
-  useEffect(() => {
-    const el = previewColRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver((entries) => { const w = entries[0].contentRect.width; if (w > 0) setScale(Math.min(1, w / 1280)); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [data]);
-  const unscaledH = SLIDE_COUNT * SLIDE_H + (SLIDE_COUNT - 1) * PREVIEW_GAP;
 
   async function onAutofill() {
     if (!data || autofilling) return;
@@ -235,152 +210,169 @@ export default function AgendaCheckpointPage() {
       if (m.eukaTried) bits.push(m.eukaOk ? 'Euka ✓' : 'Euka unavailable');
       setAutofillMsg(`Filled ${m.filled} field${m.filled === 1 ? '' : 's'} — ${bits.join(' · ')}`);
       setTimeout(() => setAutofillMsg(''), 7000);
-    } catch (e) {
-      setAutofillMsg(`Auto-fill failed: ${e?.message || e}`);
-    } finally { setAutofilling(false); }
+    } catch (e) { setAutofillMsg(`Auto-fill failed: ${e?.message || e}`); }
+    finally { setAutofilling(false); }
   }
 
   async function onGenerate() {
     if (!data) return;
     setBusy(true); setProgress({ i: 0, total: SLIDE_COUNT });
-    setPreviewData(data);
     await raf(); await raf();
     try {
       await exportCheckpointToPdf(deckRef.current, {
         title: `${brandName || 'Brand'} — Weekly Checkpoint ${weekLabel}`,
         onProgress: (i, total) => setProgress({ i, total }),
       });
-    } catch (e) {
-      // eslint-disable-next-line no-alert
-      alert(`Couldn't generate the PDF: ${e?.message || e}`);
-    } finally { setBusy(false); setProgress(null); }
+    } catch (e) { alert(`Couldn't generate the PDF: ${e?.message || e}`); } // eslint-disable-line no-alert
+    finally { setBusy(false); setProgress(null); }
   }
+
+  function openWeek(ws) { setWeekStart(ws); setMode('view'); }
+  async function onDone() { await saveNow(); setMode('view'); }
+
+  // view-mode preview scale
+  const [scale, setScale] = useState(0.5);
+  useEffect(() => {
+    if (mode !== 'view') return undefined;
+    const el = viewColRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver((entries) => { const w = entries[0].contentRect.width; if (w > 0) setScale(Math.min(1, w / 1280)); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mode, data]);
+  const unscaledH = SLIDE_COUNT * SLIDE_H + (SLIDE_COUNT - 1) * PREVIEW_GAP;
 
   const saveText = saveState === 'saving' ? 'Saving…'
     : saveState === 'saved' ? `Saved${savedAt ? ` ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`
-    : saveState === 'local' ? 'Saved locally (offline) — will sync'
-    : '';
-  const isThisWeekReview = weekStart === alignedDefault;
+    : saveState === 'local' ? 'Saved locally — will sync' : '';
+
+  const err = brandsErr?.message || '';
 
   return (
     <>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 className="page-title">Weekly Checkpoint</h1>
-          <p className="page-subtitle">Fill in last week's numbers and story, then generate a polished PDF for Tuesday's meeting.</p>
-        </div>
-        <button className="wx-btn wx-btn-primary" disabled={!data || busy} onClick={onGenerate}>
-          {busy
-            ? <><span className="wx-spinner" /> {progress ? `Rendering ${progress.i}/${progress.total}…` : 'Generating…'}</>
-            : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
-        </button>
+      {guardModal}
+      <div className="page-header">
+        <h1 className="page-title">Weekly Checkpoint</h1>
+        <p className="page-subtitle">Build a polished per-brand deck for Tuesday's meeting — it saves as you go.</p>
       </div>
 
-      {brandsErr && (
-        <div className="wx-alert wx-alert-danger" style={{ marginBottom: 14 }}>
-          <AlertIcon width="16" height="16" /> <span>{brandsErr.message}</span>
-        </div>
-      )}
+      {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 14 }}><AlertIcon width="16" height="16" /> <span>{err}</span></div>}
 
-      {/* control bar: brand + week navigator */}
-      <div className="wx-card" style={{ padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 220, flex: '1 1 220px' }}>
-          {selectedBrand && <BrandAvatar brand={selectedBrand} size={38} radius={9} />}
-          <select className="wx-input" value={brandId} onChange={(e) => setBrandId(e.target.value)}
-            disabled={brandsLoading} style={{ flex: 1, minWidth: 0, fontWeight: 700 }}>
-            {brandsLoading && <option>Loading…</option>}
-            {!brandsLoading && brands.length === 0 && <option value="">No brands available</option>}
-            {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button className="wx-btn wx-btn-ghost" style={{ padding: '8px 11px' }} title="Previous week"
-            onClick={() => setWeekStart((w) => addWeeks(w, -1))}><i className="bi bi-chevron-left" /></button>
-          <div style={{ minWidth: 188, textAlign: 'center' }}>
-            <div style={{ fontWeight: 800, fontSize: 14.5, color: 'var(--text-primary)' }}>Week of {weekLabel}</div>
-            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
-              {isThisWeekReview ? 'Last week' : (
-                <button className="wx-btn-link" onClick={() => setWeekStart(alignedDefault)}
-                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontSize: 10.5 }}>Jump to last week</button>
-              )}
-              <span title="Whether a weekly report exists for this exact week (used for auto-fetch)" style={{
-                fontWeight: 700,
-                color: reportForWeek ? 'var(--success)' : 'var(--text-muted)',
-              }}>· {reportForWeek ? 'report ✓' : 'no report'}</span>
-              {weeksSet.has(weekStart) ? null : <span style={{ opacity: .6 }}>· no checkpoint</span>}
+      {/* ─────────────── LIST ─────────────── */}
+      {mode === 'list' && (
+        <>
+          <div className="wx-card" style={{ padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 220, flex: '1 1 220px' }}>
+              {selectedBrand && <BrandAvatar brand={selectedBrand} size={38} radius={9} />}
+              <select className="wx-input" value={brandId} onChange={(e) => setBrandId(e.target.value)} disabled={brandsLoading} style={{ flex: 1, minWidth: 0, fontWeight: 700 }}>
+                {brandsLoading && <option>Loading…</option>}
+                {!brandsLoading && brands.length === 0 && <option value="">No brands available</option>}
+                {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
+              </select>
             </div>
-          </div>
-          <button className="wx-btn wx-btn-ghost" style={{ padding: '8px 11px' }} title="Next week"
-            onClick={() => setWeekStart((w) => addWeeks(w, 1))}><i className="bi bi-chevron-right" /></button>
-        </div>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <span style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>Currency</span>
-          <select className="wx-input" value={data?.currency || '$'} disabled={!data} style={{ width: 78 }}
-            onChange={(e) => setData((d) => ({ ...d, currency: e.target.value }))}>
-            <option value="$">$</option><option value="£">£</option><option value="€">€</option>
-          </select>
-        </label>
-        <div style={{ marginLeft: 'auto', fontSize: 11.5, color: saveState === 'local' ? 'var(--warning)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, minHeight: 18 }}>
-          {saveText && <><i className={`bi ${saveState === 'saving' ? 'bi-arrow-repeat' : saveState === 'local' ? 'bi-cloud-slash' : 'bi-cloud-check'}`} /> {saveText}</>}
-        </div>
-      </div>
-
-      {/* body */}
-      {!brandId ? (
-        <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Pick a brand to begin.</div>
-      ) : (existing.isLoading && !data) ? (
-        <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
-      ) : existing.isError ? (
-        <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          <AlertIcon width="18" height="18" /> <span style={{ marginLeft: 6 }}>Couldn't load this week (maybe a connection blip). Use the week arrows to retry.</span>
-        </div>
-      ) : !data ? (
-        <div className="wx-card" style={{ padding: '30px 24px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>No checkpoint yet for the week of {weekLabel}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              {hasPrev
-                ? 'Start from last week to carry over your previous numbers (they become this week’s “vs last week”), sticky settings, and any open action items — then just fill in the new week.'
-                : 'This is the first checkpoint for this brand — start blank and fill it in.'}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {hasPrev && (
-              <button className="wx-btn wx-btn-primary" disabled={creating} onClick={() => createNew(true)}>
-                {creating ? <><span className="wx-spinner" /> Creating…</> : <><i className="bi bi-arrow-down-up me-1" /> Create from last week</>}
-              </button>
-            )}
-            <button className="wx-btn wx-btn-ghost" disabled={creating} onClick={() => createNew(false)}>
-              <i className="bi bi-file-earmark-plus me-1" /> Start blank
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="ck-builder">
-          <div className="ck-builder-form">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-              <button className="wx-btn wx-btn-ghost" onClick={onAutofill} disabled={autofilling} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                {autofilling
-                  ? <><span className="wx-spinner" /> Auto-filling…</>
-                  : <><i className="bi bi-magic" /> Auto-fill from report{selectedBrand?.euka_store_id ? ' + Euka' : ''}</>}
-              </button>
-              {autofillMsg && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{autofillMsg}</span>}
-            </div>
-            <CheckpointForm data={data} setData={setData} />
-          </div>
-          <div className="ck-builder-preview" ref={previewColRef}>
-            <div className="ck-preview-sticky">
-              <div className="ck-preview-hint">Live preview · this is exactly what the PDF will look like</div>
-              <div className="ckpt-preview" style={{ height: unscaledH * scale }}>
-                <div style={{ width: 1280, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                  <MemoDeck data={previewData} ref={deckRef} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button className="wx-btn wx-btn-ghost" style={{ padding: '8px 11px' }} title="Previous week" onClick={() => setWeekStart((w) => addWeeks(w, -1))}><i className="bi bi-chevron-left" /></button>
+              <div style={{ minWidth: 188, textAlign: 'center' }}>
+                <div style={{ fontWeight: 800, fontSize: 14.5, color: 'var(--text-primary)' }}>Week of {weekLabel}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {weekStart === alignedDefault ? 'Last week' : (
+                    <button className="wx-btn-link" onClick={() => setWeekStart(alignedDefault)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontSize: 10.5 }}>Jump to last week</button>
+                  )}
+                  <span title="Whether a weekly report exists for this exact week" style={{ fontWeight: 700, color: reportForWeek ? 'var(--success)' : 'var(--text-muted)' }}>· {reportForWeek ? 'report ✓' : 'no report'}</span>
                 </div>
               </div>
+              <button className="wx-btn wx-btn-ghost" style={{ padding: '8px 11px' }} title="Next week" onClick={() => setWeekStart((w) => addWeeks(w, 1))}><i className="bi bi-chevron-right" /></button>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+              {existsForWeek ? (
+                <button className="wx-btn wx-btn-primary" onClick={() => openWeek(weekStart)}><i className="bi bi-folder2-open me-1" /> Open this week</button>
+              ) : (
+                <>
+                  {hasPrev && (
+                    <button className="wx-btn wx-btn-primary" disabled={creating} onClick={() => createNew(true)}>
+                      {creating ? <><span className="wx-spinner" /> Creating…</> : <><i className="bi bi-arrow-down-up me-1" /> Create from last week</>}
+                    </button>
+                  )}
+                  <button className="wx-btn wx-btn-ghost" disabled={creating} onClick={() => createNew(false)}><i className="bi bi-file-earmark-plus me-1" /> Start blank</button>
+                </>
+              )}
             </div>
           </div>
-        </div>
+
+          {!brandId ? (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Pick a brand to begin.</div>
+          ) : weeks.length === 0 ? (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              No checkpoints yet for {brandName}. Use the buttons above to create the first one.
+            </div>
+          ) : (
+            <div className="ck-card-grid">
+              {weeks.map((w) => (
+                <button key={w.week_start} className="ck-card" onClick={() => openWeek(w.week_start)}>
+                  <div className="ck-card-top">
+                    <span className="ck-card-week">Week of {weekLabelForStart(w.week_start)}</span>
+                    <span className={`ck-card-badge ${w.status === 'final' ? 'final' : 'draft'}`}>{w.status === 'final' ? 'Final' : 'Draft'}</span>
+                  </div>
+                  <div className="ck-card-brand">{selectedBrand && <BrandAvatar brand={selectedBrand} size={22} radius={6} />}<span>{brandName}</span></div>
+                  <div className="ck-card-updated">Updated {new Date(w.updated_at).toLocaleDateString()}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ─────────────── VIEW ─────────────── */}
+      {mode === 'view' && (
+        <>
+          <div className="ck-topbar">
+            <button className="wx-btn wx-btn-ghost" onClick={() => setMode('list')}><i className="bi bi-arrow-left me-1" /> Back</button>
+            <div className="ck-topbar-title"><strong>{brandName}</strong> · Week of {weekLabel}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="wx-btn wx-btn-ghost" disabled={!data} onClick={() => setMode('edit')}><i className="bi bi-pencil-square me-1" /> Edit</button>
+              <button className="wx-btn wx-btn-primary" disabled={!data || busy} onClick={onGenerate}>
+                {busy ? <><span className="wx-spinner" /> {progress ? `Rendering ${progress.i}/${progress.total}…` : 'Generating…'}</> : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
+              </button>
+            </div>
+          </div>
+          <div className="ck-view-stage" ref={viewColRef}>
+            {!data ? (
+              <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
+            ) : (
+              <div className="ckpt-preview" style={{ height: unscaledH * scale, margin: '0 auto', maxWidth: 1280 }}>
+                <div style={{ width: 1280, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+                  <MemoDeck data={data} ref={deckRef} />
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ─────────────── EDIT ─────────────── */}
+      {mode === 'edit' && (
+        <>
+          <div className="ck-topbar">
+            <button className="wx-btn wx-btn-ghost" onClick={() => guardAction(() => setMode('view'))}><i className="bi bi-arrow-left me-1" /> Back</button>
+            <div className="ck-topbar-title">
+              Editing · Week of {weekLabel}
+              {saveText && <span style={{ marginLeft: 12, fontSize: 12, fontWeight: 600, color: saveState === 'local' ? 'var(--warning)' : 'var(--text-muted)' }}><i className={`bi ${saveState === 'saving' ? 'bi-arrow-repeat' : saveState === 'local' ? 'bi-cloud-slash' : 'bi-cloud-check'} me-1`} />{saveText}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select className="wx-input" value={data?.currency || '$'} disabled={!data} style={{ width: 74 }} onChange={(e) => setData((d) => ({ ...d, currency: e.target.value }))}>
+                <option value="$">$</option><option value="£">£</option><option value="€">€</option>
+              </select>
+              <button className="wx-btn wx-btn-ghost" onClick={onAutofill} disabled={autofilling || !data}>
+                {autofilling ? <><span className="wx-spinner" /> Auto-filling…</> : <><i className="bi bi-magic me-1" /> Auto-fill{selectedBrand?.euka_store_id ? ' + Euka' : ''}</>}
+              </button>
+              <button className="wx-btn wx-btn-primary" onClick={onDone}><i className="bi bi-check2 me-1" /> Done</button>
+            </div>
+          </div>
+          {autofillMsg && <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '-4px 0 12px' }}>{autofillMsg}</div>}
+          {data ? <CheckpointForm data={data} setData={setData} /> : (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
+          )}
+        </>
       )}
     </>
   );
