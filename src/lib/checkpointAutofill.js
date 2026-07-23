@@ -1,5 +1,6 @@
 // ============================================================
-// Weekly Checkpoint — auto-fill for sections 1–5 (phase 2).
+// Weekly Checkpoint — auto-fill for sections 1–8 (phase 2; §07 creative angles
+// is fully manual, §09–13 not yet wired).
 //
 // Sources, kept strictly separate (per the boss):
 //   • WEEKLY REPORT for the same week (and the N-2 week) — the exact numbers.
@@ -75,21 +76,24 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
   if (wk) {
     const op = wk.overallPerformance || {};
     const on = wk.overallNotes || {};
+    const orders = asNum(op.orders);
+    const hasGmvMax = Array.isArray(wk.gmvMax) && wk.gmvMax.length > 0;
     const gmvMaxSpend = sumBy(wk.gmvMax, 'spend');
-    const gmvMaxOrders = sumBy(wk.gmvMax, 'orders');
+    const gmvMaxGmv = sumBy(wk.gmvMax, 'gmv');
 
-    // §1 Affiliate funnel — recruit + produce
+    // §01 Affiliate funnel — recruit + produce
     set('funnel.approved', op.samplesApproved);
     set('funnel.videosLive', op.videosPosted);
 
-    // §04 Performance snapshot — THIS-WEEK values (last-week from carry-forward)
+    // §04 Performance snapshot — THIS-WEEK values (last-week from carry-forward).
+    // Cost/order = GMV Max spend ÷ SKU orders (matches the PPT example).
     set('snapshot.kpis.gmv.cur', op.gmv);
-    if (gmvMaxSpend) set('snapshot.kpis.gmvMaxSpend.cur', round(gmvMaxSpend, 2));
+    if (hasGmvMax) set('snapshot.kpis.gmvMaxSpend.cur', round(gmvMaxSpend, 2));
     set('snapshot.kpis.roi.cur', op.roi);
     set('snapshot.kpis.orders.cur', op.orders);
-    if (gmvMaxSpend && gmvMaxOrders) set('snapshot.kpis.costPerOrder.cur', round(gmvMaxSpend / gmvMaxOrders, 2));
+    if (hasGmvMax && orders) set('snapshot.kpis.costPerOrder.cur', round(gmvMaxSpend / orders, 2));
     set('snapshot.kpis.videosLive.cur', op.videosPosted);
-    // (ctor + rating stay manual — not in the weekly report)
+    // ctor + avg rating stay manual — not in the weekly report
 
     // §05 Samples
     set('samples.approvedThisWeek', op.samplesApproved);
@@ -101,6 +105,24 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
         count: (p.samplesApprovedWeek === '' || p.samplesApprovedWeek == null) ? '' : String(p.samplesApprovedWeek),
       }));
     if (products.length) { arrays['samples.products'] = products; meta.filled++; }
+
+    // §06 Content & traffic — SKU orders + top videos this week (impressions/
+    // clicks stay manual; last-week from carry-forward). Top-video ANGLE isn't
+    // in the report, so it's left blank for the APC.
+    set('traffic.orders', op.orders);
+    const topVideos = (wk.topVideos || [])
+      .filter((v) => (v.creatorName || '').trim() || asNum(v.gmv) != null)
+      .map((v) => ({ creator: v.creatorName || '', angle: '', gmv: (v.gmv === '' || v.gmv == null) ? '' : String(v.gmv) }));
+    if (topVideos.length) { arrays['traffic.topVideos'] = topVideos; meta.filled++; }
+
+    // §08 GMV Max & paid — spend + gross revenue + SKU orders from the weekly
+    // GMV Max table (targetRoi / ROI-protection / mode carried forward;
+    // decision + screenshot manual). ROI & cost/order derive in the deck.
+    if (hasGmvMax) {
+      set('paid.spend', round(gmvMaxSpend, 2));
+      set('paid.grossRevenue', round(gmvMaxGmv, 2));
+    }
+    set('paid.skuOrders', op.orders);
   }
 
   // §1 Produce — Approved · Wk N-2, and §05 sample→video N-2 (needs both weeks)
