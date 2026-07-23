@@ -100,6 +100,8 @@ function UploadPanel({ onUploaded }) {
         name, filename: file?.name,
         periodStart: parsed.periodStart, periodEnd: parsed.periodEnd,
         currency: parsed.currency, weeklyKeywords: parsed.weeklyKeywords,
+        metricGran: parsed.metricGran, weeklyMetrics: parsed.weeklyMetrics,
+        monthlyMetrics: parsed.monthlyMetrics,
         rows: parsed.rows,
       });
       setOpen(false); setFile(null); setParsed(null); setName('');
@@ -168,16 +170,37 @@ function UploadPanel({ onUploaded }) {
             Products (Amazon revenue): <strong style={{ color: 'var(--text-primary)' }}>{parsed.products?.length ? parsed.products.join(', ') : '—'}</strong>
           </div>
 
+          {parsed.volumeKeywords?.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Daily branded search keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.volumeKeywords.join(', ')}</strong>
+            </div>
+          )}
+          {parsed.rankKeywords?.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Keyword search rank: <strong style={{ color: 'var(--text-primary)' }}>{parsed.rankKeywords.join(', ')}</strong>
+            </div>
+          )}
+
           {parsed.weeklyKeywords?.length ? (
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               Weekly branded search: <strong style={{ color: 'var(--text-primary)' }}>{parsed.weeklyKeywords.length} weeks</strong> ·
               keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.keywords?.join(', ') || '—'}</strong>
             </div>
-          ) : (
+          ) : !parsed.volumeKeywords?.length ? (
             <div style={{ fontSize: 12, color: 'var(--warning)' }}>
-              ⚠ No weekly “Branded Demand” tab found — the Search demand (weekly) view will be empty. Upload the full .xlsx, not just the daily sheet.
+              ⚠ No branded search data found (no daily keyword columns and no weekly “Branded Demand” tab). The Branded Search Volume metric will be unavailable. Upload the full .xlsx, not just the daily sheet.
             </div>
-          )}
+          ) : null}
+
+          {parsed.metricGran && Object.keys(parsed.metricGran).length > 0 && (() => {
+            const coarse = Object.entries(parsed.metricGran).filter(([, g]) => g !== 'day');
+            if (!coarse.length) return null;
+            return (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Weekly/monthly metrics: <strong style={{ color: 'var(--text-primary)' }}>{coarse.map(([k, g]) => `${k} (${g})`).join(', ')}</strong>
+              </div>
+            );
+          })()}
 
           <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             Dataset name

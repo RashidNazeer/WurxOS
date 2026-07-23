@@ -53,7 +53,19 @@ export async function fetchSharedHalo(token) {
     const code = error.message.match(/share_not_found|share_revoked|share_expired/)?.[0];
     throw Object.assign(new Error(friendly(code) || error.message), { code });
   }
-  return data;
+  // Normalise dataset-level fields so the explorer's granularity gating works
+  // the same as the Boss loader (missing jsonb → sensible defaults).
+  return {
+    ...data,
+    datasets: (data?.datasets || []).map((d) => ({
+      ...d,
+      currency: d.currency || '$',
+      weekly_keywords: d.weekly_keywords || [],
+      metric_gran: d.metric_gran || {},
+      weekly_metrics: d.weekly_metrics || [],
+      monthly_metrics: d.monthly_metrics || [],
+    })),
+  };
 }
 
 export async function fetchSharedHaloRows(token, datasetId) {
@@ -71,6 +83,8 @@ export async function fetchSharedHaloRows(token, datasetId) {
     date: r.date,
     metrics: r.metrics || {},
     productRevenue: r.product_revenue || {},
+    keywords: r.keywords || {},
+    keywordRanks: r.keyword_ranks || {},
   }));
 }
 

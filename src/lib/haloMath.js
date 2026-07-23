@@ -113,10 +113,20 @@ function lagRoles(fx, fy) {
 
 /**
  * Bucket the daily rows into the chosen granularity and (at week/month) inject
- * weekly-only branded search from ksvByWeek.
+ * any WEEKLY-native metrics (from weeklyMetrics) and, at month, MONTHLY-native
+ * metrics (from monthlyMetrics). Branded search (KSV) keeps its own per-keyword
+ * path via ksvByWeek so the keyword picker still works.
+ *
+ * A metric only exists in a bucket at granularities >= its native one: daily
+ * metrics are aggregated up from the daily rows here; weekly/monthly-native
+ * metrics have no daily rows and are injected straight into the coarser buckets.
+ *
  * @returns Array<{ key, label, days, metrics:{fieldKey:value} }> sorted ascending
  */
-export function buildBuckets({ byDate, dates, gran, ksvByWeek, keyword, allKeywords, minWeekDays = 7 }) {
+export function buildBuckets({
+  byDate, dates, gran, metricGran, weeklyMetrics, monthlyMetrics,
+  ksvByWeek, keyword, allKeywords, minWeekDays = 7,
+}) {
   const map = new Map();
   for (const d of dates) {
     const m = byDate[d];
@@ -139,29 +149,67 @@ export function buildBuckets({ byDate, dates, gran, ksvByWeek, keyword, allKeywo
   if (gran === 'week') buckets = buckets.filter((b) => b.days >= minWeekDays);
   else if (gran === 'month') buckets = buckets.filter((b) => b.days >= daysInMonth(b.key) * 0.85);
 
-  // Inject weekly-only branded search into the buckets it overlaps.
-  if (gran !== 'day' && ksvByWeek && ksvByWeek.size) {
+  if (gran !== 'day') {
+    const first = dates[0], last = dates[dates.length - 1];
+    // KSV is weekly-native ONLY when it isn't in the daily rows (metricGran says
+    // 'week', or there's no daily KSV and a ksvByWeek exists). When daily, it's
+    // already bucketed above and must not be overwritten by the weekly total.
+    const ksvNative = metricGran ? metricGran[KSV_KEY] : undefined;
+    const ksvIsWeekly = !!(ksvByWeek && ksvByWeek.size) && ksvNative !== 'day';
+    // A metric already aggregated from DAILY rows must never be overwritten by a
+    // weekly/monthly injector — the daily aggregate honours the range-bound and
+    // partial-edge completeness filters; the coarse value bypasses both.
+    const isDayNative = (k) => !!(metricGran && metricGran[k] === 'day');
+
+    // Weekly-native metrics keyed by their week-ending Saturday (matches bucketOf
+    // at week granularity).
+    const weekMap = new Map();
+    for (const w of weeklyMetrics || []) if (w && w.period_end) weekMap.set(w.period_end, w.metrics || {});
+
     if (gran === 'week') {
       for (const b of buckets) {
-        const v = ksvWeekValue(ksvByWeek.get(b.key), keyword, allKeywords);
-        if (v != null) b.metrics[KSV_KEY] = v;
+        if (ksvIsWeekly) {
+          const v = ksvWeekValue(ksvByWeek.get(b.key), keyword, allKeywords);
+          if (v != null) b.metrics[KSV_KEY] = v;
+        }
+        const wm = weekMap.get(b.key);
+        if (wm) for (const k in wm) { if (k === KSV_KEY && ksvIsWeekly) continue; if (isDayNative(k)) continue; if (wm[k] != null) b.metrics[k] = wm[k]; }
       }
     } else if (gran === 'month') {
-      // Sum each month's weeks — but ONLY weeks whose Week Ending falls inside
-      // the daily data span, so out-of-range demand (a week ending just before
-      // the data starts, or after it ends) can't contaminate an edge month's
-      // total and flip the correlation. Keeps KSV in step with the range-filtered
-      // daily side.
-      const first = dates[0], last = dates[dates.length - 1];
-      const byMonth = {};
-      for (const [we, kw] of ksvByWeek) {
-        if ((first && we < first) || (last && we > last)) continue;
-        const v = ksvWeekValue(kw, keyword, allKeywords);
-        if (v == null) continue;
-        const mk = we.slice(0, 7);
-        byMonth[mk] = (byMonth[mk] || 0) + v;
+      // Only weeks whose Week Ending falls inside the daily data span count, so
+      // out-of-range demand can't contaminate an edge month and flip the sign.
+      if (ksvIsWeekly) {
+        const byMonth = {};
+        for (const [we, kw] of ksvByWeek) {
+          if ((first && we < first) || (last && we > last)) continue;
+          const v = ksvWeekValue(kw, keyword, allKeywords);
+          if (v == null) continue;
+          const mk = we.slice(0, 7);
+          byMonth[mk] = (byMonth[mk] || 0) + v;
+        }
+        for (const b of buckets) if (byMonth[b.key] != null) b.metrics[KSV_KEY] = byMonth[b.key];
       }
-      for (const b of buckets) if (byMonth[b.key] != null) b.metrics[KSV_KEY] = byMonth[b.key];
+      // Other weekly-native metrics roll up to months by each field's agg.
+      const monthAcc = {};
+      for (const [we, wm] of weekMap) {
+        if ((first && we < first) || (last && we > last)) continue;
+        const mk = we.slice(0, 7);
+        for (const k in wm) {
+          if (k === KSV_KEY && ksvIsWeekly) continue;
+          if (isDayNative(k)) continue;
+          if (wm[k] == null) continue;
+          (monthAcc[mk] = monthAcc[mk] || {});
+          (monthAcc[mk][k] = monthAcc[mk][k] || []).push(wm[k]);
+        }
+      }
+      for (const b of buckets) {
+        const acc = monthAcc[b.key];
+        if (acc) for (const k in acc) b.metrics[k] = reduce(acc[k], FIELD_BY_KEY[k]?.agg || 'sum');
+      }
+      // Monthly-native metrics inject directly (keyed by YYYY-MM).
+      const monMap = new Map();
+      for (const m of monthlyMetrics || []) if (m && m.period_end) monMap.set(String(m.period_end).slice(0, 7), m.metrics || {});
+      for (const b of buckets) { const mm = monMap.get(b.key); if (mm) for (const k in mm) { if (isDayNative(k)) continue; if (mm[k] != null) b.metrics[k] = mm[k]; } }
     }
   }
   buckets.sort((a, b) => (a.key < b.key ? -1 : 1));

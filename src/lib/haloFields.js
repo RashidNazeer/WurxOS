@@ -7,16 +7,27 @@
 //   label — display name
 //   group — 'amazon' | 'tiktok'  (Boss correlates one side against the other)
 //   agg   — how to roll up over a week/month: 'sum' for counts/money,
-//           'avg' for ratios/rates (AOV, ROI, CPO, videos-per-day)
+//           'avg' for ratios/rates (AOV, ROI, CPO, videos-per-day, search rank)
 //   fmt   — 'money' | 'int' | 'num' for display
 //   sheetHeader — the exact source-sheet column name to export under, when it
 //           differs from `label` (so a downloaded sheet re-imports cleanly).
 //
-// 2026-07 format change: the sheet dropped NTB and Keyword Search Rank, split
-// Amazon Revenue into per-PRODUCT columns plus a "Total Revenue/Day", and moved
-// Keyword Search Volume to a WEEKLY subsheet. It's still a HALO_FIELD but marked
-// `weeklyOnly` (see below) — the math injects it into the weekly/monthly buckets
-// from weekly_keywords, and it's hidden at Daily granularity.
+// PER-METRIC NATIVE GRANULARITY (2026-07 rework): a metric is no longer flagged
+// `weeklyOnly` in this dictionary. Instead each DATASET carries a `metricGran`
+// map (fieldKey -> 'day'|'week'|'month') detected from the uploaded data. A
+// metric is comparable at its native granularity AND at coarser ones
+// (day → day/week/month; week → week/month; month → month). A metric absent
+// from the map has no data in that dataset and is hidden. See metricAvailableAt.
+//
+// Amazon side (the branded demand the halo drives):
+//   * NTB (units sold) — daily count
+//   * Keyword Search Volume — branded search demand. Daily in the richer
+//     single-sheet format (one column per keyword); WEEKLY-native when it only
+//     appears in a "Branded Demand" subsheet. The dataset's metricGran decides.
+//   * Keyword Search Rank — per-keyword search-result position (1 = top). Lower
+//     is better, so it rolls up as an AVERAGE and correlates INVERSELY with reach.
+//   * Revenue/Day ("Total Revenue/Day" on the sheet) — carries a per-PRODUCT
+//     breakdown in halo_rows.product_revenue.
 // ============================================================
 
 export const HALO_FIELDS = [
@@ -28,14 +39,13 @@ export const HALO_FIELDS = [
   { key: 'video_per_day',       label: 'Video/Day',           group: 'tiktok', agg: 'avg', fmt: 'num'   },
   { key: 'product_impressions', label: 'Product impressions', group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_impressions',  label: 'Unique impressions',  group: 'tiktok', agg: 'sum', fmt: 'int'   },
-  // Amazon side (daily) — the branded revenue the halo drives. The sheet calls
-  // this "Total Revenue/Day" (= sum of the per-product Revenue (Amazon) cols).
+  // ---- Amazon side ----
+  { key: 'ntb',                 label: 'NTB',                 group: 'amazon', agg: 'sum', fmt: 'int'   },
+  { key: 'keyword_search_volume', label: 'Branded Search Volume', group: 'amazon', agg: 'sum', fmt: 'int' },
+  // "Total Revenue/Day" on the sheet (= sum of the per-product Revenue cols).
   { key: 'revenue_per_day',     label: 'Amazon Revenue', sheetHeader: 'Total Revenue/Day', group: 'amazon', agg: 'sum', fmt: 'money' },
-  // Amazon branded search demand — WEEKLY-ONLY (Branded Demand subsheet). It's a
-  // normal selectable metric, but only exists at Weekly/Monthly granularity
-  // (weeklyOnly hides it at Daily). Its values come from dataset.weekly_keywords,
-  // injected into the weekly/monthly buckets by the math — never from daily rows.
-  { key: 'keyword_search_volume', label: 'Branded Search Volume', group: 'amazon', agg: 'sum', fmt: 'int', weeklyOnly: true },
+  { key: 'keyword_search_rank', label: 'Keyword Search Rank', group: 'amazon', agg: 'avg', fmt: 'num'   },
+  // ---- back to TikTok / GMV Max ----
   { key: 'product_clicks',      label: 'Product clicks',      group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_clicks',       label: 'Unique clicks',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'cost',                label: 'Cost',                group: 'tiktok', agg: 'sum', fmt: 'money' },
@@ -49,21 +59,51 @@ export const FIELD_BY_KEY = Object.fromEntries(HALO_FIELDS.map((f) => [f.key, f]
 export const AMAZON_FIELDS = HALO_FIELDS.filter((f) => f.group === 'amazon');
 export const TIKTOK_FIELDS = HALO_FIELDS.filter((f) => f.group === 'tiktok');
 
-// The weekly-only branded search metric key (lives in weekly_keywords).
+// The branded-search metric key (may be daily or weekly-native per dataset).
 export const KSV_KEY = 'keyword_search_volume';
+// The per-keyword search-rank metric key.
+export const KSR_KEY = 'keyword_search_rank';
 
 // The daily Amazon field that carries a per-PRODUCT breakdown (Revenue (Amazon)
 // columns). "All products" = the stored total (revenue_per_day); a single
 // product = that product's daily revenue.
 export const PRODUCT_REVENUE_FIELD = 'revenue_per_day';
 
-// Fields selectable at a given granularity. Weekly-only fields (branded search)
-// are hidden at Daily because there's no daily data for them.
-export function fieldsForGran(gran) {
-  return HALO_FIELDS.filter((f) => gran !== 'day' || !f.weeklyOnly);
+// ---- per-metric native granularity ------------------------------------------
+// day < week < month. A metric bucketed at its native granularity can also be
+// compared at any COARSER one (a daily metric rolls up to weeks/months; a weekly
+// metric can only be compared weekly or monthly).
+export const GRAN_ORDER = { day: 0, week: 1, month: 2 };
+
+// Is `key` comparable at `gran`, given the dataset's detected metricGran map?
+//   * No map at all (legacy dataset / unknown) → treat as available (day-native).
+//   * A key present in the map → available at its native granularity and coarser.
+//   * A key ABSENT from a populated map → no data in this dataset → unavailable.
+export function metricAvailableAt(key, gran, metricGran) {
+  if (!metricGran || Object.keys(metricGran).length === 0) return true;
+  const nat = metricGran[key];
+  if (!nat) return false;
+  return (GRAN_ORDER[gran] ?? 0) >= (GRAN_ORDER[nat] ?? 0);
 }
-export const AMAZON_FIELDS_FOR = (gran) => fieldsForGran(gran).filter((f) => f.group === 'amazon');
-export const TIKTOK_FIELDS_FOR = (gran) => fieldsForGran(gran).filter((f) => f.group === 'tiktok');
+
+// Fields selectable at a given granularity for a dataset. metricGran is the
+// dataset's fieldKey→granularity map (see metricAvailableAt).
+export function fieldsForGran(gran, metricGran) {
+  return HALO_FIELDS.filter((f) => metricAvailableAt(f.key, gran, metricGran));
+}
+export const AMAZON_FIELDS_FOR = (gran, metricGran) => fieldsForGran(gran, metricGran).filter((f) => f.group === 'amazon');
+export const TIKTOK_FIELDS_FOR = (gran, metricGran) => fieldsForGran(gran, metricGran).filter((f) => f.group === 'tiktok');
+
+// Native granularity of a metric ('day' when absent/unknown — the finest).
+export function nativeGranOf(key, metricGran) {
+  return (metricGran && metricGran[key]) || 'day';
+}
+// The coarsest of a set of granularities (the effective compare granularity).
+export function coarsestGran(...grans) {
+  let best = 'day';
+  for (const g of grans) if ((GRAN_ORDER[g] ?? 0) > (GRAN_ORDER[best] ?? 0)) best = g;
+  return best;
+}
 
 // ---- currency ---------------------------------------------------------------
 // The sheet may be in $, £ or €. parseHaloSheet detects it and stores it on the
@@ -92,7 +132,12 @@ const HEADER_SYNONYMS = {
   videos: 'video_per_day',
   productimpressions: 'product_impressions',
   uniqueimpressions: 'unique_impressions',
-  totalrevenueday: 'revenue_per_day',   // the sheet's "Total Revenue/Day"
+  ntb: 'ntb',
+  ntbunitssold: 'ntb',                   // our own export writes "NTB (units sold)"
+  keywordsearchvolume: 'keyword_search_volume',
+  keywordsearchrank: 'keyword_search_rank',
+  keywordrank: 'keyword_search_rank',
+  totalrevenueday: 'revenue_per_day',    // the sheet's "Total Revenue/Day"
   totalrevenueperday: 'revenue_per_day',
   revenueday: 'revenue_per_day',         // our own export / older sheets
   revenueperday: 'revenue_per_day',
