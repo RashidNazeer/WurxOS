@@ -49,6 +49,10 @@ export function carryForward(prev) {
   d.paid.roiProtection = prev.paid?.roiProtection || 'on';
   d.paid.mode = str(prev.paid?.mode);
 
+  // Niches invited — carried so the APC doesn't retype the same niches each
+  // week (editable). Not a stat; not fetched.
+  d.outreach.niches = str(prev.outreach?.niches);
+
   // ── open action items roll forward (template: "roll open items to next
   //    Tuesday"). Done items drop off. ─────────────────────────────────
   const openRows = (prev.actions?.rows || [])

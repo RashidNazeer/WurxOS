@@ -21,6 +21,7 @@ import {
   listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks,
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, hydrate } from '../../lib/checkpointDraft';
+import { runCheckpointAutofill, applyAutofillPatch } from '../../lib/checkpointAutofill';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
 import CheckpointDeck from '../../components/checkpoint/CheckpointDeck';
@@ -43,6 +44,8 @@ export default function AgendaCheckpointPage() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [autofilling, setAutofilling] = useState(false);
+  const [autofillMsg, setAutofillMsg] = useState('');
   const [saveState, setSaveState] = useState('idle'); // idle|saving|saved|local|error
   const [savedAt, setSavedAt] = useState(null);
 
@@ -169,7 +172,15 @@ export default function AgendaCheckpointPage() {
       } else {
         d = EMPTY_CHECKPOINT();
       }
-      d.cover = { brandName, apcName: profile?.display_name || '', team: d.cover.team || '', weekLabel };
+      const teamName = selectedBrand?.owner?.display_name ? `Team ${selectedBrand.owner.display_name}` : (d.cover.team || '');
+      d.cover = { brandName, apcName: profile?.display_name || '', team: teamName, weekLabel };
+      // Auto-fill sections 1–5 from the weekly report (+ Euka if linked). Best
+      // effort — carry-forward already set the "last week" columns; this fills
+      // the "this week" numbers. Never blocks creation.
+      try {
+        const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
+        d = applyAutofillPatch(d, patch);
+      } catch { /* non-fatal */ }
       loadedRef.current = true;
       setData(d);
       saveDraft(brandId, weekStart, d);
@@ -193,6 +204,23 @@ export default function AgendaCheckpointPage() {
     return () => ro.disconnect();
   }, [data]);
   const unscaledH = SLIDE_COUNT * SLIDE_H + (SLIDE_COUNT - 1) * PREVIEW_GAP;
+
+  async function onAutofill() {
+    if (!data || autofilling) return;
+    setAutofilling(true); setAutofillMsg('');
+    try {
+      const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
+      setData((d) => applyAutofillPatch(d, patch));
+      const m = patch.meta;
+      const bits = [m.reportFound ? 'report ✓' : 'no report for this week'];
+      if (m.reportN2Found) bits.push('N-2 report ✓');
+      if (m.eukaTried) bits.push(m.eukaOk ? 'Euka ✓' : 'Euka unavailable');
+      setAutofillMsg(`Filled ${m.filled} field${m.filled === 1 ? '' : 's'} — ${bits.join(' · ')}`);
+      setTimeout(() => setAutofillMsg(''), 7000);
+    } catch (e) {
+      setAutofillMsg(`Auto-fill failed: ${e?.message || e}`);
+    } finally { setAutofilling(false); }
+  }
 
   async function onGenerate() {
     if (!data) return;
@@ -314,6 +342,14 @@ export default function AgendaCheckpointPage() {
       ) : (
         <div className="ck-builder">
           <div className="ck-builder-form">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+              <button className="wx-btn wx-btn-ghost" onClick={onAutofill} disabled={autofilling} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {autofilling
+                  ? <><span className="wx-spinner" /> Auto-filling…</>
+                  : <><i className="bi bi-magic" /> Auto-fill from report{selectedBrand?.euka_store_id ? ' + Euka' : ''}</>}
+              </button>
+              {autofillMsg && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{autofillMsg}</span>}
+            </div>
             <CheckpointForm data={data} setData={setData} />
           </div>
           <div className="ck-builder-preview" ref={previewColRef}>
