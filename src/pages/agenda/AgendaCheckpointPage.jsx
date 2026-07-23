@@ -11,6 +11,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { listBrands } from '../../lib/brandsApi';
 import {
   EMPTY_CHECKPOINT, defaultReviewWeekStart, weekLabelForStart, addWeeks,
@@ -21,7 +22,7 @@ import {
   listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks,
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, hydrate } from '../../lib/checkpointDraft';
-import { runCheckpointAutofill, applyAutofillPatch } from '../../lib/checkpointAutofill';
+import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
 import CheckpointDeck from '../../components/checkpoint/CheckpointDeck';
@@ -62,6 +63,19 @@ export default function AgendaCheckpointPage() {
   });
   const selectedBrand = brands.find((b) => b.id === brandId) || null;
   const brandName = selectedBrand?.brand_name || '';
+
+  // Team lead for the cover ("Team <name>"): the brand's owner TL, falling back
+  // to the current user's manager (reports_to) when the brand owner isn't
+  // resolvable (e.g. no owner set / soft-deleted).
+  const { data: manager } = useQuery({
+    queryKey: ['checkpoint', 'manager', profile?.reports_to],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('display_name').eq('id', profile.reports_to).maybeSingle();
+      return data || null;
+    },
+    enabled: !!profile?.reports_to,
+  });
+  const teamLeadName = selectedBrand?.owner?.display_name || manager?.display_name || '';
 
   useEffect(() => { if (!brandId && brands.length) setBrandId(brands[0].id); }, [brands, brandId]);
 
@@ -131,13 +145,15 @@ export default function AgendaCheckpointPage() {
     }
   }, [existing.isSuccess, existing.data, brandId, weekStart, brandName, weekLabel]);
 
-  // keep cover in sync if brand name resolves after load
+  // keep cover in sync if brand name / team lead resolve after load. Team is
+  // ALWAYS derived as "Team <lead>" so a stale/blank stored value self-corrects.
   useEffect(() => {
     if (!data || !selectedBrand) return;
-    if (data.cover.brandName !== selectedBrand.brand_name || data.cover.weekLabel !== weekLabel) {
-      setData((d) => ({ ...d, cover: { ...d.cover, brandName: selectedBrand.brand_name, weekLabel } }));
+    const nextTeam = teamLeadName ? `Team ${teamLeadName}` : data.cover.team;
+    if (data.cover.brandName !== selectedBrand.brand_name || data.cover.weekLabel !== weekLabel || data.cover.team !== nextTeam) {
+      setData((d) => ({ ...d, cover: { ...d.cover, brandName: selectedBrand.brand_name, weekLabel, team: teamLeadName ? `Team ${teamLeadName}` : d.cover.team } }));
     }
-  }, [selectedBrand, weekLabel, data]);
+  }, [selectedBrand, weekLabel, data, teamLeadName]);
 
   // debounce preview
   useEffect(() => { if (data) { const id = setTimeout(() => setPreviewData(data), 180); return () => clearTimeout(id); } }, [data]);
@@ -172,14 +188,14 @@ export default function AgendaCheckpointPage() {
       } else {
         d = EMPTY_CHECKPOINT();
       }
-      const teamName = selectedBrand?.owner?.display_name ? `Team ${selectedBrand.owner.display_name}` : (d.cover.team || '');
+      const teamName = teamLeadName ? `Team ${teamLeadName}` : (d.cover.team || '');
       d.cover = { brandName, apcName: profile?.display_name || '', team: teamName, weekLabel };
-      // Auto-fill sections 1–5 from the weekly report (+ Euka if linked). Best
+      // Auto-fill sections 1–8 from the weekly report (+ Euka if linked). Best
       // effort — carry-forward already set the "last week" columns; this fills
       // the "this week" numbers. Never blocks creation.
       try {
         const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
-        d = applyAutofillPatch(d, patch);
+        d = mirrorTargetInvites(applyAutofillPatch(d, patch));
       } catch { /* non-fatal */ }
       loadedRef.current = true;
       setData(d);
@@ -210,7 +226,7 @@ export default function AgendaCheckpointPage() {
     setAutofilling(true); setAutofillMsg('');
     try {
       const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
-      setData((d) => applyAutofillPatch(d, patch));
+      setData((d) => mirrorTargetInvites(applyAutofillPatch(d, patch)));
       const m = patch.meta;
       const bits = [m.reportFound ? 'report ✓' : 'no report for this week'];
       if (m.reportN2Found) bits.push('N-2 report ✓');

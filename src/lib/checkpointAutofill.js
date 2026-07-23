@@ -145,10 +145,19 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
     } catch (e) { meta.eukaError = e?.message || String(e); }
   }
 
-  // Outreach "Target invites" = the same number as the funnel's target invites.
-  if (scalars['funnel.targetInvites'] != null) set('outreach.reachInvites', scalars['funnel.targetInvites']);
-
   return { scalars, arrays, meta };
+}
+
+// "Target invites" appears in THREE places that must all show the same number:
+// funnel.targetInvites, outreach.reachInvites ("Target invites"), and
+// effort.invitesSent ("Invites sent"). Mirror the funnel value into the other
+// two. Safe to call after applying a patch or after manual entry.
+export function mirrorTargetInvites(data) {
+  const ti = data?.funnel?.targetInvites;
+  if (ti === '' || ti == null) return data;
+  let d = setIn(data, 'outreach.reachInvites', String(ti));
+  d = setIn(d, 'effort.invitesSent', String(ti));
+  return d;
 }
 
 // Apply a patch onto checkpoint data (returns a new object).

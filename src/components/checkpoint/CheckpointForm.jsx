@@ -38,7 +38,7 @@ export default function CheckpointForm({ data, setData }) {
     const arr = getIn(d, path).filter((_, x) => x !== i);
     return setIn(d, path, arr.length ? arr : getIn(d, path).slice(0, 1).map(() => empties(path)));
   });
-  const ctx = useMemo(() => ({ data, set, sym: data.currency || '$' }), [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctx = useMemo(() => ({ data, set, setData, sym: data.currency || '$' }), [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <FieldCtx.Provider value={ctx}>
@@ -53,7 +53,7 @@ export default function CheckpointForm({ data, setData }) {
       <Section n={1} title="Affiliate funnel" accent="#4f46e5">
         <SubLabel>Recruit — this week</SubLabel>
         <Grid cols={4}>
-          <Num label="Target invites" path="funnel.targetInvites" />
+          <TargetInvites />
           <Num label="Opted in" path="funnel.optedIn" />
           <Num label="Sample requests" path="funnel.sampleRequests" />
           <Num label="Approved" path="funnel.approved" />
@@ -351,6 +351,27 @@ function Area({ label, path, rows = 3 }) {
       <span className="wx-label">{label}</span>
       <textarea className="wx-input" rows={rows} value={getIn(data, path) ?? ''}
         onChange={(e) => set(path, e.target.value)} style={{ resize: 'vertical' }} />
+    </label>
+  );
+}
+
+// "Target invites" is the same number in three places (funnel, Outreach, and
+// APC-effort "Invites sent"), so editing it here mirrors to all three.
+function TargetInvites() {
+  const { data, setData } = useContext(FieldCtx);
+  return (
+    <label className="ck-field">
+      <span className="wx-label">Target invites</span>
+      <input type="number" className="wx-input" placeholder="—" value={getIn(data, 'funnel.targetInvites') ?? ''}
+        onChange={(e) => {
+          const val = e.target.value;
+          setData((d) => {
+            let x = setIn(d, 'funnel.targetInvites', val);
+            x = setIn(x, 'outreach.reachInvites', val);
+            x = setIn(x, 'effort.invitesSent', val);
+            return x;
+          });
+        }} />
     </label>
   );
 }
