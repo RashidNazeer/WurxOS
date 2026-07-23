@@ -113,6 +113,7 @@ export default function AppShell() {
     >
       <Sidebar
         role={profile?.role}
+        menuLayout={profile?.menu_layout}
         collapsed={collapsed}
         onToggle={toggleCollapsed}
         mobileOpen={mobileOpen}

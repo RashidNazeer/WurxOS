@@ -18,6 +18,7 @@ import LeaveDefaultsSection  from './sections/LeaveDefaultsSection';
 import BackupSection         from './sections/BackupSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
+import MenuLayoutSection     from './sections/MenuLayoutSection';
 import '../../styles/settings.css';
 
 // Grouped registry — each group has its own icon (shown on the
@@ -35,9 +36,7 @@ const GROUPS = [
         icon: ReportIcon,  component: ReportFieldsSection,
         roles: ['boss','ol','tl','apc','developer'] },
       { id: 'menu',        label: 'Menu Layout',    sub: 'Pin & order sidebar items',
-        icon: BookmarkIcon, disabled: true,
-        comingSoon: 'Sidebar pinning is planned for a later release.',
-        component: ComingSoonSection },
+        icon: BookmarkIcon, component: MenuLayoutSection },
       { id: 'appearance',  label: 'Appearance',     sub: 'Theme & density',
         icon: PaletteIcon, component: AppearanceSection },
     ],

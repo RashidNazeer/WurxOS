@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { getMenuForRole } from './menu';
+import { getMenuForRole, applyMenuLayout } from './menu';
 import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
 
-export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobileClose }) {
-  // Video Reviews is shown to every APC (it has a Euka mode and a file mode).
-  const menu = getMenuForRole(role);
+export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileOpen, onMobileClose }) {
+  // Role menu + the user's saved order/pins (Settings → Menu Layout). Pinned
+  // entries are tagged `_pinned` and floated to the top by applyMenuLayout.
+  const menu = useMemo(() => applyMenuLayout(getMenuForRole(role), menuLayout), [role, menuLayout]);
   const [query, setQuery] = useState('');
 
   // v1-style menu filter — substring match against item labels +
@@ -29,6 +30,12 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
       })
       .filter(Boolean);
   }, [menu, q]);
+
+  const pinnedItems = useMemo(() => menu.filter((m) => m._pinned), [menu]);
+  const restItems = useMemo(() => menu.filter((m) => !m._pinned), [menu]);
+  const renderEntry = (item, key) => (item.children
+    ? <NavGroup key={key} item={item} collapsed={collapsed} forceOpen={!!q} />
+    : <NavItem key={key} item={item} collapsed={collapsed} />);
 
   return (
     <aside className="shell-sidebar">
@@ -100,14 +107,21 @@ export default function Sidebar({ role, collapsed, onToggle, mobileOpen, onMobil
       <nav className="shell-nav">
         {filtered.length === 0 ? (
           <div className="shell-nav-empty">No menu items match.</div>
+        ) : q ? (
+          filtered.map((item, i) => renderEntry(item, i))
         ) : (
-          filtered.map((item, i) =>
-            item.children ? (
-              <NavGroup key={i} item={item} collapsed={collapsed} forceOpen={!!q} />
-            ) : (
-              <NavItem key={i} item={item} collapsed={collapsed} />
-            ),
-          )
+          <>
+            {pinnedItems.length > 0 && (
+              <>
+                {!collapsed && (
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 16px 4px' }}>Pinned</div>
+                )}
+                {pinnedItems.map((item, i) => renderEntry(item, `p${i}`))}
+                <div style={{ height: 1, background: 'var(--border-subtle)', margin: '8px 14px' }} />
+              </>
+            )}
+            {restItems.map((item, i) => renderEntry(item, `r${i}`))}
+          </>
         )}
       </nav>
 

@@ -369,3 +369,45 @@ export function getMenuForRole(role, opts = {}) {
   }
   return out;
 }
+
+// ── per-user menu layout (Settings → Menu Layout) ───────────────────
+// Stable key for a top-level entry: a leaf's `to` path, or "group:<Label>" for
+// a collapsible group (groups have no `to`). Unique within any single role menu.
+export function menuKey(entry) {
+  return entry.to || (entry.label ? `group:${entry.label}` : '');
+}
+
+/**
+ * Apply a user's saved layout ({ order:[key…], pinned:[key…] }) to their
+ * role menu. Pure + SAFE: it can only reorder/pin entries the role ALREADY has.
+ *   - keys in the layout that aren't in the role menu are ignored (removed items
+ *     / a stale layout from a previous role),
+ *   - role-menu entries missing from the saved order keep their natural position
+ *     (appended after the saved ones), so newly-added items still appear,
+ *   - pinned entries float to the top (in their ordered order) and are tagged
+ *     `_pinned` so the sidebar can group them.
+ * Never adds an entry — so it can't surface anything the role isn't allowed.
+ */
+export function applyMenuLayout(menu, layout) {
+  const order = Array.isArray(layout?.order) ? layout.order : [];
+  const pinned = Array.isArray(layout?.pinned) ? layout.pinned : [];
+  if (!order.length && !pinned.length) return menu; // default → untouched
+
+  const byKey = new Map(menu.map((it) => [menuKey(it), it]));
+  const knownOrder = order.filter((k) => byKey.has(k));
+  const knownSet = new Set(knownOrder);
+  const ordered = [
+    ...knownOrder.map((k) => byKey.get(k)),
+    ...menu.filter((it) => !knownSet.has(menuKey(it))),
+  ];
+
+  const pinnedSet = new Set(pinned.filter((k) => byKey.has(k)));
+  if (!pinnedSet.size) return ordered;
+
+  const pins = [], rest = [];
+  for (const it of ordered) {
+    if (pinnedSet.has(menuKey(it))) pins.push({ ...it, _pinned: true });
+    else rest.push(it);
+  }
+  return [...pins, ...rest];
+}
