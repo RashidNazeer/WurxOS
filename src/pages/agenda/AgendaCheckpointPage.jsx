@@ -151,7 +151,9 @@ export default function AgendaCheckpointPage() {
     if (!data || !selectedBrand) return;
     const nextTeam = teamLeadName ? `Team ${teamLeadName}` : data.cover.team;
     if (data.cover.brandName !== selectedBrand.brand_name || data.cover.weekLabel !== weekLabel || data.cover.team !== nextTeam) {
-      setData((d) => ({ ...d, cover: { ...d.cover, brandName: selectedBrand.brand_name, weekLabel, team: teamLeadName ? `Team ${teamLeadName}` : d.cover.team } }));
+      // Guard `d` inside the updater: the reset effect (week change) can set data
+      // to null before this queued update runs, and `d.cover` would throw.
+      setData((d) => (d ? { ...d, cover: { ...d.cover, brandName: selectedBrand.brand_name, weekLabel, team: teamLeadName ? `Team ${teamLeadName}` : d.cover.team } } : d));
     }
   }, [selectedBrand, weekLabel, data, teamLeadName]);
 
