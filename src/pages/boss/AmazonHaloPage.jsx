@@ -1,37 +1,44 @@
-import { useEffect, useRef, useState } from 'react';
-import { parseHaloSheet } from '../../lib/haloParse';
-import {
-  listHaloDatasets, getHaloRows, createHaloDataset, deleteHaloDataset,
-} from '../../lib/haloApi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { parseHaloGranularitySheet } from '../../lib/haloParse';
+import { getHaloRows, createHaloDataset, deleteHaloDataset } from '../../lib/haloApi';
+import { listHaloEnabledBrands } from '../../lib/haloBrandsApi';
 import HaloExplorer from '../../components/halo/HaloExplorer';
 import HaloShareModal from '../../components/halo/HaloShareModal';
 import { LinkIcon } from '../../components/common/Icon';
 
+const GRANS = [
+  { key: 'day', label: 'Daily sheet', hint: 'one row per day' },
+  { key: 'week', label: 'Weekly sheet', hint: 'one row per week (e.g. "1 June - 7 June")' },
+  { key: 'month', label: 'Monthly sheet', hint: 'one row per month (e.g. "June 2026")' },
+];
+
 export default function AmazonHaloPage() {
-  const [datasets, setDatasets] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
+  const [brands, setBrands] = useState([]); // [{ brand, datasets:{day?,week?,month?} }]
+  const [selectedBrandId, setSelectedBrandId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
 
-  async function refreshDatasets(selectFirst = false) {
-    setLoading(true); setError('');
+  const refresh = useCallback(async () => {
+    setError('');
     try {
-      const ds = await listHaloDatasets();
-      setDatasets(ds);
-      if (selectFirst && ds.length && !selectedId) setSelectedId(ds[0].id);
-      else if (ds.length && !ds.find((d) => d.id === selectedId)) setSelectedId(ds[0]?.id || null);
+      const list = await listHaloEnabledBrands();
+      setBrands(list);
+      setSelectedBrandId((cur) => (cur && list.find((x) => x.brand.id === cur) ? cur : (list[0]?.brand?.id || null)));
     } catch (e) { setError(e.message || String(e)); }
     finally { setLoading(false); }
-  }
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  useEffect(() => { refreshDatasets(true); /* eslint-disable-next-line */ }, []);
+  const selected = brands.find((x) => x.brand.id === selectedBrandId) || null;
+  const brandDatasets = useMemo(() => (selected ? Object.values(selected.datasets) : []), [selected]);
+  const loadRows = useCallback((id) => getHaloRows(id), []);
 
-  async function handleDelete(id) {
-    if (!window.confirm('Delete this dataset and all its rows?')) return;
-    await deleteHaloDataset(id);
-    if (id === selectedId) setSelectedId(null);
-    refreshDatasets(true);
+  async function handleDelete(id, granLabel) {
+    if (!window.confirm(`Delete the ${granLabel} for this brand?`)) return;
+    try { await deleteHaloDataset(id); await refresh(); }
+    catch (e) { setError(e.message || String(e)); }
   }
 
   return (
@@ -39,43 +46,79 @@ export default function AmazonHaloPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Amazon Halo Effect</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '4px 0 0', maxWidth: 760 }}>
-            Upload the whole performance workbook (both tabs) and explore how TikTok activity drives Amazon demand.
-            The <strong>daily</strong> views correlate TikTok against Amazon revenue with a day-lag; the{' '}
-            <strong>Search demand (weekly)</strong> view correlates TikTok against branded search volume week over week.
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '4px 0 0', maxWidth: 780 }}>
+            Per brand, upload up to three sheets — a <strong>daily</strong>, a <strong>weekly</strong> and a <strong>monthly</strong> one
+            (at least one). Each granularity's charts read its own sheet, falling back to rolling up the daily sheet when a
+            weekly/monthly one isn't uploaded. Enable brands and create client links in{' '}
+            <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
           </p>
         </div>
         <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setShareOpen(true)}>
-          <LinkIcon width="14" height="14" /> Share
+          <LinkIcon width="14" height="14" /> Client links
         </button>
       </div>
 
       {error && <div className="wx-alert wx-alert-danger"><span>{error}</span></div>}
 
-      <UploadPanel onUploaded={(id) => { setSelectedId(id); refreshDatasets(); }} />
-
       {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}><span className="wx-spinner" /> Loading datasets…</div>
-      ) : !datasets.length ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}><span className="wx-spinner" /> Loading…</div>
+      ) : !brands.length ? (
         <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-          No dataset yet. Upload a workbook above to get started.
+          No brands are enabled for Halo yet. Enable them in{' '}
+          <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
         </div>
       ) : (
-        <HaloExplorer datasets={datasets} loadRows={getHaloRows} onDelete={handleDelete} initialDatasetId={selectedId} />
+        <>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Brand</span>
+            <select className="wx-input" style={{ maxWidth: 320 }} value={selectedBrandId || ''} onChange={(e) => setSelectedBrandId(e.target.value)}>
+              {brands.map((x) => (
+                <option key={x.brand.id} value={x.brand.id}>
+                  {x.brand.brand_name}{['day', 'week', 'month'].filter((g) => x.datasets[g]).length ? '' : ' — no sheets yet'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selected && (
+            <div className="wx-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <strong style={{ fontSize: 13 }}>Sheets for {selected.brand.brand_name}</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                {GRANS.map((g) => (
+                  <UploadSlot
+                    key={g.key}
+                    granularity={g.key}
+                    meta={g}
+                    brand={selected.brand}
+                    dataset={selected.datasets[g.key] || null}
+                    onDone={refresh}
+                    onDelete={() => selected.datasets[g.key] && handleDelete(selected.datasets[g.key].id, g.label.toLowerCase())}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {brandDatasets.length ? (
+            <HaloExplorer key={selectedBrandId} datasets={brandDatasets} loadRows={loadRows} />
+          ) : (
+            <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
+              Upload at least one sheet above to explore this brand's Halo.
+            </div>
+          )}
+        </>
       )}
 
-      {shareOpen && <HaloShareModal onClose={() => setShareOpen(false)} />}
+      {shareOpen && <HaloShareModal brands={brands.map((x) => x.brand)} onClose={() => setShareOpen(false)} />}
     </div>
   );
 }
 
 // ============================================================
-// Upload — reads the daily tab + the weekly "Branded Demand" tab in one file.
+// One upload slot for a brand's daily / weekly / monthly sheet.
 // ============================================================
-function UploadPanel({ onUploaded }) {
-  const [open, setOpen] = useState(false);
+function UploadSlot({ granularity, meta, brand, dataset, onDone, onDelete }) {
   const [file, setFile] = useState(null);
-  const [name, setName] = useState('');
   const [parsed, setParsed] = useState(null);
   const [parseErr, setParseErr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -86,131 +129,81 @@ function UploadPanel({ onUploaded }) {
     if (!f) return;
     try {
       const ab = await f.arrayBuffer();
-      const p = await parseHaloSheet(ab);
+      const p = await parseHaloGranularitySheet(ab, granularity);
       setParsed(p);
-      if (!name) setName(f.name.replace(/\.(xlsx|xls|csv)$/i, '') + ` (${p.periodStart} → ${p.periodEnd})`);
     } catch (e) { setParseErr(e.message || String(e)); }
+  }
+
+  function reset() {
+    setFile(null); setParsed(null); setParseErr('');
+    if (inputRef.current) inputRef.current.value = '';
   }
 
   async function save() {
     if (!parsed) return;
     setSaving(true); setParseErr('');
     try {
-      const ds = await createHaloDataset({
-        name, filename: file?.name,
-        periodStart: parsed.periodStart, periodEnd: parsed.periodEnd,
-        currency: parsed.currency, weeklyKeywords: parsed.weeklyKeywords,
-        metricGran: parsed.metricGran, weeklyMetrics: parsed.weeklyMetrics,
-        monthlyMetrics: parsed.monthlyMetrics,
+      await createHaloDataset({
+        brandId: brand.id,
+        granularity,
+        name: `${brand.brand_name} — ${granularity} (${parsed.periodStart} → ${parsed.periodEnd})`,
+        filename: file?.name,
+        periodStart: parsed.periodStart,
+        periodEnd: parsed.periodEnd,
+        currency: parsed.currency,
         rows: parsed.rows,
       });
-      setOpen(false); setFile(null); setParsed(null); setName('');
-      if (inputRef.current) inputRef.current.value = '';
-      onUploaded?.(ds.id);
+      reset();
+      onDone?.();
     } catch (e) { setParseErr(e.message || String(e)); }
     finally { setSaving(false); }
   }
 
-  if (!open) {
-    return (
-      <div>
-        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setOpen(true)}>
-          ⬆ Upload workbook
-        </button>
-      </div>
-    );
-  }
+  const rowsWord = granularity === 'day' ? 'days' : granularity === 'week' ? 'weeks' : 'months';
 
   return (
-    <div className="wx-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>Upload performance workbook</strong>
-        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setOpen(false)}>Close</button>
+    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md, 8px)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <strong style={{ fontSize: 12.5 }}>{meta.label}</strong>
+        {dataset ? (
+          <span style={{ fontSize: 10.5, color: '#22c55e', fontWeight: 700 }}>✓ uploaded</span>
+        ) : (
+          <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>none yet</span>
+        )}
       </div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{meta.hint}</div>
 
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-        Download the whole Google Sheet as <strong>.xlsx</strong> (File → Download → Microsoft Excel) so both the daily tab and
-        the weekly <strong>“Branded Demand”</strong> tab come in one file. A single daily .csv also works, but the weekly search
-        view will be empty.
-      </div>
+      {dataset && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>{dataset.row_count}</strong> {rowsWord} · {dataset.period_start} → {dataset.period_end}
+          {' · '}<button type="button" onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: 0, fontSize: 11.5 }}>Delete</button>
+        </div>
+      )}
 
-      <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input"
+      <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input" style={{ fontSize: 11.5 }}
         onChange={(e) => onFile(e.target.files?.[0] || null)} />
 
-      {parseErr && <div className="wx-alert wx-alert-danger"><span>{parseErr}</span></div>}
+      {parseErr && <div style={{ fontSize: 11.5, color: 'var(--danger, #ef4444)' }}>{parseErr}</div>}
 
       {parsed && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            Parsed <strong style={{ color: 'var(--text-primary)' }}>{parsed.rows.length}</strong> days
-            ({parsed.periodStart} → {parsed.periodEnd}) · {parsed.foundKeys.length} columns recognised · currency <strong style={{ color: 'var(--text-primary)' }}>{parsed.currency}</strong>.
-          </div>
-
-          {parsed.missingColumns?.length > 0 && (
-            <div style={{
-              border: `1px solid ${parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)'}`,
-              background: parsed.missingAnchors?.length ? 'rgba(239,68,68,.10)' : 'rgba(245,158,11,.10)',
-              borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6,
-            }}>
-              <strong style={{ color: parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)' }}>
-                ⚠ {parsed.missingAnchors?.length ? 'Required column not recognised' : 'Some standard columns not recognised'}
-              </strong>
-              <span style={{ color: 'var(--text-muted)' }}>These expected columns weren't found — did you rename or remove them?</span>
-              <span>Not found: <strong>{parsed.missingColumns.map((m) => m.label).join(', ')}</strong></span>
-              {parsed.missingAnchors?.length > 0 && (
-                <span style={{ color: 'var(--danger, #ef4444)' }}>
-                  <strong>Total Revenue/Day</strong> anchors the per-product Amazon revenue columns — without it, revenue and
-                  the product breakdown are dropped. Rename it back and re-upload.
-                </span>
-              )}
-            </div>
-          )}
-
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Products (Amazon revenue): <strong style={{ color: 'var(--text-primary)' }}>{parsed.products?.length ? parsed.products.join(', ') : '—'}</strong>
-          </div>
-
-          {parsed.volumeKeywords?.length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Daily branded search keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.volumeKeywords.join(', ')}</strong>
-            </div>
-          )}
-          {parsed.rankKeywords?.length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Keyword search rank: <strong style={{ color: 'var(--text-primary)' }}>{parsed.rankKeywords.join(', ')}</strong>
-            </div>
-          )}
-
-          {parsed.weeklyKeywords?.length ? (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Weekly branded search: <strong style={{ color: 'var(--text-primary)' }}>{parsed.weeklyKeywords.length} weeks</strong> ·
-              keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.keywords?.join(', ') || '—'}</strong>
-            </div>
-          ) : !parsed.volumeKeywords?.length ? (
-            <div style={{ fontSize: 12, color: 'var(--warning)' }}>
-              ⚠ No branded search data found (no daily keyword columns and no weekly “Branded Demand” tab). The Branded Search Volume metric will be unavailable. Upload the full .xlsx, not just the daily sheet.
-            </div>
-          ) : null}
-
-          {parsed.metricGran && Object.keys(parsed.metricGran).length > 0 && (() => {
-            const coarse = Object.entries(parsed.metricGran).filter(([, g]) => g !== 'day');
-            if (!coarse.length) return null;
-            return (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                Weekly/monthly metrics: <strong style={{ color: 'var(--text-primary)' }}>{coarse.map(([k, g]) => `${k} (${g})`).join(', ')}</strong>
-              </div>
-            );
-          })()}
-
-          <label style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Dataset name
-            <input className="wx-input" style={{ marginTop: 4 }} value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
           <div>
-            <button type="button" className="wx-btn wx-btn-primary" disabled={saving} onClick={save}>
-              {saving ? 'Saving…' : 'Save dataset'}
+            Parsed <strong style={{ color: 'var(--text-primary)' }}>{parsed.rows.length}</strong> {rowsWord}
+            {' '}({parsed.periodStart} → {parsed.periodEnd}) · {parsed.foundKeys.length} columns · {parsed.currency}
+          </div>
+          {parsed.products?.length > 0 && <div>Products: <strong style={{ color: 'var(--text-primary)' }}>{parsed.products.join(', ')}</strong></div>}
+          {parsed.volumeKeywords?.length > 0 && <div>Search keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.volumeKeywords.join(', ')}</strong></div>}
+          {parsed.warnings?.length > 0 && <div style={{ color: 'var(--warning, #f59e0b)' }}>⚠ {parsed.warnings.join(' ')}</div>}
+          {parsed.missingColumns?.length > 0 && (
+            <div style={{ color: parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)' }}>
+              ⚠ Not recognised: {parsed.missingColumns.map((m) => m.label).join(', ')}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="wx-btn wx-btn-primary wx-btn-sm" disabled={saving} onClick={save}>
+              {saving ? 'Saving…' : (dataset ? 'Replace' : 'Save')}
             </button>
+            <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" disabled={saving} onClick={reset}>Cancel</button>
           </div>
         </div>
       )}

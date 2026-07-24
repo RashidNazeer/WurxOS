@@ -105,8 +105,29 @@ export function coarsestGran(...grans) {
   return best;
 }
 
+// ---- per-SOURCE availability (per-brand 3-sheet model) ----------------------
+// A view's fields come from the ONE source chosen for that granularity (the
+// matching sheet, else the finest finer sheet). A metric is offered only if that
+// source carries NON-ZERO data for it (0 = "not available", per the sheet
+// convention) — so e.g. NTB left blank/0 in the daily sheet is hidden in Daily
+// but shows in Weekly where it was filled. This intentionally does NOT follow the
+// old "native-and-coarser" monotonic rule: availability is per chosen source.
+export function availSetForRows(rows) {
+  const s = new Set();
+  for (const r of rows || []) {
+    const m = (r && r.metrics) || {};
+    for (const k in m) if (m[k]) s.add(k); // truthy = non-zero, non-null
+  }
+  return s;
+}
+export function fieldsAvail(availSet) {
+  return HALO_FIELDS.filter((f) => availSet && availSet.has(f.key));
+}
+export const amazonAvail = (availSet) => fieldsAvail(availSet).filter((f) => f.group === 'amazon');
+export const tiktokAvail = (availSet) => fieldsAvail(availSet).filter((f) => f.group === 'tiktok');
+
 // ---- currency ---------------------------------------------------------------
-// The sheet may be in $, £ or €. parseHaloSheet detects it and stores it on the
+// The sheet may be in $, £ or €. parseHaloGranularitySheet detects it and stores it on the
 // dataset; fmtValue reads this module-level symbol so every chart/tooltip shows
 // the right currency without threading it through dozens of call sites. It is a
 // pure display symbol (numbers are unaffected), reset whenever a dataset loads.

@@ -1,7 +1,7 @@
 // ============================================================
-// Amazon Halo share links — Boss creates/lists/revokes (RLS-guarded);
-// anon clients read via the SECURITY DEFINER RPCs. Mirrors
-// reportShareApi.js. A link exposes the WHOLE Halo (all datasets).
+// Amazon Halo share links — Boss/OL create/list/revoke (RLS-guarded); anon
+// clients read via the SECURITY DEFINER RPCs. A link is scoped to one or more
+// BRANDS (halo_shares.brand_ids) — the client sees only those brands' Halo.
 // ============================================================
 
 import { supabase } from './supabase';
@@ -22,17 +22,13 @@ export async function listHaloShares() {
   return data || [];
 }
 
-export async function createHaloShare({ label = '', expiresAt = null } = {}) {
+export async function createHaloShare({ label = '', brandIds = [], expiresAt = null } = {}) {
+  if (!brandIds || !brandIds.length) throw new Error('Pick at least one brand for this link.');
   const { data: me } = await supabase.auth.getUser();
   const token = randomToken();
   const { data, error } = await supabase
     .from('halo_shares')
-    .insert({
-      token,
-      label,
-      created_by: me?.user?.id,
-      expires_at: expiresAt,
-    })
+    .insert({ token, label, brand_ids: brandIds, created_by: me?.user?.id, expires_at: expiresAt })
     .select()
     .single();
   if (error) throw new Error(error.message);
@@ -53,18 +49,10 @@ export async function fetchSharedHalo(token) {
     const code = error.message.match(/share_not_found|share_revoked|share_expired/)?.[0];
     throw Object.assign(new Error(friendly(code) || error.message), { code });
   }
-  // Normalise dataset-level fields so the explorer's granularity gating works
-  // the same as the Boss loader (missing jsonb → sensible defaults).
   return {
-    ...data,
-    datasets: (data?.datasets || []).map((d) => ({
-      ...d,
-      currency: d.currency || '$',
-      weekly_keywords: d.weekly_keywords || [],
-      metric_gran: d.metric_gran || {},
-      weekly_metrics: d.weekly_metrics || [],
-      monthly_metrics: d.monthly_metrics || [],
-    })),
+    label: data?.label || '',
+    brands: data?.brands || [],
+    datasets: (data?.datasets || []).map((d) => ({ ...d, currency: d.currency || '$' })),
   };
 }
 
@@ -74,13 +62,13 @@ export async function fetchSharedHaloRows(token, datasetId) {
     p_dataset_id: datasetId,
   });
   if (error) {
-    const code = error.message.match(/share_not_found|share_revoked|share_expired/)?.[0];
+    const code = error.message.match(/share_not_found|share_revoked|share_expired|dataset_out_of_scope/)?.[0];
     throw Object.assign(new Error(friendly(code) || error.message), { code });
   }
-  // Normalise to the same shape getHaloRows() returns so the explorer
-  // is loader-agnostic.
+  // Same shape getHaloRows() returns so the explorer is loader-agnostic.
   return (data || []).map((r) => ({
     date: r.date,
+    periodLabel: r.period_label || null,
     metrics: r.metrics || {},
     productRevenue: r.product_revenue || {},
     keywords: r.keywords || {},
@@ -93,6 +81,7 @@ function friendly(code) {
     case 'share_not_found': return 'This link is invalid.';
     case 'share_revoked':   return 'This link has been revoked.';
     case 'share_expired':   return 'This link has expired.';
+    case 'dataset_out_of_scope': return 'This data is not part of this link.';
     default: return null;
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchSharedHalo, fetchSharedHaloRows } from '../../lib/haloShareApi';
 import { AlertIcon } from '../../components/common/Icon';
@@ -14,6 +14,7 @@ export default function HaloPortalPage() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState('');
+  const [brandId, setBrandId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +28,13 @@ export default function HaloPortalPage() {
   // Stable loader so HaloExplorer's row-loading effect doesn't re-run
   // every render.
   const loadRows = useCallback((id) => fetchSharedHaloRows(token, id), [token]);
+
+  const brands = useMemo(() => data?.brands || [], [data]);
+  const datasets = useMemo(() => data?.datasets || [], [data]);
+  useEffect(() => {
+    if (brands.length && !brands.find((b) => b.id === brandId)) setBrandId(brands[0].id);
+  }, [brands, brandId]);
+  const brandDatasets = useMemo(() => datasets.filter((d) => d.brand_id === brandId), [datasets, brandId]);
 
   if (loading) {
     return (
@@ -58,7 +66,6 @@ export default function HaloPortalPage() {
     );
   }
 
-  const datasets = data?.datasets || [];
   const label = data?.label;
 
   return (
@@ -82,12 +89,21 @@ export default function HaloPortalPage() {
           </p>
         </div>
 
-        {datasets.length === 0 ? (
+        {brands.length > 1 && (
+          <div className="wx-card" style={{ padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Brand</span>
+            <select className="wx-input" style={{ maxWidth: 320 }} value={brandId || ''} onChange={(e) => setBrandId(e.target.value)}>
+              {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {brands.length === 0 || !brandDatasets.length ? (
           <div className="wx-card" style={{ padding: 24, color: 'var(--text-muted)', textAlign: 'center' }}>
             No data has been published yet.
           </div>
         ) : (
-          <HaloExplorer datasets={datasets} loadRows={loadRows} />
+          <HaloExplorer key={brandId} datasets={brandDatasets} loadRows={loadRows} />
         )}
 
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 11.5, marginTop: 24 }}>

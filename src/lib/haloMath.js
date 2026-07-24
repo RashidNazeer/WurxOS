@@ -1,19 +1,23 @@
 // ============================================================
-// Amazon Halo Effect — correlation math (bucketed model).
+// Amazon Halo Effect — correlation math (per-granularity source model).
 //
-// One granularity switch drives everything (Daily / Weekly / Monthly). We bucket
-// the daily rows into that unit, then correlate any two metrics on the shared
-// buckets with a lag measured in that same unit (days / weeks / months).
+// Each brand has up to three sheets (daily / weekly / monthly). The explorer
+// picks ONE source for the chosen view granularity: the matching sheet if it was
+// uploaded, otherwise the finest available FINER sheet rolled up. So a view is
+// never a mix of a sheet's own rows and computed rows.
 //
-// Branded Search Volume is weekly-only: it has no daily rows, so it's injected
-// straight into the weekly (or monthly) buckets from dataset.weekly_keywords —
-// never spread across days. That's why it only exists at Weekly/Monthly.
+//   * source gran == view gran  → each row IS a bucket (the sheet's own value,
+//     keyed by its anchor date, labelled by the sheet's raw period text).
+//   * source finer than view    → aggregate the finer rows up (sum/avg per field);
+//     partial edge periods are dropped (only when rolling up from DAILY).
 //
-// Weeks are Sun–Sat, keyed by the ending SATURDAY, to line up exactly with the
-// "Branded Demand" subsheet's Week Ending column.
+// Correlation pairs two metrics on the shared buckets with a lag measured in the
+// view's own unit (days / weeks / months). Weekly lag uses +lag*7 days on the
+// anchor, which is exact for contiguous 7-day weeks; irregular weekly ranges just
+// drop the mispaired bucket rather than mis-correlating.
 // ============================================================
 
-import { FIELD_BY_KEY, KSV_KEY } from './haloFields';
+import { FIELD_BY_KEY, GRAN_ORDER } from './haloFields';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
@@ -42,11 +46,20 @@ export function weekEndingOf(dateStr) {
   return isoOf(dt);
 }
 
-// bucket key + label for a date at a granularity.
+// bucket key + label for a date at a granularity (used when ROLLING UP a finer
+// source). day → the date; week → the ending Saturday; month → YYYY-MM.
 export function bucketOf(dateStr, gran) {
   if (gran === 'month') return { key: dateStr.slice(0, 7), label: dateStr.slice(0, 7) };
   if (gran === 'week') { const k = weekEndingOf(dateStr); return { key: k, label: `wk ${k.slice(5)}` }; }
   return { key: dateStr, label: dateStr.slice(5) };
+}
+
+// Key a row's own anchor at the view granularity (used when the source gran ==
+// the view gran, so the sheet's own period is preserved). day/week keep the
+// anchor date ISO; month collapses to YYYY-MM.
+function bucketKeyOf(dateStr, gran) {
+  if (gran === 'month') return dateStr.slice(0, 7);
+  return dateStr;
 }
 
 // The bucket key `lag` units later (for the delayed-halo pairing).
@@ -76,62 +89,37 @@ export function pearson(xs, ys) {
   return Number.isFinite(r) ? r : null;
 }
 
-// index date -> metrics map from raw rows
-export function indexByDate(rows) {
-  const m = {};
-  for (const r of rows) m[r.date] = r.metrics;
-  return m;
-}
-
-// A week's branded search volume for one keyword, or the sum of ALL keywords
-// when keyword is null. For the all-keywords total we require every EXPECTED
-// keyword to be present that week (the parser drops blank cells, so summing only
-// the present keys would understate the total and fake a dip) — an incomplete
-// week returns null and is skipped. Falls back to present keys if no set given.
-export function ksvWeekValue(keywordsObj, keyword, allKeywords) {
-  if (!keywordsObj) return null;
-  if (keyword) return keywordsObj[keyword] ?? null;
-  const keys = allKeywords && allKeywords.length ? allKeywords : Object.keys(keywordsObj);
-  if (!keys.length) return null;
-  let sum = 0;
-  for (const k of keys) {
-    const v = keywordsObj[k];
-    if (v == null) return null;
-    sum += v;
-  }
-  return sum;
-}
-
-// Which side is the lagging "effect"? amazon lags tiktok. Same group → no lag.
-function lagRoles(fx, fy) {
-  const gx = FIELD_BY_KEY[fx]?.group, gy = FIELD_BY_KEY[fy]?.group;
-  return {
-    xIsEffect: gx === 'amazon' && gy === 'tiktok',
-    yIsEffect: gy === 'amazon' && gx === 'tiktok',
-  };
-}
-
 /**
- * Bucket the daily rows into the chosen granularity and (at week/month) inject
- * any WEEKLY-native metrics (from weeklyMetrics) and, at month, MONTHLY-native
- * metrics (from monthlyMetrics). Branded search (KSV) keeps its own per-keyword
- * path via ksvByWeek so the keyword picker still works.
- *
- * A metric only exists in a bucket at granularities >= its native one: daily
- * metrics are aggregated up from the daily rows here; weekly/monthly-native
- * metrics have no daily rows and are injected straight into the coarser buckets.
- *
- * @returns Array<{ key, label, days, metrics:{fieldKey:value} }> sorted ascending
+ * Bucket a source's rows at a target granularity.
+ *  - sourceGran === targetGran → each row is a bucket (sheet value, own label).
+ *  - sourceGran finer          → aggregate up (sum/avg per field), dropping
+ *                                partial edge periods when rolling up from daily.
+ * `rows` = [{ date, periodLabel?, metrics }] already scoped to the chosen
+ * product/keyword. Returns Array<{ key, label, days, metrics }> sorted ascending.
  */
-export function buildBuckets({
-  byDate, dates, gran, metricGran, weeklyMetrics, monthlyMetrics,
-  ksvByWeek, keyword, allKeywords, minWeekDays = 7,
-}) {
+export function buildBucketsFromSource({ rows, sourceGran, targetGran, minWeekDays = 7 }) {
+  if (!rows || !rows.length) return [];
+  const so = GRAN_ORDER[sourceGran];
+  const to = GRAN_ORDER[targetGran];
+  if (so == null || to == null || so > to) return []; // can't synthesise a finer view
+
+  if (so === to) {
+    return rows
+      .filter((r) => r && r.date && r.metrics)
+      .map((r) => ({
+        key: bucketKeyOf(r.date, targetGran),
+        label: r.periodLabel || bucketOf(r.date, targetGran).label,
+        days: 1,
+        metrics: r.metrics,
+      }))
+      .sort((a, b) => (a.key < b.key ? -1 : 1));
+  }
+
   const map = new Map();
-  for (const d of dates) {
-    const m = byDate[d];
-    if (!m) continue;
-    const b = bucketOf(d, gran);
+  for (const r of rows) {
+    const m = r && r.metrics;
+    if (!m || !r.date) continue;
+    const b = bucketOf(r.date, targetGran);
     if (!map.has(b.key)) map.set(b.key, { key: b.key, label: b.label, days: 0, acc: {} });
     const slot = map.get(b.key);
     slot.days += 1;
@@ -144,76 +132,23 @@ export function buildBuckets({
     for (const k in slot.acc) metrics[k] = reduce(slot.acc[k], FIELD_BY_KEY[k]?.agg || 'sum');
     buckets.push({ key: slot.key, label: slot.label, days: slot.days, metrics });
   }
-  // Drop partial edge periods so their under-counted sums don't bias the
-  // correlation: a partial week (weekly) or a month missing much of its days.
-  if (gran === 'week') buckets = buckets.filter((b) => b.days >= minWeekDays);
-  else if (gran === 'month') buckets = buckets.filter((b) => b.days >= daysInMonth(b.key) * 0.85);
-
-  if (gran !== 'day') {
-    const first = dates[0], last = dates[dates.length - 1];
-    // KSV is weekly-native ONLY when it isn't in the daily rows (metricGran says
-    // 'week', or there's no daily KSV and a ksvByWeek exists). When daily, it's
-    // already bucketed above and must not be overwritten by the weekly total.
-    const ksvNative = metricGran ? metricGran[KSV_KEY] : undefined;
-    const ksvIsWeekly = !!(ksvByWeek && ksvByWeek.size) && ksvNative !== 'day';
-    // A metric already aggregated from DAILY rows must never be overwritten by a
-    // weekly/monthly injector — the daily aggregate honours the range-bound and
-    // partial-edge completeness filters; the coarse value bypasses both.
-    const isDayNative = (k) => !!(metricGran && metricGran[k] === 'day');
-
-    // Weekly-native metrics keyed by their week-ending Saturday (matches bucketOf
-    // at week granularity).
-    const weekMap = new Map();
-    for (const w of weeklyMetrics || []) if (w && w.period_end) weekMap.set(w.period_end, w.metrics || {});
-
-    if (gran === 'week') {
-      for (const b of buckets) {
-        if (ksvIsWeekly) {
-          const v = ksvWeekValue(ksvByWeek.get(b.key), keyword, allKeywords);
-          if (v != null) b.metrics[KSV_KEY] = v;
-        }
-        const wm = weekMap.get(b.key);
-        if (wm) for (const k in wm) { if (k === KSV_KEY && ksvIsWeekly) continue; if (isDayNative(k)) continue; if (wm[k] != null) b.metrics[k] = wm[k]; }
-      }
-    } else if (gran === 'month') {
-      // Only weeks whose Week Ending falls inside the daily data span count, so
-      // out-of-range demand can't contaminate an edge month and flip the sign.
-      if (ksvIsWeekly) {
-        const byMonth = {};
-        for (const [we, kw] of ksvByWeek) {
-          if ((first && we < first) || (last && we > last)) continue;
-          const v = ksvWeekValue(kw, keyword, allKeywords);
-          if (v == null) continue;
-          const mk = we.slice(0, 7);
-          byMonth[mk] = (byMonth[mk] || 0) + v;
-        }
-        for (const b of buckets) if (byMonth[b.key] != null) b.metrics[KSV_KEY] = byMonth[b.key];
-      }
-      // Other weekly-native metrics roll up to months by each field's agg.
-      const monthAcc = {};
-      for (const [we, wm] of weekMap) {
-        if ((first && we < first) || (last && we > last)) continue;
-        const mk = we.slice(0, 7);
-        for (const k in wm) {
-          if (k === KSV_KEY && ksvIsWeekly) continue;
-          if (isDayNative(k)) continue;
-          if (wm[k] == null) continue;
-          (monthAcc[mk] = monthAcc[mk] || {});
-          (monthAcc[mk][k] = monthAcc[mk][k] || []).push(wm[k]);
-        }
-      }
-      for (const b of buckets) {
-        const acc = monthAcc[b.key];
-        if (acc) for (const k in acc) b.metrics[k] = reduce(acc[k], FIELD_BY_KEY[k]?.agg || 'sum');
-      }
-      // Monthly-native metrics inject directly (keyed by YYYY-MM).
-      const monMap = new Map();
-      for (const m of monthlyMetrics || []) if (m && m.period_end) monMap.set(String(m.period_end).slice(0, 7), m.metrics || {});
-      for (const b of buckets) { const mm = monMap.get(b.key); if (mm) for (const k in mm) { if (isDayNative(k)) continue; if (mm[k] != null) b.metrics[k] = mm[k]; } }
-    }
+  // Drop partial edge periods (they under-count) — only meaningful when the
+  // source is DAILY and we know each bucket's day-count.
+  if (sourceGran === 'day') {
+    if (targetGran === 'week') buckets = buckets.filter((b) => b.days >= minWeekDays);
+    else if (targetGran === 'month') buckets = buckets.filter((b) => b.days >= daysInMonth(b.key) * 0.85);
   }
   buckets.sort((a, b) => (a.key < b.key ? -1 : 1));
   return buckets;
+}
+
+// Which side is the lagging "effect"? amazon lags tiktok. Same group → no lag.
+function lagRoles(fx, fy) {
+  const gx = FIELD_BY_KEY[fx]?.group, gy = FIELD_BY_KEY[fy]?.group;
+  return {
+    xIsEffect: gx === 'amazon' && gy === 'tiktok',
+    yIsEffect: gy === 'amazon' && gx === 'tiktok',
+  };
 }
 
 // Pair two metric columns across the buckets, with the amazon "effect" sampled

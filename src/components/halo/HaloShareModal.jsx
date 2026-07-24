@@ -11,14 +11,20 @@ import {
 // renders unstyled (no fixed overlay) on /halo.
 import '../../styles/table.css';
 
-export default function HaloShareModal({ onClose }) {
+export default function HaloShareModal({ brands = [], onClose }) {
   const [shares, setShares]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState('');
   const [busy, setBusy]       = useState(false);
   const [label, setLabel]     = useState('');
   const [expiry, setExpiry]   = useState('');     // 'YYYY-MM-DD' or empty
+  const [brandIds, setBrandIds] = useState([]);
+  const [brandSearch, setBrandSearch] = useState('');
   const [justCreated, setJustCreated] = useState(null);
+
+  const brandById = Object.fromEntries(brands.map((b) => [b.id, b]));
+  const filteredBrands = brands.filter((b) => (b.brand_name || '').toLowerCase().includes(brandSearch.trim().toLowerCase()));
+  const toggleBrand = (id) => setBrandIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
   async function load() {
     setLoading(true); setErr('');
@@ -38,12 +44,13 @@ export default function HaloShareModal({ onClose }) {
   }, []);
 
   async function handleCreate() {
+    if (!brandIds.length) { setErr('Pick at least one brand for this link.'); return; }
     setBusy(true); setErr('');
     try {
       const expiresAt = expiry ? new Date(expiry + 'T23:59:59').toISOString() : null;
-      const row = await createHaloShare({ label: label.trim(), expiresAt });
+      const row = await createHaloShare({ label: label.trim(), brandIds, expiresAt });
       setJustCreated(row.token);
-      setLabel('');
+      setLabel(''); setBrandIds([]); setBrandSearch('');
       setTimeout(() => setJustCreated(null), 5000);
       await load();
     } catch (e) { setErr(e.message); }
@@ -76,7 +83,32 @@ export default function HaloShareModal({ onClose }) {
           )}
 
           <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 14 }}>
-            Anyone with the link can view the Amazon Halo explorer (all datasets, read-only) — no login required. Revoke any time.
+            Anyone with the link can view the Amazon Halo explorer for the <strong>selected brands</strong> (read-only) — no login required. Revoke any time.
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <label className="wx-label" style={{ margin: 0 }}>Brands for this link ({brandIds.length})</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setBrandIds(filteredBrands.map((b) => b.id))}>Select all</button>
+                <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setBrandIds([])}>Clear</button>
+              </div>
+            </div>
+            <input type="text" className="wx-input" placeholder="Search brands…" value={brandSearch}
+              onChange={(e) => setBrandSearch(e.target.value)} style={{ marginBottom: 6 }} />
+            <div style={{ maxHeight: 176, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {brands.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>No Halo-enabled brands. Enable brands first (Settings → Amazon Halo).</div>
+              ) : filteredBrands.map((b) => {
+                const sel = brandIds.includes(b.id);
+                return (
+                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6, background: sel ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer', fontSize: 12.5 }}>
+                    <input type="checkbox" checked={sel} onChange={() => toggleBrand(b.id)} />
+                    <span style={{ color: 'var(--text-primary)' }}>{b.brand_name}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 18, flexWrap: 'wrap' }}>
@@ -131,6 +163,7 @@ export default function HaloShareModal({ onClose }) {
                 <ShareRow
                   key={s.token}
                   share={s}
+                  brandById={brandById}
                   justCreated={justCreated === s.token}
                   onRevoke={() => handleRevoke(s.token)}
                 />
@@ -148,12 +181,15 @@ export default function HaloShareModal({ onClose }) {
   );
 }
 
-function ShareRow({ share, justCreated, onRevoke }) {
+function ShareRow({ share, brandById = {}, justCreated, onRevoke }) {
   const [copied, setCopied] = useState(false);
   const url = buildHaloShareUrl(share.token);
   const isRevoked = !!share.revoked_at;
   const isExpired = share.expires_at && new Date(share.expires_at) < new Date();
   const state = isRevoked ? 'revoked' : isExpired ? 'expired' : 'active';
+  // Keep unresolved ids (e.g. a brand later disabled) so the count always equals
+  // the link's real scope — get_shared_halo still serves those brands.
+  const brandNames = (share.brand_ids || []).map((id) => brandById[id]?.brand_name || 'other brand');
 
   async function copy() {
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); }
@@ -173,6 +209,11 @@ function ShareRow({ share, justCreated, onRevoke }) {
         {share.label && (
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
             {share.label}
+          </div>
+        )}
+        {brandNames.length > 0 && (
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginBottom: 2 }}>
+            {brandNames.length} {brandNames.length === 1 ? 'brand' : 'brands'}: {brandNames.join(', ')}
           </div>
         )}
         <div style={{

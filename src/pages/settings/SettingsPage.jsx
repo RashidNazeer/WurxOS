@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   ClockIcon, PaletteIcon, UserIcon, MegaphoneIcon, BoxIcon, StarIcon,
   BookmarkIcon, BellIcon, ReportIcon, HomeIcon, ShieldIcon, SearchIcon,
-  ChevronLeftIcon, TrashIcon,
+  ChevronLeftIcon, TrashIcon, DiagramIcon,
 } from '../../components/common/Icon';
 import TimeShiftSection      from './sections/TimeShiftSection';
 import ReportFieldsSection   from './sections/ReportFieldsSection';
@@ -16,6 +16,7 @@ import CampaignExpirySection from './sections/CampaignExpirySection';
 import TierNotificationsSection from './sections/TierNotificationsSection';
 import LeaveDefaultsSection  from './sections/LeaveDefaultsSection';
 import BackupSection         from './sections/BackupSection';
+import AmazonHaloSection     from './sections/AmazonHaloSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import MenuLayoutSection     from './sections/MenuLayoutSection';
@@ -74,6 +75,9 @@ const GROUPS = [
       { id: 'backup', label: 'Data Backup', sub: 'Download a full snapshot of all data',
         icon: ShieldIcon, component: BackupSection,
         roles: ['boss'] },
+      { id: 'amazonHalo', label: 'Amazon Halo', sub: 'Enable brands & client links',
+        icon: DiagramIcon, component: AmazonHaloSection,
+        roles: ['boss', 'ol'] },
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
         roles: ['boss'] },
@@ -93,6 +97,7 @@ const GROUPS = [
 export default function SettingsPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const role = profile?.role;
 
   const [query, setQuery] = useState('');
@@ -114,9 +119,23 @@ export default function SettingsPage() {
   );
 
   const [activeId, setActiveId] = useState(() => {
+    const requested = searchParams.get('section');
+    if (requested && flatSections.some((s) => s.id === requested && !s.disabled)) return requested;
     const firstEnabled = flatSections.find((s) => !s.disabled);
     return firstEnabled?.id || flatSections[0]?.id;
   });
+
+  // Deep-link ?section=<id> — apply once the requested section becomes visible
+  // (roles may load after first render), without fighting later manual nav.
+  const appliedDeepLink = useRef(false);
+  useEffect(() => {
+    if (appliedDeepLink.current) return;
+    const requested = searchParams.get('section');
+    if (requested && flatSections.some((s) => s.id === requested && !s.disabled)) {
+      setActiveId(requested);
+      appliedDeepLink.current = true;
+    }
+  }, [searchParams, flatSections]);
 
   // If search whittles the list and the current active id is no longer
   // visible, fall back to the first visible enabled section.
