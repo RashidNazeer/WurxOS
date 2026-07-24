@@ -189,8 +189,11 @@ export function getLevel(score) {
 
 export function calcMetricsAvg(metrics) {
   if (!metrics) return 0;
-  const vals = V1_METRICS.map((m) => Number(metrics[m.key]) || 0);
-  return Math.round(vals.reduce((a, b) => a + b, 0) / V1_METRICS.length);
+  // Sum in integer hundredths (metric values are ≤2dp once weekly rollups exist)
+  // to mirror SQL's exact-decimal round(sum/5); plain Math.round(sum/5) can drift
+  // 1 point at a .5 boundary and break composite parity vs the AI assistant.
+  const sum = V1_METRICS.reduce((a, m) => a + Math.round((Number(metrics[m.key]) || 0) * 100), 0);
+  return Math.round(sum / (V1_METRICS.length * 100));
 }
 
 export function calcIncentiveScore(incRecord) {

@@ -53,7 +53,7 @@ for (const month of months) {
     const attP = clamp(Number(att) || 0);
 
     // ---- perf pillar ----
-    const perfJS = rec ? R(MK.map((k) => Number(rec.metrics?.[k]) || 0).reduce((a, b) => a + b, 0) / MK.length) : null;
+    const perfJS = rec ? R(MK.reduce((a, k) => a + Math.round((Number(rec.metrics?.[k]) || 0) * 100), 0) / (MK.length * 100)) : null;
     const perfSQL = rec && rec.overall_score != null ? clamp(R(Number(rec.overall_score))) : null;
 
     // ---- incentives pillar (overlay attendance items == page applyAttendanceAutofill

@@ -3,6 +3,8 @@ import {
   listAgendaTasks, listTaskReviews, saveTaskReview,
   updatePresentationReview, updateTlRemark,
 } from '../../lib/agendaApi';
+import { getWeeklyRatingsEnabled } from '../../lib/weeklyRatingsApi';
+import WeeklyRatingFields from '../performance/WeeklyRatingFields';
 
 // OL evaluation interface for the live meeting.
 //   Left  — the presenting APC's tasks as compact cards; each opens a
@@ -112,6 +114,14 @@ function TaskReviewModal({ task, review, onClose, onSave }) {
 export default function OngoingEvaluation({ meeting, activePresentation }) {
   const apcId   = activePresentation?.apc_id || null;
   const apcName = activePresentation?.apc?.display_name || 'APC';
+
+  // Weekly performance-rating trial switch (shows a "trial preview" note when off).
+  const [weeklyEnabled, setWeeklyEnabled] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getWeeklyRatingsEnabled().then((s) => { if (!cancelled) setWeeklyEnabled(!!s.enabled); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // ── TL remarks — always visible, re-init only when the meeting changes.
   const [tlRating, setTlRating] = useState(meeting.tl_rating || '');
@@ -306,6 +316,22 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                     value={overall.summary}
                     onChange={(e) => setOverall((o) => ({ ...o, summary: e.target.value }))}
                     onBlur={() => saveOverall(overall)} />
+                </div>
+              </div>
+            )}
+
+            {/* Weekly performance rating — the 5 metrics scored per week for this APC */}
+            {activePresentation && apcId && (
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: '4px solid var(--info, #0d6efd)' }}>
+                <div className="card-body p-3">
+                  <div className="fw-semibold mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.84rem' }}>
+                    <i className="bi bi-bar-chart-fill" style={{ color: 'var(--info, #0d6efd)' }} />
+                    Weekly performance rating
+                  </div>
+                  <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
+                    Score {apcName} for this week. The month’s performance is the average of these weekly scores.
+                  </p>
+                  <WeeklyRatingFields apcId={apcId} meetingId={meeting.id} enabled={weeklyEnabled} />
                 </div>
               </div>
             )}

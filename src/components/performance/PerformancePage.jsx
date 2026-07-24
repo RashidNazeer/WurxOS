@@ -14,6 +14,10 @@ import {
   // Shared role/rating helpers — single source, no local copies.
   ROLE_LABEL, canRate,
 } from '../../lib/performanceApi';
+import {
+  listPendingApcRatings, getWeeklyRatingsEnabled, setWeeklyRatingsEnabled,
+} from '../../lib/weeklyRatingsApi';
+import WeeklyBreakdownModal from './WeeklyBreakdownModal';
 import { karachiMonth } from '../../lib/serverTime';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,8 +106,10 @@ function getLevel(score) {
 
 function calcMetricsAvg(metrics) {
   if (!metrics) return 0;
-  const vals = METRICS.map(m => Number(metrics[m.key]) || 0);
-  return Math.round(vals.reduce((a, b) => a + b, 0) / METRICS.length);
+  // Integer-hundredths sum to mirror SQL round(sum/5) — metric values are ≤2dp
+  // once weekly rollups exist; plain FP Math.round(sum/5) can drift 1 point.
+  const sum = METRICS.reduce((a, m) => a + Math.round((Number(metrics[m.key]) || 0) * 100), 0);
+  return Math.round(sum / (METRICS.length * 100));
 }
 
 // An incentive/bonus line item stores its name under `text` (see
@@ -1113,6 +1119,27 @@ export default function PerformancePage() {
   const [addFlagTarget, setAddFlagTarget] = useState(null);
   const [warnTarget, setWarnTarget]       = useState(null);
   const [showWeights, setShowWeights]     = useState(false);
+  // Weekly APC ratings (mig 269): the breakdown/late-rating modal target, the
+  // Boss trial⇄live switch, and the OL "pending ratings" (2-day) list.
+  const [weeklyTarget, setWeeklyTarget]   = useState(null);
+  const [weeklyInitMeeting, setWeeklyInitMeeting] = useState(null);
+  const [weeklyCfg, setWeeklyCfg]         = useState({ enabled: false, since: null });
+  const [pendingRatings, setPendingRatings] = useState([]);
+  const [switchBusy, setSwitchBusy]       = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getWeeklyRatingsEnabled().then((s) => { if (!cancelled) setWeeklyCfg(s); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (!(isBoss || effectiveRole === 'ol')) { setPendingRatings([]); return undefined; }
+    let cancelled = false;
+    listPendingApcRatings(month)
+      .then((p) => { if (!cancelled) setPendingRatings(p || []); })
+      .catch(() => { if (!cancelled) setPendingRatings([]); });
+    return () => { cancelled = true; };
+  }, [month, isBoss, effectiveRole, weeklyCfg.enabled]);
 
   // ── Load ──
   useEffect(() => {
@@ -1352,6 +1379,31 @@ export default function PerformancePage() {
     setTeamRecords(prev => ({ ...prev, [payload.userId]: { ...prev[payload.userId], ...payload, id: payload.id || prev[payload.userId]?.id } }));
     setRateTarget(null);
   }
+  // A weekly rating changed → refresh the APC's rolled-up monthly row (so the
+  // team grid composite updates when live) and the OL pending list.
+  async function handleWeeklyChanged(apcId) {
+    try {
+      const rec = await getRatingFor(apcId, month);
+      setTeamRecords((prev) => ({ ...prev, [apcId]: rec || null }));
+    } catch { /* ignore */ }
+    if (isBoss || effectiveRole === 'ol') {
+      try { setPendingRatings(await listPendingApcRatings(month)); } catch { /* ignore */ }
+    }
+  }
+  async function toggleWeeklySwitch(next) {
+    if (!isBoss || switchBusy) return;
+    if (next && !window.confirm(
+      'Go LIVE with weekly APC ratings?\n\n'
+      + 'The average of each APC’s weekly scores becomes their OFFICIAL monthly performance score '
+      + '(this feeds the composite used for salary). You can switch back to Trial any time.'
+    )) return;
+    setSwitchBusy(true);
+    try {
+      await setWeeklyRatingsEnabled(next);
+      setWeeklyCfg((c) => ({ ...c, enabled: next }));
+    } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
+    finally { setSwitchBusy(false); }
+  }
   async function handleFlagAdded() {
     const flags = await listFlagsForUser(addFlagTarget.user.id);
     setTeamFlags((prev) => ({ ...prev, [addFlagTarget.user.id]: flags }));
@@ -1380,6 +1432,23 @@ export default function PerformancePage() {
             max={karachiMonth()}
             onChange={e => setMonth(e.target.value)} style={{ width: 160 }} />
           {isBoss && (
+            <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+              style={{
+                borderRadius: 8, fontSize: '0.74rem', fontWeight: 700,
+                background: weeklyCfg.enabled ? 'var(--success-soft)' : 'var(--warning-soft)',
+                color: weeklyCfg.enabled ? 'var(--success)' : 'var(--warning)',
+                border: `1px solid color-mix(in srgb, ${weeklyCfg.enabled ? 'var(--success)' : 'var(--warning)'} 35%, transparent)`,
+              }}
+              disabled={switchBusy}
+              onClick={() => toggleWeeklySwitch(!weeklyCfg.enabled)}
+              title="Weekly APC ratings — Trial: collected & previewed without affecting scores. Live: the weekly average becomes the official monthly performance.">
+              {switchBusy
+                ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} />
+                : <i className={`bi ${weeklyCfg.enabled ? 'bi-broadcast' : 'bi-flask'}`} />}
+              Weekly APC ratings: {weeklyCfg.enabled ? 'Live' : 'Trial'}
+            </button>
+          )}
+          {isBoss && (
             <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
               onClick={() => setShowWeights(true)} title="Configure weightages">
               <i className="bi bi-gear" />
@@ -1387,6 +1456,32 @@ export default function PerformancePage() {
           )}
         </div>
       </div>
+
+      {/* OL / Boss: APC weekly ratings still pending from meetings 2+ days ago */}
+      {(isBoss || effectiveRole === 'ol') && pendingRatings.length > 0 && (
+        <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)' }}>
+          <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+            <i className="bi bi-clock-history text-warning" />
+            <span className="fw-bold" style={{ fontSize: '0.84rem', color: 'var(--text-primary)' }}>
+              {pendingRatings.length} weekly APC rating{pendingRatings.length === 1 ? '' : 's'} pending
+            </span>
+            <span className="text-muted" style={{ fontSize: '0.72rem' }}>— meetings 2+ days ago you haven’t scored yet. Click to rate.</span>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            {pendingRatings.slice(0, 15).map((p) => (
+              <button key={`${p.meeting_id}-${p.apc_id}`} className="btn btn-sm d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 999, fontSize: '0.72rem', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+                onClick={() => { setWeeklyInitMeeting(p.meeting_id); setWeeklyTarget({ id: p.apc_id, displayName: p.apc_name, reportsTo: p.tl_id, role: 'apc' }); }}>
+                <i className="bi bi-person" />{p.apc_name}
+                <span className="text-muted">· {new Date(p.meeting_date).toLocaleDateString()}</span>
+              </button>
+            ))}
+            {pendingRatings.length > 15 && (
+              <span className="text-muted align-self-center" style={{ fontSize: '0.72rem' }}>+{pendingRatings.length - 15} more</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Weight pills */}
       <div className="d-flex gap-2 flex-wrap mb-3">
@@ -1741,13 +1836,22 @@ export default function PerformancePage() {
 
                         {/* Actions */}
                         <div className="d-flex gap-2 mt-auto">
-                          {u.canEdit && (
+                          {(u.role || u.userRole) === 'apc' ? (
+                            // APCs are rated WEEKLY in the agenda meeting — open the weekly
+                            // breakdown (view + late/corrective rating) instead of the monthly modal.
+                            <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
+                              style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
+                              onClick={() => { setWeeklyInitMeeting(null); setWeeklyTarget(u); }}
+                              title="Weekly performance ratings">
+                              <i className="bi bi-bar-chart-fill" /> Weekly
+                            </button>
+                          ) : u.canEdit ? (
                             <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
                               style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
                               onClick={() => setRateTarget(u)}>
                               <i className="bi bi-pencil" /> Rate
                             </button>
-                          )}
+                          ) : null}
                           <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
                             style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.72rem' }}
                             onClick={() => setFlagsTarget(u)}>
@@ -1774,6 +1878,17 @@ export default function PerformancePage() {
 
       {/* Modals */}
       {rateTarget && <RateModal user={rateTarget} existing={teamRecords[rateTarget.id]} month={month} onClose={() => setRateTarget(null)} onSaved={handleRateSaved} />}
+      {weeklyTarget && (
+        <WeeklyBreakdownModal
+          apc={weeklyTarget}
+          month={month}
+          enabled={weeklyCfg.enabled}
+          canWrite={isBoss || effectiveRole === 'ol'}
+          initialMeetingId={weeklyInitMeeting}
+          onClose={() => { setWeeklyTarget(null); setWeeklyInitMeeting(null); }}
+          onChanged={() => handleWeeklyChanged(weeklyTarget.id)}
+        />
+      )}
       {flagsTarget && <ViewFlagsModal
         user={flagsTarget}
         flags={teamFlags[flagsTarget.id] || []}
