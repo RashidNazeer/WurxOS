@@ -41,10 +41,14 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
         if (cancelled) return;
         const base = {};
         WEEKLY_METRIC_KEYS.forEach((k) => { base[k] = Number(r?.metrics?.[k]) || 0; });
-        // reporting slider = the stored 0–90 OL value (reportingOl), else derive from an old full-100 value.
+        const chReport = Number.isFinite(Number(ch?.report_score)) ? Number(ch.report_score) : 5;
+        const chCheckpoint = Number.isFinite(Number(ch?.checkpoint_score)) ? Number(ch.checkpoint_score) : 5;
+        // reporting slider = the stored 0–90 value (reportingOl). For a legacy row with
+        // no reportingOl, back it out of the stored total (reporting − chunks) so re-saving
+        // is idempotent instead of re-adding the chunks (which would inflate by up to +10).
         const ol = r?.metrics?.reportingOl != null
           ? Number(r.metrics.reportingOl)
-          : Math.min(REPORTING_OL_MAX, Number(r?.metrics?.reporting) || 0);
+          : Math.min(REPORTING_OL_MAX, Math.max(0, (Number(r?.metrics?.reporting) || 0) - chReport - chCheckpoint));
         base.reporting = Math.min(REPORTING_OL_MAX, Math.max(0, ol));
         setMetrics(base);
         setChunks(ch || { report_score: 5, checkpoint_score: 5, report_deducted: 0, checkpoint_deducted: 0 });

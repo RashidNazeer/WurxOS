@@ -62,6 +62,22 @@ async function main() {
     const { data: row2 } = await sb.from('weekly_performance_ratings').select('metrics').eq('apc_id', apc).eq('meeting_id', meetingId).single();
     ok('re-save re-folds with current chunks → reporting = 88', Number(row2.metrics.reporting) === 88, JSON.stringify(row2.metrics));
 
+    // ── #3: a NEW dock AUTO-re-folds the already-saved rating (no manual re-save) ──
+    const { data: pre } = await sb.from('weekly_performance_ratings').select('metrics').eq('apc_id', apc).eq('meeting_id', meetingId).single();
+    const { data: newDed } = await sb.from('apc_reporting_deductions').insert({ apc_id: apc, kind: 'report', amount: 1, decided_by: null, created_at: '2099-06-14T10:00:00+05:00' }).select('id').single();
+    const { data: post } = await sb.from('weekly_performance_ratings').select('metrics').eq('apc_id', apc).eq('meeting_id', meetingId).single();
+    ok('#3: inserting a dock auto-re-folds the saved rating (−1, no manual re-save)', Number(post.metrics.reporting) === Number(pre.metrics.reporting) - 1, `pre=${pre.metrics.reporting} post=${post.metrics.reporting}`);
+    // and deleting it auto-restores
+    await sb.from('apc_reporting_deductions').delete().eq('id', newDed.id);
+    const { data: post2 } = await sb.from('weekly_performance_ratings').select('metrics').eq('apc_id', apc).eq('meeting_id', meetingId).single();
+    ok('#3: deleting a dock auto-re-folds back up', Number(post2.metrics.reporting) === Number(pre.metrics.reporting), `back=${post2.metrics.reporting}`);
+
+    // ── #2: docks in meeting A's window do NOT bleed into meeting B (D+7) — non-overlap ──
+    const { data: mB } = await sb.from('agenda_meetings').insert({ tl_id: tlId, week_start: '2099-06-22', meeting_date: '2099-06-22', meeting_time: '10:00', status: 'completed' }).select('id').single();
+    const cB = await chunks(apc, mB.id);
+    ok('#2: earlier-week docks are not counted for the next meeting (non-overlap)', Number(cB.report_score) === 5 && Number(cB.checkpoint_score) === 5, JSON.stringify(cB));
+    await sb.from('agenda_meetings').delete().eq('id', mB.id);
+
     // ── a rating WITHOUT reportingOl is left untouched (backward compat) ──
     const { data: m2 } = await sb.from('agenda_meetings').insert({ tl_id: tlId, week_start: '2099-06-22', meeting_date: '2099-06-22', meeting_time: '10:00', status: 'completed' }).select('id').single();
     await sb.from('weekly_performance_ratings').insert({ apc_id: apc, meeting_id: m2.id, metrics: { dailyTasksQuality: 50, reporting: 95, overallWorkflow: 50, responseTime: 50, tasksProcessing: 50 }, rated_by: null });
