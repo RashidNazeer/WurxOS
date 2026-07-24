@@ -2,13 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   WEEKLY_METRIC_KEYS, weeklyOverall, getWeeklyRating, saveWeeklyRating,
 } from '../../lib/weeklyRatingsApi';
+import { apcReturnChunks } from '../../lib/apcReportingApi';
 import { getLevel } from '../../lib/performanceApi';
 
 // The 5-metric weekly performance rating (0–100 each), self-contained: loads the
 // existing rating for (apc, meeting), autosaves on change. Used in the live
 // agenda meeting (OngoingEvaluation) and in the late-rating modal. `enabled` is
-// the trial switch — when false we show a "trial preview" note (the score is
-// collected but not yet official).
+// the trial switch — when false we show a "trial preview" note.
+//
+// The REPORTING metric is split (mig 274): the OL rates 0–90; the remaining 10
+// is auto — a weekly-report chunk (0–5) + a checkpoint chunk (0–5) that fall as
+// the TL sends this APC's report/checkpoint back. The OL sees those read-only;
+// the DB trigger folds metrics.reporting = reportingOl + the two chunks.
 const METRIC_LABELS = {
   dailyTasksQuality: 'Daily task quality',
   reporting:         'Reporting',
@@ -16,11 +21,13 @@ const METRIC_LABELS = {
   responseTime:      'Response time',
   tasksProcessing:   'Efficiency',
 };
+const REPORTING_OL_MAX = 90;
 
 export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, onSaved }) {
-  const [metrics, setMetrics] = useState(null);
+  const [metrics, setMetrics] = useState(null); // 5 keys; `reporting` here = the OL's 0–90 slider
+  const [chunks, setChunks] = useState(null);   // {report_score, checkpoint_score, report_deducted, checkpoint_deducted}
   const [loading, setLoading] = useState(true);
-  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const [saveState, setSaveState] = useState('idle');
   const metricsRef = useRef(null);
   const timer = useRef(null);
 
@@ -29,35 +36,51 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setSaveState('idle');
-    getWeeklyRating(apcId, meetingId)
-      .then((r) => {
+    Promise.all([getWeeklyRating(apcId, meetingId), apcReturnChunks(apcId, meetingId).catch(() => null)])
+      .then(([r, ch]) => {
         if (cancelled) return;
         const base = {};
         WEEKLY_METRIC_KEYS.forEach((k) => { base[k] = Number(r?.metrics?.[k]) || 0; });
-        setMetrics(base); setLoading(false);
+        // reporting slider = the stored 0–90 OL value (reportingOl), else derive from an old full-100 value.
+        const ol = r?.metrics?.reportingOl != null
+          ? Number(r.metrics.reportingOl)
+          : Math.min(REPORTING_OL_MAX, Number(r?.metrics?.reporting) || 0);
+        base.reporting = Math.min(REPORTING_OL_MAX, Math.max(0, ol));
+        setMetrics(base);
+        setChunks(ch || { report_score: 5, checkpoint_score: 5, report_deducted: 0, checkpoint_deducted: 0 });
+        setLoading(false);
       })
       .catch(() => {
         if (cancelled) return;
-        const base = {};
-        WEEKLY_METRIC_KEYS.forEach((k) => { base[k] = 0; });
-        setMetrics(base); setLoading(false);
+        const b = {}; WEEKLY_METRIC_KEYS.forEach((k) => { b[k] = 0; });
+        setMetrics(b); setChunks({ report_score: 5, checkpoint_score: 5, report_deducted: 0, checkpoint_deducted: 0 }); setLoading(false);
       });
     return () => { cancelled = true; if (timer.current) clearTimeout(timer.current); };
   }, [apcId, meetingId]);
 
   function setMetric(k, v) {
-    setMetrics((m) => ({ ...m, [k]: v }));
+    const max = k === 'reporting' ? REPORTING_OL_MAX : 100;
+    const val = Math.min(max, Math.max(0, v));
+    setMetrics((m) => ({ ...m, [k]: val }));
     setSaveState('saving');
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        await saveWeeklyRating(apcId, meetingId, { ...metricsRef.current });
+        const cur = metricsRef.current;
+        // Send reportingOl = the slider; the DB trigger folds in the chunks.
+        await saveWeeklyRating(apcId, meetingId, { ...cur, reportingOl: cur.reporting });
         setSaveState('saved'); onSaved?.();
       } catch { setSaveState('error'); }
     }, 650);
   }
 
-  const overall = useMemo(() => (metrics ? weeklyOverall(metrics) : 0), [metrics]);
+  const reportChunk = chunks ? chunks.report_score : 5;
+  const checkpointChunk = chunks ? chunks.checkpoint_score : 5;
+  const effReporting = metrics ? (Number(metrics.reporting) || 0) + reportChunk + checkpointChunk : 0;
+  const overall = useMemo(
+    () => (metrics ? weeklyOverall({ ...metrics, reporting: effReporting }) : 0),
+    [metrics, effReporting],
+  );
   const lvl = getLevel(overall);
 
   if (loading || !metrics) {
@@ -66,16 +89,44 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
 
   return (
     <div>
-      {WEEKLY_METRIC_KEYS.map((k) => (
-        <div key={k} className="mb-2">
-          <div className="d-flex align-items-center justify-content-between" style={{ fontSize: '0.76rem' }}>
-            <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{METRIC_LABELS[k]}</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{metrics[k]}<span className="text-muted">/100</span></span>
+      {WEEKLY_METRIC_KEYS.map((k) => {
+        if (k === 'reporting') {
+          return (
+            <div key={k} className="mb-2">
+              <div className="d-flex align-items-center justify-content-between" style={{ fontSize: '0.76rem' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Reporting</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{effReporting}<span className="text-muted">/100</span></span>
+              </div>
+              <div className="d-flex align-items-center justify-content-between" style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                <span>Your rating</span><span>{metrics[k]}/90</span>
+              </div>
+              <input type="range" min={0} max={REPORTING_OL_MAX} step={1} value={metrics[k]} className="form-range"
+                onChange={(e) => setMetric(k, Number(e.target.value))} />
+              <div className="d-flex gap-2 flex-wrap" style={{ fontSize: '0.66rem' }}>
+                <span className="rounded px-2 py-1" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }} title="Falls when the TL sends this APC's weekly report back">
+                  Weekly report: <strong>{reportChunk}/5</strong>{chunks?.report_deducted > 0 && <span style={{ color: 'var(--danger)' }}> (−{chunks.report_deducted})</span>}
+                </span>
+                <span className="rounded px-2 py-1" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }} title="Falls when the TL sends this APC's checkpoint back">
+                  Checkpoint: <strong>{checkpointChunk}/5</strong>{chunks?.checkpoint_deducted > 0 && <span style={{ color: 'var(--danger)' }}> (−{chunks.checkpoint_deducted})</span>}
+                </span>
+              </div>
+              <div className="text-muted" style={{ fontSize: '0.62rem', marginTop: 2 }}>
+                Auto from returns (10 pts) — read-only; they add to your 0–90 rating.
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div key={k} className="mb-2">
+            <div className="d-flex align-items-center justify-content-between" style={{ fontSize: '0.76rem' }}>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{METRIC_LABELS[k]}</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{metrics[k]}<span className="text-muted">/100</span></span>
+            </div>
+            <input type="range" min={0} max={100} step={1} value={metrics[k]} className="form-range"
+              onChange={(e) => setMetric(k, Number(e.target.value))} />
           </div>
-          <input type="range" min={0} max={100} step={1} value={metrics[k]} className="form-range"
-            onChange={(e) => setMetric(k, Number(e.target.value))} />
-        </div>
-      ))}
+        );
+      })}
 
       <div className="d-flex align-items-center justify-content-between mt-2 pt-2" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
         <div className="d-flex align-items-center gap-2">

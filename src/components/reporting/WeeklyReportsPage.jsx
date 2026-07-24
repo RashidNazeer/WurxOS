@@ -8,6 +8,7 @@ import {
   REPORT_STATUSES, getReportStatus, updateReportStatus,
 } from '../../utils/reportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { deductPromptApcReport } from '../../lib/apcReportingApi';
 import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import WeeklyReportForm from './WeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
@@ -276,6 +277,7 @@ export default function WeeklyReportsPage() {
       if (selectedBrandId) getReportsForBrand(selectedBrandId).then(setBrandReports);
       setDetailReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'apc', note: note.trim() });
+      try { await deductPromptApcReport(report.id); } catch { /* deduction is best-effort; the return already happened */ }
     } catch (err) { alert('Failed to reject: ' + err.message); }
   };
 

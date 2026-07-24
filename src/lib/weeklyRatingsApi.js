@@ -66,6 +66,12 @@ export async function saveWeeklyRating(apcId, meetingId, metrics) {
   const { data: auth } = await supabase.auth.getUser();
   const clean = {};
   for (const k of WEEKLY_METRIC_KEYS) clean[k] = Number(metrics?.[k]) || 0;
+  // reportingOl = the OL's 0–90 slider for the split reporting metric (mig 274).
+  // The DB trigger folds metrics.reporting = reportingOl + the two return chunks;
+  // we keep the slider so the panel can reload it.
+  if (metrics?.reportingOl != null) {
+    clean.reportingOl = Math.min(90, Math.max(0, Number(metrics.reportingOl) || 0));
+  }
   const { data, error } = await supabase
     .from('weekly_performance_ratings')
     .upsert(

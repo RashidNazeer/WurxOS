@@ -29,6 +29,7 @@ import {
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
+import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
 import CheckpointDeck from '../../components/checkpoint/CheckpointDeck';
@@ -321,7 +322,12 @@ export default function AgendaCheckpointPage() {
     const note = returnNote.trim();
     if (!note) { setWfErr('Please add a note explaining what needs to change.'); return; }
     const ok = await runWf('return', () => returnCheckpoint(id, { note }));
-    if (ok) { setReturnOpen(false); setReturnNote(''); }
+    if (ok) {
+      setReturnOpen(false); setReturnNote('');
+      // Returning a SUBMITTED checkpoint goes to the APC (draft) — the TL may dock
+      // the APC's reporting. A verified→submitted return (OL→TL) does not.
+      if (status === 'submitted') { try { await deductPromptApcCheckpoint(id); } catch { /* best-effort */ } }
+    }
   }
 
   async function onGenerate() {
