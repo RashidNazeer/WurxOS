@@ -13,6 +13,7 @@
 // modal.
 // ============================================================
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -24,12 +25,14 @@ import {
 import { carryForward } from '../../lib/checkpointCarry';
 import {
   listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks, deleteCheckpoint,
+  submitCheckpoint, verifyCheckpoint, approveCheckpoint, returnCheckpoint, reopenCheckpoint,
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
 import CheckpointDeck from '../../components/checkpoint/CheckpointDeck';
+import CheckpointReturnNotice from '../../components/checkpoint/CheckpointReturnNotice';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import { AlertIcon } from '../../components/common/Icon';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
@@ -40,6 +43,27 @@ const SLIDE_COUNT = 12;
 const PREVIEW_GAP = 28;
 const MemoDeck = memo(CheckpointDeck);
 const raf = () => new Promise((r) => requestAnimationFrame(r));
+
+// status → { label, cls } for the card / topbar pills.
+const STATUS_PILL = {
+  draft:     { label: 'Draft',      cls: 'draft' },
+  submitted: { label: 'Pending TL', cls: 'submitted' },
+  verified:  { label: 'Pending OL', cls: 'verified' },
+  approved:  { label: 'Approved',   cls: 'approved' },
+};
+const pillFor = (s) => STATUS_PILL[s] || STATUS_PILL.draft;
+
+// Friendly one-liner after an auto-fill / create, pointing the APC at what's
+// filled vs. what they still need to complete by hand.
+function autofillSummary(meta, created) {
+  if (!meta) return created ? 'Blank checkpoint created — fill in each section below, then Done → Submit for verification.' : '';
+  const bits = [meta.reportFound ? 'weekly report ✓' : 'no weekly report for this week'];
+  if (meta.reportN2Found) bits.push('N-2 report ✓');
+  if (meta.eukaTried) bits.push(meta.eukaOk ? 'Euka ✓' : 'Euka unavailable');
+  const n = meta.filled || 0;
+  const lead = created ? 'Created & auto-filled' : 'Auto-filled';
+  return `${lead} ${n} field${n === 1 ? '' : 's'} from your data (${bits.join(' · ')}). Review those numbers, then complete the rest below.`;
+}
 
 export default function AgendaCheckpointPage() {
   const { profile } = useAuth();
@@ -52,13 +76,19 @@ export default function AgendaCheckpointPage() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [createStage, setCreateStage] = useState(null);     // {label, pct} — non-dismissable autofill overlay
   const [autofilling, setAutofilling] = useState(false);
-  const [autofillMsg, setAutofillMsg] = useState('');
+  const [autofillMsg, setAutofillMsg] = useState('');       // banner after auto-fill / create
   const [saveState, setSaveState] = useState('idle');  // idle|saving|saved|local
   const [savedAt, setSavedAt] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null); // week_start pending confirm (cards)
   const [deleting, setDeleting] = useState(false);
   const [viewDelete, setViewDelete] = useState(false);      // view-mode confirm
+  const [wfBusy, setWfBusy] = useState('');                 // '' | 'submit' | 'verify' | 'approve' | 'return' | 'reopen'
+  const [wfErr, setWfErr] = useState('');
+  const [returnOpen, setReturnOpen] = useState(false);      // return-note modal
+  const [returnNote, setReturnNote] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Who may delete a checkpoint (RLS is the real gate — mig 264
   // checkpoint_can_write = Boss/OL/dev, the brand's owner TL, or an assigned APC/IPC).
@@ -118,6 +148,32 @@ export default function AgendaCheckpointPage() {
     defaultAppliedRef.current = brandId;
     setWeekStart(alignedDefault);
   }, [brandId, reportWeeksQuery.isSuccess, alignedDefault]);
+
+  // Deep-link from a notification: /agenda/checkpoint?brand=<id>&week=<YYYY-MM-DD>
+  // opens that brand+week in view mode. Applied once; we pin defaultAppliedRef so
+  // the "jump to last week" default can't clobber the linked week, then clear the
+  // query so it doesn't fight later manual navigation.
+  const [pendingDeepView, setPendingDeepView] = useState(false);
+  const deepLinkAppliedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkAppliedRef.current || !brands.length) return;
+    const b = searchParams.get('brand');
+    const w = searchParams.get('week');
+    if (!b || !w || !brands.some((x) => x.id === b)) return;
+    deepLinkAppliedRef.current = true;
+    defaultAppliedRef.current = b;      // don't let the default-week effect override
+    setBrandId(b);
+    setWeekStart(w);
+    setPendingDeepView(true);
+    setSearchParams({}, { replace: true });
+  }, [brands, searchParams, setSearchParams]);
+  // Once the linked checkpoint has loaded, flip to view mode (the brand-change
+  // effect resets to 'list', so we wait for the row then switch).
+  useEffect(() => {
+    if (!pendingDeepView || !existing.isSuccess) return;
+    setPendingDeepView(false);
+    if (existing.data) setMode('view');
+  }, [pendingDeepView, existing.isSuccess, existing.data]);
 
   // reset the loaded checkpoint on key change
   useEffect(() => { setData(null); setDirty(false); loadedRef.current = false; baselineRef.current = ''; setSaveState('idle'); }, [brandId, weekStart]);
@@ -182,7 +238,10 @@ export default function AgendaCheckpointPage() {
 
   // ── actions ─────────────────────────────────────────────────────────
   async function createNew(fromLast) {
-    setCreating(true);
+    setCreating(true); setWfErr(''); setAutofillMsg('');
+    // Non-dismissable progress overlay so the APC sees work happening (Euka
+    // brands can take several seconds) instead of just a greyed-out button.
+    setCreateStage({ label: fromLast ? 'Loading last week…' : 'Setting up this checkpoint…', pct: 12 });
     try {
       let d;
       if (fromLast) {
@@ -193,7 +252,13 @@ export default function AgendaCheckpointPage() {
       }
       const teamName = teamLeadName ? `Team ${teamLeadName}` : (d.cover.team || '');
       d.cover = { brandName, apcName: profile?.display_name || '', team: teamName, weekLabel };
-      try { d = mirrorTargetInvites(applyAutofillPatch(d, await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand }))); } catch { /* best effort */ }
+      let meta = null;
+      try {
+        const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand, onStage: setCreateStage });
+        d = mirrorTargetInvites(applyAutofillPatch(d, patch));
+        meta = patch.meta;
+      } catch { /* best effort — a failed auto-fill still yields a usable blank/carried form */ }
+      setCreateStage({ label: 'Saving…', pct: 96 });
       loadedRef.current = true;
       setData(d);
       try {
@@ -202,8 +267,9 @@ export default function AgendaCheckpointPage() {
         qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
         qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, weekStart] });
       } catch { setSaveState('local'); }
+      setAutofillMsg(autofillSummary(meta, true));
       setMode('edit');
-    } finally { setCreating(false); }
+    } finally { setCreating(false); setCreateStage(null); }
   }
 
   async function onAutofill() {
@@ -212,14 +278,50 @@ export default function AgendaCheckpointPage() {
     try {
       const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
       setData((d) => mirrorTargetInvites(applyAutofillPatch(d, patch)));
-      const m = patch.meta;
-      const bits = [m.reportFound ? 'report ✓' : 'no report for this week'];
-      if (m.reportN2Found) bits.push('N-2 report ✓');
-      if (m.eukaTried) bits.push(m.eukaOk ? 'Euka ✓' : 'Euka unavailable');
-      setAutofillMsg(`Filled ${m.filled} field${m.filled === 1 ? '' : 's'} — ${bits.join(' · ')}`);
-      setTimeout(() => setAutofillMsg(''), 7000);
+      setAutofillMsg(autofillSummary(patch.meta, false));
     } catch (e) { setAutofillMsg(`Auto-fill failed: ${e?.message || e}`); }
     finally { setAutofilling(false); }
+  }
+
+  // ── approval workflow actions (submit → verify → approve, + return/reopen) ──
+  const cp = existing.data || null;
+  const status = cp?.status || 'draft';
+  const isAuthor = !!cp?.author_id && cp.author_id === profile?.id;
+  const isOwnerTL = !!selectedBrand?.owner_id && selectedBrand.owner_id === profile?.id;
+  const isAdmin = ['ol', 'boss', 'developer'].includes(profile?.role);
+  const canEditContent = isAdmin || (isAuthor && status === 'draft');
+  const canSubmit = status === 'draft' && (isAuthor || isAdmin);
+  const canVerify = status === 'submitted' && (isOwnerTL || isAdmin);
+  const canApprove = status === 'verified' && isAdmin;
+  const canReturn = (status === 'submitted' && (isOwnerTL || isAdmin)) || (status === 'verified' && isAdmin);
+  const canReopen = status === 'approved' && isAdmin;
+  const cpId = () => cp?.id || weeks.find((w) => w.week_start === weekStart)?.id || null;
+
+  async function runWf(kind, fn) {
+    setWfBusy(kind); setWfErr('');
+    try {
+      await fn();
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] }),
+        existing.refetch(),
+      ]);
+      return true;
+    } catch (e) { setWfErr(e?.message || String(e)); return false; }
+    finally { setWfBusy(''); }
+  }
+  async function doSubmit() {
+    if (dirty) { const ok = await saveNow(); if (!ok) { setWfErr('Could not save your latest edits — check your connection and try again.'); return; } }
+    const id = cpId(); if (id) await runWf('submit', () => submitCheckpoint(id));
+  }
+  async function doVerify()  { const id = cpId(); if (id) await runWf('verify',  () => verifyCheckpoint(id)); }
+  async function doApprove() { const id = cpId(); if (id) await runWf('approve', () => approveCheckpoint(id)); }
+  async function doReopen()  { const id = cpId(); if (id) await runWf('reopen',  () => reopenCheckpoint(id)); }
+  async function doReturn() {
+    const id = cpId(); if (!id) return;
+    const note = returnNote.trim();
+    if (!note) { setWfErr('Please add a note explaining what needs to change.'); return; }
+    const ok = await runWf('return', () => returnCheckpoint(id, { note }));
+    if (ok) { setReturnOpen(false); setReturnNote(''); }
   }
 
   async function onGenerate() {
@@ -337,7 +439,7 @@ export default function AgendaCheckpointPage() {
                   <div className="ck-card-top">
                     <span className="ck-card-week">Week of {weekLabelForStart(w.week_start)}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className={`ck-card-badge ${w.status === 'final' ? 'final' : 'draft'}`}>{w.status === 'final' ? 'Final' : 'Draft'}</span>
+                      <span className={`ck-card-badge ${pillFor(w.status).cls}`}>{pillFor(w.status).label}</span>
                       {canManage && (
                         <button type="button" className="ck-card-del" title="Delete checkpoint"
                           onClick={(e) => { e.stopPropagation(); setPendingDelete(w.week_start); }}>
@@ -369,8 +471,37 @@ export default function AgendaCheckpointPage() {
         <>
           <div className="ck-topbar">
             <button className="wx-btn wx-btn-ghost" onClick={() => setMode('list')}><i className="bi bi-arrow-left me-1" /> Back</button>
-            <div className="ck-topbar-title"><strong>{brandName}</strong> · Week of {weekLabel}</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="ck-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span><strong>{brandName}</strong> · Week of {weekLabel}</span>
+              <span className={`ck-status-pill ${pillFor(status).cls}`}>{pillFor(status).label}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {canSubmit && (
+                <button className="wx-btn wx-btn-primary" disabled={!!wfBusy || !data} onClick={doSubmit}>
+                  {wfBusy === 'submit' ? <><span className="wx-spinner" /> Submitting…</> : <><i className="bi bi-send me-1" /> Submit for verification</>}
+                </button>
+              )}
+              {canVerify && (
+                <button className="wx-btn wx-btn-primary" disabled={!!wfBusy} onClick={doVerify}>
+                  {wfBusy === 'verify' ? <><span className="wx-spinner" /> Verifying…</> : <><i className="bi bi-check2-circle me-1" /> Verify</>}
+                </button>
+              )}
+              {canApprove && (
+                <button className="wx-btn wx-btn-primary" disabled={!!wfBusy} onClick={doApprove}>
+                  {wfBusy === 'approve' ? <><span className="wx-spinner" /> Approving…</> : <><i className="bi bi-patch-check me-1" /> Approve</>}
+                </button>
+              )}
+              {canReturn && (
+                <button className="wx-btn wx-btn-ghost" style={{ color: 'var(--danger)' }} disabled={!!wfBusy}
+                  onClick={() => { setWfErr(''); setReturnNote(''); setReturnOpen(true); }}>
+                  <i className="bi bi-arrow-counterclockwise me-1" /> Return {status === 'verified' ? 'to TL' : 'to APC'}
+                </button>
+              )}
+              {canReopen && (
+                <button className="wx-btn wx-btn-ghost" disabled={!!wfBusy} onClick={doReopen}>
+                  {wfBusy === 'reopen' ? <><span className="wx-spinner" /> Reopening…</> : <><i className="bi bi-unlock me-1" /> Reopen to edit</>}
+                </button>
+              )}
               {canManage && (viewDelete ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
                   <span style={{ color: 'var(--text-muted)' }}>Delete?</span>
@@ -380,12 +511,16 @@ export default function AgendaCheckpointPage() {
               ) : (
                 <button className="wx-btn wx-btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => setViewDelete(true)}><i className="bi bi-trash3 me-1" /> Delete</button>
               ))}
-              <button className="wx-btn wx-btn-ghost" disabled={!data} onClick={() => setMode('edit')}><i className="bi bi-pencil-square me-1" /> Edit</button>
-              <button className="wx-btn wx-btn-primary" disabled={!data || busy} onClick={onGenerate}>
+              {canEditContent && (
+                <button className="wx-btn wx-btn-ghost" disabled={!data} onClick={() => setMode('edit')}><i className="bi bi-pencil-square me-1" /> Edit</button>
+              )}
+              <button className={`wx-btn ${(canSubmit || canVerify || canApprove) ? 'wx-btn-ghost' : 'wx-btn-primary'}`} disabled={!data || busy} onClick={onGenerate}>
                 {busy ? <><span className="wx-spinner" /> {progress ? `Rendering ${progress.i}/${progress.total}…` : 'Generating…'}</> : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
               </button>
             </div>
           </div>
+          {wfErr && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}><AlertIcon width="16" height="16" /> <span>{wfErr}</span></div>}
+          <CheckpointReturnNotice checkpointId={cp?.id} status={status} />
           <div className="ck-view-stage" ref={viewColRef}>
             {!data ? (
               <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
@@ -419,11 +554,55 @@ export default function AgendaCheckpointPage() {
               <button className="wx-btn wx-btn-primary" onClick={onDone}><i className="bi bi-check2 me-1" /> Done</button>
             </div>
           </div>
-          {autofillMsg && <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '-4px 0 12px' }}>{autofillMsg}</div>}
+          <CheckpointReturnNotice checkpointId={cp?.id} status={status} />
+          {autofillMsg && (
+            <div className="ck-autofill-banner">
+              <i className="bi bi-magic" />
+              <span style={{ flex: 1, minWidth: 0 }}>{autofillMsg}</span>
+              <button type="button" className="ck-autofill-x" onClick={() => setAutofillMsg('')} aria-label="Dismiss"><i className="bi bi-x-lg" /></button>
+            </div>
+          )}
           {data ? <CheckpointForm data={data} setData={setData} /> : (
             <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
           )}
         </>
+      )}
+
+      {/* ─────────── non-dismissable auto-fill / create overlay ─────────── */}
+      {creating && createStage && (
+        <div className="ck-overlay">
+          <div className="ck-overlay-card">
+            <div className="ck-overlay-spinner"><span className="wx-spinner" /></div>
+            <div className="ck-overlay-title">Preparing {brandName || 'the'} checkpoint</div>
+            <div className="ck-overlay-stage">{createStage.label || 'Working…'}</div>
+            <div className="ck-overlay-bar"><div className="ck-overlay-bar-fill" style={{ width: `${Math.max(6, Math.min(100, createStage.pct || 0))}%` }} /></div>
+            <div className="ck-overlay-note">Pulling in your weekly report{selectedBrand?.euka_store_id ? ' and Euka data' : ''} and auto-filling. Please don't close this window.</div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────── return-with-note modal ─────────── */}
+      {returnOpen && (
+        <div className="ck-overlay" onClick={() => !wfBusy && setReturnOpen(false)}>
+          <div className="ck-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ck-modal-title">
+              <i className="bi bi-arrow-counterclockwise" style={{ color: 'var(--danger)' }} />
+              Return {status === 'verified' ? 'to Team Lead' : 'to APC'}
+            </div>
+            <p className="ck-modal-sub">
+              Explain what needs to change. This note is shown to {status === 'verified' ? 'the Team Lead' : 'the APC'} on their checkpoint and sent as a notification.
+            </p>
+            <textarea className="wx-input" rows={4} autoFocus value={returnNote}
+              onChange={(e) => setReturnNote(e.target.value)} placeholder="e.g. GMV Max spend looks off vs. the report — please double-check the paid section." />
+            {wfErr && <div className="wx-alert wx-alert-danger" style={{ marginTop: 10 }}><AlertIcon width="15" height="15" /> <span>{wfErr}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button className="wx-btn wx-btn-ghost" disabled={!!wfBusy} onClick={() => setReturnOpen(false)}>Cancel</button>
+              <button className="wx-btn wx-btn-primary" style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={!!wfBusy || !returnNote.trim()} onClick={doReturn}>
+                {wfBusy === 'return' ? <><span className="wx-spinner" /> Returning…</> : <>Return checkpoint</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

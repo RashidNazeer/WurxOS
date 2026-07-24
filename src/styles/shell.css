@@ -519,18 +519,19 @@
 .shell-user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .shell-user-role { font-size: 11px; color: var(--text-muted); }
 
-/* User dropdown */
+/* User dropdown — portaled to <body> (Topbar.jsx) so it escapes the topbar's
+   z-index:5 stacking context and always paints above sticky page toolbars
+   (.ck-topbar, reports header, …). `top`/`right` are set inline from the
+   trigger's measured rect; position is fixed to the viewport. */
 .shell-user-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
+  position: fixed;
   min-width: 220px;
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: 6px;
-  z-index: 50;
+  z-index: 1200;
   animation: shell-pop 0.15s var(--ease-out);
 }
 @keyframes shell-pop {

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,15 +15,41 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [installable, setInstallable] = useState(canInstall());
-  const ref = useRef(null);
+  const [pos, setPos] = useState(null);     // portal anchor {top, right}
+  const ref = useRef(null);                  // the trigger button wrapper
+  const menuRef = useRef(null);              // the portaled menu
 
+  // Outside-click closes the menu. The menu is portaled to <body>, so it is NOT
+  // inside `ref` — check both the trigger and the menu.
   useEffect(() => {
     function onDoc(e) {
-      if (ref.current && !ref.current.contains(e.target)) setMenuOpen(false);
+      if (ref.current && ref.current.contains(e.target)) return;
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      setMenuOpen(false);
     }
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
+
+  // Anchor the portaled menu under the trigger; the profile dropdown is portaled
+  // (like NotificationBell/GlobalSearch) so it escapes the topbar's z-index:5
+  // stacking context and never renders under sticky page toolbars (.ck-topbar etc.).
+  useLayoutEffect(() => {
+    if (!menuOpen) return undefined;
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [menuOpen]);
 
   useEffect(() => onInstallAvailable(setInstallable), []);
 
@@ -75,8 +102,8 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
             </div>
             <ChevronDownIcon width="15" height="15" style={{ color: 'var(--text-muted)' }} />
           </button>
-          {menuOpen && (
-            <div className="shell-user-menu">
+          {menuOpen && pos && createPortal(
+            <div className="shell-user-menu" ref={menuRef} style={{ top: pos.top, right: pos.right }}>
               <div style={{ padding: '10px 12px' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {profile?.display_name}
@@ -110,7 +137,8 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
                 <LogoutIcon width="16" height="16" />
                 Sign out
               </button>
-            </div>
+            </div>,
+            document.body,
           )}
         </div>
       </div>

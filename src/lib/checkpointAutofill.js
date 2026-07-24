@@ -56,15 +56,18 @@ export async function fetchEukaCheckpoint(brandId, startDate, endDate) {
 
 /**
  * Build the auto-fill patch for one checkpoint week.
+ * @param onStage optional ({label, pct}) progress callback for the create overlay.
  * @returns { scalars:{path:string}, arrays:{path:any[]}, meta }
  */
-export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
+export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage }) {
+  const stage = (label, pct) => { try { onStage?.({ label, pct }); } catch { /* ignore */ } };
   const scalars = {};
   const arrays = {};
   const meta = { reportFound: false, reportN2Found: false, eukaTried: false, eukaOk: false, eukaError: null, eukaStages: null, filled: 0 };
   const set = (path, v) => { const val = asStr(v); if (val !== null) { scalars[path] = val; meta.filled++; } };
 
   // ── weekly reports (this week + N-2) ───────────────────────────────
+  stage('Reading weekly report…', 40);
   let reports = [];
   try { reports = await getReportsForBrand(brandId); } catch { reports = []; }
   const byStart = (ps) => reports.find((r) => r.weekStart === ps) || null;
@@ -136,6 +139,7 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
   // ── Euka (only when the brand is on Euka) — target invites + opted in ──
   if (brand?.euka_store_id) {
     meta.eukaTried = true;
+    stage('Fetching Euka data…', 70);
     try {
       const euka = await fetchEukaCheckpoint(brandId, weekStart, addDaysISO(weekStart, 6));
       if (euka.targetInvites != null) set('funnel.targetInvites', euka.targetInvites);
@@ -145,6 +149,7 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand }) {
     } catch (e) { meta.eukaError = e?.message || String(e); }
   }
 
+  stage('Finishing up…', 90);
   return { scalars, arrays, meta };
 }
 
