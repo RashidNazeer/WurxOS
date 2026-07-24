@@ -9,6 +9,7 @@ import {
   num, findPreviousMonthlyReport,
 } from '../../utils/monthlyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { deductPrompt } from '../../lib/tlPerfApi';
 import MonthlyReportForm from './MonthlyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import MonthlyReportView from './MonthlyReportView';
@@ -268,6 +269,7 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'tl', note: note.trim() });
+      try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
     } catch (err) { alert('Failed: ' + err.message); }
   };
 
@@ -312,6 +314,7 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'tl', note: note.trim(), isReopen: true });
+      try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
     } catch (err) { alert('Failed to reopen: ' + err.message); }
   };
 

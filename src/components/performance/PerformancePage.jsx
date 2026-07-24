@@ -17,7 +17,11 @@ import {
 import {
   listPendingApcRatings, getWeeklyRatingsEnabled, setWeeklyRatingsEnabled,
 } from '../../lib/weeklyRatingsApi';
+import {
+  getTlPerfEnabled, setTlPerfEnabled, listTlReporting, tlPerfPreview,
+} from '../../lib/tlPerfApi';
 import WeeklyBreakdownModal from './WeeklyBreakdownModal';
+import TlPerfBreakdownModal from './TlPerfBreakdownModal';
 import { karachiMonth } from '../../lib/serverTime';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -839,9 +843,30 @@ function PillarBar({ pillar, score, weight, detail }) {
 // key events only — no raw dumps. Each block knows how to handle
 // missing data ("Not rated yet", "No incentives", etc.).
 function PillarDetail({ pillarKey, ctx }) {
-  const { myRecord, myIncRecord, myAttendanceDays, myFlags, month } = ctx;
+  const { myRecord, myIncRecord, myAttendanceDays, myFlags, month, effectiveRole, tlLive, myTlPreview } = ctx;
 
   if (pillarKey === 'performance') {
+    // Team Leads under the live method: the pillar is auto-derived (team + reporting),
+    // not the old 5-metric OL rating — show that instead of the metric sliders.
+    if (effectiveRole === 'tl' && tlLive) {
+      const p = myTlPreview;
+      if (!p || p.blended == null) {
+        return (
+          <div className="text-muted small">
+            Auto-derived from your team’s composites and your reporting — it appears once your
+            APCs are rated and reports are verified.
+          </div>
+        );
+      }
+      return (
+        <div className="d-flex flex-column gap-1" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          <div className="text-muted" style={{ fontSize: '0.68rem' }}>Auto-derived: 0.6 × team score + 0.4 × reporting.</div>
+          <div className="d-flex justify-content-between"><span>Team score (avg of your APCs)</span><strong>{p.team == null ? '—' : Math.round(p.team)}/100</strong></div>
+          <div className="d-flex justify-content-between"><span>Reporting ({p.n || 0} verified · {Number(p.deductions || 0)} docked)</span><strong>{p.reporting == null ? '—' : Math.round(p.reporting)}/100</strong></div>
+          <div className="d-flex justify-content-between pt-1" style={{ borderTop: '1px dashed var(--border-subtle)' }}><span className="fw-semibold">Performance pillar</span><strong>{p.blended}/100</strong></div>
+        </div>
+      );
+    }
     const metrics = myRecord?.metrics || null;
     if (!metrics) {
       return (
@@ -1141,6 +1166,32 @@ export default function PerformancePage() {
     return () => { cancelled = true; };
   }, [month, isBoss, effectiveRole, weeklyCfg.enabled]);
 
+  // Team-Lead performance method (migs 271/272): the switch, per-TL reporting
+  // scores (boss/ol), the breakdown-modal target, and the viewer's own preview.
+  const [tlCfg, setTlCfg]             = useState({ enabled: false, since: null });
+  const [tlReporting, setTlReporting] = useState({});
+  const [tlTarget, setTlTarget]       = useState(null);
+  const [tlSwitchBusy, setTlSwitchBusy] = useState(false);
+  const [myTlPreview, setMyTlPreview] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTlPerfEnabled().then((s) => { if (!cancelled) setTlCfg(s); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (!(isBoss || effectiveRole === 'ol')) { setTlReporting({}); return undefined; }
+    let cancelled = false;
+    listTlReporting(month).then((m) => { if (!cancelled) setTlReporting(m || {}); }).catch(() => { if (!cancelled) setTlReporting({}); });
+    return () => { cancelled = true; };
+  }, [month, isBoss, effectiveRole]);
+  useEffect(() => {
+    if (effectiveRole !== 'tl' || !currentUser?.uid) { setMyTlPreview(null); return undefined; }
+    let cancelled = false;
+    tlPerfPreview(currentUser.uid, month).then((p) => { if (!cancelled) setMyTlPreview(p); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [effectiveRole, month]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Load ──
   useEffect(() => {
     // Stale-response guard: on a flaky connection a month switch can let the
@@ -1319,11 +1370,60 @@ export default function PerformancePage() {
     return t;
   }, [isBoss, effectiveRole]);
 
+  // TL method is "live" for the selected month once the Boss switch is ON and the
+  // month is >= the launch floor (mirrors the SQL gate in get_performance_composite).
+  const tlSince = tlCfg.since ? String(tlCfg.since).slice(0, 7) : '2026-08';
+  const tlLive = tlCfg.enabled && month >= tlSince;
+
+  // Effective composite for EVERY loaded user (null when not-rated / pending /
+  // attendance-failed) — the APC composites a TL's team score averages. Mirrors
+  // get_performance_composite's composite_score domain.
+  const baseCompositeById = useMemo(() => {
+    const m = {};
+    for (const u of teamUsers) {
+      const rec = teamRecords[u.id];
+      const perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
+      if (perfScore === null || attError || isIncPending(teamIncentives[u.id])) { m[u.id] = null; continue; }
+      const incScore = calcIncentiveScore(teamIncentives[u.id]);
+      const attScore = attendanceScoreFrom(teamAttendance[u.id] || null);
+      const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
+      m[u.id] = calcComposite({ performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore }, weights);
+    }
+    return m;
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, month, weights, attError]);
+
+  // Per-TL blended pillar = round(0.6×team + 0.4×reporting). Always computed (the
+  // preview); it becomes the OFFICIAL perf pillar for TL rows when tlLive.
+  const tlBlendById = useMemo(() => {
+    const m = {};
+    if (attError) return m; // attendance failed → refuse a blend (bar shows "—", like the composite)
+    for (const u of teamUsers) {
+      if ((u.role || u.userRole) !== 'tl') continue;
+      const comps = teamUsers
+        .filter((a) => (a.role || a.userRole) === 'apc' && (a.reportsTo || a.reports_to) === u.id)
+        .map((a) => baseCompositeById[a.id]).filter((v) => v != null);
+      const team = comps.length ? comps.reduce((x, y) => x + y, 0) / comps.length : null;
+      const repRaw = tlReporting[u.id]?.reporting_score;
+      const rep = repRaw == null ? null : Number(repRaw);
+      m[u.id] = (team != null && rep != null) ? Math.round(0.6 * team + 0.4 * rep)
+        : team != null ? Math.round(team) : rep != null ? Math.round(rep) : null;
+    }
+    return m;
+  }, [teamUsers, baseCompositeById, tlReporting, attError]);
+
   const filteredTeam = useMemo(() => {
     let list = teamUsers.filter(u => u._tab === teamSubTab).map(u => {
       const name = u.displayName || u.userName || u.email || '—';
-      const rec = teamRecords[u.id];
-      const perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
+      const isTlRow = (u.role || u.userRole) === 'tl';
+      const tlBlend = isTlRow ? (tlBlendById[u.id] ?? null) : null;
+      let rec = teamRecords[u.id];
+      let perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
+      // When the TL method is live, the TL's perf pillar IS the blend (and the row
+      // counts as "rated" via a synthetic rec even without an old OL rating).
+      if (isTlRow && tlLive) {
+        perfScore = tlBlend;
+        rec = tlBlend == null ? null : (rec || { tl_derived: true });
+      }
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attData = teamAttendance[u.id] || null;
       const wd = attData ? attData.daysThisMonth : 0;
@@ -1339,7 +1439,7 @@ export default function PerformancePage() {
       // so the "apcs" tab — which holds both APCs (TL view) and IPCs
       // (PCTL view) — gates each row by who can actually rate it.
       const canEdit = canRate(effectiveRole, u.role || u.userRole || 'apc');
-      return { ...u, name, rec, perfScore, incScore, attScore, flagScore, pillarScores, composite, incPending, gCount, rCount, wCount, canEdit, attData, workingDays: wd };
+      return { ...u, name, rec, perfScore, incScore, attScore, flagScore, pillarScores, composite, incPending, gCount, rCount, wCount, canEdit, attData, workingDays: wd, tlBlend, isTlRow };
     });
     if (search) { const s = search.toLowerCase(); list = list.filter(u => u.name.toLowerCase().includes(s)); }
     if (levelFilter !== 'all') {
@@ -1353,15 +1453,18 @@ export default function PerformancePage() {
         && getLevel(u.composite).label.toLowerCase() === levelFilter);
     }
     return list;
-  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError]);
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError, tlBlendById, tlLive]);
 
   // The attendance pillar failed to load → calcComposite silently re-weights
   // over the remaining pillars. Refuse to show a composite rather than show a
   // plausible-looking wrong one.
   const compositeOk = !attError;
 
-  // My pillar scores
-  const myPerfScore = myRecord ? calcMetricsAvg(myRecord.metrics) : null;
+  // My pillar scores. A TL viewing themselves under the live method sees the
+  // blended pillar (team + reporting) instead of the old OL rating.
+  const myPerfScore = (effectiveRole === 'tl' && tlLive)
+    ? (myTlPreview?.blended ?? null)
+    : (myRecord ? calcMetricsAvg(myRecord.metrics) : null);
   const myIncScore  = calcIncentiveScore(myIncRecord);
   const myIncPending = isIncPending(myIncRecord);
   const myAttScore  = attendanceScoreFrom(myAttendanceDays);
@@ -1403,6 +1506,20 @@ export default function PerformancePage() {
       setWeeklyCfg((c) => ({ ...c, enabled: next }));
     } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
     finally { setSwitchBusy(false); }
+  }
+  async function toggleTlSwitch(next) {
+    if (!isBoss || tlSwitchBusy) return;
+    if (next && !window.confirm( // eslint-disable-line no-alert
+      'Go LIVE with the Team-Lead performance method?\n\n'
+      + 'Each TL’s performance pillar becomes 0.6 × their team’s score + 0.4 × reporting '
+      + '(this feeds the composite used for salary). You can switch back to Trial any time.'
+    )) return;
+    setTlSwitchBusy(true);
+    try {
+      await setTlPerfEnabled(next);
+      setTlCfg((c) => ({ ...c, enabled: next }));
+    } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
+    finally { setTlSwitchBusy(false); }
   }
   async function handleFlagAdded() {
     const flags = await listFlagsForUser(addFlagTarget.user.id);
@@ -1446,6 +1563,23 @@ export default function PerformancePage() {
                 ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} />
                 : <i className={`bi ${weeklyCfg.enabled ? 'bi-broadcast' : 'bi-flask'}`} />}
               Weekly APC ratings: {weeklyCfg.enabled ? 'Live' : 'Trial'}
+            </button>
+          )}
+          {isBoss && (
+            <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+              style={{
+                borderRadius: 8, fontSize: '0.74rem', fontWeight: 700,
+                background: tlCfg.enabled ? 'var(--success-soft)' : 'var(--warning-soft)',
+                color: tlCfg.enabled ? 'var(--success)' : 'var(--warning)',
+                border: `1px solid color-mix(in srgb, ${tlCfg.enabled ? 'var(--success)' : 'var(--warning)'} 35%, transparent)`,
+              }}
+              disabled={tlSwitchBusy}
+              onClick={() => toggleTlSwitch(!tlCfg.enabled)}
+              title="Team-Lead performance — Trial: the new team+reporting blend is previewed without affecting scores. Live: the blend becomes the official TL performance pillar.">
+              {tlSwitchBusy
+                ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} />
+                : <i className={`bi ${tlCfg.enabled ? 'bi-broadcast' : 'bi-flask'}`} />}
+              TL performance: {tlCfg.enabled ? 'Live' : 'Trial'}
             </button>
           )}
           {isBoss && (
@@ -1600,7 +1734,7 @@ export default function PerformancePage() {
                 detail={
                   <PillarDetail
                     pillarKey={p.key}
-                    ctx={{ myRecord, myIncRecord, myAttendanceDays, myFlags, month }}
+                    ctx={{ myRecord, myIncRecord, myAttendanceDays, myFlags, month, effectiveRole, tlLive, myTlPreview }}
                   />
                 }
               />
@@ -1845,6 +1979,24 @@ export default function PerformancePage() {
                               title="Weekly performance ratings">
                               <i className="bi bi-bar-chart-fill" /> Weekly
                             </button>
+                          ) : (u.role || u.userRole) === 'tl' ? (
+                            // TLs: team + reporting breakdown. During Trial it's a preview and the
+                            // old-method manual Rate stays available; when Live it's the official pillar.
+                            <>
+                              {!tlLive && u.canEdit && (
+                                <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
+                                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
+                                  onClick={() => setRateTarget(u)}>
+                                  <i className="bi bi-pencil" /> Rate
+                                </button>
+                              )}
+                              <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
+                                style={{ background: tlLive ? 'var(--accent)' : 'var(--surface-1)', color: tlLive ? 'var(--on-accent)' : 'var(--text-secondary)', border: tlLive ? 'none' : '1.5px solid var(--border-subtle)', borderRadius: 8, fontSize: '0.72rem' }}
+                                onClick={() => setTlTarget(u)}
+                                title="Team + reporting performance breakdown">
+                                <i className="bi bi-diagram-3" /> {tlLive ? 'Performance' : 'Preview'}
+                              </button>
+                            </>
                           ) : u.canEdit ? (
                             <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
                               style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
@@ -1887,6 +2039,16 @@ export default function PerformancePage() {
           initialMeetingId={weeklyInitMeeting}
           onClose={() => { setWeeklyTarget(null); setWeeklyInitMeeting(null); }}
           onChanged={() => handleWeeklyChanged(weeklyTarget.id)}
+        />
+      )}
+      {tlTarget && (
+        <TlPerfBreakdownModal
+          tl={tlTarget}
+          month={month}
+          enabled={tlLive}
+          canManage={isBoss || effectiveRole === 'ol'}
+          onClose={() => setTlTarget(null)}
+          onChanged={() => { listTlReporting(month).then(setTlReporting).catch(() => {}); }}
         />
       )}
       {flagsTarget && <ViewFlagsModal

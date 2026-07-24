@@ -9,6 +9,7 @@ import {
 } from '../../utils/biWeeklyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
+import { deductPrompt } from '../../lib/tlPerfApi';
 import BiWeeklyReportForm from './BiWeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
@@ -311,6 +312,7 @@ export default function AllBiWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'biweekly', toRole: 'tl', note: note.trim() });
+      try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
     } catch (err) { alert('Failed to reject: ' + err.message); }
   };
 
@@ -359,6 +361,7 @@ export default function AllBiWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'biweekly', toRole: 'tl', note: note.trim(), isReopen: true });
+      try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
     } catch (err) { alert('Failed to reopen: ' + err.message); }
   };
 

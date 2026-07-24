@@ -9,6 +9,7 @@ import {
   REPORT_STATUSES, getReportStatus, updateReportStatus, deleteReport,
 } from '../../utils/reportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
+import { deductPrompt } from '../../lib/tlPerfApi';
 import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import WeeklyReportForm from './WeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
@@ -437,6 +438,7 @@ export default function AllWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'tl', note: note.trim() });
+      try { await deductPrompt(report.id); } catch { /* deduction is best-effort; the return already happened */ }
     } catch (err) { alert('Failed to reject: ' + err.message); }
   };
 
@@ -509,6 +511,7 @@ export default function AllWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'tl', note: note.trim(), isReopen: true });
+      try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
     } catch (err) { alert('Failed to reopen: ' + err.message); }
   };
 
