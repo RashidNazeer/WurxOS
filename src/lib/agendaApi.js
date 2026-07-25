@@ -684,6 +684,21 @@ export async function updateTlRemark(meetingId, { rating, remark }) {
   return data;
 }
 
+// OL — the TL's weekly REPORTING star rating (0–5, half-steps), stored on the
+// meeting. Feeds the TL performance pillar's reporting score (mig 276).
+export async function updateTlReportingStars(meetingId, stars) {
+  const { data: auth } = await supabase.auth.getUser();
+  const val = stars == null ? null : Math.max(0, Math.min(5, Number(stars)));
+  const { data, error } = await supabase
+    .from('agenda_meetings')
+    .update({ tl_reporting_stars: val, tl_reviewed_by: auth?.user?.id || null })
+    .eq('id', meetingId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // Realtime — every table the live room depends on, scoped to one meeting.
 export function subscribeAgendaRoom(meetingId, onChange) {
   const ch = supabase

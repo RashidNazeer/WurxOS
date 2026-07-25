@@ -31,6 +31,7 @@ async function main() {
   console.log(`Testing TL: ${tl.display_name} (${apcs.length} APCs), month ${M}`);
 
   let dedId = null;
+  let smId = null;
   try {
     // ── TEAM SCORE = avg of the TL's APCs' composites (skip null) ──
     const apcComps = [];
@@ -95,7 +96,19 @@ async function main() {
     const cFloor = await comp(tl.id, M);
     ok('FLOOR: month before tl_perf_since uses the OLD method even when ON',
       (oldPerf == null && cFloor.performance_score == null) || Number(cFloor.performance_score) === oldPerf, `floored=${cFloor.performance_score} old=${oldPerf}`);
+
+    // ── OL star rating blends into reporting: 0.6×stars + 0.4×accountability ──
+    // Throwaway July meeting (non-Monday week_start avoids colliding with a real one).
+    const { data: sm } = await sb.from('agenda_meetings')
+      .insert({ tl_id: tl.id, week_start: '2026-07-15', meeting_date: '2026-07-15', meeting_time: '10:00', status: 'completed', tl_reporting_stars: 4 })
+      .select('id').single();
+    smId = sm.id;
+    const pvS = await preview(tl.id, M);   // raw RPC row = snake_case columns
+    ok('star score = avg stars × 20 (4★ → 80)', near(pvS.star_score, 80) && near(pvS.star_avg, 4), `starScore=${pvS.star_score} avg=${pvS.star_avg}`);
+    const expRep = 0.6 * 80 + 0.4 * Number(pvS.accountability);
+    ok('reporting blends 0.6×stars + 0.4×accountability', near(pvS.reporting_score, expRep), `rep=${pvS.reporting_score} exp=${expRep} (acct=${pvS.accountability})`);
   } finally {
+    if (smId) await sb.from('agenda_meetings').delete().eq('id', smId);
     if (dedId) await sb.from('tl_reporting_deductions').delete().eq('id', dedId);
     await sb.from('tl_reporting_deductions').delete().eq('note', 'TEST');
     await setCfg(orig);

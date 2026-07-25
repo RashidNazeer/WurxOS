@@ -48,6 +48,9 @@ export async function tlPerfPreview(tlId, month) {
     n: r.reports_n,
     deductions: Number(r.deductions),
     blended: r.blended == null ? null : Number(r.blended),
+    starAvg: r.star_avg == null ? null : Number(r.star_avg),
+    starScore: r.star_score == null ? null : Number(r.star_score),
+    accountability: r.accountability == null ? null : Number(r.accountability),
   };
 }
 

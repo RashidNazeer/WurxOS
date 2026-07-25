@@ -102,12 +102,23 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
                 ))}
               </div>
 
-              {/* Reporting */}
+              {/* Reporting = 0.6 OL stars + 0.4 return accountability */}
               <div className="d-flex align-items-center justify-content-between mb-1">
                 <span className="fw-semibold" style={{ fontSize: '0.82rem' }}><i className="bi bi-file-earmark-check me-1 text-success" />Reporting score</span>
                 <span className="fw-bold" style={{ fontSize: '0.9rem' }}>{preview?.reporting == null ? '—' : `${Math.round(preview.reporting)}/100`}</span>
               </div>
-              <div className="text-muted mb-2" style={{ fontSize: '0.68rem' }}>
+              <div className="text-muted mb-2" style={{ fontSize: '0.66rem' }}>0.6 × OL star rating + 0.4 × return accountability</div>
+              <div className="d-flex flex-column gap-1 mb-2">
+                <div className="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.76rem' }}>
+                  <span><i className="bi bi-star-fill me-1" style={{ color: 'var(--warning)' }} />OL star rating (60%)</span>
+                  <span className="fw-semibold">{preview?.starAvg == null ? 'not rated' : `${preview.starAvg}★ · ${Math.round(preview.starScore)}/100`}</span>
+                </div>
+                <div className="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.76rem' }}>
+                  <span><i className="bi bi-arrow-counterclockwise me-1 text-muted" />Return accountability (40%)</span>
+                  <span className="fw-semibold">{preview?.accountability == null ? 'no reports' : `${Math.round(preview.accountability)}/100`}</span>
+                </div>
+              </div>
+              <div className="text-muted mb-2" style={{ fontSize: '0.66rem' }}>
                 {preview?.n || 0} report{(preview?.n || 0) === 1 ? '' : 's'} verified · {Number(preview?.deductions || 0)} mark{Number(preview?.deductions || 0) === 1 ? '' : 's'} deducted
               </div>
               {deds.length === 0 ? (

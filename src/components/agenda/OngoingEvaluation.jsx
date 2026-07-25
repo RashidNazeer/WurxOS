@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   listAgendaTasks, listTaskReviews, saveTaskReview,
-  updatePresentationReview, updateTlRemark,
+  updatePresentationReview, updateTlRemark, updateTlReportingStars,
 } from '../../lib/agendaApi';
 import { getWeeklyRatingsEnabled } from '../../lib/weeklyRatingsApi';
 import WeeklyRatingFields from '../performance/WeeklyRatingFields';
@@ -21,6 +21,27 @@ const RATINGS = [
 ];
 const STATUS_LABEL = { todo: 'To Do', in_progress: 'In Progress', completed: 'Completed' };
 function ratingMeta(v) { return RATINGS.find((r) => r[0] === v) || null; }
+
+// Half-star picker (0–5, 0.5 steps): left half of a star = x.5, right half = x.
+function StarRating({ value, onChange }) {
+  const v = Number(value) || 0;
+  return (
+    <div className="d-flex align-items-center gap-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span key={i} style={{ position: 'relative', display: 'inline-block', width: '1.15rem', height: '1.15rem', cursor: 'pointer' }}>
+          <i className={`bi ${v >= i ? 'bi-star-fill' : v >= i - 0.5 ? 'bi-star-half' : 'bi-star'}`}
+            style={{ color: 'var(--warning, #f59e0b)', fontSize: '1.15rem', position: 'absolute', inset: 0, lineHeight: 1 }} />
+          <span onClick={() => onChange(i - 0.5)} title={`${i - 0.5} stars`} style={{ position: 'absolute', left: 0, top: 0, width: '50%', height: '100%', zIndex: 1 }} />
+          <span onClick={() => onChange(i)} title={`${i} stars`} style={{ position: 'absolute', right: 0, top: 0, width: '50%', height: '100%', zIndex: 1 }} />
+        </span>
+      ))}
+      <span className="ms-1" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 700 }}>{v ? `${v}/5` : 'not rated'}</span>
+      {v > 0 && (
+        <button type="button" className="btn btn-sm p-0 px-1" style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }} onClick={() => onChange(null)} title="Clear">clear</button>
+      )}
+    </div>
+  );
+}
 
 function RatingPicker({ value, onPick }) {
   return (
@@ -126,15 +147,24 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
   // ── TL remarks — always visible, re-init only when the meeting changes.
   const [tlRating, setTlRating] = useState(meeting.tl_rating || '');
   const [tlRemark, setTlRemark] = useState(meeting.tl_remark || '');
+  const [tlStars, setTlStars]   = useState(meeting.tl_reporting_stars ?? null);
   const [tlSaved, setTlSaved]   = useState(false);
   useEffect(() => {
     setTlRating(meeting.tl_rating || '');
     setTlRemark(meeting.tl_remark || '');
+    setTlStars(meeting.tl_reporting_stars ?? null);
   }, [meeting.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveTl(next) {
     try {
       await updateTlRemark(meeting.id, { rating: next.rating, remark: next.remark });
+      setTlSaved(true); setTimeout(() => setTlSaved(false), 1800);
+    } catch (e) { /* eslint-disable-next-line no-console */ console.warn(e); }
+  }
+  async function saveStars(v) {
+    setTlStars(v);
+    try {
+      await updateTlReportingStars(meeting.id, v);
       setTlSaved(true); setTimeout(() => setTlSaved(false), 1800);
     } catch (e) { /* eslint-disable-next-line no-console */ console.warn(e); }
   }
@@ -283,6 +313,13 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                 <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
                   For {meeting.tl?.display_name || 'the Team Lead'} — editable any time during the meeting.
                 </p>
+                <div className="mb-2">
+                  <div className="text-muted mb-1 d-flex align-items-center gap-1" style={{ fontSize: '0.66rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Weekly reporting
+                    <i className="bi bi-info-circle" title="Rate the TL's reporting this week (0–5 stars). This is 60% of their reporting score; report returns are the other 40%." />
+                  </div>
+                  <StarRating value={tlStars} onChange={saveStars} />
+                </div>
                 <RatingPicker value={tlRating}
                   onPick={(v) => { setTlRating(v); saveTl({ rating: v, remark: tlRemark }); }} />
                 <textarea className="form-control form-control-sm mt-2" rows={4} style={{ borderRadius: 8, fontSize: '0.8rem' }}
