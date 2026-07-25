@@ -48,6 +48,9 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
 
   const blended = preview?.blended;
   const lvl = blended != null ? getLevel(blended) : null;
+  // The reporting score is a 60/40 blend only when BOTH components exist; if one
+  // is absent it collapses to the other (so don't show the fixed weights then).
+  const bothPresent = preview?.starScore != null && preview?.accountability != null;
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -107,14 +110,16 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
                 <span className="fw-semibold" style={{ fontSize: '0.82rem' }}><i className="bi bi-file-earmark-check me-1 text-success" />Reporting score</span>
                 <span className="fw-bold" style={{ fontSize: '0.9rem' }}>{preview?.reporting == null ? '—' : `${Math.round(preview.reporting)}/100`}</span>
               </div>
-              <div className="text-muted mb-2" style={{ fontSize: '0.66rem' }}>0.6 × OL star rating + 0.4 × return accountability</div>
+              <div className="text-muted mb-2" style={{ fontSize: '0.66rem' }}>
+                {bothPresent ? '0.6 × OL star rating + 0.4 × return accountability' : 'uses whichever component is available this month (the other is absent)'}
+              </div>
               <div className="d-flex flex-column gap-1 mb-2">
                 <div className="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.76rem' }}>
-                  <span><i className="bi bi-star-fill me-1" style={{ color: 'var(--warning)' }} />OL star rating (60%)</span>
-                  <span className="fw-semibold">{preview?.starAvg == null ? 'not rated' : `${preview.starAvg}★ · ${Math.round(preview.starScore)}/100`}</span>
+                  <span><i className="bi bi-star-fill me-1" style={{ color: 'var(--warning)' }} />OL star rating{bothPresent ? ' (60%)' : ''}</span>
+                  <span className="fw-semibold">{preview?.starAvg == null ? 'not rated' : `${Number(preview.starAvg).toFixed(1)}★ · ${Math.round(preview.starScore)}/100`}</span>
                 </div>
                 <div className="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.76rem' }}>
-                  <span><i className="bi bi-arrow-counterclockwise me-1 text-muted" />Return accountability (40%)</span>
+                  <span><i className="bi bi-arrow-counterclockwise me-1 text-muted" />Return accountability{bothPresent ? ' (40%)' : ''}</span>
                   <span className="fw-semibold">{preview?.accountability == null ? 'no reports' : `${Math.round(preview.accountability)}/100`}</span>
                 </div>
               </div>
