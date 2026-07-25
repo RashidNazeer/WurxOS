@@ -92,6 +92,25 @@ async function main() {
     ok('SWITCH ON (month ≥ floor): TL perf pillar = the blend', Number(cOn.performance_score) === expBlend, `on=${cOn.performance_score} blend=${expBlend}`);
     ok('PARITY: SQL blend == JS blend (round(0.6*team+0.4*rep))', Number(cOn.performance_score) === expBlend);
 
+    // ── FULL COMPOSITE parity for the TL (page-style composition vs SQL, live) ──
+    // Reproduce PerformancePage calcComposite over the SQL-returned pillars (drop
+    // null incentives, weighted mean, Math.round) and compare to the SQL composite.
+    if (cOn.composite_score != null) {
+      const { data: cfg } = await sb.from('performance_config').select('weight_performance, weight_incentives, weight_attendance, weight_flags').eq('id', 1).single();
+      const pillars = [
+        [Number(cOn.performance_score), Number(cfg.weight_performance)],
+        cOn.incentives_score == null ? null : [Number(cOn.incentives_score), Number(cfg.weight_incentives)],
+        [Number(cOn.attendance_score), Number(cfg.weight_attendance)],
+        [Number(cOn.flags_score), Number(cfg.weight_flags)],
+      ].filter(Boolean);
+      const numr = pillars.reduce((a, [s, w]) => a + s * w, 0);
+      const denr = pillars.reduce((a, [, w]) => a + w, 0);
+      const jsComposite = denr > 0 ? Math.round(numr / denr) : 0;
+      ok('FULL COMPOSITE PARITY: JS-page composition == SQL composite (TL, live)', Number(cOn.composite_score) === jsComposite, `js=${jsComposite} sql=${cOn.composite_score}`);
+    } else {
+      ok('FULL COMPOSITE PARITY: skipped — TL composite null (not rated / pending verify)', true);
+    }
+
     await setCfg({ tl_perf_since: '2099-01-01' }); // floor ABOVE M → M is pre-launch
     const cFloor = await comp(tl.id, M);
     ok('FLOOR: month before tl_perf_since uses the OLD method even when ON',

@@ -4,7 +4,7 @@ import {
   listApcMeetingsForMonth, listWeeklyRatingsForApcMonth,
   averageWeeklyMetrics, weeklyOverall,
 } from '../../lib/weeklyRatingsApi';
-import { getLevel } from '../../lib/performanceApi';
+import { getLevelTokens } from '../../lib/performanceApi';
 import { karachiYmd } from '../../lib/serverTime';
 import WeeklyRatingFields from './WeeklyRatingFields';
 
@@ -50,7 +50,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
     if (!ratings.length) return null;
     return weeklyOverall(averageWeeklyMetrics(ratings));
   }, [ratings]);
-  const lvl = projected != null ? getLevel(projected) : null;
+  const lvl = projected != null ? getLevelTokens(projected) : null;
 
   // Refresh only the ratings (not the whole meeting list) so autosaving a slider
   // doesn't remount the open editor behind the "Loading weeks…" spinner.
@@ -106,7 +106,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
                 const rated = !!r;
                 const upcoming = m.meeting_date > today;
                 const ov = rated ? weeklyOverall(r.metrics) : null;
-                const rlvl = ov != null ? getLevel(ov) : null;
+                const rlvl = ov != null ? getLevelTokens(ov) : null;
                 const isOpen = openId === m.id;
                 return (
                   <div key={m.id} className="rounded-3" style={{ border: '1px solid var(--border-subtle)' }}>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { getCompositeFor, getLevel } from '../../lib/performanceApi';
+import { getCompositeFor, getLevelTokens } from '../../lib/performanceApi';
 import { tlPerfPreview, listTlDeductions, tlReportDeductRemove } from '../../lib/tlPerfApi';
 
 // How a Team Lead's performance pillar is built: 60% team score (average of the
@@ -47,7 +47,7 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
   }
 
   const blended = preview?.blended;
-  const lvl = blended != null ? getLevel(blended) : null;
+  const lvl = blended != null ? getLevelTokens(blended) : null;
   // The reporting score is a 60/40 blend only when BOTH components exist; if one
   // is absent it collapses to the other (so don't show the fixed weights then).
   const bothPresent = preview?.starScore != null && preview?.accountability != null;
@@ -100,7 +100,7 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
                 ) : apcs.map((a) => (
                   <div key={a.id} className="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.76rem' }}>
                     <span>{a.name}</span>
-                    <span className="fw-semibold" style={{ color: a.composite == null ? 'var(--text-muted)' : getLevel(a.composite).color }}>{a.composite == null ? 'Not rated' : `${Math.round(a.composite)}/100`}</span>
+                    <span className="fw-semibold" style={{ color: a.composite == null ? 'var(--text-muted)' : getLevelTokens(a.composite).color }}>{a.composite == null ? 'Not rated' : `${Math.round(a.composite)}/100`}</span>
                   </div>
                 ))}
               </div>

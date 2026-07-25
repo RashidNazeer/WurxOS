@@ -54,15 +54,21 @@ export async function tlPerfPreview(tlId, month) {
   };
 }
 
-// The deduction rows behind a TL's reporting score, with report context.
+// The deduction rows behind a TL's reporting score, with report context. Uses an
+// RPC that lists on the SAME verified_at window the score uses (mig 278/L3), so
+// the modal's line-items match its "N marks deducted" total after a re-verify.
 export async function listTlDeductions(tlId, month) {
-  const { data, error } = await supabase
-    .from('tl_reporting_deductions')
-    .select('id, report_id, amount, note, created_at, decider:decided_by(display_name), report:report_id(period_label, type, brand:brand_id(brand_name))')
-    .eq('tl_id', tlId).eq('month', month)
-    .order('created_at', { ascending: false });
+  const { data, error } = await supabase.rpc('list_tl_deductions', { p_tl: tlId, p_month: month });
   if (error) throw new Error(error.message);
-  return data || [];
+  return (data || []).map((d) => ({
+    id: d.id,
+    report_id: d.report_id,
+    amount: Number(d.amount),
+    note: d.note,
+    created_at: d.created_at,
+    decider: { display_name: d.decided_by_name },
+    report: { period_label: d.period_label, brand: { brand_name: d.brand_name } },
+  }));
 }
 
 export async function tlReportDeduct(reportId, amount, note = null) {

@@ -3,7 +3,7 @@ import {
   WEEKLY_METRIC_KEYS, weeklyOverall, getWeeklyRating, saveWeeklyRating,
 } from '../../lib/weeklyRatingsApi';
 import { apcReturnChunks } from '../../lib/apcReportingApi';
-import { getLevel } from '../../lib/performanceApi';
+import { getLevelTokens } from '../../lib/performanceApi';
 
 // The 5-metric weekly performance rating (0–100 each), self-contained: loads the
 // existing rating for (apc, meeting), autosaves on change. Used in the live
@@ -59,7 +59,16 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
         const b = {}; WEEKLY_METRIC_KEYS.forEach((k) => { b[k] = 0; });
         setMetrics(b); setChunks({ report_score: 5, checkpoint_score: 5, report_deducted: 0, checkpoint_deducted: 0 }); setLoading(false);
       });
-    return () => { cancelled = true; if (timer.current) clearTimeout(timer.current); };
+    return () => {
+      cancelled = true;
+      // Flush a pending debounced save so a fast unmount / presenter switch (the
+      // meeting advancing changes apcId) doesn't silently drop the OL's last edit.
+      if (timer.current) {
+        clearTimeout(timer.current); timer.current = null;
+        const cur = metricsRef.current;
+        if (cur) saveWeeklyRating(apcId, meetingId, { ...cur, reportingOl: cur.reporting }).catch(() => {});
+      }
+    };
   }, [apcId, meetingId]);
 
   function setMetric(k, v) {
@@ -69,6 +78,7 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
     setSaveState('saving');
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
+      timer.current = null; // debounce fired — no longer pending (cleanup won't re-flush)
       try {
         const cur = metricsRef.current;
         // Send reportingOl = the slider; the DB trigger folds in the chunks.
@@ -85,7 +95,7 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
     () => (metrics ? weeklyOverall({ ...metrics, reporting: effReporting }) : 0),
     [metrics, effReporting],
   );
-  const lvl = getLevel(overall);
+  const lvl = getLevelTokens(overall);
 
   if (loading || !metrics) {
     return <div className="text-muted small py-2"><span className="spinner-border spinner-border-sm me-2" />Loading rating…</div>;

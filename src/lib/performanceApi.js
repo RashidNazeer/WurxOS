@@ -187,6 +187,15 @@ export function getLevel(score) {
   return              { label: 'Termination',   color: '#dc3545', bg: '#fce4ec', icon: 'bi-x-octagon-fill' };
 }
 
+// Same bands as getLevel but with theme-aware CSS tokens, so pills in the modals
+// adapt to dark mode. getLevel keeps its v1 literal hex for callers that need it.
+export function getLevelTokens(score) {
+  if (score >= 90) return { label: 'Promotion',   color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-trophy-fill' };
+  if (score >= 70) return { label: 'Good',         color: 'var(--info, #0d6efd)', bg: 'color-mix(in srgb, var(--info, #0d6efd) 16%, transparent)', icon: 'bi-hand-thumbs-up-fill' };
+  if (score >= 50) return { label: 'Warning',      color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-exclamation-triangle' };
+  return              { label: 'Termination',   color: 'var(--danger)', bg: 'var(--danger-soft)', icon: 'bi-x-octagon-fill' };
+}
+
 export function calcMetricsAvg(metrics) {
   if (!metrics) return 0;
   // Sum in integer hundredths (metric values are ≤2dp once weekly rollups exist)
