@@ -292,7 +292,7 @@ const CheckpointDeck = forwardRef(function CheckpointDeck({ data }, ref) {
             delta={kpiDelta(data.samples.requestsReceived, data.samples.requestsPrev, 'up')} />
           <Stat label="Approved · this week" value={fmtInt(data.samples.approvedThisWeek)} small />
           <Stat label="MTD approved" value={fmtInt(data.samples.mtdApproved)} small />
-          <Stat label="Sample→video · N-2" value={data.samples.sampleToVideoN2 !== '' ? fmtPct(data.samples.sampleToVideoN2) : '—'} small />
+          <Stat label="Sample→video · N-2" value={postedPct !== null ? fmtPct(postedPct) : '—'} small />
         </div>
         <div className="ck-cols" style={{ gridTemplateColumns: '1fr 1.2fr' }}>
           <div className="ck-panel ck-panel--fill">

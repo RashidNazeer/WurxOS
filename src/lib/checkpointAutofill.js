@@ -4,7 +4,9 @@
 //
 // Sources, kept strictly separate (per the boss):
 //   • WEEKLY REPORT for the same week (and the N-2 week) — the exact numbers.
-//   • COMPUTED — sample→video N-2 = videos live ÷ approved(N-2).
+//   • DERIVED LIVE on the form + deck (NOT here): "Videos now live" is manual,
+//     and "Sample→video N-2" = videos now live ÷ approved(N-2). Neither is ever
+//     taken from this-week's videosPosted (that is not the N-2 cohort).
 //   • EUKA (only if the brand is on Euka) — funnel.targetInvites + funnel.optedIn.
 //   • "last week" columns come from CARRY-FORWARD at create (checkpointCarry),
 //     NOT here — the two mechanisms never overlap.
@@ -86,7 +88,10 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
 
     // §01 Affiliate funnel — recruit + produce
     set('funnel.approved', op.samplesApproved);
-    set('funnel.videosLive', op.videosPosted);
+    // "Videos now live" is MANUAL — it's the videos posted by the creators we
+    // approved in Wk N-2 (the cohort), which is NOT the weekly report's
+    // this-week videosPosted. So we don't auto-fill it; the APC enters it
+    // (the form shows a hint referencing the Wk N-2 approved count).
 
     // §04 Performance snapshot — THIS-WEEK values (last-week from carry-forward).
     // Cost/order comes from the report: GMV Max spend ÷ GMV Max orders (the same
@@ -130,11 +135,11 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
     }
   }
 
-  // §1 Produce — Approved · Wk N-2, and §05 sample→video N-2 (needs both weeks)
+  // §1 Produce — Approved · Wk N-2 (from the N-2 weekly report). "Sample→video
+  // N-2" is NOT auto-filled: it equals Videos now live ÷ Approved · Wk N-2, and
+  // the form + deck derive it live from those two fields (never from this-week's
+  // videosPosted, which is not the N-2 cohort).
   if (n2) set('funnel.approvedN2', n2.overallPerformance?.samplesApproved);
-  const vLive = asNum(wk?.overallPerformance?.videosPosted);
-  const app2 = asNum(n2?.overallPerformance?.samplesApproved);
-  if (vLive != null && app2) set('samples.sampleToVideoN2', round((vLive / app2) * 100, 1));
 
   // ── Euka (only when the brand is on Euka) — target invites + opted in ──
   if (brand?.euka_store_id) {

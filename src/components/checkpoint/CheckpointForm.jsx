@@ -61,7 +61,13 @@ export default function CheckpointForm({ data, setData }) {
         <SubLabel>Produce — cohort approved ~2 wks ago</SubLabel>
         <Grid cols={3}>
           <Num label="Approved · Wk N-2" path="funnel.approvedN2" />
-          <Num label="Videos now live" path="funnel.videosLive" />
+          <Num label="Videos now live" path="funnel.videosLive"
+            hint={(d) => {
+              const n = d?.funnel?.approvedN2;
+              return (n === '' || n == null)
+                ? 'Videos those Wk N-2 approved creators have posted (enter manually)'
+                : `Videos those ${n} approved creators (Wk N-2) have posted`;
+            }} />
           <Num label="Affiliate orders" path="funnel.affiliateOrders" />
         </Grid>
       </Section>
@@ -129,7 +135,7 @@ export default function CheckpointForm({ data, setData }) {
           <Num label="MTD approved" path="samples.mtdApproved" />
         </Grid>
         <Grid cols={4}>
-          <Num label="Sample→video · N-2" path="samples.sampleToVideoN2" sfx="%" />
+          <SampleToVideoN2 />
         </Grid>
         <SubLabel>MTD approved · by tier</SubLabel>
         <Grid cols={5}>
@@ -307,8 +313,9 @@ export default function CheckpointForm({ data, setData }) {
 }
 
 // ── field primitives (module scope, context-fed) ────────────────────
-function Num({ label, path, sfx }) {
+function Num({ label, path, sfx, hint }) {
   const { data, set } = useContext(FieldCtx);
+  const hintText = typeof hint === 'function' ? hint(data) : hint;
   return (
     <label className="ck-field">
       <span className="wx-label">{label}</span>
@@ -318,9 +325,43 @@ function Num({ label, path, sfx }) {
           style={sfx ? { paddingRight: 34 } : undefined} />
         {sfx && <span className="ck-sfx">{sfx}</span>}
       </div>
+      {hintText && <span className="ck-hint">{hintText}</span>}
     </label>
   );
 }
+// A read-only field whose value is derived from other inputs, not typed.
+function Derived({ label, value, sfx, hint }) {
+  const shown = (value === '' || value == null) ? '' : value;
+  return (
+    <label className="ck-field">
+      <span className="wx-label">{label}</span>
+      <div style={{ position: 'relative' }}>
+        <input className="wx-input" value={shown} readOnly placeholder="—"
+          style={{ background: 'var(--surface-2, #f1f5f9)', cursor: 'default', ...(sfx ? { paddingRight: 34 } : null) }} />
+        {sfx && <span className="ck-sfx">{sfx}</span>}
+      </div>
+      {hint && <span className="ck-hint">{hint}</span>}
+    </label>
+  );
+}
+
+// "Sample→video · N-2" is a live ratio, not a typed number: it equals
+// "Videos now live" ÷ "Approved · Wk N-2" (the same N-2 cohort ratio the deck's
+// §01 shows). Derived read-only so it can never drift from those two fields, and
+// never sourced from this-week's videosPosted.
+function SampleToVideoN2() {
+  const { data } = useContext(FieldCtx);
+  const v = getIn(data, 'funnel.videosLive');
+  const a = getIn(data, 'funnel.approvedN2');
+  const vn = (v === '' || v == null) ? null : Number(v);
+  const an = (a === '' || a == null) ? null : Number(a);
+  const val = (vn != null && Number.isFinite(vn) && an) ? Math.round((vn / an) * 1000) / 10 : '';
+  const hint = (an && vn != null)
+    ? `Auto · ${vn} videos ÷ ${an} approved (Wk N-2)`
+    : 'Auto from Videos now live ÷ Approved · Wk N-2';
+  return <Derived label="Sample→video · N-2" value={val} sfx="%" hint={hint} />;
+}
+
 function Money({ label, path }) {
   const { data, set, sym } = useContext(FieldCtx);
   return (
