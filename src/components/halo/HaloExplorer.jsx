@@ -27,7 +27,7 @@ import {
 } from '../../lib/haloFields';
 import {
   buildBucketsFromSource, pairBuckets, correlationMatrix, overlaySeries,
-  directionSentence, corrColor, corrTextColor, fmtCorrPct, corrPct,
+  directionSentence, corrColor, corrTextColor, fmtCorrPct, corrPct, incrementalHalo,
 } from '../../lib/haloMath';
 
 const PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899', '#14b8a6'];
@@ -352,22 +352,22 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields, scope }) 
   // cross-side pair → a "move together NN%" line + a per-1,000 benchmark.
   const tk = fa?.group === 'tiktok' ? fa : fb?.group === 'tiktok' ? fb : null;
   const az = fa?.group === 'amazon' ? fa : fb?.group === 'amazon' ? fb : null;
-  const sumMetric = (key) => buckets.reduce((s, bkt) => { const v = bkt.metrics?.[key]; return v == null ? s : s + Number(v); }, 0);
-  const tkTotal = tk ? sumMetric(tk.key) : 0;
-  const azTotal = az ? sumMetric(az.key) : 0;
   const moneyPair = crossSide && tk && az && tk.fmt === 'money' && az.fmt === 'money' && tk.agg === 'sum' && az.agg === 'sum';
   const countPair = crossSide && tk && az && !moneyPair && tk.agg === 'sum' && az.agg === 'sum';
-  const mult = moneyPair && tkTotal > 0 ? azTotal / tkTotal : null;
-  const per1000 = countPair && tkTotal > 0 ? (azTotal * 1000) / tkTotal : null;
+  // INCREMENTAL halo: baseline = avg Amazon over the quietest third of periods by
+  // TikTok; lift = Amazon above that baseline across the range; credit the LIFT (not
+  // the total) to TikTok. perUnit = lift per $1 (money) or per 1,000 (count).
+  const inc = (moneyPair || countPair) ? incrementalHalo(buckets, tk.key, az.key) : null;
+  const perUnit = inc && inc.totalX > 0 ? (moneyPair ? inc.lift / inc.totalX : (inc.lift * 1000) / inc.totalX) : null;
   const tkName = tk ? `TikTok ${tk.label}` : '';
-  // Reflect an active product/keyword scope in the Amazon label, and warn that the
-  // TikTok side is NOT scoped (so a scoped ratio mixes one product/keyword's Amazon
-  // figure against total TikTok volume).
+  // Reflect an active product/keyword scope in the Amazon label, and note the TikTok
+  // side is NOT scoped (so a scoped result mixes one product/keyword's Amazon figure
+  // against total TikTok volume).
   const scopeKind = az?.key === REV ? 'product' : az?.key === KSV ? 'keyword' : null;
   const scopeVal = scopeKind === 'product' ? scope?.product : scopeKind === 'keyword' ? scope?.keyword : null;
   const azBase = az ? (az.label.toLowerCase().startsWith('amazon') ? az.label : `Amazon ${az.label}`) : '';
   const azName = azBase + (scopeVal ? ` (${scopeVal})` : '');
-  const scopeNote = scopeVal ? `Only the "${scopeVal}" ${scopeKind} is on the Amazon side; the TikTok side is the brand total, so this ratio mixes one ${scopeKind} against all TikTok activity.` : null;
+  const scopeNote = scopeVal ? `Only the "${scopeVal}" ${scopeKind} is on the Amazon side; the TikTok side is the brand total, so this mixes one ${scopeKind} against all TikTok activity.` : null;
 
   if (!fa || !fb) return <div className="wx-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No metrics available at this granularity.</div>;
 
@@ -380,7 +380,7 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields, scope }) 
           <FieldSelect value={b} onChange={setB} amazonFields={amazonFields} tiktokFields={tiktokFields} />
           <RBadge r={r} />
         </div>
-        <HaloStatement r={r} n={n} a={a} b={b} mult={mult} per1000={per1000} tk={tk} tkName={tkName} azName={azName} az={az} scopeNote={scopeNote} />
+        <HaloStatement r={r} n={n} a={a} b={b} kind={moneyPair ? 'money' : countPair ? 'count' : 'none'} inc={inc} perUnit={perUnit} gran={gran} tk={tk} tkName={tkName} azName={azName} az={az} scopeNote={scopeNote} />
 
         <div style={{ width: '100%', height: 420 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -420,7 +420,7 @@ function RBadge({ r }) {
 //  • money↔money  → dollar multiplier (Amazon $ ÷ TikTok $), shown as "N×" + "NN%".
 //  • other cross  → "move together NN%" + a per-1,000 benchmark.
 //  • same-side / averages / no-variation → the neutral direction sentence.
-function HaloStatement({ r, n, a, b, mult, per1000, tk, tkName, azName, az, scopeNote }) {
+function HaloStatement({ r, n, a, b, kind, inc, perUnit, gran, tk, tkName, azName, az, scopeNote }) {
   if (r == null) return <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{directionSentence(a, b, r, n)}</div>;
   const box = (children) => (
     <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>
@@ -431,44 +431,45 @@ function HaloStatement({ r, n, a, b, mult, per1000, tk, tkName, azName, az, scop
   const badge = (text) => (
     <span style={{ background: 'var(--surface-1, #f1f5f9)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: 999, padding: '3px 12px', fontWeight: 800, fontSize: 14 }}>{text}</span>
   );
-  if (mult != null) {
-    // Derive all three renderings ($X, N×, NN%) from ONE rounded value so they can
-    // never disagree at a rounding boundary.
-    const pct = Math.round(mult * 100);
-    const m = pct / 100;
-    return box(
-      <>
-        <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
-          For every <strong>{fmtValue(1, 'money')}</strong> of {tkName}, the brand did <strong>{fmtValue(m, 'money')}</strong> of {azName}.
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {badge(`${m}×`)}
-          {badge(`${pct}%`)}
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {fmtCorrPct(r)} correlation</span>
-        </div>
-        {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
-      </>,
-    );
-  }
-  if (per1000 != null) {
-    // "tends to rise together" is only true when the correlation is meaningful
-    // (>= 10%, the green line). At a low/0% correlation the per-1,000 figure is
-    // just an average ratio of the totals, NOT a day-to-day rise-together pattern.
-    const linked = corrPct(r) >= 10;
-    // The denominator is a MONEY total when the TikTok side is money, so show the
-    // currency ("$1,000 of TikTok GMV"), never a bare "1,000".
+  const per = UNIT[gran] || 'period';
+  if ((kind === 'money' || kind === 'count') && inc) {
+    const corr = <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {fmtCorrPct(r)} correlation</span>;
+    const hasLift = inc.lift > 0 && perUnit != null && perUnit > 0;
+    if (!hasLift) {
+      // Incremental method: Amazon didn't run above its quiet-period baseline, so
+      // there's no lift to credit to TikTok (typical when they don't move together).
+      return box(
+        <>
+          <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
+            No measurable lift in {azName} above its baseline over this range. {corr}
+          </div>
+          {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
+        </>,
+      );
+    }
+    if (kind === 'money') {
+      return box(
+        <>
+          <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
+            Above a baseline of about <strong>{fmtValue(inc.baseline, 'money')}</strong> {azName} per {per}, {tkName} is linked to about <strong>{fmtValue(inc.lift, 'money')}</strong> extra {azName} over this range.
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {badge(`${fmtValue(perUnit, 'money')} extra per ${fmtValue(1, 'money')}`)}
+            {corr}
+          </div>
+          {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
+        </>,
+      );
+    }
+    // count pair (TikTok cause vs an Amazon count effect)
     const denom = tk?.fmt === 'money' ? <>{fmtValue(1000, 'money')} of {tkName}</> : <>1,000 {tkName}</>;
     return box(
       <>
         <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
-          {linked
-            ? <>{tkName} and {azName} have <strong>{fmtCorrPct(r)}</strong> day-to-day correlation — when {tkName} rises, {azName} tends to rise too.</>
-            : <>{tkName} and {azName} have <strong>{fmtCorrPct(r)}</strong> day-to-day correlation over this range.</>}
+          Above a baseline of about <strong>{fmtValue(inc.baseline, az.fmt)}</strong> {azName} per {per}, {tkName} is linked to about <strong>{fmtValue(inc.lift, az.fmt)}</strong> extra {azName} over this range.
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          {linked
-            ? <>about <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(per1000, az.fmt)}</strong> of {azName} for every {denom} (average over this range).</>
-            : <>Across this range there was on average <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(per1000, az.fmt)}</strong> of {azName} per {denom} — an overall ratio, not a move-together pattern.</>}
+          about <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(perUnit, az.fmt)}</strong> extra {azName} per {denom} · {fmtCorrPct(r)} correlation
         </div>
         {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
       </>,
