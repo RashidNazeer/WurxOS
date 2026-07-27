@@ -132,25 +132,34 @@ export default function BrandsPage() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <select className="wx-input" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} style={{ maxWidth: 170 }} title="Filter by client">
-            <option value="">All clients</option>
-            {clientOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select className="wx-input" value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={{ maxWidth: 130 }} title="Filter by tier">
-            <option value="">All tiers</option>
-            {tierOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          {isBossOrOL && (
-            <select className="wx-input" value={tlFilter} onChange={(e) => setTlFilter(e.target.value)} style={{ maxWidth: 180 }} title="Filter by Team Lead">
-              <option value="">All Team Leads</option>
-              {tlOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          )}
-        </div>
+        <div className="wx-toolbar-spacer" />
         <button className="wx-btn wx-btn-ghost" onClick={() => refetch()} disabled={isFetching} title="Refresh">
           <RefreshIcon width="15" height="15" />
         </button>
+      </div>
+
+      {/* Filters on their own row so they line up instead of wrapping under search. */}
+      <div className="wx-toolbar" style={{ marginTop: -6 }}>
+        <select className="wx-input" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} style={{ width: 190 }} title="Filter by client">
+          <option value="">All clients</option>
+          {clientOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select className="wx-input" value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={{ width: 150 }} title="Filter by tier">
+          <option value="">All tiers</option>
+          {tierOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {isBossOrOL && (
+          <select className="wx-input" value={tlFilter} onChange={(e) => setTlFilter(e.target.value)} style={{ width: 190 }} title="Filter by Team Lead">
+            <option value="">All Team Leads</option>
+            {tlOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
+        {(clientFilter || tierFilter || tlFilter) && (
+          <button type="button" className="wx-btn wx-btn-ghost" style={{ padding: '7px 12px', fontSize: 13 }}
+            onClick={() => { setClientFilter(''); setTierFilter(''); setTlFilter(''); }}>
+            Clear filters
+          </button>
+        )}
       </div>
 
       {error && (
