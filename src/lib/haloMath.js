@@ -86,7 +86,8 @@ export function pearson(xs, ys) {
   }
   if (!(sxx > 0) || !(syy > 0)) return null;
   const r = sxy / Math.sqrt(sxx * syy);
-  return Number.isFinite(r) ? r : null;
+  if (!Number.isFinite(r)) return null;
+  return Math.max(0, r); // floor negatives to 0 — a halo effect can't be negative
 }
 
 /**
@@ -199,10 +200,9 @@ export function overlaySeries(buckets, keys) {
 
 export function strengthLabel(r) {
   if (r == null) return 'no data';
-  const a = Math.abs(r);
-  const strength = a >= 0.8 ? 'very strong' : a >= 0.6 ? 'strong' : a >= 0.4 ? 'moderate' : a >= 0.2 ? 'weak' : 'little/none';
-  if (a < 0.2) return strength;
-  return `${strength} ${r >= 0 ? 'positive' : 'negative'}`;
+  const a = Math.max(0, r); // r is floored to [0,1]; no negative direction to label
+  // "weak" starts at 10% to match the green colour threshold (< 10% reads as none).
+  return a >= 0.8 ? 'very strong' : a >= 0.6 ? 'strong' : a >= 0.4 ? 'moderate' : a >= 0.1 ? 'weak' : 'little/none';
 }
 
 export function directionSentence(fx, fy, r, n) {
@@ -212,18 +212,32 @@ export function directionSentence(fx, fy, r, n) {
   }
   const lx = FIELD_BY_KEY[fx]?.label || fx;
   const ly = FIELD_BY_KEY[fy]?.label || fy;
-  const a = Math.abs(r);
-  if (a < 0.2) return `No clear relationship between ${lx} and ${ly}${n ? ` (${n} points)` : ''}.`;
-  const dir = r >= 0 ? 'more' : 'less';
-  return `${strengthLabel(r)} (r = ${r.toFixed(2)}${n ? `, ${n} points` : ''}): higher ${lx} tends to go with ${dir} ${ly}.`;
+  const t = Math.max(0, r);
+  if (t < 0.1) return `No clear relationship between ${lx} and ${ly}${n ? ` (${n} points)` : ''}.`;
+  return `${strengthLabel(r)} (${Math.round(t * 100)}%${n ? `, ${n} points` : ''}): higher ${lx} tends to go with more ${ly}.`;
 }
 
-// r in [-1,1] -> a red↔neutral↔green colour for the heatmap.
+// r floored to [0,1] -> heatmap fill. Green ≥ 10%, orange below 10%, light red at
+// exactly 0% (includes anything that floored up from a negative r). Stronger = more saturated.
 export function corrColor(r) {
   if (r == null) return 'var(--surface-2, #2a2a33)';
-  const t = Math.max(-1, Math.min(1, r));
-  const alpha = 0.12 + Math.abs(t) * 0.7;
-  return t >= 0
-    ? `rgba(34, 197, 94, ${alpha.toFixed(3)})`
-    : `rgba(239, 68, 68, ${alpha.toFixed(3)})`;
+  const t = Math.max(0, Math.min(1, r));
+  if (t === 0) return 'rgba(239, 68, 68, 0.14)';
+  if (t < 0.10) return 'rgba(245, 158, 11, 0.20)';
+  return `rgba(34, 197, 94, ${(0.18 + t * 0.6).toFixed(3)})`;
+}
+
+// Text/emphasis colour matching corrColor's buckets.
+export function corrTextColor(r) {
+  if (r == null) return 'var(--text-muted)';
+  const t = Math.max(0, r);
+  if (t === 0) return '#ef4444';
+  if (t < 0.10) return '#f59e0b';
+  return '#22c55e';
+}
+
+// Correlation as a floored percentage string, e.g. 0.28 -> "28%"; null -> null.
+export function fmtCorrPct(r) {
+  if (r == null) return null;
+  return `${Math.round(Math.max(0, Math.min(1, r)) * 100)}%`;
 }

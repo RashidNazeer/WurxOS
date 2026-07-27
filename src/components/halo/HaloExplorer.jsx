@@ -27,7 +27,7 @@ import {
 } from '../../lib/haloFields';
 import {
   buildBucketsFromSource, pairBuckets, correlationMatrix, overlaySeries,
-  directionSentence, strengthLabel, corrColor,
+  directionSentence, strengthLabel, corrColor, corrTextColor, fmtCorrPct,
 } from '../../lib/haloMath';
 
 const PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899', '#14b8a6'];
@@ -333,7 +333,7 @@ function FieldSelect({ value, onChange, amazonFields, tiktokFields }) {
 // Compare
 // ============================================================
 function CompareView({ buckets, gran, lag, amazonFields, tiktokFields }) {
-  const dfltTt = tiktokFields.find((f) => f.key === 'video_per_day')?.key || tiktokFields[0]?.key || '';
+  const dfltTt = tiktokFields.find((f) => f.key === 'unique_impressions')?.key || tiktokFields[0]?.key || '';
   const dfltAz = amazonFields.find((f) => f.key === 'revenue_per_day')?.key || amazonFields[0]?.key || '';
   const availKeys = useMemo(() => new Set([...amazonFields, ...tiktokFields].map((f) => f.key)), [amazonFields, tiktokFields]);
   const [a, setA] = useState('');
@@ -346,6 +346,22 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields }) {
   const lineData = points.map((p) => ({ label: p.label, a: p.x, b: p.y }));
   const crossSide = fa?.group !== fb?.group;
 
+  // Halo statement (shown below the selectors). Money↔money cross pair → a dollar
+  // MULTIPLIER (Amazon $ ÷ TikTok $ over the range) crediting the whole Amazon
+  // figure to TikTok — the boss's method, shown as both "N×" and "NN%". Any other
+  // cross-side pair → a "move together NN%" line + a per-1,000 benchmark.
+  const tk = fa?.group === 'tiktok' ? fa : fb?.group === 'tiktok' ? fb : null;
+  const az = fa?.group === 'amazon' ? fa : fb?.group === 'amazon' ? fb : null;
+  const sumMetric = (key) => buckets.reduce((s, bkt) => { const v = bkt.metrics?.[key]; return v == null ? s : s + Number(v); }, 0);
+  const tkTotal = tk ? sumMetric(tk.key) : 0;
+  const azTotal = az ? sumMetric(az.key) : 0;
+  const moneyPair = crossSide && tk && az && tk.fmt === 'money' && az.fmt === 'money' && tk.agg === 'sum' && az.agg === 'sum';
+  const countPair = crossSide && tk && az && !moneyPair && tk.agg === 'sum' && az.agg === 'sum';
+  const mult = moneyPair && tkTotal > 0 ? azTotal / tkTotal : null;
+  const per1000 = countPair && tkTotal > 0 ? (azTotal * 1000) / tkTotal : null;
+  const tkName = tk ? `TikTok ${tk.label}` : '';
+  const azName = az ? (az.label.toLowerCase().startsWith('amazon') ? az.label : `Amazon ${az.label}`) : '';
+
   if (!fa || !fb) return <div className="wx-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No metrics available at this granularity.</div>;
 
   return (
@@ -357,7 +373,7 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields }) {
           <FieldSelect value={b} onChange={setB} amazonFields={amazonFields} tiktokFields={tiktokFields} />
           <RBadge r={r} />
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{directionSentence(a, b, r, n)}</div>
+        <HaloStatement r={r} n={n} a={a} b={b} mult={mult} per1000={per1000} tkName={tkName} azName={azName} az={az} />
 
         <div style={{ width: '100%', height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -402,20 +418,57 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields }) {
 }
 
 function RBadge({ r }) {
-  const a = r == null ? 0 : Math.abs(r);
-  let bg = 'var(--surface-2)', fg = 'var(--text-muted)';
-  if (r != null && r < 0) {
-    bg = a >= 0.6 ? 'rgba(239,68,68,.20)' : a >= 0.3 ? 'rgba(239,68,68,.14)' : 'rgba(239,68,68,.10)';
-    fg = '#ef4444';
-  } else if (r != null) {
-    bg = a >= 0.6 ? 'rgba(34,197,94,.18)' : a >= 0.3 ? 'rgba(245,158,11,.18)' : 'var(--surface-2)';
-    fg = a >= 0.6 ? '#22c55e' : a >= 0.3 ? '#f59e0b' : 'var(--text-muted)';
-  }
+  const fg = corrTextColor(r);
+  const bg = r == null ? 'var(--surface-2)' : `color-mix(in srgb, ${fg} 15%, transparent)`;
   return (
     <span style={{ background: bg, color: fg, borderRadius: 999, padding: '4px 12px', fontWeight: 700, fontSize: 13 }}>
-      r = {r == null ? '—' : r.toFixed(2)} · {strengthLabel(r)}
+      {fmtCorrPct(r) ?? '—'} · {strengthLabel(r)}
     </span>
   );
+}
+
+// The plain-English "halo" line under the Compare selectors.
+//  • money↔money  → dollar multiplier (Amazon $ ÷ TikTok $), shown as "N×" + "NN%".
+//  • other cross  → "move together NN%" + a per-1,000 benchmark.
+//  • same-side / averages / no-variation → the neutral direction sentence.
+function HaloStatement({ r, n, a, b, mult, per1000, tkName, azName, az }) {
+  if (r == null) return <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{directionSentence(a, b, r, n)}</div>;
+  const box = (children) => (
+    <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>
+  );
+  const badge = (text) => (
+    <span style={{ background: 'color-mix(in srgb, #22c55e 15%, transparent)', color: '#22c55e', borderRadius: 999, padding: '3px 12px', fontWeight: 800, fontSize: 14 }}>{text}</span>
+  );
+  if (mult != null) {
+    return box(
+      <>
+        <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
+          For every <strong>{fmtValue(1, 'money')}</strong> of {tkName}, the brand did <strong>{fmtValue(mult, 'money')}</strong> of {azName}.
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {badge(`${mult.toFixed(1)}×`)}
+          {badge(`${Math.round(mult * 100)}%`)}
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· they move together {fmtCorrPct(r)}</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          Credits all {azName} to {tkName} over this range (co-movement, not a proven cause).
+        </div>
+      </>,
+    );
+  }
+  if (per1000 != null) {
+    return box(
+      <>
+        <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
+          {tkName} and {azName} move together <strong>{fmtCorrPct(r)}</strong> — when {tkName} rises, {azName} tends to rise.
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          about <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(per1000, az.fmt)}</strong> of {azName} for every 1,000 {tkName}.
+        </div>
+      </>,
+    );
+  }
+  return <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{directionSentence(a, b, r, n)}</div>;
 }
 
 // ============================================================
@@ -434,7 +487,7 @@ function HeatmapView({ buckets, gran, lag, amazonFields, tiktokFields, allFields
     <div className="wx-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          Correlation (r) of each <strong>{full ? 'metric' : 'Amazon'}</strong> row against each column ({UNIT[gran]}ly). Green = positive, red = negative, stronger = more saturated.
+          Correlation of each <strong>{full ? 'metric' : 'Amazon'}</strong> row against each column ({UNIT[gran]}ly), shown as a percentage. Green ≥ 10%, orange below, light red at 0%. Stronger = more saturated.
         </div>
         <label style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Show all fields
@@ -458,9 +511,9 @@ function HeatmapView({ buckets, gran, lag, amazonFields, tiktokFields, allFields
                   const cell = matrix[i][j];
                   const same = rf.key === cf.key;
                   return (
-                    <td key={cf.key} title={`${rf.label} vs ${cf.label}: r=${cell.r == null ? 'n/a' : cell.r.toFixed(2)} (n=${cell.n})`}
-                      style={{ padding: '6px 8px', textAlign: 'center', minWidth: 46, background: same ? 'var(--surface-2)' : corrColor(cell.r), color: 'var(--text-primary)', fontWeight: cell.r != null && Math.abs(cell.r) >= 0.6 ? 700 : 400, borderRadius: 3 }}>
-                      {same ? '—' : cell.r == null ? '·' : cell.r.toFixed(2)}
+                    <td key={cf.key} title={`${rf.label} vs ${cf.label}: ${fmtCorrPct(cell.r) ?? 'n/a'} (n=${cell.n})`}
+                      style={{ padding: '6px 8px', textAlign: 'center', minWidth: 46, background: same ? 'var(--surface-2)' : corrColor(cell.r), color: 'var(--text-primary)', fontWeight: cell.r != null && cell.r >= 0.6 ? 700 : 400, borderRadius: 3 }}>
+                      {same ? '—' : (fmtCorrPct(cell.r) ?? '·')}
                     </td>
                   );
                 })}
@@ -591,14 +644,14 @@ function LagFinderView({ buckets, gran, amazonFields, tiktokFields }) {
                   {row.cells.map((c) => {
                     const isPeak = row.best && c.lag === row.best.lag;
                     return (
-                      <td key={c.lag} title={`${row.field.label} → ${amazonField?.label} @ lag ${c.lag} ${UNIT[gran]}: r=${c.r == null ? 'n/a' : c.r.toFixed(2)} (n=${c.n})`}
-                        style={{ padding: '5px 6px', textAlign: 'center', minWidth: 34, background: corrColor(c.r), color: 'var(--text-primary)', fontWeight: isPeak ? 800 : (c.r != null && Math.abs(c.r) >= 0.6 ? 700 : 400), outline: isPeak ? '2px solid var(--accent)' : 'none', outlineOffset: -2, borderRadius: 3 }}>
-                        {c.r == null ? '·' : c.r.toFixed(2)}
+                      <td key={c.lag} title={`${row.field.label} → ${amazonField?.label} @ lag ${c.lag} ${UNIT[gran]}: ${fmtCorrPct(c.r) ?? 'n/a'} (n=${c.n})`}
+                        style={{ padding: '5px 6px', textAlign: 'center', minWidth: 34, background: corrColor(c.r), color: 'var(--text-primary)', fontWeight: isPeak ? 800 : (c.r != null && c.r >= 0.6 ? 700 : 400), outline: isPeak ? '2px solid var(--accent)' : 'none', outlineOffset: -2, borderRadius: 3 }}>
+                        {fmtCorrPct(c.r) ?? '·'}
                       </td>
                     );
                   })}
                   <td style={{ padding: '4px 8px', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
-                    {row.best ? <>lag <strong style={{ color: 'var(--text-primary)' }}>{row.best.lag}{UNIT[gran][0]}</strong> · r <strong style={{ color: 'var(--text-primary)' }}>{row.best.r.toFixed(2)}</strong></> : '—'}
+                    {row.best ? <>lag <strong style={{ color: 'var(--text-primary)' }}>{row.best.lag}{UNIT[gran][0]}</strong> · <strong style={{ color: 'var(--text-primary)' }}>{fmtCorrPct(row.best.r)}</strong></> : '—'}
                   </td>
                 </tr>
               ))}
@@ -618,8 +671,8 @@ function LagFinderView({ buckets, gran, amazonFields, tiktokFields }) {
               <span style={{ width: 10, height: 10, borderRadius: 3, background: corrColor(s.r), flex: '0 0 auto', outline: '1px solid var(--border-subtle)' }} />
               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.field.label}</span>
               <span style={{ color: 'var(--text-muted)' }}>at <strong style={{ color: 'var(--text-primary)' }}>lag {unitLabel(gran, s.lag)}</strong></span>
-              <span style={{ marginLeft: 'auto', fontWeight: 700, color: s.r < 0 ? '#ef4444' : (s.r >= 0.3 ? '#22c55e' : 'var(--text-muted)') }}>
-                r = {s.r.toFixed(2)} · {strengthLabel(s.r)}
+              <span style={{ marginLeft: 'auto', fontWeight: 700, color: corrTextColor(s.r) }}>
+                {fmtCorrPct(s.r)} · {strengthLabel(s.r)}
               </span>
             </div>
           ))}

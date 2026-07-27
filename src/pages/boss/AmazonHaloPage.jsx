@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { parseHaloGranularitySheet } from '../../lib/haloParse';
 import { getHaloRows, createHaloDataset, deleteHaloDataset } from '../../lib/haloApi';
@@ -19,6 +20,7 @@ export default function AmazonHaloPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     setError('');
@@ -43,19 +45,27 @@ export default function AmazonHaloPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 40 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h1 className="page-title">Amazon Halo Effect</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '4px 0 0', maxWidth: 780 }}>
-            Per brand, upload up to three sheets — a <strong>daily</strong>, a <strong>weekly</strong> and a <strong>monthly</strong> one
-            (at least one). Each granularity's charts read its own sheet, falling back to rolling up the daily sheet when a
-            weekly/monthly one isn't uploaded. Enable brands and create client links in{' '}
-            <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
-          </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <h1 className="page-title" style={{ margin: 0 }}>Amazon Halo Effect</h1>
+          {!loading && brands.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Brand</span>
+              <select className="wx-input" style={{ maxWidth: 300, minWidth: 170 }} value={selectedBrandId || ''} onChange={(e) => setSelectedBrandId(e.target.value)}>
+                {brands.map((x) => (
+                  <option key={x.brand.id} value={x.brand.id}>
+                    {x.brand.brand_name}{['day', 'week', 'month'].filter((g) => x.datasets[g]).length ? '' : ' — no sheets yet'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setShareOpen(true)}>
-          <LinkIcon width="14" height="14" /> Client links
-        </button>
+        {!loading && brands.length > 0 && (
+          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setSettingsOpen(true)} title="Upload sheets and manage client links">
+            <i className="bi bi-gear" /> Manage
+          </button>
+        )}
       </div>
 
       {error && <div className="wx-alert wx-alert-danger"><span>{error}</span></div>}
@@ -67,50 +77,80 @@ export default function AmazonHaloPage() {
           No brands are enabled for Halo yet. Enable them in{' '}
           <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
         </div>
+      ) : brandDatasets.length ? (
+        <HaloExplorer key={selectedBrandId} datasets={brandDatasets} loadRows={loadRows} />
       ) : (
-        <>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Brand</span>
-            <select className="wx-input" style={{ maxWidth: 320 }} value={selectedBrandId || ''} onChange={(e) => setSelectedBrandId(e.target.value)}>
-              {brands.map((x) => (
-                <option key={x.brand.id} value={x.brand.id}>
-                  {x.brand.brand_name}{['day', 'week', 'month'].filter((g) => x.datasets[g]).length ? '' : ' — no sheets yet'}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selected && (
-            <div className="wx-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <strong style={{ fontSize: 13 }}>Sheets for {selected.brand.brand_name}</strong>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
-                {GRANS.map((g) => (
-                  <UploadSlot
-                    key={g.key}
-                    granularity={g.key}
-                    meta={g}
-                    brand={selected.brand}
-                    dataset={selected.datasets[g.key] || null}
-                    onDone={refresh}
-                    onDelete={() => selected.datasets[g.key] && handleDelete(selected.datasets[g.key].id, g.label.toLowerCase())}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {brandDatasets.length ? (
-            <HaloExplorer key={selectedBrandId} datasets={brandDatasets} loadRows={loadRows} />
-          ) : (
-            <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-              Upload at least one sheet above to explore this brand's Halo.
-            </div>
-          )}
-        </>
+        <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
+          No sheets for <strong>{selected?.brand?.brand_name}</strong> yet. Click <strong>Manage</strong> (top right) to upload a daily, weekly or monthly sheet.
+        </div>
       )}
 
+      {settingsOpen && selected && (
+        <HaloSettingsDrawer
+          selected={selected}
+          onClose={() => setSettingsOpen(false)}
+          onRefresh={refresh}
+          onDelete={handleDelete}
+          onOpenShare={() => setShareOpen(true)}
+        />
+      )}
       {shareOpen && <HaloShareModal brands={brands.map((x) => x.brand)} onClose={() => setShareOpen(false)} />}
     </div>
+  );
+}
+
+// ============================================================
+// Right-side drawer: per-brand sheet uploads + client-link management.
+// Keeps the main page to just the brand switcher + the explorer (gear opens this).
+// ============================================================
+function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShare }) {
+  const brand = selected.brand;
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 995 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} />
+      <div style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 'min(460px, 94vw)', background: 'var(--surface-1, #16161c)', borderLeft: '1px solid var(--border-default)', boxShadow: '-10px 0 40px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', flex: '0 0 auto' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Manage Halo</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{brand.brand_name}</div>
+          </div>
+          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Upload up to three sheets — a <strong>daily</strong>, a <strong>weekly</strong> and a <strong>monthly</strong> one (at least one).
+            Each granularity reads its own sheet, falling back to rolling up the daily sheet when a weekly/monthly one isn't uploaded.
+            Enable brands in <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }} onClick={onClose}>Settings → Amazon Halo</Link>.
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {GRANS.map((g) => (
+              <UploadSlot
+                key={g.key}
+                granularity={g.key}
+                meta={g}
+                brand={brand}
+                dataset={selected.datasets[g.key] || null}
+                onDone={onRefresh}
+                onDelete={() => selected.datasets[g.key] && onDelete(selected.datasets[g.key].id, g.label.toLowerCase())}
+              />
+            ))}
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Client links</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+              Create read-only links to share a brand's Halo with clients — no login needed.
+            </div>
+            <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onOpenShare}>
+              <LinkIcon width="14" height="14" /> Manage client links
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
