@@ -31,7 +31,14 @@ function setIn(obj, path, value) {
   return clone;
 }
 
-export default function CheckpointForm({ data, setData }) {
+export default function CheckpointForm({
+  data, setData,
+  // §09 Paid Collab is owned by the paid collab team. 'readonly' = the brand is on
+  // the team list → show their values + a Remind button; 'hidden' = not on the list
+  // → drop §09; 'edit' = legacy fallback (old editable inputs).
+  paidCollabMode = 'edit', paidCollabEntry = null,
+  onRemindPaidCollab, remindingPaidCollab, paidCollabRemindMsg,
+}) {
   const set = (path, value) => setData((d) => setIn(d, path, value));
   const addRow = (path, empty) => setData((d) => setIn(d, path, [...getIn(d, path), empty]));
   const removeRow = (path, i) => setData((d) => {
@@ -242,17 +249,26 @@ export default function CheckpointForm({ data, setData }) {
         </label>
       </Section>
 
-      <Section n={9} title="Paid Collab" accent="#db2777">
-        <Grid cols={3}>
-          <Num label="Creators onboarded" path="paidCollab.creatorsOnboarded" />
-          <Num label="Creators in pipeline" path="paidCollab.creatorsInPipeline" />
-          <Num label="Videos completed" path="paidCollab.videosCompleted" />
-          <Num label="Videos planned (total)" path="paidCollab.totalVideos" />
-          <Money label="Total budget" path="paidCollab.totalBudget" />
-          <Money label="Budget allocated" path="paidCollab.budgetAllocated" />
-        </Grid>
-        <Area label="Notes" path="paidCollab.notes" rows={2} />
-      </Section>
+      {paidCollabMode !== 'hidden' && (
+        <Section n={9} title="Paid Collab" accent="#db2777">
+          {paidCollabMode === 'readonly' ? (
+            <PaidCollabReadOnly entry={paidCollabEntry} sym={data.currency || '$'}
+              onRemind={onRemindPaidCollab} reminding={remindingPaidCollab} remindMsg={paidCollabRemindMsg} />
+          ) : (
+            <>
+              <Grid cols={3}>
+                <Num label="Creators onboarded" path="paidCollab.creatorsOnboarded" />
+                <Num label="Creators in pipeline" path="paidCollab.creatorsInPipeline" />
+                <Num label="Videos completed" path="paidCollab.videosCompleted" />
+                <Num label="Videos planned (total)" path="paidCollab.totalVideos" />
+                <Money label="Total budget" path="paidCollab.totalBudget" />
+                <Money label="Budget allocated" path="paidCollab.budgetAllocated" />
+              </Grid>
+              <Area label="Notes" path="paidCollab.notes" rows={2} />
+            </>
+          )}
+        </Section>
+      )}
 
       <Section n={10} title="Research & suggestions" accent="#0d9488">
         <SubLabel>New research / findings</SubLabel>
@@ -456,4 +472,57 @@ function RowEditor({ children, onRemove }) {
 }
 function AddBtn({ children, onClick }) {
   return <button type="button" className="ck-add-btn" onClick={onClick}>{children}</button>;
+}
+
+// §09 for the APC checkpoint on a paid-collab-managed brand: read-only view of what
+// the Paid Collab team entered for the week + a "remind them" button. The team fills
+// the values in their own dashboard; the APC only sees the status and can nudge.
+function PaidCollabReadOnly({ entry, sym = '$', onRemind, reminding, remindMsg }) {
+  const d = entry?.data || {};
+  const filled = Object.values(d).some((v) => v != null && String(v).trim() !== '');
+  const fmt = (v, money) => (v === '' || v == null ? '—' : (money ? `${sym}${v}` : String(v)));
+  const stat = (label, val, money) => (
+    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 10px' }}>
+      <div className="text-muted" style={{ fontSize: '0.68rem', fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(val, money)}</div>
+    </div>
+  );
+  return (
+    <div>
+      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Filled by the Paid Collab team.</span>
+        <span className="badge" style={{
+          background: filled ? 'var(--success-soft)' : 'var(--surface-2)',
+          color: filled ? 'var(--success)' : 'var(--text-muted)', fontSize: '0.66rem', fontWeight: 700,
+        }}>
+          {filled ? '✓ Filled' : 'Not filled yet'}{entry?.updated_at ? ` · ${new Date(entry.updated_at).toLocaleDateString()}` : ''}
+        </span>
+      </div>
+      {filled ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+          {stat('Creators onboarded', d.creatorsOnboarded)}
+          {stat('Creators in pipeline', d.creatorsInPipeline)}
+          {stat('Videos completed', d.videosCompleted)}
+          {stat('Videos planned', d.totalVideos)}
+          {stat('Total budget', d.totalBudget, true)}
+          {stat('Budget allocated', d.budgetAllocated, true)}
+        </div>
+      ) : (
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+          The Paid Collab team hasn't filled this in for this week yet.
+        </div>
+      )}
+      {d.notes && String(d.notes).trim() && (
+        <div style={{ marginTop: 10, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+          <strong>Notes:</strong> {d.notes}
+        </div>
+      )}
+      <div className="d-flex align-items-center gap-2 mt-3 flex-wrap">
+        <button type="button" className="btn btn-sm btn-outline-secondary" disabled={reminding} onClick={onRemind}>
+          {reminding ? <><span className="spinner-border spinner-border-sm me-1" /> Sending…</> : <><i className="bi bi-bell me-1" /> Remind Paid Collab team</>}
+        </button>
+        {remindMsg && <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{remindMsg}</span>}
+      </div>
+    </div>
+  );
 }

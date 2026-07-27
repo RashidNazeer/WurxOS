@@ -17,6 +17,7 @@ import TierNotificationsSection from './sections/TierNotificationsSection';
 import LeaveDefaultsSection  from './sections/LeaveDefaultsSection';
 import BackupSection         from './sections/BackupSection';
 import AmazonHaloSection     from './sections/AmazonHaloSection';
+import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBrandsSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import MenuLayoutSection     from './sections/MenuLayoutSection';
@@ -81,6 +82,16 @@ const GROUPS = [
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
         roles: ['boss'] },
+    ],
+  },
+  {
+    id: 'paidCollab',
+    label: 'Paid Collab',
+    icon: BoxIcon,
+    sections: [
+      { id: 'pcCheckpointBrands', label: 'Paid Collab Brands', sub: 'Brands your team fills the weekly Paid Collab section for',
+        icon: BoxIcon, component: PaidCollabCheckpointBrandsSection,
+        roles: ['pctl', 'ipc', 'boss', 'ol'] },
     ],
   },
   {

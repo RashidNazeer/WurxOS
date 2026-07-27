@@ -30,6 +30,8 @@ import {
 import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
 import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
+import { listManagedBrandIds, getPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
+import PaidCollabCheckpointDashboard from './PaidCollabCheckpointDashboard';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
 import CheckpointDeck from '../../components/checkpoint/CheckpointDeck';
@@ -66,7 +68,16 @@ function autofillSummary(meta, created) {
   return `${lead} ${n} field${n === 1 ? '' : 's'} from your data (${bits.join(' · ')}). Review those numbers, then complete the rest below.`;
 }
 
+// The paid collab team (pctl/ipc) gets a stripped-down §09-only dashboard; everyone
+// else gets the full APC checkpoint flow below.
 export default function AgendaCheckpointPage() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+  if (profile.role === 'pctl' || profile.role === 'ipc') return <PaidCollabCheckpointDashboard />;
+  return <ApcCheckpointPage />;
+}
+
+function ApcCheckpointPage() {
   const { profile } = useAuth();
   const qc = useQueryClient();
   const [brandId, setBrandId] = useState('');
@@ -135,6 +146,20 @@ export default function AgendaCheckpointPage() {
   const reportWeeksQuery = useQuery({
     queryKey: ['checkpoint', 'reportweeks', brandId], queryFn: () => listReportWeeks(brandId), enabled: !!brandId,
   });
+
+  // Paid Collab §09: whether THIS brand is on the shared team list (→ read-only §09
+  // + reminder in the APC form; hidden if not), and the team's entry for the week.
+  const { data: pcManagedIds = [] } = useQuery({
+    queryKey: ['checkpoint', 'pc-managed'], queryFn: listManagedBrandIds,
+  });
+  const isPaidCollabManaged = pcManagedIds.includes(brandId);
+  const pcEntryQuery = useQuery({
+    queryKey: ['checkpoint', 'pc-entry', brandId, weekStart],
+    queryFn: () => getPaidCollabEntry(brandId, weekStart),
+    enabled: !!brandId && isPaidCollabManaged,
+  });
+  const pcEntry = pcEntryQuery.data || null;
+  const paidCollabMode = isPaidCollabManaged ? 'readonly' : 'hidden';
   const reportStarts = useMemo(() => (reportWeeksQuery.data || []).map((r) => r.period_start), [reportWeeksQuery.data]);
   const reportSet = useMemo(() => new Set(reportStarts), [reportStarts]);
   const anchor = useMemo(() => (reportStarts.length ? reportStarts.reduce((a, b) => (a < b ? a : b)) : null), [reportStarts]);
@@ -284,6 +309,19 @@ export default function AgendaCheckpointPage() {
     finally { setAutofilling(false); }
   }
 
+  // Nudge the paid collab team to fill §09 for this brand+week.
+  const [remindingPc, setRemindingPc] = useState(false);
+  const [pcRemindMsg, setPcRemindMsg] = useState('');
+  async function onRemindPaidCollab() {
+    if (!brandId || remindingPc) return;
+    setRemindingPc(true); setPcRemindMsg('');
+    try {
+      const n = await remindPaidCollab(brandId, weekStart);
+      setPcRemindMsg(n > 0 ? `Reminder sent to ${n} paid collab team member${n === 1 ? '' : 's'}.` : 'No active paid collab members to notify.');
+    } catch (e) { setPcRemindMsg(`Couldn't send reminder: ${e?.message || e}`); }
+    finally { setRemindingPc(false); }
+  }
+
   // ── approval workflow actions (submit → verify → approve, + return/reopen) ──
   const cp = existing.data || null;
   const status = cp?.status || 'draft';
@@ -372,6 +410,13 @@ export default function AgendaCheckpointPage() {
     return () => ro.disconnect();
   }, [mode, data]);
   const unscaledH = SLIDE_COUNT * SLIDE_H + (SLIDE_COUNT - 1) * PREVIEW_GAP;
+
+  // For the deck/PDF, source §09 from the paid collab team's entry on managed brands
+  // (the checkpoint blob's own paidCollab is a stale mirror the APC no longer edits).
+  const deckData = useMemo(() => {
+    if (!data || !isPaidCollabManaged) return data;
+    return { ...data, paidCollab: { ...emptyPaidCollab(), ...(pcEntry?.data || {}) } };
+  }, [data, isPaidCollabManaged, pcEntry]);
 
   const saveText = saveState === 'saving' ? 'Saving…'
     : saveState === 'saved' ? `Saved${savedAt ? ` ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`
@@ -533,7 +578,7 @@ export default function AgendaCheckpointPage() {
             ) : (
               <div className="ckpt-preview" style={{ height: unscaledH * scale, margin: '0 auto', maxWidth: 1280 }}>
                 <div style={{ width: 1280, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                  <MemoDeck data={data} ref={deckRef} />
+                  <MemoDeck data={deckData} ref={deckRef} />
                 </div>
               </div>
             )}
@@ -568,7 +613,12 @@ export default function AgendaCheckpointPage() {
               <button type="button" className="ck-autofill-x" onClick={() => setAutofillMsg('')} aria-label="Dismiss"><i className="bi bi-x-lg" /></button>
             </div>
           )}
-          {data ? <CheckpointForm data={data} setData={setData} /> : (
+          {data ? (
+            <CheckpointForm data={data} setData={setData}
+              paidCollabMode={paidCollabMode} paidCollabEntry={pcEntry}
+              onRemindPaidCollab={onRemindPaidCollab} remindingPaidCollab={remindingPc}
+              paidCollabRemindMsg={pcRemindMsg} />
+          ) : (
             <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
           )}
         </>
