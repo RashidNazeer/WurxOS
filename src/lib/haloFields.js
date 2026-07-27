@@ -32,10 +32,10 @@
 
 export const HALO_FIELDS = [
   { key: 'gmv',                 label: 'GMV',                 group: 'tiktok', agg: 'sum', fmt: 'money' },
-  { key: 'orders',              label: 'Orders',              group: 'tiktok', agg: 'sum', fmt: 'int'   },
+  { key: 'orders',              label: 'Orders',              group: 'tiktok', agg: 'sum', fmt: 'int', hidden: true },
   { key: 'items_sold',          label: 'Items sold',          group: 'tiktok', agg: 'sum', fmt: 'int'   },
-  { key: 'aov',                 label: 'AOV',                 group: 'tiktok', agg: 'avg', fmt: 'money' },
-  { key: 'live_gmv',            label: 'LIVE GMV',            group: 'tiktok', agg: 'sum', fmt: 'money' },
+  { key: 'aov',                 label: 'AOV',                 group: 'tiktok', agg: 'avg', fmt: 'money', hidden: true },
+  { key: 'live_gmv',            label: 'LIVE GMV',            group: 'tiktok', agg: 'sum', fmt: 'money', hidden: true },
   { key: 'video_per_day',       label: 'Video/Day',           group: 'tiktok', agg: 'avg', fmt: 'num'   },
   { key: 'product_impressions', label: 'Product impressions', group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_impressions',  label: 'Unique impressions',  group: 'tiktok', agg: 'sum', fmt: 'int'   },
@@ -48,11 +48,11 @@ export const HALO_FIELDS = [
   // ---- back to TikTok / GMV Max ----
   { key: 'product_clicks',      label: 'Product clicks',      group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_clicks',       label: 'Unique clicks',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
-  { key: 'cost',                label: 'Cost',                group: 'tiktok', agg: 'sum', fmt: 'money' },
-  { key: 'gmvmax_orders',       label: 'GMV Max Orders', sheetHeader: 'orders', group: 'tiktok', agg: 'sum', fmt: 'int' },
-  { key: 'cpo',                 label: 'CPO',                 group: 'tiktok', agg: 'avg', fmt: 'money' },
-  { key: 'gross_revenue',       label: 'Gross revenue',       group: 'tiktok', agg: 'sum', fmt: 'money' },
-  { key: 'roi',                 label: 'ROI',                 group: 'tiktok', agg: 'avg', fmt: 'num'   },
+  { key: 'cost',                label: 'Cost',                group: 'tiktok', agg: 'sum', fmt: 'money', hidden: true },
+  { key: 'gmvmax_orders',       label: 'GMV Max Orders', sheetHeader: 'orders', group: 'tiktok', agg: 'sum', fmt: 'int', hidden: true },
+  { key: 'cpo',                 label: 'CPO',                 group: 'tiktok', agg: 'avg', fmt: 'money', hidden: true },
+  { key: 'gross_revenue',       label: 'Gross revenue',       group: 'tiktok', agg: 'sum', fmt: 'money', hidden: true },
+  { key: 'roi',                 label: 'ROI',                 group: 'tiktok', agg: 'avg', fmt: 'num', hidden: true },
 ];
 
 export const FIELD_BY_KEY = Object.fromEntries(HALO_FIELDS.map((f) => [f.key, f]));
@@ -89,7 +89,7 @@ export function metricAvailableAt(key, gran, metricGran) {
 // Fields selectable at a given granularity for a dataset. metricGran is the
 // dataset's fieldKey→granularity map (see metricAvailableAt).
 export function fieldsForGran(gran, metricGran) {
-  return HALO_FIELDS.filter((f) => metricAvailableAt(f.key, gran, metricGran));
+  return HALO_FIELDS.filter((f) => !f.hidden && metricAvailableAt(f.key, gran, metricGran));
 }
 export const AMAZON_FIELDS_FOR = (gran, metricGran) => fieldsForGran(gran, metricGran).filter((f) => f.group === 'amazon');
 export const TIKTOK_FIELDS_FOR = (gran, metricGran) => fieldsForGran(gran, metricGran).filter((f) => f.group === 'tiktok');
@@ -121,7 +121,9 @@ export function availSetForRows(rows) {
   return s;
 }
 export function fieldsAvail(availSet) {
-  return HALO_FIELDS.filter((f) => availSet && availSet.has(f.key));
+  // `hidden` fields are still parsed/stored/exported (format unchanged) but are
+  // not offered in the explorer's dropdowns/heatmap/overlay/halo-finder.
+  return HALO_FIELDS.filter((f) => !f.hidden && availSet && availSet.has(f.key));
 }
 export const amazonAvail = (availSet) => fieldsAvail(availSet).filter((f) => f.group === 'amazon');
 export const tiktokAvail = (availSet) => fieldsAvail(availSet).filter((f) => f.group === 'tiktok');
