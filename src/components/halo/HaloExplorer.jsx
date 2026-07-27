@@ -451,19 +451,27 @@ function HaloStatement({ r, n, a, b, mult, per1000, tkName, azName, az }) {
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· they move together {fmtCorrPct(r)}</span>
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          Credits all {azName} to {tkName} over this range (co-movement, not a proven cause).
+          Credits all {azName} to {tkName} over this range (a raw ratio, not a proven cause).
         </div>
       </>,
     );
   }
   if (per1000 != null) {
+    // "tends to rise together" is only true when the correlation is meaningful
+    // (>= 10%, the green line). At a low/0% correlation the per-1,000 figure is
+    // just an average ratio of the totals, NOT a day-to-day rise-together pattern.
+    const linked = r >= 0.1;
     return box(
       <>
         <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
-          {tkName} and {azName} move together <strong>{fmtCorrPct(r)}</strong> — when {tkName} rises, {azName} tends to rise.
+          {linked
+            ? <>{tkName} and {azName} move together <strong>{fmtCorrPct(r)}</strong> — when {tkName} rises, {azName} tends to rise too.</>
+            : <>{tkName} and {azName} show little day-to-day link (<strong>{fmtCorrPct(r)}</strong>) over this range.</>}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          about <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(per1000, az.fmt)}</strong> of {azName} for every 1,000 {tkName}.
+          {linked
+            ? <>about <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(per1000, az.fmt)}</strong> of {azName} for every 1,000 {tkName} (average over this range).</>
+            : <>Across this range there was on average <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(per1000, az.fmt)}</strong> of {azName} per 1,000 {tkName} — an overall ratio, not a move-together pattern.</>}
         </div>
       </>,
     );
