@@ -261,12 +261,15 @@ export function fmtCorrPct(r) {
   return p == null ? null : `${p}%`;
 }
 
-// INCREMENTAL halo (baseline method). baseline = average of the Amazon metric
-// (yKey) over the quietest third of periods by the TikTok metric (xKey) — i.e. the
-// "normal" Amazon level when TikTok is low. lift = total Amazon ABOVE that baseline
-// across ALL periods (floored at 0). We credit only the LIFT to TikTok, not the
-// total — so a period-average-as-baseline can't cancel to zero, and an uncorrelated
-// pair yields ~0 lift. Returns { baseline, lift, totalX, totalY, n } or null (<3 pts).
+// INCREMENTAL halo (regression method). Fit Amazon (Y) = intercept + slope·TikTok(X)
+// by least squares. slope = extra Amazon per 1 unit of TikTok; lift = slope·totalX =
+// the Amazon the fit attributes to TikTok, FLOORED at 0 (a flat/negative slope = no
+// halo). baseline (per period) = the intercept = (totalY − lift)/n. Crucially, when X
+// and Y don't move together the slope ~ 0 so lift ~ 0 — the number CANNOT be inflated
+// by baseline noise (the quiet-period-average method wrongly produced a large "lift"
+// at 0% correlation because the quietest periods' average rarely equals the overall
+// average). Returns { baseline, lift, totalX, totalY, n, slope } or null (<3 pts or X
+// has no variation).
 export function incrementalHalo(buckets, xKey, yKey) {
   const pts = [];
   for (const b of buckets) {
@@ -275,12 +278,15 @@ export function incrementalHalo(buckets, xKey, yKey) {
     const nx = Number(x), ny = Number(y);
     if (Number.isFinite(nx) && Number.isFinite(ny)) pts.push({ x: nx, y: ny });
   }
-  if (pts.length < 3) return null;
-  const qn = Math.max(1, Math.floor(pts.length / 3));
-  const quiet = [...pts].sort((a, b) => a.x - b.x).slice(0, qn);
-  const baseline = quiet.reduce((s, p) => s + p.y, 0) / quiet.length;
-  const totalY = pts.reduce((s, p) => s + p.y, 0);
-  const totalX = pts.reduce((s, p) => s + p.x, 0);
-  const lift = Math.max(0, totalY - baseline * pts.length);
-  return { baseline, lift, totalX, totalY, n: pts.length };
+  const n = pts.length;
+  if (n < 3) return null;
+  let sx = 0, sy = 0;
+  for (const p of pts) { sx += p.x; sy += p.y; }
+  const mx = sx / n, my = sy / n;
+  let sxx = 0, sxy = 0;
+  for (const p of pts) { const dx = p.x - mx; sxx += dx * dx; sxy += dx * (p.y - my); }
+  if (!(sxx > 0)) return null;
+  const slope = sxy / sxx;
+  const lift = Math.max(0, slope * sx);
+  return { baseline: (sy - lift) / n, lift, totalX: sx, totalY: sy, n, slope };
 }

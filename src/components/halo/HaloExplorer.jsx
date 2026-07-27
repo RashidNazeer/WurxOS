@@ -434,14 +434,15 @@ function HaloStatement({ r, n, a, b, kind, inc, perUnit, gran, tk, tkName, azNam
   const per = UNIT[gran] || 'period';
   if ((kind === 'money' || kind === 'count') && inc) {
     const corr = <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {fmtCorrPct(r)} correlation</span>;
-    const hasLift = inc.lift > 0 && perUnit != null && perUnit > 0;
+    // Only attribute a lift when the two ACTUALLY move together (>= 10%, the green
+    // line) AND the regression finds a positive slope. Below that, no dollar figure —
+    // a 0% correlation must never read as "made $X extra".
+    const hasLift = corrPct(r) >= 10 && inc.lift > 0 && perUnit != null && perUnit > 0;
     if (!hasLift) {
-      // Incremental method: Amazon didn't run above its quiet-period baseline, so
-      // there's no lift to credit to TikTok (typical when they don't move together).
       return box(
         <>
           <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
-            No measurable lift in {azName} above its baseline over this range. {corr}
+            No measurable lift in {azName} from {tkName} over this range — {fmtCorrPct(r)} correlation.
           </div>
           {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
         </>,
