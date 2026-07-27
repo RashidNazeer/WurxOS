@@ -213,7 +213,7 @@ export default function HaloExplorer({ datasets, loadRows }) {
             rankKeywordList={availSet.has(KSR) ? rankKeywordList : []} rankKeyword={rankKeyword} setRankKeyword={setRankKeyword} />
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {[['compare', 'Compare two'], ['heatmap', 'Correlation heatmap'], ['overlay', 'Multi-metric overlay'], ['lagfinder', 'Lag finder']].map(([k, label]) => (
+            {[['compare', 'Compare two'], ['heatmap', 'Correlation heatmap'], ['overlay', 'Multi-metric overlay'], ['lagfinder', 'Halo finder']].map(([k, label]) => (
               <button key={k} type="button" className={`wx-btn ${view === k ? 'wx-btn-primary' : 'wx-btn-ghost'} wx-btn-sm`} onClick={() => setView(k)}>{label}</button>
             ))}
           </div>
@@ -587,7 +587,8 @@ function OverlayView({ buckets, allFields }) {
 }
 
 // ============================================================
-// Lag finder — every TikTok metric vs ONE Amazon metric across lag 0..max.
+// Halo finder — every TikTok metric vs ONE Amazon metric across lag 0..max, to
+// surface the strongest halo signal and the delay it peaks at.
 // ============================================================
 function LagFinderView({ buckets, gran, amazonFields, tiktokFields }) {
   const [amazonKey, setAmazonKey] = useState(amazonFields[0]?.key || '');
