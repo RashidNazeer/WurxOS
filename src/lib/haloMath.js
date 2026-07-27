@@ -86,8 +86,7 @@ export function pearson(xs, ys) {
   }
   if (!(sxx > 0) || !(syy > 0)) return null;
   const r = sxy / Math.sqrt(sxx * syy);
-  if (!Number.isFinite(r)) return null;
-  return Math.max(0, r); // floor negatives to 0 — a halo effect can't be negative
+  return Number.isFinite(r) ? r : null; // raw r; sign-flip + floor happen in pairBuckets
 }
 
 /**
@@ -166,7 +165,14 @@ export function pairBuckets(buckets, fx, fy, lag, gran) {
     if (x == null || y == null) continue;
     points.push({ label: b.label, x, y });
   }
-  return { points, r: pearson(points.map((p) => p.x), points.map((p) => p.y)), n: points.length };
+  // For an INVERSE metric (e.g. Keyword Search Rank, where lower = better) a real
+  // halo shows up as a NEGATIVE Pearson. When exactly one side is inverse, flip the
+  // sign so an "improving together" relationship reads as a positive halo; THEN floor
+  // to 0 (a halo can't be negative). Both/neither inverse → no flip.
+  const raw = pearson(points.map((p) => p.x), points.map((p) => p.y));
+  const oneInverse = (!!FIELD_BY_KEY[fx]?.inverse) !== (!!FIELD_BY_KEY[fy]?.inverse);
+  const r = raw == null ? null : Math.max(0, oneInverse ? -raw : raw);
+  return { points, r, n: points.length };
 }
 
 // Correlation matrix over rowKeys x colKeys (for the heatmap).
@@ -198,11 +204,19 @@ export function overlaySeries(buckets, keys) {
   return norm;
 }
 
+// Single source of truth for the integer % shown for a correlation. FLOORED so the
+// displayed number never crosses a threshold the raw r doesn't — colour, label and
+// the "linked" wording all derive from THIS, so they can never disagree with the
+// number on screen (e.g. "10%" is never painted below-threshold orange).
+export function corrPct(r) {
+  if (r == null) return null;
+  return Math.floor(Math.max(0, Math.min(1, r)) * 100);
+}
+
 export function strengthLabel(r) {
-  if (r == null) return 'no data';
-  const a = Math.max(0, r); // r is floored to [0,1]; no negative direction to label
-  // "weak" starts at 10% to match the green colour threshold (< 10% reads as none).
-  return a >= 0.8 ? 'very strong' : a >= 0.6 ? 'strong' : a >= 0.4 ? 'moderate' : a >= 0.1 ? 'weak' : 'little/none';
+  const p = corrPct(r);
+  if (p == null) return 'no data';
+  return p >= 80 ? 'very strong' : p >= 60 ? 'strong' : p >= 40 ? 'moderate' : p >= 10 ? 'weak' : 'little/none';
 }
 
 export function directionSentence(fx, fy, r, n) {
@@ -210,34 +224,39 @@ export function directionSentence(fx, fy, r, n) {
     if (n != null && n >= 3) return 'One of these series has no variation over this range — a correlation can’t be computed.';
     return 'Not enough overlapping periods to correlate these two yet (need at least 3).';
   }
-  const lx = FIELD_BY_KEY[fx]?.label || fx;
-  const ly = FIELD_BY_KEY[fy]?.label || fy;
-  const t = Math.max(0, r);
-  if (t < 0.1) return `No clear relationship between ${lx} and ${ly}${n ? ` (${n} points)` : ''}.`;
-  return `${strengthLabel(r)} (${Math.round(t * 100)}%${n ? `, ${n} points` : ''}): higher ${lx} tends to go with more ${ly}.`;
+  const fX = FIELD_BY_KEY[fx], fY = FIELD_BY_KEY[fy];
+  const lx = fX?.label || fx;
+  const ly = fY?.label || fy;
+  const p = corrPct(r);
+  if (p < 10) return `No clear relationship between ${lx} and ${ly}${n ? ` (${n} points)` : ''}.`;
+  // r is sign-adjusted so positive = the BENEFICIAL direction for each side (an
+  // inverse metric like Keyword Search Rank improves as its number goes DOWN).
+  const goodX = fX?.inverse ? `a lower (better) ${lx}` : `higher ${lx}`;
+  const goodY = fY?.inverse ? `a lower (better) ${ly}` : `more ${ly}`;
+  return `${strengthLabel(r)} (${p}%${n ? `, ${n} points` : ''}): ${goodX} tends to go with ${goodY}.`;
 }
 
-// r floored to [0,1] -> heatmap fill. Green ≥ 10%, orange below 10%, light red at
-// exactly 0% (includes anything that floored up from a negative r). Stronger = more saturated.
+// Heatmap/badge fill, driven off the DISPLAYED integer % (corrPct) so colour can
+// never disagree with the number: green ≥ 10%, orange 1–9%, light red at 0%. Stronger = more saturated.
 export function corrColor(r) {
-  if (r == null) return 'var(--surface-2, #2a2a33)';
-  const t = Math.max(0, Math.min(1, r));
-  if (t === 0) return 'rgba(239, 68, 68, 0.14)';
-  if (t < 0.10) return 'rgba(245, 158, 11, 0.20)';
-  return `rgba(34, 197, 94, ${(0.18 + t * 0.6).toFixed(3)})`;
+  const p = corrPct(r);
+  if (p == null) return 'var(--surface-2, #2a2a33)';
+  if (p === 0) return 'rgba(239, 68, 68, 0.14)';
+  if (p < 10) return 'rgba(245, 158, 11, 0.20)';
+  return `rgba(34, 197, 94, ${(0.18 + (p / 100) * 0.6).toFixed(3)})`;
 }
 
-// Text/emphasis colour matching corrColor's buckets.
+// Text/emphasis colour matching corrColor's buckets (also off the displayed %).
 export function corrTextColor(r) {
-  if (r == null) return 'var(--text-muted)';
-  const t = Math.max(0, r);
-  if (t === 0) return '#ef4444';
-  if (t < 0.10) return '#f59e0b';
+  const p = corrPct(r);
+  if (p == null) return 'var(--text-muted)';
+  if (p === 0) return '#ef4444';
+  if (p < 10) return '#f59e0b';
   return '#22c55e';
 }
 
-// Correlation as a floored percentage string, e.g. 0.28 -> "28%"; null -> null.
+// Correlation as the displayed percentage string, e.g. 0.28 -> "28%"; null -> null.
 export function fmtCorrPct(r) {
-  if (r == null) return null;
-  return `${Math.round(Math.max(0, Math.min(1, r)) * 100)}%`;
+  const p = corrPct(r);
+  return p == null ? null : `${p}%`;
 }

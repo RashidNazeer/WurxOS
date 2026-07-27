@@ -44,7 +44,7 @@ export const HALO_FIELDS = [
   { key: 'keyword_search_volume', label: 'Branded Search Volume', group: 'amazon', agg: 'sum', fmt: 'int' },
   // "Total Revenue/Day" on the sheet (= sum of the per-product Revenue cols).
   { key: 'revenue_per_day',     label: 'Amazon Revenue', sheetHeader: 'Total Revenue/Day', group: 'amazon', agg: 'sum', fmt: 'money' },
-  { key: 'keyword_search_rank', label: 'Keyword Search Rank', group: 'amazon', agg: 'avg', fmt: 'num'   },
+  { key: 'keyword_search_rank', label: 'Keyword Search Rank', group: 'amazon', agg: 'avg', fmt: 'num', inverse: true },
   // ---- back to TikTok / GMV Max ----
   { key: 'product_clicks',      label: 'Product clicks',      group: 'tiktok', agg: 'sum', fmt: 'int'   },
   { key: 'unique_clicks',       label: 'Unique clicks',       group: 'tiktok', agg: 'sum', fmt: 'int'   },
