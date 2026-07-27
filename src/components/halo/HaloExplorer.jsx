@@ -435,10 +435,12 @@ function HaloStatement({ r, n, a, b, kind, inc, perUnit, gran, tk, tkName, azNam
   const per = UNIT[gran] || 'period';
   if ((kind === 'money' || kind === 'count') && inc) {
     const corr = <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {fmtCorrPct(r)} correlation</span>;
-    // Only attribute a lift when the two ACTUALLY move together (>= 10%, the green
-    // line) AND the regression finds a positive slope. Below that, no dollar figure —
-    // a 0% correlation must never read as "made $X extra".
-    const hasLift = corrPct(r) >= 10 && inc.lift > 0 && perUnit != null && perUnit > 0;
+    // Show a lift whenever there's ANY positive correlation (>= 1%, i.e. not a flat
+    // "0%") and a positive trend. The only thing we suppress is a LITERAL 0% — a $
+    // figure next to "0% correlation" is self-contradictory. A weak-but-real link
+    // (1–9%) still shows a small, honest number (the lift is already ~0 when they
+    // don't move together, so this can't reintroduce a big fake figure).
+    const hasLift = corrPct(r) >= 1 && inc.lift > 0 && perUnit != null && perUnit > 0;
     if (!hasLift) {
       return box(
         <>
