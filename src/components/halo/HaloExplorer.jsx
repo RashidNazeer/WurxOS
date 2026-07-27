@@ -443,8 +443,11 @@ function HaloStatement({ r, n, a, b, mult, per1000, tk, tkName, azName, az, scop
   const box = (children) => (
     <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>
   );
+  // Neutral chip — the multiplier is a size RATIO, not a strength signal, so it must
+  // not be coloured green (that reads as a validated/strong halo). The green/red
+  // "move together %" beside it is the real strength cue.
   const badge = (text) => (
-    <span style={{ background: 'color-mix(in srgb, #22c55e 15%, transparent)', color: '#22c55e', borderRadius: 999, padding: '3px 12px', fontWeight: 800, fontSize: 14 }}>{text}</span>
+    <span style={{ background: 'var(--surface-1, #f1f5f9)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: 999, padding: '3px 12px', fontWeight: 800, fontSize: 14 }}>{text}</span>
   );
   if (mult != null) {
     // Derive all three renderings ($X, N×, NN%) from ONE rounded value so they can
@@ -460,9 +463,6 @@ function HaloStatement({ r, n, a, b, mult, per1000, tk, tkName, azName, az, scop
           {badge(`${m}×`)}
           {badge(`${pct}%`)}
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· they move together {fmtCorrPct(r)}</span>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          Credits all {azName} to {tkName} over this range (a raw ratio, not a proven cause).
         </div>
         {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
       </>,
