@@ -358,7 +358,8 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields, scope }) 
   // TikTok; lift = Amazon above that baseline across the range; credit the LIFT (not
   // the total) to TikTok. perUnit = lift per $1 (money) or per 1,000 (count).
   const inc = (moneyPair || countPair) ? incrementalHalo(buckets, tk.key, az.key) : null;
-  const perUnit = inc && inc.totalX > 0 ? (moneyPair ? inc.lift / inc.totalX : (inc.lift * 1000) / inc.totalX) : null;
+  // perUnit = extra Amazon per 1 unit ($1 / 1,000) of ABOVE-AVERAGE TikTok (= the slope).
+  const perUnit = inc && inc.posDevX > 0 ? (moneyPair ? inc.lift / inc.posDevX : (inc.lift * 1000) / inc.posDevX) : null;
   const tkName = tk ? `TikTok ${tk.label}` : '';
   // Reflect an active product/keyword scope in the Amazon label, and note the TikTok
   // side is NOT scoped (so a scoped result mixes one product/keyword's Amazon figure

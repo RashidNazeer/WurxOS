@@ -261,15 +261,14 @@ export function fmtCorrPct(r) {
   return p == null ? null : `${p}%`;
 }
 
-// INCREMENTAL halo (regression method). Fit Amazon (Y) = intercept + slope·TikTok(X)
-// by least squares. slope = extra Amazon per 1 unit of TikTok; lift = slope·totalX =
-// the Amazon the fit attributes to TikTok, FLOORED at 0 (a flat/negative slope = no
-// halo). baseline (per period) = the intercept = (totalY − lift)/n. Crucially, when X
-// and Y don't move together the slope ~ 0 so lift ~ 0 — the number CANNOT be inflated
-// by baseline noise (the quiet-period-average method wrongly produced a large "lift"
-// at 0% correlation because the quietest periods' average rarely equals the overall
-// average). Returns { baseline, lift, totalX, totalY, n, slope } or null (<3 pts or X
-// has no variation).
+// INCREMENTAL halo. baseline = the plain AVERAGE Amazon per period (add up ÷ n) —
+// the "normal" level. Then, from the trend of Amazon vs TikTok (least-squares slope =
+// extra Amazon per 1 unit of TikTok), lift = slope × the total ABOVE-AVERAGE TikTok:
+// i.e. "on the periods you ran MORE TikTok than usual, this is the extra Amazon the
+// trend attributes to it." Floored at 0 (flat/negative slope = no halo). ~0 when they
+// don't move together, and the baseline is a real average — never a zero-extrapolation
+// (so a metric that's always in the millions can't get a fake tiny baseline). Returns
+// { baseline, lift, slope, posDevX, totalX, totalY, n } or null (<3 pts / X flat).
 export function incrementalHalo(buckets, xKey, yKey) {
   const pts = [];
   for (const b of buckets) {
@@ -282,11 +281,15 @@ export function incrementalHalo(buckets, xKey, yKey) {
   if (n < 3) return null;
   let sx = 0, sy = 0;
   for (const p of pts) { sx += p.x; sy += p.y; }
-  const mx = sx / n, my = sy / n;
-  let sxx = 0, sxy = 0;
-  for (const p of pts) { const dx = p.x - mx; sxx += dx * dx; sxy += dx * (p.y - my); }
+  const avgX = sx / n, avgY = sy / n;
+  let sxx = 0, sxy = 0, posDevX = 0;
+  for (const p of pts) {
+    const dx = p.x - avgX;
+    sxx += dx * dx; sxy += dx * (p.y - avgY);
+    if (dx > 0) posDevX += dx; // TikTok above its average, summed
+  }
   if (!(sxx > 0)) return null;
   const slope = sxy / sxx;
-  const lift = Math.max(0, slope * sx);
-  return { baseline: (sy - lift) / n, lift, totalX: sx, totalY: sy, n, slope };
+  const lift = Math.max(0, slope * posDevX);
+  return { baseline: avgY, lift, slope, posDevX, totalX: sx, totalY: sy, n };
 }
