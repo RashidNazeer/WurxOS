@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer, ComposedChart, LineChart, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend, ScatterChart, Scatter,
+  CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import {
   HALO_FIELDS, FIELD_BY_KEY, KSV_KEY, KSR_KEY, PRODUCT_REVENUE_FIELD,
@@ -27,7 +27,7 @@ import {
 } from '../../lib/haloFields';
 import {
   buildBucketsFromSource, pairBuckets, correlationMatrix, overlaySeries,
-  directionSentence, strengthLabel, corrColor, corrTextColor, fmtCorrPct, corrPct,
+  directionSentence, corrColor, corrTextColor, fmtCorrPct, corrPct,
 } from '../../lib/haloMath';
 
 const PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899', '#14b8a6'];
@@ -382,7 +382,7 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields, scope }) 
         </div>
         <HaloStatement r={r} n={n} a={a} b={b} mult={mult} per1000={per1000} tk={tk} tkName={tkName} azName={azName} az={az} scopeNote={scopeNote} />
 
-        <div style={{ width: '100%', height: 280 }}>
+        <div style={{ width: '100%', height: 420 }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={lineData} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
               <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
@@ -402,24 +402,6 @@ function CompareView({ buckets, gran, lag, amazonFields, tiktokFields, scope }) 
           </div>
         )}
       </div>
-
-      <div className="wx-card" style={{ padding: 14 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-          Scatter — each point is one {UNIT[gran]}. A tighter diagonal band = stronger correlation.
-        </div>
-        <div style={{ width: '100%', height: 260 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 8, right: 12, bottom: 16, left: 0 }}>
-              <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
-              <XAxis type="number" dataKey="x" name={fa.label} tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                label={{ value: fa.label, position: 'insideBottom', offset: -8, fontSize: 11, fill: 'var(--text-muted)' }} />
-              <YAxis type="number" dataKey="y" name={fb.label} width={54} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-              <Tooltip contentStyle={TT_STYLE} cursor={{ strokeDasharray: '3 3' }} formatter={(val, key) => [fmtValue(val, key === 'x' ? fa.fmt : fb.fmt), key === 'x' ? fa.label : fb.label]} />
-              <Scatter data={points} fill={PALETTE[4]} fillOpacity={0.7} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
     </div>
   );
 }
@@ -429,7 +411,7 @@ function RBadge({ r }) {
   const bg = r == null ? 'var(--surface-2)' : `color-mix(in srgb, ${fg} 15%, transparent)`;
   return (
     <span style={{ background: bg, color: fg, borderRadius: 999, padding: '4px 12px', fontWeight: 700, fontSize: 13 }}>
-      {fmtCorrPct(r) ?? '—'} · {strengthLabel(r)}
+      {r == null ? 'no data' : `${fmtCorrPct(r)} correlation`}
     </span>
   );
 }
@@ -462,7 +444,7 @@ function HaloStatement({ r, n, a, b, mult, per1000, tk, tkName, azName, az, scop
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {badge(`${m}×`)}
           {badge(`${pct}%`)}
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· they move together {fmtCorrPct(r)}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {fmtCorrPct(r)} correlation</span>
         </div>
         {scopeNote && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{scopeNote}</div>}
       </>,
@@ -480,8 +462,8 @@ function HaloStatement({ r, n, a, b, mult, per1000, tk, tkName, azName, az, scop
       <>
         <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
           {linked
-            ? <>{tkName} and {azName} move together <strong>{fmtCorrPct(r)}</strong> — when {tkName} rises, {azName} tends to rise too.</>
-            : <>{tkName} and {azName} show little day-to-day link (<strong>{fmtCorrPct(r)}</strong>) over this range.</>}
+            ? <>{tkName} and {azName} have <strong>{fmtCorrPct(r)}</strong> day-to-day correlation — when {tkName} rises, {azName} tends to rise too.</>
+            : <>{tkName} and {azName} have <strong>{fmtCorrPct(r)}</strong> day-to-day correlation over this range.</>}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           {linked
@@ -689,7 +671,7 @@ function LagFinderView({ buckets, gran, amazonFields, tiktokFields }) {
               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.field.label}</span>
               <span style={{ color: 'var(--text-muted)' }}>at <strong style={{ color: 'var(--text-primary)' }}>lag {unitLabel(gran, s.lag)}</strong></span>
               <span style={{ marginLeft: 'auto', fontWeight: 700, color: corrTextColor(s.r) }}>
-                {fmtCorrPct(s.r)} · {strengthLabel(s.r)}
+                {fmtCorrPct(s.r)} correlation
               </span>
             </div>
           ))}

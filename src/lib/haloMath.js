@@ -228,12 +228,12 @@ export function directionSentence(fx, fy, r, n) {
   const lx = fX?.label || fx;
   const ly = fY?.label || fy;
   const p = corrPct(r);
-  if (p < 10) return `No clear relationship between ${lx} and ${ly}${n ? ` (${n} points)` : ''}.`;
+  if (p < 10) return `${lx} and ${ly}: ${p}% correlation${n ? ` over ${n} points` : ''}.`;
   // r is sign-adjusted so positive = the BENEFICIAL direction for each side (an
   // inverse metric like Keyword Search Rank improves as its number goes DOWN).
   const goodX = fX?.inverse ? `a lower (better) ${lx}` : `higher ${lx}`;
   const goodY = fY?.inverse ? `a lower (better) ${ly}` : `more ${ly}`;
-  return `${strengthLabel(r)} (${p}%${n ? `, ${n} points` : ''}): ${goodX} tends to go with ${goodY}.`;
+  return `${p}% correlation${n ? ` over ${n} points` : ''} — ${goodX} tends to go with ${goodY}.`;
 }
 
 // Heatmap/badge fill, driven off the DISPLAYED integer % (corrPct) so colour can
