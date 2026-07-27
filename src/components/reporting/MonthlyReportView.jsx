@@ -14,6 +14,7 @@ import { formatPctChange } from '../../utils/formatPctChange';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichContent, { isHtml } from '../common/RichContent';
 import HighlightableContent from '../common/HighlightableContent';
+import CustomTableView from './CustomTableView';
 import HighlighterPicker, { useHighlightStyle } from '../common/HighlighterPicker';
 import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandReportLinks';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1432,10 +1433,13 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           // Group brand-defined TABLE-section entries (kind:'table' + sectionId)
           // into one card per section. Everything else (long_text brand sections
           // + legacy per-user custom fields) passes through as long-text cards.
-          const tableGroups = new Map(); // sectionId -> { name, sectionId, rows }
+          const tableGroups = new Map(); // sectionId -> { name, sectionId, rows } (legacy per-field tables)
+          const newTables = [];          // rows-based table sections (real grid)
           const passthrough = [];
           for (const [fieldId, entry] of customEntries) {
-            if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
+            if (entry && typeof entry === 'object' && entry.kind === 'table' && Array.isArray(entry.rows)) {
+              newTables.push([entry.sectionId || fieldId, entry]);
+            } else if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
               const key = entry.sectionId;
               if (!tableGroups.has(key)) tableGroups.set(key, { name: entry.sectionName || 'Section', sectionId: key, rows: [] });
               tableGroups.get(key).rows.push({ fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text' });
@@ -1445,6 +1449,19 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
               passthrough.push([fieldId, entry]);
             }
           }
+
+          const renderedNewTables = newTables.map(([sectionId, entry]) => {
+            customNames.push(entry.name);
+            if (sectEnabled[sectionId] === false) return null;
+            const cols = entry.columns || [];
+            const hasData = (entry.rows || []).some((r) => cols.some((c) => r?.[c.id] != null && r[c.id] !== ''));
+            if (!hasData) return null;
+            return (
+              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="#0ea5e9" title={entry.name}>
+                <CustomTableView entry={entry} />
+              </ContentSection>
+            );
+          });
 
           const renderedTables = [...tableGroups.values()].map((group) => {
             customNames.push(group.name);
@@ -1501,6 +1518,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const known = ['Key Wins / Insights', 'Key Wins', 'Campaigns', 'Recommendations & Action Items', ...customNames];
           return (
             <>
+              {renderedNewTables}
               {renderedTables}
               {renderedCustom}
               <BrandReportLinks brandId={report.brandId} knownSectionNames={known} reportType={reportType} injectedSections={reportLinks} />

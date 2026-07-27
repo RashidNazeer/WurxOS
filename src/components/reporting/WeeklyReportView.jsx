@@ -16,6 +16,7 @@ import { formatPctChange } from '../../utils/formatPctChange';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import RichContent, { isHtml } from '../common/RichContent';
 import HighlightableContent from '../common/HighlightableContent';
+import CustomTableView from './CustomTableView';
 import HighlighterPicker, { useHighlightStyle } from '../common/HighlighterPicker';
 import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandReportLinks';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1533,10 +1534,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           // built-in sections themselves still render via their fixed
           // JSX above; these are the "additional fields" rows that
           // appear under each one in the form.
-          const tableGroups = new Map(); // key -> { name, rows: [...] }
+          const tableGroups = new Map(); // key -> { name, rows: [...] } (legacy per-field tables)
+          const newTables = [];          // rows-based table sections (real grid)
           const passthrough = [];
           for (const [fieldId, entry] of customEntries) {
-            if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
+            if (entry && typeof entry === 'object' && entry.kind === 'table' && Array.isArray(entry.rows)) {
+              newTables.push([entry.sectionId || fieldId, entry]);
+            } else if (entry && typeof entry === 'object' && entry.kind === 'table' && entry.sectionId) {
               const key = `tbl:${entry.sectionId}`;
               if (!tableGroups.has(key)) {
                 tableGroups.set(key, { name: entry.sectionName || 'Section', sectionId: entry.sectionId, rows: [] });
@@ -1545,13 +1549,24 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                 fieldId, label: entry.name || '—', value: entry.value, type: entry.type || 'text',
               });
             } else if (entry && typeof entry === 'object' && entry.kind === 'builtin_extra' && entry.sectionKey) {
-              // Built-in extras render inline within their parent
-              // section's StatCard grid (see renderExtraStatCards
-              // above). Skip them here to avoid duplicate cards.
+              // Built-in extras render inline within their parent section's StatCard grid; skip.
             } else {
               passthrough.push([fieldId, entry]);
             }
           }
+
+          const renderedNewTables = newTables.map(([sectionId, entry]) => {
+            customNames.push(entry.name);
+            if (sectEnabled[sectionId] === false) return null;
+            const cols = entry.columns || [];
+            const hasData = (entry.rows || []).some((r) => cols.some((c) => r?.[c.id] != null && r[c.id] !== ''));
+            if (!hasData) return null;
+            return (
+              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="#0ea5e9" title={entry.name}>
+                <CustomTableView entry={entry} />
+              </ContentSection>
+            );
+          });
 
           // Custom table-kind sections render as a hero-style StatCard
           // grid (numeric/currency get prev-week + sparkline; text/URL/
@@ -1625,6 +1640,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           ];
           return (
             <>
+              {renderedNewTables}
               {renderedTables}
               {renderedCustom}
               <BrandReportLinks brandId={report.brandId} knownSectionNames={unmatchedKnown} reportType={reportType} injectedSections={reportLinks} />

@@ -94,18 +94,6 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
     }));
   }
 
-  function getPrev(id, labelOrName) {
-    const prev = previousReport?.customFields || {};
-    const byId = prev[id];
-    if (byId) return byId;
-    if (labelOrName) {
-      const byName = Object.values(prev).find((v) =>
-        v && typeof v === 'object' && v.name === labelOrName);
-      if (byName) return byName;
-    }
-    return null;
-  }
-
   return (
     <>
       {sections.map((section) => {
@@ -125,36 +113,7 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
             <div key={section.id} id={`sec-cs-${section.id}`} style={{ scrollMarginTop: 12 }}>
               {header}
               {enabled && (
-              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
-                <div className="card-body p-3">
-                  {renderPreset?.(section)}
-                  <div className="d-flex flex-column gap-3">
-                    {section.fields.map((field) => {
-                      const entry  = data.customFields?.[field.id];
-                      const value  = entry?.value ?? '';
-                      const prev   = getPrev(field.id, field.label);
-                      const prevValue = prev?.value ?? '';
-                      return (
-                        <BrandTableFieldRow
-                          key={field.id}
-                          field={field}
-                          value={value}
-                          prevValue={prevValue}
-                          onChange={(v) => setCustomEntry(field.id, {
-                            name: field.label,
-                            value: v,
-                            kind: 'table',
-                            sectionId: section.id,
-                            sectionName: section.name,
-                            type: field.type,
-                            source: 'brand',
-                          })}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+                <BrandTableSection section={section} data={data} setData={setData} renderPreset={renderPreset} />
               )}
             </div>
           );
@@ -189,38 +148,87 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
   );
 }
 
-function BrandTableFieldRow({ field, value, prevValue, onChange }) {
-  const isNumber = field.type === 'number';
-  let delta = null;
-  if (isNumber && prevValue !== '' && prevValue != null && value !== '' && value != null) {
-    const a = Number(value), b = Number(prevValue);
-    if (Number.isFinite(a) && Number.isFinite(b)) {
-      const diff = a - b;
-      if (diff !== 0) delta = { diff, up: diff > 0 };
-    }
+// A brand "table" custom section as a REAL editable table: the section's fields
+// are the COLUMNS; the user adds as many ROWS as they want. Stored as ONE entry
+// under the section id: { kind:'table', name, sectionId, columns[], rows[], source }.
+// Legacy per-field single values (old model) seed the first row and are cleaned up
+// on the first edit, so old sections keep their data without a migration.
+function BrandTableSection({ section, data, setData, renderPreset }) {
+  const columns = section.fields || [];
+  const entry = data.customFields?.[section.id];
+
+  let rows = entry && Array.isArray(entry.rows) && entry.rows.length ? entry.rows : null;
+  if (!rows) {
+    const legacy = {}; let any = false;
+    columns.forEach((c) => {
+      const old = data.customFields?.[c.id];
+      if (old && typeof old === 'object' && old.value != null && old.value !== '') { legacy[c.id] = old.value; any = true; }
+    });
+    rows = any ? [legacy] : [{}];
   }
+
+  function save(newRows) {
+    setData((d) => {
+      const cf = { ...(d.customFields || {}) };
+      columns.forEach((c) => { if (cf[c.id]?.kind === 'table') delete cf[c.id]; }); // drop legacy per-field entries
+      cf[section.id] = {
+        kind: 'table', name: section.name, sectionId: section.id, source: 'brand',
+        columns: columns.map((c) => ({ id: c.id, label: c.label, type: c.type, options: c.options || [] })),
+        rows: newRows,
+      };
+      return { ...d, customFields: cf };
+    });
+  }
+  const setCell = (ri, colId, v) => save(rows.map((r, i) => (i === ri ? { ...r, [colId]: v } : r)));
+  const addRow = () => save([...rows, {}]);
+  const removeRow = (ri) => { const next = rows.filter((_, i) => i !== ri); save(next.length ? next : [{}]); };
+
+  const th = { padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border-subtle)' };
+
   return (
-    <div>
-      <div className="d-flex align-items-center justify-content-between mb-1">
-        <label className="form-label mb-0 fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
-          {field.label}
-        </label>
-        {prevValue !== '' && prevValue != null && (
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            Previous: <strong style={{ color: 'var(--text-secondary)' }}>{String(prevValue)}</strong>
-            {delta && (
-              <span style={{
-                marginLeft: 6,
-                color: delta.up ? 'var(--success)' : 'var(--danger)',
-                fontWeight: 700,
-              }}>
-                {delta.up ? '▲' : '▼'} {Math.abs(delta.diff).toLocaleString()}
-              </span>
-            )}
-          </span>
+    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card-body p-3">
+        {renderPreset?.(section)}
+        {columns.length === 0 ? (
+          <div className="text-muted" style={{ fontSize: '0.82rem' }}>No columns defined for this table. Delete it and add one with columns.</div>
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, width: 30, textAlign: 'center', color: 'var(--text-muted)' }}>#</th>
+                    {columns.map((c) => <th key={c.id} style={th}>{c.label}</th>)}
+                    <th style={{ ...th, width: 38 }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, ri) => (
+                    <tr key={ri}>
+                      <td style={{ padding: '4px 6px', textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{ri + 1}</td>
+                      {columns.map((c) => (
+                        <td key={c.id} style={{ padding: 4, minWidth: 130 }}>
+                          <BrandFieldInput field={c} value={row?.[c.id] ?? ''} onChange={(v) => setCell(ri, c.id, v)} />
+                        </td>
+                      ))}
+                      <td style={{ padding: 4, textAlign: 'center' }}>
+                        <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+                          onClick={() => removeRow(ri)} title="Remove row" style={{ padding: '2px 6px' }}>
+                          <i className="bi bi-trash3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button type="button" className="btn btn-sm btn-outline-secondary mt-2"
+              onClick={addRow} style={{ borderRadius: 8, fontSize: '0.76rem' }}>
+              <i className="bi bi-plus-circle" /> Add row
+            </button>
+          </>
         )}
       </div>
-      <BrandFieldInput field={field} value={value} onChange={onChange} />
     </div>
   );
 }
