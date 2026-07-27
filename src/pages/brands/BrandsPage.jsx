@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listBrands } from '../../lib/brandsApi';
 import { useAuth } from '../../contexts/AuthContext';
-import BrandCard from '../../components/brands/BrandCard';
+import BrandCard, { formatTier } from '../../components/brands/BrandCard';
 import BrandForm from '../../components/brands/BrandForm';
 import BrandSwitcherModal from '../../components/brands/BrandSwitcherModal';
 import RequestBrandSwitchModal from '../../components/brands/RequestBrandSwitchModal';
@@ -21,6 +21,9 @@ export default function BrandsPage() {
 
   const [q, setQ]           = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
+  const [clientFilter, setClientFilter] = useState('');
+  const [tierFilter, setTierFilter]     = useState('');
+  const [tlFilter, setTlFilter]         = useState('');
   const [showForm, setShowForm]   = useState(false);
   const [editBrand, setEditBrand] = useState(null);
   const [switchBrand, setSwitchBrand] = useState(null);
@@ -39,10 +42,35 @@ export default function BrandsPage() {
   const error = queryError?.message || '';
   const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ['brands'] }), [qc]);
 
+  // Distinct filter options, drawn from all brands (so a choice never disappears
+  // when another filter narrows the list).
+  const clientOptions = useMemo(
+    () => [...new Set(rows.map((b) => (b.client_name || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [rows],
+  );
+  const tierOptions = useMemo(() => {
+    const set = new Set();
+    rows.forEach((b) => { const t = formatTier(b.tier); if (t) set.add(t); });
+    return [...set].sort((a, b) => {
+      const na = Number(a), nb = Number(b), an = Number.isFinite(na), bn = Number.isFinite(nb);
+      if (an && bn) return na - nb;       // numeric tiers ascending
+      if (an) return -1; if (bn) return 1; // "Unlimited" etc. last
+      return a.localeCompare(b);
+    });
+  }, [rows]);
+  const tlOptions = useMemo(() => {
+    const m = new Map();
+    rows.forEach((b) => { if (b.owner?.id) m.set(b.owner.id, b.owner.display_name); });
+    return [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
     return rows.filter((b) => {
       if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+      if (clientFilter && (b.client_name || '') !== clientFilter) return false;
+      if (tierFilter && formatTier(b.tier) !== tierFilter) return false;
+      if (tlFilter && b.owner?.id !== tlFilter) return false;
       if (!qq) return true;
       return (
         (b.brand_name  || '').toLowerCase().includes(qq) ||
@@ -50,7 +78,7 @@ export default function BrandsPage() {
         (b.owner?.display_name || '').toLowerCase().includes(qq)
       );
     });
-  }, [rows, q, statusFilter]);
+  }, [rows, q, statusFilter, clientFilter, tierFilter, tlFilter]);
 
   const canEditRow = useCallback((b) => {
     if (isBossOrOL) return true;
@@ -103,6 +131,22 @@ export default function BrandsPage() {
               {s[0].toUpperCase() + s.slice(1)}
             </button>
           ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <select className="wx-input" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} style={{ maxWidth: 170 }} title="Filter by client">
+            <option value="">All clients</option>
+            {clientOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="wx-input" value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={{ maxWidth: 130 }} title="Filter by tier">
+            <option value="">All tiers</option>
+            {tierOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          {isBossOrOL && (
+            <select className="wx-input" value={tlFilter} onChange={(e) => setTlFilter(e.target.value)} style={{ maxWidth: 180 }} title="Filter by Team Lead">
+              <option value="">All Team Leads</option>
+              {tlOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
         </div>
         <button className="wx-btn wx-btn-ghost" onClick={() => refetch()} disabled={isFetching} title="Refresh">
           <RefreshIcon width="15" height="15" />

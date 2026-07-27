@@ -19,6 +19,7 @@ export default function BrandCard({ brand, canEdit, canSwitch, onEdit, onSwitch 
   const apcs  = brand.assignedUsers || [];
   const visibleApcs = apcs.slice(0, 4);
   const extra = apcs.length - visibleApcs.length;
+  const tierLabel = formatTier(brand.tier);
 
   const statusClass =
     brand.status === 'active' ? 'brand-status-badge-active' : 'brand-status-badge-inactive';
@@ -45,7 +46,7 @@ export default function BrandCard({ brand, canEdit, canSwitch, onEdit, onSwitch 
       </div>
 
       <div className="brand-card-meta">
-        {brand.tier && (
+        {tierLabel && (
           <span
             style={{
               padding: '2px 8px',
@@ -56,7 +57,7 @@ export default function BrandCard({ brand, canEdit, canSwitch, onEdit, onSwitch 
               borderRadius: 'var(--radius-pill)',
             }}
           >
-            Tier · {brand.tier}
+            Tier · {tierLabel}
           </span>
         )}
         {brand.gmv != null && (
@@ -132,4 +133,19 @@ function formatMoney(n) {
   if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000)     return `$${(num / 1_000).toFixed(1)}K`;
   return `$${num.toFixed(0)}`;
+}
+
+// Normalise a brand's tier for display + filtering so it's always a concrete number
+// ("2K" -> "2000") and "unlimited" is shown consistently. Free-text values differ
+// across brands, so this fixes the display without touching the stored data.
+export function formatTier(tier) {
+  if (tier == null) return null;
+  const s = String(tier).trim();
+  if (!s) return null;
+  if (/unlimited/i.test(s)) return 'Unlimited';
+  const k = s.match(/^([\d.,]+)\s*[kK]$/); // "2K", "2.5k", "10 K"
+  if (k) { const n = parseFloat(k[1].replace(/,/g, '')); if (Number.isFinite(n)) return String(Math.round(n * 1000)); }
+  const n = Number(s.replace(/,/g, '')); // "2000", "2,000"
+  if (Number.isFinite(n)) return String(n);
+  return s; // unknown format — show as-is
 }
