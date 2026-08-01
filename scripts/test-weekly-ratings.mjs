@@ -153,14 +153,21 @@ async function main() {
     ok('F8: JS integer-hundredths avg == SQL round (both 73, no FP drift)', jsAvg === Math.round(Number(par.overall_score)), `js=${jsAvg} sql=${Math.round(Number(par.overall_score))}`);
     await sb.from('weekly_performance_ratings').delete().eq('apc_id', apc).eq('month', FM);
   } finally {
-    // ── cleanup: restore switch, wipe every test row (NEVER the real July data) ──
-    await sb.from('weekly_performance_ratings').delete().eq('apc_id', apc).in('month', [FM, FM2, FM3, PRE]);
+    // ── cleanup: restore switch, wipe every test row. Scope the weekly-row delete
+    // to the throwaway test MEETINGS (never by month) — the PRE (2026-07) floor test
+    // shares a month with the REAL July trial ratings, so a month-based delete would
+    // wipe a real rating if the picked APC happened to have one. ──
+    if (meetingIds.length) await sb.from('weekly_performance_ratings').delete().in('meeting_id', meetingIds);
     await sb.from('performance_ratings').delete().eq('user_id', apc).in('month', [FM, FM2, FM3]); // NOT PRE — that's real
     if (meetingIds.length) await sb.from('agenda_meetings').delete().in('id', meetingIds);
     await setEnabled(origEnabled);
     const { data: chk } = await sb.from('performance_config').select('weekly_apc_ratings_enabled').eq('id', 1).single();
     ok('cleanup: switch restored to original', chk.weekly_apc_ratings_enabled === origEnabled, `(now ${chk.weekly_apc_ratings_enabled})`);
-    const { data: leftWpr } = await sb.from('weekly_performance_ratings').select('id').in('month', [FM, FM2, FM3, PRE]);
+    // Scope the leftover check to the test meetings too (month-based would match the
+    // real 2026-07 trial rows and false-fail).
+    const { data: leftWpr } = meetingIds.length
+      ? await sb.from('weekly_performance_ratings').select('id').in('meeting_id', meetingIds)
+      : { data: [] };
     ok('cleanup: no test weekly rows left', (leftWpr || []).length === 0);
     const { data: leftPr } = await sb.from('performance_ratings').select('user_id').eq('user_id', apc).in('month', [FM, FM2, FM3]);
     ok('cleanup: no test monthly rows left', (leftPr || []).length === 0);
