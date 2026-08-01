@@ -96,8 +96,9 @@ function OlBrandPanel({ status, olItem, paid }) {
             <div key={s.brand_id} className="d-flex align-items-center gap-2 px-2 py-1" style={{ fontSize: '0.8rem' }}>
               <i className={`bi ${cfg.icon}`} style={{ color: cfg.color, fontSize: '0.85rem' }} />
               <span className="fw-medium text-truncate" style={{ flex: '1 1 auto', minWidth: 0 }}>{s.brand_name}</span>
-              <span className="text-muted text-truncate" style={{ fontSize: '0.68rem', maxWidth: 160 }} title={s.matched_text || ''}>
-                {s.matched_text ? `TL: ${s.matched_text}` : `TL · ${s.owner_name || '—'}`}
+              <span className="text-muted text-truncate" style={{ fontSize: '0.68rem', maxWidth: 160 }}
+                title={s.matched_text ? `Matched TL item: ${s.matched_text}` : 'No matching TL GMV item'}>
+                TL: {s.owner_name || '—'}
               </span>
               <span style={{ color: cfg.color, fontSize: '0.66rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{cfg.label}</span>
             </div>
