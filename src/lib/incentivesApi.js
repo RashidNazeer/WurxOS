@@ -531,15 +531,19 @@ export async function getUserForEditor(userId) {
   let assignedBrands = [];
   const shape = (b) => ({ id: b.id, name: b.brand_name, tier: b.tier, status: b.status, client: b.client_name });
   if (data.role === 'tl') {
-    const { data: bs } = await supabase
+    const { data: bs, error: be } = await supabase
       .from('brands').select('id, brand_name, tier, status, client_name')
       .eq('owner_id', userId).eq('status', 'active').order('brand_name');
+    // Throw (never swallow) — a silent [] here would make the editor's carry-forward
+    // reconcile DROP every brand-linked item as an orphan. Fail loud instead.
+    if (be) throw new Error(be.message);
     assignedBrands = (bs || []).map(shape);
   } else if (data.role === 'apc' || data.role === 'ipc') {
-    const { data: rows } = await supabase
+    const { data: rows, error: ae } = await supabase
       .from('brand_assignments')
       .select('brand:brand_id(id, brand_name, tier, status, client_name)')
       .eq('user_id', userId);
+    if (ae) throw new Error(ae.message);
     assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
       .filter((b) => b.status === 'active').map(shape)
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));

@@ -438,7 +438,10 @@ export default function IncentiveForm() {
               ...(i.source ? { source: i.source } : {}),
               ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
             });
-            const keep = (i) => !i.brandId || curIds.has(i.brandId);
+            // Drop links to brands the user no longer has — but NEVER when the brand
+            // list is empty (that reconciles to "drop everything"); keep them as
+            // orphans instead, so a mis-load can't wipe the whole plan.
+            const keep = (i) => !i.brandId || curIds.size === 0 || curIds.has(i.brandId);
             setIncentives((prior.incentives || []).filter(keep).map(carry));
             setBonuses((prior.bonuses || []).filter(keep).map(carry));
             setCarryoverInfo({ source: 'prior', sourceMonth: prior.month });

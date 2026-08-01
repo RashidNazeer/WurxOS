@@ -319,6 +319,8 @@ function EditModal({ record, items, onClose, onSaved }) {
             completedBy:   isAtt ? (o.completedBy || null) : (b.completed ? (apcProfile?.userName || currentUser.uid) : null),
             completedAt:   isAtt ? (o.completedAt || null)  : (b.completed ? new Date().toISOString() : null),
             ...(o.source ? { source: o.source } : {}),
+            // Preserve the hard brand link on bonuses too (parity with incentives map).
+            ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
           };
         }),
       });
