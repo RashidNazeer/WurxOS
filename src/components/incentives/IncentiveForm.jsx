@@ -40,22 +40,24 @@ const looksLikeAttendance = (text) => /attendance|punctual|absence/i.test(text |
 // line — reveal it when the row is already flagged or its text names brands+GMV.
 const looksLikeOlBrands = (text) => /brand.*gmv|gmv.*brand|brands hit/i.test(text || '');
 
-function LineRow({ item, onChange, onRemove, index }) {
+function LineRow({ item, onChange, onRemove, hideToggles }) {
   const isAtt      = item.source === 'attendance';
   const isOlBrands = item.source === 'ol_brands';
   const suffix = isAtt ? '%' : (item.suffix ?? (item.unit === 'percent' ? '%' : ''));
-  const showAttToggle = !isOlBrands && (isAtt || looksLikeAttendance(item.text));
-  const showOlToggle  = !isAtt && (isOlBrands || looksLikeOlBrands(item.text));
+  // Brand-linked rows (hideToggles) never show the attendance/ol_brands source
+  // toggles — those only belong on "Other" (non-brand) lines.
+  const showAttToggle = !hideToggles && !isOlBrands && (isAtt || looksLikeAttendance(item.text));
+  const showOlToggle  = !hideToggles && !isAtt && (isOlBrands || looksLikeOlBrands(item.text));
 
   // Toggling attendance mode pins Target=100 and unit=% so the ≥90% rule
   // means "≥90% attendance". Achieved is then filled from live attendance.
   function toggleAttendance(on) {
     if (on) {
-      onChange(index, 'source', 'attendance');
-      onChange(index, 'targetValue', 100);
-      onChange(index, 'suffix', '%');
+      onChange(item.id, 'source', 'attendance');
+      onChange(item.id, 'targetValue', 100);
+      onChange(item.id, 'suffix', '%');
     } else {
-      onChange(index, 'source', null);
+      onChange(item.id, 'source', null);
     }
   }
 
@@ -64,11 +66,11 @@ function LineRow({ item, onChange, onRemove, index }) {
   // threshold, default 70); unit pinned to %.
   function toggleOlBrands(on) {
     if (on) {
-      onChange(index, 'source', 'ol_brands');
-      if (!Number(item.targetValue)) onChange(index, 'targetValue', 70);
-      onChange(index, 'suffix', '%');
+      onChange(item.id, 'source', 'ol_brands');
+      if (!Number(item.targetValue)) onChange(item.id, 'targetValue', 70);
+      onChange(item.id, 'suffix', '%');
     } else {
-      onChange(index, 'source', null);
+      onChange(item.id, 'source', null);
     }
   }
 
@@ -83,12 +85,12 @@ function LineRow({ item, onChange, onRemove, index }) {
           className="form-control form-control-sm flex-grow-1"
           placeholder="e.g. 250 affiliates with 3+ videos"
           value={item.text}
-          onChange={e => onChange(index, 'text', e.target.value)}
+          onChange={e => onChange(item.id, 'text', e.target.value)}
         />
         <button
           type="button"
           className="btn btn-sm btn-link text-danger p-0 flex-shrink-0"
-          onClick={() => onRemove(index)}
+          onClick={() => onRemove(item.id)}
           title="Remove"
         >
           <i className="bi bi-x-lg" />
@@ -161,7 +163,7 @@ function LineRow({ item, onChange, onRemove, index }) {
               placeholder="e.g. 250"
               min="0"
               value={isAtt ? 100 : (item.targetValue ?? '')}
-              onChange={e => onChange(index, 'targetValue', e.target.value)}
+              onChange={e => onChange(item.id, 'targetValue', e.target.value)}
               readOnly={isAtt}
               disabled={isAtt}
               style={lockStyle}
@@ -172,7 +174,7 @@ function LineRow({ item, onChange, onRemove, index }) {
               placeholder="—"
               maxLength={6}
               value={suffix}
-              onChange={e => onChange(index, 'suffix', e.target.value)}
+              onChange={e => onChange(item.id, 'suffix', e.target.value)}
               readOnly={isAtt}
               disabled={isAtt}
               style={{ maxWidth: 60, fontSize: '0.78rem', textAlign: 'center', ...(lockStyle || {}) }}
@@ -190,7 +192,7 @@ function LineRow({ item, onChange, onRemove, index }) {
               placeholder="Amount"
               min="0"
               value={item.amount}
-              onChange={e => onChange(index, 'amount', e.target.value)}
+              onChange={e => onChange(item.id, 'amount', e.target.value)}
             />
             <span className="input-group-text" style={{ fontSize: '0.7rem' }}>PKR</span>
           </div>
@@ -200,18 +202,50 @@ function LineRow({ item, onChange, onRemove, index }) {
   );
 }
 
-// ── Section block (Incentives or Bonuses) ────────────────────────────────────
-function Section({ title, color, icon, items, setItems, addLabel }) {
-  function handleChange(idx, field, val) {
-    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
-  }
-  function handleRemove(idx) {
-    setItems(prev => prev.filter((_, i) => i !== idx));
-  }
-  function handleAdd() {
-    setItems(prev => [...prev, { id: uid4(), text: '', amount: '', suffix: '' }]);
-  }
+// ── One brand's group of items inside a section ──────────────────────────────
+function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun }) {
+  const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const tier = brand.tier ? TIER_STYLE[String(brand.tier).toLowerCase()] : null;
+  return (
+    <div className="rounded-3 mb-2" style={{ border: '1px solid #e2e8f0', background: '#fff', overflow: 'hidden' }}>
+      <div className="d-flex align-items-center justify-content-between px-3 py-2"
+        style={{ background: '#f8fafc', borderBottom: items.length ? '1px solid #eef2f7' : 'none' }}>
+        <span className="d-inline-flex align-items-center gap-2">
+          <i className="bi bi-shop" style={{ color, fontSize: '0.8rem' }} />
+          <span className="fw-semibold" style={{ fontSize: '0.82rem' }}>{brand.name}</span>
+          {tier && (
+            <span className="rounded-pill" style={{ background: tier.bg, color: tier.fg, border: `1px solid ${tier.border}`, padding: '0 6px', fontSize: '0.58rem', fontWeight: 700 }}>{tier.label}</span>
+          )}
+        </span>
+        {total > 0 && <span className="fw-bold" style={{ fontSize: '0.75rem', color }}>+{total.toLocaleString()} PKR</span>}
+      </div>
+      <div className="p-2">
+        {items.length === 0
+          ? <p className="text-muted mb-2 px-1" style={{ fontSize: '0.72rem' }}>No {noun} for this brand yet.</p>
+          : items.map((item) => <LineRow key={item.id} item={item} onChange={onChange} onRemove={onRemove} hideToggles />)}
+        <button type="button" className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+          style={{ fontSize: '0.72rem' }} onClick={() => onAdd(brand)}>
+          <i className="bi bi-plus-lg" /> Add {noun} for {brand.name}
+        </button>
+      </div>
+    </div>
+  );
+}
 
+// ── A full section (Incentives or Bonuses): brand groups + an "Other" bucket ──
+// State stays a FLAT array; each item carries an optional brandId (+ brandName
+// snapshot). Items are rendered grouped by their linked brand, driven by the
+// user's CURRENT brands — so a newly-assigned brand shows an empty group to fill
+// and an item linked to a brand the user no longer has surfaces as an orphan.
+function PlanSection({ title, color, icon, items, setItems, brands, noun }) {
+  const change = (id, field, val) => setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: val } : it));
+  const remove = (id) => setItems(prev => prev.filter(it => it.id !== id));
+  const addBrand = (brand) => setItems(prev => [...prev, { id: uid4(), text: '', amount: '', suffix: '', brandId: brand.id, brandName: brand.name }]);
+  const addOther = () => setItems(prev => [...prev, { id: uid4(), text: '', amount: '', suffix: '' }]);
+
+  const brandIds = new Set((brands || []).map(b => b.id));
+  const otherItems  = items.filter(i => !i.brandId);
+  const orphanItems = items.filter(i => i.brandId && !brandIds.has(i.brandId));
   const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
   return (
@@ -219,44 +253,47 @@ function Section({ title, color, icon, items, setItems, addLabel }) {
       <div className="card-body p-3">
         <div className="d-flex align-items-center justify-content-between mb-3">
           <div className="d-flex align-items-center gap-2">
-            <div
-              className="rounded-2 d-flex align-items-center justify-content-center"
-              style={{ width: 30, height: 30, background: color + '20' }}
-            >
+            <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: color + '20' }}>
               <i className={`bi ${icon}`} style={{ color, fontSize: '0.85rem' }} />
             </div>
             <span className="fw-semibold small">{title}</span>
           </div>
-          {total > 0 && (
-            <span className="fw-bold small" style={{ color }}>
-              +{total.toLocaleString()} PKR
-            </span>
-          )}
+          {total > 0 && <span className="fw-bold small" style={{ color }}>+{total.toLocaleString()} PKR</span>}
         </div>
 
-        {items.length === 0 ? (
-          <p className="text-muted small mb-2" style={{ fontSize: '0.75rem' }}>
-            No {title.toLowerCase()} added yet.
-          </p>
+        {brands && brands.length > 0 ? (
+          <>
+            <div className="text-muted fw-semibold mb-2" style={{ fontSize: '0.66rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <i className="bi bi-link-45deg me-1" />Brand {noun}s
+            </div>
+            {brands.map((brand) => (
+              <BrandGroup key={brand.id} brand={brand} color={color} noun={noun}
+                items={items.filter(i => i.brandId === brand.id)}
+                onChange={change} onRemove={remove} onAdd={addBrand} />
+            ))}
+          </>
         ) : (
-          items.map((item, idx) => (
-            <LineRow
-              key={item.id}
-              item={item}
-              index={idx}
-              onChange={handleChange}
-              onRemove={handleRemove}
-            />
-          ))
+          <p className="text-muted mb-3" style={{ fontSize: '0.72rem' }}>No brands assigned to this person — add items under “Other” below.</p>
         )}
 
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
-          style={{ fontSize: '0.75rem' }}
-          onClick={handleAdd}
-        >
-          <i className="bi bi-plus-lg" /> {addLabel}
+        {orphanItems.length > 0 && (
+          <div className="rounded-3 mb-2 mt-2 p-2" style={{ border: '1px dashed #f59e0b', background: '#fffbeb' }}>
+            <div className="fw-semibold mb-2" style={{ fontSize: '0.7rem', color: '#b45309' }}>
+              <i className="bi bi-exclamation-triangle me-1" />Linked to a brand no longer assigned{orphanItems[0]?.brandName ? ` (${orphanItems.map(o => o.brandName).filter((v, i, a) => v && a.indexOf(v) === i).join(', ')})` : ''} — remove, or it drops on the next carry-forward
+            </div>
+            {orphanItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} hideToggles />)}
+          </div>
+        )}
+
+        <div className="text-muted fw-semibold mt-3 mb-2" style={{ fontSize: '0.66rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Other {noun}s <span className="text-muted" style={{ fontWeight: 400, textTransform: 'none' }}>· not tied to a brand (e.g. attendance)</span>
+        </div>
+        {otherItems.length === 0
+          ? <p className="text-muted mb-2 px-1" style={{ fontSize: '0.72rem' }}>None.</p>
+          : otherItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} />)}
+        <button type="button" className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
+          style={{ fontSize: '0.72rem' }} onClick={addOther}>
+          <i className="bi bi-plus-lg" /> Add other {noun}
         </button>
       </div>
     </div>
@@ -389,18 +426,21 @@ export default function IncentiveForm() {
           const prior = await getMostRecentPriorPlan(targetId, currentMonth);
           if (prior) {
             setBasicSalary(String(prior.basicSalary || ''));
-            setIncentives((prior.incentives || []).map((i) => ({
+            // Carry the brand link forward and reset progress. DROP items linked to
+            // a brand the user no longer has (brand switched away). Newly-assigned
+            // brands surface automatically as empty groups (sections render from the
+            // user's CURRENT brands).
+            const curIds = new Set((u.assignedBrands || []).map((b) => b.id));
+            const carry = (i) => ({
               id: uid4(), text: i.text, amount: i.amount,
               targetValue: i.targetValue ?? '', suffix: itemSuffix(i),
               achievedValue: 0, completed: false, completedBy: null,
               ...(i.source ? { source: i.source } : {}),
-            })));
-            setBonuses((prior.bonuses || []).map((b) => ({
-              id: uid4(), text: b.text, amount: b.amount,
-              targetValue: b.targetValue ?? '', suffix: itemSuffix(b),
-              achievedValue: 0, completed: false, completedBy: null,
-              ...(b.source ? { source: b.source } : {}),
-            })));
+              ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+            });
+            const keep = (i) => !i.brandId || curIds.has(i.brandId);
+            setIncentives((prior.incentives || []).filter(keep).map(carry));
+            setBonuses((prior.bonuses || []).filter(keep).map(carry));
             setCarryoverInfo({ source: 'prior', sourceMonth: prior.month });
           }
         } catch (err) {
@@ -470,7 +510,7 @@ export default function IncentiveForm() {
       // so the existing rows that other pages read stay compatible.
       // Attendance-linked items pin Target=100 / unit=% so the ≥90% rule
       // means "≥90% attendance"; their Achieved is filled at read time.
-      const incPayload = incentives.map((i) => ({
+      const mapItem = (i) => ({
         id: i.id, text: i.text, amount: Number(i.amount) || 0,
         targetValue: i.source === 'attendance' ? 100 : (Number(i.targetValue) || 0),
         suffix: i.source === 'attendance' ? '%' : itemSuffix(i),
@@ -478,16 +518,11 @@ export default function IncentiveForm() {
         achievedValue: i.achievedValue || 0,
         completedBy: i.completedBy || null,
         ...(i.source ? { source: i.source } : {}),
-      }));
-      const bonPayload = bonuses.map((b) => ({
-        id: b.id, text: b.text, amount: Number(b.amount) || 0,
-        targetValue: b.source === 'attendance' ? 100 : (Number(b.targetValue) || 0),
-        suffix: b.source === 'attendance' ? '%' : itemSuffix(b),
-        completed: b.completed || false,
-        achievedValue: b.achievedValue || 0,
-        completedBy: b.completedBy || null,
-        ...(b.source ? { source: b.source } : {}),
-      }));
+        // Hard brand link (new model). Kept only when set, so "Other" items stay unlinked.
+        ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+      });
+      const incPayload = incentives.map(mapItem);
+      const bonPayload = bonuses.map(mapItem);
 
       const saved = await savePlan({
         id: existingDocId || null,
@@ -650,24 +685,26 @@ export default function IncentiveForm() {
           </div>
         </div>
 
-        {/* Incentives */}
-        <Section
+        {/* Incentives — brand groups + Other */}
+        <PlanSection
           title="Incentives"
           color="#198754"
           icon="bi-graph-up-arrow"
           items={incentives}
           setItems={setIncentives}
-          addLabel="Add incentive"
+          brands={brands}
+          noun="incentive"
         />
 
-        {/* Bonuses */}
-        <Section
+        {/* Bonuses — brand groups + Other */}
+        <PlanSection
           title="Bonuses"
           color="#0d6efd"
           icon="bi-trophy"
           items={bonuses}
           setItems={setBonuses}
-          addLabel="Add bonus"
+          brands={brands}
+          noun="bonus"
         />
 
         {/* Summary */}

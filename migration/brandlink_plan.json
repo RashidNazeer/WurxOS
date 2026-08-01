@@ -1,0 +1,800 @@
+[
+ {
+  "rowId": "046e59ae-53b7-4fff-82c2-8c0cdc781545",
+  "cat": "incentives",
+  "itemId": "bofbk3uu",
+  "action": "link",
+  "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+  "brandName": "Klassy Network"
+ },
+ {
+  "rowId": "046e59ae-53b7-4fff-82c2-8c0cdc781545",
+  "cat": "incentives",
+  "itemId": "5y6bdzwq",
+  "action": "link",
+  "brandId": "0cf41a92-be55-5f0b-89ae-af25937f018c",
+  "brandName": "Obagi Skin Care"
+ },
+ {
+  "rowId": "046e59ae-53b7-4fff-82c2-8c0cdc781545",
+  "cat": "incentives",
+  "itemId": "vm1ok78n",
+  "action": "link",
+  "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+  "brandName": "Cutler Nutritions"
+ },
+ {
+  "rowId": "046e59ae-53b7-4fff-82c2-8c0cdc781545",
+  "cat": "incentives",
+  "itemId": "w0f1wsx7",
+  "action": "link",
+  "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+  "brandName": "Louisville Jerky"
+ },
+ {
+  "rowId": "046e59ae-53b7-4fff-82c2-8c0cdc781545",
+  "cat": "incentives",
+  "itemId": "sxwfmp1q",
+  "action": "link",
+  "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+  "brandName": "YesDay"
+ },
+ {
+  "rowId": "0edbf290-24f0-4974-a656-5732f70ed334",
+  "cat": "incentives",
+  "itemId": "r8bddwgg",
+  "action": "link",
+  "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+  "brandName": "Swisse"
+ },
+ {
+  "rowId": "0edbf290-24f0-4974-a656-5732f70ed334",
+  "cat": "incentives",
+  "itemId": "53vwiph0",
+  "action": "link",
+  "brandId": "894109fc-4337-5eac-8e63-b6792304fe9c",
+  "brandName": "Aurelia"
+ },
+ {
+  "rowId": "0edbf290-24f0-4974-a656-5732f70ed334",
+  "cat": "incentives",
+  "itemId": "5w46f41x",
+  "action": "link",
+  "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+  "brandName": "Inno Supps"
+ },
+ {
+  "rowId": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "cat": "incentives",
+  "itemId": "35a1tcap",
+  "action": "link",
+  "brandId": "06bcd676-af81-4c3a-ba20-90e4bca8ca68",
+  "brandName": "VidgePets USA"
+ },
+ {
+  "rowId": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "cat": "incentives",
+  "itemId": "8vdbzdsd",
+  "action": "link",
+  "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+  "brandName": "Penetrex"
+ },
+ {
+  "rowId": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "cat": "incentives",
+  "itemId": "00z8z3cf",
+  "action": "link",
+  "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+  "brandName": "Longevity Box"
+ },
+ {
+  "rowId": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "cat": "incentives",
+  "itemId": "i6itmoaf",
+  "action": "link",
+  "brandId": "563774dd-5e1e-5b2c-8f73-0e1bd353f12e",
+  "brandName": "Biostime Shop US"
+ },
+ {
+  "rowId": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "cat": "incentives",
+  "itemId": "7x8qjrsw",
+  "action": "link",
+  "brandId": "88dd7b60-c6ec-51e2-a381-8ed267b85e29",
+  "brandName": "Dr. Harvey's"
+ },
+ {
+  "rowId": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "cat": "incentives",
+  "itemId": "682rgofa",
+  "action": "link",
+  "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+  "brandName": "Aqua Sonic"
+ },
+ {
+  "rowId": "17ae6f15-6a60-41c5-9642-fea905ed18f0",
+  "cat": "incentives",
+  "itemId": "sua5pri3",
+  "action": "link",
+  "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+  "brandName": "Bentgo"
+ },
+ {
+  "rowId": "17ae6f15-6a60-41c5-9642-fea905ed18f0",
+  "cat": "incentives",
+  "itemId": "jwm0qqn3",
+  "action": "link",
+  "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+  "brandName": "FlyWell"
+ },
+ {
+  "rowId": "17ae6f15-6a60-41c5-9642-fea905ed18f0",
+  "cat": "incentives",
+  "itemId": "mj43hogr",
+  "action": "link",
+  "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+  "brandName": "Pure Daily Care"
+ },
+ {
+  "rowId": "17ae6f15-6a60-41c5-9642-fea905ed18f0",
+  "cat": "incentives",
+  "itemId": "tf5y4rwn",
+  "action": "link",
+  "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+  "brandName": "JoyMode"
+ },
+ {
+  "rowId": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "cat": "incentives",
+  "itemId": "vbijq4qq",
+  "action": "link",
+  "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+  "brandName": "Inno Supps"
+ },
+ {
+  "rowId": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "cat": "incentives",
+  "itemId": "zm8to4lr",
+  "action": "link",
+  "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+  "brandName": "Inno Supps"
+ },
+ {
+  "rowId": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "cat": "incentives",
+  "itemId": "bp5s6mkd",
+  "action": "link",
+  "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+  "brandName": "Inno Supps"
+ },
+ {
+  "rowId": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "cat": "incentives",
+  "itemId": "mrnuxm2q",
+  "action": "other"
+ },
+ {
+  "rowId": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "cat": "bonuses",
+  "itemId": "h77fzel0",
+  "action": "link",
+  "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+  "brandName": "Inno Supps"
+ },
+ {
+  "rowId": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "cat": "bonuses",
+  "itemId": "51e69cv1",
+  "action": "link",
+  "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+  "brandName": "Inno Supps"
+ },
+ {
+  "rowId": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "cat": "incentives",
+  "itemId": "pr07c84z",
+  "action": "drop"
+ },
+ {
+  "rowId": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "cat": "incentives",
+  "itemId": "cemjc49x",
+  "action": "drop"
+ },
+ {
+  "rowId": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "cat": "incentives",
+  "itemId": "4a6pvqd7",
+  "action": "drop"
+ },
+ {
+  "rowId": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "cat": "incentives",
+  "itemId": "epolz9o9",
+  "action": "other"
+ },
+ {
+  "rowId": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "cat": "bonuses",
+  "itemId": "shupzsj6",
+  "action": "link",
+  "brandId": "88dd7b60-c6ec-51e2-a381-8ed267b85e29",
+  "brandName": "Dr. Harvey's"
+ },
+ {
+  "rowId": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "cat": "bonuses",
+  "itemId": "nijsh860",
+  "action": "link",
+  "brandId": "88dd7b60-c6ec-51e2-a381-8ed267b85e29",
+  "brandName": "Dr. Harvey's"
+ },
+ {
+  "rowId": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "cat": "incentives",
+  "itemId": "0b1ods13",
+  "action": "link",
+  "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+  "brandName": "Longevity Box"
+ },
+ {
+  "rowId": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "cat": "incentives",
+  "itemId": "142vihas",
+  "action": "link",
+  "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+  "brandName": "Longevity Box"
+ },
+ {
+  "rowId": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "cat": "incentives",
+  "itemId": "rd5lvbep",
+  "action": "link",
+  "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+  "brandName": "Longevity Box"
+ },
+ {
+  "rowId": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "cat": "incentives",
+  "itemId": "mftdx9f7",
+  "action": "other"
+ },
+ {
+  "rowId": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "cat": "bonuses",
+  "itemId": "sy8ftqne",
+  "action": "link",
+  "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+  "brandName": "Longevity Box"
+ },
+ {
+  "rowId": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "cat": "bonuses",
+  "itemId": "ljmve3eg",
+  "action": "link",
+  "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+  "brandName": "Longevity Box"
+ },
+ {
+  "rowId": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "cat": "incentives",
+  "itemId": "ch82n4js",
+  "action": "link",
+  "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+  "brandName": "Swisse"
+ },
+ {
+  "rowId": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "cat": "incentives",
+  "itemId": "x8m6z7t3",
+  "action": "link",
+  "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+  "brandName": "Swisse"
+ },
+ {
+  "rowId": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "cat": "incentives",
+  "itemId": "zx8t8sr2",
+  "action": "link",
+  "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+  "brandName": "Swisse"
+ },
+ {
+  "rowId": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "cat": "incentives",
+  "itemId": "yp260em2",
+  "action": "other"
+ },
+ {
+  "rowId": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "cat": "bonuses",
+  "itemId": "mk2dkqqf",
+  "action": "link",
+  "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+  "brandName": "Swisse"
+ },
+ {
+  "rowId": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "cat": "bonuses",
+  "itemId": "wszvv4q1",
+  "action": "link",
+  "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+  "brandName": "Swisse"
+ },
+ {
+  "rowId": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "cat": "incentives",
+  "itemId": "6om7oeby",
+  "action": "link",
+  "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+  "brandName": "Louisville Jerky"
+ },
+ {
+  "rowId": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "cat": "incentives",
+  "itemId": "fgjchi54",
+  "action": "link",
+  "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+  "brandName": "Louisville Jerky"
+ },
+ {
+  "rowId": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "cat": "incentives",
+  "itemId": "90rt9es1",
+  "action": "link",
+  "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+  "brandName": "Louisville Jerky"
+ },
+ {
+  "rowId": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "cat": "incentives",
+  "itemId": "pzssay4z",
+  "action": "other"
+ },
+ {
+  "rowId": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "cat": "bonuses",
+  "itemId": "lhke2ltg",
+  "action": "link",
+  "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+  "brandName": "Louisville Jerky"
+ },
+ {
+  "rowId": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "cat": "bonuses",
+  "itemId": "jq4p8i37",
+  "action": "link",
+  "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+  "brandName": "Louisville Jerky"
+ },
+ {
+  "rowId": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "cat": "incentives",
+  "itemId": "0u3g04jj",
+  "action": "link",
+  "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+  "brandName": "Cutler Nutritions"
+ },
+ {
+  "rowId": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "cat": "incentives",
+  "itemId": "jey46cuk",
+  "action": "link",
+  "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+  "brandName": "Cutler Nutritions"
+ },
+ {
+  "rowId": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "cat": "incentives",
+  "itemId": "lks1mzpa",
+  "action": "link",
+  "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+  "brandName": "Cutler Nutritions"
+ },
+ {
+  "rowId": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "cat": "incentives",
+  "itemId": "o3d2izcn",
+  "action": "other"
+ },
+ {
+  "rowId": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "cat": "bonuses",
+  "itemId": "9j7kkwdc",
+  "action": "link",
+  "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+  "brandName": "Cutler Nutritions"
+ },
+ {
+  "rowId": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "cat": "bonuses",
+  "itemId": "06g2nss6",
+  "action": "link",
+  "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+  "brandName": "Cutler Nutritions"
+ },
+ {
+  "rowId": "d75e4566-ebd3-455f-8157-9faeaefd4a2d",
+  "cat": "incentives",
+  "itemId": "9n68qlop",
+  "action": "link",
+  "brandId": "ced1f13c-0255-4b5d-bf98-2e5047598f07",
+  "brandName": "Kenashii"
+ },
+ {
+  "rowId": "d75e4566-ebd3-455f-8157-9faeaefd4a2d",
+  "cat": "bonuses",
+  "itemId": "00dngq0y",
+  "action": "link",
+  "brandId": "ced1f13c-0255-4b5d-bf98-2e5047598f07",
+  "brandName": "Kenashii"
+ },
+ {
+  "rowId": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "cat": "incentives",
+  "itemId": "t2y77cpb",
+  "action": "link",
+  "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+  "brandName": "Penetrex"
+ },
+ {
+  "rowId": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "cat": "incentives",
+  "itemId": "ssazx37k",
+  "action": "link",
+  "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+  "brandName": "Penetrex"
+ },
+ {
+  "rowId": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "cat": "incentives",
+  "itemId": "8fcc1wo2",
+  "action": "link",
+  "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+  "brandName": "Penetrex"
+ },
+ {
+  "rowId": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "cat": "incentives",
+  "itemId": "127ujlev",
+  "action": "other"
+ },
+ {
+  "rowId": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "cat": "bonuses",
+  "itemId": "i3i8r1i5",
+  "action": "link",
+  "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+  "brandName": "Penetrex"
+ },
+ {
+  "rowId": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "cat": "bonuses",
+  "itemId": "xiq2w1mu",
+  "action": "link",
+  "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+  "brandName": "Penetrex"
+ },
+ {
+  "rowId": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "cat": "incentives",
+  "itemId": "2pdg2pdu",
+  "action": "link",
+  "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+  "brandName": "JoyMode"
+ },
+ {
+  "rowId": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "cat": "incentives",
+  "itemId": "55gpfzu2",
+  "action": "link",
+  "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+  "brandName": "JoyMode"
+ },
+ {
+  "rowId": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "cat": "incentives",
+  "itemId": "c6d7c01c",
+  "action": "link",
+  "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+  "brandName": "JoyMode"
+ },
+ {
+  "rowId": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "cat": "incentives",
+  "itemId": "766a6skt",
+  "action": "other"
+ },
+ {
+  "rowId": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "cat": "bonuses",
+  "itemId": "umwroeil",
+  "action": "link",
+  "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+  "brandName": "JoyMode"
+ },
+ {
+  "rowId": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "cat": "bonuses",
+  "itemId": "o3rj394h",
+  "action": "link",
+  "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+  "brandName": "JoyMode"
+ },
+ {
+  "rowId": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "cat": "incentives",
+  "itemId": "lajlnwjq",
+  "action": "link",
+  "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+  "brandName": "FlyWell"
+ },
+ {
+  "rowId": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "cat": "incentives",
+  "itemId": "1gxgi0hn",
+  "action": "link",
+  "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+  "brandName": "FlyWell"
+ },
+ {
+  "rowId": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "cat": "incentives",
+  "itemId": "sqcja5hy",
+  "action": "link",
+  "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+  "brandName": "FlyWell"
+ },
+ {
+  "rowId": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "cat": "incentives",
+  "itemId": "doq7b5j0",
+  "action": "other"
+ },
+ {
+  "rowId": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "cat": "bonuses",
+  "itemId": "eik3gww9",
+  "action": "link",
+  "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+  "brandName": "FlyWell"
+ },
+ {
+  "rowId": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "cat": "bonuses",
+  "itemId": "628nhshc",
+  "action": "link",
+  "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+  "brandName": "FlyWell"
+ },
+ {
+  "rowId": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "cat": "incentives",
+  "itemId": "4xv35xuq",
+  "action": "link",
+  "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+  "brandName": "Klassy Network"
+ },
+ {
+  "rowId": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "cat": "incentives",
+  "itemId": "bqrmmod9",
+  "action": "link",
+  "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+  "brandName": "Klassy Network"
+ },
+ {
+  "rowId": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "cat": "incentives",
+  "itemId": "qb5ks1a7",
+  "action": "link",
+  "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+  "brandName": "Klassy Network"
+ },
+ {
+  "rowId": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "cat": "incentives",
+  "itemId": "4xxf888i",
+  "action": "other"
+ },
+ {
+  "rowId": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "cat": "bonuses",
+  "itemId": "14a50i47",
+  "action": "link",
+  "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+  "brandName": "Klassy Network"
+ },
+ {
+  "rowId": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "cat": "bonuses",
+  "itemId": "hcwd88p9",
+  "action": "link",
+  "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+  "brandName": "Klassy Network"
+ },
+ {
+  "rowId": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "cat": "incentives",
+  "itemId": "i7r3g4ww",
+  "action": "link",
+  "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+  "brandName": "Pure Daily Care"
+ },
+ {
+  "rowId": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "cat": "incentives",
+  "itemId": "esh01ky8",
+  "action": "link",
+  "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+  "brandName": "Pure Daily Care"
+ },
+ {
+  "rowId": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "cat": "incentives",
+  "itemId": "uh33a2m0",
+  "action": "link",
+  "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+  "brandName": "Pure Daily Care"
+ },
+ {
+  "rowId": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "cat": "incentives",
+  "itemId": "t8duociw",
+  "action": "other"
+ },
+ {
+  "rowId": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "cat": "bonuses",
+  "itemId": "q4p18h8w",
+  "action": "link",
+  "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+  "brandName": "Pure Daily Care"
+ },
+ {
+  "rowId": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "cat": "bonuses",
+  "itemId": "1i6tvqhw",
+  "action": "link",
+  "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+  "brandName": "Pure Daily Care"
+ },
+ {
+  "rowId": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "cat": "incentives",
+  "itemId": "fb3tygav",
+  "action": "link",
+  "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+  "brandName": "Bentgo"
+ },
+ {
+  "rowId": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "cat": "incentives",
+  "itemId": "79ficgsj",
+  "action": "link",
+  "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+  "brandName": "Bentgo"
+ },
+ {
+  "rowId": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "cat": "incentives",
+  "itemId": "hadjb69a",
+  "action": "link",
+  "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+  "brandName": "Bentgo"
+ },
+ {
+  "rowId": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "cat": "incentives",
+  "itemId": "e2l0gkxr",
+  "action": "other"
+ },
+ {
+  "rowId": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "cat": "bonuses",
+  "itemId": "w8w550dj",
+  "action": "link",
+  "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+  "brandName": "Bentgo"
+ },
+ {
+  "rowId": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "cat": "bonuses",
+  "itemId": "r9n9nqvd",
+  "action": "link",
+  "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+  "brandName": "Bentgo"
+ },
+ {
+  "rowId": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "cat": "incentives",
+  "itemId": "02k53wlk",
+  "action": "link",
+  "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+  "brandName": "Aqua Sonic"
+ },
+ {
+  "rowId": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "cat": "incentives",
+  "itemId": "eb94spla",
+  "action": "link",
+  "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+  "brandName": "Aqua Sonic"
+ },
+ {
+  "rowId": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "cat": "incentives",
+  "itemId": "3b8x8yig",
+  "action": "link",
+  "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+  "brandName": "Aqua Sonic"
+ },
+ {
+  "rowId": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "cat": "incentives",
+  "itemId": "h1z0vaqk",
+  "action": "other"
+ },
+ {
+  "rowId": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "cat": "bonuses",
+  "itemId": "id979ebj",
+  "action": "link",
+  "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+  "brandName": "Aqua Sonic"
+ },
+ {
+  "rowId": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "cat": "bonuses",
+  "itemId": "vkes5du2",
+  "action": "link",
+  "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+  "brandName": "Aqua Sonic"
+ },
+ {
+  "rowId": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "cat": "incentives",
+  "itemId": "yvs6lpx1",
+  "action": "link",
+  "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+  "brandName": "YesDay"
+ },
+ {
+  "rowId": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "cat": "incentives",
+  "itemId": "wsr1zy9u",
+  "action": "link",
+  "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+  "brandName": "YesDay"
+ },
+ {
+  "rowId": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "cat": "incentives",
+  "itemId": "8w7q7asc",
+  "action": "link",
+  "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+  "brandName": "YesDay"
+ },
+ {
+  "rowId": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "cat": "incentives",
+  "itemId": "kxgzmcw8",
+  "action": "other"
+ },
+ {
+  "rowId": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "cat": "bonuses",
+  "itemId": "dk6sqgbq",
+  "action": "link",
+  "brandId": "7b9a1c8f-56f3-4ad4-be5b-091d1b48f060",
+  "brandName": "Dangle"
+ },
+ {
+  "rowId": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "cat": "bonuses",
+  "itemId": "6u82bqmr",
+  "action": "link",
+  "brandId": "7b9a1c8f-56f3-4ad4-be5b-091d1b48f060",
+  "brandName": "Dangle"
+ }
+]

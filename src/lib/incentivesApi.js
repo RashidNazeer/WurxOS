@@ -525,6 +525,25 @@ export async function getUserForEditor(userId) {
       .from('profiles').select('display_name').eq('id', data.reports_to).maybeSingle();
     ownerName = o?.display_name || '';
   }
+  // The user's ACTIVE brands, resolved per the team model: a TL owns brands
+  // (brands.owner_id); an APC/IPC gets them via brand_assignments. These drive
+  // the brand-linked incentive sections, so they must be the live assignment.
+  let assignedBrands = [];
+  const shape = (b) => ({ id: b.id, name: b.brand_name, tier: b.tier, status: b.status, client: b.client_name });
+  if (data.role === 'tl') {
+    const { data: bs } = await supabase
+      .from('brands').select('id, brand_name, tier, status, client_name')
+      .eq('owner_id', userId).eq('status', 'active').order('brand_name');
+    assignedBrands = (bs || []).map(shape);
+  } else if (data.role === 'apc' || data.role === 'ipc') {
+    const { data: rows } = await supabase
+      .from('brand_assignments')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name)')
+      .eq('user_id', userId);
+    assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
+      .filter((b) => b.status === 'active').map(shape)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
   return {
     id:              data.id,
     displayName:     data.display_name || data.email || '—',
@@ -534,7 +553,7 @@ export async function getUserForEditor(userId) {
     email:           data.email,
     ownerId:         data.reports_to || null,
     ownerName,
-    assignedBrands:  [],
+    assignedBrands,
   };
 }
 
