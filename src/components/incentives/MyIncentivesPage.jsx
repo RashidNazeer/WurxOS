@@ -153,6 +153,8 @@ function EditProgressModal({ record, onClose, onSaved }) {
           completed:     isAtt ? !!o.completed : (it.completed || false),
           completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),
           ...(o.source ? { source: o.source } : {}),
+          // Preserve the hard brand link — a progress edit must never strip it.
+          ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
         };
       };
       await updateIncentivesProgress({

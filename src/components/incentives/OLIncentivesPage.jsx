@@ -336,6 +336,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
           completed:     isAtt ? !!o.completed : (it.completed || false),
           completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),
           ...(o.source ? { source: o.source } : {}),
+          ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
         };
       };
       await updateIncentivesProgress({
@@ -823,6 +824,7 @@ export default function OLIncentivesPage() {
           completed: !!i.completed,
           completedBy: i.completed ? (i.completedBy || myName) : null,
           ...(i.source ? { source: i.source } : {}),
+          ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
         }));
         savedRec = await updateIncentivesProgress({
           rowId: rec.id,

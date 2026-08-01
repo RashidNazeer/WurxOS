@@ -303,6 +303,8 @@ function EditModal({ record, items, onClose, onSaved }) {
             completedBy:   isAtt ? (o.completedBy || null) : (i.completed ? (apcProfile?.userName || currentUser.uid) : null),
             completedAt:   isAtt ? (o.completedAt || null)  : (i.completed ? new Date().toISOString() : null),
             ...(o.source ? { source: o.source } : {}),
+            // Preserve the hard brand link — an APC progress edit must never strip it.
+            ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
           };
         }),
         bonuses: editItems.bonuses.map(b => {
