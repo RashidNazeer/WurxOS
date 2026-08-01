@@ -6,7 +6,7 @@ import {
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
-  applyAttendanceAutofill,
+  applyAttendanceAutofill, fetchOlBrandStatus,
 } from '../../lib/incentivesApi';
 
 function getCurrentMonth() {
@@ -20,6 +20,92 @@ function getMonthLabel(ym) {
 function pct(achieved, target) {
   if (!target || target <= 0) return 0;
   return Math.min(Math.round((Number(achieved) / Number(target)) * 100), 100);
+}
+
+// The OL's incentive-brand roll-up: which of their curated brands hit their GMV
+// target (owning TL marked it complete), the live %, and progress to the 70%
+// threshold. Curate the list in Settings → My Incentive Brands.
+function OlBrandPanel({ status, olItem, paid }) {
+  const list = Array.isArray(status) ? status : [];
+  const total = list.length;
+  const hits = list.filter((s) => s.is_hit).length;
+  const unmatched = list.filter((s) => !s.matched_text).length;
+  const target = Number(olItem?.targetValue) || 70;
+  const hasItem = !!olItem;                       // is the roll-up wired to an earnable line item?
+  // Once the month is PAID the payout was frozen from the snapshotted % in the
+  // line item. Show THAT number (not a live recompute a backdated TL edit could
+  // drift) so the panel always agrees with what the OL was actually paid.
+  const frozenPct = paid && olItem ? Number(olItem.achievedValue) : NaN;
+  const p = (paid && !Number.isNaN(frozenPct))
+    ? Math.round(frozenPct)
+    : (total ? Math.round((hits / total) * 100) : 0);
+  const met = hasItem && (paid ? !!olItem.completed : (total > 0 && p >= target));
+
+  return (
+    <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 14, overflow: 'hidden' }}>
+      <div className="p-3 d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div>
+          <div className="fw-bold" style={{ fontSize: '0.9rem' }}><i className="bi bi-bullseye me-1" style={{ color: 'var(--accent)' }} />Incentive brands</div>
+          <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+            <Link to="/settings?section=olIncentiveBrands">Choose which brands count</Link> · a brand counts once its TL marks its GMV target complete
+          </div>
+        </div>
+        <div className="text-end">
+          <div className="fw-bold" style={{ fontSize: '1.25rem', color: met ? 'var(--success)' : 'var(--text-primary)' }}>{p}%</div>
+          <div className="text-muted" style={{ fontSize: '0.68rem' }}>{paid ? 'frozen paid figure' : `${hits} of ${total} hit target`}</div>
+        </div>
+      </div>
+
+      <div className="px-3 pt-3">
+        {/* progress with a marker at the target% */}
+        <div className="position-relative rounded-pill" style={{ height: 8, background: 'var(--surface-2)' }}>
+          <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: met ? 'var(--success)' : 'var(--accent)', transition: 'width .4s' }} />
+          <div style={{ position: 'absolute', top: -3, bottom: -3, left: `${target}%`, width: 2, background: 'var(--text-primary)', opacity: 0.55 }} title={`Target ${target}%`} />
+        </div>
+        <div className="d-flex justify-content-between mt-1" style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+          <span>{met
+            ? <span style={{ color: 'var(--success)', fontWeight: 700 }}>Above the {target}% target ✓ {paid ? '(paid · locked)' : '(locks at month-end)'}</span>
+            : `${target}% needed`}</span>
+          <span>{p}%{paid && <span className="ms-1" style={{ opacity: 0.7 }}>· paid</span>}</span>
+        </div>
+        {!hasItem && total > 0 && (
+          <div className="mt-2 mb-1 px-2 py-1 rounded" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.7rem' }}>
+            <i className="bi bi-exclamation-triangle me-1" />This roll-up isn't wired to an incentive line item yet, so it can't be earned. Ask the Boss to add a "Brands hit their GMV targets" incentive item to your plan.
+          </div>
+        )}
+        {unmatched > 0 && (
+          <div className="mt-2 mb-1 px-2 py-1 rounded" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.7rem' }}>
+            <i className="bi bi-exclamation-triangle me-1" />{unmatched} brand{unmatched === 1 ? '' : 's'} have no matching TL GMV-target item yet — they can't count until the Team Lead adds/renames that item to include the brand name.
+          </div>
+        )}
+      </div>
+
+      <div className="p-2" style={{ maxHeight: 300, overflowY: 'auto' }}>
+        {total === 0 ? (
+          <div className="text-muted text-center py-3" style={{ fontSize: '0.8rem' }}>
+            No brands selected yet — <Link to="/settings?section=olIncentiveBrands">pick your incentive brands</Link>.
+          </div>
+        ) : list.map((s) => {
+          const state = s.is_hit ? 'hit' : (s.matched_text ? 'pending' : 'unmatched');
+          const cfg = {
+            hit:       { icon: 'bi-check-circle-fill', color: 'var(--success)', label: 'Hit' },
+            pending:   { icon: 'bi-circle',            color: 'var(--text-muted)', label: 'Not yet' },
+            unmatched: { icon: 'bi-exclamation-triangle-fill', color: 'var(--warning)', label: 'No TL item' },
+          }[state];
+          return (
+            <div key={s.brand_id} className="d-flex align-items-center gap-2 px-2 py-1" style={{ fontSize: '0.8rem' }}>
+              <i className={`bi ${cfg.icon}`} style={{ color: cfg.color, fontSize: '0.85rem' }} />
+              <span className="fw-medium text-truncate" style={{ flex: '1 1 auto', minWidth: 0 }}>{s.brand_name}</span>
+              <span className="text-muted text-truncate" style={{ fontSize: '0.68rem', maxWidth: 160 }} title={s.matched_text || ''}>
+                {s.matched_text ? `TL: ${s.matched_text}` : `TL · ${s.owner_name || '—'}`}
+              </span>
+              <span style={{ color: cfg.color, fontSize: '0.66rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{cfg.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 function calcBreakdown(rec) {
   const incTotal    = (rec.incentives || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
@@ -36,12 +122,58 @@ function itemSuffix(item) {
   return '';
 }
 
+// Cumulative payout/achievement snapshot for a set of users (base + incentives +
+// bonuses earned, and the fully/partial/none achievement split). Reused for the
+// APC+IPC combined view and the TL-only view.
+function computeCombinedStats(users, records) {
+  let totalBase = 0, incEarned = 0, incPotential = 0, bonEarned = 0, bonPotential = 0;
+  let withPlans = 0, fullyAchieved = 0, partial = 0, noneEarned = 0, noPlan = 0;
+  for (const u of users) {
+    const r = records[u.id];
+    if (!r) { noPlan++; continue; }
+    withPlans++;
+    const incs = r.incentives || [];
+    const bons = r.bonuses    || [];
+    totalBase    += Number(r.basicSalary) || 0;
+    const ip = incs.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const ie = incs.filter(i => i.completed).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const bp = bons.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+    const be = bons.filter(b => b.completed).reduce((s, b) => s + (Number(b.amount) || 0), 0);
+    incPotential += ip; incEarned += ie;
+    bonPotential += bp; bonEarned += be;
+    const incCount = incs.length;
+    const completedInc = incs.filter(i => i.completed).length;
+    if (incCount === 0)                 partial++;
+    else if (completedInc === 0)        noneEarned++;
+    else if (completedInc === incCount) fullyAchieved++;
+    else                                partial++;
+  }
+  return {
+    teamSize: users.length, withPlans, noPlan,
+    totalBase, incEarned, incPotential, bonEarned, bonPotential,
+    totalPayout: totalBase + incEarned + bonEarned,
+    fullyAchieved, partial, noneEarned,
+  };
+}
+
 // Small marker for incentive items whose Achieved is auto-filled from attendance.
 function AttendanceBadge() {
   return (
     <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
       style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
       <i className="bi bi-calendar-check me-1" />Auto
+    </span>
+  );
+}
+
+// Generic "Auto" marker for any read-time-derived item (attendance or ol_brands).
+function AutoBadge({ source }) {
+  const isBrands = source === 'ol_brands';
+  return (
+    <span className="badge rounded-pill"
+      title={isBrands ? 'Auto-filled from your incentive-brands roll-up' : 'Auto-filled from monthly attendance %'}
+      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      <i className={`bi ${isBrands ? 'bi-bullseye' : 'bi-calendar-check'} me-1`} />Auto
     </span>
   );
 }
@@ -87,23 +219,35 @@ function BrandTierChip({ brand }) {
 }
 
 // ── Edit Row (own progress) ───────────────────────────────────────────────────
-function EditRow({ item, cat, onChange }) {
-  const isAtt    = item.source === 'attendance';
+// lockTarget: when the OL edits their OWN progress, the Target is Boss-set and must
+// be read-only (an OL must not lower their own target to pass it) — same rule as
+// APC/TL. Left editable (default) when the OL manages an APC/IPC target.
+function EditRow({ item, cat, onChange, lockTarget = false }) {
+  const isAtt      = item.source === 'attendance';
+  const isOlBrands = item.source === 'ol_brands';
+  const isDerived  = isAtt || isOlBrands;        // read-time-filled → locked here
+  const lockTgt    = isDerived || lockTarget;    // target read-only?
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
   const p        = pct(achieved, target);          // display % only (rounded, capped 100)
-  const done     = autoComplete({ ...item, achievedValue: achieved, targetValue: target }); // single rule: raw ratio >= 0.9
+  // Completion rule per source: attendance/normal items use the ≥0.9 ratio;
+  // ol_brands uses the exact ≥ target (≥70) rule the overlay + payout freeze use,
+  // so this editor badge agrees with OlBrandPanel and the actual payout instead of
+  // showing "Completed" at 65%.
+  const done     = isOlBrands
+    ? (Number(achieved) >= (Number(target) || 70))
+    : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAtt ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAtt ? '#bfdbfe' : '#e9ecef')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isDerived ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isDerived ? '#bfdbfe' : '#e9ecef')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
-          {isAtt && <AttendanceBadge />}
+          {isDerived && <AutoBadge source={item.source} />}
           <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? '#e6f4ea' : '#fff3e0', color: done ? '#198754' : '#fd7e14' }}>
             {done ? '✓ Completed' : `${p}%`}
           </span>
@@ -111,20 +255,20 @@ function EditRow({ item, cat, onChange }) {
       </div>
       <div className="row g-2">
         <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Target</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Target{lockTgt && !isDerived && <span className="text-muted" style={{ fontSize: '0.6rem' }}> (set by Boss · read-only)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={target}
               onChange={e => onChange(cat, item.id, 'targetValue', e.target.value)}
-              readOnly={isAtt} disabled={isAtt} style={isAtt ? lock : undefined} />
+              readOnly={lockTgt} disabled={lockTgt} style={lockTgt ? lock : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
         </div>
         <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAtt && <span className="text-muted"> (auto)</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isDerived && <span className="text-muted"> (auto)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
               onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
-              readOnly={isAtt} disabled={isAtt} style={isAtt ? lock : undefined} />
+              readOnly={isDerived} disabled={isDerived} style={isDerived ? lock : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
         </div>
@@ -132,13 +276,16 @@ function EditRow({ item, cat, onChange }) {
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Unit</label>
           <input type="text" className="form-control form-control-sm" placeholder="%" maxLength={6}
             value={sfx} onChange={e => onChange(cat, item.id, 'suffix', e.target.value)}
-            readOnly={isAtt} disabled={isAtt}
-            style={{ textAlign: 'center', fontSize: '0.78rem', ...(isAtt ? lock : {}) }} />
+            readOnly={isDerived} disabled={isDerived}
+            style={{ textAlign: 'center', fontSize: '0.78rem', ...(isDerived ? lock : {}) }} />
         </div>
       </div>
-      {isAtt && (
+      {isDerived && (
         <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
-          <i className="bi bi-calendar-check me-1" />Filled automatically from this month's attendance %.
+          <i className={`bi ${isAtt ? 'bi-calendar-check' : 'bi-bullseye'} me-1`} />
+          {isAtt
+            ? "Filled automatically from this month's attendance %."
+            : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
         </div>
       )}
     </div>
@@ -172,24 +319,29 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
     setSaving(true); setError('');
     try {
       const myName = userProfile?.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || 'OL';
+      // The OL may only edit `achievedValue` + `completed` on their OWN progress.
+      // Preserve every Boss-set field (text, amount, targetValue, suffix, source) by
+      // re-reading from the original `items` — a lowered target can't be persisted,
+      // even if the client state were tampered. Matches APC/TL handleSave.
+      const origInc = new Map((items.incentives || []).map(i => [i.id, i]));
+      const origBon = new Map((items.bonuses    || []).map(b => [b.id, b]));
+      const mapItem = (it, orig) => {
+        const o = orig.get(it.id) || {};
+        const isAtt = o.source === 'attendance';
+        return {
+          id: it.id, text: o.text, amount: o.amount,
+          targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
+          achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(it.achievedValue) || 0),
+          suffix:        isAtt ? '%' : itemSuffix(o),
+          completed:     isAtt ? !!o.completed : (it.completed || false),
+          completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),
+          ...(o.source ? { source: o.source } : {}),
+        };
+      };
       await updateIncentivesProgress({
         rowId: record.id,
-        incentives: editItems.incentives.map(i => ({
-          id: i.id, text: i.text, amount: i.amount,
-          targetValue: Number(i.targetValue) || 0, achievedValue: Number(i.achievedValue) || 0,
-          suffix: itemSuffix(i),
-          completed: i.completed || false,
-          completedBy: i.completed ? (i.completedBy || myName) : null,
-          ...(i.source ? { source: i.source } : {}),
-        })),
-        bonuses: editItems.bonuses.map(b => ({
-          id: b.id, text: b.text, amount: b.amount,
-          targetValue: Number(b.targetValue) || 0, achievedValue: Number(b.achievedValue) || 0,
-          suffix: itemSuffix(b),
-          completed: b.completed || false,
-          completedBy: b.completed ? (b.completedBy || myName) : null,
-          ...(b.source ? { source: b.source } : {}),
-        })),
+        incentives: editItems.incentives.map(i => mapItem(i, origInc)),
+        bonuses:    editItems.bonuses.map(b => mapItem(b, origBon)),
       });
       onSaved(editItems);
     } catch { setError('Failed to save.'); } finally { setSaving(false); }
@@ -215,7 +367,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-graph-up-arrow me-1 text-success" />Incentives
               </p>
-              {editItems.incentives.map(i => <EditRow key={i.id} item={i} cat="incentives" onChange={handleChange} />)}
+              {editItems.incentives.map(i => <EditRow key={i.id} item={i} cat="incentives" onChange={handleChange} lockTarget />)}
             </div>
           )}
           {editItems.bonuses.length > 0 && (
@@ -223,7 +375,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-trophy me-1 text-primary" />Bonuses
               </p>
-              {editItems.bonuses.map(b => <EditRow key={b.id} item={b} cat="bonuses" onChange={handleChange} />)}
+              {editItems.bonuses.map(b => <EditRow key={b.id} item={b} cat="bonuses" onChange={handleChange} lockTarget />)}
             </div>
           )}
           {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}
@@ -240,7 +392,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
 }
 
 // ── User Details Modal (OL viewing an APC/IPC, with edit/toggle/verify) ──────
-function UserDetailsModal({ rec, user, onClose, onToggleItem, onVerify, onUnverify, verifying }) {
+function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, onVerify, onUnverify, verifying }) {
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState({ incentives: [], bonuses: [] });
 
@@ -323,7 +475,7 @@ function UserDetailsModal({ rec, user, onClose, onToggleItem, onVerify, onUnveri
             <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
               {item.completed ? '✓ Done' : `${p}%`}
             </span>
-            {item.source !== 'attendance' && (
+            {!readOnly && item.source !== 'attendance' && (
               <button className="btn btn-sm btn-link p-0" style={{ fontSize: '0.7rem', color: item.completed ? '#dc3545' : '#198754' }}
                 onClick={() => onToggleItem(rec, category, item.id, !item.completed)}
                 title={item.completed ? 'Mark incomplete' : 'Mark complete'}>
@@ -362,7 +514,7 @@ function UserDetailsModal({ rec, user, onClose, onToggleItem, onVerify, onUnveri
               </p>
             </div>
             <div className="d-flex align-items-center gap-1">
-              {!rec.verified && !editMode && (
+              {!readOnly && !rec.verified && !editMode && (
                 <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                   style={{ borderRadius: 8, fontSize: '0.72rem' }}
                   onClick={() => setEditMode(true)}
@@ -444,24 +596,24 @@ function UserDetailsModal({ rec, user, onClose, onToggleItem, onVerify, onUnveri
             ) : (
               <>
                 <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Close</button>
-                {!rec.verified && (
+                {!readOnly && !rec.verified && (
                   <button className="btn btn-sm btn-success px-3 d-inline-flex align-items-center gap-1"
                     onClick={() => onVerify(rec)} disabled={verifying === rec.id}>
                     {verifying === rec.id ? <><span className="spinner-border spinner-border-sm" /> Verifying…</> : <><i className="bi bi-patch-check-fill" /> Verify</>}
                   </button>
                 )}
                 {rec.verified && (
-                  <>
-                    <span className="badge rounded-pill px-3 py-2 d-inline-flex align-items-center gap-1"
-                      style={{ background: '#e6f4ea', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.75rem' }}>
-                      <i className="bi bi-patch-check-fill" /> Verified
-                    </span>
-                    <button className="btn btn-sm btn-outline-warning px-3 d-inline-flex align-items-center gap-1"
-                      onClick={() => onUnverify(rec)} disabled={verifying === rec.id}
-                      title="Mark as unverified and notify the user">
-                      {verifying === rec.id ? <><span className="spinner-border spinner-border-sm" /> Working…</> : <><i className="bi bi-arrow-counterclockwise" /> Mark Unverified</>}
-                    </button>
-                  </>
+                  <span className="badge rounded-pill px-3 py-2 d-inline-flex align-items-center gap-1"
+                    style={{ background: '#e6f4ea', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.75rem' }}>
+                    <i className="bi bi-patch-check-fill" /> Verified{rec.verifiedByRole ? ` by ${rec.verifiedByRole === 'boss' ? 'Boss' : rec.verifiedByRole.toUpperCase()}` : ''}
+                  </span>
+                )}
+                {!readOnly && rec.verified && (
+                  <button className="btn btn-sm btn-outline-warning px-3 d-inline-flex align-items-center gap-1"
+                    onClick={() => onUnverify(rec)} disabled={verifying === rec.id}
+                    title="Mark as unverified and notify the user">
+                    {verifying === rec.id ? <><span className="spinner-border spinner-border-sm" /> Working…</> : <><i className="bi bi-arrow-counterclockwise" /> Mark Unverified</>}
+                  </button>
                 )}
               </>
             )}
@@ -505,9 +657,11 @@ export default function OLIncentivesPage() {
   const [myRecord, setMyRecord] = useState(null);
   const [myItems, setMyItems] = useState({ incentives: [], bonuses: [] });
   const [showEditOwn, setShowEditOwn] = useState(false);
+  const [myBrandStatus, setMyBrandStatus] = useState(null); // OL's incentive-brand roll-up
 
   // APC/IPC management state
   const [allUsers, setAllUsers] = useState([]); // both APCs and IPCs
+  const [tlUsers, setTlUsers] = useState([]);   // Team Leads (read-only breakdown for the OL)
   const [records, setRecords] = useState({}); // userId → incentive doc
   const [loading, setLoading] = useState(true);
   const [detailsTarget, setDetailsTarget] = useState(null);
@@ -521,7 +675,10 @@ export default function OLIncentivesPage() {
     async function load() {
       setLoading(true);
 
-      // 1. Load OL's own incentive record
+      // 1. Load OL's own incentive record + their brand roll-up (best-effort)
+      fetchOlBrandStatus(currentUser.uid, month)
+        .then((s) => setMyBrandStatus(s))
+        .catch(() => setMyBrandStatus([]));
       const myRec = await getIncentives(currentUser.uid, month);
       if (myRec) {
         setMyRecord(myRec);
@@ -534,25 +691,30 @@ export default function OLIncentivesPage() {
         setMyItems({ incentives: [], bonuses: [] });
       }
 
-      // 2. Load ALL APCs and IPCs (across the entire office)
-      const teamList = await listUsersByRoles(['apc', 'ipc']);
+      // 2. Load ALL APCs and IPCs, and (for the read-only TL breakdown) all TLs.
+      const [teamList, tlList] = await Promise.all([
+        listUsersByRoles(['apc', 'ipc']),
+        listUsersByRoles(['tl']),
+      ]);
       setAllUsers(teamList);
+      setTlUsers(tlList);
 
-      // 3. Load all incentive records for the selected month
+      // 3. Load all incentive records for the selected month (an active OL can read
+      // every incentive row per RLS; we keep APC/IPC + TL and key them by user).
       const incList = await listIncentivesMonth(month);
       const map = {};
       incList.forEach((data) => {
         const uid = data.userId;
         if (!uid) return;
-        if (data.userRole === 'apc' || data.userRole === 'ipc') {
+        if (['apc', 'ipc', 'tl'].includes(data.userRole)) {
           map[uid] = data;
         }
       });
 
-      // 3b. Auto carry-forward: for users without a plan this month,
-      // fall back to their most recent prior plan and synthesise a
+      // 3b. Auto carry-forward: for any managed user (APC/IPC/TL) without a plan
+      // this month, fall back to their most recent prior plan and synthesise a
       // ghost record (no doc yet) with achieved/completed reset.
-      const missing = teamList.filter(u => !map[u.id]);
+      const missing = [...teamList, ...tlList].filter(u => !map[u.id]);
       await Promise.all(missing.map(async (u) => {
         try {
           const prior = await getMostRecentPriorPlan(u.id, month);
@@ -601,7 +763,10 @@ export default function OLIncentivesPage() {
 
   const apcs = allUsers.filter(u => !u.userType || u.userType === 'apc');
   const ipcs = allUsers.filter(u => u.userType === 'ipc');
-  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : [];
+  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers : [];
+  // TL incentives are the Boss's to manage — the OL sees them read-only.
+  const readOnly = tab === 'tls';
+  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : 'TLs';
 
   // Apply search + filters before rendering and for stats
   const list = baseList.filter(u => {
@@ -719,40 +884,10 @@ export default function OLIncentivesPage() {
   const recordsCount  = list.filter(u => records[u.id]).length;
   const verifiedCount = list.filter(u => records[u.id]?.verified).length;
 
-  // ── Combined payout snapshot (APCs + IPCs cumulative) ─────────────────────
-  const combinedStats = (() => {
-    const teamUsers = [...apcs, ...ipcs];
-    let totalBase = 0, incEarned = 0, incPotential = 0, bonEarned = 0, bonPotential = 0;
-    let withPlans = 0, fullyAchieved = 0, partial = 0, noneEarned = 0, noPlan = 0;
-    for (const u of teamUsers) {
-      const r = records[u.id];
-      if (!r) { noPlan++; continue; }
-      withPlans++;
-      const incs = r.incentives || [];
-      const bons = r.bonuses    || [];
-      totalBase    += Number(r.basicSalary) || 0;
-      const ip     = incs.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-      const ie     = incs.filter(i => i.completed).reduce((s, i) => s + (Number(i.amount) || 0), 0);
-      const bp     = bons.reduce((s, b) => s + (Number(b.amount) || 0), 0);
-      const be     = bons.filter(b => b.completed).reduce((s, b) => s + (Number(b.amount) || 0), 0);
-      incPotential += ip; incEarned += ie;
-      bonPotential += bp; bonEarned += be;
-
-      // Achievement bucket — based on incentive items only
-      const incCount = incs.length;
-      const completedInc = incs.filter(i => i.completed).length;
-      if (incCount === 0)              partial++;        // no incentive items defined → counts as partial / N/A
-      else if (completedInc === 0)     noneEarned++;
-      else if (completedInc === incCount) fullyAchieved++;
-      else                             partial++;
-    }
-    const totalPayout = totalBase + incEarned + bonEarned;
-    return {
-      teamSize: teamUsers.length, withPlans, noPlan,
-      totalBase, incEarned, incPotential, bonEarned, bonPotential, totalPayout,
-      fullyAchieved, partial, noneEarned,
-    };
-  })();
+  // ── Combined payout snapshots — APCs+IPCs cumulative, and TLs cumulative ──
+  const combinedStats = computeCombinedStats([...apcs, ...ipcs], records);
+  const tlStats       = computeCombinedStats(tlUsers, records);
+  const snapshotStats = tab === 'tls' ? tlStats : combinedStats;
 
   // My incentives summary
   const myAllItems     = [...myItems.incentives, ...myItems.bonuses];
@@ -779,9 +914,9 @@ export default function OLIncentivesPage() {
           style={{ width: 160, fontSize: '0.8rem', borderRadius: 8 }} />
       </div>
 
-      {/* Combined payout snapshot — cumulative APC + IPC */}
-      {!loading && combinedStats.teamSize > 0 && (
-        <CombinedPayoutSnapshot stats={combinedStats} monthLabel={getMonthLabel(month)} />
+      {/* Combined payout snapshot — cumulative for the active management tab */}
+      {!loading && tab !== 'my' && snapshotStats.teamSize > 0 && (
+        <CombinedPayoutSnapshot stats={snapshotStats} monthLabel={getMonthLabel(month)} />
       )}
 
       {/* Tabs */}
@@ -789,6 +924,7 @@ export default function OLIncentivesPage() {
         {[
           { key: 'apcs', label: 'APC Incentives', icon: 'bi-people' },
           { key: 'ipcs', label: 'IPC Incentives', icon: 'bi-people-fill' },
+          { key: 'tls',  label: 'TL Incentives',  icon: 'bi-person-badge' },
           { key: 'my',   label: 'My Incentives',  icon: 'bi-person' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -863,6 +999,11 @@ export default function OLIncentivesPage() {
                 )}
               </div>
             </div>
+            {myBrandStatus && (
+              <OlBrandPanel status={myBrandStatus}
+                paid={!!myRecord.payoutCleared}
+                olItem={(myRecord.incentives || []).find((i) => i.source === 'ol_brands')} />
+            )}
           </div>
         )
       ) : (
@@ -890,7 +1031,7 @@ export default function OLIncentivesPage() {
                 <i className="bi bi-search position-absolute text-muted"
                   style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
                 <input type="text" className="form-control form-control-sm"
-                  placeholder={`Search ${tab === 'apcs' ? 'APCs' : 'IPCs'}…`}
+                  placeholder={`Search ${tabNoun}…`}
                   style={{ paddingLeft: 28, borderRadius: 8 }}
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
@@ -903,7 +1044,7 @@ export default function OLIncentivesPage() {
                 <option value="verified">Verified</option>
                 <option value="unverified">Unverified</option>
               </select>
-              {teamOptions.length > 0 && (
+              {!readOnly && teamOptions.length > 0 && (
                 <select className="form-select form-select-sm"
                   value={filterTeam} onChange={e => setFilterTeam(e.target.value)}
                   style={{ width: 180, borderRadius: 8 }}>
@@ -930,8 +1071,8 @@ export default function OLIncentivesPage() {
               <i className="bi bi-people text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">
                 {hasFilters
-                  ? `No ${tab === 'apcs' ? 'APCs' : 'IPCs'} match your filters.`
-                  : `No ${tab === 'apcs' ? 'APCs' : 'IPCs'} in the office yet.`}
+                  ? `No ${tabNoun} match your filters.`
+                  : `No ${tabNoun} in the office yet.`}
               </p>
             </div>
           ) : (
@@ -998,12 +1139,18 @@ export default function OLIncentivesPage() {
                                 onClick={() => setDetailsTarget({ user, rec })}>
                                 <i className="bi bi-eye" /> Details
                               </button>
-                              <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 btn-dark"
-                                style={{ borderRadius: 8, fontSize: '0.7rem' }}>
-                                <i className="bi bi-pencil" /> Edit Plan
-                              </Link>
+                              {!readOnly && (
+                                <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 btn-dark"
+                                  style={{ borderRadius: 8, fontSize: '0.7rem' }}>
+                                  <i className="bi bi-pencil" /> Edit Plan
+                                </Link>
+                              )}
                             </div>
                           </>
+                        ) : readOnly ? (
+                          <div className="text-muted text-center py-1" style={{ fontSize: '0.72rem' }}>
+                            No incentive plan set for {getMonthLabel(month)}.
+                          </div>
                         ) : (
                           <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm btn-outline-dark w-100 d-inline-flex align-items-center justify-content-center gap-1"
                             style={{ borderRadius: 8, fontSize: '0.72rem' }}>

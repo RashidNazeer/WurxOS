@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { parseHaloGranularitySheet } from '../../lib/haloParse';
+import { parseSearchVolumeSheet, buildWeeklyFromDaily } from '../../lib/haloWeeklyBuild';
 import { getHaloRows, createHaloDataset, deleteHaloDataset } from '../../lib/haloApi';
 import { listHaloEnabledBrands } from '../../lib/haloBrandsApi';
 import HaloExplorer from '../../components/halo/HaloExplorer';
@@ -132,6 +133,7 @@ function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShar
                 meta={g}
                 brand={brand}
                 dataset={selected.datasets[g.key] || null}
+                dailyDataset={selected.datasets.day || null}
                 onDone={onRefresh}
                 onDelete={() => selected.datasets[g.key] && onDelete(selected.datasets[g.key].id, g.label.toLowerCase())}
               />
@@ -157,7 +159,7 @@ function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShar
 // ============================================================
 // One upload slot for a brand's daily / weekly / monthly sheet.
 // ============================================================
-function UploadSlot({ granularity, meta, brand, dataset, onDone, onDelete }) {
+function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, onDelete }) {
   const [file, setFile] = useState(null);
   const [parsed, setParsed] = useState(null);
   const [parseErr, setParseErr] = useState('');
@@ -245,6 +247,110 @@ function UploadSlot({ granularity, meta, brand, dataset, onDone, onDelete }) {
             </button>
             <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" disabled={saving} onClick={reset}>Cancel</button>
           </div>
+        </div>
+      )}
+
+      {/* Weekly-only: build the weekly sheet from the daily data + a search-volume
+          roll-up sheet, so the search volume never has to be reformatted by hand. */}
+      {granularity === 'week' && (
+        <WeeklySearchBuilder brand={brand} dailyDataset={dailyDataset} hasWeekly={!!dataset} onDone={onDone} />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Build the weekly dataset from the brand's daily sheet + a "Weekly Search
+// Volume — Brand Roll-Ups" sheet. The user uploads ONLY the search-volume sheet
+// and picks their column; we roll the daily data up to the same weeks and attach
+// it. No hand-merging, and the daily/weekly parser format is untouched.
+// ============================================================
+function WeeklySearchBuilder({ brand, dailyDataset, hasWeekly, onDone }) {
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState(null);
+  const [sv, setSv] = useState(null);          // { columns, weeks }
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const inputRef = useRef(null);
+
+  function reset() {
+    setFile(null); setSv(null); setErr(''); setNote('');
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  async function onFile(f) {
+    setFile(f); setSv(null); setErr(''); setNote('');
+    if (!f) return;
+    try {
+      setSv(await parseSearchVolumeSheet(await f.arrayBuffer()));
+    } catch (e) { setErr(e.message || String(e)); }
+  }
+
+  async function build() {
+    if (!sv || !dailyDataset) return;
+    setBusy(true); setErr(''); setNote('');
+    try {
+      const dailyRows = await getHaloRows(dailyDataset.id);
+      const out = buildWeeklyFromDaily({ dailyRows, searchWeeks: sv.weeks, columns: sv.columns, tailWeeks: 3 });
+      await createHaloDataset({
+        brandId: brand.id,
+        granularity: 'week',
+        name: `${brand.brand_name} — week (built from daily + search volume)`,
+        filename: file?.name,
+        periodStart: out.periodStart,
+        periodEnd: out.periodEnd,
+        currency: dailyDataset.currency || '$',
+        rows: out.rows,
+      });
+      setNote(`Built ${out.weeksBuilt} weeks (${out.strictCount} with daily data${out.tailCount ? ` + ${out.tailCount} trailing` : ''}).`);
+      reset();
+      onDone?.();
+    } catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div style={{ marginTop: 4, borderTop: '1px dashed var(--border-subtle)', paddingTop: 8 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, fontSize: 11.5, fontWeight: 600 }}>
+        {open ? '▾' : '▸'} Or build from a search-volume sheet
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11.5, color: 'var(--text-muted)' }}>
+          <div style={{ lineHeight: 1.5 }}>
+            Upload the <strong>Weekly Search Volume roll-up</strong> sheet only. Every keyword column in it is summed into
+            this brand's branded search volume, and the daily data is rolled up to the same (Saturday-ending) weeks — no
+            picking, no manual grouping.
+          </div>
+
+          {!dailyDataset ? (
+            <div style={{ color: 'var(--warning, #f59e0b)' }}>⚠ Upload the daily sheet first — the weekly build rolls it up for the metrics.</div>
+          ) : (
+            <>
+              <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input" style={{ fontSize: 11.5 }}
+                onChange={(e) => onFile(e.target.files?.[0] || null)} />
+
+              {err && <div style={{ color: 'var(--danger, #ef4444)' }}>{err}</div>}
+              {note && <div style={{ color: '#22c55e' }}>✓ {note}</div>}
+
+              {sv && (
+                <>
+                  <div>
+                    Summing <strong style={{ color: 'var(--text-primary)' }}>{sv.columns.length}</strong> keyword column{sv.columns.length !== 1 ? 's' : ''} into {brand.brand_name}'s branded search volume:{' '}
+                    <span style={{ color: 'var(--text-primary)' }}>{sv.columns.join(', ')}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button type="button" className="wx-btn wx-btn-primary wx-btn-sm" disabled={busy} onClick={build}>
+                      {busy ? 'Building…' : (hasWeekly ? 'Rebuild weekly' : 'Build weekly')}
+                    </button>
+                    <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" disabled={busy} onClick={reset}>Cancel</button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

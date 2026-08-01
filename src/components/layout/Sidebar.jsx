@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { getMenuForRole, applyMenuLayout } from './menu';
 import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
+import { useNotifications } from '../../contexts/NotificationsContext';
 
 export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileOpen, onMobileClose }) {
   // Role menu + the user's saved order/pins (Settings → Menu Layout). Pinned
@@ -145,18 +146,24 @@ export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileO
 
 function NavItem({ item, collapsed }) {
   const Icon = item.icon;
+  // Alert items (e.g. Creator Library) escalate a plain unread dot into a
+  // blinking, colour-inverted row when their category has unread — impossible
+  // to miss. Non-alert items keep the subtle dot.
+  const { counts } = useNotifications();
+  const alertN = item.alert && item.category ? (counts.byCategory?.[item.category] || 0) : 0;
   return (
     <NavLink
       to={item.to}
       end={item.to === '/dashboard'}
       title={collapsed ? item.label : undefined}
-      className={({ isActive }) => `shell-nav-link ${isActive ? 'active' : ''}`}
+      className={({ isActive }) => `shell-nav-link ${isActive ? 'active' : ''}${alertN ? ' shell-nav-link--alert' : ''}`}
     >
       <span className="icon" style={{ position: 'relative' }}>
         {Icon ? <Icon width="17" height="17" /> : null}
-        {item.category && <UnreadDot category={item.category} />}
+        {item.category && !alertN && <UnreadDot category={item.category} />}
       </span>
       <span className="label">{item.label}</span>
+      {alertN > 0 && <span className="shell-nav-alert-badge">{alertN}</span>}
     </NavLink>
   );
 }

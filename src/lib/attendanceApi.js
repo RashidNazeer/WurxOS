@@ -1067,12 +1067,12 @@ export async function bulkMarkMissedAsPresent(arg) {
  * @property {number}       weekendDays
  * @property {number}       holidayDays        weekday-only
  * @property {number}       approvedLeaveDays  weekday-only, holiday-subtracted
- * @property {number}       coveredDays
- * @property {number}       daysNotCovered     === missedDates.length (TODAY INCLUDED)
- * @property {number|null}  pct                INTEGER 0..100; null when daysThisMonth === 0
+ * @property {number}       coveredDays        set-union clock-ins∪adj∪leave∪holiday∪weekend, <= cutoff
+ * @property {number}       daysNotCovered     PAST weekdays not covered (today EXEMPT; === missedDatesPast.length) — mig 286
+ * @property {number|null}  pct                INTEGER 0..100; an uncovered TODAY is credited so it never drags the score (mig 286); null when daysThisMonth === 0
  * @property {number|null}  pctExact           1-dp numeric (what the incentive pays on); null likewise
- * @property {string[]}     missedDates        <= cutoff, TODAY INCLUDED (Roster + bulk-mark)
- * @property {string[]}     missedDatesPast    strictly < today (personal card)
+ * @property {string[]}     missedDates        <= cutoff, TODAY INCLUDED (raw calendar view)
+ * @property {string[]}     missedDatesPast    strictly < today — the "missed" set every surface scores on
  * @property {string[]}     presentDates       FULL month (calendar)
  * @property {string[]}     adjustedDates      FULL month (hasOverride = length > 0)
  * @property {string[]}     leaveDates         FULL month, UNCLIPPED — the calendar paints FUTURE leave blue

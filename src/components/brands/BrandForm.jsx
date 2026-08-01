@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import LogoPicker from './LogoPicker';
 import { XIcon, AlertIcon, ShieldIcon } from '../common/Icon';
 import { PAID_COLLAB_STATUSES, GMV_MAX_STATUSES, isManagedByUs } from '../../lib/roles';
+import { CURRENCIES, currencySymbol } from '../../utils/currencies';
 import BrandCustomFieldsPanel from './BrandCustomFieldsPanel';
 import BrandActivityPanel from './BrandActivityPanel';
 import BrandResourcesPanel from './BrandResourcesPanel';
@@ -33,6 +34,7 @@ export default function BrandForm({ brand, onClose, onSaved }) {
   const [clientName, setClientName] = useState(brand?.client_name || '');
   const [tier, setTier]             = useState(brand?.tier        || '');
   const [gmv, setGmv]               = useState(brand?.gmv != null ? String(brand.gmv) : '');
+  const [currency, setCurrency]     = useState(brand?.currency    || 'USD');
   const [status, setStatus]         = useState(brand?.status      || 'active');
   const [paidCollabStatus, setPaidCollabStatus] = useState(
     brand?.paid_collab_status || 'not_applicable',
@@ -156,13 +158,13 @@ export default function BrandForm({ brand, onClose, onSaved }) {
       let saved;
       if (isEdit) {
         saved = await updateBrand(brand.id, {
-          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus, gmvMaxStatus,
+          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus, gmvMaxStatus, currency,
           logoUrl: nextLogoUrl,
           eukaStoreId: eukaStoreToSave, eukaSlug: eukaSlugToSave,
         });
       } else {
         saved = await createBrand({
-          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus, gmvMaxStatus,
+          brandName, clientName, tier, gmv, status, ownerId, paidCollabStatus, gmvMaxStatus, currency,
           logoUrl: nextLogoUrl,
           eukaStoreId: eukaStoreToSave, eukaSlug: eukaSlugToSave,
         });
@@ -242,7 +244,7 @@ export default function BrandForm({ brand, onClose, onSaved }) {
                       fontSize: 13,
                       pointerEvents: 'none',
                     }}
-                  >$</span>
+                  >{currencySymbol(currency)}</span>
                   <input
                     type="number"
                     min="0"
@@ -272,6 +274,26 @@ export default function BrandForm({ brand, onClose, onSaved }) {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Reporting currency — single source of truth. Every money value
+                across this brand's reports, brand pages and the client portal
+                shows this symbol, past reports included. */}
+            <div style={{ marginBottom: 14 }}>
+              <label className="wx-label">Reporting currency</label>
+              <select
+                className="wx-input"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                disabled={saving}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.symbol}  ·  {c.code} — {c.label}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                Applies to every report for this brand — weekly, monthly and the client portal. Changing it updates all of them at once.
               </div>
             </div>
 

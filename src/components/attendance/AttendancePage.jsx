@@ -266,7 +266,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
           style={{ background: pct >= 80 ? 'var(--success-soft)' : pct >= 50 ? 'var(--warning-soft)' : 'var(--danger-soft)',
                    color:      pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)',
                    fontSize: '0.78rem', fontWeight: 700 }}>
-          <i className="bi bi-check2-circle" /> {stats.accountedDays} / {stats.workingDays} days · {pct}%
+          <i className="bi bi-check2-circle" /> {stats.workingDays - stats.missedDays} / {stats.workingDays} days · {pct}%
         </span>
       </div>
 

@@ -367,7 +367,11 @@ export default function KnowledgeBasePage() {
       });
       setShowPropose(false);
       setProposeSuccess(true);
-    } catch { /* ignore */ } finally { setProposeSaving(false); }
+    } catch (err) {
+      // Surface the failure — a silent catch let a failed propose look like a
+      // success while nothing was saved (the "added but never persisted" ghost).
+      throw err;
+    } finally { setProposeSaving(false); }
   }
 
   return (
@@ -608,12 +612,17 @@ function ProposeModal({ onClose, onSave, saving }) {
   const [version, setVersion] = useState('');
   const [error, setError] = useState('');
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim()) { setError('Title is required.'); return; }
     if (!url.trim()) { setError('URL / Link is required.'); return; }
     if (SOP_TABS.includes(tab) && !version.trim()) { setError('Version is required for SOP documents.'); return; }
-    onSave({ title, url, description: desc, tab, version });
+    setError('');
+    try {
+      await onSave({ title, url, description: desc, tab, version });
+    } catch (err) {
+      setError(err?.message || 'Could not submit — please check your connection and try again. It was NOT saved.');
+    }
   }
 
   // Themed input style — Bootstrap form-control doesn't honor our tokens

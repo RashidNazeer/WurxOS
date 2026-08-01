@@ -23,6 +23,7 @@ export default function AgendaPriorPage() {
   const [loading, setLoading]     = useState(true);
   const [viewMonth, setViewMonth] = useState(currentMonthStr);
   const [selected, setSelected]   = useState(null);   // { meeting, weekIndex }
+  const [sortDir, setSortDir]     = useState('desc');  // newest week/meeting first
 
   function reload() {
     // All statuses — so week numbers stay canonical (a completed week 3
@@ -54,15 +55,16 @@ export default function AgendaPriorPage() {
       if (!byWeek.has(m.week_start)) byWeek.set(m.week_start, []);
       byWeek.get(m.week_start).push(m);
     });
+    const dir = sortDir === 'asc' ? 1 : -1;
     return [...byWeek.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .sort((a, b) => dir * a[0].localeCompare(b[0]))
       .map(([weekStart, ms]) => ({
         weekStart,
         index: weekIndex[weekStart] || 1,
         meetings: ms.sort((a, b) =>
-          `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`)),
+          dir * `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`)),
       }));
-  }, [meetings, viewMonth]);
+  }, [meetings, viewMonth, sortDir]);
 
   if (selected) {
     return (
@@ -86,13 +88,20 @@ export default function AgendaPriorPage() {
           </h5>
           <p className="text-muted small mb-0">Completed agenda meetings — records, attendance and evaluations.</p>
         </div>
-        <MonthNavigator
-          label={viewMonthLabel}
-          isCurrent={isCurrentMonth}
-          onPrev={() => setViewMonth((m) => stepMonthStr(m, -1))}
-          onNext={() => setViewMonth((m) => stepMonthStr(m, 1))}
-          onReset={() => setViewMonth(currentMonthStr())}
-        />
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          <select className="form-select form-select-sm" value={sortDir} onChange={(e) => setSortDir(e.target.value)}
+            style={{ width: 150, borderRadius: 8, fontSize: '0.8rem' }} title="Sort meetings">
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+          <MonthNavigator
+            label={viewMonthLabel}
+            isCurrent={isCurrentMonth}
+            onPrev={() => setViewMonth((m) => stepMonthStr(m, -1))}
+            onNext={() => setViewMonth((m) => stepMonthStr(m, 1))}
+            onReset={() => setViewMonth(currentMonthStr())}
+          />
+        </div>
       </div>
 
       {loading ? (

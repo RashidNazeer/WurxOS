@@ -130,7 +130,7 @@ function BrandPaidCollabCard({ brand, weekStart, entry, onSaved }) {
             <span className="wx-label" style={{ fontSize: 12 }}>{f.label}{f.money ? ' ($)' : ''}</span>
             <input type="text" inputMode="decimal" className="wx-input"
               value={form[f.key] ?? ''} placeholder={f.money ? '$ —' : '—'}
-              onChange={(e) => set(f.key, e.target.value)} />
+              onChange={(e) => set(f.key, e.target.value.replace(/[^0-9.\-]/g, ''))} />
           </label>
         ))}
       </div>

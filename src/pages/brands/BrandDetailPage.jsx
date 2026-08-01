@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { getBrand } from '../../lib/brandsApi';
+import { getBrand, setBrandLastSaleDate } from '../../lib/brandsApi';
 import { listTasks } from '../../lib/tasksApi';
 import { listReports } from '../../lib/reportsApi';
 import { listProducts } from '../../lib/productsApi';
 import { useReportsRealtime } from '../../lib/useReportsRealtime';
+import { currencySymbol } from '../../utils/currencies';
 
 const REPORT_STATUS_TONE = {
   draft:     { fg: 'var(--text-muted)', label: 'Draft' },
@@ -36,7 +37,7 @@ import CreateTaskModal from '../../components/tasks/CreateTaskModal';
 import {
   ChevronRightIcon, ChevronDownIcon, PencilIcon, AlertIcon,
   PlusIcon, StoreIcon, ChecklistIcon, ReportIcon, UsersIcon, BookmarkIcon,
-  ShieldIcon, SettingsIcon, ClockIcon, BoxIcon, MegaphoneIcon,
+  ShieldIcon, SettingsIcon, ClockIcon, BoxIcon, MegaphoneIcon, StarIcon,
 } from '../../components/common/Icon';
 import '../../styles/table.css';
 import '../../styles/brands.css';
@@ -280,6 +281,8 @@ export default function BrandDetailPage() {
             <OverviewPanel
               brand={brand}
               canEdit={canEditBrand}
+              canManageTier={canEditBrand || assigned.some((a) => a.id === uid)}
+              onSaved={refetchBrand}
               owner={owner}
               assigned={assigned}
               gmv={brand.gmv}
@@ -399,15 +402,124 @@ export default function BrandDetailPage() {
 }
 
 // ============================================================
+// Tier sale tracker — a brand that isn't 'unlimited' must have a sale generated
+// at least every 30 days to keep its creator-outreach tier unlocked. Record the
+// last sale date here; the reminder fires 3/2/1 days before (date+30) then daily
+// until it's updated (or the tier is set to unlimited). Boss/OL/owner-TL/assigned
+// -APC can edit (server re-checks via brand_set_last_sale_date).
+function karachiToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date()); // YYYY-MM-DD
+}
+function tierDeadlineInfo(dateStr) {
+  if (!dateStr) return null;
+  const deadline = new Date(dateStr + 'T00:00:00');
+  deadline.setDate(deadline.getDate() + 30);
+  const today = new Date(karachiToday() + 'T00:00:00');
+  const daysLeft = Math.round((deadline - today) / 86400000);
+  const deadlineLabel = deadline.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return { daysLeft, deadlineLabel };
+}
+
+function TierSaleCard({ brand, canManage, onSaved }) {
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  // Local copy so the picked date shows INSTANTLY while the RPC + refetch are in
+  // flight — a purely prop-controlled input would flash back to the old value on
+  // the setSaving re-render (painful on the slow ISPs this app codes for).
+  const [localDate, setLocalDate] = useState(brand.last_sale_generated_date || '');
+  useEffect(() => { setLocalDate(brand.last_sale_generated_date || ''); }, [brand.last_sale_generated_date]);
+  const dateStr = localDate;
+  const info = tierDeadlineInfo(dateStr);
+
+  async function save(newDate) {
+    setLocalDate(newDate || '');            // optimistic
+    setSaving(true); setErr('');
+    try {
+      await setBrandLastSaleDate(brand.id, newDate || null);
+      await onSaved?.();
+    } catch (e) {
+      setErr(e.message || 'Failed to save.');
+      setLocalDate(brand.last_sale_generated_date || '');   // revert on failure
+    }
+    finally { setSaving(false); }
+  }
+
+  // Countdown badge tone/label.
+  let badge = { text: 'No sale date set', bg: 'var(--warning-soft)', fg: 'var(--warning)' };
+  if (info) {
+    const d = info.daysLeft;
+    if (d > 3)       badge = { text: `Next due in ${d} days`, bg: 'var(--success-soft)', fg: 'var(--success)' };
+    else if (d > 0)  badge = { text: `Due in ${d} day${d === 1 ? '' : 's'}`, bg: 'var(--warning-soft)', fg: 'var(--warning)' };
+    else if (d === 0) badge = { text: 'Due today', bg: 'var(--danger-soft)', fg: 'var(--danger)' };
+    else             badge = { text: `Overdue by ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'}`, bg: 'var(--danger-soft)', fg: 'var(--danger)' };
+  }
+
+  return (
+    <div className="bd-card">
+      <div className="bd-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <StarIcon width="15" height="15" style={{ color: 'var(--accent)' }} />
+        Tier sale tracker
+      </div>
+      <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 10px' }}>
+        Tier <strong>{brand.tier}</strong> stays unlocked only if a sale is generated every 30 days.
+        Record the last sale date — reminders fire 3 days before it's due, then daily until you update it
+        (or set the tier to <strong>unlimited</strong>).
+      </p>
+
+      <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
+        <span style={{
+          fontSize: 11.5, fontWeight: 800, padding: '4px 11px', borderRadius: 999,
+          background: badge.bg, color: badge.fg,
+        }}>{badge.text}</span>
+        {info && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Deadline · {info.deadlineLabel}</span>
+        )}
+      </div>
+
+      {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 8, fontSize: 12 }}><span>{err}</span></div>}
+
+      {canManage ? (
+        <div className="d-flex align-items-end flex-wrap gap-2">
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
+              Last sale generated
+            </div>
+            <input type="date" className="wx-input" style={{ width: 170 }}
+              value={dateStr} max={karachiToday()} disabled={saving}
+              onChange={(e) => save(e.target.value)} />
+          </div>
+          <button className="wx-btn wx-btn-primary" disabled={saving}
+            onClick={() => save(karachiToday())}>
+            {saving ? <span className="wx-spinner" /> : <><i className="bi bi-check2-circle me-1" />Mark generated today</>}
+          </button>
+          {dateStr && (
+            <button className="wx-btn wx-btn-ghost" disabled={saving} onClick={() => save(null)} title="Clear the date (stops reminders)">
+              Clear
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13 }}>
+          Last sale generated: <strong>{dateStr ? new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 function OverviewPanel({
-  brand, canEdit, owner, assigned,
+  brand, canEdit, canManageTier, onSaved, owner, assigned,
   gmv, productsCount, openTaskCount, overdueCount, dueTodayCount,
 }) {
+  // A brand is "under tier" (needs periodic sale generation to stay unlocked)
+  // when it has a concrete tier that isn't 'unlimited'.
+  const underTier = brand.tier && brand.tier.trim() && brand.tier.trim().toLowerCase() !== 'unlimited';
   // Build the KPI tile list, skipping tiles we don't have data for.
   const tiles = [];
   if (gmv != null) {
     tiles.push({
-      key: 'gmv', label: 'GMV · 30 day', value: formatMoney(gmv),
+      key: 'gmv', label: 'GMV · 30 day', value: formatMoney(gmv, brand.currency),
       icon: 'bi-cash-stack', accent: '#0ea5e9',
       foot: gmv === 0 ? 'No attributed sales yet' : null,
     });
@@ -465,13 +577,17 @@ function OverviewPanel({
             <dl className="bd-kv">
               <dt>Client</dt><dd>{brand.client_name || '—'}</dd>
               <dt>Tier</dt><dd>{brand.tier || '—'}</dd>
-              <dt>GMV · 30 day</dt><dd>{brand.gmv != null ? formatMoney(brand.gmv) : '—'}</dd>
+              <dt>GMV · 30 day</dt><dd>{brand.gmv != null ? formatMoney(brand.gmv, brand.currency) : '—'}</dd>
               <dt>Paid Collab</dt><dd>{paidCollabStatusLabel(brand.paid_collab_status)}</dd>
               <dt>GMV Max</dt><dd>{gmvMaxStatusLabel(brand.gmv_max_status)}</dd>
               <dt>Status</dt><dd style={{ textTransform: 'capitalize' }}>{brand.status}</dd>
               <dt>Created</dt><dd>{new Date(brand.created_at).toLocaleDateString()}</dd>
             </dl>
           </div>
+
+          {underTier && brand.status === 'active' && (
+            <TierSaleCard brand={brand} canManage={canManageTier} onSaved={onSaved} />
+          )}
 
           <BrandCustomFieldsPanel brandId={brand.id} canEdit={canEdit} />
         </div>
@@ -673,10 +789,11 @@ function initialsOf(name) {
   if (!name) return '?';
   return String(name).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 }
-function formatMoney(n) {
+function formatMoney(n, currency = 'USD') {
   if (n == null) return '—';
+  const sym = currencySymbol(currency);
   const num = Number(n);
-  if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000)     return `$${(num / 1_000).toFixed(1)}K`;
-  return `$${num.toFixed(0)}`;
+  if (num >= 1_000_000) return `${sym}${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000)     return `${sym}${(num / 1_000).toFixed(1)}K`;
+  return `${sym}${num.toFixed(0)}`;
 }

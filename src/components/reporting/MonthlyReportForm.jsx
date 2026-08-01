@@ -111,13 +111,13 @@ function ArraySection({ items, setItems, fields, addLabel, minRows = 1 }) {
 }
 
 /* Render a small "vs last month" chip next to a value field */
-function ComparisonChip({ thisVal, lastVal, format = 'num' }) {
+function ComparisonChip({ thisVal, lastVal, format = 'num', sym = '$' }) {
   if (lastVal == null || lastVal === '') return null;
   const c = parseFloat(thisVal) || 0;
   const p = parseFloat(lastVal) || 0;
   if (!c && !p) return null;
   const fmt = (v) => format === 'usd'
-    ? '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    ? sym + Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })
     : Number(v).toLocaleString();
   let pct = null;
   if (p !== 0) pct = ((c - p) / Math.abs(p)) * 100;
@@ -949,7 +949,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
             <Field label={`Month GMV (${curSym})`} type="number" placeholder="357869.19"
               value={data.totalSales?.monthGmv}
               onChange={v => setObj('totalSales', 'monthGmv', v)} />
-            <ComparisonChip thisVal={data.totalSales?.monthGmv} lastVal={previousReport?.totalSales?.monthGmv} format="usd" />
+            <ComparisonChip thisVal={data.totalSales?.monthGmv} lastVal={previousReport?.totalSales?.monthGmv} format="usd" sym={curSym} />
           </div>
           <div style={{ width: 220 }}>
             <Field label={`All-time GMV (${curSym})`} type="number" placeholder="10168563.71"
@@ -974,7 +974,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               <Field label={f.label} type="number" placeholder={f.placeholder}
                 value={data.keyMetrics?.[f.key]}
                 onChange={v => setObj('keyMetrics', f.key, v)} />
-              <ComparisonChip thisVal={data.keyMetrics?.[f.key]} lastVal={previousReport?.keyMetrics?.[f.key]} format={f.format} />
+              <ComparisonChip thisVal={data.keyMetrics?.[f.key]} lastVal={previousReport?.keyMetrics?.[f.key]} format={f.format} sym={curSym} />
             </div>
           ))}
         </div>
@@ -1017,7 +1017,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               <Field label={f.label} type="number" placeholder={f.placeholder}
                 value={data.gmvBreakdown?.[f.key]}
                 onChange={v => setObj('gmvBreakdown', f.key, v)} />
-              <ComparisonChip thisVal={data.gmvBreakdown?.[f.key]} lastVal={previousReport?.gmvBreakdown?.[f.key]} format="usd" />
+              <ComparisonChip thisVal={data.gmvBreakdown?.[f.key]} lastVal={previousReport?.gmvBreakdown?.[f.key]} format="usd" sym={curSym} />
             </div>
           ))}
         </div>

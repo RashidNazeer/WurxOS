@@ -12,6 +12,7 @@ import { deductPromptApcReport } from '../../lib/apcReportingApi';
 import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import WeeklyReportForm from './WeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
+import ReportPeriodStrip from './ReportPeriodStrip';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -56,6 +57,7 @@ export default function WeeklyReportsPage() {
   const [calYear, setCalYear] = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth());
   const [filterWeek, setFilterWeek] = useState('');
+  const [brandSortBy, setBrandSortBy] = useState('newest');
 
   // Filters for overview
   const [overviewFilter, setOverviewFilter] = useState(''); // '', 'submitted', 'pending'
@@ -110,8 +112,16 @@ export default function WeeklyReportsPage() {
     const mk = monthKey(calYear, calMonth);
     let list = brandReports.filter(r => r.weekStart && r.weekStart.startsWith(mk));
     if (filterWeek) list = list.filter(r => String(r.week) === filterWeek);
-    return list.sort((a, b) => (a.weekStart || '').localeCompare(b.weekStart || ''));
-  }, [brandReports, calYear, calMonth, filterWeek]);
+    return list.sort((a, b) => {
+      switch (brandSortBy) {
+        case 'oldest':   return (a.weekStart || '').localeCompare(b.weekStart || '');
+        case 'gmv_desc': return num(b.overallPerformance?.gmv) - num(a.overallPerformance?.gmv);
+        case 'gmv_asc':  return num(a.overallPerformance?.gmv) - num(b.overallPerformance?.gmv);
+        case 'newest':
+        default:         return (b.weekStart || '').localeCompare(a.weekStart || '');
+      }
+    });
+  }, [brandReports, calYear, calMonth, filterWeek, brandSortBy]);
 
   /* ── Overview computations ─────────────────────────────────────────────── */
 
@@ -320,7 +330,12 @@ export default function WeeklyReportsPage() {
     const canReject = userRole === 'tl' && rStatus === 'submitted';
     return (
       <div>
-        <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div style={{
+            position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 10,
+            background: 'var(--surface-0)', borderBottom: '1px solid var(--border-subtle)',
+            padding: '10px 0 6px',
+          }}>
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <button className="btn btn-sm btn-link text-muted p-0" onClick={() => { setView(selectedBrandId ? 'brand' : 'overview'); setDetailReport(null); }}>
             <i className="bi bi-arrow-left me-1" /> Back
           </button>
@@ -348,6 +363,8 @@ export default function WeeklyReportsPage() {
               </button>
             )}
           </div>
+          </div>
+          <ReportPeriodStrip reports={sourceList} currentId={detailReport.id} onSelect={setDetailReport} />
         </div>
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
@@ -423,6 +440,13 @@ export default function WeeklyReportsPage() {
                 onClick={() => { setCalYear(now.getFullYear()); setCalMonth(now.getMonth()); setFilterWeek(''); }}>Today</button>
             </div>
             <div className="d-flex align-items-center gap-2">
+              <select className="form-select form-select-sm" value={brandSortBy} onChange={e => setBrandSortBy(e.target.value)}
+                style={{ width: 150, borderRadius: 8 }} title="Sort reports">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="gmv_desc">GMV: high → low</option>
+                <option value="gmv_asc">GMV: low → high</option>
+              </select>
               <select className="form-select form-select-sm" value={filterWeek} onChange={e => setFilterWeek(e.target.value)} style={{ width: 160, borderRadius: 8 }}>
                 <option value="">All Weeks ({filteredReports.length})</option>
                 {calWeeks.map(w => <option key={w.week} value={String(w.week)}>Week {w.week}</option>)}

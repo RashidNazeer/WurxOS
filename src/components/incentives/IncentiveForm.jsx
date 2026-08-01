@@ -36,11 +36,16 @@ function itemSuffix(item) {
 // it only when the row is already attendance-linked or its text names
 // attendance / punctuality / absence(s).
 const looksLikeAttendance = (text) => /attendance|punctual|absence/i.test(text || '');
+// The ol_brands toggle belongs on an OL "% of my brands hit their GMV target"
+// line — reveal it when the row is already flagged or its text names brands+GMV.
+const looksLikeOlBrands = (text) => /brand.*gmv|gmv.*brand|brands hit/i.test(text || '');
 
 function LineRow({ item, onChange, onRemove, index }) {
-  const isAtt  = item.source === 'attendance';
+  const isAtt      = item.source === 'attendance';
+  const isOlBrands = item.source === 'ol_brands';
   const suffix = isAtt ? '%' : (item.suffix ?? (item.unit === 'percent' ? '%' : ''));
-  const showAttToggle = isAtt || looksLikeAttendance(item.text);
+  const showAttToggle = !isOlBrands && (isAtt || looksLikeAttendance(item.text));
+  const showOlToggle  = !isAtt && (isOlBrands || looksLikeOlBrands(item.text));
 
   // Toggling attendance mode pins Target=100 and unit=% so the ≥90% rule
   // means "≥90% attendance". Achieved is then filled from live attendance.
@@ -48,6 +53,19 @@ function LineRow({ item, onChange, onRemove, index }) {
     if (on) {
       onChange(index, 'source', 'attendance');
       onChange(index, 'targetValue', 100);
+      onChange(index, 'suffix', '%');
+    } else {
+      onChange(index, 'source', null);
+    }
+  }
+
+  // Toggling ol_brands mode flags the item so the read-time overlay fills its
+  // Achieved with the OL's brand roll-up %. Target stays editable (it's the
+  // threshold, default 70); unit pinned to %.
+  function toggleOlBrands(on) {
+    if (on) {
+      onChange(index, 'source', 'ol_brands');
+      if (!Number(item.targetValue)) onChange(index, 'targetValue', 70);
       onChange(index, 'suffix', '%');
     } else {
       onChange(index, 'source', null);
@@ -99,6 +117,32 @@ function LineRow({ item, onChange, onRemove, index }) {
           <i className="bi bi-info-circle me-1" />
           Achieved fills automatically from this person's attendance % — no manual entry.
           Target is pinned to 100% (≥90% attendance completes it).
+        </div>
+      )}
+
+      {/* Auto-fill from OL brand roll-up toggle — only on an OL brands+GMV line */}
+      {showOlToggle && (
+        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
+          <input
+            className="form-check-input flex-shrink-0 mt-0"
+            type="checkbox"
+            role="switch"
+            id={`olb-${item.id}`}
+            checked={isOlBrands}
+            onChange={e => toggleOlBrands(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor={`olb-${item.id}`} style={{ fontSize: '0.72rem', color: isOlBrands ? '#1e40af' : '#6c757d' }}>
+            <i className="bi bi-bullseye me-1" />
+            Auto-fill “Achieved” from this OL's incentive-brand roll-up
+          </label>
+        </div>
+      )}
+      {isOlBrands && (
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
+          <i className="bi bi-info-circle me-1" />
+          Achieved fills automatically with the % of the OL's curated brands whose TL
+          marked the GMV target complete. Set Target to the threshold (e.g. 70%);
+          it completes at month-end once the % reaches it.
         </div>
       )}
 

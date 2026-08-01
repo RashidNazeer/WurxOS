@@ -13,7 +13,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
-  subscribeAllCampaigns, addCampaign, updateCampaign, deleteCampaign, addCampaignsBulk,
+  subscribeAllCampaigns, addCampaign, updateCampaign, deleteCampaign, addCampaignsBulk, bulkDeleteCampaigns,
 } from '../../lib/campaignsApiV1';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -277,6 +277,16 @@ export default function CampaignTrackerPage() {
   // Delete confirm
   const [deleteId, setDeleteId] = useState(null);
 
+  // Bulk selection (checkbox per row + select-all + bulk delete)
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const toggleSelected = (id) => setSelected((s) => {
+    const next = new Set(s);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelected = () => setSelected(new Set());
+
   // ── Load campaigns ────────────────────────────────────────────────────────
   // Cap the listener to the most recent N campaigns so read cost is bounded
   // as the collection grows. Stash the refetch in a ref so action handlers
@@ -343,6 +353,17 @@ export default function CampaignTrackerPage() {
   }, [campaigns, fSearch, fStatus, fBrand, fType, fAddedBy, fStartFrom, fEndTo, userRole, brands, currentUser]);
 
   const hasFilters = fSearch || fStatus || fBrand || fType || fAddedBy || fStartFrom || fEndTo;
+
+  // Select-all operates on the currently-visible (filtered) rows.
+  const filteredIds = useMemo(() => filtered.map((c) => c.id), [filtered]);
+  const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id));
+  const someSelected = filteredIds.some((id) => selected.has(id));
+  const toggleSelectAll = () => setSelected((s) => {
+    const next = new Set(s);
+    if (filteredIds.every((id) => next.has(id))) filteredIds.forEach((id) => next.delete(id));
+    else filteredIds.forEach((id) => next.add(id));
+    return next;
+  });
 
   function clearFilters() {
     setFSearch(''); setFStatus(''); setFBrand('');
@@ -485,6 +506,25 @@ export default function CampaignTrackerPage() {
     setDeleteId(null);
   }
 
+  // ── Bulk delete ───────────────────────────────────────────────────────────
+  // RLS scopes the delete server-side, so each user can only remove campaigns
+  // they're allowed to (rows they can't delete are simply left untouched).
+  async function handleBulkDelete() {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (!window.confirm(`Delete ${ids.length} campaign${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    try {
+      await bulkDeleteCampaigns(ids);
+      clearSelected();
+      refetch();
+    } catch (e) {
+      alert('Failed to delete: ' + (e?.message || e));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
@@ -583,6 +623,23 @@ export default function CampaignTrackerPage() {
         </div>
       </div>
 
+      {/* ── Bulk action bar ── */}
+      {selected.size > 0 && (
+        <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
+          style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>
+            <i className="bi bi-check2-square me-1" />{selected.size} selected
+          </span>
+          <button className="btn btn-sm btn-outline-secondary ms-auto" style={{ borderRadius: 8, fontSize: '0.78rem' }}
+            onClick={clearSelected} disabled={bulkBusy}>Clear</button>
+          <button className="btn btn-sm btn-danger d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.78rem' }}
+            onClick={handleBulkDelete} disabled={bulkBusy}>
+            {bulkBusy ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-trash" />}
+            Delete {selected.size}
+          </button>
+        </div>
+      )}
+
       {/* ── Table ── */}
       {loading ? (
         <div className="text-center py-5 text-muted">
@@ -606,6 +663,13 @@ export default function CampaignTrackerPage() {
             <table className="table table-hover mb-0" style={{ fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)' }}>
+                  <th className="px-3 py-2" style={{ width: 34 }}>
+                    <input type="checkbox" className="form-check-input" style={{ cursor: 'pointer' }}
+                      checked={allSelected}
+                      ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                      onChange={toggleSelectAll}
+                      title={allSelected ? 'Deselect all' : 'Select all'} />
+                  </th>
                   {['Brand', 'Promotion Name', 'Status', 'Start Time', 'End Time', 'Type', 'Days Left', ''].map(h => (
                     <th key={h} className="px-3 py-2 fw-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
@@ -618,8 +682,17 @@ export default function CampaignTrackerPage() {
                   return (
                     <tr
                       key={c.id}
-                      style={deleteId === c.id ? { background: 'rgba(239,68,68,0.04)' } : {}}
+                      style={
+                        selected.has(c.id) ? { background: 'rgba(59,130,246,0.08)' }
+                        : deleteId === c.id ? { background: 'rgba(239,68,68,0.04)' }
+                        : {}
+                      }
                     >
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" className="form-check-input" style={{ cursor: 'pointer' }}
+                          checked={selected.has(c.id)}
+                          onChange={() => toggleSelected(c.id)} />
+                      </td>
                       <td className="px-3 py-2 fw-medium" style={{ whiteSpace: 'nowrap' }}>
                         {c.brandName || <span className="text-muted">—</span>}
                       </td>

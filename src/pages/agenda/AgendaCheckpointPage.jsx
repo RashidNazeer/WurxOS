@@ -30,7 +30,7 @@ import {
 import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
 import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
-import { listManagedBrandIds, getPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
+import { listManagedBrandIds, getPaidCollabEntry, getLatestPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
 import PaidCollabCheckpointDashboard from './PaidCollabCheckpointDashboard';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
@@ -160,6 +160,21 @@ function ApcCheckpointPage() {
   });
   const pcEntry = pcEntryQuery.data || null;
   const paidCollabMode = isPaidCollabManaged ? 'readonly' : 'hidden';
+  // The Paid Collab team fills §09 as a rolling snapshot (not week-specific), and
+  // its week_start can differ from the checkpoint's (e.g. Mon-start vs Sun-start).
+  // So when THIS exact week has nothing, auto-fall-back to the brand's latest
+  // filled entry — that way OL / TL / APC all see the team's data instead of a
+  // blank section. The APC can still explicitly re-pull.
+  const pcLatestQuery = useQuery({
+    queryKey: ['checkpoint', 'pc-latest', brandId],
+    queryFn: () => getLatestPaidCollabEntry(brandId),
+    enabled: !!brandId && isPaidCollabManaged,
+  });
+  const [pulledPcEntry, setPulledPcEntry] = useState(null);
+  const [pullingPc, setPullingPc] = useState(false);
+  useEffect(() => { setPulledPcEntry(null); }, [brandId, weekStart]);
+  const effectivePcEntry = pcEntry || pulledPcEntry || pcLatestQuery.data || null;
+  const paidCollabPulled = !pcEntry && !!effectivePcEntry;
   const reportStarts = useMemo(() => (reportWeeksQuery.data || []).map((r) => r.period_start), [reportWeeksQuery.data]);
   const reportSet = useMemo(() => new Set(reportStarts), [reportStarts]);
   const anchor = useMemo(() => (reportStarts.length ? reportStarts.reduce((a, b) => (a < b ? a : b)) : null), [reportStarts]);
@@ -322,13 +337,30 @@ function ApcCheckpointPage() {
     finally { setRemindingPc(false); }
   }
 
+  // Pull whatever the paid collab team last entered for this brand (any week).
+  async function onPullPaidCollab() {
+    if (!brandId || pullingPc) return;
+    setPullingPc(true); setPcRemindMsg('');
+    try {
+      const latest = await getLatestPaidCollabEntry(brandId);
+      setPulledPcEntry(latest || null);
+      if (!latest) setPcRemindMsg("The Paid Collab team hasn't entered any data for this brand yet.");
+    } catch (e) { setPcRemindMsg(`Couldn't pull the team's data: ${e?.message || e}`); }
+    finally { setPullingPc(false); }
+  }
+
   // ── approval workflow actions (submit → verify → approve, + return/reopen) ──
   const cp = existing.data || null;
   const status = cp?.status || 'draft';
   const isAuthor = !!cp?.author_id && cp.author_id === profile?.id;
   const isOwnerTL = !!selectedBrand?.owner_id && selectedBrand.owner_id === profile?.id;
   const isAdmin = ['ol', 'boss', 'developer'].includes(profile?.role);
-  const canEditContent = isAdmin || (isAuthor && status === 'draft');
+  // The owner TL can edit the checkpoint directly (draft or submitted) instead of
+  // bouncing it back to the APC for every small fix. RLS (checkpoint_can_write)
+  // already grants the owner TL write access.
+  const canEditContent = isAdmin
+    || (isAuthor && status === 'draft')
+    || (isOwnerTL && (status === 'draft' || status === 'submitted'));
   const canSubmit = status === 'draft' && (isAuthor || isAdmin);
   const canVerify = status === 'submitted' && (isOwnerTL || isAdmin);
   const canApprove = status === 'verified' && isAdmin;
@@ -415,8 +447,8 @@ function ApcCheckpointPage() {
   // (the checkpoint blob's own paidCollab is a stale mirror the APC no longer edits).
   const deckData = useMemo(() => {
     if (!data || !isPaidCollabManaged) return data;
-    return { ...data, paidCollab: { ...emptyPaidCollab(), ...(pcEntry?.data || {}) } };
-  }, [data, isPaidCollabManaged, pcEntry]);
+    return { ...data, paidCollab: { ...emptyPaidCollab(), ...(effectivePcEntry?.data || {}) } };
+  }, [data, isPaidCollabManaged, effectivePcEntry]);
 
   const saveText = saveState === 'saving' ? 'Saving…'
     : saveState === 'saved' ? `Saved${savedAt ? ` ${new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`
@@ -615,9 +647,11 @@ function ApcCheckpointPage() {
           )}
           {data ? (
             <CheckpointForm data={data} setData={setData}
-              paidCollabMode={paidCollabMode} paidCollabEntry={pcEntry}
+              paidCollabMode={paidCollabMode} paidCollabEntry={effectivePcEntry}
               onRemindPaidCollab={onRemindPaidCollab} remindingPaidCollab={remindingPc}
-              paidCollabRemindMsg={pcRemindMsg} />
+              paidCollabRemindMsg={pcRemindMsg}
+              onPullPaidCollab={onPullPaidCollab} pullingPaidCollab={pullingPc}
+              paidCollabPulled={paidCollabPulled} paidCollabHasWeekEntry={!!pcEntry} />
           ) : (
             <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
           )}

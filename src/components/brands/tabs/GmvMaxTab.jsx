@@ -9,6 +9,7 @@ import {
 import {
   PlusIcon, PencilIcon, TrashIcon, CheckIcon, XIcon, AlertIcon,
 } from '../../common/Icon';
+import { currencySymbol } from '../../../utils/currencies';
 
 // ── Field icons / tints ────────────────────────────────────────────
 function fieldEmoji(k) {
@@ -22,7 +23,7 @@ function statusCfg(key) {
 }
 
 // ── Reusable metric tile ───────────────────────────────────────────
-function MetricTile({ field, value }) {
+function MetricTile({ field, value, currency = 'USD' }) {
   const tint = fieldTint(field.key);
   const has = value !== '' && value != null;
   return (
@@ -58,7 +59,7 @@ function MetricTile({ field, value }) {
         color: has ? 'var(--text-primary)' : 'var(--text-muted)',
         letterSpacing: '-0.02em', lineHeight: 1.15,
       }}>
-        {has ? formatGmvField(field.key, value) : '—'}
+        {has ? formatGmvField(field.key, value, currency) : '—'}
       </div>
     </div>
   );
@@ -402,7 +403,7 @@ function formatScheduleTime(s) {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-function CampaignCard({ campaign, onEdit, onRemove }) {
+function CampaignCard({ campaign, onEdit, onRemove, currency = 'USD' }) {
   const st = statusCfg(campaign.status);
   return (
     <div style={{
@@ -433,7 +434,7 @@ function CampaignCard({ campaign, onEdit, onRemove }) {
               <MetaPill label="Scheduled" value={formatScheduleTime(campaign.scheduleTime)} tint="#0ea5e9" />
             )}
             {campaign.campaignBudget != null && campaign.campaignBudget !== '' && Number(campaign.campaignBudget) !== 0 && (
-              <MetaPill label="Budget" value={Number(campaign.campaignBudget).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} tint="#16a34a" />
+              <MetaPill label="Budget" value={currencySymbol(currency) + Number(campaign.campaignBudget).toLocaleString('en-US', { maximumFractionDigits: 0 })} tint="#16a34a" />
             )}
           </div>
         </div>
@@ -448,7 +449,7 @@ function CampaignCard({ campaign, onEdit, onRemove }) {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {GMV_MAX_FIELDS.map(f => <MetricTile key={f.key} field={f} value={campaign[f.key]} />)}
+        {GMV_MAX_FIELDS.map(f => <MetricTile key={f.key} field={f} value={campaign[f.key]} currency={currency} />)}
       </div>
 
       {campaign.notes && (
@@ -462,6 +463,7 @@ function CampaignCard({ campaign, onEdit, onRemove }) {
 
 // ── Monthly block ─────────────────────────────────────────────────
 function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
+  const currency = brand.currency || 'USD';
   const [editingOverview, setEditingOverview] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -534,7 +536,7 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
 
         {overviewHasData ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {GMV_MAX_FIELDS.map(f => <MetricTile key={f.key} field={f} value={monthlyDoc[f.key]} />)}
+            {GMV_MAX_FIELDS.map(f => <MetricTile key={f.key} field={f} value={monthlyDoc[f.key]} currency={currency} />)}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: 14, borderRadius: 10, background: 'var(--surface-2)', border: '1px dashed var(--border)' }}>
@@ -587,7 +589,7 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {campaigns.map(c => (
-              <CampaignCard key={c.id} campaign={c}
+              <CampaignCard key={c.id} campaign={c} currency={currency}
                 onEdit={() => canEdit && setEditingCampaign({ defaultValues: c })}
                 onRemove={() => canEdit && handleRemoveCampaign(c)} />
             ))}

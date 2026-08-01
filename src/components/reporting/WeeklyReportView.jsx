@@ -258,6 +258,7 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
   const prevByName = new Map(prevRows.map(g => [normName(g.campaign), g]));
   const ms = (v) => fmt$short(v, currency);
   const m  = (v) => fmt$(v, currency);
+  const sym = currencySymbol(currency);
   const t = gmvMaxTotals(list);
   // Per-metric config drives both the value and its inline delta. Spend is
   // neutral (no value judgement), CPO is lower-is-better, the rest higher.
@@ -316,7 +317,7 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
               <div className="mt-3">
                 <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   <span>Cost efficiency</span>
-                  <span>$1 → ${(gmv / spend).toFixed(2)}</span>
+                  <span>{sym}1 → {sym}{(gmv / spend).toFixed(2)}</span>
                 </div>
                 <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>{ms(spend)} in</div>

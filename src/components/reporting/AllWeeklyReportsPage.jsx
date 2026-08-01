@@ -14,6 +14,7 @@ import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctC
 import WeeklyReportForm from './WeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
+import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
@@ -28,12 +29,13 @@ function StatusBadge({ status, style }) {
   );
 }
 
-// Compact dollar formatter: $1.154M / $812K / $342
-function fmtCompactDollars(n) {
+// Compact money formatter: £1.154M / £812K / £342. Symbol is passed in (the
+// brand-resolved currency of the reports in scope) rather than hardcoded.
+function fmtCompactDollars(n, sym = '$') {
   const v = Number(n) || 0;
-  if (v >= 1e6) return '$' + (v / 1e6).toFixed(v >= 1e7 ? 1 : 3) + 'M';
-  if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
-  return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (v >= 1e6) return sym + (v / 1e6).toFixed(v >= 1e7 ? 1 : 3) + 'M';
+  if (v >= 1e3) return sym + (v / 1e3).toFixed(1) + 'K';
+  return sym + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
 // Tiny inline bar chart used in the stat cards
@@ -121,6 +123,7 @@ export default function AllWeeklyReportsPage() {
   const [filterCreator, setFilterCreator] = useState('');
   const [filterWeek, setFilterWeek] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
 
   const [viewReport, setViewReport] = useState(null);
   const [editDatesReport, setEditDatesReport] = useState(null);
@@ -244,8 +247,18 @@ export default function AllWeeklyReportsPage() {
       if (filterWeek && String(r.week) !== filterWeek) return false;
       if (filterStatus && getReportStatus(r) !== filterStatus) return false;
       return true;
-    }).sort((a, b) => (a.weekStart || '').localeCompare(b.weekStart || ''));
-  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek, filterStatus]);
+    }).sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':   return (a.weekStart || '').localeCompare(b.weekStart || '');
+        case 'gmv_desc': return num(b.overallPerformance?.gmv) - num(a.overallPerformance?.gmv);
+        case 'gmv_asc':  return num(a.overallPerformance?.gmv) - num(b.overallPerformance?.gmv);
+        case 'brand_az': return (a.brandName || '').localeCompare(b.brandName || '')
+                             || (b.weekStart || '').localeCompare(a.weekStart || '');
+        case 'newest':
+        default:         return (b.weekStart || '').localeCompare(a.weekStart || '');
+      }
+    });
+  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek, filterStatus, sortBy]);
 
   // Grouped by brand
   const grouped = useMemo(() => {
@@ -305,9 +318,15 @@ export default function AllWeeklyReportsPage() {
 
     const approvalRate = reportCount > 0 ? Math.round((approved / reportCount) * 100) : 0;
 
+    // Currency symbol for the aggregate total: use the reports' shared currency
+    // when they all match (the common case, incl. a single-brand filter); fall
+    // back to the default only when the scope genuinely mixes currencies.
+    const curSet = new Set(filtered.map(r => r.currency || DEFAULT_CURRENCY));
+    const currency = curSet.size === 1 ? [...curSet][0] : DEFAULT_CURRENCY;
+
     return { totalGmv, totalOrders, reportCount, brandCount: brandSet.size,
       pendingApproval, pendingOverdue, approved, approvalRate,
-      gmvTrend, reportsTrend, brandsTrend, barPcts };
+      gmvTrend, reportsTrend, brandsTrend, barPcts, currency };
   }, [filtered, reports, calYear, calMonth, calWeeks]);
 
   // Live indicator
@@ -554,13 +573,13 @@ export default function AllWeeklyReportsPage() {
       <div>
         {/* Sticky action bar — stays pinned while reviewing a long
             report so the OL never has to scroll back up for actions. */}
-        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2"
-          style={{
+        <div style={{
             position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 10,
             background: 'var(--surface-0)',
             borderBottom: '1px solid var(--border-subtle)',
-            padding: '12px 28px', margin: '0 -28px 12px',
+            padding: '12px 28px 8px', margin: '0 -28px 10px',
           }}>
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <button className="btn btn-sm btn-link text-muted p-0" onClick={() => setViewReport(null)}>
             <i className="bi bi-arrow-left me-1" /> Back to all reports
           </button>
@@ -645,6 +664,8 @@ export default function AllWeeklyReportsPage() {
                 report view so they stay reachable while scrolling. */}
             <ReportActionsMenu actions={reportActions} />
           </div>
+          </div>
+          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} />
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
@@ -717,7 +738,7 @@ export default function AllWeeklyReportsPage() {
             </div>
             <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Total GMV this period</div>
             <div className="fw-bold" style={{ fontSize: '1.6rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2 }}>
-              {fmtCompactDollars(monthStats.totalGmv)}
+              {fmtCompactDollars(monthStats.totalGmv, currencySymbol(monthStats.currency))}
             </div>
             <Sparkbars values={monthStats.barPcts} highlightLast color="rgba(255,255,255,0.85)" muted="rgba(255,255,255,0.18)" />
           </div>
@@ -862,9 +883,20 @@ export default function AllWeeklyReportsPage() {
             </button>
           )}
 
-          <span className="ms-auto text-muted" style={{ fontSize: '0.78rem' }}>
-            {filtered.length} reports
-          </span>
+          <div className="ms-auto d-inline-flex align-items-center gap-2">
+            <label className="text-muted d-inline-flex align-items-center" style={{ fontSize: '0.74rem', fontWeight: 600 }}>
+              <i className="bi bi-sort-down me-1" />Sort
+            </label>
+            <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}
+              style={{ width: 158, borderRadius: 8, fontSize: '0.78rem' }}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="gmv_desc">GMV: high → low</option>
+              <option value="gmv_asc">GMV: low → high</option>
+              <option value="brand_az">Brand A → Z</option>
+            </select>
+            <span className="text-muted" style={{ fontSize: '0.78rem' }}>{filtered.length} reports</span>
+          </div>
         </div>
       </div>
 

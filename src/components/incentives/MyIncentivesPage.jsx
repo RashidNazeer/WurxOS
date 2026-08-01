@@ -49,6 +49,10 @@ function calcBreakdown(rec) {
 
 // ── Edit row used inside the progress modal ──────────────────────────────────
 
+// A TL may only edit "Achieved" on their own progress — the Target is set by the
+// Boss and is read-only (a TL must not lower their own target to pass it). Mirrors
+// the APC page (ApcIncentivesPage EditItemRow). Save also re-reads the target from
+// the original record so a tampered client can't persist a changed target either.
 function EditProgressRow({ item, cat, onChange }) {
   const isAtt    = item.source === 'attendance';
   const achieved = item.achievedValue ?? '';
@@ -56,7 +60,6 @@ function EditProgressRow({ item, cat, onChange }) {
   const sfx      = itemSuffix(item);
   const p        = pct(achieved, target);          // display % only (rounded, capped 100)
   const done     = autoComplete({ ...item, achievedValue: achieved, targetValue: target }); // single rule: raw ratio >= 0.9
-  const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
     <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAtt ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAtt ? '#bfdbfe' : '#e9ecef')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -72,30 +75,27 @@ function EditProgressRow({ item, cat, onChange }) {
         </div>
       </div>
       <div className="row g-2">
-        <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Target</label>
+        <div className="col-6">
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
+            Target <span className="text-muted" style={{ fontSize: '0.6rem' }}>(set by Boss · read-only)</span>
+          </label>
           <div className="input-group input-group-sm">
-            <input type="number" className="form-control" min="0" value={target}
-              onChange={e => onChange(cat, item.id, 'targetValue', e.target.value)}
-              readOnly={isAtt} disabled={isAtt} style={isAtt ? lock : undefined} />
-            {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
+            <input type="text" className="form-control"
+              value={target !== '' ? `${Number(target).toLocaleString()}${sfx}` : '—'}
+              readOnly disabled style={{ background: '#f1f5f9', cursor: 'not-allowed' }} />
+            <span className="input-group-text" style={{ fontSize: '0.7rem', background: '#f1f5f9' }}>
+              <i className="bi bi-lock-fill" style={{ fontSize: '0.7rem', color: '#94a3b8' }} />
+            </span>
           </div>
         </div>
-        <div className="col-5">
+        <div className="col-6">
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAtt && <span className="text-muted"> (auto)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
               onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
-              readOnly={isAtt} disabled={isAtt} style={isAtt ? lock : undefined} />
+              readOnly={isAtt} disabled={isAtt} style={isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
-        </div>
-        <div className="col-2">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Unit</label>
-          <input type="text" className="form-control form-control-sm" placeholder="%" maxLength={6}
-            value={sfx} onChange={e => onChange(cat, item.id, 'suffix', e.target.value)}
-            readOnly={isAtt} disabled={isAtt}
-            style={{ textAlign: 'center', fontSize: '0.78rem', ...(isAtt ? lock : {}) }} />
         </div>
       </div>
       {isAtt && (
@@ -136,24 +136,29 @@ function EditProgressModal({ record, onClose, onSaved }) {
     setSaving(true); setError('');
     try {
       const myName = userProfile?.displayName || currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+      // A TL may only edit `achievedValue` + `completed`. Preserve every Boss-set
+      // field (text, amount, targetValue, suffix, source) by re-reading from the
+      // ORIGINAL record — so a lowered target can never be persisted, even if the
+      // client state were tampered. Mirrors ApcIncentivesPage.handleSave.
+      const origInc = new Map((record.incentives || []).map(i => [i.id, i]));
+      const origBon = new Map((record.bonuses    || []).map(b => [b.id, b]));
+      const mapItem = (it, orig) => {
+        const o = orig.get(it.id) || {};
+        const isAtt = o.source === 'attendance';
+        return {
+          id: it.id, text: o.text, amount: o.amount,
+          targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
+          achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(it.achievedValue) || 0),
+          suffix:        isAtt ? '%' : itemSuffix(o),
+          completed:     isAtt ? !!o.completed : (it.completed || false),
+          completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),
+          ...(o.source ? { source: o.source } : {}),
+        };
+      };
       await updateIncentivesProgress({
         rowId: record.id,
-        incentives: items.incentives.map(i => ({
-          id: i.id, text: i.text, amount: i.amount,
-          targetValue: Number(i.targetValue) || 0, achievedValue: Number(i.achievedValue) || 0,
-          suffix: itemSuffix(i),
-          completed: i.completed || false,
-          completedBy: i.completed ? (i.completedBy || myName) : null,
-          ...(i.source ? { source: i.source } : {}),
-        })),
-        bonuses: items.bonuses.map(b => ({
-          id: b.id, text: b.text, amount: b.amount,
-          targetValue: Number(b.targetValue) || 0, achievedValue: Number(b.achievedValue) || 0,
-          suffix: itemSuffix(b),
-          completed: b.completed || false,
-          completedBy: b.completed ? (b.completedBy || myName) : null,
-          ...(b.source ? { source: b.source } : {}),
-        })),
+        incentives: items.incentives.map(i => mapItem(i, origInc)),
+        bonuses:    items.bonuses.map(b => mapItem(b, origBon)),
       });
       onSaved(items);
     } catch { setError('Failed to save.'); } finally { setSaving(false); }
@@ -167,7 +172,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
               <h6 className="fw-bold mb-0">Edit My Progress</h6>
-              <p className="text-muted small mb-0">Update your target & achieved values</p>
+              <p className="text-muted small mb-0">Update your achieved values — targets are set by the Boss</p>
             </div>
             <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
               style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

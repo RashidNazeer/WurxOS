@@ -17,6 +17,8 @@ import TierNotificationsSection from './sections/TierNotificationsSection';
 import LeaveDefaultsSection  from './sections/LeaveDefaultsSection';
 import BackupSection         from './sections/BackupSection';
 import AmazonHaloSection     from './sections/AmazonHaloSection';
+import CreatorLibrarySection from './sections/CreatorLibrarySection';
+import OlIncentiveBrandsSection from './sections/OlIncentiveBrandsSection';
 import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBrandsSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
@@ -78,7 +80,13 @@ const GROUPS = [
         roles: ['boss'] },
       { id: 'amazonHalo', label: 'Amazon Halo', sub: 'Enable brands & client links',
         icon: DiagramIcon, component: AmazonHaloSection,
+        roles: ['boss', 'ol', 'tl'] },
+      { id: 'creatorLibrary', label: 'Creator Library', sub: 'Published creator sheet URL',
+        icon: BoxIcon, component: CreatorLibrarySection,
         roles: ['boss', 'ol'] },
+      { id: 'olIncentiveBrands', label: 'My Incentive Brands', sub: 'Brands that count toward your incentive',
+        icon: StarIcon, component: OlIncentiveBrandsSection,
+        roles: ['ol'] },
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
         roles: ['boss'] },

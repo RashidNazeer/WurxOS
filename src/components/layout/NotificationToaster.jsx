@@ -6,7 +6,7 @@ import { useNotifications } from '../../contexts/NotificationsContext';
 import { formatRelTime } from '../../lib/notificationsApi';
 import {
   XIcon, CheckIcon, ChecklistIcon, ReportIcon, StoreIcon,
-  MegaphoneIcon, HomeIcon, BookmarkIcon, StarIcon, MessageIcon,
+  MegaphoneIcon, HomeIcon, BookmarkIcon, StarIcon, MessageIcon, UsersIcon,
 } from '../common/Icon';
 import '../../styles/notifications.css';
 
@@ -21,6 +21,7 @@ const CATEGORY_META = {
   resource:    { label: 'Resource',    icon: BookmarkIcon,  cat: 'resource' },
   performance: { label: 'Performance', icon: StarIcon,      cat: 'performance' },
   agenda:      { label: 'Agenda',      icon: ChecklistIcon, cat: 'agenda' },
+  creator_library: { label: 'Creator Library', icon: UsersIcon, cat: 'brand' },
   salary:      { label: 'Salary',      icon: StarIcon,      cat: 'performance' },
   hr:          { label: 'HR',          icon: ChecklistIcon, cat: 'agenda' },
   system:      { label: 'System',      icon: MessageIcon,   cat: 'system' },

@@ -129,7 +129,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
     return allUsers.filter(u => (u.displayName || u.userName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
   }, [allUsers, userSearch]);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim()) { setError('Title is required.'); return; }
     if (!url.trim()) { setError('URL/Link is required.'); return; }
@@ -151,7 +151,11 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
     const visibility = { type: visType, roles: visType === 'roles' ? visRoles : [], userIds: visType === 'users' ? visUserIds : [] };
     const payload = { title: title.trim(), url: url.trim(), description: desc.trim(), tab: selectedTab, visibility, ...(SOP_TABS.includes(selectedTab) ? { version: version.trim() } : {}) };
     if (parent) payload.sopGroupId = parent.sopGroupId || parent.id;
-    onSave(payload);
+    try {
+      await onSave(payload);   // parent closes the modal on success; on failure it re-throws
+    } catch (err) {
+      setError(err?.message || 'Could not save — please check your connection and try again. The document was NOT saved.');
+    }
   }
 
   return (
@@ -584,7 +588,12 @@ export default function BossKnowledgeBasePage() {
         await bossSaveArticle(data);
       }
       setShowModal(false); setEditDoc(null); setNewVersionTarget(null);
-    } catch { /* ignore */ } finally { setSaving(false); }
+    } catch (err) {
+      // NEVER swallow a save failure — a silent catch here let RLS/constraint/
+      // network errors drop a doc while the user thought it saved (the "added
+      // but never persisted" ghost). Surface it so the modal shows why + stays open.
+      throw err;
+    } finally { setSaving(false); }
   }
 
   async function handleDelete(itemId) {

@@ -141,7 +141,13 @@ export const COMMON_BOTTLENECKS = [
 // ── numeric + format helpers ────────────────────────────────────────
 export const num = (v) => {
   if (v === '' || v === null || v === undefined) return null;
-  const n = Number(v);
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  // Tolerate what people actually type into money/number fields — a currency
+  // symbol ("$5,000", even "$$5,000"), thousands separators, "%", stray spaces.
+  // Keep only digits, sign and decimal, so budgets don't silently blank to "—".
+  const s = String(v).replace(/[^0-9.\-]/g, '');
+  if (s === '' || s === '-' || s === '.') return null;
+  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 };
 export const ratio = (a, b) => {

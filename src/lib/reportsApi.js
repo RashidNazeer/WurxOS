@@ -288,7 +288,7 @@ export async function listReports({ type, brandId, year, month, status } = {}) {
     .from('reports')
     .select(`
       *,
-      brand:brand_id(id, brand_name, logo_url, owner_id),
+      brand:brand_id(id, brand_name, logo_url, owner_id, currency),
       author:author_id(id, display_name, email)
     `)
     .order('period_start', { ascending: false });
@@ -362,7 +362,7 @@ export async function findAnyReport({ brandId, type, periodStart }) {
 export async function getReport(id) {
   const { data, error } = await supabase
     .from('reports')
-    .select(`*, brand:brand_id(id, brand_name, logo_url, owner_id), author:author_id(id, display_name, email)`)
+    .select(`*, brand:brand_id(id, brand_name, logo_url, owner_id, currency), author:author_id(id, display_name, email)`)
     .eq('id', id)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -799,6 +799,12 @@ export function _normReport(row) {
     // Spread all v1 content fields back onto the doc so v1 markup like
     // `report.overallPerformance.gmv` works without unwrapping `.data`.
     ...data,
+
+    // Currency is a single per-brand source of truth: the brand's currency wins
+    // over the legacy per-report snapshot (data.currency), so changing a brand's
+    // currency reflects across ALL its historical reports at once. Falls back to
+    // the old snapshot (then USD) for reports whose brand join is missing.
+    currency: row.brand?.currency || data.currency || 'USD',
   };
 
   if (isMonthly) {
@@ -1327,7 +1333,7 @@ export async function updateReportStatus(reportId, nextStatus, auditData = null)
 // v1-shaped reads
 // ---------------------------------------------------------------------
 const _SELECT_WITH_JOINS =
-  '*, brand:brand_id(id, brand_name, logo_url, owner_id),' +
+  '*, brand:brand_id(id, brand_name, logo_url, owner_id, currency),' +
   'author:author_id(id, display_name, role, avatar_url),' +
   'submitter:submitted_by(id, display_name),' +
   'verifier:verified_by(id, display_name),' +
@@ -1571,7 +1577,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   if (canViewAll) {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id')
+      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id, currency, owner:owner_id(id, display_name)')
       .eq('status', 'active')
       .order('brand_name');
     if (error) throw new Error(error.message);
@@ -1580,7 +1586,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   if (role === 'tl') {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id')
+      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id, currency, owner:owner_id(id, display_name)')
       .eq('status', 'active')
       .eq('owner_id', uid)
       .order('brand_name');
@@ -1590,7 +1596,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   // APC/IPC — use brand_assignments
   const { data, error } = await supabase
     .from('brand_assignments')
-    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name, euka_slug, euka_store_id)')
+    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name, euka_slug, euka_store_id, currency)')
     .eq('user_id', uid);
   if (error) throw new Error(error.message);
   return (data || [])

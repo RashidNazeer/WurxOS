@@ -975,12 +975,13 @@ function PillarDetail({ pillarKey, ctx }) {
     const leaveDays   = b.approvedLeaveDays;
     const holidayDays = b.holidayDays;
     const weekendDays = b.weekendDays;
-    // coveredDays is the SQL set-union (clock-ins ∪ adjustments ∪ leave ∪
-    // holidays ∪ weekends) — an overlap is counted once, so the score can
-    // never be padded beyond reality.
-    const covered     = b.coveredDays;
+    // The score credits everything except real (past) misses: an in-progress
+    // TODAY never counts against you (mig 286), so covered-for-score is elapsed
+    // minus the past-only "not covered" count. This keeps the fraction shown
+    // here consistent with pctExact (e.g. 30/30 = 100%, not 29/30 = 96.7%).
     const wd          = b.daysThisMonth;
-    const missed      = b.daysNotCovered;
+    const missed      = b.daysNotCovered;        // past weekdays not covered
+    const covered     = wd - missed;
     return (
       <div className="d-flex flex-column gap-2" style={{ fontSize: '0.75rem' }}>
         <div className="text-muted" style={{ fontSize: '0.68rem' }}>

@@ -11,6 +11,7 @@ const CATEGORIES = [
   { key: 'leave',       label: 'Leave',       blurb: 'New requests you need to decide on, and decisions on yours.' },
   { key: 'agenda',      label: 'Agenda',      blurb: 'Meetings you’re attending — scheduled, started — and agenda tasks.' },
   { key: 'paid_collab', label: 'Paid Collab', blurb: 'Creator and video activity updates.' },
+  { key: 'creator_library', label: 'Creator Library', blurb: 'Creators needing review, and approvals on your brands.' },
   { key: 'salary',      label: 'Salary',      blurb: 'When your fixed salary is updated.' },
   { key: 'hr',          label: 'HR',          blurb: 'Work anniversaries and other people-ops alerts.' },
   { key: 'system',      label: 'System',      blurb: 'Maintenance and account alerts.' },

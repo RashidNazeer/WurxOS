@@ -13,6 +13,7 @@ import { deductPrompt } from '../../lib/tlPerfApi';
 import MonthlyReportForm from './MonthlyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import MonthlyReportView from './MonthlyReportView';
+import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
@@ -175,7 +176,10 @@ export default function AllMonthlyReportsPage() {
       if (s === 'verified') pendingApproval++;
       if (s === 'approved') approved++;
     });
-    return { totalGmv, reportCount, brandCount: brandSet.size, pendingApproval, approved };
+    // Shared currency of the reports in scope (default only when they mix).
+    const curSet = new Set(filtered.map(r => r.currency || DEFAULT_CURRENCY));
+    const currency = curSet.size === 1 ? [...curSet][0] : DEFAULT_CURRENCY;
+    return { totalGmv, reportCount, brandCount: brandSet.size, pendingApproval, approved, currency };
   }, [filtered]);
 
   const hasFilters = filterBrand || filterClient || filterTeam || filterSearch || filterCreator || filterMonth !== '' || filterStatus;
@@ -391,13 +395,13 @@ export default function AllMonthlyReportsPage() {
       <div>
         {/* Sticky action bar — stays pinned while reviewing a long
             report so the OL never has to scroll back up for actions. */}
-        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2"
-          style={{
+        <div style={{
             position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 10,
             background: 'var(--surface-0)',
             borderBottom: '1px solid var(--border-subtle)',
-            padding: '12px 28px', margin: '0 -28px 12px',
+            padding: '12px 28px 8px', margin: '0 -28px 10px',
           }}>
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <button className="btn btn-sm btn-link text-muted p-0" onClick={() => setViewReport(null)}>
             <i className="bi bi-arrow-left me-1" /> Back to all reports
           </button>
@@ -489,6 +493,8 @@ export default function AllMonthlyReportsPage() {
                 so they stay reachable while scrolling. */}
             <ReportActionsMenu actions={reportActions} />
           </div>
+          </div>
+          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} />
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
@@ -569,7 +575,7 @@ export default function AllMonthlyReportsPage() {
               </div>
               <div>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>
-                  ${monthStats.totalGmv >= 1000 ? (monthStats.totalGmv / 1000).toFixed(1) + 'K' : monthStats.totalGmv.toFixed(0)}
+                  {currencySymbol(monthStats.currency)}{monthStats.totalGmv >= 1000 ? (monthStats.totalGmv / 1000).toFixed(1) + 'K' : monthStats.totalGmv.toFixed(0)}
                 </div>
                 <div className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 600 }}>Total GMV</div>
               </div>

@@ -36,12 +36,18 @@ const MONTHS = {
   dec: 11, december: 11,
 };
 
-// "$1,503" / "£717" -> 1503 / 717 ; "11.56" -> 11.56 ; "" / "-" -> null
+// "$1,503" / "£717" -> 1503 / 717 ; "11.56" -> 11.56 ; "" / "-" -> null.
+// Strip EVERYTHING except digits, sign and decimal point — not just a fixed set
+// of currency symbols. A CSV whose UTF-8 "£" was mis-decoded as Latin-1 arrives
+// as "Â£717"; keeping only [0-9.-] recovers 717 instead of failing to NaN (which
+// would blank out Amazon Revenue / GMV and leave the view with "no metrics").
 function parseNum(v) {
   if (v == null) return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  const s = String(v).replace(/[$£€,%\s]/g, '').trim();
-  if (s === '' || s === '-' || s === '—') return null;
+  const raw = String(v).trim();
+  if (raw === '' || raw === '-' || raw === '—') return null;
+  const s = raw.replace(/[^0-9.\-]/g, '');
+  if (s === '' || s === '-' || s === '.') return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
@@ -302,9 +308,14 @@ function mapSheetColumns(grid, headerIdx) {
 
   const productCols = [];
   if (revCols.length) {
-    const isTotal = (c) => colMap[c.idx] === 'revenue_per_day'
-      || c.norm.includes('allproduct') || c.norm.includes('total') || c.norm.includes('overall');
-    let total = revCols.find(isTotal);
+    // Pick the TOTAL column. Prefer an explicitly-named total ("All Products" /
+    // "Total" / "Overall" Revenue/Day) FIRST — otherwise a plain "Revenue/Day"
+    // column (e.g. a blank "Revenue (Shopify)/Day") that also maps to
+    // revenue_per_day can steal the total slot, pushing the real "Total
+    // Revenue/Day" into the product list and double-counting Amazon Revenue.
+    const isNamedTotal = (c) => c.norm.includes('allproduct') || c.norm.includes('total') || c.norm.includes('overall');
+    let total = revCols.find(isNamedTotal)
+      || revCols.find((c) => colMap[c.idx] === 'revenue_per_day');
     if (!total) {
       total = revCols.length === 1
         ? revCols[0]

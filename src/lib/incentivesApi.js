@@ -56,8 +56,12 @@ function _isPaid(row) {
 // snapshot is written server-side at payout-clear, not here.
 function stripAttendanceForSave(items) {
   return (items || []).map((it) => {
-    if (!it || it.source !== 'attendance') return it;
-    return { ...it, achievedValue: null, completed: false, completedBy: null, targetValue: 100, suffix: it.suffix || '%' };
+    if (!it) return it;
+    // Attendance % is pinned to a /100 target; OL-brands % keeps its own target
+    // (e.g. 70). Both are read-time-derived, so never freeze achieved/completed.
+    if (it.source === 'attendance') return { ...it, achievedValue: null, completed: false, completedBy: null, targetValue: 100, suffix: it.suffix || '%' };
+    if (it.source === 'ol_brands')  return { ...it, achievedValue: null, completed: false, completedBy: null, suffix: it.suffix || '%' };
+    return it;
   });
 }
 
@@ -112,6 +116,75 @@ export async function applyAttendanceAutofill(rows, month) {
   });
 }
 
+// ── OL brands auto-fill ───────────────────────────────────────────
+// An OL incentive item flagged { source: 'ol_brands' } gets its achievedValue
+// filled from the % of the OL's CURATED brands (Settings) whose owning TL marked
+// the matching per-brand GMV item complete (mig 291 RPC). Mirrors the attendance
+// overlay: read-time, never frozen at rest, money-gated to a CLOSED month.
+export async function fetchOlBrandPct(month, olIds) {
+  const ids = Array.from(new Set((olIds || []).filter(Boolean)));
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase.rpc('ol_brand_incentive_pct', { p_month: month, p_ol_ids: ids });
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  (data || []).forEach((r) => m.set(r.ol_id, { hits: Number(r.hits) || 0, total: Number(r.total) || 0, pct: Number(r.pct) || 0 }));
+  return m;
+}
+function _hasOlBrandsItem(row) {
+  return [...(row?.incentives || []), ...(row?.bonuses || [])].some((it) => it && it.source === 'ol_brands');
+}
+export async function applyOlBrandsAutofill(rows, month) {
+  const list = Array.isArray(rows) ? rows : [];
+  const needIds = list.filter((r) => !_isPaid(r) && _hasOlBrandsItem(r)).map((r) => r.user_id || r.userId).filter(Boolean);
+  if (!needIds.length) return list;
+  let pctByOl;
+  try { pctByOl = await fetchOlBrandPct(month, needIds); }
+  catch (e) { console.warn('ol-brands autofill skipped:', e.message); return list; }
+  // MONEY GATE (same as attendance): show the running % always, but only let the
+  // item COMPLETE (become payable / count as Earned) once the month is CLOSED —
+  // mid-month a TL may still mark/unmark brand targets.
+  const isFinalMonth = String(month) < karachiMonth();
+  const patchItem = (it, uid) => {
+    if (!it || it.source !== 'ol_brands') return it;
+    const info = pctByOl.get(uid);
+    const val = info ? info.pct : (Number(it.achievedValue) || 0);
+    const tgt = Number(it.targetValue) || 70;
+    const next = { ...it, achievedValue: val, suffix: it.suffix || '%' };
+    next.completed = isFinalMonth ? (val >= tgt) : false;
+    return next;
+  };
+  return list.map((r) => {
+    if (_isPaid(r)) return r;
+    const uid = r.user_id || r.userId;
+    return { ...r, incentives: (r.incentives || []).map((it) => patchItem(it, uid)), bonuses: (r.bonuses || []).map((it) => patchItem(it, uid)) };
+  });
+}
+
+// Both read-time overlays, in sequence — the single entry point every read path uses.
+export async function applyDerivedAutofill(rows, month) {
+  return applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month);
+}
+
+// ── OL incentive-brands curation (Settings) + per-brand status (panel) ──────
+export async function getOlIncentiveBrands(olId) {
+  const { data, error } = await supabase.from('ol_incentive_brands').select('brand_id').eq('ol_id', olId);
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => r.brand_id);
+}
+export async function setOlIncentiveBrands(olId, brandIds) {
+  const ids = Array.from(new Set((brandIds || []).filter(Boolean)));
+  // Atomic replace via RPC (mig 295): a plain delete-then-insert is two separate
+  // autocommit calls, so a payout-lock landing between them could wipe the set.
+  const { error } = await supabase.rpc('ol_set_incentive_brands', { p_ol: olId, p_brand_ids: ids });
+  if (error) throw new Error(error.message);
+}
+// [{ brand_id, brand_name, client_name, owner_name, matched_text, is_hit }]
+export async function fetchOlBrandStatus(olId, month) {
+  const { data, error } = await supabase.rpc('ol_brand_incentive_status', { p_ol: olId, p_month: month });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 export async function getIncentives(userId, month = currentMonth()) {
   const { data, error } = await supabase
     .from('incentives')
@@ -121,7 +194,7 @@ export async function getIncentives(userId, month = currentMonth()) {
   // Note: _normRow attaches v1 aliases (basicSalary, userId, payoutCleared,
   // verifiedByName, etc.) so v1 markup reads it without translation.
   if (!data) return null;
-  const [row] = await applyAttendanceAutofill([_normRow(data)], month);
+  const [row] = await applyDerivedAutofill([_normRow(data)], month);
   return row;
 }
 
@@ -131,9 +204,9 @@ export async function listIncentivesForMonth(month = currentMonth()) {
     .select('*, user:user_id(id, display_name, role)')
     .eq('month', month).order('updated_at', { ascending: false });
   if (error) throw new Error(error.message);
-  // Overlay attendance-linked items even though this loader has no live consumer
-  // today — cheap safety so a future rewire can't silently bypass the overlay.
-  return applyAttendanceAutofill(data || [], month);
+  // Overlay derived items even though this loader has no live consumer today —
+  // cheap safety so a future rewire can't silently bypass the overlay.
+  return applyDerivedAutofill(data || [], month);
 }
 
 export async function upsertIncentives(userId, month, patch) {
@@ -230,7 +303,7 @@ export async function listIncentivesForRole(role, month = currentMonth()) {
   if (error) throw new Error(error.message);
   // Overlay attendance-linked items (cheap no-op when none present) so this loader
   // stays consistent with the read paths if it is ever wired to a live surface.
-  return applyAttendanceAutofill((data || []).filter((r) => r.user?.role === role), month);
+  return applyDerivedAutofill((data || []).filter((r) => r.user?.role === role), month);
 }
 
 // Month view scoped to a manager's direct-report team (for OL viewing APCs).
@@ -242,7 +315,7 @@ export async function listIncentivesForMyTeam(managerId, month = currentMonth())
   if (error) throw new Error(error.message);
   // Overlay attendance-linked items (cheap no-op when none present) so this loader
   // stays consistent with the read paths if it is ever wired to a live surface.
-  return applyAttendanceAutofill((data || []).filter((r) => r.user?.reports_to === managerId), month);
+  return applyDerivedAutofill((data || []).filter((r) => r.user?.reports_to === managerId), month);
 }
 
 // All months that have any incentive row — for the month picker.
@@ -356,7 +429,7 @@ export async function listIncentivesMonth(month = currentMonth()) {
     .select('*, user:user_id(id, display_name, email, role, reports_to, is_active), verifier:verified_by(display_name)')
     .eq('month', month);
   if (error) throw new Error(error.message);
-  return applyAttendanceAutofill((data || []).map(_normRow), month);
+  return applyDerivedAutofill((data || []).map(_normRow), month);
 }
 
 // Most recent prior plan for one user (used for ghost auto-carry-forward).

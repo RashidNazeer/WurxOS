@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { GMV_MAX_FIELDS, formatGmvField, monthLabel, CAMPAIGN_STATUSES } from '../../lib/gmvMaxApi';
 import { formatPctChange } from '../../utils/formatPctChange';
+import { currencySymbol } from '../../utils/currencies';
 
 /* Wurx theme tokens — pure black + warm peach + cream. */
 const WURX = {
@@ -29,7 +30,7 @@ function formatScheduleTime(s) {
 }
 
 // ── Metric tile ────────────────────────────────────────────────────
-function MetricTile({ field, value, prevValue, dark }) {
+function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
   const v = Number(value) || 0;
   const pv = Number(prevValue) || 0;
   let delta = null;
@@ -80,7 +81,7 @@ function MetricTile({ field, value, prevValue, dark }) {
         color: dark ? WURX.cream : (has ? 'var(--text-primary)' : 'var(--text-muted)'),
         letterSpacing: '-0.025em', lineHeight: 1.1,
       }}>
-        {has ? formatGmvField(field.key, value) : '—'}
+        {has ? formatGmvField(field.key, value, currency) : '—'}
       </div>
       {delta && (
         <div style={{
@@ -99,7 +100,7 @@ function MetricTile({ field, value, prevValue, dark }) {
 }
 
 // ── Monthly Overview hero card ─────────────────────────────────────
-function MonthlyCard({ label, sublabel, report, prevReport, isPrimary }) {
+function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency = 'USD' }) {
   const empty = !report;
   return (
     <div style={{
@@ -160,7 +161,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary }) {
             <MetricTile key={f.key} field={f}
               value={camelGet(report, f.key)}
               prevValue={prevReport ? camelGet(prevReport, f.key) : null}
-              dark={isPrimary} />
+              dark={isPrimary} currency={currency} />
           ))}
         </div>
       )}
@@ -199,7 +200,7 @@ function MetaPill({ label, value, dark }) {
   );
 }
 
-function CampaignCard({ campaign, prevCampaign }) {
+function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
   const st = statusCfg(campaign.status);
   const isActive = campaign.status === 'active';
   const dark = isActive;
@@ -255,14 +256,14 @@ function CampaignCard({ campaign, prevCampaign }) {
           )}
           {campaign.scheduleTime && <MetaPill label="Scheduled" value={formatScheduleTime(campaign.scheduleTime)} dark={dark} />}
           {campaign.campaignBudget != null && Number(campaign.campaignBudget) !== 0 && (
-            <MetaPill label="Budget" value={Number(campaign.campaignBudget).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} dark={dark} />
+            <MetaPill label="Budget" value={currencySymbol(currency) + Number(campaign.campaignBudget).toLocaleString('en-US', { maximumFractionDigits: 0 })} dark={dark} />
           )}
         </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, position: 'relative' }}>
         {GMV_MAX_FIELDS.map(f => (
-          <MetricTile key={f.key} field={f} value={campaign[f.key]} prevValue={prevCampaign ? prevCampaign[f.key] : null} dark={dark} />
+          <MetricTile key={f.key} field={f} value={campaign[f.key]} prevValue={prevCampaign ? prevCampaign[f.key] : null} dark={dark} currency={currency} />
         ))}
       </div>
 
@@ -282,6 +283,7 @@ function CampaignCard({ campaign, prevCampaign }) {
 
 // ── Brand block ───────────────────────────────────────────────────
 function BrandBlock({ brand, allReports, year, monthIdx, view }) {
+  const currency = brand.currency || 'USD';
   const today = new Date();
   const isCurrentMonth = year === today.getFullYear() && monthIdx === today.getMonth();
   const selectedKey = monthKey(year, monthIdx);
@@ -338,11 +340,11 @@ function BrandBlock({ brand, allReports, year, monthIdx, view }) {
           <MonthlyCard
             label="Previous Month"
             sublabel={`${MONTH_SHORT[monthIdx === 0 ? 11 : monthIdx - 1]} ${monthIdx === 0 ? year - 1 : year}`}
-            report={prev} prevReport={null} isPrimary={false} />
+            report={prev} prevReport={null} isPrimary={false} currency={currency} />
           <MonthlyCard
             label={isCurrentMonth ? 'This Month (so far)' : 'Selected Month'}
             sublabel={`${MONTH_SHORT[monthIdx]} ${year}`}
-            report={selected} prevReport={prev} isPrimary={true} />
+            report={selected} prevReport={prev} isPrimary={true} currency={currency} />
         </div>
       )}
 
@@ -365,7 +367,7 @@ function BrandBlock({ brand, allReports, year, monthIdx, view }) {
           <div>
             {sortedCampaigns.map(c => {
               const prevForThis = c.campaignName ? prevByName.get(c.campaignName.trim().toLowerCase()) : null;
-              return <CampaignCard key={c.id} campaign={c} prevCampaign={prevForThis} />;
+              return <CampaignCard key={c.id} campaign={c} prevCampaign={prevForThis} currency={currency} />;
             })}
           </div>
         )

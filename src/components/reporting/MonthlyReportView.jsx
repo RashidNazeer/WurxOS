@@ -759,6 +759,7 @@ function MetricGrid({ items, cols = 4 }) {
 function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
   const ms = (v) => fmt$short(v, currency);
   const m = (v) => fmt$(v, currency);
+  const sym = currencySymbol(currency);
   const cells = [
     { label: 'Cost', value: ms(row.spend) },
     { label: 'GMV', value: ms(row.gmv) },
@@ -787,7 +788,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
         <div className="mt-3">
           <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.66rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             <span>Cost efficiency</span>
-            <span>$1 → ${(gmv / spend).toFixed(2)}</span>
+            <span>{sym}1 → {sym}{(gmv / spend).toFixed(2)}</span>
           </div>
           <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
             <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>

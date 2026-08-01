@@ -38,6 +38,7 @@ export default function CheckpointForm({
   // → drop §09; 'edit' = legacy fallback (old editable inputs).
   paidCollabMode = 'edit', paidCollabEntry = null,
   onRemindPaidCollab, remindingPaidCollab, paidCollabRemindMsg,
+  onPullPaidCollab, pullingPaidCollab, paidCollabPulled = false, paidCollabHasWeekEntry = false,
 }) {
   const set = (path, value) => setData((d) => setIn(d, path, value));
   const addRow = (path, empty) => setData((d) => setIn(d, path, [...getIn(d, path), empty]));
@@ -253,7 +254,9 @@ export default function CheckpointForm({
         <Section n={9} title="Paid Collab" accent="#db2777">
           {paidCollabMode === 'readonly' ? (
             <PaidCollabReadOnly entry={paidCollabEntry} sym={data.currency || '$'}
-              onRemind={onRemindPaidCollab} reminding={remindingPaidCollab} remindMsg={paidCollabRemindMsg} />
+              onRemind={onRemindPaidCollab} reminding={remindingPaidCollab} remindMsg={paidCollabRemindMsg}
+              onPull={onPullPaidCollab} pulling={pullingPaidCollab}
+              pulled={paidCollabPulled} hasWeekEntry={paidCollabHasWeekEntry} />
           ) : (
             <>
               <Grid cols={3}>
@@ -336,8 +339,12 @@ function Num({ label, path, sfx, hint }) {
     <label className="ck-field">
       <span className="wx-label">{label}</span>
       <div style={{ position: 'relative' }}>
-        <input type="number" className="wx-input" value={getIn(data, path) ?? ''}
-          onChange={(e) => set(path, e.target.value)} placeholder="—"
+        {/* type="text" + inputMode="decimal" (NOT type="number"): a controlled
+            number input swallows the decimal point ("0." reads back as "" in
+            Chrome), so users could never type rates like 0.4. This keeps exactly
+            what they type — digits, a dot, a leading minus. */}
+        <input type="text" inputMode="decimal" className="wx-input" value={getIn(data, path) ?? ''}
+          onChange={(e) => set(path, e.target.value.replace(/[^0-9.\-]/g, ''))} placeholder="—"
           style={sfx ? { paddingRight: 34 } : undefined} />
         {sfx && <span className="ck-sfx">{sfx}</span>}
       </div>
@@ -385,8 +392,8 @@ function Money({ label, path }) {
       <span className="wx-label">{label}</span>
       <div style={{ position: 'relative' }}>
         <span className="ck-pfx">{sym}</span>
-        <input type="number" className="wx-input" value={getIn(data, path) ?? ''}
-          onChange={(e) => set(path, e.target.value)} placeholder="—" style={{ paddingLeft: 26 }} />
+        <input type="text" inputMode="decimal" className="wx-input" value={getIn(data, path) ?? ''}
+          onChange={(e) => set(path, e.target.value.replace(/[^0-9.\-]/g, ''))} placeholder="—" style={{ paddingLeft: 26 }} />
       </div>
     </label>
   );
@@ -477,16 +484,29 @@ function AddBtn({ children, onClick }) {
 // §09 for the APC checkpoint on a paid-collab-managed brand: read-only view of what
 // the Paid Collab team entered for the week + a "remind them" button. The team fills
 // the values in their own dashboard; the APC only sees the status and can nudge.
-function PaidCollabReadOnly({ entry, sym = '$', onRemind, reminding, remindMsg }) {
+function PaidCollabReadOnly({
+  entry, sym = '$', onRemind, reminding, remindMsg,
+  onPull, pulling, pulled = false, hasWeekEntry = false,
+}) {
   const d = entry?.data || {};
   const filled = Object.values(d).some((v) => v != null && String(v).trim() !== '');
-  const fmt = (v, money) => (v === '' || v == null ? '—' : (money ? `${sym}${v}` : String(v)));
+  // Money values may have been typed with a currency symbol / commas ("$5,000",
+  // even "$$5,000"); strip to the number and re-format so we never show "$$…".
+  const fmt = (v, money) => {
+    if (v === '' || v == null) return '—';
+    if (!money) return String(v);
+    const clean = String(v).replace(/[^0-9.]/g, '');
+    return clean ? sym + Number(clean).toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v);
+  };
   const stat = (label, val, money) => (
     <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 10px' }}>
       <div className="text-muted" style={{ fontSize: '0.68rem', fontWeight: 600 }}>{label}</div>
       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(val, money)}</div>
     </div>
   );
+  const pulledWeek = pulled && entry?.week_start
+    ? new Date(`${entry.week_start}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
   return (
     <div>
       <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
@@ -495,9 +515,16 @@ function PaidCollabReadOnly({ entry, sym = '$', onRemind, reminding, remindMsg }
           background: filled ? 'var(--success-soft)' : 'var(--surface-2)',
           color: filled ? 'var(--success)' : 'var(--text-muted)', fontSize: '0.66rem', fontWeight: 700,
         }}>
-          {filled ? '✓ Filled' : 'Not filled yet'}{entry?.updated_at ? ` · ${new Date(entry.updated_at).toLocaleDateString()}` : ''}
+          {hasWeekEntry ? '✓ Filled for this week' : (filled && pulled) ? '✓ Pulled from team data' : 'Not filled for this week'}
+          {entry?.updated_at ? ` · ${new Date(entry.updated_at).toLocaleDateString()}` : ''}
         </span>
       </div>
+      {pulled && filled && pulledWeek && (
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>
+          <i className="bi bi-info-circle me-1" />
+          Showing the team's latest entry (tagged to the week of {pulledWeek}) — this data isn't tied to a specific week.
+        </div>
+      )}
       {filled ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
           {stat('Creators onboarded', d.creatorsOnboarded)}
@@ -509,7 +536,7 @@ function PaidCollabReadOnly({ entry, sym = '$', onRemind, reminding, remindMsg }
         </div>
       ) : (
         <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-          The Paid Collab team hasn't filled this in for this week yet.
+          The Paid Collab team hasn't entered any data for this brand yet.
         </div>
       )}
       {d.notes && String(d.notes).trim() && (
@@ -518,6 +545,15 @@ function PaidCollabReadOnly({ entry, sym = '$', onRemind, reminding, remindMsg }
         </div>
       )}
       <div className="d-flex align-items-center gap-2 mt-3 flex-wrap">
+        {/* Data now auto-falls-back to the team's latest entry, so this manual
+            pull only appears when there's genuinely nothing to show. */}
+        {!hasWeekEntry && !filled && (
+          <button type="button" className="btn btn-sm btn-primary" disabled={pulling} onClick={onPull}>
+            {pulling
+              ? <><span className="spinner-border spinner-border-sm me-1" /> Pulling…</>
+              : <><i className="bi bi-download me-1" /> {pulled ? 'Re-pull' : 'Pull'} Paid Collab data</>}
+          </button>
+        )}
         <button type="button" className="btn btn-sm btn-outline-secondary" disabled={reminding} onClick={onRemind}>
           {reminding ? <><span className="spinner-border spinner-border-sm me-1" /> Sending…</> : <><i className="bi bi-bell me-1" /> Remind Paid Collab team</>}
         </button>

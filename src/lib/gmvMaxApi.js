@@ -12,6 +12,7 @@
 // manages. (Other parts of WurxOS use PKR; GMV Max is the exception.)
 
 import { supabase } from './supabase';
+import { currencySymbol } from '../utils/currencies';
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -67,13 +68,13 @@ export const CAMPAIGN_STATUSES = [
   { key: 'draft',  label: 'Draft',  color: '#7c3aed', bg: '#f3e8ff' },
 ];
 
-export function formatGmvField(key, value) {
+export function formatGmvField(key, value, currency = 'USD') {
   const v = Number(value) || 0;
   switch (key) {
     case 'cost':
     case 'costPerOrder':
     case 'grossRevenue':
-      return v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+      return currencySymbol(currency) + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     case 'skuOrders':
       return v.toLocaleString('en-US');
     case 'roi':

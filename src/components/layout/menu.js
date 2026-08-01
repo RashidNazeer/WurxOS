@@ -43,6 +43,11 @@ const HOLIDAYS_ITEM   = { label: 'Holidays',   icon: CalendarIcon, to: '/holiday
 const RESOURCES_ITEM  = { label: 'Resources',  icon: BookmarkIcon, to: '/resources' };
 const PERFORMANCE_ITEM = { label: 'Performance', icon: StarIcon, to: '/performance' };
 const INCENTIVES_ITEM = { label: 'Incentives',  icon: ReportIcon, to: '/incentives' };
+// `alert:true` — when this category has unread notifications the sidebar item
+// doesn't just show a dot, it inverts + blinks (IPCs nudge TL/OLs to review;
+// this is time-critical, so it must be impossible to miss). Cleared when the
+// user opens the page (CreatorLibraryPage marks the category read).
+const CREATOR_LIBRARY_ITEM = { label: 'Creator Library', icon: UsersIcon, to: '/creator-library', category: 'creator_library', alert: true };
 const CHAT_ITEM       = { label: 'Chat',        icon: UsersIcon, to: '/chat' };
 const KNOWLEDGE_ITEM  = { label: 'Knowledge Base', icon: BookmarkIcon, to: '/kb', category: 'knowledge_base' };
 const REMINDERS_ITEM  = { label: 'Reminders', icon: BellIcon, to: '/reminders', category: 'reminder' };
@@ -195,6 +200,7 @@ export const MENUS = {
     DASHBOARD_ITEM,
     EMPLOYEES_GROUP,
     BRANDS_ITEM,
+    CREATOR_LIBRARY_ITEM,
     BRAND_ANALYTICS,
     EUKA_ANALYTICS_ITEM,
     HALO_ITEM,
@@ -227,6 +233,7 @@ export const MENUS = {
   ol: [
     DASHBOARD_ITEM,
     BRANDS_ITEM,
+    CREATOR_LIBRARY_ITEM,
     BRAND_ANALYTICS,
     HALO_ITEM,
     BRAND_SWITCHES,
@@ -257,6 +264,8 @@ export const MENUS = {
   tl: [
     DASHBOARD_ITEM,
     MY_BRANDS,
+    CREATOR_LIBRARY_ITEM,
+    HALO_ITEM,
     { label: 'My team', icon: UsersIcon, to: '/tl/team' },
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
@@ -279,6 +288,7 @@ export const MENUS = {
   ],
   pctl: [
     DASHBOARD_ITEM,
+    CREATOR_LIBRARY_ITEM,
     TASKS_ITEM,
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
@@ -319,6 +329,7 @@ export const MENUS = {
   ipc: [
     DASHBOARD_ITEM,
     MY_BRANDS,
+    CREATOR_LIBRARY_ITEM,
     CAMPAIGNS,
     TASKS_ITEM,
     INCENTIVES_ITEM,

@@ -63,6 +63,20 @@ export async function getPaidCollabEntry(brandId, weekStart) {
   return data || null;
 }
 
+// The team's latest FILLED §09 for a brand, regardless of week. The Paid Collab
+// data is a rolling snapshot (creators/videos/budget), not tied to the exact
+// checkpoint week — so the APC can pull whatever the team last entered even if
+// it's tagged to a different week. Returns null if the team has entered nothing.
+export async function getLatestPaidCollabEntry(brandId) {
+  const { data, error } = await supabase
+    .from(ENTRIES).select('*')
+    .eq('brand_id', brandId)
+    .order('week_start', { ascending: false })
+    .limit(12);
+  if (error) throw new Error(error.message);
+  return (data || []).find((r) => isPaidCollabFilled(r.data)) || null;
+}
+
 // Entries for many brands in one week (dashboard status) → { brandId: entry }.
 export async function getPaidCollabEntriesForWeek(brandIds, weekStart) {
   if (!brandIds?.length) return {};

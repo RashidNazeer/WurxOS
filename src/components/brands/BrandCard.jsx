@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import BrandAvatar from './BrandAvatar';
 import { PencilIcon, RefreshIcon, ChevronRightIcon } from '../common/Icon';
+import { currencySymbol } from '../../utils/currencies';
 
 /**
  * Single brand card. Shows logo/initials, name, client, status badge,
@@ -72,7 +73,7 @@ export default function BrandCard({ brand, canEdit, canSwitch, onEdit, onSwitch 
             }}
             title="30-day GMV"
           >
-            GMV · {formatMoney(brand.gmv)}
+            GMV · {formatMoney(brand.gmv, brand.currency)}
           </span>
         )}
         {owner && (
@@ -127,12 +128,13 @@ function initials(name) {
   return (name || '?').split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 }
 
-function formatMoney(n) {
+function formatMoney(n, currency = 'USD') {
   if (n == null) return '—';
+  const sym = currencySymbol(currency);
   const num = Number(n);
-  if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000)     return `$${(num / 1_000).toFixed(1)}K`;
-  return `$${num.toFixed(0)}`;
+  if (num >= 1_000_000) return `${sym}${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000)     return `${sym}${(num / 1_000).toFixed(1)}K`;
+  return `${sym}${num.toFixed(0)}`;
 }
 
 // Normalise a brand's tier for display + filtering so it's always a concrete number

@@ -34,6 +34,16 @@ export async function getBrand(id) {
   return data ? normalizeBrand(data) : null;
 }
 
+// Record (or clear, pass null) the last date a sale was generated for a brand.
+// Goes through the RPC so an assigned APC/IPC can set it even though they can't
+// edit the brand form (Boss/OL/owner only). Server re-checks the caller's scope.
+export async function setBrandLastSaleDate(brandId, date) {
+  const { error } = await supabase.rpc('brand_set_last_sale_date', {
+    p_brand: brandId, p_date: date || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
 function normalizeBrand(row) {
   // Strip soft-deleted users from the assignment list and the owner.
   // Profile rows have deleted_at set by the delete-user Edge Function;
@@ -61,7 +71,7 @@ export async function listEukaStores() {
   return data || [];
 }
 
-export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', eukaStoreId = null, eukaSlug = null }) {
+export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null }) {
   const { data: me } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('brands')
@@ -75,6 +85,7 @@ export async function createBrand({ brandName, clientName, tier, gmv, ownerId, l
       status,
       paid_collab_status: paidCollabStatus,
       gmv_max_status: gmvMaxStatus,
+      currency: currency || 'USD',
       euka_store_id: eukaStoreId || null,
       euka_slug: eukaSlug || null,
       created_by: me?.user?.id ?? null,
@@ -102,6 +113,7 @@ export async function updateBrand(id, patch) {
   if ('status'     in patch) payload.status      = patch.status;
   if ('paidCollabStatus' in patch) payload.paid_collab_status = patch.paidCollabStatus;
   if ('gmvMaxStatus'     in patch) payload.gmv_max_status     = patch.gmvMaxStatus;
+  if ('currency'         in patch) payload.currency           = patch.currency || 'USD';
   // Euka link — set both together (store scopes queries, slug picks the key).
   // Passing null for both un-links the brand from Euka.
   if ('eukaStoreId' in patch) payload.euka_store_id = patch.eukaStoreId || null;

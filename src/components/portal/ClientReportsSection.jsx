@@ -68,6 +68,11 @@ function adaptReportForView(r) {
     // Spread data fields onto the root so report.overallPerformance,
     // report.topCreators, report.gmvMax, etc. all work unchanged.
     ...data,
+    // Brand currency (from get_client_access) is the single source of truth for
+    // money symbols and wins over the legacy per-report snapshot, so the portal
+    // shows one consistent currency across a brand's reports. Falls back to the
+    // old snapshot then USD.
+    currency: r.brand_currency || data.currency || 'USD',
   };
   if (r.type === 'monthly') {
     return {
@@ -246,40 +251,20 @@ export default function ClientReportsSection({
 
   // ── Detail view ────────────────────────────────────────────────────
   if (viewReport) {
-    const brandReports = inType.filter(r => r.brandId === viewReport.brandId);
-    const prev = findPreviousReport(brandReports, viewReport);
-    const brandSections = sectionsByBrand.get(viewReport.brandId) || [];
-    const reportValues  = valuesByReport.get(viewReport.id) || [];
-    const brandLinks    = resourcesByBrand.get(viewReport.brandId) || [];
     return (
-      <div>
-        <button
-          onClick={() => setViewReport(null)}
-          style={{
-            background: 'transparent', border: 0, padding: 0,
-            color: 'var(--text-muted)', fontSize: 13, marginBottom: 12,
-            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
-          }}>
-          <span style={{ fontSize: 14 }}>←</span> Back to reports
-        </button>
-        {viewReport.type === 'monthly' ? (
-          <MonthlyReportView report={viewReport} previousReport={prev} clientView reportLinks={brandLinks} />
-        ) : (
-          <WeeklyReportView report={viewReport} previousReport={prev} allReports={brandReports} clientView reportLinks={brandLinks} />
-        )}
-        {/* Custom client sections — appears below the report dashboard.
-            In client-mode (token present) they can add/edit/remove. */}
-        <BrandSectionsPanel
-          brandId={viewReport.brandId}
-          brandName={viewReport.brandName}
-          reportId={viewReport.id}
-          sections={brandSections}
-          sectionValues={reportValues}
-          token={token}
-          readOnly={!token}
-          onMutate={onMutate}
-        />
-      </div>
+      <ReportDetailView
+        report={viewReport}
+        reportsForBrand={adapted.filter(r => r.brandId === viewReport.brandId)}
+        grantedTypes={availableTypes}
+        onSwitchType={setActiveType}
+        onOpen={setViewReport}
+        onBack={() => setViewReport(null)}
+        sectionsByBrand={sectionsByBrand}
+        valuesByReport={valuesByReport}
+        resourcesByBrand={resourcesByBrand}
+        token={token}
+        onMutate={onMutate}
+      />
     );
   }
 
@@ -467,17 +452,234 @@ export default function ClientReportsSection({
   );
 }
 
+function reportSortKey(r) {
+  return r.weekStart || r.periodStart || (r.monthKey ? r.monthKey + '-01' : '');
+}
+
 function findPreviousReport(list, current) {
-  const cur = current.weekStart || current.periodStart || (current.monthKey ? current.monthKey + '-01' : '');
+  const cur = reportSortKey(current);
   if (!cur) return null;
   return [...list]
     .filter(r => {
-      const s = r.weekStart || r.periodStart || (r.monthKey ? r.monthKey + '-01' : '');
+      const s = reportSortKey(r);
       return s && s < cur;
     })
-    .sort((a, b) => {
-      const sa = a.weekStart || a.periodStart || (a.monthKey ? a.monthKey + '-01' : '');
-      const sb = b.weekStart || b.periodStart || (b.monthKey ? b.monthKey + '-01' : '');
-      return sb.localeCompare(sa);
-    })[0] || null;
+    .sort((a, b) => reportSortKey(b).localeCompare(reportSortKey(a)))[0] || null;
+}
+
+// Short label for the prev/next nav buttons — the client asked to see the
+// target period, e.g. "Week 2". Derive it from the stored label string
+// ("Week 16 (Jul 19 - 25)" / "Period 2 (May 3 - 16)" / "June 2026"), NOT from
+// period_number: the portal RPC doesn't return period_number, and it's null in
+// the DB for every monthly report and some bi-weekly ones. The label is the
+// always-populated, authoritative field (it's what the report cards show too).
+function shortPeriodLabel(r) {
+  if (!r) return '';
+  const full = r.type === 'monthly'
+    ? (r.monthLabel || '')
+    : r.type === 'biweekly'
+      ? (r.periodLabel || '')
+      : (r.weekLabel || '');
+  // Keep the leading name + number, drop the "(date range)" suffix.
+  const short = full.split(' (')[0].trim();
+  if (short) return short;
+  if (r.type === 'monthly')  return 'Month';
+  if (r.type === 'biweekly') return 'Period';
+  return 'Week';
+}
+
+// The report body renders at this fixed design width and is scaled to fit the
+// available column, so the layout is identical on every screen (it only shrinks
+// uniformly on narrower windows — it never reflows to a different arrangement).
+const DESIGN_W = 1140;
+
+function scrollToTop() {
+  if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// The full stored period label, e.g. "Week 16 (Jul 19 - 25)" / "June 2026".
+function fullPeriodLabel(r) {
+  if (!r) return '';
+  return r.type === 'monthly' ? (r.monthLabel || '')
+    : r.type === 'biweekly' ? (r.periodLabel || '')
+    : (r.weekLabel || '');
+}
+
+// The "(Jul 19 - 25)" date range pulled out of the label, for the tile subtitle.
+function dateRangeLabel(r) {
+  const m = fullPeriodLabel(r).match(/\(([^)]+)\)/);
+  return m ? m[1] : '';
+}
+
+// ── Client report detail — a sticky header (brand + back + type toggle + a
+// horizontally-scrollable strip of report tiles) over the report body. The body
+// is rendered at a fixed design width and scaled to fit so it looks identical on
+// every screen. A floating "back to top" button replaces the old sticky back.
+function ReportDetailView({
+  report, reportsForBrand, grantedTypes, onSwitchType, onOpen, onBack,
+  sectionsByBrand, valuesByReport, resourcesByBrand, token, onMutate,
+}) {
+  const [viewType, setViewType] = useState(report.type);
+  useEffect(() => { setViewType(report.type); }, [report.type]);
+
+  // Only the report types this brand actually has AND the client is granted.
+  const typeTabs = useMemo(() => {
+    const present = new Set(reportsForBrand.map(r => r.type));
+    return ['weekly', 'biweekly', 'monthly'].filter(t => present.has(t) && grantedTypes.includes(t));
+  }, [reportsForBrand, grantedTypes]);
+
+  // Tiles: this brand's reports of the selected type, oldest → newest.
+  const tiles = useMemo(
+    () => reportsForBrand.filter(r => r.type === viewType)
+      .sort((a, b) => reportSortKey(a).localeCompare(reportSortKey(b))),
+    [reportsForBrand, viewType],
+  );
+
+  const prev = findPreviousReport(tiles, report);
+  const brandSections = sectionsByBrand.get(report.brandId) || [];
+  const reportValues  = valuesByReport.get(report.id) || [];
+  const brandLinks    = resourcesByBrand.get(report.brandId) || [];
+
+  const open = (r) => { if (r && r.id !== report.id) { onOpen(r); scrollToTop(); } };
+  const switchType = (t) => {
+    if (t === viewType) return;
+    setViewType(t);
+    onSwitchType?.(t);
+    const latest = reportsForBrand.filter(r => r.type === t)
+      .sort((a, b) => reportSortKey(b).localeCompare(reportSortKey(a)))[0];
+    if (latest && latest.id !== report.id) { onOpen(latest); scrollToTop(); }
+  };
+
+  // Scale-to-fit: measure the frame, render the fixed-width canvas scaled down
+  // when the frame is narrower, centred when wider. Height tracks the scaled
+  // canvas so the page flows correctly.
+  const frameRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [offsetX, setOffsetX] = useState(0);
+  const [frameH, setFrameH] = useState(undefined);
+  useEffect(() => {
+    const frame = frameRef.current, canvas = canvasRef.current;
+    if (!frame || !canvas) return undefined;
+    const recompute = () => {
+      const w = frame.clientWidth;
+      const s = Math.min(1, w / DESIGN_W);
+      setScale(s);
+      setOffsetX(Math.max(0, (w - DESIGN_W * s) / 2));
+      setFrameH(canvas.offsetHeight * s);
+    };
+    recompute();
+    const roF = new ResizeObserver(recompute); roF.observe(frame);
+    const roC = new ResizeObserver(recompute); roC.observe(canvas);
+    return () => { roF.disconnect(); roC.disconnect(); };
+  }, [report.id, viewType]);
+
+  // Keep the active tile in view as the client moves between reports.
+  const tilesRef = useRef(null);
+  useEffect(() => {
+    const el = tilesRef.current?.querySelector('[data-active="true"]');
+    if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [report.id, viewType]);
+
+  const glyph = (report.brandName || '?').slice(0, 2).toUpperCase();
+
+  return (
+    <div>
+      <div className="preport-header">
+        <div className="preport-bar">
+          <button className="preport-back" onClick={onBack}>
+            <span aria-hidden>←</span> Back
+          </button>
+          <div className="preport-brand">
+            <div className="preport-glyph">{glyph}</div>
+            <div className="preport-brand-name">{report.brandName || 'Brand'}</div>
+          </div>
+          {typeTabs.length > 1 && (
+            <div className="preport-tabs">
+              {typeTabs.map(t => (
+                <button key={t} className={`preport-tab ${viewType === t ? 'active' : ''}`} onClick={() => switchType(t)}>
+                  {t === 'biweekly' ? 'Bi-Weekly' : t === 'monthly' ? 'Monthly' : 'Weekly'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="preport-tiles" ref={tilesRef}>
+          {tiles.map(r => (
+            <ReportTile key={r.id} report={r} active={r.id === report.id} onClick={() => open(r)} />
+          ))}
+        </div>
+      </div>
+
+      {/* Report body — fixed design width, scaled to fit for an identical layout everywhere. */}
+      <div className="preport-frame" ref={frameRef} style={{ height: frameH }}>
+        <div className="preport-canvas" ref={canvasRef}
+          style={{ width: DESIGN_W, marginLeft: offsetX, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          {report.type === 'monthly' ? (
+            <MonthlyReportView report={report} previousReport={prev} clientView reportLinks={brandLinks} />
+          ) : (
+            <WeeklyReportView report={report} previousReport={prev} allReports={tiles} clientView reportLinks={brandLinks} />
+          )}
+        </div>
+      </div>
+
+      {/* Custom client sections — kept at native width (interactive; can add/edit/remove). */}
+      <div style={{ marginTop: 20 }}>
+        <BrandSectionsPanel
+          brandId={report.brandId}
+          brandName={report.brandName}
+          reportId={report.id}
+          sections={brandSections}
+          sectionValues={reportValues}
+          token={token}
+          readOnly={!token}
+          onMutate={onMutate}
+        />
+      </div>
+
+      <ScrollTopButton />
+    </div>
+  );
+}
+
+// A single modern report tile in the sticky header strip.
+function ReportTile({ report, active, onClick }) {
+  const m = reportMetrics(report);
+  const sym = currencySymbol(report.currency || DEFAULT_CURRENCY);
+  const range = dateRangeLabel(report);
+  return (
+    <button type="button" data-active={active ? 'true' : 'false'}
+      className={`preport-tile ${active ? 'active' : ''}`} onClick={onClick}>
+      <div className="preport-tile-top">
+        <span className="preport-tile-label">{shortPeriodLabel(report)}</span>
+        {active && <span className="preport-tile-dot" />}
+      </div>
+      {range && <div className="preport-tile-range">{range}</div>}
+      <div className="preport-tile-gmv">
+        <span className="preport-tile-gmv-val">
+          {sym}{Number(m.gmv).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </span>
+        <span className="preport-tile-gmv-lbl">GMV</span>
+      </div>
+    </button>
+  );
+}
+
+// Floating "back to top" button — appears once the client scrolls down.
+function ScrollTopButton() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShow(window.scrollY > 400);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  if (!show) return null;
+  return (
+    <button className="preport-scrolltop" aria-label="Back to top" title="Back to top"
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+      <span aria-hidden>↑</span>
+    </button>
+  );
 }

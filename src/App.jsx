@@ -69,6 +69,7 @@ const PerformancePage       = lazy(() => import('./components/performance/Perfor
 // per-role pages, dispatched by IncentivesRouter. The plan editor
 // (IncentiveForm) is shared between Boss and OL via /incentives/edit/:userId.
 const IncentivesPage        = lazy(() => import('./components/incentives/IncentivesRouter'));
+const CreatorLibraryPage    = lazy(() => import('./pages/creators/CreatorLibraryPage'));
 const IncentivePlanEditorPage = lazy(() => import('./components/incentives/IncentiveForm'));
 const BroadcastsPage        = lazy(() => import('./pages/broadcasts/BroadcastsPage'));
 // Replaced v2-original campaigns pages with v1 verbatim ports under
@@ -269,7 +270,7 @@ export default function App() {
               <Route
                 path="/halo"
                 element={
-                  <RoleGuard allow={['boss', 'ol']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl']}>
                     <AmazonHaloPage />
                   </RoleGuard>
                 }
@@ -444,6 +445,15 @@ export default function App() {
                 }
               />
 
+              {/* Creator Library — IPC/PCTL/TL/OL (Boss too); RLS is the real boundary */}
+              <Route
+                path="/creator-library"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'ipc']}>
+                    <CreatorLibraryPage />
+                  </RoleGuard>
+                }
+              />
               {/* Incentives — staff only (developer excluded; RLS still the boundary) */}
               <Route
                 path="/incentives"

@@ -36,6 +36,7 @@ function _normBrand(row) {
     clientName:  row.client_name || '',
     logoUrl:     row.logo_url || '',
     ownerId:     row.owner_id || null,
+    ownerName:   row.owner?.display_name || null,
     status:      row.status || 'active',
     // Pass-through any other columns we didn't rename
     ...row,
