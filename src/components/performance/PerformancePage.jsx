@@ -1505,6 +1505,7 @@ export default function PerformancePage() {
     try {
       await setWeeklyRatingsEnabled(next);
       setWeeklyCfg((c) => ({ ...c, enabled: next }));
+      setAttReloadKey((k) => k + 1); // going Live backfills official scores — reload the grid so it isn't stale
     } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
     finally { setSwitchBusy(false); }
   }
@@ -1519,6 +1520,7 @@ export default function PerformancePage() {
     try {
       await setTlPerfEnabled(next);
       setTlCfg((c) => ({ ...c, enabled: next }));
+      setAttReloadKey((k) => k + 1); // on-read TL blend flips immediately — reload the grid so it isn't stale
     } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
     finally { setTlSwitchBusy(false); }
   }
