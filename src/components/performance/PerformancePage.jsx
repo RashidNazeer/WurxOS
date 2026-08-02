@@ -1375,6 +1375,12 @@ export default function PerformancePage() {
   // month is >= the launch floor (mirrors the SQL gate in get_performance_composite).
   const tlSince = tlCfg.since ? String(tlCfg.since).slice(0, 7) : '2026-08';
   const tlLive = tlCfg.enabled && month >= tlSince;
+  // A month BEFORE the go-live floor keeps the original rating method even when the
+  // switch is Live (the floor protects already-scored/paid closed months). Surface
+  // that distinctly so a pre-floor month (e.g. July) doesn't read as "not switched".
+  const weeklySince = weeklyCfg.since ? String(weeklyCfg.since).slice(0, 7) : '2026-08';
+  const tlPreLaunch = tlCfg.enabled && month < tlSince;
+  const weeklyPreLaunch = weeklyCfg.enabled && month < weeklySince;
 
   // Effective composite for EVERY loaded user (null when not-rated / pending /
   // attendance-failed) — the APC composites a TL's team score averages. Mirrors
@@ -1593,6 +1599,21 @@ export default function PerformancePage() {
           )}
         </div>
       </div>
+
+      {/* Pre-launch clarity: the switch IS Live, but the viewed month predates go-live
+          so it keeps the original method — say so, or it reads as "not switched". */}
+      {(tlPreLaunch || weeklyPreLaunch) && (
+        <div className="rounded-3 p-3 mb-3 d-flex align-items-start gap-2"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <i className="bi bi-hourglass-split mt-1" style={{ color: 'var(--accent)' }} />
+          <div>
+            The new {[tlPreLaunch && 'Team-Lead performance', weeklyPreLaunch && 'weekly APC ratings'].filter(Boolean).join(' & ')} method
+            {' '}is <b>Live</b> from {getMonthLabel(tlPreLaunch ? tlSince : weeklySince)}.
+            You're viewing <b>{getMonthLabel(month)}</b>, which is before go-live, so it keeps the <b>original</b> rating —
+            that's why it shows “Preview”, not because the switch is off.
+          </div>
+        </div>
+      )}
 
       {/* OL / Boss: APC weekly ratings still pending from meetings 2+ days ago */}
       {(isBoss || effectiveRole === 'ol') && pendingRatings.length > 0 && (
