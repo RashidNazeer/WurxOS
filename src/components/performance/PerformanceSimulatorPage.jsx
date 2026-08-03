@@ -145,6 +145,12 @@ export default function PerformanceSimulatorPage() {
 
   // ── Simulation state ──────────────────────────────────────────
   const [simMetrics, setSimMetrics] = useState({ dailyTasksQuality: 0, reporting: 0, overallWorkflow: 0, responseTime: 0, tasksProcessing: 0 });
+  // APC-only: the Reporting metric is a split (OL 0–90 + a 0–5 report chunk + a
+  // 0–5 checkpoint chunk); each returned report/checkpoint docks a chunk (mig 274).
+  const isApc = role === 'apc';
+  const [simRepOl, setSimRepOl] = useState(0);      // OL's 0–90 reporting rating
+  const [simRepDocks, setSimRepDocks] = useState(0); // reports returned (marks docked)
+  const [simCpDocks, setSimCpDocks] = useState(0);   // checkpoints returned
   const [simTeam, setSimTeam] = useState(0);
   const [simHasTeam, setSimHasTeam] = useState(true); // false when the TL has no rated APCs → team component drops
   const [simStars, setSimStars] = useState(0);      // 0..5
@@ -250,13 +256,17 @@ export default function PerformanceSimulatorPage() {
         };
         // Keep attendance EXACT (1-dp) — the real composite feeds it in unrounded.
         const att = realAtt != null ? realAtt : 0;
+        // APC reporting split seed: OL rating = reporting − the two full 5-pt
+        // chunks; with 0 docks the split reproduces the real reporting metric.
+        const repOl = role === 'apc' ? clamp(metricVals.reporting - 10, 0, 90) : 0;
 
         setSimMetrics(metricVals);
+        setSimRepOl(repOl); setSimRepDocks(0); setSimCpDocks(0);
         setSimTeam(team); setSimHasTeam(hasTeam); setSimStars(stars); setSimHasStars(hasStars); setSimN(n); setSimD(d); setSimHasReports(hasReports);
         setIncludeInc(hasPlan); setSimIncPct(incPct); setSimVerified(verified);
         setSimAtt(att); setSimGreen(g); setSimRed(rr);
         setInitial({
-          metrics: metricVals, team, hasTeam, stars, hasStars, n, d, hasReports,
+          metrics: metricVals, repOl, repDocks: 0, cpDocks: 0, team, hasTeam, stars, hasStars, n, d, hasReports,
           includeInc: hasPlan, incPct, verified, att, green: g, red: rr,
         });
       } catch (e) {
@@ -268,6 +278,10 @@ export default function PerformanceSimulatorPage() {
     return () => { cancelled = true; };
   }, [uid, role, month]);
 
+  // APC reporting metric = OL rating (0–90) + report chunk (0–5) + checkpoint
+  // chunk (0–5); each returned report/checkpoint docks its chunk (mig 274).
+  const apcReporting = clamp(simRepOl + Math.max(0, 5 - simRepDocks) + Math.max(0, 5 - simCpDocks), 0, 100);
+
   // ── Derived pillar scores (the SAME math the real score uses) ──
   const simPerf = useMemo(() => {
     if (mode === 'tl') {
@@ -278,8 +292,10 @@ export default function PerformanceSimulatorPage() {
       const acct = (simHasReports && simN > 0) ? clamp(Math.max(0, simN - simD) / simN * 100, 0, 100) : null;
       return tlPerfPillar(team, tlReportingScore(starScore, acct));
     }
-    return calcMetricsAvg(simMetrics);
-  }, [mode, simMetrics, simTeam, simHasTeam, simStars, simHasStars, simN, simD, simHasReports]);
+    // For an APC the Reporting metric comes from the split, not a plain slider.
+    const metrics = isApc ? { ...simMetrics, reporting: apcReporting } : simMetrics;
+    return calcMetricsAvg(metrics);
+  }, [mode, isApc, simMetrics, apcReporting, simTeam, simHasTeam, simStars, simHasStars, simN, simD, simHasReports]);
 
   const simIncScore = includeInc ? clamp(Math.round(simIncPct), 0, 100) : null;
   const simFlagsScore = clamp(80 + simGreen * 10 - simRed * 20, 0, 100);
@@ -334,6 +350,7 @@ export default function PerformanceSimulatorPage() {
   const reset = () => {
     if (!initial) return;
     setSimMetrics(initial.metrics);
+    setSimRepOl(initial.repOl); setSimRepDocks(initial.repDocks); setSimCpDocks(initial.cpDocks);
     setSimTeam(initial.team); setSimHasTeam(initial.hasTeam); setSimStars(initial.stars); setSimHasStars(initial.hasStars);
     setSimN(initial.n); setSimD(initial.d); setSimHasReports(initial.hasReports);
     setIncludeInc(initial.includeInc); setSimIncPct(initial.incPct); setSimVerified(initial.verified);
@@ -347,14 +364,15 @@ export default function PerformanceSimulatorPage() {
     if (!initial) return false;
     const norm = (s) => JSON.stringify({
       metrics: Object.fromEntries(Object.keys(s.metrics).map((k) => [k, Math.round(Number(s.metrics[k]) || 0)])),
+      repOl: Math.round(s.repOl), repDocks: s.repDocks, cpDocks: s.cpDocks,
       team: Math.round(s.team), hasTeam: s.hasTeam, stars: roundHalf(s.stars), hasStars: s.hasStars,
       n: s.n, d: s.d, hasReports: s.hasReports, includeInc: s.includeInc, incPct: Math.round(s.incPct),
       verified: s.verified, att: Math.round(s.att), green: s.green, red: s.red,
     });
-    const now = norm({ metrics: simMetrics, team: simTeam, hasTeam: simHasTeam, stars: simStars, hasStars: simHasStars, n: simN, d: simD, hasReports: simHasReports, includeInc, incPct: simIncPct, verified: simVerified, att: simAtt, green: simGreen, red: simRed });
-    const was = norm({ metrics: initial.metrics, team: initial.team, hasTeam: initial.hasTeam, stars: initial.stars, hasStars: initial.hasStars, n: initial.n, d: initial.d, hasReports: initial.hasReports, includeInc: initial.includeInc, incPct: initial.incPct, verified: initial.verified, att: initial.att, green: initial.green, red: initial.red });
+    const now = norm({ metrics: simMetrics, repOl: simRepOl, repDocks: simRepDocks, cpDocks: simCpDocks, team: simTeam, hasTeam: simHasTeam, stars: simStars, hasStars: simHasStars, n: simN, d: simD, hasReports: simHasReports, includeInc, incPct: simIncPct, verified: simVerified, att: simAtt, green: simGreen, red: simRed });
+    const was = norm({ metrics: initial.metrics, repOl: initial.repOl, repDocks: initial.repDocks, cpDocks: initial.cpDocks, team: initial.team, hasTeam: initial.hasTeam, stars: initial.stars, hasStars: initial.hasStars, n: initial.n, d: initial.d, hasReports: initial.hasReports, includeInc: initial.includeInc, incPct: initial.incPct, verified: initial.verified, att: initial.att, green: initial.green, red: initial.red });
     return now !== was;
-  }, [initial, simMetrics, simTeam, simHasTeam, simStars, simHasStars, simN, simD, simHasReports, includeInc, simIncPct, simVerified, simAtt, simGreen, simRed]);
+  }, [initial, simMetrics, simRepOl, simRepDocks, simCpDocks, simTeam, simHasTeam, simStars, simHasStars, simN, simD, simHasReports, includeInc, simIncPct, simVerified, simAtt, simGreen, simRed]);
 
   const roleLabel = ROLE_LABEL[role] || role.toUpperCase();
   const realCompositeText = real.composite != null ? real.composite
@@ -481,10 +499,31 @@ export default function PerformanceSimulatorPage() {
                   </>
                 ) : (
                   <>
-                    {V1_METRICS.map((m) => (
-                      <Slider key={m.key} label={m.label} value={Math.round(Number(simMetrics[m.key]) || 0)}
-                        onChange={(v) => setSimMetrics((prev) => ({ ...prev, [m.key]: v }))} suffix="/100" />
-                    ))}
+                    {V1_METRICS.map((m) => {
+                      // APC: the Reporting metric is a split driven by return docks.
+                      if (m.key === 'reporting' && isApc) {
+                        return (
+                          <div key="reporting-split" className="mb-3 rounded-3 p-3" style={{ background: 'var(--surface-2)' }}>
+                            <div className="d-flex justify-content-between align-items-baseline mb-2">
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 700 }}><i className="bi bi-file-earmark-text me-1" />Reporting</span>
+                              <span className="badge rounded-pill" style={{ background: getLevelTokens(apcReporting).bg, color: getLevelTokens(apcReporting).color, fontWeight: 800 }}>{Math.round(apcReporting)}<span style={{ opacity: 0.7 }}>/100</span></span>
+                            </div>
+                            <Slider label="Your OL's reporting rating" value={simRepOl} min={0} max={90} onChange={setSimRepOl} suffix="/90" accent="var(--accent)" />
+                            <div className="row g-2">
+                              <div className="col-6"><Stepper label="Reports returned to you" value={simRepDocks} min={0} max={5} onChange={setSimRepDocks} color="var(--danger)" hint={`report chunk ${Math.max(0, 5 - simRepDocks)}/5`} /></div>
+                              <div className="col-6"><Stepper label="Checkpoints returned" value={simCpDocks} min={0} max={5} onChange={setSimCpDocks} color="var(--danger)" hint={`checkpoint chunk ${Math.max(0, 5 - simCpDocks)}/5`} /></div>
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
+                              Reporting = OL rating (0–90) + up to 5 for clean reports + up to 5 for clean checkpoints. Every report or checkpoint your TL sends back docks a point.
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <Slider key={m.key} label={m.label} value={Math.round(Number(simMetrics[m.key]) || 0)}
+                          onChange={(v) => setSimMetrics((prev) => ({ ...prev, [m.key]: v }))} suffix="/100" />
+                      );
+                    })}
                     <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Performance = the average of these five.</div>
                   </>
                 )}
