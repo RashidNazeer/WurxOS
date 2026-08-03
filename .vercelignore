@@ -12,6 +12,7 @@ README.md
 # Large snapshots / backups
 *.tar.gz
 *.zip
+backups
 
 # Supabase server-side code is deployed separately via `supabase functions deploy`;
 # it has no business in the Vite bundle.

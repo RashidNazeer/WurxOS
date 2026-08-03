@@ -234,7 +234,10 @@ function isGmvTailNoise(l) {
     || DATETIME_RE.test(l);
 }
 
-const stripUsd = v => (v == null ? '' : String(v).replace(/USD/i, '').replace(/[$,\s]/g, ''));
+// Clean a money cell to a bare numeric string: drop any currency code (USD, GBP,
+// EUR, …), symbol ($ £ €), commas and spaces — keep digits, dot and minus only.
+// (USD-only stripping left non-USD brands as "826.71GBP", which broke Number().)
+const stripUsd = v => (v == null ? '' : String(v).replace(/[^\d.\-]/g, ''));
 
 /**
  * Parse the "GMV Max" campaign-list copy-paste (Product or LIVE GMV Max).
