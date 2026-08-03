@@ -65,6 +65,7 @@ const ResourcesPage         = lazy(() => import('./components/resources/AllResou
 // components/performance. Keeps the /performance route + menu link
 // pointing at the new file.
 const PerformancePage       = lazy(() => import('./components/performance/PerformancePage'));
+const PerformanceSimulatorPage = lazy(() => import('./components/performance/PerformanceSimulatorPage'));
 // Replaced the v2-original single-page Incentives with v1-style
 // per-role pages, dispatched by IncentivesRouter. The plan editor
 // (IncentiveForm) is shared between Boss and OL via /incentives/edit/:userId.
@@ -441,6 +442,16 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
                     <PerformancePage />
+                  </RoleGuard>
+                }
+              />
+              {/* Performance Simulator — private read-only what-if tool for one's
+                  OWN score (Boss has no personal score, so excluded). */}
+              <Route
+                path="/performance/simulator"
+                element={
+                  <RoleGuard allow={['ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                    <PerformanceSimulatorPage />
                   </RoleGuard>
                 }
               />

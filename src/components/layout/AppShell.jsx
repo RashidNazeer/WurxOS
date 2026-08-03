@@ -32,6 +32,7 @@ const PAGE_META = {
   '/brands':                   { title: 'Brands',                 subtitle: 'Brand portfolio and assignments' },
   '/tasks':                    { title: 'Tasks',                  subtitle: 'Your tasks, assigned work and personal to-dos' },
   '/reports':                  { title: 'Reports',                subtitle: 'Weekly and bi-weekly brand reports' },
+  '/performance/simulator':    { title: 'Performance Simulator',  subtitle: 'A private what-if tool for your own score' },
   '/notifications':            { title: 'Notifications',          subtitle: 'Updates on your work' },
   '/settings':                 { title: 'Settings',               subtitle: 'Your personal preferences' },
   '/boss/manage/tls':          { title: 'Team Leads',             subtitle: 'Affiliate TLs' },

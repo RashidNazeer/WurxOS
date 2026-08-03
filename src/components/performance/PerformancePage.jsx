@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   // Bulk loaders
@@ -1739,6 +1740,15 @@ export default function PerformancePage() {
               </div>
             </div>
           )}
+
+          {/* Private what-if tool — see exactly how the score is built and
+              simulate reaching a goal. Read-only; never touches real data. */}
+          <Link to="/performance/simulator"
+            className="d-flex align-items-center justify-content-center gap-2 mb-4 text-decoration-none"
+            style={{ borderRadius: 12, fontWeight: 700, fontSize: '0.82rem', background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', padding: '11px 14px' }}>
+            <i className="bi bi-sliders" /> Simulate my performance
+            <span style={{ fontWeight: 500, fontSize: '0.7rem', opacity: 0.85 }}>· what would reach my goal?</span>
+          </Link>
 
           {/* Pillar breakdown — click any pillar to expand and see how
               its score was computed. */}

@@ -471,6 +471,31 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-primary);
 }
 
+/* Range sliders (.form-range) — Bootstrap forces appearance:none + a fixed
+   #0d6efd thumb (so accent-color is inert) and a light-gray track that never
+   themes (the app uses data-theme, not data-bs-theme). Drive the thumb from
+   --range-c (falls back to the brand accent) and theme the track for both
+   light and dark. Applies app-wide (Rate modal, weekly rating fields, the
+   performance simulator). */
+.form-range::-webkit-slider-thumb {
+  background-color: var(--range-c, var(--accent));
+  border: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.form-range::-webkit-slider-thumb:active { background-color: var(--range-c, var(--accent)); }
+.form-range::-moz-range-thumb {
+  background-color: var(--range-c, var(--accent));
+  border: 0;
+}
+.form-range::-webkit-slider-runnable-track {
+  background-color: var(--surface-3, #e9ecef);
+}
+.form-range::-moz-range-track {
+  background-color: var(--surface-3, #e9ecef);
+}
+.form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 0.2rem var(--accent-ring, rgba(13, 110, 253, 0.25)); }
+.form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 0.2rem var(--accent-ring, rgba(13, 110, 253, 0.25)); }
+
 /* Native datetime/date input picker icon — Chromium renders it
    black, which becomes invisible on a dark input. Invert it. */
 [data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
