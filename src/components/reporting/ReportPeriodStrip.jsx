@@ -11,11 +11,31 @@ import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 // report carries (weekLabel/week/weekStart or periodLabel/monthKey/periodStart).
 
 const sortKey = (r) => r.weekStart || r.periodStart || r.monthKey || '';
-const periodLabel = (r) =>
-  r.weekLabel || r.periodLabel || r.monthLabel
-  || (r.week != null ? `Week ${r.week}` : (r.monthKey || '—'));
 
-export default function ReportPeriodStrip({ reports = [], currentId, onSelect }) {
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// A monthly report's friendly month ("Jul 2026"), derived from year+month
+// (0-indexed) or the "YYYY-MM" monthKey — so the strip shows a real month
+// instead of the raw "2026-07". Falls back to any stored monthLabel.
+function monthName(r) {
+  if (r.year != null && r.month != null && MONTHS_SHORT[r.month]) return `${MONTHS_SHORT[r.month]} ${r.year}`;
+  if (typeof r.monthKey === 'string') {
+    const m = /^(\d{4})-(\d{2})$/.exec(r.monthKey);
+    if (m) { const i = Number(m[2]) - 1; if (MONTHS_SHORT[i]) return `${MONTHS_SHORT[i]} ${m[1]}`; }
+  }
+  return r.monthLabel || null;
+}
+
+export default function ReportPeriodStrip({ reports = [], currentId, onSelect, type = 'weekly' }) {
+  // The headline number + label depend on the report TYPE — the strip is shared
+  // by all viewers and each stores GMV/period differently:
+  //   weekly / bi-weekly → overallPerformance.gmv, week/period label
+  //   monthly            → totalSales.monthGmv,    "Mon YYYY" (was showing £0 +
+  //                        the raw "2026-07" because it only read the weekly fields)
+  const isMonthly = type === 'monthly';
+  const gmvOf   = (r) => num(isMonthly ? r.totalSales?.monthGmv : r.overallPerformance?.gmv);
+  const labelOf = (r) => isMonthly
+    ? (monthName(r) || r.monthKey || '—')
+    : (r.weekLabel || r.periodLabel || (r.week != null ? `Week ${r.week}` : (monthName(r) || r.monthKey || '—')));
   // Newest first — the same order the lists now use.
   const sorted = useMemo(
     () => [...reports].sort((a, b) => sortKey(b).localeCompare(sortKey(a))),
@@ -60,12 +80,12 @@ export default function ReportPeriodStrip({ reports = [], currentId, onSelect })
         const status = getReportStatus(r);
         const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
         const sym = currencySymbol(r.currency || DEFAULT_CURRENCY);
-        const gmv = num(r.overallPerformance?.gmv);
+        const gmv = gmvOf(r);
         return (
           <button key={r.id} type="button" role="tab" aria-selected={active}
             ref={active ? activeRef : null}
             onClick={() => onSelect(r)}
-            title={`${periodLabel(r)} · ${cfg.label}`}
+            title={`${labelOf(r)} · ${cfg.label}`}
             style={{
               flex: '0 0 auto', minWidth: 116, textAlign: 'left',
               padding: '7px 11px', borderRadius: 10, cursor: 'pointer',
@@ -77,7 +97,7 @@ export default function ReportPeriodStrip({ reports = [], currentId, onSelect })
             <div className="d-flex align-items-center gap-1" style={{ minWidth: 0 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
               <span className="fw-semibold text-truncate" style={{ fontSize: '0.74rem', color: active ? 'var(--accent)' : 'var(--text-primary)' }}>
-                {periodLabel(r)}
+                {labelOf(r)}
               </span>
             </div>
             <div className="fw-bold" style={{ fontSize: '0.8rem', color: 'var(--text-primary)', marginTop: 2 }}>

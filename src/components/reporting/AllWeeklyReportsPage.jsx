@@ -665,7 +665,7 @@ export default function AllWeeklyReportsPage() {
             <ReportActionsMenu actions={reportActions} />
           </div>
           </div>
-          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} />
+          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} type="weekly" />
         </div>
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"

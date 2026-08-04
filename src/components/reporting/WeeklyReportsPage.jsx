@@ -364,7 +364,7 @@ export default function WeeklyReportsPage() {
             )}
           </div>
           </div>
-          <ReportPeriodStrip reports={sourceList} currentId={detailReport.id} onSelect={setDetailReport} />
+          <ReportPeriodStrip reports={sourceList} currentId={detailReport.id} onSelect={setDetailReport} type="weekly" />
         </div>
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
