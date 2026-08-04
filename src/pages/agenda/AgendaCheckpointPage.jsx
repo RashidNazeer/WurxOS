@@ -22,13 +22,13 @@ import {
   EMPTY_CHECKPOINT, defaultReviewWeekStart, weekLabelForStart, addWeeks,
   alignToGrid, todayISO,
 } from '../../lib/checkpointModel';
-import { carryForward } from '../../lib/checkpointCarry';
+import { carryForward, fillPrevInto } from '../../lib/checkpointCarry';
 import {
   listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks, deleteCheckpoint,
-  submitCheckpoint, verifyCheckpoint, approveCheckpoint, returnCheckpoint, reopenCheckpoint,
+  submitCheckpoint, verifyCheckpoint, returnCheckpoint, reopenCheckpoint,
 } from '../../lib/checkpointsApi';
 import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
-import { runCheckpointAutofill, applyAutofillPatch, mirrorTargetInvites } from '../../lib/checkpointAutofill';
+import { runCheckpointAutofill, applyAutofillPatch, mirrorDuplicates } from '../../lib/checkpointAutofill';
 import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
 import { listManagedBrandIds, getPaidCollabEntry, getLatestPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
 import PaidCollabCheckpointDashboard from './PaidCollabCheckpointDashboard';
@@ -51,8 +51,8 @@ const raf = () => new Promise((r) => requestAnimationFrame(r));
 const STATUS_PILL = {
   draft:     { label: 'Draft',      cls: 'draft' },
   submitted: { label: 'Pending TL', cls: 'submitted' },
-  verified:  { label: 'Pending OL', cls: 'verified' },
-  approved:  { label: 'Approved',   cls: 'approved' },
+  verified:  { label: 'Verified',   cls: 'verified' },
+  approved:  { label: 'Verified',   cls: 'verified' }, // legacy rows (mig 299 → verified)
 };
 const pillFor = (s) => STATUS_PILL[s] || STATUS_PILL.draft;
 
@@ -96,7 +96,7 @@ function ApcCheckpointPage() {
   const [pendingDelete, setPendingDelete] = useState(null); // week_start pending confirm (cards)
   const [deleting, setDeleting] = useState(false);
   const [viewDelete, setViewDelete] = useState(false);      // view-mode confirm
-  const [wfBusy, setWfBusy] = useState('');                 // '' | 'submit' | 'verify' | 'approve' | 'return' | 'reopen'
+  const [wfBusy, setWfBusy] = useState('');                 // '' | 'submit' | 'verify' | 'return' | 'reopen'
   const [wfErr, setWfErr] = useState('');
   const [returnOpen, setReturnOpen] = useState(false);      // return-note modal
   const [returnNote, setReturnNote] = useState('');
@@ -284,19 +284,17 @@ function ApcCheckpointPage() {
     // brands can take several seconds) instead of just a greyed-out button.
     setCreateStage({ label: fromLast ? 'Loading last week…' : 'Setting up this checkpoint…', pct: 12 });
     try {
-      let d;
-      if (fromLast) {
-        const prev = await findPreviousCheckpoint(brandId, weekStart);
-        d = carryForward(prev?.data ? hydrate(prev.data) : null);
-      } else {
-        d = EMPTY_CHECKPOINT();
-      }
+      // Always fetch last week's checkpoint so its "previous" columns fill on
+      // BOTH paths — "Start blank" gets last-week too, not only "from last week".
+      let prevData = null;
+      try { const prev = await findPreviousCheckpoint(brandId, weekStart); prevData = prev?.data ? hydrate(prev.data) : null; } catch { /* ignore */ }
+      let d = fromLast ? carryForward(prevData) : fillPrevInto(EMPTY_CHECKPOINT(), prevData);
       const teamName = teamLeadName ? `Team ${teamLeadName}` : (d.cover.team || '');
       d.cover = { brandName, apcName: profile?.display_name || '', team: teamName, weekLabel };
       let meta = null;
       try {
         const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand, onStage: setCreateStage });
-        d = mirrorTargetInvites(applyAutofillPatch(d, patch));
+        d = fillPrevInto(mirrorDuplicates(applyAutofillPatch(d, patch)), prevData);
         meta = patch.meta;
       } catch { /* best effort — a failed auto-fill still yields a usable blank/carried form */ }
       setCreateStage({ label: 'Saving…', pct: 96 });
@@ -318,7 +316,11 @@ function ApcCheckpointPage() {
     setAutofilling(true); setAutofillMsg('');
     try {
       const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
-      setData((d) => mirrorTargetInvites(applyAutofillPatch(d, patch)));
+      // Also fetch last week's checkpoint so Auto-fill fills the "previous"
+      // columns too (heals existing checkpoints that never ran carry-forward).
+      let prevData = null;
+      try { const prev = await findPreviousCheckpoint(brandId, weekStart); prevData = prev?.data ? hydrate(prev.data) : null; } catch { /* ignore */ }
+      setData((d) => fillPrevInto(mirrorDuplicates(applyAutofillPatch(d, patch)), prevData));
       setAutofillMsg(autofillSummary(patch.meta, false));
     } catch (e) { setAutofillMsg(`Auto-fill failed: ${e?.message || e}`); }
     finally { setAutofilling(false); }
@@ -349,7 +351,7 @@ function ApcCheckpointPage() {
     finally { setPullingPc(false); }
   }
 
-  // ── approval workflow actions (submit → verify → approve, + return/reopen) ──
+  // ── workflow actions: submit → verify (done), + return-to-APC / reopen ──
   const cp = existing.data || null;
   const status = cp?.status || 'draft';
   const isAuthor = !!cp?.author_id && cp.author_id === profile?.id;
@@ -363,9 +365,9 @@ function ApcCheckpointPage() {
     || (isOwnerTL && (status === 'draft' || status === 'submitted'));
   const canSubmit = status === 'draft' && (isAuthor || isAdmin);
   const canVerify = status === 'submitted' && (isOwnerTL || isAdmin);
-  const canApprove = status === 'verified' && isAdmin;
-  const canReturn = (status === 'submitted' && (isOwnerTL || isAdmin)) || (status === 'verified' && isAdmin);
-  const canReopen = status === 'approved' && isAdmin;
+  // TL returns a submitted checkpoint to the APC; TL reopens a done (verified) one.
+  const canReturn = status === 'submitted' && (isOwnerTL || isAdmin);
+  const canReopen = status === 'verified' && (isOwnerTL || isAdmin);
   const cpId = () => cp?.id || weeks.find((w) => w.week_start === weekStart)?.id || null;
 
   async function runWf(kind, fn) {
@@ -385,7 +387,6 @@ function ApcCheckpointPage() {
     const id = cpId(); if (id) await runWf('submit', () => submitCheckpoint(id));
   }
   async function doVerify()  { const id = cpId(); if (id) await runWf('verify',  () => verifyCheckpoint(id)); }
-  async function doApprove() { const id = cpId(); if (id) await runWf('approve', () => approveCheckpoint(id)); }
   async function doReopen()  { const id = cpId(); if (id) await runWf('reopen',  () => reopenCheckpoint(id)); }
   async function doReturn() {
     const id = cpId(); if (!id) return;
@@ -394,9 +395,9 @@ function ApcCheckpointPage() {
     const ok = await runWf('return', () => returnCheckpoint(id, { note }));
     if (ok) {
       setReturnOpen(false); setReturnNote('');
-      // Returning a SUBMITTED checkpoint goes to the APC (draft) — the TL may dock
-      // the APC's reporting. A verified→submitted return (OL→TL) does not.
-      if (status === 'submitted') { try { await deductPromptApcCheckpoint(id); } catch { /* best-effort */ } }
+      // A returned checkpoint always goes to the APC (draft) — the TL may dock the
+      // APC's reporting on the way (default 1; 0 = none).
+      try { await deductPromptApcCheckpoint(id); } catch { /* best-effort */ }
     }
   }
 
@@ -566,18 +567,13 @@ function ApcCheckpointPage() {
               )}
               {canVerify && (
                 <button className="wx-btn wx-btn-primary" disabled={!!wfBusy} onClick={doVerify}>
-                  {wfBusy === 'verify' ? <><span className="wx-spinner" /> Verifying…</> : <><i className="bi bi-check2-circle me-1" /> Verify</>}
-                </button>
-              )}
-              {canApprove && (
-                <button className="wx-btn wx-btn-primary" disabled={!!wfBusy} onClick={doApprove}>
-                  {wfBusy === 'approve' ? <><span className="wx-spinner" /> Approving…</> : <><i className="bi bi-patch-check me-1" /> Approve</>}
+                  {wfBusy === 'verify' ? <><span className="wx-spinner" /> Verifying…</> : <><i className="bi bi-check2-circle me-1" /> Verify (mark done)</>}
                 </button>
               )}
               {canReturn && (
                 <button className="wx-btn wx-btn-ghost" style={{ color: 'var(--danger)' }} disabled={!!wfBusy}
                   onClick={() => { setWfErr(''); setReturnNote(''); setReturnOpen(true); }}>
-                  <i className="bi bi-arrow-counterclockwise me-1" /> Return {status === 'verified' ? 'to TL' : 'to APC'}
+                  <i className="bi bi-arrow-counterclockwise me-1" /> Return to APC
                 </button>
               )}
               {canReopen && (
@@ -597,7 +593,7 @@ function ApcCheckpointPage() {
               {canEditContent && (
                 <button className="wx-btn wx-btn-ghost" disabled={!data} onClick={() => setMode('edit')}><i className="bi bi-pencil-square me-1" /> Edit</button>
               )}
-              <button className={`wx-btn ${(canSubmit || canVerify || canApprove) ? 'wx-btn-ghost' : 'wx-btn-primary'}`} disabled={!data || busy} onClick={onGenerate}>
+              <button className={`wx-btn ${(canSubmit || canVerify) ? 'wx-btn-ghost' : 'wx-btn-primary'}`} disabled={!data || busy} onClick={onGenerate}>
                 {busy ? <><span className="wx-spinner" /> {progress ? `Rendering ${progress.i}/${progress.total}…` : 'Generating…'}</> : <><i className="bi bi-filetype-pdf me-1" /> Generate PDF</>}
               </button>
             </div>
@@ -677,10 +673,10 @@ function ApcCheckpointPage() {
           <div className="ck-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="ck-modal-title">
               <i className="bi bi-arrow-counterclockwise" style={{ color: 'var(--danger)' }} />
-              Return {status === 'verified' ? 'to Team Lead' : 'to APC'}
+              Return to APC
             </div>
             <p className="ck-modal-sub">
-              Explain what needs to change. This note is shown to {status === 'verified' ? 'the Team Lead' : 'the APC'} on their checkpoint and sent as a notification.
+              Explain what needs to change. This note is shown to the APC on their checkpoint and sent as a notification.
             </p>
             <textarea className="wx-input" rows={4} autoFocus value={returnNote}
               onChange={(e) => setReturnNote(e.target.value)} placeholder="e.g. GMV Max spend looks off vs. the report — please double-check the paid section." />

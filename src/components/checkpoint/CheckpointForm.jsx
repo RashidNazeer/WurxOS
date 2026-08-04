@@ -14,6 +14,11 @@ import {
 // each keystroke and drop focus).
 const FieldCtx = createContext(null);
 
+// §04 KPIs that are the SAME number as a field in another section — typing the
+// KPI's "this week" value also fills the sibling (two-way; the siblings mirror
+// back). Only genuine same-type pairs (NOT the GMV-Max-only §08 SKU orders).
+const KPI_MIRROR = { orders: 'traffic.orders', gmvMaxSpend: 'paid.spend' };
+
 // ── immutable nested get/set by dot-path ────────────────────────────
 function getIn(obj, path) {
   return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
@@ -61,10 +66,10 @@ export default function CheckpointForm({
       <Section n={1} title="Affiliate funnel" accent="#4f46e5">
         <SubLabel>Recruit — this week</SubLabel>
         <Grid cols={4}>
-          <TargetInvites />
+          <MirrorNum label="Target invites" path="funnel.targetInvites" mirror={['outreach.reachInvites', 'effort.invitesSent']} />
           <Num label="Opted in" path="funnel.optedIn" />
-          <Num label="Sample requests" path="funnel.sampleRequests" />
-          <Num label="Approved" path="funnel.approved" />
+          <MirrorNum label="Sample requests" path="funnel.sampleRequests" mirror={['samples.requestsReceived', 'effort.sampleRequested']} />
+          <MirrorNum label="Approved" path="funnel.approved" mirror={['samples.approvedThisWeek']} />
         </Grid>
         <SubLabel>Produce — cohort approved ~2 wks ago</SubLabel>
         <Grid cols={3}>
@@ -82,8 +87,8 @@ export default function CheckpointForm({
 
       <Section n={2} title="APC effort log" accent="#0ea5e9">
         <Grid cols={3}>
-          <Num label="Invites sent" path="effort.invitesSent" />
-          <Num label="Samples requested" path="effort.sampleRequested" />
+          <MirrorNum label="Invites sent" path="effort.invitesSent" mirror={['funnel.targetInvites', 'outreach.reachInvites']} />
+          <MirrorNum label="Samples requested" path="effort.sampleRequested" mirror={['funnel.sampleRequests', 'samples.requestsReceived']} />
           <Num label="Creators onboarded" path="effort.creatorsOnboarded" />
           <Num label="Via auto-approval" path="effort.onboardedAutoApproval" />
           <Num label="Ad-code follow-ups" path="effort.adCodeFollowups" />
@@ -95,7 +100,7 @@ export default function CheckpointForm({
       <Section n={3} title="Outreach & sourcing" accent="#0d9488">
         <SubLabel>How we reached out</SubLabel>
         <Grid cols={3}>
-          <Num label="Target invites" path="outreach.reachInvites" />
+          <MirrorNum label="Target invites" path="outreach.reachInvites" mirror={['funnel.targetInvites', 'effort.invitesSent']} />
           <Num label="Competitors" path="outreach.reachCompetitors" />
           <Num label="DM / Email" path="outreach.reachDmEmail" />
         </Grid>
@@ -125,10 +130,17 @@ export default function CheckpointForm({
           {SNAPSHOT_KPIS.map((k) => (
             <div className="ck-kpi-form-row" key={k.key}>
               <div className="ck-kpi-name">{k.label}</div>
-              <input type="number" className="wx-input" placeholder="This week"
-                value={data.snapshot.kpis[k.key].cur} onChange={(e) => set(`snapshot.kpis.${k.key}.cur`, e.target.value)} />
-              <input type="number" className="wx-input" placeholder="Last week"
-                value={data.snapshot.kpis[k.key].prev} onChange={(e) => set(`snapshot.kpis.${k.key}.prev`, e.target.value)} />
+              {/* type=text + inputMode=decimal (like Num) so decimal KPIs (ROI,
+                  CTOR, money) don't get their trailing '.' swallowed, and the
+                  mirrored value matches its type=text sibling exactly. */}
+              <input type="text" inputMode="decimal" className="wx-input" placeholder="This week"
+                value={data.snapshot.kpis[k.key].cur}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9.\-]/g, ''); const mir = KPI_MIRROR[k.key];
+                  setData((d) => { let x = setIn(d, `snapshot.kpis.${k.key}.cur`, v); if (mir) x = setIn(x, mir, v); return x; });
+                }} />
+              <input type="text" inputMode="decimal" className="wx-input" placeholder="Last week"
+                value={data.snapshot.kpis[k.key].prev} onChange={(e) => set(`snapshot.kpis.${k.key}.prev`, e.target.value.replace(/[^0-9.\-]/g, ''))} />
             </div>
           ))}
         </div>
@@ -137,9 +149,9 @@ export default function CheckpointForm({
 
       <Section n={5} title="Samples" accent="#16a34a">
         <Grid cols={4}>
-          <Num label="Requests received" path="samples.requestsReceived" />
+          <MirrorNum label="Requests received" path="samples.requestsReceived" mirror={['funnel.sampleRequests', 'effort.sampleRequested']} />
           <Num label="Requests last week" path="samples.requestsPrev" />
-          <Num label="Approved this week" path="samples.approvedThisWeek" />
+          <MirrorNum label="Approved this week" path="samples.approvedThisWeek" mirror={['funnel.approved']} />
           <Num label="MTD approved" path="samples.mtdApproved" />
         </Grid>
         <Grid cols={4}>
@@ -171,7 +183,7 @@ export default function CheckpointForm({
         <Grid cols={3}>
           <Num label="Impressions" path="traffic.impressions" />
           <Num label="Clicks" path="traffic.clicks" />
-          <Num label="SKU orders" path="traffic.orders" />
+          <MirrorNum label="SKU orders" path="traffic.orders" mirror={['snapshot.kpis.orders.cur']} />
           <Num label="Impressions · last wk" path="traffic.impressionsPrev" />
           <Num label="Clicks · last wk" path="traffic.clicksPrev" />
           <Num label="Orders · last wk" path="traffic.ordersPrev" />
@@ -214,7 +226,7 @@ export default function CheckpointForm({
 
       <Section n={8} title="GMV Max & paid" accent="#d97706">
         <Grid cols={4}>
-          <Money label="Spend" path="paid.spend" />
+          <MirrorNum label="Spend" path="paid.spend" mirror={['snapshot.kpis.gmvMaxSpend.cur']} money />
           <Money label="Gross revenue" path="paid.grossRevenue" />
           <Num label="SKU orders" path="paid.skuOrders" />
           <Num label="Target ROI (break-even)" path="paid.targetRoi" sfx="x" />
@@ -352,6 +364,27 @@ function Num({ label, path, sfx, hint }) {
     </label>
   );
 }
+// A number field that also mirrors its value into other paths that hold the SAME
+// number (so the APC types it once). Two-way: put a MirrorNum at each spot with
+// the OTHER paths in `mirror`. Same sanitiser as Num; optional currency prefix.
+function MirrorNum({ label, path, mirror = [], sfx, money, hint }) {
+  const { data, setData, sym } = useContext(FieldCtx);
+  const hintText = typeof hint === 'function' ? hint(data) : hint;
+  const write = (val) => setData((d) => [path, ...mirror].reduce((acc, p) => setIn(acc, p, val), d));
+  return (
+    <label className="ck-field">
+      <span className="wx-label">{label}</span>
+      <div style={{ position: 'relative' }}>
+        {money && <span className="ck-pfx">{sym}</span>}
+        <input type="text" inputMode="decimal" className="wx-input" value={getIn(data, path) ?? ''}
+          onChange={(e) => write(e.target.value.replace(/[^0-9.\-]/g, ''))} placeholder="—"
+          style={money ? { paddingLeft: 26 } : (sfx ? { paddingRight: 34 } : undefined)} />
+        {sfx && !money && <span className="ck-sfx">{sfx}</span>}
+      </div>
+      {hintText && <span className="ck-hint">{hintText}</span>}
+    </label>
+  );
+}
 // A read-only field whose value is derived from other inputs, not typed.
 function Derived({ label, value, sfx, hint }) {
   const shown = (value === '' || value == null) ? '' : value;
@@ -419,26 +452,6 @@ function Area({ label, path, rows = 3 }) {
   );
 }
 
-// "Target invites" is the same number in three places (funnel, Outreach, and
-// APC-effort "Invites sent"), so editing it here mirrors to all three.
-function TargetInvites() {
-  const { data, setData } = useContext(FieldCtx);
-  return (
-    <label className="ck-field">
-      <span className="wx-label">Target invites</span>
-      <input type="number" className="wx-input" placeholder="—" value={getIn(data, 'funnel.targetInvites') ?? ''}
-        onChange={(e) => {
-          const val = e.target.value;
-          setData((d) => {
-            let x = setIn(d, 'funnel.targetInvites', val);
-            x = setIn(x, 'outreach.reachInvites', val);
-            x = setIn(x, 'effort.invitesSent', val);
-            return x;
-          });
-        }} />
-    </label>
-  );
-}
 
 // empties for the "never drop the last row" guard
 function empties(path) {

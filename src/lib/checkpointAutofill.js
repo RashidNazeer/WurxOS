@@ -44,6 +44,9 @@ function setIn(obj, path, value) {
   cur[keys[keys.length - 1]] = value;
   return clone;
 }
+function getIn(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
 
 // Call the Euka edge function for the two funnel counts. Returns
 // { targetInvites, optedIn, optInStage, funnelStages } or throws.
@@ -158,15 +161,33 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
   return { scalars, arrays, meta };
 }
 
-// "Target invites" appears in THREE places that must all show the same number:
-// funnel.targetInvites, outreach.reachInvites ("Target invites"), and
-// effort.invitesSent ("Invites sent"). Mirror the funnel value into the other
-// two. Safe to call after applying a patch or after manual entry.
-export function mirrorTargetInvites(data) {
-  const ti = data?.funnel?.targetInvites;
-  if (ti === '' || ti == null) return data;
-  let d = setIn(data, 'outreach.reachInvites', String(ti));
-  d = setIn(d, 'effort.invitesSent', String(ti));
+// Fields that are the SAME number in more than one section, so the APC only ever
+// types it once (verified same-type — the autofill fills every member of a group
+// from the identical report value; boss-confirmed for sample requests). Each
+// group's members mirror each other (two-way in the form; and here after a patch
+// so an autofill/Euka value that lands on one member propagates to the rest).
+// Look-alikes that are NOT the same (e.g. "Videos now live" N-2 cohort vs §04
+// "Videos Live" this week; §08 GMV-Max "SKU orders" vs the weekly total; MTD vs
+// weekly; this-week vs last-week) are deliberately NOT grouped.
+export const MIRROR_GROUPS = [
+  ['funnel.targetInvites', 'outreach.reachInvites', 'effort.invitesSent'],   // target invites
+  ['funnel.approved', 'samples.approvedThisWeek'],                            // samples approved this week
+  ['funnel.sampleRequests', 'samples.requestsReceived', 'effort.sampleRequested'], // sample requests
+  ['snapshot.kpis.orders.cur', 'traffic.orders'],                            // weekly SKU orders (total)
+  ['snapshot.kpis.gmvMaxSpend.cur', 'paid.spend'],                           // GMV Max spend
+];
+
+// Propagate each group's value onto all its members. Uses the first non-empty
+// member as the source (autofill writes the first-listed member), never mirrors
+// a blank. Idempotent — the members are already equal after autofill/typing.
+export function mirrorDuplicates(data) {
+  let d = data;
+  for (const group of MIRROR_GROUPS) {
+    let v = null;
+    for (const p of group) { const cur = getIn(d, p); if (cur !== '' && cur != null) { v = String(cur); break; } }
+    if (v == null) continue;
+    for (const p of group) d = setIn(d, p, v);
+  }
   return d;
 }
 
