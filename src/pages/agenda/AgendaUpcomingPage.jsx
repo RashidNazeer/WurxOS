@@ -417,9 +417,13 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
             <i className={`bi ${BADGE.icon}`} style={{ fontSize: '0.6rem' }} />{BADGE.label}
           </span>
         </div>
+        {/* The week SPAN, not a single date — teams can meet on different
+            days this week, so each team's own day is shown on its row below.
+            (A single headline date used to collapse a mixed-day week to the
+            earliest team's day, hiding everyone else's.) */}
         <div className="fw-bold mb-2" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
-          <i className="bi bi-calendar-event me-1 text-muted" style={{ fontSize: '0.82rem' }} />
-          {fmtDate(card.anchor)}
+          <i className="bi bi-calendar-week me-1 text-muted" style={{ fontSize: '0.82rem' }} />
+          {fmtDate(card.weekStart, false)} – {fmtDate(addDays(card.weekStart, 6), false)}
         </div>
 
         <div className="d-flex flex-column gap-2" style={{ flexGrow: 1 }}>
@@ -449,6 +453,12 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                     <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{r.tlName}</div>
                     <div className="text-muted" style={{ fontSize: '0.66rem' }}>
                       <i className="bi bi-people me-1" />{r.apcs.length} APC{r.apcs.length === 1 ? '' : 's'}
+                      {' · '}
+                      {/* This TEAM's own meeting day — each team sets its own,
+                          so the day lives on the row, not just the card head. */}
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        <i className="bi bi-calendar-event me-1" />{fmtDate(r.meetingDate)}
+                      </span>
                       {' · '}<i className="bi bi-clock me-1" />{fmtTime(r.meetingTime)} PKT
                     </div>
                   </div>
