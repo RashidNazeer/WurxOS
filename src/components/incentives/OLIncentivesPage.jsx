@@ -664,6 +664,7 @@ export default function OLIncentivesPage() {
   // APC/IPC management state
   const [allUsers, setAllUsers] = useState([]); // both APCs and IPCs
   const [tlUsers, setTlUsers] = useState([]);   // Team Leads (read-only breakdown for the OL)
+  const [olUsers, setOlUsers] = useState([]);   // Operation Leads (read-only view; includes self)
   const [records, setRecords] = useState({}); // userId → incentive doc
   const [loading, setLoading] = useState(true);
   const [detailsTarget, setDetailsTarget] = useState(null);
@@ -693,13 +694,15 @@ export default function OLIncentivesPage() {
         setMyItems({ incentives: [], bonuses: [] });
       }
 
-      // 2. Load ALL APCs and IPCs, and (for the read-only TL breakdown) all TLs.
-      const [teamList, tlList] = await Promise.all([
+      // 2. Load ALL APCs and IPCs, and (for the read-only TL + OL breakdowns) all TLs and OLs.
+      const [teamList, tlList, olList] = await Promise.all([
         listUsersByRoles(['apc', 'ipc']),
         listUsersByRoles(['tl']),
+        listUsersByRoles(['ol']),
       ]);
       setAllUsers(teamList);
       setTlUsers(tlList);
+      setOlUsers(olList);
 
       // 3. Load all incentive records for the selected month (an active OL can read
       // every incentive row per RLS; we keep APC/IPC + TL and key them by user).
@@ -708,7 +711,7 @@ export default function OLIncentivesPage() {
       incList.forEach((data) => {
         const uid = data.userId;
         if (!uid) return;
-        if (['apc', 'ipc', 'tl'].includes(data.userRole)) {
+        if (['apc', 'ipc', 'tl', 'ol'].includes(data.userRole)) {
           map[uid] = data;
         }
       });
@@ -716,7 +719,7 @@ export default function OLIncentivesPage() {
       // 3b. Auto carry-forward: for any managed user (APC/IPC/TL) without a plan
       // this month, fall back to their most recent prior plan and synthesise a
       // ghost record (no doc yet) with achieved/completed reset.
-      const missing = [...teamList, ...tlList].filter(u => !map[u.id]);
+      const missing = [...teamList, ...tlList, ...olList].filter(u => !map[u.id]);
       await Promise.all(missing.map(async (u) => {
         try {
           const prior = await getMostRecentPriorPlan(u.id, month);
@@ -765,10 +768,12 @@ export default function OLIncentivesPage() {
 
   const apcs = allUsers.filter(u => !u.userType || u.userType === 'apc');
   const ipcs = allUsers.filter(u => u.userType === 'ipc');
-  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers : [];
-  // TL incentives are the Boss's to manage — the OL sees them read-only.
-  const readOnly = tab === 'tls';
-  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : 'TLs';
+  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers : tab === 'ols' ? olUsers : [];
+  // TL and OL incentives are the Boss's to manage — the OL sees them read-only.
+  // (Server-side too: mig 301 stops an OL verifying/editing any OL/admin row.)
+  const readOnly = tab === 'tls' || tab === 'ols';
+  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : tab === 'tls' ? 'TLs' : 'OLs';
+  const roleWord = tab === 'apcs' ? 'APC' : tab === 'ipcs' ? 'IPC' : tab === 'tls' ? 'TL' : tab === 'ols' ? 'OL' : '';
 
   // Apply search + filters before rendering and for stats
   const list = baseList.filter(u => {
@@ -887,10 +892,11 @@ export default function OLIncentivesPage() {
   const recordsCount  = list.filter(u => records[u.id]).length;
   const verifiedCount = list.filter(u => records[u.id]?.verified).length;
 
-  // ── Combined payout snapshot — ONE cumulative figure across EVERYONE the OL
-  // manages (APCs + IPCs + TLs together), shown identically on every management
-  // tab (was split: APCs+IPCs on the apc/ipc tabs, TLs alone on the tl tab). ──
-  const snapshotStats = computeCombinedStats([...apcs, ...ipcs, ...tlUsers], records);
+  // ── Combined payout snapshot — ONE cumulative figure across EVERYONE the office
+  // pays below the Boss (APCs + IPCs + TLs + both OLs), shown identically on every
+  // management tab. OLs are included so the total reflects the WHOLE payroll (the
+  // OLs' own salary + incentives were previously excluded). ──
+  const snapshotStats = computeCombinedStats([...apcs, ...ipcs, ...tlUsers, ...olUsers], records);
 
   // My incentives summary
   const myAllItems     = [...myItems.incentives, ...myItems.bonuses];
@@ -928,6 +934,7 @@ export default function OLIncentivesPage() {
           { key: 'apcs', label: 'APC Incentives', icon: 'bi-people' },
           { key: 'ipcs', label: 'IPC Incentives', icon: 'bi-people-fill' },
           { key: 'tls',  label: 'TL Incentives',  icon: 'bi-person-badge' },
+          { key: 'ols',  label: 'OL Incentives',  icon: 'bi-person-workspace' },
           { key: 'my',   label: 'My Incentives',  icon: 'bi-person' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -1015,13 +1022,17 @@ export default function OLIncentivesPage() {
           {recordsCount > 0 && (
             <div className="d-flex gap-2 flex-wrap mb-3">
               {[
-                { label: 'Total Payout', value: `${totalPayout.toLocaleString()} PKR`, bg: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' },
-                { label: 'With Plans',   value: `${recordsCount} / ${list.length}`,    bg: '#e8f0fe', color: '#0d6efd' },
-                { label: 'Verified',     value: `${verifiedCount} / ${recordsCount}`,  bg: '#e6f4ea', color: '#198754' },
+                // This section's OWN role total, sitting right beside the combined
+                // (all-roles) total so the OL sees both figures in every section.
+                { label: `${roleWord} Payout`,  value: `${totalPayout.toLocaleString()} PKR`,               bg: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff', sub: `${roleWord} total` },
+                { label: 'Combined Payout',      value: `${snapshotStats.totalPayout.toLocaleString()} PKR`, bg: '#0f172a', color: '#fff', sub: 'all roles incl. OLs' },
+                { label: 'With Plans',           value: `${recordsCount} / ${list.length}`,                  bg: '#e8f0fe', color: '#0d6efd' },
+                { label: 'Verified',             value: `${verifiedCount} / ${recordsCount}`,                bg: '#e6f4ea', color: '#198754' },
               ].map(s => (
-                <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, color: s.color, minWidth: 110 }}>
+                <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, color: s.color, minWidth: 120 }}>
                   <div style={{ fontSize: '0.6rem', opacity: 0.7, letterSpacing: 1, textTransform: 'uppercase' }}>{s.label}</div>
                   <div className="fw-bold" style={{ fontSize: '1rem' }}>{s.value}</div>
+                  {s.sub && <div style={{ fontSize: '0.55rem', opacity: 0.6, marginTop: 1 }}>{s.sub}</div>}
                 </div>
               ))}
             </div>
@@ -1174,6 +1185,10 @@ export default function OLIncentivesPage() {
         <UserDetailsModal
           rec={detailsTarget.rec}
           user={detailsTarget.user}
+          // BOTH the TL and OL sections are read-only for the OL (Boss-managed).
+          // Use the section's readOnly flag, not just 'ols', or the TL Details
+          // modal would still expose Verify/Edit/toggle for a TL's plan.
+          readOnly={readOnly}
           onClose={() => setDetailsTarget(null)}
           onToggleItem={handleToggleItem}
           onVerify={handleVerify}
