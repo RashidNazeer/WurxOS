@@ -244,6 +244,18 @@ export const STATUS_COLOR = {
 // 'approved' silently locked the form as read-only before the first save.
 export function getReportStatus(r) { return r?.status || 'draft'; }
 
+// OL/Boss reminder: nudge whoever owes the next action on these reports —
+// a DRAFT reminds its author (APC) to submit, a SUBMITTED reminds the brand
+// owner (TL) to verify. One notification per recipient (server dedups + re-reads
+// status). Returns { sent } = number of people notified.
+export async function remindReports(ids) {
+  const list = (ids || []).filter(Boolean);
+  if (!list.length) return { sent: 0 };
+  const { data, error } = await supabase.rpc('reports_remind', { p_ids: list });
+  if (error) throw new Error(error.message);
+  return data || { sent: 0 };
+}
+
 // What the current user can do on this report given their role.
 export function reportPermissions({ report, role, uid, brandOwnerId }) {
   const status = getReportStatus(report);

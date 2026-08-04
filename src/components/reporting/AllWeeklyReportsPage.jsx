@@ -18,6 +18,7 @@ import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
+import { remindReports } from '../../lib/reportsApi';
 
 function StatusBadge({ status, style }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -103,6 +104,10 @@ export default function AllWeeklyReportsPage() {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const canBulkDelete = userRole === 'boss' || userRole === 'ol';
+  const canNotify = userRole === 'boss' || userRole === 'ol';
+  // Reminder toast + which stat card's notify is in flight ('draft' | 'submitted').
+  const [flash, setFlash] = useState('');
+  const [notifyBusy, setNotifyBusy] = useState('');
   const toggleSelected = (id) => setSelected((s) => {
     const next = new Set(s);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -329,6 +334,39 @@ export default function AllWeeklyReportsPage() {
       gmvTrend, reportsTrend, brandsTrend, barPcts, currency };
   }, [filtered, reports, calYear, calMonth, calWeeks]);
 
+  // Status breakdown over the month scope but INDEPENDENT of the active status
+  // filter, so the Draft / Submitted / Pending / Approved cards always show the
+  // true month counts and behave as filter toggles (clicking one never zeroes
+  // out the others). Honours the brand/team/week/search/reporter filters.
+  const statusScope = useMemo(() => {
+    const mk = monthKey(calYear, calMonth);
+    return reports.filter(r => {
+      if (!r.weekStart || !r.weekStart.startsWith(mk)) return false;
+      if (filterBrand && r.brandName !== filterBrand) return false;
+      if (filterClient && clientByBrandId.get(r.brandId) !== filterClient) return false;
+      if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
+      if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
+      if (filterCreator && r.createdByName !== filterCreator) return false;
+      if (filterWeek && String(r.week) !== filterWeek) return false;
+      return true;
+    });
+  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek]);
+
+  const statusStats = useMemo(() => {
+    const c = { draft: 0, submitted: 0, verified: 0, approved: 0, pendingOverdue: 0, total: statusScope.length };
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    statusScope.forEach(r => {
+      const s = getReportStatus(r);
+      if (s === 'draft' || s === 'submitted' || s === 'verified' || s === 'approved') c[s]++;
+      if (s === 'verified' && r.verifiedAt) {
+        const ts = new Date(r.verifiedAt).getTime();
+        if (ts && ts < cutoff) c.pendingOverdue++;
+      }
+    });
+    c.approvalRate = c.total > 0 ? Math.round((c.approved / c.total) * 100) : 0;
+    return c;
+  }, [statusScope]);
+
   // Live indicator
   const [syncedAt] = useState(() => new Date());
   const [syncTick, setSyncTick] = useState(0);
@@ -350,6 +388,29 @@ export default function AllWeeklyReportsPage() {
   const clearAllFilters = () => {
     setFilterBrand(''); setFilterClient(''); setFilterTeam('');
     setFilterSearch(''); setFilterCreator(''); setFilterWeek(''); setFilterStatus('');
+  };
+
+  // OL/Boss fires a reminder from the Draft / Submitted card: draft → nudge the
+  // APC authors to submit; submitted → nudge the TLs to verify. Scoped to the
+  // reports in view (statusScope); the server re-checks each report's status.
+  const handleRemind = async (kind) => {
+    const targets = statusScope.filter(r => getReportStatus(r) === kind);
+    if (!targets.length) return;
+    const who  = kind === 'draft' ? 'APC' : 'Team Lead';
+    const verb = kind === 'draft' ? 'submit' : 'verify';
+    if (!window.confirm(`Send a reminder to the ${who}s to ${verb} ${targets.length} ${kind} report${targets.length === 1 ? '' : 's'}?`)) return;
+    setNotifyBusy(kind);
+    try {
+      const res = await remindReports(targets.map(r => r.id));
+      const n = res?.sent ?? 0;
+      setFlash(n > 0
+        ? `Reminder sent to ${n} ${who}${n === 1 ? '' : 's'}.`
+        : `No active ${who} to notify for those reports.`);
+      setTimeout(() => setFlash(''), 4000);
+    } catch (e) {
+      setFlash('Failed to send reminders: ' + (e.message || 'unknown'));
+      setTimeout(() => setFlash(''), 5000);
+    } finally { setNotifyBusy(''); }
   };
 
   // Popover filter specs (everything except the inline search box)
@@ -713,6 +774,14 @@ export default function AllWeeklyReportsPage() {
         </div>
       </div>
 
+      {/* Reminder toast */}
+      {flash && (
+        <div className="d-inline-flex align-items-center gap-2 rounded-3 px-3 py-2 mb-3"
+          style={{ background: 'var(--info-soft)', color: 'var(--info)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.8rem', fontWeight: 600 }}>
+          <i className="bi bi-bell-fill" />{flash}
+        </div>
+      )}
+
       {/* Stat cards row */}
       <div className="row g-3 mb-4">
         {/* Total GMV — dark prominent card */}
@@ -762,6 +831,72 @@ export default function AllWeeklyReportsPage() {
           />
         </div>
 
+        {/* Drafts — click to filter; OL/Boss can nudge the APC authors to submit */}
+        <div className="col-6 col-xl">
+          <div className="rounded-3 h-100 p-3" role="button" tabIndex={0}
+            style={{ background: 'var(--surface-1)', cursor: 'pointer', position: 'relative',
+                     border: filterStatus === 'draft' ? '1.5px solid var(--text-secondary)' : '1px solid var(--border-subtle)' }}
+            onClick={() => setFilterStatus(filterStatus === 'draft' ? '' : 'draft')}
+            onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setFilterStatus(filterStatus === 'draft' ? '' : 'draft'); } }}
+            title="Click to show only draft reports">
+            <div className="d-flex align-items-start justify-content-between mb-3">
+              <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--surface-2)' }}>
+                <i className="bi bi-pencil-square" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }} />
+              </div>
+              {canNotify && statusStats.draft > 0 && (
+                <button type="button"
+                  className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 border-0"
+                  style={{ fontSize: '0.62rem', fontWeight: 700, background: 'var(--info-soft)', color: 'var(--info)', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); handleRemind('draft'); }}
+                  disabled={notifyBusy === 'draft'}
+                  title="Notify the APCs to submit their draft reports">
+                  {notifyBusy === 'draft'
+                    ? <span className="spinner-border spinner-border-sm" style={{ width: 11, height: 11 }} />
+                    : <i className="bi bi-bell" />}
+                  Notify APCs
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Drafts</div>
+            <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
+              {statusStats.draft} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>in progress</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Submitted — click to filter; OL/Boss can nudge the TLs to verify */}
+        <div className="col-6 col-xl">
+          <div className="rounded-3 h-100 p-3" role="button" tabIndex={0}
+            style={{ background: 'var(--surface-1)', cursor: 'pointer', position: 'relative',
+                     border: filterStatus === 'submitted' ? '1.5px solid var(--info)' : '1px solid var(--border-subtle)' }}
+            onClick={() => setFilterStatus(filterStatus === 'submitted' ? '' : 'submitted')}
+            onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setFilterStatus(filterStatus === 'submitted' ? '' : 'submitted'); } }}
+            title="Click to show only submitted reports">
+            <div className="d-flex align-items-start justify-content-between mb-3">
+              <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--info-soft)' }}>
+                <i className="bi bi-inbox" style={{ color: 'var(--info)', fontSize: '0.85rem' }} />
+              </div>
+              {canNotify && statusStats.submitted > 0 && (
+                <button type="button"
+                  className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 border-0"
+                  style={{ fontSize: '0.62rem', fontWeight: 700, background: 'var(--warning-soft)', color: 'var(--warning)', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); handleRemind('submitted'); }}
+                  disabled={notifyBusy === 'submitted'}
+                  title="Notify the Team Leads to verify these reports">
+                  {notifyBusy === 'submitted'
+                    ? <span className="spinner-border spinner-border-sm" style={{ width: 11, height: 11 }} />
+                    : <i className="bi bi-bell" />}
+                  Notify TLs
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Submitted</div>
+            <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
+              {statusStats.submitted} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting review</span>
+            </div>
+          </div>
+        </div>
+
         {/* Approved */}
         <div className="col-6 col-xl">
           <button className="rounded-3 h-100 w-100 text-start p-0 border-0 bg-transparent"
@@ -776,12 +911,12 @@ export default function AllWeeklyReportsPage() {
                 </div>
                 <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
                   style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.66rem', fontWeight: 600 }}>
-                  {monthStats.approvalRate}% rate
+                  {statusStats.approvalRate}% rate
                 </span>
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Approved</div>
               <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
-                {monthStats.approved} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>of {monthStats.reportCount}</span>
+                {statusStats.approved} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>of {statusStats.total}</span>
               </div>
               <Sparkbars values={monthStats.barPcts} highlightLast color="var(--success)" muted="var(--border-subtle)" />
             </div>
@@ -800,17 +935,17 @@ export default function AllWeeklyReportsPage() {
                   style={{ width: 30, height: 30, background: 'var(--warning-soft)' }}>
                   <i className="bi bi-hourglass-split" style={{ color: 'var(--warning)', fontSize: '0.85rem' }} />
                 </div>
-                {monthStats.pendingOverdue > 0 && (
+                {statusStats.pendingOverdue > 0 && (
                   <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
                     style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.66rem', fontWeight: 600 }}>
                     <i className="bi bi-arrow-up-right" />
-                    {monthStats.pendingOverdue} over 24h
+                    {statusStats.pendingOverdue} over 24h
                   </span>
                 )}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Pending approval</div>
               <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
-                {monthStats.pendingApproval} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting</span>
+                {statusStats.verified} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting</span>
               </div>
               <Sparkbars values={monthStats.barPcts} highlightLast color="var(--warning)" muted="var(--border-subtle)" />
             </div>
