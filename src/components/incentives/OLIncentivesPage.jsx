@@ -887,10 +887,10 @@ export default function OLIncentivesPage() {
   const recordsCount  = list.filter(u => records[u.id]).length;
   const verifiedCount = list.filter(u => records[u.id]?.verified).length;
 
-  // ── Combined payout snapshots — APCs+IPCs cumulative, and TLs cumulative ──
-  const combinedStats = computeCombinedStats([...apcs, ...ipcs], records);
-  const tlStats       = computeCombinedStats(tlUsers, records);
-  const snapshotStats = tab === 'tls' ? tlStats : combinedStats;
+  // ── Combined payout snapshot — ONE cumulative figure across EVERYONE the OL
+  // manages (APCs + IPCs + TLs together), shown identically on every management
+  // tab (was split: APCs+IPCs on the apc/ipc tabs, TLs alone on the tl tab). ──
+  const snapshotStats = computeCombinedStats([...apcs, ...ipcs, ...tlUsers], records);
 
   // My incentives summary
   const myAllItems     = [...myItems.incentives, ...myItems.bonuses];
