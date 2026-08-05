@@ -18,6 +18,7 @@ import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import ClientMultiSelect from './ClientMultiSelect';
+import ToolbarSelect from './ToolbarSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 import { remindReports } from '../../lib/reportsApi';
@@ -415,27 +416,14 @@ export default function AllWeeklyReportsPage() {
     } finally { setNotifyBusy(''); }
   };
 
-  // Popover filter specs (everything except the inline search box)
+  // Popover now holds only the advanced Team filter (boss/ol). Client + Week are
+  // standalone toolbar controls; Status is driven by the stat cards; Brand +
+  // Reporter were removed as redundant.
   const popoverFilters = [
-    { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
-      options: brandOptions.map(b => ({ value: b, label: b })) },
-    // Client is now a standalone multi-select on the toolbar (ClientMultiSelect),
-    // pulled out of this popover so several clients can be viewed at once.
     ...((userRole === 'boss' || userRole === 'ol') && teamOptions.length > 0
       ? [{ key: 'team', label: 'Team', value: filterTeam, setValue: setFilterTeam,
           options: teamOptions.map(t => ({ value: t.id, label: `Team ${t.name}` })) }]
       : []),
-    { key: 'reporter', label: 'Reporter', value: filterCreator, setValue: setFilterCreator,
-      options: creatorOptions.map(c => ({ value: c, label: c })) },
-    { key: 'week', label: 'Week', value: filterWeek, setValue: setFilterWeek,
-      options: weekOptions },
-    { key: 'status', label: 'Status', value: filterStatus, setValue: setFilterStatus,
-      options: [
-        { value: 'draft', label: 'Draft' },
-        { value: 'submitted', label: 'Submitted' },
-        { value: 'verified', label: 'Verified' },
-        { value: 'approved', label: 'Approved' },
-      ] },
   ];
 
   // Month navigation
@@ -991,35 +979,14 @@ export default function AllWeeklyReportsPage() {
               value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
           </div>
 
-          {/* Status filter pills */}
-          <div className="d-inline-flex gap-1">
-            {[
-              { v: '', label: 'All' },
-              { v: 'approved', label: 'Approved' },
-              { v: 'verified', label: 'Pending' },
-              { v: 'submitted', label: 'Needs Review' },
-            ].map(opt => {
-              const active = filterStatus === opt.v;
-              return (
-                <button key={opt.v} type="button"
-                  onClick={() => setFilterStatus(opt.v)}
-                  className="btn btn-sm rounded-3 px-3 d-inline-flex align-items-center gap-1"
-                  style={{
-                    fontSize: '0.78rem', fontWeight: 600,
-                    background: active ? 'var(--accent)'      : 'var(--surface-1)',
-                    color:      active ? 'var(--on-accent)'   : 'var(--text-secondary)',
-                    border:     active ? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
-                  }}>
-                  {opt.v === '' && <i className="bi bi-funnel" style={{ fontSize: '0.72rem' }} />}
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+          <ToolbarSelect allLabel="All Weeks" value={filterWeek} onChange={setFilterWeek}
+            options={weekOptions} title="Filter by week" />
 
           <ClientMultiSelect options={clientOptions} selected={filterClients} onChange={setFilterClients} />
 
-          <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
+          {popoverFilters.length > 0 && (
+            <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
+          )}
 
           {hasFilters && (
             <button className="btn btn-sm btn-light border d-inline-flex align-items-center gap-1 rounded-3"

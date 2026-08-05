@@ -17,6 +17,7 @@ import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import ClientMultiSelect from './ClientMultiSelect';
+import ToolbarSelect from './ToolbarSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 import { remindReports } from '../../lib/reportsApi';
@@ -244,25 +245,14 @@ export default function AllMonthlyReportsPage() {
     } finally { setNotifyBusy(''); }
   };
 
+  // Popover now holds only the advanced Team filter (boss/ol). Client + Month are
+  // standalone toolbar controls; Status is driven by the stat cards; Brand +
+  // Reporter were removed as redundant.
   const popoverFilters = [
-    { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
-      options: brandOptions.map(b => ({ value: b, label: b })) },
-    // Client is now a standalone multi-select on the toolbar (ClientMultiSelect).
     ...((userRole === 'boss' || userRole === 'ol') && teamOptions.length > 0
       ? [{ key: 'team', label: 'Team', value: filterTeam, setValue: setFilterTeam,
           options: teamOptions.map(t => ({ value: t.id, label: `Team ${t.name}` })) }]
       : []),
-    { key: 'reporter', label: 'Reporter', value: filterCreator, setValue: setFilterCreator,
-      options: creatorOptions.map(c => ({ value: c, label: c })) },
-    { key: 'month', label: 'Month', value: filterMonth, setValue: setFilterMonth,
-      options: MONTH_NAMES.map((m, i) => ({ value: String(i), label: m })) },
-    { key: 'status', label: 'Status', value: filterStatus, setValue: setFilterStatus,
-      options: [
-        { value: 'draft', label: 'Draft' },
-        { value: 'submitted', label: 'Submitted' },
-        { value: 'verified', label: 'Verified' },
-        { value: 'approved', label: 'Approved' },
-      ] },
   ];
 
   const prevYear = () => setCalYear(y => y - 1);
@@ -784,11 +774,16 @@ export default function AllMonthlyReportsPage() {
               <input type="text" className="form-control form-control-sm" placeholder="Search brand…"
                 style={{ paddingLeft: 28, borderRadius: 8 }} value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
             </div>
+            <ToolbarSelect allLabel="All Months" value={filterMonth} onChange={setFilterMonth}
+              options={MONTH_NAMES.map((m, i) => ({ value: String(i), label: m }))} title="Filter by month" />
+
             {(userRole === 'boss' || userRole === 'ol') && (
               <ClientMultiSelect options={clientOptions} selected={filterClients} onChange={setFilterClients} />
             )}
 
-            <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
+            {popoverFilters.length > 0 && (
+              <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
+            )}
             {hasFilters && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
                 style={{ borderRadius: 8, fontSize: '0.72rem' }}

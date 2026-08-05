@@ -221,6 +221,10 @@ export default function AllBiWeeklyReportsPage() {
     setFilterSearch(''); setFilterCreator(''); setFilterPeriod(''); setFilterStatus('');
   };
 
+  // NOTE: the weekly/monthly filter declutter is NOT applied here — bi-weekly's
+  // status stat cards are OL-only (boss/TL see a static "Total Orders" card) and
+  // cover only verified/approved, so removing Status from the popover would
+  // strand status filtering. Keep the full popover for this page.
   const popoverFilters = [
     { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
       options: brandOptions.map(b => ({ value: b, label: b })) },
