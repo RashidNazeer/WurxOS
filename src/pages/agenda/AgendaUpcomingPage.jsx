@@ -568,6 +568,20 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                       : <><i className="bi bi-megaphone" /> Notify this team</>}
                   </button>
                 )}
+                {/* Still pending (Scheduled) → let the OL re-ping this one team,
+                    e.g. right before starting. Hidden once the meeting is
+                    ongoing / paused / completed — no point re-notifying then. */}
+                {olCurrent && mStatus === 'upcoming' && (
+                  <button className="btn btn-sm w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 6, fontSize: '0.68rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+                    disabled={notifying || !!notifyingTl}
+                    title={`Re-notify ${r.tlName} that their meeting is coming up`}
+                    onClick={() => onNotifyTeam(r.tlId, r.tlName)}>
+                    {notifyingTl === r.tlId
+                      ? <span className="spinner-border spinner-border-sm" />
+                      : <><i className="bi bi-megaphone" /> Re-notify team</>}
+                  </button>
+                )}
               </div>
             );
           })}
