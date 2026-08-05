@@ -14,6 +14,7 @@ import MonthlyReportForm from './MonthlyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import MonthlyReportView from './MonthlyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
+import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
@@ -549,6 +550,12 @@ export default function AllMonthlyReportsPage() {
           </div>
           <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} type="monthly" />
         </div>
+        <ReportRatingBar
+          report={viewReport}
+          viewerRole={userRole}
+          isBrandOwner={brands.find((b) => b.id === viewReport.brandId)?.ownerId === currentUser?.uid}
+          onRated={(updated) => setViewReport((r) => (r ? { ...r, ...updated } : updated))}
+        />
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>

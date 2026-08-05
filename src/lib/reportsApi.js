@@ -581,6 +581,23 @@ export async function reopenReport(id, { target = 'verified', note }) {
 }
 
 // --------------------------------------------------------------
+// Per-report reporting stars (mig 303). External reporting is scored per report:
+//   • the TL rates their APC's report 0–5★ at VERIFY  → feeds the APC's score
+//   • the OL rates the TL's report 0–5★ at APPROVE     → feeds the TL's score
+// Both go through gated SECURITY DEFINER RPCs (the reports UPDATE RLS is too broad
+// to guard a single star column). Half-stars (0.5) allowed.
+// --------------------------------------------------------------
+export async function rateApcReport(reportId, stars) {
+  const { error } = await supabase.rpc('report_rate_apc', { p_report_id: reportId, p_stars: Number(stars) });
+  if (error) throw new Error(error.message);
+}
+
+export async function rateTlReport(reportId, stars) {
+  const { error } = await supabase.rpc('report_rate_tl', { p_report_id: reportId, p_stars: Number(stars) });
+  if (error) throw new Error(error.message);
+}
+
+// --------------------------------------------------------------
 // OL/Boss edit-the-dates — change a report's period without touching
 // any sibling reports. Just an UPDATE in v2 (Postgres uses the row's
 // uuid id; no document-rewrite cascade needed like Firestore).
@@ -817,6 +834,13 @@ export function _normReport(row) {
     // currency reflects across ALL its historical reports at once. Falls back to
     // the old snapshot (then USD) for reports whose brand join is missing.
     currency: row.brand?.currency || data.currency || 'USD',
+
+    // Per-report reporting stars (mig 303). These are top-level columns, NOT
+    // inside `data`, so the `...data` spread above doesn't carry them — copy
+    // them through explicitly (snake_case, matching what ReportRatingBar reads)
+    // or the picker can't show the previously-saved rating after a reload.
+    apc_stars: row.apc_stars ?? null,
+    tl_stars:  row.tl_stars ?? null,
   };
 
   if (isMonthly) {

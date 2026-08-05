@@ -13,6 +13,7 @@ import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctC
 import WeeklyReportForm from './WeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
+import ReportRatingBar from './ReportRatingBar';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -366,6 +367,12 @@ export default function WeeklyReportsPage() {
           </div>
           <ReportPeriodStrip reports={sourceList} currentId={detailReport.id} onSelect={setDetailReport} type="weekly" />
         </div>
+        <ReportRatingBar
+          report={detailReport}
+          viewerRole={userRole}
+          isBrandOwner={currentBrand?.ownerId === user?.id}
+          onRated={(updated) => setDetailReport((r) => (r ? { ...r, ...updated } : updated))}
+        />
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>

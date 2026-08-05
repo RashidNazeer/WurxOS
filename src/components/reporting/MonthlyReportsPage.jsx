@@ -10,7 +10,9 @@ import {
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import MonthlyReportForm from './MonthlyReportForm';
 import MonthlyReportView from './MonthlyReportView';
+import ReportRatingBar from './ReportRatingBar';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
+import { deductPromptApcReport } from '../../lib/apcReportingApi';
 
 function StatusBadge({ status }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -125,6 +127,8 @@ export default function MonthlyReportsPage() {
       setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'draft', rejectionNote: note.trim() } : r));
       setDetailReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'apc', note: note.trim() });
+      // Optional reporting dock for the APC (all cadences now — mig 304 symmetry).
+      try { await deductPromptApcReport(report.id); } catch { /* best-effort; the return already happened */ }
     } catch (err) { alert('Failed: ' + err.message); }
   };
 
@@ -221,6 +225,12 @@ export default function MonthlyReportsPage() {
             )}
           </div>
         </div>
+        <ReportRatingBar
+          report={detailReport}
+          viewerRole={userRole}
+          isBrandOwner={brands.find((b) => b.id === detailReport.brandId)?.ownerId === currentUser?.uid}
+          onRated={(updated) => setDetailReport((r) => (r ? { ...r, ...updated } : updated))}
+        />
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>

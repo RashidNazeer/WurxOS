@@ -8,9 +8,10 @@ import { getLevelTokens } from '../../lib/performanceApi';
 import { karachiYmd } from '../../lib/serverTime';
 import WeeklyRatingFields from './WeeklyRatingFields';
 
-// The weekly breakdown for one APC in one month: each meeting (week) with its
-// score, expandable to the 5-slider rating for late / corrective entry. Also the
-// place the Boss/OL sees the weekly scores that make up the monthly average.
+// The weekly CHECKPOINT breakdown for one APC in one month: each meeting (week)
+// with its score, expandable to the 4-slider rating for late / corrective entry.
+// The month average here is the APC's checkpoint factor (0.6 of the performance
+// pillar); the other 0.4 is the per-report external-report score (mig 304).
 function fmtDate(d) {
   if (!d) return '—';
   const [y, m, day] = d.split('-').map(Number);
@@ -76,9 +77,9 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
           <div className="d-flex align-items-center justify-content-between rounded-3 px-3 py-2 mb-3" style={{ background: 'var(--surface-2)' }}>
             <div>
               <div className="text-muted" style={{ fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {enabled ? 'Monthly performance (official)' : 'Monthly performance (trial preview)'}
+                {enabled ? 'Monthly checkpoint (official)' : 'Monthly checkpoint (trial preview)'}
               </div>
-              <div className="text-muted" style={{ fontSize: '0.68rem' }}>{ratings.length} week{ratings.length === 1 ? '' : 's'} rated</div>
+              <div className="text-muted" style={{ fontSize: '0.68rem' }}>{ratings.length} week{ratings.length === 1 ? '' : 's'} rated · 0.6 of performance</div>
             </div>
             {projected != null ? (
               <span className="rounded-pill px-3 py-1" style={{ background: lvl.bg, color: lvl.color, fontSize: '1rem', fontWeight: 800 }}>{projected}/100</span>

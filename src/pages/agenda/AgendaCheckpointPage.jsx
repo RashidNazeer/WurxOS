@@ -357,17 +357,14 @@ function ApcCheckpointPage() {
   const isAuthor = !!cp?.author_id && cp.author_id === profile?.id;
   const isOwnerTL = !!selectedBrand?.owner_id && selectedBrand.owner_id === profile?.id;
   const isAdmin = ['ol', 'boss', 'developer'].includes(profile?.role);
-  // The owner TL can edit the checkpoint directly (draft or submitted) instead of
-  // bouncing it back to the APC for every small fix. RLS (checkpoint_can_write)
-  // already grants the owner TL write access.
-  const canEditContent = isAdmin
-    || (isAuthor && status === 'draft')
-    || (isOwnerTL && (status === 'draft' || status === 'submitted'));
-  const canSubmit = status === 'draft' && (isAuthor || isAdmin);
-  const canVerify = status === 'submitted' && (isOwnerTL || isAdmin);
-  // TL returns a submitted checkpoint to the APC; TL reopens a done (verified) one.
-  const canReturn = status === 'submitted' && (isOwnerTL || isAdmin);
-  const canReopen = status === 'verified' && (isOwnerTL || isAdmin);
+  // Submit-only (mig 305): the checkpoint is the APC's own document — no TL verify
+  // or return. The author (and OL/Boss admin) can edit it any time, even after
+  // submitting; the TL only VIEWS it. RLS (checkpoint_can_write) still backs writes.
+  const canEditContent = isAdmin || isAuthor;
+  const canSubmit = status !== 'submitted' && (isAuthor || isAdmin);
+  const canVerify = false;   // retired — TL no longer verifies checkpoints
+  const canReturn = false;   // retired — no return step
+  const canReopen = false;   // retired — nothing to reopen
   const cpId = () => cp?.id || weeks.find((w) => w.week_start === weekStart)?.id || null;
 
   async function runWf(kind, fn) {

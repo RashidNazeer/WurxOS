@@ -11,7 +11,9 @@ import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import BiWeeklyReportForm from './BiWeeklyReportForm';
 import WeeklyReportView from './WeeklyReportView';
+import ReportRatingBar from './ReportRatingBar';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
+import { deductPromptApcReport } from '../../lib/apcReportingApi';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -264,6 +266,8 @@ export default function BiWeeklyReportsPage() {
       if (selectedBrandId) getBiWeeklyReportsForBrand(selectedBrandId).then(setBrandReports);
       setDetailReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'biweekly', toRole: 'apc', note: note.trim() });
+      // Optional reporting dock for the APC (all cadences now — mig 304 symmetry).
+      try { await deductPromptApcReport(report.id); } catch { /* best-effort; the return already happened */ }
     } catch (err) { alert('Failed to reject: ' + err.message); }
   };
 
@@ -344,6 +348,12 @@ export default function BiWeeklyReportsPage() {
             )}
           </div>
         </div>
+        <ReportRatingBar
+          report={detailReport}
+          viewerRole={userRole}
+          isBrandOwner={currentBrand?.ownerId === user?.id}
+          onRated={(updated) => setDetailReport((r) => (r ? { ...r, ...updated } : updated))}
+        />
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
