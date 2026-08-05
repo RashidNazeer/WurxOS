@@ -592,9 +592,27 @@ export async function rateApcReport(reportId, stars) {
   if (error) throw new Error(error.message);
 }
 
-export async function rateTlReport(reportId, stars) {
-  const { error } = await supabase.rpc('report_rate_tl', { p_report_id: reportId, p_stars: Number(stars) });
+// `note` is an OPTIONAL justification the OL leaves for the TL (mig 309/310). A
+// null star = note-only save (leaves the star untouched). The note lands in the
+// scoped report_tl_stars_notes table, not on the report row.
+export async function rateTlReport(reportId, stars, note = null) {
+  const { error } = await supabase.rpc('report_rate_tl', {
+    p_report_id: reportId,
+    p_stars: stars == null ? null : Number(stars),
+    p_note: note ?? null,
+  });
   if (error) throw new Error(error.message);
+}
+
+// The OL's justification note for a TL report — readable (RLS) only by the
+// OL/Boss and the report's brand-owner TL (mig 310). null when none / not
+// permitted. Kept OFF the report payload so it never leaks to the APC author.
+export async function getReportTlNote(reportId) {
+  if (!reportId) return null;
+  const { data, error } = await supabase
+    .from('report_tl_stars_notes').select('note').eq('report_id', reportId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.note ?? null;
 }
 
 // --------------------------------------------------------------
