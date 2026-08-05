@@ -34,14 +34,16 @@ function parse(buffer) {
   }
 
   const byCreator = new Map(); // name -> Map(videoId -> day)
-  let videos = 0, minDay = null, maxDay = null;
+  // Full accounting so the total rows always reconcile: unique videos +
+  // duplicate video rows + skipped (non-blank but missing name/id/valid date).
+  let videos = 0, dupes = 0, skipped = 0, minDay = null, maxDay = null;
   for (let r = h.i + 1; r < aoa.length; r++) {
     const row = aoa[r];
-    if (!row) continue;
+    if (!row || row.every((x) => String(x).trim() === '')) continue; // truly blank — not counted
     const name = String(row[h.name] || '').trim();
     const vid = String(row[h.vid] || '').trim();
     const day = toDay(row[h.time]);
-    if (!name || !vid || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    if (!name || !vid || !/^\d{4}-\d{2}-\d{2}$/.test(day)) { skipped++; continue; }
     let m = byCreator.get(name);
     if (!m) { m = new Map(); byCreator.set(name, m); }
     if (!m.has(vid)) {
@@ -49,6 +51,8 @@ function parse(buffer) {
       videos++;
       if (!minDay || day < minDay) minDay = day;
       if (!maxDay || day > maxDay) maxDay = day;
+    } else {
+      dupes++;   // same video listed more than once — counted once
     }
   }
 
@@ -56,7 +60,7 @@ function parse(buffer) {
   for (const [name, m] of byCreator) {
     creators.push({ creator: name, days: [...m.values()].sort(cmp) });
   }
-  return { creators, stats: { videos, creators: creators.length, minDay, maxDay } };
+  return { creators, stats: { videos, creators: creators.length, dupes, skipped, minDay, maxDay } };
 }
 
 self.onmessage = (e) => {

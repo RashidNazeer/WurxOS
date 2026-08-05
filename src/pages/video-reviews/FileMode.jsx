@@ -161,39 +161,30 @@ export default function FileMode() {
       .filter((c) => c.days.length);
   }, [parsed, runDate]);
 
-  function download(def) {
+  // Downloading a list == sending it, so it auto-advances the queue (marks those
+  // creators sent) — no separate "mark as sent" step. Idempotent per group via
+  // sentGroups, so a re-download never double-counts.
+  const [markingKey, setMarkingKey] = useState('');
+  async function download(def) {
     if (!result) return;
-    downloadHandlesCsv(applyExclude(result[def.key] || []), `${brandLabel} - ${def.ord} video review creators.csv`);
-  }
-
-  const [markingSent, setMarkingSent] = useState(false);
-  const allSent = result && FILE_DEFS.every((def) => sentGroups.has(def.key));
-
-  // APCs always send all three lists, so it's one action: advance every creator
-  // shown (across all three lists, minus excludes) by one message in a single write.
-  async function markAllSent() {
-    if (!result || allSent) return;
-    setMarkingSent(true);
+    const group = applyExclude(result[def.key] || []);
+    downloadHandlesCsv(group, `${brandLabel} - ${def.ord} video review creators.csv`);
+    if (!group.length || sentGroups.has(def.key)) return;
+    setMarkingKey(def.key); setGenErr('');
     try {
-      const updates = [];
-      for (const def of FILE_DEFS) {
-        const group = applyExclude(result[def.key] || []);   // only creators we actually messaged
-        if (!group.length) continue;
-        updates.push(...markSentUpdates({
-          creators: clippedCreators, group, runDate, startDate: runDate,
-          tracker: trackerRef.current, keyOf: (c) => creatorKey(c.creator),
-        }));
-      }
+      const updates = markSentUpdates({
+        creators: clippedCreators, group, runDate, startDate: runDate,
+        tracker: trackerRef.current, keyOf: (c) => creatorKey(c.creator),
+      });
       if (updates.length) {
         await markSent(brandId, updates);
-        // reflect locally so a re-generate won't re-show them today
         for (const u of updates) trackerRef.current.set(u.key, { sentCount: u.sentCount, lastSentDate: u.lastSentDate });
       }
-      setSentGroups(new Set(FILE_DEFS.map((def) => def.key)));
+      setSentGroups((s) => new Set(s).add(def.key));
     } catch (e) {
-      setGenErr(e?.message || 'Could not mark as sent.');
+      setGenErr(e?.message || 'Downloaded, but could not mark the list as sent — those creators may re-appear next run.');
     } finally {
-      setMarkingSent(false);
+      setMarkingKey('');
     }
   }
 
@@ -259,6 +250,13 @@ export default function FileMode() {
                 <i className="bi bi-check-circle-fill me-1" style={{ color: 'var(--success)' }} />
                 {parsed.stats.videos.toLocaleString()} videos · {parsed.stats.creators.toLocaleString()} creators · {parsed.stats.minDay} → {parsed.stats.maxDay}
                 {fileName ? <span style={{ color: 'var(--text-muted)' }}> · {fileName}</span> : null}
+                {(parsed.stats.dupes || parsed.stats.skipped) ? (
+                  <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                    {parsed.stats.dupes ? `${parsed.stats.dupes.toLocaleString()} duplicate video row${parsed.stats.dupes === 1 ? '' : 's'} (counted once)` : ''}
+                    {parsed.stats.dupes && parsed.stats.skipped ? ' · ' : ''}
+                    {parsed.stats.skipped ? `${parsed.stats.skipped.toLocaleString()} row${parsed.stats.skipped === 1 ? '' : 's'} skipped — missing creator/ID or unreadable date` : ''}
+                  </div>
+                ) : null}
               </div>
             )}
             {parseErr && <div style={{ fontSize: 12, color: 'var(--danger)' }}><i className="bi bi-exclamation-triangle me-1" />{parseErr}</div>}
@@ -271,6 +269,13 @@ export default function FileMode() {
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
               The day you're sending reviews for. We read each creator's full history to place them; videos before this day just count toward where they stand. Defaults to today (PKT).
             </span>
+            {parsed && runDate && (runDate < parsed.stats.minDay || runDate > parsed.stats.maxDay) && (
+              <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 11.5, lineHeight: 1.5,
+                background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', color: 'var(--warning)' }}>
+                <i className="bi bi-exclamation-triangle me-1" />
+                {prettyDate(runDate)} is outside this file's data ({parsed.stats.minDay} → {parsed.stats.maxDay}) — no videos fall on it, so all three lists come out empty. Pick a day within the range.
+              </div>
+            )}
           </Step>
 
           {/* Step 4 · Exclude (optional) */}
@@ -345,9 +350,12 @@ export default function FileMode() {
                         <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{count}</div>
                         <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>creator{count === 1 ? '' : 's'}</div>
                       </div>
-                      <button className="wx-btn wx-btn-ghost" onClick={() => download(def)} disabled={count === 0} title="Download CSV"
+                      <button className="wx-btn wx-btn-ghost" onClick={() => download(def)} disabled={count === 0 || markingKey === def.key}
+                        title="Download CSV — automatically marks these creators as sent"
                         style={{ flexShrink: 0, padding: '7px 14px', display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13 }}>
-                        <i className="bi bi-download" /> CSV
+                        {markingKey === def.key ? <span className="wx-spinner" style={{ width: 13, height: 13 }} />
+                          : sent ? <><i className="bi bi-check2-all" style={{ color: 'var(--success)' }} /> Sent</>
+                          : <><i className="bi bi-download" /> CSV</>}
                       </button>
                     </div>
                   );
@@ -356,16 +364,10 @@ export default function FileMode() {
 
               <div style={{ padding: '11px 14px', border: '1px dashed var(--border-default)', borderRadius: 12, background: 'var(--surface-2)', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <i className="bi bi-info-circle me-1" style={{ color: 'var(--accent)' }} />
-                Download all three lists and send them, then hit <strong>Mark all as sent</strong>. Creators who posted several new videos get their next message the following day, so run again tomorrow with a fresh file.
+                Download each list and send it — <strong>downloading a list automatically marks those creators as sent</strong>, so they advance in the queue (no extra step). Creators who posted several videos get their next message the following day, so run again tomorrow with a fresh file.
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <button className="wx-btn wx-btn-primary" onClick={markAllSent} disabled={allSent || markingSent || totalDue === 0}
-                  style={{ padding: '10px 18px', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
-                  {allSent ? <><i className="bi bi-check-lg" /> All marked sent</>
-                    : markingSent ? <><span className="wx-spinner" style={{ width: 15, height: 15 }} /> Saving…</>
-                    : <><i className="bi bi-check2-all" /> Mark all as sent</>}
-                </button>
                 <button className="wx-btn wx-btn-ghost" onClick={() => { setResult(null); setSentGroups(new Set()); }} style={{ fontSize: 13 }}>
                   <i className="bi bi-arrow-repeat me-1" /> Clear results
                 </button>
