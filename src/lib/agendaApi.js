@@ -520,10 +520,14 @@ export async function listAgendaMeetings({ status = null, statuses = null } = {}
   return data || [];
 }
 
-// OL only — materialise + notify the given week's meetings (week start
-// must be a Monday).
-export async function notifyWeek(weekStart) {
-  const { data, error } = await supabase.rpc('agenda_notify_week', { p_week_start: weekStart });
+// OL only — materialise + notify the given week's meetings (week start must be
+// a Monday). `tlIds` scopes it to specific teams (mig 308); null/empty = all
+// configured teams (the "Notify all teams" button).
+export async function notifyWeek(weekStart, tlIds = null) {
+  const { data, error } = await supabase.rpc('agenda_notify_week', {
+    p_week_start: weekStart,
+    p_tl_ids: tlIds && tlIds.length ? tlIds : null,
+  });
   if (error) throw new Error(error.message);
   return data;
 }

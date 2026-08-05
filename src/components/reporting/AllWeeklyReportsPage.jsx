@@ -17,6 +17,7 @@ import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
+import ClientMultiSelect from './ClientMultiSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 import { remindReports } from '../../lib/reportsApi';
@@ -123,7 +124,7 @@ export default function AllWeeklyReportsPage() {
 
   // Filters
   const [filterBrand, setFilterBrand] = useState('');
-  const [filterClient, setFilterClient] = useState('');
+  const [filterClients, setFilterClients] = useState([]);
   const [filterTeam, setFilterTeam] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCreator, setFilterCreator] = useState('');
@@ -246,7 +247,7 @@ export default function AllWeeklyReportsPage() {
       if (!r.weekStart) return false;
       if (!r.weekStart.startsWith(mk)) return false;
       if (filterBrand && r.brandName !== filterBrand) return false;
-      if (filterClient && clientByBrandId.get(r.brandId) !== filterClient) return false;
+      if (filterClients.length && !filterClients.includes(clientByBrandId.get(r.brandId))) return false;
       if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
       if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
       if (filterCreator && r.createdByName !== filterCreator) return false;
@@ -264,7 +265,7 @@ export default function AllWeeklyReportsPage() {
         default:         return (b.weekStart || '').localeCompare(a.weekStart || '');
       }
     });
-  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek, filterStatus, sortBy]);
+  }, [reports, calYear, calMonth, filterBrand, filterClients, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek, filterStatus, sortBy]);
 
   // Grouped by brand
   const grouped = useMemo(() => {
@@ -344,14 +345,14 @@ export default function AllWeeklyReportsPage() {
     return reports.filter(r => {
       if (!r.weekStart || !r.weekStart.startsWith(mk)) return false;
       if (filterBrand && r.brandName !== filterBrand) return false;
-      if (filterClient && clientByBrandId.get(r.brandId) !== filterClient) return false;
+      if (filterClients.length && !filterClients.includes(clientByBrandId.get(r.brandId))) return false;
       if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
       if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
       if (filterCreator && r.createdByName !== filterCreator) return false;
       if (filterWeek && String(r.week) !== filterWeek) return false;
       return true;
     });
-  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek]);
+  }, [reports, calYear, calMonth, filterBrand, filterClients, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek]);
 
   const statusStats = useMemo(() => {
     const c = { draft: 0, submitted: 0, verified: 0, approved: 0, pendingOverdue: 0, total: statusScope.length };
@@ -384,10 +385,10 @@ export default function AllWeeklyReportsPage() {
   // touch to silence unused-var lint
   void syncTick;
 
-  const hasFilters = filterBrand || filterClient || filterTeam || filterSearch || filterCreator || filterWeek || filterStatus;
+  const hasFilters = filterBrand || filterClients.length || filterTeam || filterSearch || filterCreator || filterWeek || filterStatus;
 
   const clearAllFilters = () => {
-    setFilterBrand(''); setFilterClient(''); setFilterTeam('');
+    setFilterBrand(''); setFilterClients([]); setFilterTeam('');
     setFilterSearch(''); setFilterCreator(''); setFilterWeek(''); setFilterStatus('');
   };
 
@@ -418,15 +419,8 @@ export default function AllWeeklyReportsPage() {
   const popoverFilters = [
     { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
       options: brandOptions.map(b => ({ value: b, label: b })) },
-    // Client filter — visible whenever any brand in the current
-    // result set has a client_name set. Previously gated to boss/ol
-    // only, but TLs and PCTLs equally benefit from grouping their
-    // own brands by client. Keep the data-driven length check so we
-    // don't show an empty dropdown.
-    ...(clientOptions.length > 0
-      ? [{ key: 'client', label: 'Client', value: filterClient, setValue: setFilterClient,
-          options: clientOptions.map(c => ({ value: c, label: c })) }]
-      : []),
+    // Client is now a standalone multi-select on the toolbar (ClientMultiSelect),
+    // pulled out of this popover so several clients can be viewed at once.
     ...((userRole === 'boss' || userRole === 'ol') && teamOptions.length > 0
       ? [{ key: 'team', label: 'Team', value: filterTeam, setValue: setFilterTeam,
           options: teamOptions.map(t => ({ value: t.id, label: `Team ${t.name}` })) }]
@@ -1022,6 +1016,8 @@ export default function AllWeeklyReportsPage() {
               );
             })}
           </div>
+
+          <ClientMultiSelect options={clientOptions} selected={filterClients} onChange={setFilterClients} />
 
           <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
 

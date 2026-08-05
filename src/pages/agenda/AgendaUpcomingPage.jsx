@@ -63,6 +63,7 @@ export default function AgendaUpcomingPage() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [notifying, setNotifying] = useState(false);
+  const [notifyingTl, setNotifyingTl] = useState(null);   // per-team notify in flight
   const [busyId, setBusyId]       = useState(null);
   const [flash, setFlash]         = useState('');
   const [guestEdit, setGuestEdit] = useState(null);   // the meeting whose guests the OL is changing
@@ -169,6 +170,22 @@ export default function AgendaUpcomingPage() {
     }
   }
 
+  // Notify a single team for the current week (mig 308) — for a team added or
+  // rescheduled after the rest were notified, without re-pinging everyone.
+  async function handleNotifyTeam(tlId, tlName) {
+    setNotifyingTl(tlId); setFlash('');
+    try {
+      await notifyWeek(currentWeekStart, [tlId]);
+      setFlash(`Notified ${tlName || 'the team'} for this week.`);
+      reloadMeetings();
+      setTimeout(() => setFlash(''), 4000);
+    } catch (e) {
+      setFlash('Failed: ' + (e.message || 'unknown'));
+    } finally {
+      setNotifyingTl(null);
+    }
+  }
+
   // Start (upcoming) / Resume (paused) / Reopen (completed) all flip the
   // meeting to 'ongoing' via the same RPC, then drop the OL into its room.
   async function goLive(meetingId) {
@@ -219,10 +236,11 @@ export default function AgendaUpcomingPage() {
         {isOL && (
           <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 8, fontSize: '0.8rem' }}
-            onClick={handleNotify} disabled={notifying || configuredCount === 0}>
+            title="Notify every configured team for this week"
+            onClick={handleNotify} disabled={notifying || notifyingTl || configuredCount === 0}>
             {notifying
               ? <><span className="spinner-border spinner-border-sm" /> Notifying…</>
-              : <><i className="bi bi-megaphone" /> Notify Teams</>}
+              : <><i className="bi bi-megaphone" /> Notify all teams</>}
           </button>
         )}
       </div>
@@ -254,9 +272,12 @@ export default function AgendaUpcomingPage() {
                 today={today}
                 now={now}
                 busyId={busyId}
+                notifying={notifying}
+                notifyingTl={notifyingTl}
                 onStart={goLive}
                 onOpen={openRoom}
                 onEditGuests={setGuestEdit}
+                onNotifyTeam={handleNotifyTeam}
               />
             </div>
           ))}
@@ -343,7 +364,7 @@ function GuestEditModal({ meeting, teams, tlName, onClose, onSave }) {
 }
 
 // ── Week card ───────────────────────────────────────────────────────────
-function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, today, now, busyId, onStart, onOpen, onEditGuests }) {
+function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, today, now, busyId, notifying, notifyingTl, onStart, onOpen, onEditGuests, onNotifyTeam }) {
   // Who sees which rows. An OL sees every team. Everyone else sees the UNION
   // of their own team and the teams they were invited to sit in on — so a TL
   // who is also a guest keeps their own meeting. Anyone who is neither sees
@@ -363,8 +384,12 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
     ? card.rows
     : card.rows.filter((r) => (myTeamTlId && r.tlId === myTeamTlId) || (isGuest && guestSees(r)));
 
-  const notifiedRows = card.rows.filter((r) => r.meeting);
-  const allDone = notifiedRows.length > 0 && notifiedRows.every((r) => r.meeting.status === 'completed');
+  // The week reads "done" only when EVERY configured team is notified AND
+  // completed. Basing this on all rows (not just notified ones) means a partial
+  // per-team notify — some teams still un-notified — keeps the week "current",
+  // so its per-team "Notify this team" buttons and the Current-Week highlight
+  // stay coherent instead of showing a green "Completed" over un-met teams.
+  const allDone = card.rows.length > 0 && card.rows.every((r) => r.meeting && r.meeting.status === 'completed');
   // Once any meeting in the week has started or finished, the week is
   // "in progress" — the remaining meetings no longer wait for their date.
   const weekProgressed = card.rows.some(
@@ -533,9 +558,15 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                   </button>
                 )}
                 {card.isCurrent && isOL && mStatus === 'not_notified' && (
-                  <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
-                    <i className="bi bi-megaphone me-1" />Use “Notify Teams” to open this week.
-                  </div>
+                  <button className="btn btn-sm btn-outline-dark w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    disabled={notifying || !!notifyingTl}
+                    title={`Notify ${r.tlName} for this week`}
+                    onClick={() => onNotifyTeam(r.tlId, r.tlName)}>
+                    {notifyingTl === r.tlId
+                      ? <span className="spinner-border spinner-border-sm" />
+                      : <><i className="bi bi-megaphone" /> Notify this team</>}
+                  </button>
                 )}
               </div>
             );

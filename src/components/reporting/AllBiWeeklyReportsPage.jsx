@@ -16,6 +16,7 @@ import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
+import ClientMultiSelect from './ClientMultiSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 
@@ -59,7 +60,7 @@ export default function AllBiWeeklyReportsPage() {
 
   // Filters
   const [filterBrand, setFilterBrand] = useState('');
-  const [filterClient, setFilterClient] = useState('');
+  const [filterClients, setFilterClients] = useState([]);
   const [filterTeam, setFilterTeam] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCreator, setFilterCreator] = useState('');
@@ -171,7 +172,7 @@ export default function AllBiWeeklyReportsPage() {
       if (!r.periodStart) return false;
       if (!r.periodStart.startsWith(mk)) return false;
       if (filterBrand && r.brandName !== filterBrand) return false;
-      if (filterClient && clientByBrandId.get(r.brandId) !== filterClient) return false;
+      if (filterClients.length && !filterClients.includes(clientByBrandId.get(r.brandId))) return false;
       if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
       if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
       if (filterCreator && r.createdByName !== filterCreator) return false;
@@ -179,7 +180,7 @@ export default function AllBiWeeklyReportsPage() {
       if (filterStatus && getReportStatus(r) !== filterStatus) return false;
       return true;
     }).sort((a, b) => (b.periodStart || '').localeCompare(a.periodStart || ''));  // newest first
-  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterPeriod, filterStatus]);
+  }, [reports, calYear, calMonth, filterBrand, filterClients, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterPeriod, filterStatus]);
 
   // Grouped by brand
   const grouped = useMemo(() => {
@@ -213,20 +214,17 @@ export default function AllBiWeeklyReportsPage() {
     return { totalGmv, totalOrders, reportCount, brandCount: brandSet.size, pendingApproval, approved, currency };
   }, [filtered]);
 
-  const hasFilters = filterBrand || filterClient || filterTeam || filterSearch || filterCreator || filterPeriod || filterStatus;
+  const hasFilters = filterBrand || filterClients.length || filterTeam || filterSearch || filterCreator || filterPeriod || filterStatus;
 
   const clearAllFilters = () => {
-    setFilterBrand(''); setFilterClient(''); setFilterTeam('');
+    setFilterBrand(''); setFilterClients([]); setFilterTeam('');
     setFilterSearch(''); setFilterCreator(''); setFilterPeriod(''); setFilterStatus('');
   };
 
   const popoverFilters = [
     { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
       options: brandOptions.map(b => ({ value: b, label: b })) },
-    ...((userRole === 'boss' || userRole === 'ol') && clientOptions.length > 0
-      ? [{ key: 'client', label: 'Client', value: filterClient, setValue: setFilterClient,
-          options: clientOptions.map(c => ({ value: c, label: c })) }]
-      : []),
+    // Client is now a standalone multi-select on the toolbar (ClientMultiSelect).
     ...((userRole === 'boss' || userRole === 'ol') && teamOptions.length > 0
       ? [{ key: 'team', label: 'Team', value: filterTeam, setValue: setFilterTeam,
           options: teamOptions.map(t => ({ value: t.id, label: `Team ${t.name}` })) }]
@@ -730,6 +728,10 @@ export default function AllBiWeeklyReportsPage() {
               <input type="text" className="form-control form-control-sm" placeholder="Search brand…"
                 style={{ paddingLeft: 28, borderRadius: 8 }} value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
             </div>
+            {(userRole === 'boss' || userRole === 'ol') && (
+              <ClientMultiSelect options={clientOptions} selected={filterClients} onChange={setFilterClients} />
+            )}
+
             <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
             {hasFilters && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
