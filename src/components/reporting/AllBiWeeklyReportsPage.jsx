@@ -460,9 +460,13 @@ export default function AllBiWeeklyReportsPage() {
             padding: '12px 28px 8px', margin: '0 -28px 10px',
           }}>
           <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <button className="btn btn-sm btn-link text-muted p-0" onClick={() => setViewReport(null)}>
-            <i className="bi bi-arrow-left me-1" /> Back to all reports
-          </button>
+          <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
+            <button className="btn btn-sm btn-link text-muted p-0 flex-shrink-0" onClick={() => setViewReport(null)}>
+              <i className="bi bi-arrow-left me-1" /> Back to all reports
+            </button>
+            <span className="text-muted flex-shrink-0" aria-hidden="true">·</span>
+            <span className="fw-bold text-truncate" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }} title={viewReport.brandName}>{viewReport.brandName}</span>
+          </div>
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <StatusBadge status={rStatus} />
             {canEdit && (
