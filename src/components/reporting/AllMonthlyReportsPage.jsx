@@ -606,7 +606,7 @@ export default function AllMonthlyReportsPage() {
 
       {/* Stats */}
       <div className="row g-3 mb-4">
-        <div className="col-6 col-md-4 col-xl-2">
+        <div className="col-6 col-md-4 col-xl">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -620,7 +620,7 @@ export default function AllMonthlyReportsPage() {
             </div>
           </div>
         </div>
-        <div className="col-6 col-md-4 col-xl-2">
+        <div className="col-6 col-md-4 col-xl">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -634,7 +634,7 @@ export default function AllMonthlyReportsPage() {
             </div>
           </div>
         </div>
-        <div className="col-6 col-md-4 col-xl-2">
+        <div className="col-6 col-md-4 col-xl">
           <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -652,7 +652,7 @@ export default function AllMonthlyReportsPage() {
         </div>
 
         {/* Drafts — click to filter; OL/Boss nudge the APC authors to submit */}
-        <div className="col-6 col-md-4 col-xl-2">
+        <div className="col-6 col-md-4 col-xl">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12, cursor: 'pointer', border: filterStatus === 'draft' ? '1.5px solid var(--text-secondary)' : undefined }}
             onClick={() => setFilterStatus(f => f === 'draft' ? '' : 'draft')}
             title="Click to show only draft reports">
@@ -681,7 +681,7 @@ export default function AllMonthlyReportsPage() {
         </div>
 
         {/* Submitted — click to filter; OL/Boss nudge the TLs to verify */}
-        <div className="col-6 col-md-4 col-xl-2">
+        <div className="col-6 col-md-4 col-xl">
           <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12, cursor: 'pointer', border: filterStatus === 'submitted' ? '1.5px solid var(--info)' : undefined }}
             onClick={() => setFilterStatus(f => f === 'submitted' ? '' : 'submitted')}
             title="Click to show only submitted reports">
@@ -709,38 +709,41 @@ export default function AllMonthlyReportsPage() {
           </div>
         </div>
 
-        {userRole === 'ol' ? (
-          <div className="col-6 col-md-4 col-xl-2">
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer' }}
-              onClick={() => setFilterStatus(f => f === 'verified' ? '' : 'verified')}>
-              <div className="card-body p-3 d-flex align-items-center gap-2">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
-                  <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
-                </div>
-                <div>
-                  <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{statusStats.verified}</div>
-                  <div className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 600 }}>Pending Approval</div>
-                </div>
+        {/* Pending Approval — verified, awaiting OL approval (click to filter) */}
+        <div className="col-6 col-md-4 col-xl">
+          <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12, cursor: 'pointer', border: filterStatus === 'verified' ? '1.5px solid #7c3aed' : undefined }}
+            onClick={() => setFilterStatus(f => f === 'verified' ? '' : 'verified')}
+            title="Click to show reports awaiting approval">
+            <div className="card-body p-3 d-flex align-items-center gap-2">
+              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
+                style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
+                <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{statusStats.verified}</div>
+                <div className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 600 }}>Pending Approval</div>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="col-6 col-md-4 col-xl-2">
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3 d-flex align-items-center gap-2">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
-                  <i className="bi bi-shield-check-fill" style={{ color: 'var(--success)' }} />
-                </div>
-                <div>
-                  <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{statusStats.approved}</div>
-                  <div className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 600 }}>Approved</div>
-                </div>
+        </div>
+
+        {/* Approved — click to filter */}
+        <div className="col-6 col-md-4 col-xl">
+          <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12, cursor: 'pointer', border: filterStatus === 'approved' ? '1.5px solid var(--success)' : undefined }}
+            onClick={() => setFilterStatus(f => f === 'approved' ? '' : 'approved')}
+            title="Click to show approved reports">
+            <div className="card-body p-3 d-flex align-items-center gap-2">
+              <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
+                style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
+                <i className="bi bi-shield-check-fill" style={{ color: 'var(--success)' }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{statusStats.approved}</div>
+                <div className="text-muted" style={{ fontSize: '0.65rem', fontWeight: 600 }}>Approved</div>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Year navigator + filters */}

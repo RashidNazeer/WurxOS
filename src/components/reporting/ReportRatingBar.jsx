@@ -21,12 +21,14 @@ function StarPicker({ value, onChange, disabled }) {
   );
 }
 
-// One rating row (label + stars + save state), with an optimistic save.
-function RatingRow({ label, hint, value, onSave }) {
+// One rating row (label + stars + save state). Editable (optimistic save) or, when
+// `readOnly`, a view-only display of whoever else set the rating.
+function RatingRow({ label, hint, value, onSave, readOnly = false }) {
   const [stars, setStars] = useState(value ?? null);
   const [state, setState] = useState('idle');
   useEffect(() => { setStars(value ?? null); }, [value]);
   async function pick(v) {
+    if (readOnly) return;
     setStars(v); setState('saving');
     try { await onSave(v); setState('saved'); setTimeout(() => setState('idle'), 1600); }
     catch { setState('error'); }
@@ -39,12 +41,16 @@ function RatingRow({ label, hint, value, onSave }) {
         {hint && <div className="text-muted" style={{ fontSize: '0.64rem' }}>{hint}</div>}
       </div>
       <div className="d-flex align-items-center gap-2">
-        <StarPicker value={stars} onChange={pick} />
-        <span style={{ fontSize: '0.66rem', minWidth: 46, color: state === 'error' ? 'var(--danger)' : 'var(--text-muted)' }}>
-          {state === 'saving' && <><span className="spinner-border spinner-border-sm me-1" style={{ width: 10, height: 10 }} />…</>}
-          {state === 'saved' && <><i className="bi bi-check-circle-fill me-1 text-success" />Saved</>}
-          {state === 'error' && <><i className="bi bi-exclamation-triangle me-1" />Failed</>}
-          {state === 'idle' && stars != null && <span>{stars}/5</span>}
+        <StarPicker value={stars} onChange={pick} disabled={readOnly} />
+        <span style={{ fontSize: '0.66rem', minWidth: 52, textAlign: 'right', color: state === 'error' ? 'var(--danger)' : 'var(--text-muted)' }}>
+          {readOnly
+            ? (stars != null ? <strong style={{ color: 'var(--text-secondary)' }}>{stars}/5</strong> : <span>not rated</span>)
+            : (<>
+                {state === 'saving' && <><span className="spinner-border spinner-border-sm me-1" style={{ width: 10, height: 10 }} />…</>}
+                {state === 'saved' && <><i className="bi bi-check-circle-fill me-1 text-success" />Saved</>}
+                {state === 'error' && <><i className="bi bi-exclamation-triangle me-1" />Failed</>}
+                {state === 'idle' && stars != null && <span>{stars}/5</span>}
+              </>)}
         </span>
       </div>
     </div>
@@ -67,10 +73,13 @@ export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRa
   // The APC star is the Team Lead's (verifier's) job — shown to the brand-owner TL
   // (+ Boss as super-admin), NOT to the OL, whose job is the TL star below.
   const canRateApc = (isBrandOwner || isBoss) && rateable;
+  // The OL/dev can't edit the APC star (that's the TL's call) but should SEE
+  // whether — and how — the Team Lead rated it.
+  const showApcReadonly = !canRateApc && isAdmin && rateable;
   // The TL star is the OL's job at approval — available from the verified stage
   // (when the report is on the OL's desk for approval), through approved.
   const canRateTl = isAdmin && rateable;
-  if (!canRateApc && !canRateTl) return null;
+  if (!canRateApc && !showApcReadonly && !canRateTl) return null;
 
   return (
     <div className="d-flex flex-column gap-2 mt-2">
@@ -82,10 +91,18 @@ export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRa
           onSave={async (v) => { await rateApcReport(report.id, v); onRated?.({ ...report, apc_stars: v }); }}
         />
       )}
+      {showApcReadonly && (
+        <RatingRow
+          label="Report quality (APC)"
+          hint="The Team Lead's rating of this report (feeds the APC's score) — view only."
+          value={report.apc_stars}
+          readOnly
+        />
+      )}
       {canRateTl && (
         <RatingRow
           label="TL reporting"
-          hint="Your 0–5★ on this approved report feeds the Team Lead's reporting score."
+          hint="Your 0–5★ on this report feeds the Team Lead's reporting score."
           value={report.tl_stars}
           onSave={async (v) => { await rateTlReport(report.id, v); onRated?.({ ...report, tl_stars: v }); }}
         />
