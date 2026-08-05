@@ -666,14 +666,6 @@ export default function AllWeeklyReportsPage() {
                 <i className="bi bi-calendar-event" /> Edit Dates
               </button>
             )}
-            {canSubmitAsApc && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--info)', color: 'white', border: 'none' }}
-                onClick={() => handleSubmitAsApc(viewReport)}
-                title="Move this draft to submitted (acting on behalf of the APC)">
-                <i className="bi bi-send-fill" /> Submit as APC
-              </button>
-            )}
             {canVerifyAsTl && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
                 style={{ borderRadius: 8, fontSize: '0.78rem', background: '#7c3aed', color: 'white', border: 'none' }}
@@ -718,17 +710,29 @@ export default function AllWeeklyReportsPage() {
                 </button>
               </>
             )}
-            {canDelete && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--danger)', color: 'white', border: 'none' }}
-                onClick={() => handleDeleteReport(viewReport)}
-                title="Permanently delete this report">
-                <i className="bi bi-trash3" /> Delete
-              </button>
+            {/* Most-used report actions as quick icon buttons. */}
+            {reportActions && (
+              <>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                  style={{ borderRadius: 8, fontSize: '0.9rem', color: reportActions.highlighterActive ? 'var(--warning)' : undefined, borderColor: reportActions.highlighterActive ? 'var(--warning)' : undefined }}
+                  onClick={reportActions.onToggleHighlighter}
+                  title={reportActions.highlighterActive ? 'Highlighter on — click to stop' : 'Highlighter'}>
+                  <i className="bi bi-highlighter" />
+                </button>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                  style={{ borderRadius: 8, fontSize: '0.9rem' }}
+                  onClick={reportActions.onExportPdf} disabled={reportActions.pdfBusy}
+                  title={reportActions.pdfBusy ? 'Exporting PDF…' : 'Export PDF'}>
+                  <i className={`bi ${reportActions.pdfBusy ? 'bi-hourglass-split' : 'bi-file-earmark-pdf'}`} />
+                </button>
+              </>
             )}
-            {/* Highlighter / Export PDF / Export Word — lifted from the
-                report view so they stay reachable while scrolling. */}
-            <ReportActionsMenu actions={reportActions} />
+            {/* Less-used / destructive actions tucked into the menu. */}
+            <ReportActionsMenu actions={reportActions} hidePrimaryExports
+              extraItems={[
+                canSubmitAsApc && { key: 'submit', label: 'Submit as APC', icon: 'bi-send-fill', iconColor: 'var(--info)', onClick: () => handleSubmitAsApc(viewReport) },
+                canDelete && { key: 'delete', label: 'Delete report', icon: 'bi-trash3', iconColor: 'var(--danger)', danger: true, onClick: () => handleDeleteReport(viewReport) },
+              ]} />
           </div>
           </div>
           <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} type="weekly" />
