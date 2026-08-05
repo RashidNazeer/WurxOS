@@ -500,7 +500,7 @@ export default function App() {
               <Route
                 path="/chat"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer']}>
                     <ChatPage />
                   </RoleGuard>
                 }

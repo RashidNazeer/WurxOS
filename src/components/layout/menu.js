@@ -356,6 +356,7 @@ export const MENUS = {
     ATTENDANCE_ITEM,
     { label: 'Leave', icon: CalendarIcon, to: '/leave', category: 'leave' },
     MY_COMPENSATION_ITEM,
+    CHAT_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
   ],
