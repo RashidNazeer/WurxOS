@@ -4,6 +4,9 @@ import {
   listMeetingAttendance, listPresentations, listTaskReviews, listAgendaTeams,
   getMyGuestTeams, isGuestOf,
 } from '../../lib/agendaApi';
+import { listWeeklyRatingsForMeeting, weeklyOverall, getWeeklyRatingsEnabled } from '../../lib/weeklyRatingsApi';
+import { getLevelTokens } from '../../lib/performanceApi';
+import RateApcModal from './RateApcModal';
 
 // Prior Meetings — a single completed meeting's record. Role-based:
 //   APC → their own evaluation only
@@ -73,6 +76,21 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
   const [team, setTeam]               = useState(null);
   const [loading, setLoading]         = useState(true);
 
+  // OL catch-up rating: which APCs are already scored for this meeting, the
+  // trial/live switch (drives the modal's "does this count yet" note), and the
+  // APC currently open in the rating modal.
+  const [ratings, setRatings]         = useState([]);
+  const [weeklyEnabled, setWeeklyEnabled] = useState(false);
+  const [rateTarget, setRateTarget]   = useState(null);
+
+  const reloadRatings = () => {
+    if (!isOL) return;
+    listWeeklyRatingsForMeeting(meeting.id).then((r) => setRatings(r || [])).catch(() => {});
+  };
+  const reloadPresentations = () => {
+    listPresentations(meeting.id).then((p) => setPresentations(p || [])).catch(() => {});
+  };
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -94,6 +112,24 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [meeting.id, meeting.tl_id]);
+
+  // OL-only: the weekly checkpoint ratings for this meeting + the trial switch.
+  useEffect(() => {
+    if (!isOL) return undefined;
+    let cancelled = false;
+    Promise.all([listWeeklyRatingsForMeeting(meeting.id), getWeeklyRatingsEnabled()])
+      .then(([rts, cfg]) => {
+        if (cancelled) return;
+        setRatings(rts || []);
+        setWeeklyEnabled(!!cfg?.enabled);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isOL, meeting.id]);
+
+  const ratingByApc = useMemo(() => {
+    const m = {}; ratings.forEach((r) => { m[r.apc_id] = r; }); return m;
+  }, [ratings]);
 
   const attByApc  = useMemo(() => {
     const m = {}; attendance.forEach((a) => { m[a.apc_id] = a; }); return m;
@@ -128,6 +164,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
 
   const presentCount = attendance.filter((a) => a.status === 'present').length;
   const absentCount  = attendance.filter((a) => a.status === 'absent').length;
+  const ratedCount   = useMemo(() => roster.filter((a) => ratingByApc[a.id]).length, [roster, ratingByApc]);
   const teamName = team?.tl?.display_name || meeting.tl?.display_name || 'Team';
   const duration = (meeting.started_at && meeting.finished_at)
     ? Math.max(1, Math.round((new Date(meeting.finished_at) - new Date(meeting.started_at)) / 60000))
@@ -197,10 +234,26 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
           )}
 
           {/* Evaluations */}
-          <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
-            <i className="bi bi-clipboard-data text-primary" />
-            {isApc ? 'Your evaluation' : 'APC evaluations'}
+          <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+            <div className="fw-semibold small d-flex align-items-center gap-2">
+              <i className="bi bi-clipboard-data text-primary" />
+              {isApc ? 'Your evaluation' : 'APC evaluations'}
+            </div>
+            {isOL && roster.length > 0 && (
+              <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
+                style={{ background: ratedCount >= roster.length ? 'var(--success-soft)' : 'var(--warning-soft)',
+                  color: ratedCount >= roster.length ? 'var(--success)' : 'var(--warning)', fontSize: '0.66rem', fontWeight: 800 }}
+                title="Weekly checkpoint ratings scored for this meeting">
+                <i className={`bi ${ratedCount >= roster.length ? 'bi-check-circle-fill' : 'bi-bar-chart-fill'}`} />
+                {ratedCount}/{roster.length} rated
+              </span>
+            )}
           </div>
+          {isOL && roster.length > 0 && ratedCount < roster.length && (
+            <div className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
+              <i className="bi bi-info-circle me-1" />Missed someone in the meeting? You can score anyone here — mark them presented if they forgot to.
+            </div>
+          )}
           {roster.length === 0 ? (
             <div className="text-muted small mb-3" style={{ fontSize: '0.8rem' }}>No APC records for this meeting.</div>
           ) : (
@@ -211,6 +264,9 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
                   reviews={reviewsByApc[a.id] || []}
                   attStatus={attByApc[a.id]?.status}
                   order={orderByApc[a.id]}
+                  isOL={isOL}
+                  rating={ratingByApc[a.id]}
+                  onRate={() => setRateTarget(a)}
                   defaultOpen={isApc || roster.length === 1}
                   collapsible={!isApc && roster.length > 1} />
               ))}
@@ -260,6 +316,19 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
           )}
         </>
       )}
+
+      {isOL && rateTarget && (
+        <RateApcModal
+          apc={rateTarget}
+          meeting={meeting}
+          weekIndex={weekIndex}
+          presented={presByApc[rateTarget.id]?.status === 'done' || presByApc[rateTarget.id]?.status === 'presenting'}
+          weeklyEnabled={weeklyEnabled}
+          onClose={() => { setRateTarget(null); setTimeout(reloadRatings, 700); }}
+          onChanged={reloadRatings}
+          onMarkedPresented={reloadPresentations}
+        />
+      )}
     </div>
   );
 }
@@ -276,36 +345,64 @@ function Info({ icon, label, value }) {
 }
 
 // ── Per-APC record ──────────────────────────────────────────────────────
-function ApcRecord({ apc, presentation, reviews, attStatus, order, defaultOpen, collapsible }) {
+function ApcRecord({ apc, presentation, reviews, attStatus, order, isOL, rating, onRate, defaultOpen, collapsible }) {
   const [open, setOpen] = useState(defaultOpen);
   const presented = presentation?.status === 'done' || presentation?.status === 'presenting';
+  const checkpoint = rating ? weeklyOverall(rating.metrics) : null;
+  const clvl = checkpoint != null ? getLevelTokens(checkpoint) : null;
 
   return (
     <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-      <button type="button"
-        onClick={() => collapsible && setOpen((o) => !o)}
-        className="card-body p-3 border-0 w-100 text-start d-flex align-items-center gap-2"
-        style={{ background: 'transparent', cursor: collapsible ? 'pointer' : 'default' }}>
-        {collapsible && <i className={`bi bi-chevron-${open ? 'down' : 'right'} text-muted`} style={{ fontSize: '0.72rem' }} />}
-        <span className="fw-semibold" style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{apc.display_name}</span>
-        <span className="rounded-pill px-2" style={{
-          background: presented ? 'var(--success-soft)' : 'var(--surface-2)',
-          color: presented ? 'var(--success)' : 'var(--text-secondary)',
-          fontSize: '0.6rem', fontWeight: 700,
-        }}>
-          {presented ? `Presented${order ? ` · #${order}` : ''}` : 'Did not present'}
-        </span>
-        {attStatus && (
-          <span className="rounded-pill px-2" style={{
-            background: attStatus === 'present' ? 'var(--success-soft)' : 'var(--danger-soft)',
-            color: attStatus === 'present' ? 'var(--success)' : 'var(--danger)', fontSize: '0.6rem', fontWeight: 700,
+      <div className="card-body p-3 d-flex align-items-center gap-2">
+        <button type="button"
+          onClick={() => collapsible && setOpen((o) => !o)}
+          className="border-0 p-0 text-start d-flex align-items-center gap-2 flex-grow-1 min-w-0"
+          style={{ background: 'transparent', cursor: collapsible ? 'pointer' : 'default' }}>
+          {collapsible && <i className={`bi bi-chevron-${open ? 'down' : 'right'} text-muted`} style={{ fontSize: '0.72rem' }} />}
+          <span className="fw-semibold text-truncate" style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{apc.display_name}</span>
+          <span className="rounded-pill px-2 flex-shrink-0" style={{
+            background: presented ? 'var(--success-soft)' : 'var(--surface-2)',
+            color: presented ? 'var(--success)' : 'var(--text-secondary)',
+            fontSize: '0.6rem', fontWeight: 700,
           }}>
-            {attStatus === 'present' ? 'Present' : 'Absent'}
+            {presented ? `Presented${order ? ` · #${order}` : ''}` : 'Did not present'}
           </span>
-        )}
-        <span className="ms-auto" />
+          {attStatus && (
+            <span className="rounded-pill px-2 flex-shrink-0" style={{
+              background: attStatus === 'present' ? 'var(--success-soft)' : 'var(--danger-soft)',
+              color: attStatus === 'present' ? 'var(--success)' : 'var(--danger)', fontSize: '0.6rem', fontWeight: 700,
+            }}>
+              {attStatus === 'present' ? 'Present' : 'Absent'}
+            </span>
+          )}
+        </button>
         {presentation?.overall_rating && <RatingChip value={presentation.overall_rating} />}
-      </button>
+        {isOL && (
+          checkpoint != null ? (
+            <span className="rounded-pill px-2 py-1 flex-shrink-0" style={{ background: clvl.bg, color: clvl.color, fontSize: '0.62rem', fontWeight: 800 }}
+              title="Weekly checkpoint score">
+              {checkpoint}/100
+            </span>
+          ) : (
+            <span className="rounded-pill px-2 py-1 flex-shrink-0" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.6rem', fontWeight: 700 }}>
+              Not rated
+            </span>
+          )
+        )}
+        {isOL && (
+          <button type="button" onClick={onRate}
+            className="btn btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
+            style={{
+              borderRadius: 8, fontSize: '0.68rem', fontWeight: 700,
+              background: checkpoint != null ? 'var(--accent-soft)' : 'var(--accent)',
+              color: checkpoint != null ? 'var(--accent)' : 'var(--on-accent)',
+              border: checkpoint != null ? '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' : 'none',
+            }}>
+            <i className={`bi ${checkpoint != null ? 'bi-pencil' : 'bi-star'}`} />
+            {checkpoint != null ? 'Edit' : 'Rate'}
+          </button>
+        )}
+      </div>
 
       {open && (
         <div className="px-3 pb-3">

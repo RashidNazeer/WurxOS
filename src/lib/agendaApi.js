@@ -633,6 +633,16 @@ export async function reopenPresentation(meetingId, apcId) {
   return data;
 }
 
+// OL — mark an APC as presented for a meeting that has already started/ended
+// (mig 307). For the APC who forgot to click Present or was absent: creates the
+// 'done' presentation row so the OL can score their week from Prior Meetings.
+// Record fix only — no score/salary effect. Idempotent, keeps any prior review.
+export async function markPresented(meetingId, apcId) {
+  const { data, error } = await supabase.rpc('agenda_mark_presented', { p_meeting: meetingId, p_apc: apcId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // OL — the per-APC overall rating + summary on the presentation row.
 export async function updatePresentationReview(presentationId, { rating, summary }) {
   const { data: auth } = await supabase.auth.getUser();
