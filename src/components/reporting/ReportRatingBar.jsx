@@ -61,9 +61,15 @@ function RatingRow({ label, hint, value, onSave }) {
 export default function ReportRatingBar({ report, viewerRole, isBrandOwner, onRated }) {
   if (!report) return null;
   const isAdmin = viewerRole === 'ol' || viewerRole === 'boss' || viewerRole === 'developer';
+  const isBoss = viewerRole === 'boss';
   const status = report.status || 'draft';
-  const canRateApc = (isBrandOwner || isAdmin) && (status === 'verified' || status === 'approved');
-  const canRateTl = isAdmin && status === 'approved';
+  const rateable = status === 'verified' || status === 'approved';
+  // The APC star is the Team Lead's (verifier's) job — shown to the brand-owner TL
+  // (+ Boss as super-admin), NOT to the OL, whose job is the TL star below.
+  const canRateApc = (isBrandOwner || isBoss) && rateable;
+  // The TL star is the OL's job at approval — available from the verified stage
+  // (when the report is on the OL's desk for approval), through approved.
+  const canRateTl = isAdmin && rateable;
   if (!canRateApc && !canRateTl) return null;
 
   return (
