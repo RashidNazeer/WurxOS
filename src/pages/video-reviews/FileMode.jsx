@@ -103,6 +103,14 @@ export default function FileMode() {
     setParsed(null); setFileName(''); setParseErr('');
   }, [brandId]);
 
+  // Snap the run date into the uploaded file's range so it never sits on a day
+  // with no data (which would silently produce empty lists).
+  useEffect(() => {
+    if (!parsed) return;
+    const { minDay, maxDay } = parsed.stats;
+    setRunDate((d) => (d < minDay ? minDay : d > maxDay ? maxDay : d));
+  }, [parsed]);
+
   function onFile(e) {
     const f = e.target.files?.[0];
     e.target.value = '';
@@ -264,8 +272,17 @@ export default function FileMode() {
 
           {/* Step 3 · Date */}
           <Step n={3} title="Sending reviews for">
-            <input type="date" className="wx-input" value={runDate} max={maxDate} disabled={generating}
+            <input type="date" className="wx-input" value={runDate}
+              min={parsed ? parsed.stats.minDay : undefined}
+              max={parsed ? (parsed.stats.maxDay < maxDate ? parsed.stats.maxDay : maxDate) : maxDate}
+              disabled={generating}
               onChange={(e) => { setRunDate(e.target.value); setResult(null); setSentGroups(new Set()); }} />
+            {parsed && (
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <i className="bi bi-calendar-range" style={{ color: 'var(--accent)' }} />
+                This file covers <strong>{parsed.stats.minDay}</strong> → <strong>{parsed.stats.maxDay}</strong> — pick a day inside this range.
+              </div>
+            )}
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
               The day you're sending reviews for. We read each creator's full history to place them; videos before this day just count toward where they stand. Defaults to today (PKT).
             </span>
