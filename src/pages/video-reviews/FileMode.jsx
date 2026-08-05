@@ -103,12 +103,13 @@ export default function FileMode() {
     setParsed(null); setFileName(''); setParseErr('');
   }, [brandId]);
 
-  // Snap the run date into the uploaded file's range so it never sits on a day
-  // with no data (which would silently produce empty lists).
+  // Snap the run date into the uploaded file's range. When today is outside the
+  // file (a backlog upload), start at the EARLIEST day so the first run catches
+  // creators from the beginning — not the last day, where everyone's already done.
   useEffect(() => {
     if (!parsed) return;
     const { minDay, maxDay } = parsed.stats;
-    setRunDate((d) => (d < minDay ? minDay : d > maxDay ? maxDay : d));
+    setRunDate((d) => (d < minDay || d > maxDay ? minDay : d));
   }, [parsed]);
 
   function onFile(e) {
