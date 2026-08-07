@@ -8,6 +8,7 @@ import {
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
   applyAttendanceAutofill, fetchOlBrandStatus,
 } from '../../lib/incentivesApi';
+import BrandChip from './BrandChip';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -451,6 +452,7 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="small fw-semibold">{item.text || '—'}</div>
+            {item.brandName && <div className="mt-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>+{fmtN(item.amount)} PKR</div>
             {item.targetValue > 0 && (
               <div className="d-flex flex-wrap gap-3 mt-1" style={{ fontSize: '0.82rem' }}>
@@ -769,9 +771,11 @@ export default function OLIncentivesPage() {
   const apcs = allUsers.filter(u => !u.userType || u.userType === 'apc');
   const ipcs = allUsers.filter(u => u.userType === 'ipc');
   const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers : tab === 'ols' ? olUsers : [];
-  // TL and OL incentives are the Boss's to manage — the OL sees them read-only.
-  // (Server-side too: mig 301 stops an OL verifying/editing any OL/admin row.)
-  const readOnly = tab === 'tls' || tab === 'ols';
+  // The OL manages APC/IPC and TL incentives. OL incentives are the Boss's to
+  // manage, so only the OL tab is read-only here. (Server-side too: mig 301 lets an
+  // OL write/verify any target except roles ol/developer/boss, and hard-locks the
+  // OL/admin rows — so the TL tab being editable is already backed by RLS.)
+  const readOnly = tab === 'ols';
   const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : tab === 'tls' ? 'TLs' : 'OLs';
   const roleWord = tab === 'apcs' ? 'APC' : tab === 'ipcs' ? 'IPC' : tab === 'tls' ? 'TL' : tab === 'ols' ? 'OL' : '';
 
@@ -1185,9 +1189,9 @@ export default function OLIncentivesPage() {
         <UserDetailsModal
           rec={detailsTarget.rec}
           user={detailsTarget.user}
-          // BOTH the TL and OL sections are read-only for the OL (Boss-managed).
-          // Use the section's readOnly flag, not just 'ols', or the TL Details
-          // modal would still expose Verify/Edit/toggle for a TL's plan.
+          // Only the OL section is read-only (Boss-managed). Drive off the section's
+          // readOnly flag so the OL Details modal keeps hiding Verify/Edit/toggle,
+          // while the TL modal now exposes them (OL manages TL incentives).
           readOnly={readOnly}
           onClose={() => setDetailsTarget(null)}
           onToggleItem={handleToggleItem}

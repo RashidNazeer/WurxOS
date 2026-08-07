@@ -4,6 +4,7 @@ import {
   getIncentives, updateIncentivesProgress, notifyIncentiveEmployee, autoComplete,
 } from '../../lib/incentivesApi';
 import { listBrandsForApc } from '../../lib/agendaApi';
+import BrandChip from './BrandChip';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -55,6 +56,7 @@ function DetailsModal({ record, items, onClose }) {
         <div className="d-flex align-items-start justify-content-between gap-2 mb-1">
           <div style={{ minWidth: 0 }}>
             <div className="fw-semibold small">{item.text || '—'}</div>
+            {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted" style={{ fontSize: '0.7rem' }}>
               Compensation: <strong style={{ color }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</strong>
             </div>

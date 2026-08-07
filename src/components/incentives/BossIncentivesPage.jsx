@@ -6,6 +6,7 @@ import {
   verifyIncentives, clearIncentivePayout,
   resetAndRoll,
 } from '../../lib/incentivesApi';
+import BrandChip from './BrandChip';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ function DetailsModal({ rec, userName, onClose }) {
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div>
             <div className="small fw-semibold">{item.text || '—'}</div>
+            {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted" style={{ fontSize: '0.68rem' }}>
               +{(Number(item.amount) || 0).toLocaleString()} PKR
               {item.targetValue > 0 && <span className="ms-2">· Target: {Number(item.targetValue).toLocaleString()}{unitSfx}</span>}

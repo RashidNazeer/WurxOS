@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   getIncentives, updateIncentivesProgress, autoComplete,
 } from '../../lib/incentivesApi';
+import BrandChip from './BrandChip';
 
 function getMonthLabel(ym) {
   const [year, month] = ym.split('-');
@@ -65,6 +66,7 @@ function EditProgressRow({ item, cat, onChange }) {
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
+          {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
