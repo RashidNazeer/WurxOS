@@ -191,15 +191,29 @@ export async function fetchOlBrandStatus(olId, month) {
 export async function listOlBrandsByOl() {
   const { data, error } = await supabase
     .from('ol_incentive_brands')
-    .select('ol_id, brand:brand_id(id, brand_name, status, client_name)');
+    .select('ol_id, brand:brand_id(id, brand_name, status, client_name, owner_id)');
   if (error) throw new Error(error.message);
   const map = {};
   (data || []).forEach((r) => {
     if (!r.brand) return;
-    (map[r.ol_id] ||= []).push({ id: r.brand.id, name: r.brand.brand_name, status: r.brand.status, notes: r.brand.client_name || null });
+    (map[r.ol_id] ||= []).push({ id: r.brand.id, name: r.brand.brand_name, status: r.brand.status, notes: r.brand.client_name || null, ownerId: r.brand.owner_id });
   });
   Object.values(map).forEach((arr) => arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
   return map;
+}
+
+// Does a brand "hit" for its owning TL? Mirrors the ol_brand_incentive_pct RPC
+// (mig 296): the TL has a COMPLETED item linked by brandId (or, for unlinked
+// legacy items, a normalised-text name match). Used client-side to badge OL cards.
+const _normBrand = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function brandHitByTL(tlRecord, brand) {
+  if (!tlRecord || !brand) return false;
+  const nb = _normBrand(brand.name);
+  const items = [...(tlRecord.incentives || []), ...(tlRecord.bonuses || [])];
+  return items.some((it) => it && it.completed && (
+    (it.brandId != null && String(it.brandId) === String(brand.id)) ||
+    (it.brandId == null && nb.length >= 3 && _normBrand(it.text).includes(nb))
+  ));
 }
 
 export async function getIncentives(userId, month = currentMonth()) {

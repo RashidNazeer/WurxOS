@@ -6,7 +6,7 @@ import {
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
-  applyAttendanceAutofill, fetchOlBrandStatus, listOlBrandsByOl, fmtUnitValue,
+  applyAttendanceAutofill, fetchOlBrandStatus, listOlBrandsByOl, brandHitByTL, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
 import InactiveBrandsNotice from './InactiveBrandsNotice';
@@ -194,17 +194,20 @@ function BrandTierChip({ brand }) {
   const tierKey = brand.tier ? String(brand.tier).toLowerCase() : null;
   const tierColor = tierKey ? _TIER_COLORS[tierKey] : null;
   const inactive = brand.status && String(brand.status).toLowerCase() !== 'active';
+  const hit = brand.is_hit === true;
   return (
     <span
       className="badge d-inline-flex align-items-center gap-1"
       title={[
+        hit ? 'Hit its GMV target' : null,
         brand.tier ? `Tier: ${brand.tier}` : null,
         brand.status ? `Status: ${brand.status}` : null,
         brand.notes || null,
       ].filter(Boolean).join('\n')}
       style={{
-        background: '#f3f4f6',
-        color: '#495057',
+        background: hit ? '#e6f4ea' : '#f3f4f6',
+        color: hit ? '#15803d' : '#495057',
+        border: hit ? '1px solid #bbf7d0' : '1px solid transparent',
         fontSize: '0.6rem',
         fontWeight: 500,
         opacity: inactive ? 0.55 : 1,
@@ -217,6 +220,7 @@ function BrandTierChip({ brand }) {
         }} />
       )}
       {brand.name}
+      {hit && <i className="bi bi-check-circle-fill" style={{ color: '#16a34a', fontSize: '0.6rem', flexShrink: 0 }} />}
     </span>
   );
 }
@@ -1106,7 +1110,10 @@ export default function OLIncentivesPage() {
               {list.map(user => {
                 const rec = records[user.id];
                 const hasData = Boolean(rec);
-                const brands = user.assignedBrands || [];
+                // For OL cards, flag each brand that already hit its GMV target (its
+                // owning TL completed the linked item) so the OL sees who's tracking.
+                const brands = (user.assignedBrands || []).map(b =>
+                  b.ownerId ? { ...b, is_hit: brandHitByTL(records[b.ownerId], b) } : b);
                 const totalItems = hasData ? (rec.incentives || []).length + (rec.bonuses || []).length : 0;
                 const completedItems = hasData ? (rec.incentives || []).filter(i => i.completed).length + (rec.bonuses || []).filter(b => b.completed).length : 0;
                 const breakdown = hasData ? calcBreakdown(rec) : null;
