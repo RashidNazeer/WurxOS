@@ -707,7 +707,15 @@ export default function OLIncentivesPage() {
       ]);
       setAllUsers(teamList);
       setTlUsers(tlList);
-      setOlUsers(olList);
+      // Attach each OL's curated incentive brands so the OL Incentives tab cards can
+      // show them (RLS lets an active OL/Boss read any OL's brands). Best-effort per OL.
+      const olEnriched = await Promise.all((olList || []).map(async (ol) => {
+        try {
+          const st = await fetchOlBrandStatus(ol.id, month);
+          return { ...ol, assignedBrands: (st || []).map(b => ({ id: b.brand_id, name: b.brand_name, notes: b.owner_name ? `TL: ${b.owner_name}` : (b.client_name || null) })) };
+        } catch { return ol; }
+      }));
+      setOlUsers(olEnriched);
 
       // 3. Load all incentive records for the selected month (an active OL can read
       // every incentive row per RLS; we keep APC/IPC + TL and key them by user).
