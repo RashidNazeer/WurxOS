@@ -7,6 +7,7 @@ import {
   resetAndRoll, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
+import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,8 @@ function DetailsModal({ rec, userName, onClose }) {
             </div>
             <div className="text-muted text-end mt-1" style={{ fontSize: '0.68rem' }}>Potential: {totalPotential.toLocaleString()} PKR</div>
           </div>
+
+          <InactiveBrandsNotice userId={rec?.user_id} />
 
           <div className="d-flex justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Close</button>

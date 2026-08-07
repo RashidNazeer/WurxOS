@@ -9,6 +9,7 @@ import {
   applyAttendanceAutofill, fetchOlBrandStatus, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
+import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -584,6 +585,8 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
               )}
             </div>
           )}
+
+          <InactiveBrandsNotice userId={user?.id} role={user?.userType} />
 
           <div className="d-flex gap-2 justify-content-end mt-3">
             {editMode ? (

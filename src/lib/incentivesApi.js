@@ -568,6 +568,27 @@ export async function getUserForEditor(userId) {
   };
 }
 
+// Inactive brands a user is responsible for, for the "not included in incentives"
+// notice. A TL owns brands (brands.owner_id); an APC/IPC gets them via
+// brand_assignments. `role` is optional — when unknown we check both sources.
+// Non-critical (drives a hint), so it never throws — returns [] on any error.
+export async function listInactiveBrandsForUser(userId, role) {
+  if (!userId) return [];
+  const seen = new Map();
+  const add = (b) => { if (b && b.status && b.status !== 'active') seen.set(b.id, { id: b.id, name: b.brand_name, status: b.status }); };
+  if (!role || role === 'tl' || role === 'pctl') {
+    const { data } = await supabase.from('brands')
+      .select('id, brand_name, status').eq('owner_id', userId).neq('status', 'active');
+    (data || []).forEach(add);
+  }
+  if (!role || role === 'apc' || role === 'ipc') {
+    const { data } = await supabase.from('brand_assignments')
+      .select('brand:brand_id(id, brand_name, status)').eq('user_id', userId);
+    (data || []).forEach((r) => add(r.brand));
+  }
+  return [...seen.values()].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+}
+
 // ── Mutation: write an items-only progress patch (APC / TL / OL editing
 // their own progress, or APC EditModal). Server-side guard already
 // blocks non-admins from changing verified / payout_cleared / basic_salary.

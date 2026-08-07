@@ -4,6 +4,7 @@ import {
   getIncentives, updateIncentivesProgress, autoComplete, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
+import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 function getMonthLabel(ym) {
   const [year, month] = ym.split('-');
@@ -344,6 +345,7 @@ export default function IncentivesPage() {
                 )}
               </div>
             </div>
+            <InactiveBrandsNotice userId={currentUser?.uid} role={profile?.role} />
           </div>
         )}
 
