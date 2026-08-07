@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import { AlertIcon } from '../../components/common/Icon';
 import {
   listActiveBrands, getBrandMonthlyMetrics, saveBrandMonthlyMetrics, listMonthsWithData,
+  listBrandMetricsForMonth,
 } from '../../lib/brandMetricsApi';
 import { isManagedByUs } from '../../lib/roles';
 
@@ -68,15 +69,18 @@ export default function BrandAnalyticsPage() {
   const [brandId, setBrandId] = useState('');
   const [month, setMonth] = useState(pakistanMonth);
   const [editing, setEditing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [goalFilter, setGoalFilter] = useState('all'); // all | set | unset
 
   const { data: brands = [], isLoading: brandsLoading, error: brandsErr } = useQuery({
     queryKey: ['brandMetrics', 'brands'],
     queryFn: listActiveBrands,
   });
-  // Auto-select the first brand so the page isn't empty on load.
-  useEffect(() => {
-    if (!brandId && brands.length) setBrandId(brands[0].id);
-  }, [brands, brandId]);
+  // Every brand's row for the picked month — drives the card badges + filter.
+  const { data: monthMap = {} } = useQuery({
+    queryKey: ['brandMetrics', 'monthMap', month],
+    queryFn: () => listBrandMetricsForMonth(month),
+  });
 
   const selectedBrand = brands.find((b) => b.id === brandId) || null;
 
@@ -101,19 +105,36 @@ export default function BrandAnalyticsPage() {
   }, [selectedBrand]);
   const hasAny = visibleMetrics.some((m) => data && (data[m.tCol] != null || data[m.aCol] != null));
 
+  // ── Brand picker (cards) filtering ──
+  const setCount = useMemo(() => brands.filter((b) => monthMap[b.id]).length, [brands, monthMap]);
+  const filteredBrands = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return brands.filter((b) => {
+      if (q && !`${b.brand_name || ''} ${b.client_name || ''}`.toLowerCase().includes(q)) return false;
+      const hasGoals = !!monthMap[b.id];
+      if (goalFilter === 'set' && !hasGoals) return false;
+      if (goalFilter === 'unset' && hasGoals) return false;
+      return true;
+    });
+  }, [brands, search, goalFilter, monthMap]);
+
   const err = brandsErr?.message || error?.message || '';
   const thisMonth = pakistanMonth();
 
   return (
     <>
+      <style>{`.wx-brandpick{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:12px;transition:border-color .15s,box-shadow .15s,transform .1s}.wx-brandpick:hover{border-color:var(--accent);box-shadow:0 3px 14px rgba(0,0,0,.07)}.wx-brandpick:active{transform:translateY(1px)}`}</style>
+
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 className="page-title">Brand analytics</h1>
           <p className="page-subtitle">Monthly goals and progress, per brand. Set a target and what was achieved for each.</p>
         </div>
-        <button className="wx-btn wx-btn-primary" disabled={!brandId || !isSuccess} onClick={() => setEditing(true)}>
-          <i className="bi bi-pencil-square me-1" /> {hasAny ? 'Edit goals' : 'Set goals'}
-        </button>
+        {selectedBrand && (
+          <button className="wx-btn wx-btn-primary" disabled={!isSuccess} onClick={() => setEditing(true)}>
+            <i className="bi bi-pencil-square me-1" /> {hasAny ? 'Edit goals' : 'Set goals'}
+          </button>
+        )}
       </div>
 
       {err && (
@@ -122,87 +143,118 @@ export default function BrandAnalyticsPage() {
         </div>
       )}
 
-      {/* Controls: brand picker + month navigator */}
-      <div className="wx-card" style={{ padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 240, flex: '1 1 240px' }}>
-          {selectedBrand && <BrandAvatar brand={selectedBrand} size={38} radius={9} />}
-          <select className="wx-input" value={brandId} onChange={(e) => setBrandId(e.target.value)}
-            disabled={brandsLoading} style={{ flex: 1, minWidth: 0, fontWeight: 700 }}>
-            {brandsLoading && <option>Loading…</option>}
-            {!brandsLoading && brands.length === 0 && <option value="">No active brands</option>}
-            {brands.map((b) => (<option key={b.id} value={b.id}>{b.brand_name}</option>))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-          <button className="wx-btn wx-btn-ghost" onClick={() => setMonth((m) => addMonths(m, -1))} title="Previous month"
-            style={{ padding: '8px 11px' }}>
-            <i className="bi bi-chevron-left" />
-          </button>
-          <div style={{ minWidth: 150, textAlign: 'center' }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{prettyMonth(month)}</div>
-            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
-              {month === thisMonth ? 'This month' : (
-                <button className="wx-btn-link" onClick={() => setMonth(thisMonth)}
-                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontSize: 10.5 }}>
-                  Jump to this month
+      {!selectedBrand ? (
+        /* ───────── Brand picker: search + filter + cards ───────── */
+        <>
+          <div className="wx-card" style={{ padding: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 260px', minWidth: 220 }}>
+              <i className="bi bi-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 13, pointerEvents: 'none' }} />
+              <input className="wx-input" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search brand or client…" style={{ paddingLeft: 32, width: '100%' }} />
+              {search && (
+                <button onClick={() => setSearch('')} aria-label="Clear search"
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
+                  <i className="bi bi-x-lg" style={{ fontSize: 12 }} />
                 </button>
               )}
-              {monthsWithData.includes(month) ? null : <span style={{ opacity: 0.6 }}>· no data</span>}
             </div>
+            <MonthNav month={month} setMonth={setMonth} thisMonth={thisMonth} />
           </div>
-          <button className="wx-btn wx-btn-ghost" onClick={() => setMonth((m) => addMonths(m, 1))} title="Next month"
-            style={{ padding: '8px 11px' }}>
-            <i className="bi bi-chevron-right" />
-          </button>
-        </div>
-      </div>
 
-      {/* Metric cards */}
-      {!brandId ? (
-        <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Pick a brand to see its goals.</div>
-      ) : isLoading ? (
-        <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
-      ) : isError ? (
-        // Never fall through to the "no goals" empty state on a failed read —
-        // that would let an all-blank save wipe values that actually exist.
-        <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          <AlertIcon width="18" height="18" /> <span style={{ marginLeft: 6 }}>Couldn't load this month's goals (maybe a connection blip). Use the month arrows to retry.</span>
-        </div>
-      ) : (
-        <>
-          {!hasAny && (
-            <div className="wx-card" style={{ padding: '22px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>No goals set for {prettyMonth(month)}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Set the targets and achieved values for {selectedBrand?.brand_name} this month.</div>
-              </div>
-              <button className="wx-btn wx-btn-primary" onClick={() => setEditing(true)}><i className="bi bi-plus-lg me-1" /> Set goals</button>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
-            {visibleMetrics.map((m) => (
-              <MetricCard key={m.key} metric={m} target={data?.[m.tCol]} achieved={data?.[m.aCol]} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+            {[
+              { key: 'all', label: 'All', n: brands.length },
+              { key: 'set', label: 'With goals', n: setCount },
+              { key: 'unset', label: 'Needs goals', n: brands.length - setCount },
+            ].map((f) => (
+              <button key={f.key} onClick={() => setGoalFilter(f.key)}
+                className="wx-btn"
+                style={{
+                  padding: '6px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 999,
+                  background: goalFilter === f.key ? 'var(--accent)' : 'var(--surface-2)',
+                  color: goalFilter === f.key ? '#fff' : 'var(--text-secondary)',
+                  border: '1px solid ' + (goalFilter === f.key ? 'var(--accent)' : 'var(--border-subtle)'),
+                }}>
+                {f.label} <span style={{ opacity: 0.75, fontVariantNumeric: 'tabular-nums' }}>({f.n})</span>
+              </button>
             ))}
           </div>
-          {hiddenGroups.length > 0 && (
-            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-              <i className="bi bi-info-circle" style={{ marginTop: 1 }} />
-              <span>
-                Hidden for {selectedBrand?.brand_name}: <strong>{hiddenGroups.join(' · ')}</strong> — we don’t manage {hiddenGroups.length > 1 ? 'these' : 'this'} for this brand.
-                Change the brand’s status in <strong>Brands</strong> to track {hiddenGroups.length > 1 ? 'them' : 'it'}.
-              </span>
+
+          {brandsLoading ? (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading brands…</div>
+          ) : brands.length === 0 ? (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>No active brands.</div>
+          ) : filteredBrands.length === 0 ? (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>No brands match your search or filter.</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(236px, 1fr))', gap: 12 }}>
+              {filteredBrands.map((b) => (
+                <BrandCard key={b.id} brand={b} row={monthMap[b.id]} onClick={() => setBrandId(b.id)} />
+              ))}
             </div>
           )}
-          {data?.updated_at && (
-            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12 }}>
-              Last updated {new Date(data.updated_at).toLocaleString()}
+        </>
+      ) : (
+        /* ───────── Selected brand: metrics ───────── */
+        <>
+          <div className="wx-card" style={{ padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <button className="wx-btn wx-btn-ghost" onClick={() => { setBrandId(''); setEditing(false); }} style={{ padding: '8px 12px' }}>
+              <i className="bi bi-arrow-left me-1" /> Brands
+            </button>
+            <BrandAvatar brand={selectedBrand} size={38} radius={9} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedBrand.brand_name}</div>
+              {selectedBrand.client_name && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{selectedBrand.client_name}</div>}
             </div>
+            <div style={{ marginLeft: 'auto' }}>
+              <MonthNav month={month} setMonth={setMonth} thisMonth={thisMonth} monthsWithData={monthsWithData} />
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center' }}><span className="wx-spinner" /> Loading…</div>
+          ) : isError ? (
+            // Never fall through to the "no goals" empty state on a failed read —
+            // that would let an all-blank save wipe values that actually exist.
+            <div className="wx-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <AlertIcon width="18" height="18" /> <span style={{ marginLeft: 6 }}>Couldn't load this month's goals (maybe a connection blip). Use the month arrows to retry.</span>
+            </div>
+          ) : (
+            <>
+              {!hasAny && (
+                <div className="wx-card" style={{ padding: '22px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>No goals set for {prettyMonth(month)}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Set the targets and achieved values for {selectedBrand?.brand_name} this month.</div>
+                  </div>
+                  <button className="wx-btn wx-btn-primary" onClick={() => setEditing(true)}><i className="bi bi-plus-lg me-1" /> Set goals</button>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
+                {visibleMetrics.map((m) => (
+                  <MetricCard key={m.key} metric={m} target={data?.[m.tCol]} achieved={data?.[m.aCol]} />
+                ))}
+              </div>
+              {hiddenGroups.length > 0 && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  <i className="bi bi-info-circle" style={{ marginTop: 1 }} />
+                  <span>
+                    Hidden for {selectedBrand?.brand_name}: <strong>{hiddenGroups.join(' · ')}</strong> — we don’t manage {hiddenGroups.length > 1 ? 'these' : 'this'} for this brand.
+                    Change the brand’s status in <strong>Brands</strong> to track {hiddenGroups.length > 1 ? 'them' : 'it'}.
+                  </span>
+                </div>
+              )}
+              {data?.updated_at && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12 }}>
+                  Last updated {new Date(data.updated_at).toLocaleString()}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
 
-      {editing && (
+      {editing && selectedBrand && (
         <EditModal
           brand={selectedBrand}
           month={month}
@@ -212,11 +264,72 @@ export default function BrandAnalyticsPage() {
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'months', brandId] });
+            qc.invalidateQueries({ queryKey: ['brandMetrics', 'monthMap', month] });
             setEditing(false);
           }}
         />
       )}
     </>
+  );
+}
+
+// ── Month navigator (shared by the picker and the brand detail) ─────
+function MonthNav({ month, setMonth, thisMonth, monthsWithData }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button className="wx-btn wx-btn-ghost" onClick={() => setMonth((m) => addMonths(m, -1))} title="Previous month" style={{ padding: '8px 11px' }}>
+        <i className="bi bi-chevron-left" />
+      </button>
+      <div style={{ minWidth: 150, textAlign: 'center' }}>
+        <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{prettyMonth(month)}</div>
+        <div style={{ fontSize: 10.5, color: 'var(--text-muted)', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+          {month === thisMonth ? 'This month' : (
+            <button className="wx-btn-link" onClick={() => setMonth(thisMonth)}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontSize: 10.5 }}>
+              Jump to this month
+            </button>
+          )}
+          {monthsWithData && !monthsWithData.includes(month) ? <span style={{ opacity: 0.6 }}>· no data</span> : null}
+        </div>
+      </div>
+      <button className="wx-btn wx-btn-ghost" onClick={() => setMonth((m) => addMonths(m, 1))} title="Next month" style={{ padding: '8px 11px' }}>
+        <i className="bi bi-chevron-right" />
+      </button>
+    </div>
+  );
+}
+
+// ── One brand card in the picker ────────────────────────────────────
+function BrandCard({ brand, row, onClick }) {
+  const hasGoals = !!row;
+  const gmv = row?.gmv_target;
+  return (
+    <button type="button" onClick={onClick} className="wx-brandpick"
+      style={{ padding: 14, textAlign: 'left', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <BrandAvatar brand={brand} size={40} radius={10} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{brand.brand_name}</div>
+          {brand.client_name && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{brand.client_name}</div>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        {hasGoals ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 12%, transparent)', padding: '3px 8px', borderRadius: 999 }}>
+            <i className="bi bi-check-circle-fill" style={{ fontSize: 10 }} /> Goals set
+          </span>
+        ) : (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+            <i className="bi bi-dash-circle" style={{ fontSize: 10 }} /> No goals set
+          </span>
+        )}
+        {hasGoals && gmv != null && (
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }} title="Monthly GMV Goal">
+            {fmt('$', gmv)}
+          </span>
+        )}
+      </div>
+    </button>
   );
 }
 
