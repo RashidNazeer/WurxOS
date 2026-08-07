@@ -184,6 +184,23 @@ export async function fetchOlBrandStatus(olId, month) {
   if (error) throw new Error(error.message);
   return data || [];
 }
+// Map ol_id -> that OL's curated incentive brands, for showing every OL what
+// brands sit behind each OL's incentive. One query; the oib_select RLS lets an
+// active OL/Boss read ALL OLs' rows (self-only otherwise). Includes inactive
+// brands (BrandTierChip dims them) so nothing silently disappears.
+export async function listOlBrandsByOl() {
+  const { data, error } = await supabase
+    .from('ol_incentive_brands')
+    .select('ol_id, brand:brand_id(id, brand_name, status, client_name)');
+  if (error) throw new Error(error.message);
+  const map = {};
+  (data || []).forEach((r) => {
+    if (!r.brand) return;
+    (map[r.ol_id] ||= []).push({ id: r.brand.id, name: r.brand.brand_name, status: r.brand.status, notes: r.brand.client_name || null });
+  });
+  Object.values(map).forEach((arr) => arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+  return map;
+}
 
 export async function getIncentives(userId, month = currentMonth()) {
   const { data, error } = await supabase

@@ -6,7 +6,7 @@ import {
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
-  applyAttendanceAutofill, fetchOlBrandStatus, fmtUnitValue,
+  applyAttendanceAutofill, fetchOlBrandStatus, listOlBrandsByOl, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
 import InactiveBrandsNotice from './InactiveBrandsNotice';
@@ -707,15 +707,12 @@ export default function OLIncentivesPage() {
       ]);
       setAllUsers(teamList);
       setTlUsers(tlList);
-      // Attach each OL's curated incentive brands so the OL Incentives tab cards can
-      // show them (RLS lets an active OL/Boss read any OL's brands). Best-effort per OL.
-      const olEnriched = await Promise.all((olList || []).map(async (ol) => {
-        try {
-          const st = await fetchOlBrandStatus(ol.id, month);
-          return { ...ol, assignedBrands: (st || []).map(b => ({ id: b.brand_id, name: b.brand_name, notes: b.owner_name ? `TL: ${b.owner_name}` : (b.client_name || null) })) };
-        } catch { return ol; }
-      }));
-      setOlUsers(olEnriched);
+      // Show every OL the brands behind each OL's incentive. Load ALL OLs' curated
+      // brands in one query (oib_select RLS lets an active OL/Boss read every row)
+      // and attach per OL, so the OL Incentives tab cards render them.
+      let olBrandMap = {};
+      try { olBrandMap = await listOlBrandsByOl(); } catch { olBrandMap = {}; }
+      setOlUsers((olList || []).map((ol) => ({ ...ol, assignedBrands: olBrandMap[ol.id] || [] })));
 
       // 3. Load all incentive records for the selected month (an active OL can read
       // every incentive row per RLS; we keep APC/IPC + TL and key them by user).
