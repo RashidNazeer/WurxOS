@@ -6,7 +6,7 @@ import {
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
-  applyAttendanceAutofill, fetchOlBrandStatus,
+  applyAttendanceAutofill, fetchOlBrandStatus, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
 
@@ -456,12 +456,12 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
             <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>+{fmtN(item.amount)} PKR</div>
             {item.targetValue > 0 && (
               <div className="d-flex flex-wrap gap-3 mt-1" style={{ fontSize: '0.82rem' }}>
-                <span><span className="text-muted">Target:</span> <span className="fw-semibold" style={{ color: '#1e293b' }}>{fmtN(item.targetValue)}{unitSfx}</span></span>
+                <span><span className="text-muted">Target:</span> <span className="fw-semibold" style={{ color: '#1e293b' }}>{fmtUnitValue(item.targetValue, unitSfx)}</span></span>
                 {item.achievedValue != null && (
                   <span>
                     <span className="text-muted">Achieved:</span>{' '}
                     <span className="fw-semibold" style={{ color: item.completed ? '#15803d' : '#0f172a' }}>
-                      {fmtN(item.achievedValue)}{unitSfx}
+                      {fmtUnitValue(item.achievedValue, unitSfx)}
                     </span>
                     <span className="ms-1" style={{ color: item.completed ? '#16a34a' : '#475569', fontWeight: 600 }}>({p}%)</span>
                   </span>

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   listIncentivesMonth, listUsersByRoles,
   verifyIncentives, clearIncentivePayout,
-  resetAndRoll,
+  resetAndRoll, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
 
@@ -79,8 +79,8 @@ function DetailsModal({ rec, userName, onClose }) {
             {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted" style={{ fontSize: '0.68rem' }}>
               +{(Number(item.amount) || 0).toLocaleString()} PKR
-              {item.targetValue > 0 && <span className="ms-2">· Target: {Number(item.targetValue).toLocaleString()}{unitSfx}</span>}
-              {item.achievedValue > 0 && <span className="ms-2">· Achieved: {Number(item.achievedValue).toLocaleString()}{unitSfx} ({p}%)</span>}
+              {item.targetValue > 0 && <span className="ms-2">· Target: {fmtUnitValue(item.targetValue, unitSfx)}</span>}
+              {item.achievedValue > 0 && <span className="ms-2">· Achieved: {fmtUnitValue(item.achievedValue, unitSfx)} ({p}%)</span>}
             </div>
             {item.completedBy && <div style={{ fontSize: '0.63rem', color: '#198754' }}><i className="bi bi-person-check me-1" />Marked by {item.completedBy}</div>}
           </div>

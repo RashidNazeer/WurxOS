@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getIncentives, updateIncentivesProgress, autoComplete,
+  getIncentives, updateIncentivesProgress, autoComplete, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
 
@@ -83,7 +83,7 @@ function EditProgressRow({ item, cat, onChange }) {
           </label>
           <div className="input-group input-group-sm">
             <input type="text" className="form-control"
-              value={target !== '' ? `${Number(target).toLocaleString()}${sfx}` : '—'}
+              value={target !== '' ? fmtUnitValue(target, sfx) : '—'}
               readOnly disabled style={{ background: '#f1f5f9', cursor: 'not-allowed' }} />
             <span className="input-group-text" style={{ fontSize: '0.7rem', background: '#f1f5f9' }}>
               <i className="bi bi-lock-fill" style={{ fontSize: '0.7rem', color: '#94a3b8' }} />

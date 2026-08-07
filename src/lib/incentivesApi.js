@@ -359,6 +359,13 @@ export function itemSuffix(item) {
   if (item?.unit === 'percent') return '%';
   return '';
 }
+// Format a value with its unit: currency symbols go BEFORE the number ($4,500),
+// everything else (%, plain counts) stays after (95%). Keeps money reading naturally.
+const CURRENCY_UNITS = ['$', '£', '€', '¥', '₹'];
+export function fmtUnitValue(value, sfx) {
+  const n = Number(value || 0).toLocaleString();
+  return CURRENCY_UNITS.includes(sfx) ? `${sfx}${n}` : `${n}${sfx || ''}`;
+}
 export function uid4() { return Math.random().toString(36).slice(2, 10); }
 
 // Mirror of v1's calcBreakdown — returns both potential and

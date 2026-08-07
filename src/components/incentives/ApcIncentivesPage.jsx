@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getIncentives, updateIncentivesProgress, notifyIncentiveEmployee, autoComplete,
+  getIncentives, updateIncentivesProgress, notifyIncentiveEmployee, autoComplete, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import { listBrandsForApc } from '../../lib/agendaApi';
 import BrandChip from './BrandChip';
@@ -78,8 +78,8 @@ function DetailsModal({ record, items, onClose }) {
 
         {(item.targetValue > 0 || item.achievedValue > 0) && (
           <div className="d-flex gap-3 mb-2" style={{ fontSize: '0.72rem', color: '#6c757d' }}>
-            <span>Target: <strong>{Number(item.targetValue || 0).toLocaleString()}{unitSfx}</strong></span>
-            <span>Achieved: <strong>{Number(item.achievedValue || 0).toLocaleString()}{unitSfx}</strong></span>
+            <span>Target: <strong>{fmtUnitValue(item.targetValue, unitSfx)}</strong></span>
+            <span>Achieved: <strong>{fmtUnitValue(item.achievedValue, unitSfx)}</strong></span>
           </div>
         )}
 
@@ -206,7 +206,7 @@ function EditItemRow({ item, category, onChange }) {
           <div className="input-group input-group-sm">
             <input
               type="text" className="form-control"
-              value={target ? `${Number(target).toLocaleString()}${unitSfx}` : '—'}
+              value={target ? fmtUnitValue(target, unitSfx) : '—'}
               readOnly disabled
               style={{ background: '#f1f5f9', cursor: 'not-allowed' }}
             />
@@ -217,7 +217,7 @@ function EditItemRow({ item, category, onChange }) {
         </div>
         <div className="col-6">
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
-            Achieved {isAtt ? <span className="text-muted">(auto · attendance)</span> : (target ? <span className="text-muted">/ {Number(target).toLocaleString()}{unitSfx}</span> : '')}
+            Achieved {isAtt ? <span className="text-muted">(auto · attendance)</span> : (target ? <span className="text-muted">/ {fmtUnitValue(target, unitSfx)}</span> : '')}
           </label>
           <div className="input-group input-group-sm">
             <input
