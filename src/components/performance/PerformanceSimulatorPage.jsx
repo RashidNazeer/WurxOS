@@ -564,15 +564,16 @@ export default function PerformanceSimulatorPage() {
                     {/* External report — monthly, NOT per week (mig 304) */}
                     <div className="pt-3 mt-2" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
                       <div className="fw-semibold mb-2" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}><i className="bi bi-file-earmark-text me-1" />External report (40% of Performance)</div>
-                      <Toggle label="My TL has star-rated my reports" checked={apcHasStar} onChange={setApcHasStar} hint={apcHasStar ? undefined : 'With no stars yet, only report accountability counts.'} />
-                      {apcHasStar && (
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="flex-shrink-0" style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>TL's star rating on your reports</span>
-                          <input type="range" className="form-range flex-grow-1" min={0} max={5} step={0.5} value={apcStar}
-                            aria-label="TL's star rating on your reports" onChange={(e) => setApcStar(Number(e.target.value))} style={{ '--range-c': 'var(--accent)' }} />
-                          <span className="flex-shrink-0" style={{ fontWeight: 800, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{apcStar}★</span>
-                        </div>
-                      )}
+                      <Toggle label="Count my TL's star rating" checked={apcHasStar} onChange={setApcHasStar} hint={apcHasStar ? undefined : 'Off = no TL stars yet, so only report accountability counts. Drag the stars below to simulate a rating.'} />
+                      {/* Star slider is ALWAYS visible so the lever is discoverable even
+                          before a TL has rated any reports; dragging it counts the star. */}
+                      <div className="d-flex align-items-center gap-2 mb-1" style={{ opacity: apcHasStar ? 1 : 0.55, transition: 'opacity 0.15s' }}>
+                        <span className="flex-shrink-0" style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>TL's star rating on your reports</span>
+                        <input type="range" className="form-range flex-grow-1" min={0} max={5} step={0.5} value={apcStar}
+                          aria-label="TL's star rating on your reports"
+                          onChange={(e) => { setApcStar(Number(e.target.value)); setApcHasStar(true); }} style={{ '--range-c': 'var(--accent)' }} />
+                        <span className="flex-shrink-0" style={{ fontWeight: 800, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{apcStar}★</span>
+                      </div>
                       <div className="mb-2" style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Star score = {apcStarScoreNow == null ? 'n/a' : `${Math.round(apcStarScoreNow)}/100`} (avg stars × 20).</div>
                       <div className="fw-semibold mb-2 mt-1" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>Report accountability</div>
                       <div className="row g-2">
