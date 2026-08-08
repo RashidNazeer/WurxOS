@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { currencySymbol, fmtMoney } from '../../utils/currencies';
+// These stylesheets are imported per-page (not global); the attendance page
+// doesn't otherwise load them, so pull them in wherever this modal renders.
+import '../../styles/table.css';   // .wx-modal / .wx-modal-backdrop shell
+import '../../styles/modal.css';   // .wx-m-* rich modal primitives
 
 // APC clock-in gate: enter each active brand's month-to-date GMV, review, confirm.
 // On confirm the parent saves the GMV (overwrites each brand's Achieved) then
