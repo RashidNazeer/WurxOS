@@ -89,7 +89,7 @@ function computePerf(mode, s) {
     // APC branch. External report reuses the same 0.6·star + 0.4·accountability
     // null-collapse as the TL reporting blend (tlReportingScore).
     const checkpoint = apcMonthlyCheckpoint(s.apcWeeks);
-    const starScore = s.apcHasStar ? clamp((Number(s.apcStar) || 0) * 20, 0, 100) : null;
+    const starScore = tlStarScore(s.apcStarWeeks); // avg of the per-report weekly stars × 20 (null if no weeks)
     const acct = (s.hasReports && s.n > 0) ? clamp(Math.max(0, s.n - s.d) / s.n * 100, 0, 100) : null;
     return apcPerfPillar(checkpoint, tlReportingScore(starScore, acct));
   }
@@ -204,8 +204,7 @@ export default function PerformanceSimulatorPage() {
   // ── Simulation state ──
   const [apcWeeks, setApcWeeks] = useState([]);
   const [activeApc, setActiveApc] = useState(0);
-  const [apcStar, setApcStar] = useState(0);          // TL's per-report star avg (0–5)
-  const [apcHasStar, setApcHasStar] = useState(false); // false ⇒ star factor collapses out
+  const [apcStarWeeks, setApcStarWeeks] = useState([]); // TL's per-report star, one per week (mirrors tlWeeks; empty ⇒ factor collapses out)
   const [simMetrics, setSimMetrics] = useState({ dailyTasksQuality: 0, reporting: 0, overallWorkflow: 0, responseTime: 0, tasksProcessing: 0 });
   const [tlWeeks, setTlWeeks] = useState([]);   // [{ label, stars }]
   const [simTeam, setSimTeam] = useState(0);
@@ -252,7 +251,7 @@ export default function PerformanceSimulatorPage() {
         // ---- role-specific Performance pre-fill ----
         let weeks = [], metricVals = { dailyTasksQuality: 0, reporting: 0, overallWorkflow: 0, responseTime: 0, tasksProcessing: 0 };
         let tlW = [], team = 0, hasTeam = true, n = 0, d = 0, hasReports = true;
-        let star = 0, hasStar = false;
+        let apcStarWk = [];
 
         if (m === 'tl') {
           const pv = await tlPerfPreview(uid, month).catch(() => null);
@@ -274,7 +273,9 @@ export default function PerformanceSimulatorPage() {
           if (!cancelled && pv) {
             // External report factor (mig 304): per-report TL star + accountability.
             n = pv.n || 0; d = pv.deductions || 0; hasReports = pv.accountability != null;
-            star = pv.starAvg != null ? pv.starAvg : 0; hasStar = pv.starAvg != null;
+            // Seed one report-star week from the real monthly star avg; the APC can
+            // add more weeks to simulate each week's report being rated (mirrors TL).
+            if (pv.starAvg != null) apcStarWk = [{ label: 'Wk 1', stars: pv.starAvg }];
           }
         } else {
           const r = await getRatingFor(uid, month).catch(() => null);
@@ -308,12 +309,12 @@ export default function PerformanceSimulatorPage() {
         if (cancelled) return;
         const att = realAtt != null ? realAtt : 0; // exact 1-dp — the real composite feeds it unrounded
 
-        setApcWeeks(weeks); setActiveApc(0); setApcStar(star); setApcHasStar(hasStar); setSimMetrics(metricVals);
+        setApcWeeks(weeks); setActiveApc(0); setApcStarWeeks(apcStarWk); setSimMetrics(metricVals);
         setTlWeeks(tlW); setSimTeam(team); setSimHasTeam(hasTeam); setSimN(n); setSimD(d); setSimHasReports(hasReports);
         setIncludeInc(hasPlan); setSimIncPct(incPct); setSimVerified(verified);
         setSimAtt(att); setSimGreen(g); setSimRed(rr);
         setInitial({
-          apcWeeks: clone(weeks), apcStar: star, apcHasStar: hasStar, metrics: metricVals, tlWeeks: clone(tlW), team, hasTeam, n, d, hasReports,
+          apcWeeks: clone(weeks), apcStarWeeks: clone(apcStarWk), metrics: metricVals, tlWeeks: clone(tlW), team, hasTeam, n, d, hasReports,
           includeInc: hasPlan, incPct, verified, att, green: g, red: rr,
         });
       } catch (e) {
@@ -327,8 +328,8 @@ export default function PerformanceSimulatorPage() {
 
   // ── Derived pillar scores (the SAME math the real score uses) ──
   const simPerf = useMemo(
-    () => computePerf(mode, { apcWeeks, apcStar, apcHasStar, metrics: simMetrics, tlWeeks, team: simTeam, hasTeam: simHasTeam, n: simN, d: simD, hasReports: simHasReports }),
-    [mode, apcWeeks, apcStar, apcHasStar, simMetrics, tlWeeks, simTeam, simHasTeam, simN, simD, simHasReports],
+    () => computePerf(mode, { apcWeeks, apcStarWeeks, metrics: simMetrics, tlWeeks, team: simTeam, hasTeam: simHasTeam, n: simN, d: simD, hasReports: simHasReports }),
+    [mode, apcWeeks, apcStarWeeks, simMetrics, tlWeeks, simTeam, simHasTeam, simN, simD, simHasReports],
   );
 
   const simIncScore = includeInc ? clamp(Math.round(simIncPct), 0, 100) : null;
@@ -391,10 +392,14 @@ export default function PerformanceSimulatorPage() {
   const setTlWeekStars = (idx, v) => setTlWeeks((prev) => prev.map((w, i) => (i === idx ? { ...w, stars: v } : w)));
   const addTlWeek = () => setTlWeeks((prev) => [...prev, { label: `Wk ${prev.length + 1}`, stars: prev[prev.length - 1]?.stars ?? 4 }]);
   const removeTlWeek = (idx) => setTlWeeks((prev) => prev.filter((_, i) => i !== idx).map((w, i) => ({ ...w, label: `Wk ${i + 1}` })));
+  // APC per-report star weeks (mirror the TL OL-star weeks above)
+  const setApcStarWeekStars = (idx, v) => setApcStarWeeks((prev) => prev.map((w, i) => (i === idx ? { ...w, stars: v } : w)));
+  const addApcStarWeek = () => setApcStarWeeks((prev) => [...prev, { label: `Wk ${prev.length + 1}`, stars: prev[prev.length - 1]?.stars ?? 4 }]);
+  const removeApcStarWeek = (idx) => setApcStarWeeks((prev) => prev.filter((_, i) => i !== idx).map((w, i) => ({ ...w, label: `Wk ${i + 1}` })));
 
   const reset = () => {
     if (!initial) return;
-    setApcWeeks(clone(initial.apcWeeks)); setActiveApc(0); setApcStar(initial.apcStar); setApcHasStar(initial.apcHasStar); setSimMetrics(initial.metrics); setTlWeeks(clone(initial.tlWeeks));
+    setApcWeeks(clone(initial.apcWeeks)); setActiveApc(0); setApcStarWeeks(clone(initial.apcStarWeeks)); setSimMetrics(initial.metrics); setTlWeeks(clone(initial.tlWeeks));
     setSimTeam(initial.team); setSimHasTeam(initial.hasTeam); setSimN(initial.n); setSimD(initial.d); setSimHasReports(initial.hasReports);
     setIncludeInc(initial.includeInc); setSimIncPct(initial.incPct); setSimVerified(initial.verified);
     setSimAtt(initial.att); setSimGreen(initial.green); setSimRed(initial.red);
@@ -406,7 +411,7 @@ export default function PerformanceSimulatorPage() {
   // phantom delta, and any real change does. Robust to off-grid decimal seeds.
   const dirty = useMemo(() => {
     if (!initial) return false;
-    const perf0 = computePerf(mode, { apcWeeks: initial.apcWeeks, apcStar: initial.apcStar, apcHasStar: initial.apcHasStar, metrics: initial.metrics, tlWeeks: initial.tlWeeks, team: initial.team, hasTeam: initial.hasTeam, n: initial.n, d: initial.d, hasReports: initial.hasReports });
+    const perf0 = computePerf(mode, { apcWeeks: initial.apcWeeks, apcStarWeeks: initial.apcStarWeeks, metrics: initial.metrics, tlWeeks: initial.tlWeeks, team: initial.team, hasTeam: initial.hasTeam, n: initial.n, d: initial.d, hasReports: initial.hasReports });
     const inc0 = initial.includeInc ? clamp(Math.round(initial.incPct), 0, 100) : null;
     const att0 = clamp(initial.att, 0, 100);
     const flags0 = clamp(80 + initial.green * 10 - initial.red * 20, 0, 100);
@@ -422,7 +427,7 @@ export default function PerformanceSimulatorPage() {
   const acctNow = (simHasReports && simN > 0) ? clamp(Math.max(0, simN - simD) / simN * 100, 0, 100) : null;
   const reportingNow = tlReportingScore(starScoreNow, acctNow);
   // APC external-report readouts (share acctNow — same accountability formula).
-  const apcStarScoreNow = apcHasStar ? clamp((Number(apcStar) || 0) * 20, 0, 100) : null;
+  const apcStarScoreNow = tlStarScore(apcStarWeeks);
   const apcReportNow = tlReportingScore(apcStarScoreNow, acctNow);
   const apcCheckpointNow = apcMonthlyCheckpoint(apcWeeks);
   const aw = apcWeeks[activeApc];
@@ -564,16 +569,22 @@ export default function PerformanceSimulatorPage() {
                     {/* External report — monthly, NOT per week (mig 304) */}
                     <div className="pt-3 mt-2" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
                       <div className="fw-semibold mb-2" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}><i className="bi bi-file-earmark-text me-1" />External report (40% of Performance)</div>
-                      <Toggle label="Count my TL's star rating" checked={apcHasStar} onChange={setApcHasStar} hint={apcHasStar ? undefined : 'Off = no TL stars yet, so only report accountability counts. Drag the stars below to simulate a rating.'} />
-                      {/* Star slider is ALWAYS visible so the lever is discoverable even
-                          before a TL has rated any reports; dragging it counts the star. */}
-                      <div className="d-flex align-items-center gap-2 mb-1" style={{ opacity: apcHasStar ? 1 : 0.55, transition: 'opacity 0.15s' }}>
-                        <span className="flex-shrink-0" style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600 }}>TL's star rating on your reports</span>
-                        <input type="range" className="form-range flex-grow-1" min={0} max={5} step={0.5} value={apcStar}
-                          aria-label="TL's star rating on your reports"
-                          onChange={(e) => { setApcStar(Number(e.target.value)); setApcHasStar(true); }} style={{ '--range-c': 'var(--accent)' }} />
-                        <span className="flex-shrink-0" style={{ fontWeight: 800, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{apcStar}★</span>
+                      {/* TL rates each weekly report — one star per week, add weeks to
+                          simulate (mirrors the TL's OL-star-per-week lever). */}
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <div className="fw-semibold" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>Your TL's star per report — one per week (60% of external report)</div>
+                        <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.68rem', padding: '2px 8px' }} onClick={addApcStarWeek}><i className="bi bi-plus" />Add week</button>
                       </div>
+                      {apcStarWeeks.length === 0 && <div className="rounded-2 px-2 py-2 mb-2" style={{ background: 'var(--surface-2)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>No report star ratings yet — add a week to simulate your TL rating each week's report.</div>}
+                      {apcStarWeeks.map((wk, i) => (
+                        <div key={i} className="d-flex align-items-center gap-2 mb-1">
+                          <span className="flex-shrink-0" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 700, minWidth: 42 }}>{wk.label}</span>
+                          <input type="range" className="form-range flex-grow-1" min={0} max={5} step={0.5} value={wk.stars}
+                            aria-label={`${wk.label} report star rating`} onChange={(e) => setApcStarWeekStars(i, Number(e.target.value))} style={{ '--range-c': 'var(--accent)' }} />
+                          <span className="flex-shrink-0" style={{ fontWeight: 800, minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{wk.stars}★</span>
+                          <button className="btn btn-sm btn-link text-muted p-0 flex-shrink-0" style={{ fontSize: '0.7rem' }} aria-label={`Remove ${wk.label}`} onClick={() => removeApcStarWeek(i)}><i className="bi bi-x-lg" /></button>
+                        </div>
+                      ))}
                       <div className="mb-2" style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>Star score = {apcStarScoreNow == null ? 'n/a' : `${Math.round(apcStarScoreNow)}/100`} (avg stars × 20).</div>
                       <div className="fw-semibold mb-2 mt-1" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>Report accountability</div>
                       <div className="row g-2">
