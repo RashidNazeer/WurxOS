@@ -27,7 +27,7 @@ export async function listActiveBrands() {
 export async function listBrandMetricsForMonth(monthKey) {
   const { data, error } = await supabase
     .from('brand_monthly_metrics')
-    .select(['brand_id', ...METRIC_COLUMNS].join(', '))
+    .select(['brand_id', ...METRIC_COLUMNS, 'updated_at'].join(', '))
     .eq('month_key', monthKey);
   if (error) throw new Error(error.message);
   const map = {};
