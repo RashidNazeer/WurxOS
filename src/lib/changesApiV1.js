@@ -156,7 +156,7 @@ export async function listAllUsersForChanges() {
     .in('role', ['boss', 'tl', 'ol', 'pctl', 'apc', 'ipc'])
     .order('display_name');
   if (error) throw new Error(error.message);
-  const ROLE_LABELS = { boss: 'Boss', tl: 'Team Lead', ol: 'Op Lead', pctl: 'PCTL', apc: 'APC', ipc: 'IPC' };
+  const ROLE_LABELS = { boss: 'Boss', tl: 'Team Lead', ol: 'Op Lead', pctl: 'PCTL', apc: 'APC', ipc: 'IPC', ads_manager: 'Ads Manager' };
   return (data || []).map((p) => ({
     id: p.id,
     name: p.display_name || p.email?.split('@')[0] || 'User',

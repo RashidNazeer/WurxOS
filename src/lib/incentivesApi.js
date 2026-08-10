@@ -178,6 +178,43 @@ export async function setOlIncentiveBrands(olId, brandIds) {
   const { error } = await supabase.rpc('ol_set_incentive_brands', { p_ol: olId, p_brand_ids: ids });
   if (error) throw new Error(error.message);
 }
+// ── Ads-manager brands (OL-curated in Settings; mig 316) ───────────────────
+// This one list does double duty: it is what the ads manager can SEE
+// (can_view_brand) and the brand groups the OL builds their plan from.
+export async function getAdsManagerBrands(userId) {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('ads_manager_brands').select('brand_id').eq('ads_manager_id', userId);
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => r.brand_id);
+}
+export async function setAdsManagerBrands(userId, brandIds) {
+  const ids = Array.from(new Set((brandIds || []).filter(Boolean)));
+  // Atomic replace (same reasoning as ol_set_incentive_brands): delete-then-
+  // insert as two calls would leave the manager brand-less — i.e. blind — in
+  // between.
+  const { error } = await supabase.rpc('ads_manager_set_brands', { p_user: userId, p_brand_ids: ids });
+  if (error) throw new Error(error.message);
+}
+// user_id -> [brand_id] for a set of ads managers, in one query.
+export async function fetchAdsManagerBrandMap(userIds) {
+  const ids = (userIds || []).filter(Boolean);
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase
+    .from('ads_manager_brands')
+    .select('ads_manager_id, brand:brand_id(id, brand_name, tier, status, client_name)')
+    .in('ads_manager_id', ids);
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  for (const row of data || []) {
+    if (!row.brand) continue;
+    const list = m.get(row.ads_manager_id) || [];
+    list.push(row.brand);
+    m.set(row.ads_manager_id, list);
+  }
+  return m;
+}
+
 // [{ brand_id, brand_name, client_name, owner_name, matched_text, is_hit }]
 export async function fetchOlBrandStatus(olId, month) {
   const { data, error } = await supabase.rpc('ol_brand_incentive_status', { p_ol: olId, p_month: month });
@@ -516,24 +553,32 @@ export async function listUsersByRoles(roles) {
   // `name` for the UI which expects that field.
   const userIds = (data || []).map((p) => p.id);
   let brandsByUser = new Map();
+  const pushBrand = (userId, brand) => {
+    if (!brand) return;
+    const list = brandsByUser.get(userId) || [];
+    list.push({
+      id:     brand.id,
+      name:   brand.brand_name,
+      tier:   brand.tier        || null,
+      status: brand.status      || null,
+      notes:  brand.client_name || null,
+    });
+    brandsByUser.set(userId, list);
+  };
   if (userIds.length) {
     const { data: links, error: e3 } = await supabase
       .from('brand_assignments')
       .select('user_id, brand:brand_id(id, brand_name, tier, status, client_name)')
       .in('user_id', userIds);
     if (e3) throw new Error(e3.message);
-    (links || []).forEach((row) => {
-      if (!row.brand) return;
-      const list = brandsByUser.get(row.user_id) || [];
-      list.push({
-        id:     row.brand.id,
-        name:   row.brand.brand_name,
-        tier:   row.brand.tier        || null,
-        status: row.brand.status      || null,
-        notes:  row.brand.client_name || null,
-      });
-      brandsByUser.set(row.user_id, list);
-    });
+    (links || []).forEach((row) => pushBrand(row.user_id, row.brand));
+  }
+  // An ads manager's brands live in their own table, not brand_assignments —
+  // so the OL's cards show the brands they run ads for (mig 316).
+  const adsIds = (data || []).filter((p) => p.role === 'ads_manager').map((p) => p.id);
+  if (adsIds.length) {
+    const adsMap = await fetchAdsManagerBrandMap(adsIds);
+    for (const [userId, brands] of adsMap) brands.forEach((b) => pushBrand(userId, b));
   }
 
   return (data || []).map((p) => ({
@@ -585,6 +630,18 @@ export async function getUserForEditor(userId) {
     assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
       .filter((b) => b.status === 'active').map(shape)
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else if (data.role === 'ads_manager') {
+    // Third source, same contract as the two above: the OL-curated ads brands
+    // (mig 316) ARE this user's brand groups in the plan editor. Throws like the
+    // TL branch — a swallowed [] would make carry-forward drop every linked item.
+    const { data: rows, error: me } = await supabase
+      .from('ads_manager_brands')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name)')
+      .eq('ads_manager_id', userId);
+    if (me) throw new Error(me.message);
+    assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
+      .filter((b) => b.status === 'active').map(shape)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
   return {
     id:              data.id,
@@ -615,6 +672,11 @@ export async function listInactiveBrandsForUser(userId, role) {
   if (!role || role === 'apc' || role === 'ipc') {
     const { data } = await supabase.from('brand_assignments')
       .select('brand:brand_id(id, brand_name, status)').eq('user_id', userId);
+    (data || []).forEach((r) => add(r.brand));
+  }
+  if (!role || role === 'ads_manager') {
+    const { data } = await supabase.from('ads_manager_brands')
+      .select('brand:brand_id(id, brand_name, status)').eq('ads_manager_id', userId);
     (data || []).forEach((r) => add(r.brand));
   }
   return [...seen.values()].sort((a, b) => (a.name || '').localeCompare(b.name || ''));

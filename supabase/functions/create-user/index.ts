@@ -6,6 +6,9 @@
 //   * PCTL — permissions: { canAddIPC, canAddBrand }
 //   * APC  — reports_to (required): a TL profile id
 //   * IPC  — reports_to (required): a PCTL profile id
+//   * ADS_MANAGER — no parent, no permission flags. Which brands they run ads
+//     for is set afterwards by an OL in Settings → Ads Manager Brands
+//     (ads_manager_brands, mig 316) — that list is also what they can SEE.
 //
 // The profile row is inserted by the `handle_new_user` trigger which
 // reads all of these from user_metadata.
@@ -21,7 +24,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const ALLOWED_ROLES = ['ol', 'tl', 'pctl', 'apc', 'ipc', 'developer'];
+const ALLOWED_ROLES = ['ol', 'tl', 'pctl', 'apc', 'ipc', 'ads_manager', 'developer'];
 const REPORTS_TO_EXPECT: Record<string, string> = { apc: 'tl', ipc: 'pctl' };
 
 const PERMISSION_KEYS: Record<string, string[]> = {

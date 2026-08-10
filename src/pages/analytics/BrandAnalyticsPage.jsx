@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import { AlertIcon } from '../../components/common/Icon';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { currencySymbol } from '../../utils/currencies';
 import {
   listActiveBrands, getBrandMonthlyMetrics, saveBrandMonthlyMetrics, listMonthsWithData,
@@ -134,6 +135,11 @@ const STATUS_COLOR = { ontrack: 'var(--ba-ontrack)', met: 'var(--ba-ontrack)', b
 
 export default function BrandAnalyticsPage() {
   const qc = useQueryClient();
+  const { profile } = useAuth();
+  // Goals are the Boss/OL's to set (bmm_all, mig 260). An Ads Manager reads the
+  // page for the brands they run ads for (bmm_select_ads_manager, mig 316), so
+  // hide every edit affordance rather than let RLS reject the save.
+  const canEditGoals = profile?.role === 'boss' || profile?.role === 'ol' || profile?.role === 'developer';
   const [brandId, setBrandId] = useState('');
   const [month, setMonth] = useState(pakistanMonth);
   const [editing, setEditing] = useState(false);
@@ -234,7 +240,7 @@ export default function BrandAnalyticsPage() {
           <h1 className="page-title">Brand analytics</h1>
           <p className="page-subtitle">Real-time tracking of affiliate GMV goals</p>
         </div>
-        {selectedBrand && (
+        {selectedBrand && canEditGoals && (
           <button className="wx-btn wx-btn-primary" disabled={!isSuccess} onClick={() => setEditing(true)}>
             <i className="bi bi-pencil-square me-1" /> {hasAny ? 'Edit goals' : 'Set goals'}
           </button>
@@ -308,7 +314,7 @@ export default function BrandAnalyticsPage() {
               {filteredBrands.map((b) => (
                 <BrandDashCard key={b.id} brand={b} stat={stats[b.id]}
                   onOpen={() => setBrandId(b.id)}
-                  onSetGoals={() => { setBrandId(b.id); setEditing(true); }} />
+                  onSetGoals={canEditGoals ? () => { setBrandId(b.id); setEditing(true); } : null} />
               ))}
             </div>
           )}
@@ -344,7 +350,7 @@ export default function BrandAnalyticsPage() {
                     <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>No goals set for {prettyMonth(month)}</div>
                     <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Set the targets and achieved values for {selectedBrand?.brand_name} this month.</div>
                   </div>
-                  <button className="wx-btn wx-btn-primary" onClick={() => setEditing(true)}><i className="bi bi-plus-lg me-1" /> Set goals</button>
+                  {canEditGoals && <button className="wx-btn wx-btn-primary" onClick={() => setEditing(true)}><i className="bi bi-plus-lg me-1" /> Set goals</button>}
                 </div>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
@@ -371,7 +377,7 @@ export default function BrandAnalyticsPage() {
         </>
       )}
 
-      {editing && selectedBrand && (
+      {editing && selectedBrand && canEditGoals && (
         <EditModal
           brand={selectedBrand}
           month={month}
@@ -485,10 +491,14 @@ function BrandDashCard({ brand, stat, onOpen, onSetGoals }) {
         {header}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '18px 0 8px' }}>
           <i className="bi bi-bar-chart-line" style={{ fontSize: 30, color: 'var(--text-muted)', opacity: 0.6 }} />
-          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center' }}>Set goals to track GMV pacing.</div>
-          <button className="wx-btn wx-btn-ghost" onClick={(e) => { e.stopPropagation(); onSetGoals(); }} style={{ marginTop: 2 }}>
-            <i className="bi bi-plus-lg me-1" /> Set goals
-          </button>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center' }}>
+            {onSetGoals ? 'Set goals to track GMV pacing.' : 'No goals set for this month yet.'}
+          </div>
+          {onSetGoals && (
+            <button className="wx-btn wx-btn-ghost" onClick={(e) => { e.stopPropagation(); onSetGoals(); }} style={{ marginTop: 2 }}>
+              <i className="bi bi-plus-lg me-1" /> Set goals
+            </button>
+          )}
         </div>
       </div>
     );

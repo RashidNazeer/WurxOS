@@ -177,7 +177,7 @@ export const V1_WEIGHTAGES = [
   { key: 'critical', label: 'Critical', color: '#7b1fa2', bg: '#f3e5f5', pts: 12 },
 ];
 
-export const ROLE_LABEL = { apc: 'APC', ipc: 'IPC', tl: 'Team Lead', pctl: 'Paid Collab TL', ol: 'Operation Lead', boss: 'Boss', developer: 'Developer' };
+export const ROLE_LABEL = { apc: 'APC', ipc: 'IPC', tl: 'Team Lead', pctl: 'Paid Collab TL', ol: 'Operation Lead', ads_manager: 'Ads Manager', boss: 'Boss', developer: 'Developer' };
 
 // ── Pure helpers — IDENTICAL to v1's math ──────────────────────
 export function getLevel(score) {

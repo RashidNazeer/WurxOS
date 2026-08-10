@@ -28,6 +28,7 @@ const PCTLsPage             = lazy(() => import('./pages/boss/manage/PCTLsPage')
 const OLsPage               = lazy(() => import('./pages/boss/manage/OLsPage'));
 const APCsPage              = lazy(() => import('./pages/boss/manage/APCsPage'));
 const IPCsPage              = lazy(() => import('./pages/boss/manage/IPCsPage'));
+const AdsManagersPage       = lazy(() => import('./pages/boss/manage/AdsManagersPage'));
 const DevelopersPage        = lazy(() => import('./pages/boss/manage/DevelopersPage'));
 const BrandsPage            = lazy(() => import('./pages/brands/BrandsPage'));
 const BrandDetailPage       = lazy(() => import('./pages/brands/BrandDetailPage'));
@@ -220,7 +221,7 @@ export default function App() {
               <Route
                 path="/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'ipc', 'ads_manager']}>
                     <BrandsPage />
                   </RoleGuard>
                 }
@@ -228,7 +229,7 @@ export default function App() {
               <Route
                 path="/brands/:id"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'ads_manager']}>
                     <BrandDetailPage />
                   </RoleGuard>
                 }
@@ -239,7 +240,7 @@ export default function App() {
               <Route
                 path="/agenda/upcoming"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc', 'ads_manager']}>
                     <AgendaUpcomingPage />
                   </RoleGuard>
                 }
@@ -247,7 +248,7 @@ export default function App() {
               <Route
                 path="/agenda/ongoing"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc', 'ads_manager']}>
                     <AgendaOngoingPage />
                   </RoleGuard>
                 }
@@ -255,7 +256,7 @@ export default function App() {
               <Route
                 path="/agenda/prior"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc', 'ads_manager']}>
                     <AgendaPriorPage />
                   </RoleGuard>
                 }
@@ -295,7 +296,7 @@ export default function App() {
               <Route
                 path="/agenda/tasks"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc', 'ads_manager']}>
                     <AgendaTasksPage />
                   </RoleGuard>
                 }
@@ -303,7 +304,7 @@ export default function App() {
               <Route
                 path="/agenda/resources"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'apc', 'pctl', 'ipc', 'ads_manager']}>
                     <AgendaResourcesPage />
                   </RoleGuard>
                 }
@@ -385,7 +386,7 @@ export default function App() {
               <Route
                 path="/gmv-max"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
+                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc', 'ads_manager']}>
                     <GmvMaxReportingPage />
                   </RoleGuard>
                 }
@@ -469,7 +470,7 @@ export default function App() {
               <Route
                 path="/incentives"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'ads_manager']}>
                     <IncentivesPage />
                   </RoleGuard>
                 }
@@ -500,7 +501,7 @@ export default function App() {
               <Route
                 path="/chat"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer']}>
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer', 'ads_manager']}>
                     <ChatPage />
                   </RoleGuard>
                 }
@@ -521,7 +522,7 @@ export default function App() {
               <Route
                 path="/analytics/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol']}>
+                  <RoleGuard allow={['boss', 'ol', 'ads_manager']}>
                     <BrandAnalyticsPage />
                   </RoleGuard>
                 }
@@ -578,6 +579,10 @@ export default function App() {
               <Route
                 path="/boss/manage/ipcs"
                 element={<RoleGuard allow="boss"><IPCsPage /></RoleGuard>}
+              />
+              <Route
+                path="/boss/manage/ads-managers"
+                element={<RoleGuard allow="boss"><AdsManagersPage /></RoleGuard>}
               />
               <Route
                 path="/boss/manage/developers"

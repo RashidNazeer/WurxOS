@@ -7,7 +7,7 @@ import { supabase } from './supabase';
 // is the singleton `resource_planner_config` row.
 // ============================================================
 
-export const ROLE_KEYS = ['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc'];
+export const ROLE_KEYS = ['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'ads_manager'];
 
 export const ROLE_LABELS = {
   boss: 'Boss',
@@ -16,6 +16,7 @@ export const ROLE_LABELS = {
   pctl: 'Paid Collab TL',
   apc:  'APC',
   ipc:  'IPC',
+  ads_manager: 'Ads Manager',
 };
 
 // The v1 department map — deterministic from role, no DB column needed.
@@ -26,6 +27,7 @@ export const ROLE_DEPARTMENTS = {
   pctl: 'Paid Collab',
   apc:  'Account Management',
   ipc:  'Paid Collab',
+  ads_manager: 'Paid Ads',
 };
 
 export const DEPARTMENTS = [
@@ -34,6 +36,7 @@ export const DEPARTMENTS = [
   'Team Leads',
   'Paid Collab',
   'Account Management',
+  'Paid Ads',
 ];
 
 // Oversight departments see ALL active brands as their load — they

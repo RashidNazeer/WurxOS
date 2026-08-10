@@ -58,6 +58,7 @@ function uid4() { return Math.random().toString(36).slice(2, 10); }
 const TABS = [
   { key: 'apcs', label: 'APCs',            icon: 'bi-person-lines-fill' },
   { key: 'tls',  label: 'Team Leads',      icon: 'bi-person-badge' },
+  { key: 'ams',  label: 'Ads Managers',    icon: 'bi-megaphone' },
   { key: 'ols',  label: 'Operation Leads',  icon: 'bi-person-workspace' },
 ];
 
@@ -266,7 +267,7 @@ export default function BossIncentivesPage() {
 
   const [month,        setMonth]        = useState(getCurrentMonth());
   const [tab,          setTab]          = useState('apcs');
-  const [allUsers,     setAllUsers]     = useState({ apcs: [], tls: [], ols: [] });
+  const [allUsers,     setAllUsers]     = useState({ apcs: [], tls: [], ols: [], ams: [] });
   const [records,      setRecords]      = useState({});  // userId → record
   const [loading,      setLoading]      = useState(true);
   const [search,       setSearch]       = useState('');
@@ -284,13 +285,14 @@ export default function BossIncentivesPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [tls, ols, apcs, incList] = await Promise.all([
+      const [tls, ols, apcs, ams, incList] = await Promise.all([
         listUsersByRoles(['tl', 'pctl']),
         listUsersByRoles(['ol']),
         listUsersByRoles(['apc', 'ipc']),
+        listUsersByRoles(['ads_manager']),
         listIncentivesMonth(month),
       ]);
-      setAllUsers({ tls, ols, apcs });
+      setAllUsers({ tls, ols, apcs, ams });
       const map = {};
       incList.forEach((data) => {
         const uid = data.userId;
@@ -367,7 +369,7 @@ export default function BossIncentivesPage() {
 
   // ── Combined payout snapshot (cumulative across APCs + TLs + OLs) ──
   const combinedStats = (() => {
-    const everyone = [...(allUsers.apcs || []), ...(allUsers.tls || []), ...(allUsers.ols || [])];
+    const everyone = [...(allUsers.apcs || []), ...(allUsers.tls || []), ...(allUsers.ols || []), ...(allUsers.ams || [])];
     let totalBase = 0, incEarned = 0, incPotential = 0, bonEarned = 0, bonPotential = 0;
     let withPlans = 0, fullyAchieved = 0, partial = 0, noneEarned = 0, noPlan = 0;
     for (const u of everyone) {

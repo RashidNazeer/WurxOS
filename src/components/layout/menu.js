@@ -146,6 +146,7 @@ const EMPLOYEES_GROUP = {
     { label: 'Operation Leads', to: '/boss/manage/ols' },
     { label: 'APCs',            to: '/boss/manage/apcs' },
     { label: 'IPCs',            to: '/boss/manage/ipcs' },
+    { label: 'Ads Managers',    to: '/boss/manage/ads-managers' },
     { label: 'Developers',      to: '/boss/manage/developers' },
     { label: 'Salaries',        to: '/boss/salaries' },
   ],
@@ -177,6 +178,21 @@ const AGENDA_GROUP_BASIC = {
     { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
     { label: 'Prior Meetings',    to: '/agenda/prior' },
     { label: 'Weekly Checkpoint', to: '/agenda/checkpoint' },
+    { label: 'Tasks',             to: '/agenda/tasks' },
+    { label: 'Resources',         to: '/agenda/resources' },
+  ],
+};
+// Ads Managers attend meetings as a guest team (Paid Media) — they don't
+// present a Weekly Checkpoint, so that entry is omitted rather than shown
+// and then refused by the route.
+const AGENDA_GROUP_GUEST = {
+  label: 'Agenda Meetings',
+  icon: CalendarIcon,
+  category: 'agenda',
+  children: [
+    { label: 'Upcoming Meetings', to: '/agenda/upcoming' },
+    { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
+    { label: 'Prior Meetings',    to: '/agenda/prior' },
     { label: 'Tasks',             to: '/agenda/tasks' },
     { label: 'Resources',         to: '/agenda/resources' },
   ],
@@ -338,6 +354,27 @@ export const MENUS = {
     KNOWLEDGE_ITEM,
     CHANGES_ITEM,
     AGENDA_GROUP_BASIC,
+    REQUESTS_GROUP_APPLIER,
+    CHAT_ITEM,
+    MY_COMPENSATION_ITEM,
+    NOTIFS_ITEM,
+    SETTINGS_ITEM,
+  ],
+  // Ads Manager — runs paid ads / GMV Max for the brands an OL assigns them
+  // (Settings → Ads Manager Brands). "My Brands", Brand Analytics and GMV Max
+  // are all RLS-scoped to that set, so they see their brands and no others.
+  // No Reporting (they don't write client reports), no Performance (no rating
+  // model for ads yet), no Creator Library / Video Reviews (APC surfaces).
+  ads_manager: [
+    DASHBOARD_ITEM,
+    MY_BRANDS,
+    BRAND_ANALYTICS,
+    { label: 'GMV Max', icon: ReportIcon, to: '/gmv-max' },
+    TASKS_ITEM,
+    AGENDA_GROUP_GUEST,
+    INCENTIVES_ITEM,
+    ATTENDANCE_ITEM,
+    KNOWLEDGE_ITEM,
     REQUESTS_GROUP_APPLIER,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,

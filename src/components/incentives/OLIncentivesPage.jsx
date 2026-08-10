@@ -674,6 +674,7 @@ export default function OLIncentivesPage() {
   const [allUsers, setAllUsers] = useState([]); // both APCs and IPCs
   const [tlUsers, setTlUsers] = useState([]);   // Team Leads (read-only breakdown for the OL)
   const [olUsers, setOlUsers] = useState([]);   // Operation Leads (read-only view; includes self)
+  const [amUsers, setAmUsers] = useState([]);   // Ads Managers (OL-managed, like APCs)
   const [records, setRecords] = useState({}); // userId → incentive doc
   const [loading, setLoading] = useState(true);
   const [detailsTarget, setDetailsTarget] = useState(null);
@@ -704,13 +705,18 @@ export default function OLIncentivesPage() {
       }
 
       // 2. Load ALL APCs and IPCs, and (for the read-only TL + OL breakdowns) all TLs and OLs.
-      const [teamList, tlList, olList] = await Promise.all([
+      const [teamList, tlList, olList, amList] = await Promise.all([
         listUsersByRoles(['apc', 'ipc']),
         listUsersByRoles(['tl']),
         listUsersByRoles(['ol']),
+        // Ads Managers — listUsersByRoles resolves their brands from
+        // ads_manager_brands (mig 316), so the cards show the brands they run
+        // ads for, exactly like an APC's assigned brands.
+        listUsersByRoles(['ads_manager']),
       ]);
       setAllUsers(teamList);
       setTlUsers(tlList);
+      setAmUsers(amList);
       // Show every OL the brands behind each OL's incentive. Load ALL OLs' curated
       // brands in one query (oib_select RLS lets an active OL/Boss read every row)
       // and attach per OL, so the OL Incentives tab cards render them.
@@ -725,7 +731,7 @@ export default function OLIncentivesPage() {
       incList.forEach((data) => {
         const uid = data.userId;
         if (!uid) return;
-        if (['apc', 'ipc', 'tl', 'ol'].includes(data.userRole)) {
+        if (['apc', 'ipc', 'tl', 'ol', 'ads_manager'].includes(data.userRole)) {
           map[uid] = data;
         }
       });
@@ -733,7 +739,7 @@ export default function OLIncentivesPage() {
       // 3b. Auto carry-forward: for any managed user (APC/IPC/TL) without a plan
       // this month, fall back to their most recent prior plan and synthesise a
       // ghost record (no doc yet) with achieved/completed reset.
-      const missing = [...teamList, ...tlList, ...olList].filter(u => !map[u.id]);
+      const missing = [...teamList, ...tlList, ...olList, ...amList].filter(u => !map[u.id]);
       await Promise.all(missing.map(async (u) => {
         try {
           const prior = await getMostRecentPriorPlan(u.id, month);
@@ -782,14 +788,17 @@ export default function OLIncentivesPage() {
 
   const apcs = allUsers.filter(u => !u.userType || u.userType === 'apc');
   const ipcs = allUsers.filter(u => u.userType === 'ipc');
-  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers : tab === 'ols' ? olUsers : [];
-  // The OL manages APC/IPC and TL incentives. OL incentives are the Boss's to
-  // manage, so only the OL tab is read-only here. (Server-side too: mig 301 lets an
-  // OL write/verify any target except roles ol/developer/boss, and hard-locks the
-  // OL/admin rows — so the TL tab being editable is already backed by RLS.)
+  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers
+    : tab === 'ols' ? olUsers : tab === 'ams' ? amUsers : [];
+  // The OL manages APC/IPC, TL and Ads Manager incentives. OL incentives are the
+  // Boss's to manage, so only the OL tab is read-only here. (Server-side too: mig
+  // 301 lets an OL write/verify any target except roles ol/developer/boss, and
+  // hard-locks the OL/admin rows — so every editable tab is backed by RLS.)
   const readOnly = tab === 'ols';
-  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : tab === 'tls' ? 'TLs' : 'OLs';
-  const roleWord = tab === 'apcs' ? 'APC' : tab === 'ipcs' ? 'IPC' : tab === 'tls' ? 'TL' : tab === 'ols' ? 'OL' : '';
+  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : tab === 'tls' ? 'TLs'
+    : tab === 'ams' ? 'Ads Managers' : 'OLs';
+  const roleWord = tab === 'apcs' ? 'APC' : tab === 'ipcs' ? 'IPC' : tab === 'tls' ? 'TL'
+    : tab === 'ams' ? 'Ads Manager' : tab === 'ols' ? 'OL' : '';
 
   // Apply search + filters before rendering and for stats
   const list = baseList.filter(u => {
@@ -912,7 +921,7 @@ export default function OLIncentivesPage() {
   // pays below the Boss (APCs + IPCs + TLs + both OLs), shown identically on every
   // management tab. OLs are included so the total reflects the WHOLE payroll (the
   // OLs' own salary + incentives were previously excluded). ──
-  const snapshotStats = computeCombinedStats([...apcs, ...ipcs, ...tlUsers, ...olUsers], records);
+  const snapshotStats = computeCombinedStats([...apcs, ...ipcs, ...tlUsers, ...olUsers, ...amUsers], records);
 
   // My incentives summary
   const myAllItems     = [...myItems.incentives, ...myItems.bonuses];
@@ -950,6 +959,7 @@ export default function OLIncentivesPage() {
           { key: 'apcs', label: 'APC Incentives', icon: 'bi-people' },
           { key: 'ipcs', label: 'IPC Incentives', icon: 'bi-people-fill' },
           { key: 'tls',  label: 'TL Incentives',  icon: 'bi-person-badge' },
+          { key: 'ams',  label: 'Ads Managers',   icon: 'bi-megaphone' },
           { key: 'ols',  label: 'OL Incentives',  icon: 'bi-person-workspace' },
           { key: 'my',   label: 'My Incentives',  icon: 'bi-person' },
         ].map(t => (
