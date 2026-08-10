@@ -76,8 +76,13 @@ export const eukaConversionFunnel = (storeId, startDate, endDate, fresh) =>
 
 // ── Dashboard — {postedDateRange:{start,end}} form ────────────────
 const pdr = (storeId, start, end, extra = {}) => ({ storeId, postedDateRange: { start, end }, ...extra });
+// Products: Euka REMOVED /dashboard/top-products-by-video-revenue (Aug 2026 —
+// 404 "Route not found"). products-performance replaces it and is richer: it
+// returns per-product totalGmv / affiliateGmv / orders / itemsSold / videosPosted
+// in ONE call, so nothing needs a per-product performance-overview follow-up.
+// Takes pageSize (not limit) + sortField/sortOrder; there is no revenue delta.
 export const eukaTopProducts = (storeId, start, end, extra = {}, fresh) =>
-  call('/dashboard/top-products-by-video-revenue', { body: pdr(storeId, start, end, extra), fresh });
+  call('/dashboard/products-performance', { body: pdr(storeId, start, end, { sortField: 'gmv', sortOrder: 'DESC', ...extra }), fresh });
 export const eukaTopCreators = (storeId, start, end, extra = {}, fresh) =>
   call('/dashboard/top-creators-by-gmv', { body: pdr(storeId, start, end, extra), fresh });
 export const eukaLivestreamGmv = (storeId, start, end, fresh) =>
@@ -153,7 +158,7 @@ export async function buildEukaAutofillData({ storeId, week, fresh = false }) {
   const [overview, creatorsResp, prodResp] = await Promise.all([
     eukaOverview(storeId, s, e, {}, fresh),
     eukaTopCreators(storeId, s, e, { limit: 10 }, fresh).catch(() => null),
-    eukaTopProducts(storeId, s, e, { limit: 10 }, fresh).catch(() => null),
+    eukaTopProducts(storeId, s, e, { pageSize: 25 }, fresh).catch(() => null),
   ]);
   if (!overview) throw new Error('Euka returned no performance data for this week.');
 
@@ -165,16 +170,10 @@ export async function buildEukaAutofillData({ storeId, week, fresh = false }) {
     notes: '',
   }));
 
-  // Per-product AFFILIATE GMV + orders: one filtered performance-overview
-  // per product (the productIds filter) — this is the number the report's
-  // product column uses.
-  const baseProducts = prodResp?.products || [];
-  const withGmv = await Promise.all(baseProducts.map((p) =>
-    eukaOverview(storeId, s, e, { productIds: [p.productId] }, fresh)
-      .then((o) => ({ ...p, affiliateGmv: o?.totalAffiliateGMV ?? null, orders: o?.totalOrders ?? null }))
-      .catch(() => ({ ...p, affiliateGmv: null, orders: null })),
-  ));
-  const productHighlights = withGmv
+  // Per-product AFFILIATE GMV + orders — the numbers the report's product
+  // column uses. products-performance returns both per row, so this no longer
+  // fans out one filtered performance-overview call per product.
+  const productHighlights = (prodResp?.products || [])
     .filter((p) => Number(p.affiliateGmv) > 0)
     .sort((a, b) => Number(b.affiliateGmv) - Number(a.affiliateGmv))
     .slice(0, 8)

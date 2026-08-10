@@ -177,17 +177,33 @@ Deno.serve(async (req) => {
     // Shared-key brands: the key sees ALL stores, so the frontend can't tell
     // them apart. Force the request to THIS brand's store so it can never read
     // a sibling brand's data. (Dashboard endpoints take storeId in the body.)
-    if (brandStoreId) {
-      if (path.startsWith('/dashboard/') || path === '/data-export') {
-        body = { ...(body && typeof body === 'object' ? body : {}), storeId: brandStoreId };
+    if (brandStoreId && path.startsWith('/dashboard/')) {
+      body = { ...(body && typeof body === 'object' ? body : {}), storeId: brandStoreId };
+    }
+
+    // /data-export is a GET, so its scope lives in the QUERY, not the body
+    // (the old body injection above never applied to it). Euka now requires
+    // `brand_id` next to `store_id` there — and brand_id is what actually
+    // scopes the rows: a store/brand mismatch returns the OTHER brand's data.
+    // So resolve BOTH server-side from euka_stores (mig 315) and overwrite
+    // whatever the client sent.
+    let effQuery: Record<string, unknown> = (query && typeof query === 'object') ? { ...query } : {};
+    if (path === '/data-export') {
+      const storeId = brandStoreId || String(effQuery.store_id || '').trim();
+      if (!storeId) return json({ error: 'data-export needs a store_id' }, 400);
+      const { data: st } = await admin
+        .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
+      if (!st?.euka_brand_id) {
+        return json({ error: `No Euka brand id on file for store ${storeId} — add it to euka_stores.euka_brand_id.` }, 500);
       }
+      effQuery = { ...effQuery, store_id: storeId, brand_id: st.euka_brand_id };
     }
 
     // Build the upstream URL (+ query string for GET endpoints).
     let url = EUKA_BASE + path;
-    if (query && typeof query === 'object') {
+    {
       const qs = new URLSearchParams();
-      for (const [k, v] of Object.entries(query)) {
+      for (const [k, v] of Object.entries(effQuery)) {
         if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
       }
       const s = qs.toString();
@@ -196,7 +212,7 @@ Deno.serve(async (req) => {
 
     // ── Cache (skip CSV exports — they can be large/streamed) ───────
     const isExport = path === '/data-export';
-    const cacheKey = `${brandSlug}:${method}:${path}:${JSON.stringify(query || {})}:${JSON.stringify(body || {})}`;
+    const cacheKey = `${brandSlug}:${method}:${path}:${JSON.stringify(effQuery)}:${JSON.stringify(body || {})}`;
     if (!fresh && !isExport) {
       const { data: hit } = await admin
         .from('euka_api_cache')

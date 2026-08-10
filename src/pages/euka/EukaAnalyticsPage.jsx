@@ -365,16 +365,17 @@ function TopCreatorsSection({ storeId, start, end }) {
   );
 }
 function TopProductsSection({ storeId, start, end }) {
-  const q = useEuka(['topProducts', storeId, start, end], (f) => eukaTopProducts(storeId, start, end, { limit: 10 }, f), true);
+  const q = useEuka(['topProducts', storeId, start, end], (f) => eukaTopProducts(storeId, start, end, { pageSize: 10 }, f), true);
   const rows = q.data?.products || [];
   return (
-    <Section span={6} title="Top products by video revenue" icon="bi-box-seam" color="#3b82f6">
+    <Section span={6} title="Top products by GMV" icon="bi-box-seam" color="#3b82f6">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <Table empty="No products in range." rows={rows} cols={[
           { key: 'title', label: 'Product', render: (r) => <span className="fw-semibold text-truncate d-inline-block" style={{ maxWidth: 260 }}>{r.title || r.productId}</span> },
-          { key: 'videoCount', label: 'Videos', align: 'right', render: (r) => fmtNum(r.videoCount) },
-          { key: 'totalRevenue', label: 'Revenue', align: 'right', render: (r) => fmtMoney0(r.totalRevenue) },
-          { key: 'revenueDelta', label: 'Δ', align: 'right', render: (r) => <Delta pct={r.revenueDelta} /> },
+          { key: 'videosPosted', label: 'Videos', align: 'right', render: (r) => fmtNum(r.videosPosted) },
+          { key: 'orders', label: 'Orders', align: 'right', render: (r) => fmtNum(r.orders) },
+          { key: 'affiliateGmv', label: 'Affiliate GMV', align: 'right', render: (r) => fmtMoney0(r.affiliateGmv) },
+          { key: 'totalGmv', label: 'GMV', align: 'right', render: (r) => fmtMoney0(r.totalGmv) },
         ]} />
       )}
     </Section>
