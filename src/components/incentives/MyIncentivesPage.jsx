@@ -57,13 +57,16 @@ function calcBreakdown(rec) {
 // the original record so a tampered client can't persist a changed target either.
 function EditProgressRow({ item, cat, onChange }) {
   const isAtt    = item.source === 'attendance';
+  // GMV-Max achieved comes from Brand Analytics (mig 317) — not typed here.
+  const isGmvMax = item.source === 'gmv_max';
+  const isAuto   = isAtt || isGmvMax;
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
   const p        = pct(achieved, target);          // display % only (rounded, capped 100)
   const done     = autoComplete({ ...item, achievedValue: achieved, targetValue: target }); // single rule: raw ratio >= 0.9
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAtt ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAtt ? '#bfdbfe' : '#e9ecef')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAuto ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAuto ? '#bfdbfe' : '#e9ecef')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
@@ -92,11 +95,11 @@ function EditProgressRow({ item, cat, onChange }) {
           </div>
         </div>
         <div className="col-6">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAtt && <span className="text-muted"> (auto)</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAuto && <span className="text-muted"> (auto{isGmvMax ? ' · Brand Analytics' : ''})</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
               onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
-              readOnly={isAtt} disabled={isAtt} style={isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined} />
+              readOnly={isAuto} disabled={isAuto} style={isAuto ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
         </div>
@@ -104,6 +107,12 @@ function EditProgressRow({ item, cat, onChange }) {
       {isAtt && (
         <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
           <i className="bi bi-calendar-check me-1" />Filled automatically from this month's attendance %.
+        </div>
+      )}
+      {isGmvMax && (
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
+          <i className="bi bi-graph-up-arrow me-1" />
+          Achieved comes from this brand's GMV in Brand Analytics — no need to type it.
         </div>
       )}
     </div>
@@ -148,10 +157,11 @@ function EditProgressModal({ record, onClose, onSaved }) {
       const mapItem = (it, orig) => {
         const o = orig.get(it.id) || {};
         const isAtt = o.source === 'attendance';
+        const isAuto = isAtt || o.source === 'gmv_max';
         return {
           id: it.id, text: o.text, amount: o.amount,
           targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
-          achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(it.achievedValue) || 0),
+          achievedValue: isAuto ? (Number(o.achievedValue) || 0) : (Number(it.achievedValue) || 0),
           suffix:        isAtt ? '%' : itemSuffix(o),
           completed:     isAtt ? !!o.completed : (it.completed || false),
           completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),

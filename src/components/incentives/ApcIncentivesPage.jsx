@@ -167,6 +167,10 @@ function EditItemRow({ item, category, onChange }) {
   const p        = pct(achieved, target);          // display % only (rounded, capped 100)
   const isCompleted = autoComplete(item);           // completion = raw ratio >= 0.9 (single rule)
   const isAtt    = item.source === 'attendance';
+  // GMV-Max achieved is derived from Brand Analytics (mig 317) — the APC no
+  // longer types it, so the field is locked exactly like an attendance item.
+  const isGmvMax = item.source === 'gmv_max';
+  const isAuto   = isAtt || isGmvMax;
 
   return (
     <div
@@ -217,15 +221,19 @@ function EditItemRow({ item, category, onChange }) {
         </div>
         <div className="col-6">
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
-            Achieved {isAtt ? <span className="text-muted">(auto · attendance)</span> : (target ? <span className="text-muted">/ {fmtUnitValue(target, unitSfx)}</span> : '')}
+            Achieved {isAtt
+              ? <span className="text-muted">(auto · attendance)</span>
+              : isGmvMax
+                ? <span className="text-muted">(auto · Brand Analytics)</span>
+                : (target ? <span className="text-muted">/ {fmtUnitValue(target, unitSfx)}</span> : '')}
           </label>
           <div className="input-group input-group-sm">
             <input
               type="number" className="form-control"
               placeholder="Your result" min="0" value={achieved}
               onChange={e => onChange(category, item.id, 'achievedValue', e.target.value)}
-              readOnly={isAtt} disabled={isAtt}
-              style={isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined}
+              readOnly={isAuto} disabled={isAuto}
+              style={isAuto ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined}
             />
             {unitSfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{unitSfx}</span>}
           </div>
@@ -295,11 +303,13 @@ function EditModal({ record, items, onClose, onSaved }) {
         incentives: editItems.incentives.map(i => {
           const o = origInc.get(i.id) || {};
           const isAtt = o.source === 'attendance';
+          const isAuto = isAtt || o.source === 'gmv_max';
           return {
             id: i.id, text: o.text, amount: o.amount,
             targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
-            // Attendance items ignore any typed value — keep the auto figure.
-            achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(i.achievedValue) || 0),
+            // Auto items (attendance %, GMV-Max) ignore any typed value — keep
+            // the derived figure; the save funnel strips it again anyway.
+            achievedValue: isAuto ? (Number(o.achievedValue) || 0) : (Number(i.achievedValue) || 0),
             suffix:        isAtt ? '%' : itemSuffix(o),
             completed:     isAtt ? !!o.completed : (i.completed || false),
             completedBy:   isAtt ? (o.completedBy || null) : (i.completed ? (apcProfile?.userName || currentUser.uid) : null),
@@ -312,10 +322,11 @@ function EditModal({ record, items, onClose, onSaved }) {
         bonuses: editItems.bonuses.map(b => {
           const o = origBon.get(b.id) || {};
           const isAtt = o.source === 'attendance';
+          const isAuto = isAtt || o.source === 'gmv_max';
           return {
             id: b.id, text: o.text, amount: o.amount,
             targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
-            achievedValue: isAtt ? (Number(o.achievedValue) || 0) : (Number(b.achievedValue) || 0),
+            achievedValue: isAuto ? (Number(o.achievedValue) || 0) : (Number(b.achievedValue) || 0),
             suffix:        isAtt ? '%' : itemSuffix(o),
             completed:     isAtt ? !!o.completed : (b.completed || false),
             completedBy:   isAtt ? (o.completedBy || null) : (b.completed ? (apcProfile?.userName || currentUser.uid) : null),

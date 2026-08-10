@@ -61,6 +61,10 @@ function stripAttendanceForSave(items) {
     // (e.g. 70). Both are read-time-derived, so never freeze achieved/completed.
     if (it.source === 'attendance') return { ...it, achievedValue: null, completed: false, completedBy: null, targetValue: 100, suffix: it.suffix || '%' };
     if (it.source === 'ol_brands')  return { ...it, achievedValue: null, completed: false, completedBy: null, suffix: it.suffix || '%' };
+    // GMV-Max: achieved is derived, but `completed` is a HUMAN decision (a TL/OL
+    // ticks it) and the TARGET is real money the OL set — so blank the achieved
+    // only and leave both of those alone.
+    if (it.source === 'gmv_max')    return { ...it, achievedValue: null };
     return it;
   });
 }
@@ -160,9 +164,58 @@ export async function applyOlBrandsAutofill(rows, month) {
   });
 }
 
-// Both read-time overlays, in sequence — the single entry point every read path uses.
+// ── GMV-Max auto-fill (mig 317) ───────────────────────────────────
+// A per-brand item flagged { source: 'gmv_max' } takes its achievedValue from
+// that brand's month figure in Brand Analytics — brand_monthly_metrics
+// .gmv_achieved, which is what the APC enters at clock-in (mig 311). Verified
+// same metric: for every brand carrying one of these items the incentive target
+// and the Brand Analytics GMV target are identical, currency included.
+//
+// Unlike attendance/ol_brands this does NOT derive `completed` — a TL/OL still
+// ticks the item — so there is no month-closed money gate to apply here. It
+// only ever replaces a number the person used to type by hand.
+export async function fetchGmvMaxAchieved(month) {
+  const { data, error } = await supabase.rpc('gmv_max_achieved_map', { p_month: month });
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  (data || []).forEach((r) => m.set(r.brand_id, Number(r.achieved) || 0));
+  return m;
+}
+function _hasGmvMaxItem(row) {
+  return [...(row?.incentives || []), ...(row?.bonuses || [])]
+    .some((it) => it && it.source === 'gmv_max' && it.brandId);
+}
+export async function applyGmvMaxAutofill(rows, month) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.some((r) => !_isPaid(r) && _hasGmvMaxItem(r))) return list;
+  let byBrand;
+  try { byBrand = await fetchGmvMaxAchieved(month); }
+  // eslint-disable-next-line no-console
+  catch (e) { console.warn('gmv-max autofill skipped:', e.message); return list; }
+  const patchItem = (it) => {
+    if (!it || it.source !== 'gmv_max' || !it.brandId) return it;
+    // No metrics row yet for this brand+month → 0, not the stale typed figure.
+    // Leaving the old number would be worse than an honest zero: it would read
+    // as progress nobody can trace to a source.
+    return { ...it, achievedValue: byBrand.has(it.brandId) ? byBrand.get(it.brandId) : 0 };
+  };
+  return list.map((r) => {
+    if (_isPaid(r)) return r;   // frozen at payout — never re-overlay
+    return {
+      ...r,
+      incentives: (r.incentives || []).map(patchItem),
+      bonuses:    (r.bonuses    || []).map(patchItem),
+    };
+  });
+}
+
+// All three read-time overlays, in sequence — the single entry point every read
+// path uses. Order is irrelevant: each only touches its own `source`.
 export async function applyDerivedAutofill(rows, month) {
-  return applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month);
+  return applyGmvMaxAutofill(
+    await applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month),
+    month,
+  );
 }
 
 // ── OL incentive-brands curation (Settings) + per-brand status (panel) ──────

@@ -39,15 +39,28 @@ const looksLikeAttendance = (text) => /attendance|punctual|absence/i.test(text |
 // The ol_brands toggle belongs on an OL "% of my brands hit their GMV target"
 // line — reveal it when the row is already flagged or its text names brands+GMV.
 const looksLikeOlBrands = (text) => /brand.*gmv|gmv.*brand|brands hit/i.test(text || '');
+// A per-brand GMV-Max line ("Total Revenue in GMV Max", "Total GMV from GMV Max",
+// "... (Inno Supps)"). Its Achieved is filled from Brand Analytics (mig 317).
+const looksLikeGmvMax = (text) => /gmvs*max/i.test(text || '');
 
 function LineRow({ item, onChange, onRemove, hideToggles }) {
   const isAtt      = item.source === 'attendance';
   const isOlBrands = item.source === 'ol_brands';
+  const isGmvMax   = item.source === 'gmv_max';
+  // Brand rows only. Stamp the flag as soon as the line is recognisably a
+  // GMV-Max one, so a new plan is auto-filled without anyone remembering to
+  // flip a switch. `source === undefined` means "never decided"; toggling the
+  // switch off writes null, which is a decision and is respected.
+  const canGmvMax = !!hideToggles && looksLikeGmvMax(item.text);
+  useEffect(() => {
+    if (canGmvMax && item.source === undefined) onChange(item.id, 'source', 'gmv_max');
+  }, [canGmvMax, item.source, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const suffix = isAtt ? '%' : (item.suffix ?? (item.unit === 'percent' ? '%' : ''));
   // Brand-linked rows (hideToggles) never show the attendance/ol_brands source
   // toggles — those only belong on "Other" (non-brand) lines.
   const showAttToggle = !hideToggles && !isOlBrands && (isAtt || looksLikeAttendance(item.text));
   const showOlToggle  = !hideToggles && !isAtt && (isOlBrands || looksLikeOlBrands(item.text));
+  const showGmvToggle = canGmvMax || isGmvMax;
 
   // Toggling attendance mode pins Target=100 and unit=% so the ≥90% rule
   // means "≥90% attendance". Achieved is then filled from live attendance.
@@ -72,6 +85,10 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
     } else {
       onChange(item.id, 'source', null);
     }
+  }
+
+  function toggleGmvMax(on) {
+    onChange(item.id, 'source', on ? 'gmv_max' : null);
   }
 
   const lockStyle = isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
@@ -137,6 +154,30 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
             <i className="bi bi-bullseye me-1" />
             Auto-fill “Achieved” from this OL's incentive-brand roll-up
           </label>
+        </div>
+      )}
+      {showGmvToggle && (
+        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
+          <input
+            className="form-check-input flex-shrink-0 mt-0"
+            type="checkbox"
+            role="switch"
+            id={`gmvmax-${item.id}`}
+            checked={isGmvMax}
+            onChange={e => toggleGmvMax(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor={`gmvmax-${item.id}`} style={{ fontSize: '0.72rem', color: isGmvMax ? '#1e40af' : '#6c757d' }}>
+            <i className="bi bi-graph-up-arrow me-1" />
+            Auto-fill “Achieved” from this brand's GMV in Brand Analytics
+          </label>
+        </div>
+      )}
+      {isGmvMax && (
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
+          <i className="bi bi-info-circle me-1" />
+          Achieved tracks the brand's month figure in Brand Analytics — the number
+          the APC enters at clock-in — so nobody types it by hand. Set the Target
+          here; ticking the item as earned stays a manual decision.
         </div>
       )}
       {isOlBrands && (

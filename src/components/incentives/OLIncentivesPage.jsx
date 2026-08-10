@@ -171,12 +171,14 @@ function AttendanceBadge() {
 
 // Generic "Auto" marker for any read-time-derived item (attendance or ol_brands).
 function AutoBadge({ source }) {
-  const isBrands = source === 'ol_brands';
+  const meta = {
+    ol_brands: { title: 'Auto-filled from your incentive-brands roll-up', icon: 'bi-bullseye' },
+    gmv_max:   { title: "Auto-filled from the brand's GMV in Brand Analytics", icon: 'bi-graph-up-arrow' },
+  }[source] || { title: 'Auto-filled from monthly attendance %', icon: 'bi-calendar-check' };
   return (
-    <span className="badge rounded-pill"
-      title={isBrands ? 'Auto-filled from your incentive-brands roll-up' : 'Auto-filled from monthly attendance %'}
+    <span className="badge rounded-pill" title={meta.title}
       style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
-      <i className={`bi ${isBrands ? 'bi-bullseye' : 'bi-calendar-check'} me-1`} />Auto
+      <i className={`bi ${meta.icon} me-1`} />Auto
     </span>
   );
 }
@@ -232,8 +234,11 @@ function BrandTierChip({ brand }) {
 function EditRow({ item, cat, onChange, lockTarget = false }) {
   const isAtt      = item.source === 'attendance';
   const isOlBrands = item.source === 'ol_brands';
-  const isDerived  = isAtt || isOlBrands;        // read-time-filled → locked here
-  const lockTgt    = isDerived || lockTarget;    // target read-only?
+  const isGmvMax   = item.source === 'gmv_max';
+  const isDerived  = isAtt || isOlBrands || isGmvMax;   // achieved is read-time-filled → locked
+  // GMV-Max differs from the other two: only its ACHIEVED is derived. The target
+  // is the per-brand money figure the OL sets, so it stays editable here.
+  const lockTgt    = (isDerived && !isGmvMax) || lockTarget;
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
@@ -289,10 +294,12 @@ function EditRow({ item, cat, onChange, lockTarget = false }) {
       </div>
       {isDerived && (
         <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
-          <i className={`bi ${isAtt ? 'bi-calendar-check' : 'bi-bullseye'} me-1`} />
+          <i className={`bi ${isAtt ? 'bi-calendar-check' : isGmvMax ? 'bi-graph-up-arrow' : 'bi-bullseye'} me-1`} />
           {isAtt
             ? "Filled automatically from this month's attendance %."
-            : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
+            : isGmvMax
+              ? "Achieved comes from this brand's GMV in Brand Analytics — the figure the APC enters at clock-in. Set the target here; tick the item yourself when it's earned."
+              : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
         </div>
       )}
     </div>
