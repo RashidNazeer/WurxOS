@@ -522,7 +522,7 @@ export default function App() {
               <Route
                 path="/analytics/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'ads_manager']}>
+                  <RoleGuard allow={['boss', 'ol', 'pctl', 'ads_manager']}>
                     <BrandAnalyticsPage />
                   </RoleGuard>
                 }
