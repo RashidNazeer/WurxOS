@@ -32,8 +32,11 @@ portals — everything an agency needs.
 - **Repo:** the GitHub remote is `RashidNazeer/WurxOS` (private) = `origin`;
   all commits push there. The "WurxOS-V2" name is only the local folder /
   internal project name (this is the v2 rewrite) — there is **no** separate
-  "v2" repo on GitHub. A fresh clone lands on `main`; active work lives on
-  feature branches, so check `git branch -r` after cloning.
+  "v2" repo on GitHub. A fresh clone lands on `main`, which as of
+  **2026-08-11** is the production code: `feature/brand-linked-incentives` (54
+  commits that had been running in prod while main sat behind) was merged in.
+  Revert point for that merge: tag `stable-pre-main-merge-2026-08-11`.
+  Other feature branches still exist — check `git branch -r` after cloning.
 - Read **`.claude/memory/git-workflow.md`** for the full policy.
 - TL;DR: atomic commits to `main` by default; branch only when a change spans
   multiple commits OR is risky. Merge with `--no-ff`. NEVER `reset --hard` on
@@ -44,7 +47,8 @@ portals — everything an agency needs.
 
 ### Migrations
 - Live in `supabase/migrations/*.sql`. Naming: `NNN_short_name.sql`. Currently
-  at **195** (next available is 196).
+  at **318** (next available is 319). Don't trust this number blindly — `ls`
+  the folder, it moves most weeks.
 - Apply via `supabase db push --include-all`. The CLI is already linked to the
   WurxOS-V2 project (ref `xoaaidgvblondjpvxjqp`).
 - Triggers do NOT fire retroactively. If you ship a trigger to keep some
@@ -54,8 +58,11 @@ portals — everything an agency needs.
 ### Edge Functions
 - In `supabase/functions/*/index.ts` (Deno). Deploy via
   `supabase functions deploy <name>`.
-- Active functions: `create-user`, `delete-user`, `wipe-data`, `send-push`,
-  `snooze-notification`, `mark-notification-read`, `euka-sync`.
+- Active functions: `ai-chat`, `create-user`, `creator-sheet`, `delete-user`,
+  `euka-api`, `euka-checkpoint-autofill`, `euka-report-autofill`,
+  `mark-notification-read`, `send-push`, `snooze-notification`,
+  `video-review-targets`, `wipe-data`. (`euka-sync` is RETIRED — the v1 MCP
+  sync; it still exists on the Supabase project but nothing calls it.)
 - `create-user` and `delete-user` are Boss-only admin endpoints. Always route
   user-account mutations through them — don't do `supabase.auth.admin.deleteUser`
   by hand (it leaves data inconsistent — see the Mushammir Qamar incident
