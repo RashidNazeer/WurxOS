@@ -326,7 +326,7 @@ export default function AgendaOngoingPage() {
 
         {showNextUp && (
           <NextUpPanel meetings={weekUpcoming} teamsById={teamsById}
-            busy={busy} onStart={handleStartMeeting} weekProgressed={justFinished || hasActive} />
+            busy={busy} onStart={handleStartMeeting} />
         )}
 
         {!hasActive && !showNextUp && (
@@ -738,32 +738,34 @@ function ActiveRoomsList({ meetings, teamsById, onOpen }) {
 }
 
 // ── Next-up panel (OL, shown after finishing) ───────────────────────────
-function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = false }) {
+function NextUpPanel({ meetings, teamsById, busy, onStart }) {
   const now = useNow();
   const sorted = [...meetings].sort((a, b) =>
     `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`));
   // Per-meeting gate: a team's Start button appears once that meeting's OWN
   // scheduled time is reached (server clock). Once the week is under way (a
   // meeting was finished this session) the rest stay open for back-to-back.
-  const startable = (m) => {
+  // Scheduled time is a hint, never a lock — the two OLs run teams in parallel
+  // and start ahead of the slot. See the same note in AgendaUpcomingPage.
+  const timeReached = (m) => {
     const at = agendaMeetingStartAt(m);
-    return weekProgressed || !at || now.getTime() >= at.getTime();
+    return !at || now.getTime() >= at.getTime();
   };
   const first = sorted[0];
-  const anyStartable = sorted.some(startable);
+  const noSlotReachedYet = sorted.length > 0 && !sorted.some(timeReached);
   return (
     <>
       <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
         <i className="bi bi-arrow-right-circle text-primary" />Next up this week
       </div>
-      {!anyStartable && first && (
+      {noSlotReachedYet && first && (
         <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
           style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '1.15rem' }} />
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Teams are notified. The first meeting can be started at{' '}
+            Teams are notified. The first slot is{' '}
             <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(first.meeting_time)} PKT</strong>
-            {' '}({fmtDate(first.meeting_date)}) — each team unlocks at its own time.
+            {' '}({fmtDate(first.meeting_date)}) — you can start any team before then.
           </div>
         </div>
       )}
@@ -797,18 +799,17 @@ function NextUpPanel({ meetings, teamsById, busy, onStart, weekProgressed = fals
                     </div>
                   )}
                   <div style={{ flexGrow: 1 }} />
-                  {startable(m) ? (
-                    <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
-                      style={{ borderRadius: 8, fontSize: '0.74rem' }}
-                      disabled={busy === `start-${m.id}`}
-                      onClick={() => onStart(m.id)}>
-                      {busy === `start-${m.id}`
-                        ? <span className="spinner-border spinner-border-sm" />
-                        : <><i className="bi bi-play-fill" /> Start Meeting</>}
-                    </button>
-                  ) : (
-                    <div className="text-muted text-center mt-3" style={{ fontSize: '0.7rem' }}>
-                      <i className="bi bi-clock-history me-1" />Starts at {fmtTime(m.meeting_time)} PKT
+                  <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                    disabled={busy === `start-${m.id}`}
+                    onClick={() => onStart(m.id)}>
+                    {busy === `start-${m.id}`
+                      ? <span className="spinner-border spinner-border-sm" />
+                      : <><i className="bi bi-play-fill" /> Start Meeting</>}
+                  </button>
+                  {!timeReached(m) && (
+                    <div className="text-muted text-center mt-1" style={{ fontSize: '0.66rem' }}>
+                      <i className="bi bi-clock-history me-1" />Scheduled {fmtTime(m.meeting_time)} PKT
                     </div>
                   )}
                 </div>

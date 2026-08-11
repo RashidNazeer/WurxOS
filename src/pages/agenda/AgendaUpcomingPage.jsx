@@ -390,26 +390,24 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
   // so its per-team "Notify this team" buttons and the Current-Week highlight
   // stay coherent instead of showing a green "Completed" over un-met teams.
   const allDone = card.rows.length > 0 && card.rows.every((r) => r.meeting && r.meeting.status === 'completed');
-  // Once any meeting in the week has started or finished, the week is
-  // "in progress" — the remaining meetings no longer wait for their date.
-  const weekProgressed = card.rows.some(
-    (r) => r.meeting && ['completed', 'ongoing', 'paused'].includes(r.meeting.status),
-  );
-  // Global time gate (current week): Start buttons stay hidden until the
-  // earliest scheduled meeting time is reached, then all teams unlock
-  // together. Once the week is under way (one started/finished) it stays open.
   const weekUpcoming = card.rows
     .filter((r) => r.meeting && r.meeting.status === 'upcoming')
     .map((r) => r.meeting);
   const earliestMeeting = [...weekUpcoming].sort((a, b) =>
     `${a.meeting_date}${a.meeting_time || ''}`.localeCompare(`${b.meeting_date}${b.meeting_time || ''}`))[0] || null;
-  // Per-meeting gate: each team's Start appears once that meeting's own
-  // scheduled time is reached; once the week is under way it all stays open.
-  const startable = (m) => {
+  // The scheduled time is INFORMATION, not a lock. It used to gate the Start
+  // button per team — a meeting could only be started once its own slot came
+  // round — which broke how the OLs actually work: there are two of them, they
+  // run different teams in parallel, and whoever is ready starts whichever
+  // meeting hasn't started yet, often ahead of the slot. Nothing on the server
+  // ever enforced this: agenda_start_meeting accepts any OL starting any
+  // meeting in upcoming/paused/completed. So the gate was UI-only, and it made
+  // the second OL stare at a card with no button.
+  const timeReached = (m) => {
     const at = agendaMeetingStartAt(m);
-    return weekProgressed || !at || now.getTime() >= at.getTime();
+    return !at || now.getTime() >= at.getTime();
   };
-  const anyStartable = weekUpcoming.some(startable);
+  const noSlotReachedYet = weekUpcoming.length > 0 && !weekUpcoming.some(timeReached);
 
   let state = 'future';
   if (card.isPast) state = 'past';
@@ -468,8 +466,10 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
             // never start/resume/reopen/notify (those stay OL-only).
             const canOpenRoom = card.isCurrent && (isOL || isGuest) && !!r.meeting;
             const rowGuests = (r.guestTeams || []).map((s) => guestLabels[s] || s);
-            const canStart  = olCurrent && mStatus === 'upcoming' && startable(r.meeting);
-            const waitTime  = olCurrent && mStatus === 'upcoming' && !startable(r.meeting);
+            const canStart  = olCurrent && mStatus === 'upcoming';
+            // Slot not here yet — shown as a caption UNDER the button now, not
+            // instead of it.
+            const waitTime  = canStart && !timeReached(r.meeting);
             const meetingBusy = r.meeting && busyId === r.meeting.id;
             return (
               <div key={r.tlId} className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
@@ -531,7 +531,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                 )}
                 {waitTime && (
                   <div className="text-muted mt-1" style={{ fontSize: '0.64rem' }}>
-                    <i className="bi bi-clock-history me-1" />Starts at {fmtTime(r.meetingTime)} PKT
+                    <i className="bi bi-clock-history me-1" />Scheduled {fmtTime(r.meetingTime)} PKT — you can start it now
                   </div>
                 )}
                 {canOpenRoom && mStatus === 'ongoing' && (
@@ -586,13 +586,14 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
             );
           })}
         </div>
-        {live && isOL && !anyStartable && earliestMeeting && (
+        {live && isOL && noSlotReachedYet && earliestMeeting && (
           <div className="rounded-2 p-2 mt-2 d-flex align-items-start gap-2"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <i className="bi bi-megaphone-fill text-primary" style={{ fontSize: '0.8rem', marginTop: 1 }} />
             <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)' }}>
-              Teams notified. You can start meetings at{' '}
-              <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(earliestMeeting.meeting_time)} PKT</strong>.
+              Teams notified. First slot is{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{fmtTime(earliestMeeting.meeting_time)} PKT</strong>
+              {' '}— start any team earlier if you're ready.
             </div>
           </div>
         )}
