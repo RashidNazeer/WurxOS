@@ -244,6 +244,18 @@ export const STATUS_COLOR = {
 // 'approved' silently locked the form as read-only before the first save.
 export function getReportStatus(r) { return r?.status || 'draft'; }
 
+// OL/Boss reminder: nudge whoever owes the next action on these reports —
+// a DRAFT reminds its author (APC) to submit, a SUBMITTED reminds the brand
+// owner (TL) to verify. One notification per recipient (server dedups + re-reads
+// status). Returns { sent } = number of people notified.
+export async function remindReports(ids) {
+  const list = (ids || []).filter(Boolean);
+  if (!list.length) return { sent: 0 };
+  const { data, error } = await supabase.rpc('reports_remind', { p_ids: list });
+  if (error) throw new Error(error.message);
+  return data || { sent: 0 };
+}
+
 // What the current user can do on this report given their role.
 export function reportPermissions({ report, role, uid, brandOwnerId }) {
   const status = getReportStatus(report);
@@ -569,6 +581,41 @@ export async function reopenReport(id, { target = 'verified', note }) {
 }
 
 // --------------------------------------------------------------
+// Per-report reporting stars (mig 303). External reporting is scored per report:
+//   • the TL rates their APC's report 0–5★ at VERIFY  → feeds the APC's score
+//   • the OL rates the TL's report 0–5★ at APPROVE     → feeds the TL's score
+// Both go through gated SECURITY DEFINER RPCs (the reports UPDATE RLS is too broad
+// to guard a single star column). Half-stars (0.5) allowed.
+// --------------------------------------------------------------
+export async function rateApcReport(reportId, stars) {
+  const { error } = await supabase.rpc('report_rate_apc', { p_report_id: reportId, p_stars: Number(stars) });
+  if (error) throw new Error(error.message);
+}
+
+// `note` is an OPTIONAL justification the OL leaves for the TL (mig 309/310). A
+// null star = note-only save (leaves the star untouched). The note lands in the
+// scoped report_tl_stars_notes table, not on the report row.
+export async function rateTlReport(reportId, stars, note = null) {
+  const { error } = await supabase.rpc('report_rate_tl', {
+    p_report_id: reportId,
+    p_stars: stars == null ? null : Number(stars),
+    p_note: note ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+// The OL's justification note for a TL report — readable (RLS) only by the
+// OL/Boss and the report's brand-owner TL (mig 310). null when none / not
+// permitted. Kept OFF the report payload so it never leaks to the APC author.
+export async function getReportTlNote(reportId) {
+  if (!reportId) return null;
+  const { data, error } = await supabase
+    .from('report_tl_stars_notes').select('note').eq('report_id', reportId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.note ?? null;
+}
+
+// --------------------------------------------------------------
 // OL/Boss edit-the-dates — change a report's period without touching
 // any sibling reports. Just an UPDATE in v2 (Postgres uses the row's
 // uuid id; no document-rewrite cascade needed like Firestore).
@@ -805,6 +852,13 @@ export function _normReport(row) {
     // currency reflects across ALL its historical reports at once. Falls back to
     // the old snapshot (then USD) for reports whose brand join is missing.
     currency: row.brand?.currency || data.currency || 'USD',
+
+    // Per-report reporting stars (mig 303). These are top-level columns, NOT
+    // inside `data`, so the `...data` spread above doesn't carry them — copy
+    // them through explicitly (snake_case, matching what ReportRatingBar reads)
+    // or the picker can't show the previously-saved rating after a reload.
+    apc_stars: row.apc_stars ?? null,
+    tl_stars:  row.tl_stars ?? null,
   };
 
   if (isMonthly) {

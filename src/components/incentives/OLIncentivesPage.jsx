@@ -6,8 +6,10 @@ import {
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
-  applyAttendanceAutofill, fetchOlBrandStatus,
+  applyAttendanceAutofill, fetchOlBrandStatus, listOlBrandsByOl, brandHitByTL, fmtUnitValue,
 } from '../../lib/incentivesApi';
+import BrandChip from './BrandChip';
+import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -96,8 +98,9 @@ function OlBrandPanel({ status, olItem, paid }) {
             <div key={s.brand_id} className="d-flex align-items-center gap-2 px-2 py-1" style={{ fontSize: '0.8rem' }}>
               <i className={`bi ${cfg.icon}`} style={{ color: cfg.color, fontSize: '0.85rem' }} />
               <span className="fw-medium text-truncate" style={{ flex: '1 1 auto', minWidth: 0 }}>{s.brand_name}</span>
-              <span className="text-muted text-truncate" style={{ fontSize: '0.68rem', maxWidth: 160 }} title={s.matched_text || ''}>
-                {s.matched_text ? `TL: ${s.matched_text}` : `TL · ${s.owner_name || '—'}`}
+              <span className="text-muted text-truncate" style={{ fontSize: '0.68rem', maxWidth: 160 }}
+                title={s.matched_text ? `Matched TL item: ${s.matched_text}` : 'No matching TL GMV item'}>
+                TL: {s.owner_name || '—'}
               </span>
               <span style={{ color: cfg.color, fontSize: '0.66rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{cfg.label}</span>
             </div>
@@ -168,12 +171,14 @@ function AttendanceBadge() {
 
 // Generic "Auto" marker for any read-time-derived item (attendance or ol_brands).
 function AutoBadge({ source }) {
-  const isBrands = source === 'ol_brands';
+  const meta = {
+    ol_brands: { title: 'Auto-filled from your incentive-brands roll-up', icon: 'bi-bullseye' },
+    gmv_max:   { title: "Auto-filled from the brand's GMV in Brand Analytics", icon: 'bi-graph-up-arrow' },
+  }[source] || { title: 'Auto-filled from monthly attendance %', icon: 'bi-calendar-check' };
   return (
-    <span className="badge rounded-pill"
-      title={isBrands ? 'Auto-filled from your incentive-brands roll-up' : 'Auto-filled from monthly attendance %'}
+    <span className="badge rounded-pill" title={meta.title}
       style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
-      <i className={`bi ${isBrands ? 'bi-bullseye' : 'bi-calendar-check'} me-1`} />Auto
+      <i className={`bi ${meta.icon} me-1`} />Auto
     </span>
   );
 }
@@ -191,17 +196,20 @@ function BrandTierChip({ brand }) {
   const tierKey = brand.tier ? String(brand.tier).toLowerCase() : null;
   const tierColor = tierKey ? _TIER_COLORS[tierKey] : null;
   const inactive = brand.status && String(brand.status).toLowerCase() !== 'active';
+  const hit = brand.is_hit === true;
   return (
     <span
       className="badge d-inline-flex align-items-center gap-1"
       title={[
+        hit ? 'Hit its GMV target' : null,
         brand.tier ? `Tier: ${brand.tier}` : null,
         brand.status ? `Status: ${brand.status}` : null,
         brand.notes || null,
       ].filter(Boolean).join('\n')}
       style={{
-        background: '#f3f4f6',
-        color: '#495057',
+        background: hit ? '#e6f4ea' : '#f3f4f6',
+        color: hit ? '#15803d' : '#495057',
+        border: hit ? '1px solid #bbf7d0' : '1px solid transparent',
         fontSize: '0.6rem',
         fontWeight: 500,
         opacity: inactive ? 0.55 : 1,
@@ -214,6 +222,7 @@ function BrandTierChip({ brand }) {
         }} />
       )}
       {brand.name}
+      {hit && <i className="bi bi-check-circle-fill" style={{ color: '#16a34a', fontSize: '0.6rem', flexShrink: 0 }} />}
     </span>
   );
 }
@@ -225,8 +234,11 @@ function BrandTierChip({ brand }) {
 function EditRow({ item, cat, onChange, lockTarget = false }) {
   const isAtt      = item.source === 'attendance';
   const isOlBrands = item.source === 'ol_brands';
-  const isDerived  = isAtt || isOlBrands;        // read-time-filled → locked here
-  const lockTgt    = isDerived || lockTarget;    // target read-only?
+  const isGmvMax   = item.source === 'gmv_max';
+  const isDerived  = isAtt || isOlBrands || isGmvMax;   // achieved is read-time-filled → locked
+  // GMV-Max differs from the other two: only its ACHIEVED is derived. The target
+  // is the per-brand money figure the OL sets, so it stays editable here.
+  const lockTgt    = (isDerived && !isGmvMax) || lockTarget;
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
@@ -282,10 +294,12 @@ function EditRow({ item, cat, onChange, lockTarget = false }) {
       </div>
       {isDerived && (
         <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
-          <i className={`bi ${isAtt ? 'bi-calendar-check' : 'bi-bullseye'} me-1`} />
+          <i className={`bi ${isAtt ? 'bi-calendar-check' : isGmvMax ? 'bi-graph-up-arrow' : 'bi-bullseye'} me-1`} />
           {isAtt
             ? "Filled automatically from this month's attendance %."
-            : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
+            : isGmvMax
+              ? "Achieved comes from this brand's GMV in Brand Analytics — the figure the APC enters at clock-in. Set the target here; tick the item yourself when it's earned."
+              : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
         </div>
       )}
     </div>
@@ -336,6 +350,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
           completed:     isAtt ? !!o.completed : (it.completed || false),
           completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),
           ...(o.source ? { source: o.source } : {}),
+          ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
         };
       };
       await updateIncentivesProgress({
@@ -449,15 +464,16 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="small fw-semibold">{item.text || '—'}</div>
+            {item.brandName && <div className="mt-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>+{fmtN(item.amount)} PKR</div>
             {item.targetValue > 0 && (
               <div className="d-flex flex-wrap gap-3 mt-1" style={{ fontSize: '0.82rem' }}>
-                <span><span className="text-muted">Target:</span> <span className="fw-semibold" style={{ color: '#1e293b' }}>{fmtN(item.targetValue)}{unitSfx}</span></span>
+                <span><span className="text-muted">Target:</span> <span className="fw-semibold" style={{ color: '#1e293b' }}>{fmtUnitValue(item.targetValue, unitSfx)}</span></span>
                 {item.achievedValue != null && (
                   <span>
                     <span className="text-muted">Achieved:</span>{' '}
                     <span className="fw-semibold" style={{ color: item.completed ? '#15803d' : '#0f172a' }}>
-                      {fmtN(item.achievedValue)}{unitSfx}
+                      {fmtUnitValue(item.achievedValue, unitSfx)}
                     </span>
                     <span className="ms-1" style={{ color: item.completed ? '#16a34a' : '#475569', fontWeight: 600 }}>({p}%)</span>
                   </span>
@@ -581,6 +597,8 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
             </div>
           )}
 
+          <InactiveBrandsNotice userId={user?.id} role={user?.userType} />
+
           <div className="d-flex gap-2 justify-content-end mt-3">
             {editMode ? (
               <>
@@ -662,6 +680,8 @@ export default function OLIncentivesPage() {
   // APC/IPC management state
   const [allUsers, setAllUsers] = useState([]); // both APCs and IPCs
   const [tlUsers, setTlUsers] = useState([]);   // Team Leads (read-only breakdown for the OL)
+  const [olUsers, setOlUsers] = useState([]);   // Operation Leads (read-only view; includes self)
+  const [amUsers, setAmUsers] = useState([]);   // Ads Managers (OL-managed, like APCs)
   const [records, setRecords] = useState({}); // userId → incentive doc
   const [loading, setLoading] = useState(true);
   const [detailsTarget, setDetailsTarget] = useState(null);
@@ -691,13 +711,25 @@ export default function OLIncentivesPage() {
         setMyItems({ incentives: [], bonuses: [] });
       }
 
-      // 2. Load ALL APCs and IPCs, and (for the read-only TL breakdown) all TLs.
-      const [teamList, tlList] = await Promise.all([
+      // 2. Load ALL APCs and IPCs, and (for the read-only TL + OL breakdowns) all TLs and OLs.
+      const [teamList, tlList, olList, amList] = await Promise.all([
         listUsersByRoles(['apc', 'ipc']),
         listUsersByRoles(['tl']),
+        listUsersByRoles(['ol']),
+        // Ads Managers — listUsersByRoles resolves their brands from
+        // ads_manager_brands (mig 316), so the cards show the brands they run
+        // ads for, exactly like an APC's assigned brands.
+        listUsersByRoles(['ads_manager']),
       ]);
       setAllUsers(teamList);
       setTlUsers(tlList);
+      setAmUsers(amList);
+      // Show every OL the brands behind each OL's incentive. Load ALL OLs' curated
+      // brands in one query (oib_select RLS lets an active OL/Boss read every row)
+      // and attach per OL, so the OL Incentives tab cards render them.
+      let olBrandMap = {};
+      try { olBrandMap = await listOlBrandsByOl(); } catch { olBrandMap = {}; }
+      setOlUsers((olList || []).map((ol) => ({ ...ol, assignedBrands: olBrandMap[ol.id] || [] })));
 
       // 3. Load all incentive records for the selected month (an active OL can read
       // every incentive row per RLS; we keep APC/IPC + TL and key them by user).
@@ -706,7 +738,7 @@ export default function OLIncentivesPage() {
       incList.forEach((data) => {
         const uid = data.userId;
         if (!uid) return;
-        if (['apc', 'ipc', 'tl'].includes(data.userRole)) {
+        if (['apc', 'ipc', 'tl', 'ol', 'ads_manager'].includes(data.userRole)) {
           map[uid] = data;
         }
       });
@@ -714,7 +746,7 @@ export default function OLIncentivesPage() {
       // 3b. Auto carry-forward: for any managed user (APC/IPC/TL) without a plan
       // this month, fall back to their most recent prior plan and synthesise a
       // ghost record (no doc yet) with achieved/completed reset.
-      const missing = [...teamList, ...tlList].filter(u => !map[u.id]);
+      const missing = [...teamList, ...tlList, ...olList, ...amList].filter(u => !map[u.id]);
       await Promise.all(missing.map(async (u) => {
         try {
           const prior = await getMostRecentPriorPlan(u.id, month);
@@ -763,10 +795,17 @@ export default function OLIncentivesPage() {
 
   const apcs = allUsers.filter(u => !u.userType || u.userType === 'apc');
   const ipcs = allUsers.filter(u => u.userType === 'ipc');
-  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers : [];
-  // TL incentives are the Boss's to manage — the OL sees them read-only.
-  const readOnly = tab === 'tls';
-  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : 'TLs';
+  const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers
+    : tab === 'ols' ? olUsers : tab === 'ams' ? amUsers : [];
+  // The OL manages APC/IPC, TL and Ads Manager incentives. OL incentives are the
+  // Boss's to manage, so only the OL tab is read-only here. (Server-side too: mig
+  // 301 lets an OL write/verify any target except roles ol/developer/boss, and
+  // hard-locks the OL/admin rows — so every editable tab is backed by RLS.)
+  const readOnly = tab === 'ols';
+  const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : tab === 'tls' ? 'TLs'
+    : tab === 'ams' ? 'Ads Managers' : 'OLs';
+  const roleWord = tab === 'apcs' ? 'APC' : tab === 'ipcs' ? 'IPC' : tab === 'tls' ? 'TL'
+    : tab === 'ams' ? 'Ads Manager' : tab === 'ols' ? 'OL' : '';
 
   // Apply search + filters before rendering and for stats
   const list = baseList.filter(u => {
@@ -823,6 +862,7 @@ export default function OLIncentivesPage() {
           completed: !!i.completed,
           completedBy: i.completed ? (i.completedBy || myName) : null,
           ...(i.source ? { source: i.source } : {}),
+          ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
         }));
         savedRec = await updateIncentivesProgress({
           rowId: rec.id,
@@ -884,10 +924,11 @@ export default function OLIncentivesPage() {
   const recordsCount  = list.filter(u => records[u.id]).length;
   const verifiedCount = list.filter(u => records[u.id]?.verified).length;
 
-  // ── Combined payout snapshots — APCs+IPCs cumulative, and TLs cumulative ──
-  const combinedStats = computeCombinedStats([...apcs, ...ipcs], records);
-  const tlStats       = computeCombinedStats(tlUsers, records);
-  const snapshotStats = tab === 'tls' ? tlStats : combinedStats;
+  // ── Combined payout snapshot — ONE cumulative figure across EVERYONE the office
+  // pays below the Boss (APCs + IPCs + TLs + both OLs), shown identically on every
+  // management tab. OLs are included so the total reflects the WHOLE payroll (the
+  // OLs' own salary + incentives were previously excluded). ──
+  const snapshotStats = computeCombinedStats([...apcs, ...ipcs, ...tlUsers, ...olUsers, ...amUsers], records);
 
   // My incentives summary
   const myAllItems     = [...myItems.incentives, ...myItems.bonuses];
@@ -925,6 +966,8 @@ export default function OLIncentivesPage() {
           { key: 'apcs', label: 'APC Incentives', icon: 'bi-people' },
           { key: 'ipcs', label: 'IPC Incentives', icon: 'bi-people-fill' },
           { key: 'tls',  label: 'TL Incentives',  icon: 'bi-person-badge' },
+          { key: 'ams',  label: 'Ads Managers',   icon: 'bi-megaphone' },
+          { key: 'ols',  label: 'OL Incentives',  icon: 'bi-person-workspace' },
           { key: 'my',   label: 'My Incentives',  icon: 'bi-person' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -1012,13 +1055,17 @@ export default function OLIncentivesPage() {
           {recordsCount > 0 && (
             <div className="d-flex gap-2 flex-wrap mb-3">
               {[
-                { label: 'Total Payout', value: `${totalPayout.toLocaleString()} PKR`, bg: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' },
-                { label: 'With Plans',   value: `${recordsCount} / ${list.length}`,    bg: '#e8f0fe', color: '#0d6efd' },
-                { label: 'Verified',     value: `${verifiedCount} / ${recordsCount}`,  bg: '#e6f4ea', color: '#198754' },
+                // This section's OWN role total, sitting right beside the combined
+                // (all-roles) total so the OL sees both figures in every section.
+                { label: `${roleWord} Payout`,  value: `${totalPayout.toLocaleString()} PKR`,               bg: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff', sub: `${roleWord} total` },
+                { label: 'Combined Payout',      value: `${snapshotStats.totalPayout.toLocaleString()} PKR`, bg: '#0f172a', color: '#fff', sub: 'all roles incl. OLs' },
+                { label: 'With Plans',           value: `${recordsCount} / ${list.length}`,                  bg: '#e8f0fe', color: '#0d6efd' },
+                { label: 'Verified',             value: `${verifiedCount} / ${recordsCount}`,                bg: '#e6f4ea', color: '#198754' },
               ].map(s => (
-                <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, color: s.color, minWidth: 110 }}>
+                <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, color: s.color, minWidth: 120 }}>
                   <div style={{ fontSize: '0.6rem', opacity: 0.7, letterSpacing: 1, textTransform: 'uppercase' }}>{s.label}</div>
                   <div className="fw-bold" style={{ fontSize: '1rem' }}>{s.value}</div>
+                  {s.sub && <div style={{ fontSize: '0.55rem', opacity: 0.6, marginTop: 1 }}>{s.sub}</div>}
                 </div>
               ))}
             </div>
@@ -1080,7 +1127,10 @@ export default function OLIncentivesPage() {
               {list.map(user => {
                 const rec = records[user.id];
                 const hasData = Boolean(rec);
-                const brands = user.assignedBrands || [];
+                // For OL cards, flag each brand that already hit its GMV target (its
+                // owning TL completed the linked item) so the OL sees who's tracking.
+                const brands = (user.assignedBrands || []).map(b =>
+                  b.ownerId ? { ...b, is_hit: brandHitByTL(records[b.ownerId], b) } : b);
                 const totalItems = hasData ? (rec.incentives || []).length + (rec.bonuses || []).length : 0;
                 const completedItems = hasData ? (rec.incentives || []).filter(i => i.completed).length + (rec.bonuses || []).filter(b => b.completed).length : 0;
                 const breakdown = hasData ? calcBreakdown(rec) : null;
@@ -1171,6 +1221,10 @@ export default function OLIncentivesPage() {
         <UserDetailsModal
           rec={detailsTarget.rec}
           user={detailsTarget.user}
+          // Only the OL section is read-only (Boss-managed). Drive off the section's
+          // readOnly flag so the OL Details modal keeps hiding Verify/Edit/toggle,
+          // while the TL modal now exposes them (OL manages TL incentives).
+          readOnly={readOnly}
           onClose={() => setDetailsTarget(null)}
           onToggleItem={handleToggleItem}
           onVerify={handleVerify}

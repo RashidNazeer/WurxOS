@@ -19,6 +19,7 @@ import BackupSection         from './sections/BackupSection';
 import AmazonHaloSection     from './sections/AmazonHaloSection';
 import CreatorLibrarySection from './sections/CreatorLibrarySection';
 import OlIncentiveBrandsSection from './sections/OlIncentiveBrandsSection';
+import AdsManagerBrandsSection from './sections/AdsManagerBrandsSection';
 import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBrandsSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
@@ -87,6 +88,9 @@ const GROUPS = [
       { id: 'olIncentiveBrands', label: 'My Incentive Brands', sub: 'Brands that count toward your incentive',
         icon: StarIcon, component: OlIncentiveBrandsSection,
         roles: ['ol'] },
+      { id: 'adsManagerBrands', label: 'Ads Manager Brands', sub: 'Which brands each ads manager runs ads for',
+        icon: MegaphoneIcon, component: AdsManagerBrandsSection,
+        roles: ['ol', 'boss'] },
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
         roles: ['boss'] },

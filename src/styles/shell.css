@@ -5,7 +5,13 @@
 
 .shell {
   display: grid;
-  grid-template-columns: var(--sidebar-w, 240px) 1fr;
+  /* minmax(0, …) — NOT a bare 1fr. A 1fr track = minmax(auto, 1fr), whose
+     `auto` minimum is the content's intrinsic width, so a wide child (e.g. the
+     report period strip's card row) forces the whole content column past the
+     viewport and scrolls the ENTIRE page sideways. Pinning the min to 0 lets
+     the column shrink to the available width so inner overflow-x scrollers
+     (and .shell-content's clip) contain wide content instead. */
+  grid-template-columns: var(--sidebar-w, 240px) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
     'sidebar topbar'
@@ -654,7 +660,7 @@
 /* ---------- Mobile ---------- */
 @media (max-width: 860px) {
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'topbar' 'content';
     /* Topbar shrinks to 60px on mobile (see .shell-topbar below) —
        keep the sticky-header offset in sync. */

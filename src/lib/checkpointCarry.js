@@ -14,8 +14,41 @@ import { EMPTY_CHECKPOINT, num, pct, SNAPSHOT_KPIS } from './checkpointModel';
 
 const str = (v) => (v === null || v === undefined ? '' : v);
 
+// Write ONLY this week's "previous" comparison columns from last week's checkpoint
+// into an EXISTING data object (immutably), leaving every current-week field and
+// config untouched. This is the reusable core so "last week" can be populated on
+// EVERY path (create blank, create-from-last, and the Auto-fill button) — not
+// only the one "Create from last week" button, which was the bug.
+export function fillPrevInto(data, prev) {
+  if (!prev || !data) return data;
+  const d = {
+    ...data,
+    snapshot: { ...data.snapshot, kpis: { ...data.snapshot.kpis } },
+    samples: { ...data.samples },
+    traffic: { ...data.traffic },
+    outreach: { ...data.outreach },
+    paid: { ...data.paid },
+  };
+  for (const k of SNAPSHOT_KPIS) {
+    d.snapshot.kpis[k.key] = { ...d.snapshot.kpis[k.key], prev: str(prev.snapshot?.kpis?.[k.key]?.cur) };
+  }
+  d.samples.requestsPrev = str(prev.samples?.requestsReceived);
+  d.traffic.impressionsPrev = str(prev.traffic?.impressions);
+  d.traffic.clicksPrev = str(prev.traffic?.clicks);
+  d.traffic.ordersPrev = str(prev.traffic?.orders);
+  const oip = pct(prev.funnel?.optedIn, prev.funnel?.targetInvites);
+  d.outreach.optInRatePrev = oip == null ? '' : String(Math.round(oip * 10) / 10);
+  d.paid.spendPrev = str(prev.paid?.spend);
+  d.paid.grossRevenuePrev = str(prev.paid?.grossRevenue);
+  const prevSpend = num(prev.paid?.spend);
+  const prevOrders = num(prev.paid?.skuOrders);
+  const prevCpo = (prevSpend != null && prevOrders) ? prevSpend / prevOrders : null;
+  d.paid.costPerOrderPrev = prevCpo == null ? '' : String(Math.round(prevCpo * 100) / 100);
+  return d;
+}
+
 export function carryForward(prev) {
-  const d = EMPTY_CHECKPOINT();
+  let d = EMPTY_CHECKPOINT();
   if (!prev) return d;
 
   // ── non-stat config (identity/format — never fetched, so safe) ──────
@@ -24,25 +57,7 @@ export function carryForward(prev) {
   d.cover.team = str(prev.cover?.team);
 
   // ── PREVIOUS comparison columns = last week's CURRENT values ────────
-  for (const k of SNAPSHOT_KPIS) {
-    d.snapshot.kpis[k.key].prev = str(prev.snapshot?.kpis?.[k.key]?.cur);
-  }
-  d.samples.requestsPrev = str(prev.samples?.requestsReceived);
-  d.traffic.impressionsPrev = str(prev.traffic?.impressions);
-  d.traffic.clicksPrev = str(prev.traffic?.clicks);
-  d.traffic.ordersPrev = str(prev.traffic?.orders);
-
-  // opt-in rate "last week" = last week's computed opt-in rate
-  const oip = pct(prev.funnel?.optedIn, prev.funnel?.targetInvites);
-  d.outreach.optInRatePrev = oip == null ? '' : String(Math.round(oip * 10) / 10);
-
-  // paid "last week" comparison values
-  d.paid.spendPrev = str(prev.paid?.spend);
-  d.paid.grossRevenuePrev = str(prev.paid?.grossRevenue);
-  const prevSpend = num(prev.paid?.spend);
-  const prevOrders = num(prev.paid?.skuOrders);
-  const prevCpo = (prevSpend != null && prevOrders) ? prevSpend / prevOrders : null;
-  d.paid.costPerOrderPrev = prevCpo == null ? '' : String(Math.round(prevCpo * 100) / 100);
+  d = fillPrevInto(d, prev);
 
   // ── sticky paid config (manual, not a fetched stat) ─────────────────
   d.paid.targetRoi = str(prev.paid?.targetRoi);

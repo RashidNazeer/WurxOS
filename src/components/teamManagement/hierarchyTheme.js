@@ -13,13 +13,13 @@ export const ROLE_COLORS = {
 export function roleLabel(role) {
   return {
     boss: 'BOSS', ol: 'OL', tl: 'TEAM LEAD', pctl: 'PAID COLLAB TL',
-    apc: 'APC', ipc: 'IPC',
+    apc: 'APC', ipc: 'IPC', ads_manager: 'ADS MANAGER',
   }[role] || (role || '').toUpperCase();
 }
 
 export function roleShortLabel(role) {
   return {
-    boss: 'BOSS', ol: 'OL', tl: 'TL', pctl: 'PCTL', apc: 'APC', ipc: 'IPC',
+    boss: 'BOSS', ol: 'OL', tl: 'TL', pctl: 'PCTL', apc: 'APC', ipc: 'IPC', ads_manager: 'ADS MGR',
   }[role] || (role || '').toUpperCase();
 }
 

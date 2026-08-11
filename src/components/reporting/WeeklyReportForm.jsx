@@ -16,7 +16,7 @@ import {
   generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
   generateAllInsights,
 } from '../../utils/aiInsights';
-import { findPreviousReport } from '../../lib/reportsApi';
+import { findPreviousReport, num as parseNum } from '../../lib/reportsApi';
 import { runEukaReportAutofill, mergeAutofill } from '../../lib/eukaReportAutofillApi';
 import { productUnitsLabel } from '../../lib/reportUnitsLabel';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
@@ -669,8 +669,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // injected into overallPerformance.roi at save (like autoTotalVideos), never
   // written live so loading a report doesn't falsely mark the form dirty.
   const weeklyGmvMaxRows = (data.gmvMax || []).filter(g => g && g.campaign && String(g.campaign).trim());
-  const weeklyGmvMaxSpend = weeklyGmvMaxRows.reduce((s, g) => s + (Number(g.spend) || 0), 0);
-  const weeklyGmvMaxGmv = weeklyGmvMaxRows.reduce((s, g) => s + (Number(g.gmv) || 0), 0);
+  // num() (not strict Number()) so a currency-tagged cell like "826.71GBP" or
+  // "13164.46USD" — TikTok exports non-USD/some USD brands that way — parses to
+  // its number instead of NaN→0, which used to zero the whole ROI.
+  const weeklyGmvMaxSpend = weeklyGmvMaxRows.reduce((s, g) => s + parseNum(g.spend), 0);
+  const weeklyGmvMaxGmv = weeklyGmvMaxRows.reduce((s, g) => s + parseNum(g.gmv), 0);
   const weeklyRoi = weeklyGmvMaxSpend > 0 ? weeklyGmvMaxGmv / weeklyGmvMaxSpend : null;
   const weeklyRoiStr = weeklyRoi != null ? weeklyRoi.toFixed(2) : '';
 

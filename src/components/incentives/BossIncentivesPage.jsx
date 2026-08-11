@@ -4,8 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   listIncentivesMonth, listUsersByRoles,
   verifyIncentives, clearIncentivePayout,
-  resetAndRoll,
+  resetAndRoll, fmtUnitValue,
 } from '../../lib/incentivesApi';
+import BrandChip from './BrandChip';
+import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ function uid4() { return Math.random().toString(36).slice(2, 10); }
 const TABS = [
   { key: 'apcs', label: 'APCs',            icon: 'bi-person-lines-fill' },
   { key: 'tls',  label: 'Team Leads',      icon: 'bi-person-badge' },
+  { key: 'ams',  label: 'Ads Managers',    icon: 'bi-megaphone' },
   { key: 'ols',  label: 'Operation Leads',  icon: 'bi-person-workspace' },
 ];
 
@@ -75,10 +78,11 @@ function DetailsModal({ rec, userName, onClose }) {
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div>
             <div className="small fw-semibold">{item.text || '—'}</div>
+            {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted" style={{ fontSize: '0.68rem' }}>
               +{(Number(item.amount) || 0).toLocaleString()} PKR
-              {item.targetValue > 0 && <span className="ms-2">· Target: {Number(item.targetValue).toLocaleString()}{unitSfx}</span>}
-              {item.achievedValue > 0 && <span className="ms-2">· Achieved: {Number(item.achievedValue).toLocaleString()}{unitSfx} ({p}%)</span>}
+              {item.targetValue > 0 && <span className="ms-2">· Target: {fmtUnitValue(item.targetValue, unitSfx)}</span>}
+              {item.achievedValue > 0 && <span className="ms-2">· Achieved: {fmtUnitValue(item.achievedValue, unitSfx)} ({p}%)</span>}
             </div>
             {item.completedBy && <div style={{ fontSize: '0.63rem', color: '#198754' }}><i className="bi bi-person-check me-1" />Marked by {item.completedBy}</div>}
           </div>
@@ -142,6 +146,8 @@ function DetailsModal({ rec, userName, onClose }) {
             </div>
             <div className="text-muted text-end mt-1" style={{ fontSize: '0.68rem' }}>Potential: {totalPotential.toLocaleString()} PKR</div>
           </div>
+
+          <InactiveBrandsNotice userId={rec?.user_id} />
 
           <div className="d-flex justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Close</button>
@@ -261,7 +267,7 @@ export default function BossIncentivesPage() {
 
   const [month,        setMonth]        = useState(getCurrentMonth());
   const [tab,          setTab]          = useState('apcs');
-  const [allUsers,     setAllUsers]     = useState({ apcs: [], tls: [], ols: [] });
+  const [allUsers,     setAllUsers]     = useState({ apcs: [], tls: [], ols: [], ams: [] });
   const [records,      setRecords]      = useState({});  // userId → record
   const [loading,      setLoading]      = useState(true);
   const [search,       setSearch]       = useState('');
@@ -279,13 +285,14 @@ export default function BossIncentivesPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [tls, ols, apcs, incList] = await Promise.all([
+      const [tls, ols, apcs, ams, incList] = await Promise.all([
         listUsersByRoles(['tl', 'pctl']),
         listUsersByRoles(['ol']),
         listUsersByRoles(['apc', 'ipc']),
+        listUsersByRoles(['ads_manager']),
         listIncentivesMonth(month),
       ]);
-      setAllUsers({ tls, ols, apcs });
+      setAllUsers({ tls, ols, apcs, ams });
       const map = {};
       incList.forEach((data) => {
         const uid = data.userId;
@@ -362,7 +369,7 @@ export default function BossIncentivesPage() {
 
   // ── Combined payout snapshot (cumulative across APCs + TLs + OLs) ──
   const combinedStats = (() => {
-    const everyone = [...(allUsers.apcs || []), ...(allUsers.tls || []), ...(allUsers.ols || [])];
+    const everyone = [...(allUsers.apcs || []), ...(allUsers.tls || []), ...(allUsers.ols || []), ...(allUsers.ams || [])];
     let totalBase = 0, incEarned = 0, incPotential = 0, bonEarned = 0, bonPotential = 0;
     let withPlans = 0, fullyAchieved = 0, partial = 0, noneEarned = 0, noPlan = 0;
     for (const u of everyone) {

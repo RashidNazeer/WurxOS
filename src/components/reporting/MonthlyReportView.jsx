@@ -1066,8 +1066,14 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       {/* ─── Canvas (printable) ─────────────────────────────────────── */}
       <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 18, border: `1px solid ${C.line}` }}>
 
-        {/* Brand chip + breadcrumb */}
-        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        {/* Brand chip + breadcrumb — sticky so the OL always knows which report
+            they're reading while scrolling a long report. Pins flush under the
+            app topbar (var(--topbar-h)); the canvas background hides content
+            scrolling behind it. */}
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3"
+          style={{ position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 4,
+            background: C.surfaceAlt, paddingTop: 6, paddingBottom: 10, marginBottom: 18,
+            borderBottom: `1px solid ${C.line}` }}>
           <div className="d-flex align-items-center gap-3">
             <div style={{
               width: 42, height: 42, borderRadius: 10, background: C.amber,

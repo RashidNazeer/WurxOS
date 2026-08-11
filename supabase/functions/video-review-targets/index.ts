@@ -137,7 +137,7 @@ async function eukaGet(path: string, key: string): Promise<any> {
 // no-shortcuts ground truth (zero faults). It changes WHO IS SKIPPED, never who
 // gets a message.
 async function fullHistory(
-  handle: string, target: string, candStart: string, storeId: string, key: string,
+  handle: string, target: string, candStart: string, scope: string, key: string,
 ): Promise<{ skip: boolean; days: string[] }> {
   const vids = new Map<string, string>(); // video_id -> posted_date iso
   let end = target;
@@ -147,7 +147,7 @@ async function fullHistory(
     let rows: any[] = [];
     try {
       const r = await eukaGet(
-        `/data-export?type=creator_video_level&store_id=${storeId}` +
+        `/data-export?type=creator_video_level&${scope}` +
         `&start_date=${start}&end_date=${end}&export_type=json&creator_handle=${encodeURIComponent(handle)}`,
         key,
       );
@@ -213,6 +213,19 @@ Deno.serve(async (req) => {
     const key = eukaKeyForSlug(String(brand.euka_slug));
     if (!key) return json({ error: `Euka key not configured for "${brand.brand_name}".` }, 500);
 
+    // /data-export needs BOTH store_id and brand_id (Euka added brand_id in Aug
+    // 2026 — undocumented, and it is the param that actually scopes the rows: a
+    // store/brand mismatch returns another brand's videos). Sending store_id
+    // alone 400s, and eukaGet returns that 400 body, so `data` stops being an
+    // array and every list comes back EMPTY — which reads as "nobody hit a
+    // milestone". Hence the hard link in euka_stores (mig 315), not a guess.
+    const { data: storeRow } = await admin
+      .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
+    if (!storeRow?.euka_brand_id) {
+      return json({ error: `No Euka brand id on file for "${brand.brand_name}" — set euka_stores.euka_brand_id for store ${storeId}.` }, 500);
+    }
+    const scope = `store_id=${encodeURIComponent(storeId)}&brand_id=${encodeURIComponent(String(storeRow.euka_brand_id))}`;
+
     const { data: assign } = await admin
       .from('brand_assignments').select('brand_id').eq('brand_id', brandId).eq('user_id', uid).maybeSingle();
     if (!assign) return json({ error: 'forbidden — this brand is not assigned to you' }, 403);
@@ -227,7 +240,7 @@ Deno.serve(async (req) => {
 
     // ── Step 1: candidates (all posters in window; not GMV-capped) ───
     const cv = await eukaGet(
-      `/data-export?type=creator_videos&store_id=${storeId}` +
+      `/data-export?type=creator_videos&${scope}` +
       `&start_date=${candStart}&end_date=${candEnd}&export_type=json`,
       key,
     );
@@ -257,7 +270,7 @@ Deno.serve(async (req) => {
       while (idx < candidateHandles.length) {
         const handle = candidateHandles[idx++];
         let res: { skip: boolean; days: string[] };
-        try { res = await fullHistory(handle, target, candStart, storeId, key); }
+        try { res = await fullHistory(handle, target, candStart, scope, key); }
         catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
         // Ruled out: 3+ videos predate the window, so all three messages fell due
         // days ago. Nothing due today — and NOT a manual case.

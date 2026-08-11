@@ -16,8 +16,9 @@
 //   topCreators[]:      TOP 3 by GMV — name (@handle), videosPosted (videoCount,
 //                       0 when Euka reports none), gmv (totalGmv) [itemsSold blank]
 //   productHighlights[]: TOP 5 by affiliate GMV — productId, productName (title),
-//                       unitsSold (per-product totalOrders — the report's
-//                       "Orders" column), gmv (per-product totalAffiliateGMV)
+//                       unitsSold (per-product orders — the report's "Orders"
+//                       column), gmv (per-product affiliateGmv), all straight
+//                       from /dashboard/products-performance
 //   overallInsights:    a short auto-generated summary
 //
 // AuthZ: OL/Boss any brand; TL the brand they own; APC/IPC a brand assigned to
@@ -160,7 +161,12 @@ Deno.serve(async (req) => {
       [overview, creatorsResp, prodResp] = await Promise.all([
         eukaPost('/dashboard/performance-overview', { storeId, startDate, endDate }, key),
         eukaPost('/dashboard/top-creators-by-gmv', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 5 }, key).catch(() => null),
-        eukaPost('/dashboard/top-products-by-video-revenue', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 10 }, key).catch(() => null),
+        // products-performance carries per-product affiliateGmv + orders itself.
+        // (It replaced top-products-by-video-revenue, which Euka removed in Aug
+        // 2026 — that 404 was swallowed here, so product rows silently stopped
+        // filling. Ranked by total GMV; we re-rank by AFFILIATE GMV below, so
+        // ask for more rows than the 5 we keep.)
+        eukaPost('/dashboard/products-performance', { storeId, postedDateRange: { start: startDate, end: endDate }, pageSize: 25, sortField: 'gmv', sortOrder: 'DESC' }, key).catch(() => null),
       ]);
     } catch (e) {
       return errOut('euka-fetch', 'Euka did not return performance data for this period. It may be too recent (data not synced yet) or Euka may be temporarily unavailable. Try a slightly older week.', 502, e);
@@ -196,27 +202,20 @@ Deno.serve(async (req) => {
       .filter((c: any) => c.name)
       .slice(0, 3);
 
-    // Per-product AFFILIATE GMV + orders (the report's product columns).
-    const baseProducts = prodResp?.products || [];
-    let productHighlights: any[] = [];
-    try {
-      const withGmv = await Promise.all(baseProducts.map((p: any) =>
-        eukaPost('/dashboard/performance-overview', { storeId, startDate, endDate, productIds: [p.productId] }, key)
-          .then((o: any) => ({ ...p, affiliateGmv: o?.totalAffiliateGMV ?? null, orders: o?.totalOrders ?? null }))
-          .catch(() => ({ ...p, affiliateGmv: null, orders: null })),
-      ));
-      productHighlights = withGmv
-        .filter((p: any) => Number(p.affiliateGmv) > 0)
-        .sort((a: any, b: any) => Number(b.affiliateGmv) - Number(a.affiliateGmv))
-        .slice(0, 5)
-        .map((p: any) => ({
-          productId: p.productId || '',
-          productName: p.title || '',
-          unitsSold: num(p.orders),   // report uses ORDERS as "units"
-          gmv: money(p.affiliateGmv),
-          newVideos: '', videosMtd: '', samplesApprovedWeek: '', samplesApprovedMtd: '', notes: '',
-        }));
-    } catch { productHighlights = []; }
+    // Per-product AFFILIATE GMV + orders (the report's product columns) — one
+    // response, no per-product fan-out. Products with no affiliate GMV are
+    // dropped: the report's product table is an affiliate-performance table.
+    const productHighlights = (prodResp?.products || [])
+      .filter((p: any) => Number(p.affiliateGmv) > 0)
+      .sort((a: any, b: any) => Number(b.affiliateGmv) - Number(a.affiliateGmv))
+      .slice(0, 5)
+      .map((p: any) => ({
+        productId: p.productId || '',
+        productName: p.title || '',
+        unitsSold: num(p.orders),   // report uses ORDERS as "units"
+        gmv: money(p.affiliateGmv),
+        newVideos: '', videosMtd: '', samplesApprovedWeek: '', samplesApprovedMtd: '', notes: '',
+      }));
 
     const data = {
       overallPerformance: {

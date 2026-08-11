@@ -177,7 +177,7 @@ export const V1_WEIGHTAGES = [
   { key: 'critical', label: 'Critical', color: '#7b1fa2', bg: '#f3e5f5', pts: 12 },
 ];
 
-export const ROLE_LABEL = { apc: 'APC', ipc: 'IPC', tl: 'Team Lead', pctl: 'Paid Collab TL', ol: 'Operation Lead', boss: 'Boss', developer: 'Developer' };
+export const ROLE_LABEL = { apc: 'APC', ipc: 'IPC', tl: 'Team Lead', pctl: 'Paid Collab TL', ol: 'Operation Lead', ads_manager: 'Ads Manager', boss: 'Boss', developer: 'Developer' };
 
 // ── Pure helpers — IDENTICAL to v1's math ──────────────────────
 export function getLevel(score) {
@@ -203,6 +203,36 @@ export function calcMetricsAvg(metrics) {
   // 1 point at a .5 boundary and break composite parity vs the AI assistant.
   const sum = V1_METRICS.reduce((a, m) => a + Math.round((Number(metrics[m.key]) || 0) * 100), 0);
   return Math.round(sum / (V1_METRICS.length * 100));
+}
+
+// ── APC performance blend (mig 304) — the parity mirror of the SQL APC branch ──
+// The OL's weekly slider set dropped 'reporting' (now the per-report TL star), so
+// the APC "checkpoint" factor averages these 4 keys. Distinct from V1_METRICS (5),
+// which the OLD method + monthly hand-rating still use.
+export const CHECKPOINT_METRIC_KEYS = ['dailyTasksQuality', 'overallWorkflow', 'responseTime', 'tasksProcessing'];
+
+// checkpoint factor = integer avg of the 4 keys, mirroring SQL apc_checkpoint_score
+// = round(sum/4). Integer-hundredths to avoid the .5-boundary FP drift.
+export function calcCheckpointAvg(metrics) {
+  if (!metrics) return 0;
+  const sum = CHECKPOINT_METRIC_KEYS.reduce((a, k) => a + Math.round((Number(metrics[k]) || 0) * 100), 0);
+  return Math.round(sum / (CHECKPOINT_METRIC_KEYS.length * 100));
+}
+
+// APC performance pillar = 0.6×checkpoint + 0.4×external-report score, with the
+// same null-collapse + clamp as the SQL APC branch of get_performance_composite.
+// `checkpoint` is the 4-key avg (0–100 or null); `report` is apc_report_score
+// (0–100 or null, i.e. 0.6×stars + 0.4×accountability). Returns null when neither
+// factor exists (⇒ "Not Rated").
+export function apcPerfPillar(checkpoint, report) {
+  const c = checkpoint == null ? null : Number(checkpoint);
+  const r = report == null ? null : Number(report);
+  let v;
+  if (c != null && r != null) v = Math.round(0.6 * c + 0.4 * r);
+  else if (c != null) v = Math.round(c);
+  else if (r != null) v = Math.round(r);
+  else return null;
+  return Math.max(0, Math.min(100, v));
 }
 
 export function calcIncentiveScore(incRecord) {

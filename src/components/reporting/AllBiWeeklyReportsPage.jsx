@@ -14,7 +14,9 @@ import BiWeeklyReportForm from './BiWeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
+import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
+import ClientMultiSelect from './ClientMultiSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 
@@ -58,7 +60,7 @@ export default function AllBiWeeklyReportsPage() {
 
   // Filters
   const [filterBrand, setFilterBrand] = useState('');
-  const [filterClient, setFilterClient] = useState('');
+  const [filterClients, setFilterClients] = useState([]);
   const [filterTeam, setFilterTeam] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCreator, setFilterCreator] = useState('');
@@ -170,7 +172,7 @@ export default function AllBiWeeklyReportsPage() {
       if (!r.periodStart) return false;
       if (!r.periodStart.startsWith(mk)) return false;
       if (filterBrand && r.brandName !== filterBrand) return false;
-      if (filterClient && clientByBrandId.get(r.brandId) !== filterClient) return false;
+      if (filterClients.length && !filterClients.includes(clientByBrandId.get(r.brandId))) return false;
       if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
       if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
       if (filterCreator && r.createdByName !== filterCreator) return false;
@@ -178,7 +180,7 @@ export default function AllBiWeeklyReportsPage() {
       if (filterStatus && getReportStatus(r) !== filterStatus) return false;
       return true;
     }).sort((a, b) => (b.periodStart || '').localeCompare(a.periodStart || ''));  // newest first
-  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterPeriod, filterStatus]);
+  }, [reports, calYear, calMonth, filterBrand, filterClients, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterPeriod, filterStatus]);
 
   // Grouped by brand
   const grouped = useMemo(() => {
@@ -212,20 +214,21 @@ export default function AllBiWeeklyReportsPage() {
     return { totalGmv, totalOrders, reportCount, brandCount: brandSet.size, pendingApproval, approved, currency };
   }, [filtered]);
 
-  const hasFilters = filterBrand || filterClient || filterTeam || filterSearch || filterCreator || filterPeriod || filterStatus;
+  const hasFilters = filterBrand || filterClients.length || filterTeam || filterSearch || filterCreator || filterPeriod || filterStatus;
 
   const clearAllFilters = () => {
-    setFilterBrand(''); setFilterClient(''); setFilterTeam('');
+    setFilterBrand(''); setFilterClients([]); setFilterTeam('');
     setFilterSearch(''); setFilterCreator(''); setFilterPeriod(''); setFilterStatus('');
   };
 
+  // NOTE: the weekly/monthly filter declutter is NOT applied here — bi-weekly's
+  // status stat cards are OL-only (boss/TL see a static "Total Orders" card) and
+  // cover only verified/approved, so removing Status from the popover would
+  // strand status filtering. Keep the full popover for this page.
   const popoverFilters = [
     { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
       options: brandOptions.map(b => ({ value: b, label: b })) },
-    ...((userRole === 'boss' || userRole === 'ol') && clientOptions.length > 0
-      ? [{ key: 'client', label: 'Client', value: filterClient, setValue: setFilterClient,
-          options: clientOptions.map(c => ({ value: c, label: c })) }]
-      : []),
+    // Client is now a standalone multi-select on the toolbar (ClientMultiSelect).
     ...((userRole === 'boss' || userRole === 'ol') && teamOptions.length > 0
       ? [{ key: 'team', label: 'Team', value: filterTeam, setValue: setFilterTeam,
           options: teamOptions.map(t => ({ value: t.id, label: `Team ${t.name}` })) }]
@@ -459,9 +462,13 @@ export default function AllBiWeeklyReportsPage() {
             padding: '12px 28px 8px', margin: '0 -28px 10px',
           }}>
           <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <button className="btn btn-sm btn-link text-muted p-0" onClick={() => setViewReport(null)}>
-            <i className="bi bi-arrow-left me-1" /> Back to all reports
-          </button>
+          <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
+            <button className="btn btn-sm btn-link text-muted p-0 flex-shrink-0" onClick={() => setViewReport(null)}>
+              <i className="bi bi-arrow-left me-1" /> Back to all reports
+            </button>
+            <span className="text-muted flex-shrink-0" aria-hidden="true">·</span>
+            <span className="fw-bold text-truncate" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }} title={viewReport.brandName}>{viewReport.brandName}</span>
+          </div>
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <StatusBadge status={rStatus} />
             {canEdit && (
@@ -477,14 +484,6 @@ export default function AllBiWeeklyReportsPage() {
                 onClick={() => setEditDatesReport(viewReport)}
                 title="Change just this report's start/end dates without touching siblings">
                 <i className="bi bi-calendar-event" /> Edit Dates
-              </button>
-            )}
-            {canSubmitAsApc && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#0ea5e9', color: 'white', border: 'none' }}
-                onClick={() => handleSubmitAsApc(viewReport)}
-                title="Move this draft to submitted (acting on behalf of the APC)">
-                <i className="bi bi-send-fill" /> Submit as APC
               </button>
             )}
             {canVerifyAsTl && (
@@ -531,21 +530,39 @@ export default function AllBiWeeklyReportsPage() {
                 </button>
               </>
             )}
-            {canDelete && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#dc2626', color: 'white', border: 'none' }}
-                onClick={() => handleDeleteReport(viewReport)}
-                title="Permanently delete this report">
-                <i className="bi bi-trash3" /> Delete
-              </button>
+            {/* Most-used report actions as quick icon buttons. */}
+            {reportActions && (
+              <>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                  style={{ borderRadius: 8, fontSize: '0.9rem', color: reportActions.highlighterActive ? 'var(--warning)' : undefined, borderColor: reportActions.highlighterActive ? 'var(--warning)' : undefined }}
+                  onClick={reportActions.onToggleHighlighter}
+                  title={reportActions.highlighterActive ? 'Highlighter on — click to stop' : 'Highlighter'}>
+                  <i className="bi bi-highlighter" />
+                </button>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                  style={{ borderRadius: 8, fontSize: '0.9rem' }}
+                  onClick={reportActions.onExportPdf} disabled={reportActions.pdfBusy}
+                  title={reportActions.pdfBusy ? 'Exporting PDF…' : 'Export PDF'}>
+                  <i className={`bi ${reportActions.pdfBusy ? 'bi-hourglass-split' : 'bi-file-earmark-pdf'}`} />
+                </button>
+              </>
             )}
-            {/* Highlighter / Export PDF / Export Word — lifted from the
-                report view so they stay reachable while scrolling. */}
-            <ReportActionsMenu actions={reportActions} />
+            {/* Less-used / destructive actions tucked into the menu. */}
+            <ReportActionsMenu actions={reportActions} hidePrimaryExports
+              extraItems={[
+                canSubmitAsApc && { key: 'submit', label: 'Submit as APC', icon: 'bi-send-fill', iconColor: '#0ea5e9', onClick: () => handleSubmitAsApc(viewReport) },
+                canDelete && { key: 'delete', label: 'Delete report', icon: 'bi-trash3', iconColor: 'var(--danger)', danger: true, onClick: () => handleDeleteReport(viewReport) },
+              ]} />
           </div>
           </div>
-          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} />
+          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} type="biweekly" />
         </div>
+        <ReportRatingBar
+          report={viewReport}
+          viewerRole={userRole}
+          isBrandOwner={brands.find((b) => b.id === viewReport.brandId)?.ownerId === user?.id}
+          onRated={(updated) => setViewReport((r) => (r ? { ...r, ...updated } : updated))}
+        />
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
@@ -715,6 +732,10 @@ export default function AllBiWeeklyReportsPage() {
               <input type="text" className="form-control form-control-sm" placeholder="Search brand…"
                 style={{ paddingLeft: 28, borderRadius: 8 }} value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
             </div>
+            {(userRole === 'boss' || userRole === 'ol') && (
+              <ClientMultiSelect options={clientOptions} selected={filterClients} onChange={setFilterClients} />
+            )}
+
             <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
             {hasFilters && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"

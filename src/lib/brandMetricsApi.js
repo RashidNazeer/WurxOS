@@ -15,11 +15,24 @@ export const METRIC_COLUMNS = [
 export async function listActiveBrands() {
   const { data, error } = await supabase
     .from('brands')
-    .select('id, brand_name, logo_url, status, paid_collab_status, gmv_max_status')
+    .select('id, brand_name, client_name, logo_url, status, paid_collab_status, gmv_max_status')
     .eq('status', 'active')
     .order('brand_name');
   if (error) throw new Error(error.message);
   return data || [];
+}
+
+// Every brand's metric row for one month -> map of brand_id -> row. Powers the
+// brand picker cards (goals-set badge + GMV goal) and the "needs goals" filter.
+export async function listBrandMetricsForMonth(monthKey) {
+  const { data, error } = await supabase
+    .from('brand_monthly_metrics')
+    .select(['brand_id', ...METRIC_COLUMNS, 'updated_at'].join(', '))
+    .eq('month_key', monthKey);
+  if (error) throw new Error(error.message);
+  const map = {};
+  (data || []).forEach((r) => { map[r.brand_id] = r; });
+  return map;
 }
 
 // One brand's metrics for a month -> the row, or null if nothing saved yet.

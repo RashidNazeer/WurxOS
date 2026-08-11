@@ -135,14 +135,31 @@ Deno.serve(async (req) => {
     const key = eukaKeyForSlug(String(brand.euka_slug));
     if (!key) return errOut('config', `Euka key not configured for "${brand.brand_name}" — tell the developer.`, 500);
 
+    // /data-export needs store_id AND brand_id (Euka added brand_id in Aug 2026;
+    // it is undocumented and is what actually scopes the rows). The pairing is
+    // stored in euka_stores (mig 315) — never matched by name at call time.
+    const { data: storeRow } = await admin
+      .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
+    const eukaBrandId = String(storeRow?.euka_brand_id || '');
+
     // ── Fetch both metrics in parallel (each failure = null, non-fatal) ──
-    const qs = `type=target_collab_invites&store_id=${encodeURIComponent(storeId)}&start_date=${startDate}&end_date=${endDate}&export_type=json`;
+    const qs = `type=target_collab_invites&store_id=${encodeURIComponent(storeId)}`
+      + (eukaBrandId ? `&brand_id=${encodeURIComponent(eukaBrandId)}` : '')
+      + `&start_date=${startDate}&end_date=${endDate}&export_type=json`;
     const [invitesResp, funnelResp] = await Promise.all([
       eukaGet(`/data-export?${qs}`, key).catch((e) => ({ __err: String(e) })),
       eukaPost('/dashboard/creator-outreach-funnel', { storeId, postedDateRange: { start: startDate, end: endDate } }, key).catch((e) => ({ __err: String(e) })),
     ]);
 
     const targetInvites = Array.isArray(invitesResp?.data) ? invitesResp.data.length : null;
+    // eukaGet RETURNS a 400 body instead of throwing, so a rejected export used
+    // to land here as a silent null. Surface why.
+    const invitesError = invitesResp?.__err
+      || (targetInvites === null
+        ? (!eukaBrandId
+          ? `No Euka brand id on file for store ${storeId} — set euka_stores.euka_brand_id.`
+          : (invitesResp?.error?.message || invitesResp?.message || 'Euka returned no invite rows.'))
+        : null);
 
     const stages = Array.isArray(funnelResp?.stages) ? funnelResp.stages : [];
     const funnelStages: string[] = stages.map((s: any) => s?.label).filter(Boolean);
@@ -154,7 +171,7 @@ Deno.serve(async (req) => {
       optedIn,
       optInStage: hit ? hit.label : null,
       funnelStages,
-      invitesError: invitesResp?.__err || null,
+      invitesError,
       funnelError: funnelResp?.__err || null,
     });
   } catch (e) {

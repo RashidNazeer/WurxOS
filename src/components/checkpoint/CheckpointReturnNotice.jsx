@@ -9,7 +9,7 @@ import { fmtPktStamp } from '../../utils/pktTime';
 // append-only checkpoint_returns log (mig 268) so the reason, who and when are
 // always visible, with full history. Renders nothing when there are no returns.
 
-const STATUS_LABEL = { draft: 'Draft', submitted: 'Pending TL', verified: 'Pending OL', approved: 'Approved' };
+const STATUS_LABEL = { draft: 'Draft', submitted: 'Pending TL', verified: 'Verified', approved: 'Verified' };
 
 // Who a return landed on, worded for the VIEWER. `to_status`: 'draft' → the APC
 // author, 'submitted' → the brand's TL. Returns a short phrase (no leading cap).

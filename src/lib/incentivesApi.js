@@ -61,6 +61,10 @@ function stripAttendanceForSave(items) {
     // (e.g. 70). Both are read-time-derived, so never freeze achieved/completed.
     if (it.source === 'attendance') return { ...it, achievedValue: null, completed: false, completedBy: null, targetValue: 100, suffix: it.suffix || '%' };
     if (it.source === 'ol_brands')  return { ...it, achievedValue: null, completed: false, completedBy: null, suffix: it.suffix || '%' };
+    // GMV-Max: achieved is derived, but `completed` is a HUMAN decision (a TL/OL
+    // ticks it) and the TARGET is real money the OL set — so blank the achieved
+    // only and leave both of those alone.
+    if (it.source === 'gmv_max')    return { ...it, achievedValue: null };
     return it;
   });
 }
@@ -160,9 +164,58 @@ export async function applyOlBrandsAutofill(rows, month) {
   });
 }
 
-// Both read-time overlays, in sequence — the single entry point every read path uses.
+// ── GMV-Max auto-fill (mig 317) ───────────────────────────────────
+// A per-brand item flagged { source: 'gmv_max' } takes its achievedValue from
+// that brand's month figure in Brand Analytics — brand_monthly_metrics
+// .gmv_achieved, which is what the APC enters at clock-in (mig 311). Verified
+// same metric: for every brand carrying one of these items the incentive target
+// and the Brand Analytics GMV target are identical, currency included.
+//
+// Unlike attendance/ol_brands this does NOT derive `completed` — a TL/OL still
+// ticks the item — so there is no month-closed money gate to apply here. It
+// only ever replaces a number the person used to type by hand.
+export async function fetchGmvMaxAchieved(month) {
+  const { data, error } = await supabase.rpc('gmv_max_achieved_map', { p_month: month });
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  (data || []).forEach((r) => m.set(r.brand_id, Number(r.achieved) || 0));
+  return m;
+}
+function _hasGmvMaxItem(row) {
+  return [...(row?.incentives || []), ...(row?.bonuses || [])]
+    .some((it) => it && it.source === 'gmv_max' && it.brandId);
+}
+export async function applyGmvMaxAutofill(rows, month) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.some((r) => !_isPaid(r) && _hasGmvMaxItem(r))) return list;
+  let byBrand;
+  try { byBrand = await fetchGmvMaxAchieved(month); }
+  // eslint-disable-next-line no-console
+  catch (e) { console.warn('gmv-max autofill skipped:', e.message); return list; }
+  const patchItem = (it) => {
+    if (!it || it.source !== 'gmv_max' || !it.brandId) return it;
+    // No metrics row yet for this brand+month → 0, not the stale typed figure.
+    // Leaving the old number would be worse than an honest zero: it would read
+    // as progress nobody can trace to a source.
+    return { ...it, achievedValue: byBrand.has(it.brandId) ? byBrand.get(it.brandId) : 0 };
+  };
+  return list.map((r) => {
+    if (_isPaid(r)) return r;   // frozen at payout — never re-overlay
+    return {
+      ...r,
+      incentives: (r.incentives || []).map(patchItem),
+      bonuses:    (r.bonuses    || []).map(patchItem),
+    };
+  });
+}
+
+// All three read-time overlays, in sequence — the single entry point every read
+// path uses. Order is irrelevant: each only touches its own `source`.
 export async function applyDerivedAutofill(rows, month) {
-  return applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month);
+  return applyGmvMaxAutofill(
+    await applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month),
+    month,
+  );
 }
 
 // ── OL incentive-brands curation (Settings) + per-brand status (panel) ──────
@@ -178,11 +231,79 @@ export async function setOlIncentiveBrands(olId, brandIds) {
   const { error } = await supabase.rpc('ol_set_incentive_brands', { p_ol: olId, p_brand_ids: ids });
   if (error) throw new Error(error.message);
 }
+// ── Ads-manager brands (OL-curated in Settings; mig 316) ───────────────────
+// This one list does double duty: it is what the ads manager can SEE
+// (can_view_brand) and the brand groups the OL builds their plan from.
+export async function getAdsManagerBrands(userId) {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('ads_manager_brands').select('brand_id').eq('ads_manager_id', userId);
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => r.brand_id);
+}
+export async function setAdsManagerBrands(userId, brandIds) {
+  const ids = Array.from(new Set((brandIds || []).filter(Boolean)));
+  // Atomic replace (same reasoning as ol_set_incentive_brands): delete-then-
+  // insert as two calls would leave the manager brand-less — i.e. blind — in
+  // between.
+  const { error } = await supabase.rpc('ads_manager_set_brands', { p_user: userId, p_brand_ids: ids });
+  if (error) throw new Error(error.message);
+}
+// user_id -> [brand_id] for a set of ads managers, in one query.
+export async function fetchAdsManagerBrandMap(userIds) {
+  const ids = (userIds || []).filter(Boolean);
+  if (!ids.length) return new Map();
+  const { data, error } = await supabase
+    .from('ads_manager_brands')
+    .select('ads_manager_id, brand:brand_id(id, brand_name, tier, status, client_name)')
+    .in('ads_manager_id', ids);
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  for (const row of data || []) {
+    if (!row.brand) continue;
+    const list = m.get(row.ads_manager_id) || [];
+    list.push(row.brand);
+    m.set(row.ads_manager_id, list);
+  }
+  return m;
+}
+
 // [{ brand_id, brand_name, client_name, owner_name, matched_text, is_hit }]
 export async function fetchOlBrandStatus(olId, month) {
   const { data, error } = await supabase.rpc('ol_brand_incentive_status', { p_ol: olId, p_month: month });
   if (error) throw new Error(error.message);
   return data || [];
+}
+// Map ol_id -> that OL's curated incentive brands, for showing every OL what
+// brands sit behind each OL's incentive. One query; the oib_select RLS lets an
+// active OL/Boss read ALL OLs' rows (self-only otherwise). Includes inactive
+// brands (BrandTierChip dims them) so nothing silently disappears.
+export async function listOlBrandsByOl() {
+  const { data, error } = await supabase
+    .from('ol_incentive_brands')
+    .select('ol_id, brand:brand_id(id, brand_name, status, client_name, owner_id)');
+  if (error) throw new Error(error.message);
+  const map = {};
+  (data || []).forEach((r) => {
+    if (!r.brand) return;
+    (map[r.ol_id] ||= []).push({ id: r.brand.id, name: r.brand.brand_name, status: r.brand.status, notes: r.brand.client_name || null, ownerId: r.brand.owner_id });
+  });
+  Object.values(map).forEach((arr) => arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+  return map;
+}
+
+// Does a brand "hit" for its owning TL? Mirrors the ol_brand_incentive_pct RPC
+// (mig 296): the TL has a COMPLETED item linked by brandId (or, for unlinked
+// legacy items, a normalised-text name match). Used client-side to badge OL cards.
+const _normBrand = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function brandHitByTL(tlRecord, brand) {
+  if (!tlRecord || !brand) return false;
+  const nb = _normBrand(brand.name);
+  const items = [...(tlRecord.incentives || []), ...(tlRecord.bonuses || [])];
+  return items.some((it) => it && it.completed && (
+    (it.brandId != null && String(it.brandId) === String(brand.id)) ||
+    (it.brandId == null && nb.length >= 3 && _normBrand(it.text).includes(nb))
+  ));
 }
 
 export async function getIncentives(userId, month = currentMonth()) {
@@ -359,6 +480,13 @@ export function itemSuffix(item) {
   if (item?.unit === 'percent') return '%';
   return '';
 }
+// Format a value with its unit: currency symbols go BEFORE the number ($4,500),
+// everything else (%, plain counts) stays after (95%). Keeps money reading naturally.
+const CURRENCY_UNITS = ['$', '£', '€', '¥', '₹'];
+export function fmtUnitValue(value, sfx) {
+  const n = Number(value || 0).toLocaleString();
+  return CURRENCY_UNITS.includes(sfx) ? `${sfx}${n}` : `${n}${sfx || ''}`;
+}
 export function uid4() { return Math.random().toString(36).slice(2, 10); }
 
 // Mirror of v1's calcBreakdown — returns both potential and
@@ -478,24 +606,32 @@ export async function listUsersByRoles(roles) {
   // `name` for the UI which expects that field.
   const userIds = (data || []).map((p) => p.id);
   let brandsByUser = new Map();
+  const pushBrand = (userId, brand) => {
+    if (!brand) return;
+    const list = brandsByUser.get(userId) || [];
+    list.push({
+      id:     brand.id,
+      name:   brand.brand_name,
+      tier:   brand.tier        || null,
+      status: brand.status      || null,
+      notes:  brand.client_name || null,
+    });
+    brandsByUser.set(userId, list);
+  };
   if (userIds.length) {
     const { data: links, error: e3 } = await supabase
       .from('brand_assignments')
       .select('user_id, brand:brand_id(id, brand_name, tier, status, client_name)')
       .in('user_id', userIds);
     if (e3) throw new Error(e3.message);
-    (links || []).forEach((row) => {
-      if (!row.brand) return;
-      const list = brandsByUser.get(row.user_id) || [];
-      list.push({
-        id:     row.brand.id,
-        name:   row.brand.brand_name,
-        tier:   row.brand.tier        || null,
-        status: row.brand.status      || null,
-        notes:  row.brand.client_name || null,
-      });
-      brandsByUser.set(row.user_id, list);
-    });
+    (links || []).forEach((row) => pushBrand(row.user_id, row.brand));
+  }
+  // An ads manager's brands live in their own table, not brand_assignments —
+  // so the OL's cards show the brands they run ads for (mig 316).
+  const adsIds = (data || []).filter((p) => p.role === 'ads_manager').map((p) => p.id);
+  if (adsIds.length) {
+    const adsMap = await fetchAdsManagerBrandMap(adsIds);
+    for (const [userId, brands] of adsMap) brands.forEach((b) => pushBrand(userId, b));
   }
 
   return (data || []).map((p) => ({
@@ -525,6 +661,41 @@ export async function getUserForEditor(userId) {
       .from('profiles').select('display_name').eq('id', data.reports_to).maybeSingle();
     ownerName = o?.display_name || '';
   }
+  // The user's ACTIVE brands, resolved per the team model: a TL owns brands
+  // (brands.owner_id); an APC/IPC gets them via brand_assignments. These drive
+  // the brand-linked incentive sections, so they must be the live assignment.
+  let assignedBrands = [];
+  const shape = (b) => ({ id: b.id, name: b.brand_name, tier: b.tier, status: b.status, client: b.client_name });
+  if (data.role === 'tl') {
+    const { data: bs, error: be } = await supabase
+      .from('brands').select('id, brand_name, tier, status, client_name')
+      .eq('owner_id', userId).eq('status', 'active').order('brand_name');
+    // Throw (never swallow) — a silent [] here would make the editor's carry-forward
+    // reconcile DROP every brand-linked item as an orphan. Fail loud instead.
+    if (be) throw new Error(be.message);
+    assignedBrands = (bs || []).map(shape);
+  } else if (data.role === 'apc' || data.role === 'ipc') {
+    const { data: rows, error: ae } = await supabase
+      .from('brand_assignments')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name)')
+      .eq('user_id', userId);
+    if (ae) throw new Error(ae.message);
+    assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
+      .filter((b) => b.status === 'active').map(shape)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else if (data.role === 'ads_manager') {
+    // Third source, same contract as the two above: the OL-curated ads brands
+    // (mig 316) ARE this user's brand groups in the plan editor. Throws like the
+    // TL branch — a swallowed [] would make carry-forward drop every linked item.
+    const { data: rows, error: me } = await supabase
+      .from('ads_manager_brands')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name)')
+      .eq('ads_manager_id', userId);
+    if (me) throw new Error(me.message);
+    assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
+      .filter((b) => b.status === 'active').map(shape)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
   return {
     id:              data.id,
     displayName:     data.display_name || data.email || '—',
@@ -534,8 +705,34 @@ export async function getUserForEditor(userId) {
     email:           data.email,
     ownerId:         data.reports_to || null,
     ownerName,
-    assignedBrands:  [],
+    assignedBrands,
   };
+}
+
+// Inactive brands a user is responsible for, for the "not included in incentives"
+// notice. A TL owns brands (brands.owner_id); an APC/IPC gets them via
+// brand_assignments. `role` is optional — when unknown we check both sources.
+// Non-critical (drives a hint), so it never throws — returns [] on any error.
+export async function listInactiveBrandsForUser(userId, role) {
+  if (!userId) return [];
+  const seen = new Map();
+  const add = (b) => { if (b && b.status && b.status !== 'active') seen.set(b.id, { id: b.id, name: b.brand_name, status: b.status }); };
+  if (!role || role === 'tl' || role === 'pctl') {
+    const { data } = await supabase.from('brands')
+      .select('id, brand_name, status').eq('owner_id', userId).neq('status', 'active');
+    (data || []).forEach(add);
+  }
+  if (!role || role === 'apc' || role === 'ipc') {
+    const { data } = await supabase.from('brand_assignments')
+      .select('brand:brand_id(id, brand_name, status)').eq('user_id', userId);
+    (data || []).forEach((r) => add(r.brand));
+  }
+  if (!role || role === 'ads_manager') {
+    const { data } = await supabase.from('ads_manager_brands')
+      .select('brand:brand_id(id, brand_name, status)').eq('ads_manager_id', userId);
+    (data || []).forEach((r) => add(r.brand));
+  }
+  return [...seen.values()].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
 // ── Mutation: write an items-only progress patch (APC / TL / OL editing

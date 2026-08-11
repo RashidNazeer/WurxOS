@@ -1,0 +1,151 @@
+
+
+############## TLs ##############
+
+  Ali Hamza (tl):
+     [i] "Klassy Network GMV Target "  → Klassy Network
+     [i] "Obaji Skincare GMV Target"  → Obagi Skin Care
+     [i] "Cutler Nutrition GMV Target"  → Cutler Nutritions
+     [i] "Louisville GMV Target"  → Louisville Jerky
+     [i] "Yesday Target GMV"  → YesDay
+
+  Haider Ali (tl):
+     [i] "Swisse Target GMV "  → Swisse
+     [i] "Aurelia Target GMV"  → Aurelia
+     [i] "InnoSupps Target "  → Inno Supps
+
+  Muhammad Azam (tl):
+     [i] "Vidge Pets Target GMV"  → VidgePets USA
+     [i] "Penetrex Target GMV "  → Penetrex
+     [i] "Longevity Target GMV"  → Longevity Box
+     [i] "Biostime Target GMV"  → Biostime Shop US
+     [i] "Dr Harvey Target GMV"  → Dr. Harvey's
+     [i] "AquaSonic"  → Aqua Sonic
+
+  Mustafa Jan (tl):
+     [i] "Bentgo Target GMV"  → Bentgo
+     [i] "Flywell Target GMV"  → FlyWell
+     [i] "PDC Target GMV"  → Pure Daily Care
+     [i] "JoyMode Target GMV "  → JoyMode
+
+
+############## APCs ##############
+
+  Abrar Ahmad (apc):
+     [i] "Authorized Videos"  → Inno Supps
+     [i] "Creators with more than three video"  → Inno Supps
+     [i] "Videos with $100+ GMV"  → Inno Supps
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV (Inno Supps)"  → Inno Supps
+     [b] "Onboarding L3+ Creators"  → Inno Supps
+
+  Ahmad Raza (apc):
+     [i] "Authorized Videos (Biostime)"  ✗ DROP (stale)
+     [i] "Creators with more than three video (Biostim"  ✗ DROP (stale)
+     [i] "Videos with $100+ GMV (Biostime)"  ✗ DROP (stale)
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Total GMV (Dr. Harvey's)"  → Dr. Harvey's
+     [b] "Onboarding L3+ Creators (Dr. Harvey's)"  → Dr. Harvey's
+
+  Ali Ahmad (apc):
+     [i] "Authorized Videos (Longevity Box)"  → Longevity Box
+     [i] "Creators with more than three video (Longevi"  → Longevity Box
+     [i] "Videos with $100+ GMV  (Longevity Box)"  → Longevity Box
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV (Longevity Box)"  → Longevity Box
+     [b] "Onboarding L3+ Creators (Longevity Box)"  → Longevity Box
+
+  Ali Waseem (apc):
+     [i] "Authorized Videos "  → Swisse
+     [i] "Creators with more than three video"  → Swisse
+     [i] "Videos with $100+ GMV"  → Swisse
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Total GMV "  → Swisse
+     [b] "Onboarding L3+ Creators"  → Swisse
+
+  Farakh Farooq (apc):
+     [i] "Ad code Collected"  → Louisville Jerky
+     [i] "Creators with more than three video"  → Louisville Jerky
+     [i] "Videos with $100+ GMV "  → Louisville Jerky
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV "  → Louisville Jerky
+     [b] "Onboarding L3+ Creators"  → Louisville Jerky
+
+  Hamza Babar (apc):
+     [i] "Authorized Videos"  → Cutler Nutritions
+     [i] "Creators with more than three video"  → Cutler Nutritions
+     [i] "Videos with $100+ GMV "  → Cutler Nutritions
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV "  → Cutler Nutritions
+     [b] "Onboarding L3+ Creators"  → Cutler Nutritions
+
+  Hareem Asim (apc):
+     [i] "Completion of all tasks by TL/Ops would lead"  → Kenashii
+     [b] "Onboarding L3+ Creators"  → Kenashii
+
+  Haseeb (apc):
+     [i] "Authorized Videos "  → Penetrex
+     [i] "Creators with more than three video "  → Penetrex
+     [i] "Videos with $100+ GMV "  → Penetrex
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Total GMV"  → Penetrex
+     [b] "Onboarding L3+ Creators"  → Penetrex
+
+  Ibrahim Baloch (apc):
+     [i] "Video authorized "  → JoyMode
+     [i] "Creators with more than three video"  → JoyMode
+     [i] "Videos with $100+ GMV "  → JoyMode
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV "  → JoyMode
+     [b] "Onboarding L3+ Creators"  → JoyMode
+
+  Maida Hashmi (apc):
+     [i] "Authorized Videos"  → FlyWell
+     [i] "Creators with more than three video"  → FlyWell
+     [i] "Videos with $100+ GMV "  → FlyWell
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV "  → FlyWell
+     [b] "Onboarding L3+ Creators"  → FlyWell
+
+  Mian Hassan (apc):
+     [i] "Total Authorized Videos"  → Klassy Network
+     [i] "Creators with more than three video"  → Klassy Network
+     [i] "Videos with $100+ GMV "  → Klassy Network
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Total Affiliate GMV"  → Klassy Network
+     [b] "Onboarding L3+ Creators"  → Klassy Network
+
+  Muhammad Mohid (apc):
+     [i] "Authorized Videos"  → Pure Daily Care
+     [i] "Creators with more than three video"  → Pure Daily Care
+     [i] "Videos with $100+ GMV "  → Pure Daily Care
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV "  → Pure Daily Care
+     [b] "Onboarding L3+ Creators"  → Pure Daily Care
+
+  Romail (apc):
+     [i] "Authorized Videos"  → Bentgo
+     [i] "Creators with more than three video"  → Bentgo
+     [i] "Videos with $100+ GMV "  → Bentgo
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV "  → Bentgo
+     [b] "Onboarding L3+ Creators"  → Bentgo
+
+  Umair Tariq (apc):
+     [i] "Authorized Videos"  → Aqua Sonic
+     [i] "Creators with more than three video"  → Aqua Sonic
+     [i] "Videos with $100+ GMV "  → Aqua Sonic
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Total Affiliate GMV "  → Aqua Sonic
+     [b] "Onboarding L3+ Creators"  → Aqua Sonic
+
+  Umar Ilyas (apc):
+     [i] "Authorized Videos (Yesday)"  → YesDay
+     [i] "Creators with more than three video (Yesday)"  → YesDay
+     [i] "Videos with $100+ GMV (Yesday)"  → YesDay
+     [i] "Punctuality + Absences + General Review of p"  · Other
+     [b] "Affiliate GMV (Dangle It)"  → Dangle
+     [b] "Onboarding L3+ Creators (Dangle It)"  → Dangle
+
+
+=== TOTALS: link 87 · other 14 · drop 3 · UNRESOLVED 0 ===

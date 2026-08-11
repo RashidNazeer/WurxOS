@@ -10,6 +10,7 @@ import ApcIncentivesPage from './ApcIncentivesPage';
  *   boss / developer → BossIncentivesPage
  *   ol               → OLIncentivesPage
  *   tl / pctl        → MyIncentivesPage
+ *   ads_manager      → MyIncentivesPage (own plan only; an OL builds it)
  *   apc / ipc        → ApcIncentivesPage
  *
  * Mirrors v1's separate role routes (boss/incentives, ol/incentives,
@@ -21,6 +22,6 @@ export default function IncentivesRouter() {
   const role = profile?.role || '';
   if (role === 'boss' || role === 'developer') return <BossIncentivesPage />;
   if (role === 'ol')                          return <OLIncentivesPage />;
-  if (role === 'tl' || role === 'pctl')       return <MyIncentivesPage />;
+  if (role === 'tl' || role === 'pctl' || role === 'ads_manager') return <MyIncentivesPage />;
   return <ApcIncentivesPage />;
 }

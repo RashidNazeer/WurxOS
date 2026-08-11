@@ -1,0 +1,1454 @@
+[
+ {
+  "user_id": "c0fd1182-dff8-5027-b218-7ddfa54bf365",
+  "month": "2026-08",
+  "basic_salary": 120000,
+  "incentives": [
+   {
+    "id": "r8bddwgg",
+    "text": "Swisse Target GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3500,
+    "achievedValue": 0,
+    "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+    "brandName": "Swisse"
+   },
+   {
+    "id": "53vwiph0",
+    "text": "Aurelia Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 2500,
+    "achievedValue": 0,
+    "brandId": "894109fc-4337-5eac-8e63-b6792304fe9c",
+    "brandName": "Aurelia"
+   },
+   {
+    "id": "5w46f41x",
+    "text": "InnoSupps Target ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 40000,
+    "achievedValue": 0,
+    "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+    "brandName": "Inno Supps"
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "user_id": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+  "month": "2026-08",
+  "basic_salary": 120000,
+  "incentives": [
+   {
+    "id": "35a1tcap",
+    "text": "Vidge Pets Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 2000,
+    "achievedValue": 0,
+    "brandId": "06bcd676-af81-4c3a-ba20-90e4bca8ca68",
+    "brandName": "VidgePets USA"
+   },
+   {
+    "id": "8vdbzdsd",
+    "text": "Penetrex Target GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 75000,
+    "achievedValue": 0,
+    "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+    "brandName": "Penetrex"
+   },
+   {
+    "id": "00z8z3cf",
+    "text": "Longevity Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 15000,
+    "achievedValue": 0,
+    "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+    "brandName": "Longevity Box"
+   },
+   {
+    "id": "i6itmoaf",
+    "text": "Biostime Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0,
+    "brandId": "563774dd-5e1e-5b2c-8f73-0e1bd353f12e",
+    "brandName": "Biostime Shop US"
+   },
+   {
+    "id": "7x8qjrsw",
+    "text": "Dr Harvey Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0,
+    "brandId": "88dd7b60-c6ec-51e2-a381-8ed267b85e29",
+    "brandName": "Dr. Harvey's"
+   },
+   {
+    "id": "682rgofa",
+    "text": "AquaSonic",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 175000,
+    "achievedValue": 0,
+    "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+    "brandName": "Aqua Sonic"
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "user_id": "7ab9eeb2-0398-577d-b25e-d57075ac817c",
+  "month": "2026-08",
+  "basic_salary": 120000,
+  "incentives": [
+   {
+    "id": "bofbk3uu",
+    "text": "Klassy Network GMV Target ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 320000,
+    "achievedValue": 0,
+    "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+    "brandName": "Klassy Network"
+   },
+   {
+    "id": "5y6bdzwq",
+    "text": "Obaji Skincare GMV Target",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100000,
+    "achievedValue": 0,
+    "brandId": "0cf41a92-be55-5f0b-89ae-af25937f018c",
+    "brandName": "Obagi Skin Care"
+   },
+   {
+    "id": "vm1ok78n",
+    "text": "Cutler Nutrition GMV Target",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 400000,
+    "achievedValue": 0,
+    "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+    "brandName": "Cutler Nutritions"
+   },
+   {
+    "id": "w0f1wsx7",
+    "text": "Louisville GMV Target",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 4500,
+    "achievedValue": 0,
+    "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+    "brandName": "Louisville Jerky"
+   },
+   {
+    "id": "sxwfmp1q",
+    "text": "Yesday Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 4500,
+    "achievedValue": 0,
+    "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+    "brandName": "YesDay"
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "user_id": "f9c7bfb1-cf20-505d-afec-d4a459354216",
+  "month": "2026-08",
+  "basic_salary": 180000,
+  "incentives": [
+   {
+    "id": "jkp7fhth",
+    "text": "Brands hit their GMV Targets ",
+    "amount": 20000,
+    "source": "ol_brands",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 70,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "user_id": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+  "month": "2026-08",
+  "basic_salary": 170000,
+  "incentives": [
+   {
+    "id": "69wcj839",
+    "text": "Brands hit their GMV targets",
+    "amount": 20000,
+    "source": "ol_brands",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 70,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "user_id": "5bdb63a9-af56-5342-a20a-25fa5dada47c",
+  "month": "2026-08",
+  "basic_salary": 60000,
+  "incentives": [
+   {
+    "id": "4xv35xuq",
+    "text": "Total Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 95,
+    "achievedValue": 0,
+    "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+    "brandName": "Klassy Network"
+   },
+   {
+    "id": "bqrmmod9",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 280,
+    "achievedValue": 0,
+    "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+    "brandName": "Klassy Network"
+   },
+   {
+    "id": "qb5ks1a7",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 375,
+    "achievedValue": 0,
+    "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+    "brandName": "Klassy Network"
+   },
+   {
+    "id": "4xxf888i",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "14a50i47",
+    "text": "Total Affiliate GMV",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 280000,
+    "achievedValue": 0,
+    "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+    "brandName": "Klassy Network"
+   },
+   {
+    "id": "hcwd88p9",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 200,
+    "achievedValue": 0,
+    "brandId": "2f5615e9-ffdb-584b-bba6-9785f8d74e45",
+    "brandName": "Klassy Network"
+   }
+  ]
+ },
+ {
+  "user_id": "e3983541-0195-590c-a466-e61e2e430f1a",
+  "month": "2026-08",
+  "basic_salary": 185000,
+  "incentives": [
+   {
+    "id": "sua5pri3",
+    "text": "Bentgo Target GMV",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 15000,
+    "achievedValue": 0,
+    "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+    "brandName": "Bentgo"
+   },
+   {
+    "id": "jwm0qqn3",
+    "text": "Flywell Target GMV",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3500,
+    "achievedValue": 0,
+    "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+    "brandName": "FlyWell"
+   },
+   {
+    "id": "mj43hogr",
+    "text": "PDC Target GMV",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 170000,
+    "achievedValue": 0,
+    "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+    "brandName": "Pure Daily Care"
+   },
+   {
+    "id": "tf5y4rwn",
+    "text": "JoyMode Target GMV ",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100000,
+    "achievedValue": 0,
+    "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+    "brandName": "JoyMode"
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "user_id": "2552ed49-6c77-56ab-99c6-6a5ea005b1ea",
+  "month": "2026-08",
+  "basic_salary": 100000,
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "user_id": "5d463224-4e07-5e52-841a-f7dfb4dc3fb7",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "ch82n4js",
+    "text": "Authorized Videos ",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedAt": "2026-07-25T12:29:45.773Z",
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0,
+    "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+    "brandName": "Swisse"
+   },
+   {
+    "id": "x8m6z7t3",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 55,
+    "achievedValue": 0,
+    "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+    "brandName": "Swisse"
+   },
+   {
+    "id": "zx8t8sr2",
+    "text": "Videos with $100+ GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 7,
+    "achievedValue": 0,
+    "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+    "brandName": "Swisse"
+   },
+   {
+    "id": "yp260em2",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "mk2dkqqf",
+    "text": "Total GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedAt": "2026-07-25T12:29:45.773Z",
+    "completedBy": null,
+    "targetValue": 2000,
+    "achievedValue": 0,
+    "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+    "brandName": "Swisse"
+   },
+   {
+    "id": "wszvv4q1",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": "2026-07-25T12:29:45.773Z",
+    "completedBy": null,
+    "targetValue": 10,
+    "achievedValue": 0,
+    "brandId": "19469fc9-840a-5c7b-9243-2a5e762ea8f9",
+    "brandName": "Swisse"
+   }
+  ]
+ },
+ {
+  "user_id": "9cf31cc3-96e0-5855-ae50-db4386db0c78",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "vbijq4qq",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0,
+    "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+    "brandName": "Inno Supps"
+   },
+   {
+    "id": "zm8to4lr",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 115,
+    "achievedValue": 0,
+    "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+    "brandName": "Inno Supps"
+   },
+   {
+    "id": "bp5s6mkd",
+    "text": "Videos with $100+ GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 50,
+    "achievedValue": 0,
+    "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+    "brandName": "Inno Supps"
+   },
+   {
+    "id": "mrnuxm2q",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "h77fzel0",
+    "text": "Affiliate GMV (Inno Supps)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 28000,
+    "achievedValue": 0,
+    "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+    "brandName": "Inno Supps"
+   },
+   {
+    "id": "51e69cv1",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 25,
+    "achievedValue": 0,
+    "brandId": "4d7ad530-286b-5e04-aa64-d510d23e252c",
+    "brandName": "Inno Supps"
+   }
+  ]
+ },
+ {
+  "user_id": "0beaff2d-dc51-5cdb-a97e-a1f4a67b3f46",
+  "month": "2026-08",
+  "basic_salary": 0,
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "user_id": "bb4eb9a2-890f-4d53-9f7c-fdd885fe32cd",
+  "month": "2026-08",
+  "basic_salary": 0,
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "user_id": "87cbdb86-c22a-5c17-9574-73fcb764b79e",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "6om7oeby",
+    "text": "Ad code Collected",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 50,
+    "achievedValue": 0,
+    "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+    "brandName": "Louisville Jerky"
+   },
+   {
+    "id": "fgjchi54",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 22,
+    "achievedValue": 0,
+    "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+    "brandName": "Louisville Jerky"
+   },
+   {
+    "id": "90rt9es1",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 20,
+    "achievedValue": 0,
+    "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+    "brandName": "Louisville Jerky"
+   },
+   {
+    "id": "pzssay4z",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "lhke2ltg",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 8500,
+    "achievedValue": 0,
+    "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+    "brandName": "Louisville Jerky"
+   },
+   {
+    "id": "jq4p8i37",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 35,
+    "achievedValue": 0,
+    "brandId": "c53e2844-f39a-5d76-84bb-f9f0794c5538",
+    "brandName": "Louisville Jerky"
+   }
+  ]
+ },
+ {
+  "user_id": "a02eb90b-a2a5-5621-96b6-cf809dd9d6da",
+  "month": "2026-08",
+  "basic_salary": 60000,
+  "incentives": [
+   {
+    "id": "0u3g04jj",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 80,
+    "achievedValue": 0,
+    "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+    "brandName": "Cutler Nutritions"
+   },
+   {
+    "id": "jey46cuk",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 320,
+    "achievedValue": 0,
+    "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+    "brandName": "Cutler Nutritions"
+   },
+   {
+    "id": "lks1mzpa",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 320,
+    "achievedValue": 0,
+    "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+    "brandName": "Cutler Nutritions"
+   },
+   {
+    "id": "o3d2izcn",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "9j7kkwdc",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 180000,
+    "achievedValue": 0,
+    "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+    "brandName": "Cutler Nutritions"
+   },
+   {
+    "id": "06g2nss6",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 75,
+    "achievedValue": 0,
+    "brandId": "b79d71b8-4a57-5fbc-b912-4b81c016bb5a",
+    "brandName": "Cutler Nutritions"
+   }
+  ]
+ },
+ {
+  "user_id": "27f2a01e-6816-5309-bed5-b05065a00007",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "9n68qlop",
+    "text": "Completion of all tasks by TL/Ops would lead to a 70,000 PKR fixed salary. Since you do not currently have any active brand, the bonus and incentive structure will start once your brand has been active for one month.",
+    "amount": 20000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 30,
+    "achievedValue": 0,
+    "brandId": "ced1f13c-0255-4b5d-bf98-2e5047598f07",
+    "brandName": "Kenashii"
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "00dngq0y",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 0,
+    "achievedValue": 0,
+    "brandId": "ced1f13c-0255-4b5d-bf98-2e5047598f07",
+    "brandName": "Kenashii"
+   }
+  ]
+ },
+ {
+  "user_id": "2afc6ad4-312c-5f8b-af3e-9c786a856bf0",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "02k53wlk",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": null,
+    "targetValue": 95,
+    "achievedValue": 0,
+    "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+    "brandName": "Aqua Sonic"
+   },
+   {
+    "id": "eb94spla",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0,
+    "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+    "brandName": "Aqua Sonic"
+   },
+   {
+    "id": "3b8x8yig",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": null,
+    "targetValue": 92,
+    "achievedValue": 0,
+    "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+    "brandName": "Aqua Sonic"
+   },
+   {
+    "id": "h1z0vaqk",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "id979ebj",
+    "text": "Total Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": null,
+    "targetValue": 150000,
+    "achievedValue": 0,
+    "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+    "brandName": "Aqua Sonic"
+   },
+   {
+    "id": "vkes5du2",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": null,
+    "targetValue": 200,
+    "achievedValue": 0,
+    "brandId": "6994eab1-353f-5d8f-966f-c377ab6043a3",
+    "brandName": "Aqua Sonic"
+   }
+  ]
+ },
+ {
+  "user_id": "5b55547a-90f1-51e3-ba42-62787703301b",
+  "month": "2026-08",
+  "basic_salary": 60000,
+  "incentives": [
+   {
+    "id": "epolz9o9",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "shupzsj6",
+    "text": "Total GMV (Dr. Harvey's)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0,
+    "brandId": "88dd7b60-c6ec-51e2-a381-8ed267b85e29",
+    "brandName": "Dr. Harvey's"
+   },
+   {
+    "id": "nijsh860",
+    "text": "Onboarding L3+ Creators (Dr. Harvey's)",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 25,
+    "achievedValue": 0,
+    "brandId": "88dd7b60-c6ec-51e2-a381-8ed267b85e29",
+    "brandName": "Dr. Harvey's"
+   }
+  ]
+ },
+ {
+  "user_id": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+  "month": "2026-08",
+  "basic_salary": 60000,
+  "incentives": [
+   {
+    "id": "i7r3g4ww",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0,
+    "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+    "brandName": "Pure Daily Care"
+   },
+   {
+    "id": "esh01ky8",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 150,
+    "achievedValue": 0,
+    "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+    "brandName": "Pure Daily Care"
+   },
+   {
+    "id": "uh33a2m0",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 190,
+    "achievedValue": 0,
+    "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+    "brandName": "Pure Daily Care"
+   },
+   {
+    "id": "t8duociw",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "q4p18h8w",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 150000,
+    "achievedValue": 0,
+    "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+    "brandName": "Pure Daily Care"
+   },
+   {
+    "id": "1i6tvqhw",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0,
+    "brandId": "015f1653-1df5-564b-86e2-434c7bfdfac0",
+    "brandName": "Pure Daily Care"
+   }
+  ]
+ },
+ {
+  "user_id": "a62d33ef-3ece-4ba5-a41b-a6de0f367632",
+  "month": "2026-08",
+  "basic_salary": 0,
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "user_id": "76cea800-34f9-5fcc-8489-0bfe405534ff",
+  "month": "2026-08",
+  "basic_salary": 60000,
+  "incentives": [
+   {
+    "id": "fb3tygav",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0,
+    "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+    "brandName": "Bentgo"
+   },
+   {
+    "id": "79ficgsj",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 32,
+    "achievedValue": 0,
+    "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+    "brandName": "Bentgo"
+   },
+   {
+    "id": "hadjb69a",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 18,
+    "achievedValue": 0,
+    "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+    "brandName": "Bentgo"
+   },
+   {
+    "id": "e2l0gkxr",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "w8w550dj",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 6000,
+    "achievedValue": 0,
+    "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+    "brandName": "Bentgo"
+   },
+   {
+    "id": "r9n9nqvd",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0,
+    "brandId": "bdfed395-3b5e-5393-90ae-1cc637a96644",
+    "brandName": "Bentgo"
+   }
+  ]
+ },
+ {
+  "user_id": "20f4156e-397a-52d7-8003-d00686630b32",
+  "month": "2026-08",
+  "basic_salary": 60000,
+  "incentives": [
+   {
+    "id": "t2y77cpb",
+    "text": "Authorized Videos ",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0,
+    "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+    "brandName": "Penetrex"
+   },
+   {
+    "id": "ssazx37k",
+    "text": "Creators with more than three video ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": null,
+    "targetValue": 120,
+    "achievedValue": 0,
+    "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+    "brandName": "Penetrex"
+   },
+   {
+    "id": "8fcc1wo2",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": null,
+    "targetValue": 70,
+    "achievedValue": 0,
+    "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+    "brandName": "Penetrex"
+   },
+   {
+    "id": "127ujlev",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "i3i8r1i5",
+    "text": "Total GMV",
+    "amount": 10000,
+    "suffix": "£",
+    "completed": false,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": null,
+    "targetValue": 60000,
+    "achievedValue": 0,
+    "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+    "brandName": "Penetrex"
+   },
+   {
+    "id": "xiq2w1mu",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 50,
+    "achievedValue": 0,
+    "brandId": "c430e0b4-585f-5b01-932b-1459c2d27911",
+    "brandName": "Penetrex"
+   }
+  ]
+ },
+ {
+  "user_id": "5d15f70d-cf9f-5a4f-a936-1153d1b352e8",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "yvs6lpx1",
+    "text": "Authorized Videos (Yesday)",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 85,
+    "achievedValue": 0,
+    "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+    "brandName": "YesDay"
+   },
+   {
+    "id": "wsr1zy9u",
+    "text": "Creators with more than three video (Yesday)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 26,
+    "achievedValue": 0,
+    "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+    "brandName": "YesDay"
+   },
+   {
+    "id": "8w7q7asc",
+    "text": "Videos with $100+ GMV (Yesday)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3,
+    "achievedValue": 0,
+    "brandId": "ad94a665-843f-5298-b0b9-a6e1afb8364a",
+    "brandName": "YesDay"
+   },
+   {
+    "id": "kxgzmcw8",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "dk6sqgbq",
+    "text": "Affiliate GMV (Dangle It)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 1500,
+    "achievedValue": 0,
+    "brandId": "7b9a1c8f-56f3-4ad4-be5b-091d1b48f060",
+    "brandName": "Dangle"
+   },
+   {
+    "id": "6u82bqmr",
+    "text": "Onboarding L3+ Creators (Dangle It)",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 20,
+    "achievedValue": 0,
+    "brandId": "7b9a1c8f-56f3-4ad4-be5b-091d1b48f060",
+    "brandName": "Dangle"
+   }
+  ]
+ },
+ {
+  "user_id": "52569db0-55e6-532b-9055-a8c00064e1de",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "lajlnwjq",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0,
+    "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+    "brandName": "FlyWell"
+   },
+   {
+    "id": "1gxgi0hn",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 20,
+    "achievedValue": 0,
+    "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+    "brandName": "FlyWell"
+   },
+   {
+    "id": "sqcja5hy",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3,
+    "achievedValue": 0,
+    "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+    "brandName": "FlyWell"
+   },
+   {
+    "id": "doq7b5j0",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "eik3gww9",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 1500,
+    "achievedValue": 0,
+    "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+    "brandName": "FlyWell"
+   },
+   {
+    "id": "628nhshc",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10,
+    "achievedValue": 0,
+    "brandId": "91b6c205-29c5-5627-92ce-7d8393c7bbdc",
+    "brandName": "FlyWell"
+   }
+  ]
+ },
+ {
+  "user_id": "7deb55a6-3fcf-5151-915d-12d89398859f",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "2pdg2pdu",
+    "text": "Video authorized ",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 95,
+    "achievedValue": 0,
+    "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+    "brandName": "JoyMode"
+   },
+   {
+    "id": "55gpfzu2",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 40,
+    "achievedValue": 0,
+    "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+    "brandName": "JoyMode"
+   },
+   {
+    "id": "c6d7c01c",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 85,
+    "achievedValue": 0,
+    "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+    "brandName": "JoyMode"
+   },
+   {
+    "id": "766a6skt",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "umwroeil",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 49998,
+    "achievedValue": 0,
+    "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+    "brandName": "JoyMode"
+   },
+   {
+    "id": "o3rj394h",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 25,
+    "achievedValue": 0,
+    "brandId": "d1bd8f94-1f81-5bdf-b64e-4c1eda388b54",
+    "brandName": "JoyMode"
+   }
+  ]
+ },
+ {
+  "user_id": "44c1ec2b-5cd6-5d31-8760-9948aa067d97",
+  "month": "2026-08",
+  "basic_salary": 50000,
+  "incentives": [
+   {
+    "id": "0b1ods13",
+    "text": "Authorized Videos (Longevity Box)",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 95,
+    "achievedValue": 0,
+    "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+    "brandName": "Longevity Box"
+   },
+   {
+    "id": "142vihas",
+    "text": "Creators with more than three video (Longevity Box)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 42,
+    "achievedValue": 0,
+    "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+    "brandName": "Longevity Box"
+   },
+   {
+    "id": "rd5lvbep",
+    "text": "Videos with $100+ GMV  (Longevity Box)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 28,
+    "achievedValue": 0,
+    "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+    "brandName": "Longevity Box"
+   },
+   {
+    "id": "mftdx9f7",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "sy8ftqne",
+    "text": "Affiliate GMV (Longevity Box)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0,
+    "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+    "brandName": "Longevity Box"
+   },
+   {
+    "id": "ljmve3eg",
+    "text": "Onboarding L3+ Creators (Longevity Box)",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10,
+    "achievedValue": 0,
+    "brandId": "19a4f596-9282-56a2-a549-66537eb0ea36",
+    "brandName": "Longevity Box"
+   }
+  ]
+ }
+]

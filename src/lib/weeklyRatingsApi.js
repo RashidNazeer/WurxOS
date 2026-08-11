@@ -1,28 +1,31 @@
 // ============================================================
-// Weekly APC performance ratings (mig 269).
+// Weekly APC performance ratings (mig 269; restructured mig 304).
 //
-// The OL rates an APC's 5 performance metrics each week, right after the APC
+// The OL rates an APC's CHECKPOINT metrics each week, right after the APC
 // presents in the agenda meeting. One row per (apc, meeting). The month's
-// performance pillar = the AVERAGE of that month's weekly rows, rolled up in SQL
-// into the existing monthly performance_ratings row (so the composite formula is
-// untouched). See [[weekly-apc-performance]].
+// average of these rows = the APC's "checkpoint" factor = 0.6 of the APC
+// performance pillar (the other 0.4 is the per-report external-report score;
+// see mig 304). The "reporting" slider + the ±5 return chunks (mig 274) were
+// RETIRED — external reporting is now the TL's per-report star. See
+// [[weekly-apc-performance]] / [[tl-performance-method]].
 // ============================================================
 import { supabase } from './supabase';
 
-// The 5 scored metrics — MUST match performanceApi METRICS + the generated
-// overall_score columns on performance_ratings AND weekly_performance_ratings.
+// The 4 CHECKPOINT metrics the OL rates weekly. 'reporting' was dropped (mig 304);
+// external reporting is scored per-report via the TL star. The monthly rollup +
+// apc_checkpoint_score average exactly these 4 keys.
 export const WEEKLY_METRIC_KEYS = [
-  'dailyTasksQuality', 'reporting', 'overallWorkflow', 'responseTime', 'tasksProcessing',
+  'dailyTasksQuality', 'overallWorkflow', 'responseTime', 'tasksProcessing',
 ];
 
 const SELECT =
   'id, apc_id, meeting_id, week_start, month, metrics, overall_score, rated_by, updated_at,' +
   ' rater:rated_by(id, display_name)';
 
-// Average of a metrics object over the 5 keys (0 for missing) → rounded int,
-// identical to the composite's calcMetricsAvg so the preview matches the score.
-// Sum in integer hundredths (metrics are ≤2dp) to mirror SQL's exact-decimal
-// round(sum/5) — plain FP Math.round(sum/5) can drift 1 point at a .5 boundary.
+// Average of a metrics object over the 4 checkpoint keys (0 for missing) →
+// rounded int, identical to SQL apc_checkpoint_score so the preview matches the
+// score. Sum in integer hundredths (metrics are ≤2dp) to mirror SQL's exact
+// round(sum/4) — plain FP Math.round(sum/4) can drift 1 point at a .5 boundary.
 export function weeklyOverall(metrics) {
   if (!metrics) return 0;
   const sum = WEEKLY_METRIC_KEYS.reduce((a, k) => a + Math.round((Number(metrics[k]) || 0) * 100), 0);
@@ -61,17 +64,11 @@ export async function getWeeklyRating(apcId, meetingId) {
 }
 
 // Upsert an APC's weekly rating for a meeting. week_start/month are filled by a
-// DB trigger from the meeting, so callers pass only the scores.
+// DB trigger from the meeting, so callers pass only the 4 checkpoint scores.
 export async function saveWeeklyRating(apcId, meetingId, metrics) {
   const { data: auth } = await supabase.auth.getUser();
   const clean = {};
   for (const k of WEEKLY_METRIC_KEYS) clean[k] = Number(metrics?.[k]) || 0;
-  // reportingOl = the OL's 0–90 slider for the split reporting metric (mig 274).
-  // The DB trigger folds metrics.reporting = reportingOl + the two return chunks;
-  // we keep the slider so the panel can reload it.
-  if (metrics?.reportingOl != null) {
-    clean.reportingOl = Math.min(90, Math.max(0, Number(metrics.reportingOl) || 0));
-  }
   const { data, error } = await supabase
     .from('weekly_performance_ratings')
     .upsert(
@@ -132,6 +129,43 @@ export async function listPendingApcRatings(month = null) {
   const { data, error } = await supabase.rpc('list_pending_apc_ratings', { p_month: month });
   if (error) throw new Error(error.message);
   return data || [];
+}
+
+// Bulk external-report reporting for every APC the caller manages (mig 304) →
+// { apcId: {reports_n, deductions, star_score, accountability, report_score} }.
+// The page combines report_score with a JS checkpoint avg into the APC blend.
+export async function listApcReporting(month) {
+  const { data, error } = await supabase.rpc('list_apc_reporting', { p_month: month });
+  if (error) throw new Error(error.message);
+  const map = {};
+  for (const r of data || []) {
+    map[r.apc_id] = {
+      reports_n: r.reports_n,
+      deductions: Number(r.deductions),
+      star_score: r.star_score == null ? null : Number(r.star_score),
+      accountability: r.accountability == null ? null : Number(r.accountability),
+      report_score: r.report_score == null ? null : Number(r.report_score),
+    };
+  }
+  return map;
+}
+
+// The APC blend components for one APC (breakdown modal + self-view preview).
+export async function apcPerfPreview(apcId, month) {
+  const { data, error } = await supabase.rpc('apc_perf_preview', { p_apc: apcId, p_month: month });
+  if (error) throw new Error(error.message);
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    checkpoint: r.checkpoint_score == null ? null : Number(r.checkpoint_score),
+    report: r.report_score == null ? null : Number(r.report_score),
+    n: r.reports_n,
+    deductions: Number(r.deductions),
+    blended: r.blended == null ? null : Number(r.blended),
+    starAvg: r.star_avg == null ? null : Number(r.star_avg),
+    starScore: r.star_score == null ? null : Number(r.star_score),
+    accountability: r.accountability == null ? null : Number(r.accountability),
+  };
 }
 
 // The trial switch (read).

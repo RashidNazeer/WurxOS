@@ -15,9 +15,13 @@ import WeeklyReportForm from './WeeklyReportForm';
 import ReportActionsMenu from './ReportActionsMenu';
 import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
+import ReportRatingBar from './ReportRatingBar';
 import ReportFiltersPopover from './ReportFiltersPopover';
+import ClientMultiSelect from './ClientMultiSelect';
+import ToolbarSelect from './ToolbarSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
+import { remindReports } from '../../lib/reportsApi';
 
 function StatusBadge({ status, style }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -103,6 +107,10 @@ export default function AllWeeklyReportsPage() {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const canBulkDelete = userRole === 'boss' || userRole === 'ol';
+  const canNotify = userRole === 'boss' || userRole === 'ol';
+  // Reminder toast + which stat card's notify is in flight ('draft' | 'submitted').
+  const [flash, setFlash] = useState('');
+  const [notifyBusy, setNotifyBusy] = useState('');
   const toggleSelected = (id) => setSelected((s) => {
     const next = new Set(s);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -117,7 +125,7 @@ export default function AllWeeklyReportsPage() {
 
   // Filters
   const [filterBrand, setFilterBrand] = useState('');
-  const [filterClient, setFilterClient] = useState('');
+  const [filterClients, setFilterClients] = useState([]);
   const [filterTeam, setFilterTeam] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCreator, setFilterCreator] = useState('');
@@ -240,7 +248,7 @@ export default function AllWeeklyReportsPage() {
       if (!r.weekStart) return false;
       if (!r.weekStart.startsWith(mk)) return false;
       if (filterBrand && r.brandName !== filterBrand) return false;
-      if (filterClient && clientByBrandId.get(r.brandId) !== filterClient) return false;
+      if (filterClients.length && !filterClients.includes(clientByBrandId.get(r.brandId))) return false;
       if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
       if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
       if (filterCreator && r.createdByName !== filterCreator) return false;
@@ -258,7 +266,7 @@ export default function AllWeeklyReportsPage() {
         default:         return (b.weekStart || '').localeCompare(a.weekStart || '');
       }
     });
-  }, [reports, calYear, calMonth, filterBrand, filterClient, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek, filterStatus, sortBy]);
+  }, [reports, calYear, calMonth, filterBrand, filterClients, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek, filterStatus, sortBy]);
 
   // Grouped by brand
   const grouped = useMemo(() => {
@@ -329,6 +337,39 @@ export default function AllWeeklyReportsPage() {
       gmvTrend, reportsTrend, brandsTrend, barPcts, currency };
   }, [filtered, reports, calYear, calMonth, calWeeks]);
 
+  // Status breakdown over the month scope but INDEPENDENT of the active status
+  // filter, so the Draft / Submitted / Pending / Approved cards always show the
+  // true month counts and behave as filter toggles (clicking one never zeroes
+  // out the others). Honours the brand/team/week/search/reporter filters.
+  const statusScope = useMemo(() => {
+    const mk = monthKey(calYear, calMonth);
+    return reports.filter(r => {
+      if (!r.weekStart || !r.weekStart.startsWith(mk)) return false;
+      if (filterBrand && r.brandName !== filterBrand) return false;
+      if (filterClients.length && !filterClients.includes(clientByBrandId.get(r.brandId))) return false;
+      if (filterTeam && ownerByBrandId.get(r.brandId)?.id !== filterTeam) return false;
+      if (filterSearch && !(r.brandName || '').toLowerCase().includes(filterSearch.toLowerCase())) return false;
+      if (filterCreator && r.createdByName !== filterCreator) return false;
+      if (filterWeek && String(r.week) !== filterWeek) return false;
+      return true;
+    });
+  }, [reports, calYear, calMonth, filterBrand, filterClients, clientByBrandId, filterTeam, ownerByBrandId, filterSearch, filterCreator, filterWeek]);
+
+  const statusStats = useMemo(() => {
+    const c = { draft: 0, submitted: 0, verified: 0, approved: 0, pendingOverdue: 0, total: statusScope.length };
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    statusScope.forEach(r => {
+      const s = getReportStatus(r);
+      if (s === 'draft' || s === 'submitted' || s === 'verified' || s === 'approved') c[s]++;
+      if (s === 'verified' && r.verifiedAt) {
+        const ts = new Date(r.verifiedAt).getTime();
+        if (ts && ts < cutoff) c.pendingOverdue++;
+      }
+    });
+    c.approvalRate = c.total > 0 ? Math.round((c.approved / c.total) * 100) : 0;
+    return c;
+  }, [statusScope]);
+
   // Live indicator
   const [syncedAt] = useState(() => new Date());
   const [syncTick, setSyncTick] = useState(0);
@@ -345,41 +386,44 @@ export default function AllWeeklyReportsPage() {
   // touch to silence unused-var lint
   void syncTick;
 
-  const hasFilters = filterBrand || filterClient || filterTeam || filterSearch || filterCreator || filterWeek || filterStatus;
+  const hasFilters = filterBrand || filterClients.length || filterTeam || filterSearch || filterCreator || filterWeek || filterStatus;
 
   const clearAllFilters = () => {
-    setFilterBrand(''); setFilterClient(''); setFilterTeam('');
+    setFilterBrand(''); setFilterClients([]); setFilterTeam('');
     setFilterSearch(''); setFilterCreator(''); setFilterWeek(''); setFilterStatus('');
   };
 
-  // Popover filter specs (everything except the inline search box)
+  // OL/Boss fires a reminder from the Draft / Submitted card: draft → nudge the
+  // APC authors to submit; submitted → nudge the TLs to verify. Scoped to the
+  // reports in view (statusScope); the server re-checks each report's status.
+  const handleRemind = async (kind) => {
+    const targets = statusScope.filter(r => getReportStatus(r) === kind);
+    if (!targets.length) return;
+    const who  = kind === 'draft' ? 'APC' : 'Team Lead';
+    const verb = kind === 'draft' ? 'submit' : 'verify';
+    if (!window.confirm(`Send a reminder to the ${who}s to ${verb} ${targets.length} ${kind} report${targets.length === 1 ? '' : 's'}?`)) return;
+    setNotifyBusy(kind);
+    try {
+      const res = await remindReports(targets.map(r => r.id));
+      const n = res?.sent ?? 0;
+      setFlash(n > 0
+        ? `Reminder sent to ${n} ${who}${n === 1 ? '' : 's'}.`
+        : `No active ${who} to notify for those reports.`);
+      setTimeout(() => setFlash(''), 4000);
+    } catch (e) {
+      setFlash('Failed to send reminders: ' + (e.message || 'unknown'));
+      setTimeout(() => setFlash(''), 5000);
+    } finally { setNotifyBusy(''); }
+  };
+
+  // Popover now holds only the advanced Team filter (boss/ol). Client + Week are
+  // standalone toolbar controls; Status is driven by the stat cards; Brand +
+  // Reporter were removed as redundant.
   const popoverFilters = [
-    { key: 'brand', label: 'Brand', value: filterBrand, setValue: setFilterBrand,
-      options: brandOptions.map(b => ({ value: b, label: b })) },
-    // Client filter — visible whenever any brand in the current
-    // result set has a client_name set. Previously gated to boss/ol
-    // only, but TLs and PCTLs equally benefit from grouping their
-    // own brands by client. Keep the data-driven length check so we
-    // don't show an empty dropdown.
-    ...(clientOptions.length > 0
-      ? [{ key: 'client', label: 'Client', value: filterClient, setValue: setFilterClient,
-          options: clientOptions.map(c => ({ value: c, label: c })) }]
-      : []),
     ...((userRole === 'boss' || userRole === 'ol') && teamOptions.length > 0
       ? [{ key: 'team', label: 'Team', value: filterTeam, setValue: setFilterTeam,
           options: teamOptions.map(t => ({ value: t.id, label: `Team ${t.name}` })) }]
       : []),
-    { key: 'reporter', label: 'Reporter', value: filterCreator, setValue: setFilterCreator,
-      options: creatorOptions.map(c => ({ value: c, label: c })) },
-    { key: 'week', label: 'Week', value: filterWeek, setValue: setFilterWeek,
-      options: weekOptions },
-    { key: 'status', label: 'Status', value: filterStatus, setValue: setFilterStatus,
-      options: [
-        { value: 'draft', label: 'Draft' },
-        { value: 'submitted', label: 'Submitted' },
-        { value: 'verified', label: 'Verified' },
-        { value: 'approved', label: 'Approved' },
-      ] },
   ];
 
   // Month navigation
@@ -580,9 +624,13 @@ export default function AllWeeklyReportsPage() {
             padding: '12px 28px 8px', margin: '0 -28px 10px',
           }}>
           <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <button className="btn btn-sm btn-link text-muted p-0" onClick={() => setViewReport(null)}>
-            <i className="bi bi-arrow-left me-1" /> Back to all reports
-          </button>
+          <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
+            <button className="btn btn-sm btn-link text-muted p-0 flex-shrink-0" onClick={() => setViewReport(null)}>
+              <i className="bi bi-arrow-left me-1" /> Back to all reports
+            </button>
+            <span className="text-muted flex-shrink-0" aria-hidden="true">·</span>
+            <span className="fw-bold text-truncate" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }} title={viewReport.brandName}>{viewReport.brandName}</span>
+          </div>
           <div className="d-flex align-items-center gap-2 flex-wrap">
             <StatusBadge status={rStatus} />
             {canEdit && (
@@ -598,14 +646,6 @@ export default function AllWeeklyReportsPage() {
                 onClick={() => setEditDatesReport(viewReport)}
                 title="Change just this report's start/end dates without touching siblings">
                 <i className="bi bi-calendar-event" /> Edit Dates
-              </button>
-            )}
-            {canSubmitAsApc && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--info)', color: 'white', border: 'none' }}
-                onClick={() => handleSubmitAsApc(viewReport)}
-                title="Move this draft to submitted (acting on behalf of the APC)">
-                <i className="bi bi-send-fill" /> Submit as APC
               </button>
             )}
             {canVerifyAsTl && (
@@ -652,21 +692,39 @@ export default function AllWeeklyReportsPage() {
                 </button>
               </>
             )}
-            {canDelete && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--danger)', color: 'white', border: 'none' }}
-                onClick={() => handleDeleteReport(viewReport)}
-                title="Permanently delete this report">
-                <i className="bi bi-trash3" /> Delete
-              </button>
+            {/* Most-used report actions as quick icon buttons. */}
+            {reportActions && (
+              <>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                  style={{ borderRadius: 8, fontSize: '0.9rem', color: reportActions.highlighterActive ? 'var(--warning)' : undefined, borderColor: reportActions.highlighterActive ? 'var(--warning)' : undefined }}
+                  onClick={reportActions.onToggleHighlighter}
+                  title={reportActions.highlighterActive ? 'Highlighter on — click to stop' : 'Highlighter'}>
+                  <i className="bi bi-highlighter" />
+                </button>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                  style={{ borderRadius: 8, fontSize: '0.9rem' }}
+                  onClick={reportActions.onExportPdf} disabled={reportActions.pdfBusy}
+                  title={reportActions.pdfBusy ? 'Exporting PDF…' : 'Export PDF'}>
+                  <i className={`bi ${reportActions.pdfBusy ? 'bi-hourglass-split' : 'bi-file-earmark-pdf'}`} />
+                </button>
+              </>
             )}
-            {/* Highlighter / Export PDF / Export Word — lifted from the
-                report view so they stay reachable while scrolling. */}
-            <ReportActionsMenu actions={reportActions} />
+            {/* Less-used / destructive actions tucked into the menu. */}
+            <ReportActionsMenu actions={reportActions} hidePrimaryExports
+              extraItems={[
+                canSubmitAsApc && { key: 'submit', label: 'Submit as APC', icon: 'bi-send-fill', iconColor: 'var(--info)', onClick: () => handleSubmitAsApc(viewReport) },
+                canDelete && { key: 'delete', label: 'Delete report', icon: 'bi-trash3', iconColor: 'var(--danger)', danger: true, onClick: () => handleDeleteReport(viewReport) },
+              ]} />
           </div>
           </div>
-          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} />
+          <ReportPeriodStrip reports={brandReports} currentId={viewReport.id} onSelect={setViewReport} type="weekly" />
         </div>
+        <ReportRatingBar
+          report={viewReport}
+          viewerRole={userRole}
+          isBrandOwner={brands.find((b) => b.id === viewReport.brandId)?.ownerId === user?.id}
+          onRated={(updated) => setViewReport((r) => (r ? { ...r, ...updated } : updated))}
+        />
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
             style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
@@ -712,6 +770,14 @@ export default function AllWeeklyReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Reminder toast */}
+      {flash && (
+        <div className="d-inline-flex align-items-center gap-2 rounded-3 px-3 py-2 mb-3"
+          style={{ background: 'var(--info-soft)', color: 'var(--info)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.8rem', fontWeight: 600 }}>
+          <i className="bi bi-bell-fill" />{flash}
+        </div>
+      )}
 
       {/* Stat cards row */}
       <div className="row g-3 mb-4">
@@ -762,6 +828,72 @@ export default function AllWeeklyReportsPage() {
           />
         </div>
 
+        {/* Drafts — click to filter; OL/Boss can nudge the APC authors to submit */}
+        <div className="col-6 col-xl">
+          <div className="rounded-3 h-100 p-3" role="button" tabIndex={0}
+            style={{ background: 'var(--surface-1)', cursor: 'pointer', position: 'relative',
+                     border: filterStatus === 'draft' ? '1.5px solid var(--text-secondary)' : '1px solid var(--border-subtle)' }}
+            onClick={() => setFilterStatus(filterStatus === 'draft' ? '' : 'draft')}
+            onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setFilterStatus(filterStatus === 'draft' ? '' : 'draft'); } }}
+            title="Click to show only draft reports">
+            <div className="d-flex align-items-start justify-content-between mb-3">
+              <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--surface-2)' }}>
+                <i className="bi bi-pencil-square" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }} />
+              </div>
+              {canNotify && statusStats.draft > 0 && (
+                <button type="button"
+                  className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 border-0"
+                  style={{ fontSize: '0.62rem', fontWeight: 700, background: 'var(--info-soft)', color: 'var(--info)', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); handleRemind('draft'); }}
+                  disabled={notifyBusy === 'draft'}
+                  title="Notify the APCs to submit their draft reports">
+                  {notifyBusy === 'draft'
+                    ? <span className="spinner-border spinner-border-sm" style={{ width: 11, height: 11 }} />
+                    : <i className="bi bi-bell" />}
+                  Notify APCs
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Drafts</div>
+            <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
+              {statusStats.draft} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>in progress</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Submitted — click to filter; OL/Boss can nudge the TLs to verify */}
+        <div className="col-6 col-xl">
+          <div className="rounded-3 h-100 p-3" role="button" tabIndex={0}
+            style={{ background: 'var(--surface-1)', cursor: 'pointer', position: 'relative',
+                     border: filterStatus === 'submitted' ? '1.5px solid var(--info)' : '1px solid var(--border-subtle)' }}
+            onClick={() => setFilterStatus(filterStatus === 'submitted' ? '' : 'submitted')}
+            onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setFilterStatus(filterStatus === 'submitted' ? '' : 'submitted'); } }}
+            title="Click to show only submitted reports">
+            <div className="d-flex align-items-start justify-content-between mb-3">
+              <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--info-soft)' }}>
+                <i className="bi bi-inbox" style={{ color: 'var(--info)', fontSize: '0.85rem' }} />
+              </div>
+              {canNotify && statusStats.submitted > 0 && (
+                <button type="button"
+                  className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 border-0"
+                  style={{ fontSize: '0.62rem', fontWeight: 700, background: 'var(--warning-soft)', color: 'var(--warning)', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); handleRemind('submitted'); }}
+                  disabled={notifyBusy === 'submitted'}
+                  title="Notify the Team Leads to verify these reports">
+                  {notifyBusy === 'submitted'
+                    ? <span className="spinner-border spinner-border-sm" style={{ width: 11, height: 11 }} />
+                    : <i className="bi bi-bell" />}
+                  Notify TLs
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Submitted</div>
+            <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
+              {statusStats.submitted} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting review</span>
+            </div>
+          </div>
+        </div>
+
         {/* Approved */}
         <div className="col-6 col-xl">
           <button className="rounded-3 h-100 w-100 text-start p-0 border-0 bg-transparent"
@@ -776,12 +908,12 @@ export default function AllWeeklyReportsPage() {
                 </div>
                 <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
                   style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.66rem', fontWeight: 600 }}>
-                  {monthStats.approvalRate}% rate
+                  {statusStats.approvalRate}% rate
                 </span>
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Approved</div>
               <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
-                {monthStats.approved} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>of {monthStats.reportCount}</span>
+                {statusStats.approved} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>of {statusStats.total}</span>
               </div>
               <Sparkbars values={monthStats.barPcts} highlightLast color="var(--success)" muted="var(--border-subtle)" />
             </div>
@@ -800,17 +932,17 @@ export default function AllWeeklyReportsPage() {
                   style={{ width: 30, height: 30, background: 'var(--warning-soft)' }}>
                   <i className="bi bi-hourglass-split" style={{ color: 'var(--warning)', fontSize: '0.85rem' }} />
                 </div>
-                {monthStats.pendingOverdue > 0 && (
+                {statusStats.pendingOverdue > 0 && (
                   <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
                     style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.66rem', fontWeight: 600 }}>
                     <i className="bi bi-arrow-up-right" />
-                    {monthStats.pendingOverdue} over 24h
+                    {statusStats.pendingOverdue} over 24h
                   </span>
                 )}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Pending approval</div>
               <div className="fw-bold" style={{ fontSize: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2, color: 'var(--text-primary)' }}>
-                {monthStats.pendingApproval} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting</span>
+                {statusStats.verified} <span className="text-muted fw-normal" style={{ fontSize: '0.78rem' }}>awaiting</span>
               </div>
               <Sparkbars values={monthStats.barPcts} highlightLast color="var(--warning)" muted="var(--border-subtle)" />
             </div>
@@ -847,33 +979,14 @@ export default function AllWeeklyReportsPage() {
               value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
           </div>
 
-          {/* Status filter pills */}
-          <div className="d-inline-flex gap-1">
-            {[
-              { v: '', label: 'All' },
-              { v: 'approved', label: 'Approved' },
-              { v: 'verified', label: 'Pending' },
-              { v: 'submitted', label: 'Needs Review' },
-            ].map(opt => {
-              const active = filterStatus === opt.v;
-              return (
-                <button key={opt.v} type="button"
-                  onClick={() => setFilterStatus(opt.v)}
-                  className="btn btn-sm rounded-3 px-3 d-inline-flex align-items-center gap-1"
-                  style={{
-                    fontSize: '0.78rem', fontWeight: 600,
-                    background: active ? 'var(--accent)'      : 'var(--surface-1)',
-                    color:      active ? 'var(--on-accent)'   : 'var(--text-secondary)',
-                    border:     active ? '1px solid var(--accent)' : '1px solid var(--border-subtle)',
-                  }}>
-                  {opt.v === '' && <i className="bi bi-funnel" style={{ fontSize: '0.72rem' }} />}
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+          <ToolbarSelect allLabel="All Weeks" value={filterWeek} onChange={setFilterWeek}
+            options={weekOptions} title="Filter by week" />
 
-          <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
+          <ClientMultiSelect options={clientOptions} selected={filterClients} onChange={setFilterClients} />
+
+          {popoverFilters.length > 0 && (
+            <ReportFiltersPopover filters={popoverFilters} onClear={clearAllFilters} />
+          )}
 
           {hasFilters && (
             <button className="btn btn-sm btn-light border d-inline-flex align-items-center gap-1 rounded-3"

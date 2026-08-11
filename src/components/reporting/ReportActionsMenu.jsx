@@ -10,7 +10,11 @@ import { useEffect, useRef, useState } from 'react';
 //
 // `actions` is null until the report view has mounted and reported
 // its handlers — render nothing until then.
-export default function ReportActionsMenu({ actions }) {
+// `extraItems` are page-supplied menu rows shown ABOVE the report-view actions
+// (e.g. Submit as APC / Delete) — each { key, label, icon, iconColor, onClick,
+// disabled, danger }. `hidePrimaryExports` drops Highlighter + Export PDF from
+// the menu when the page surfaces them as their own icon buttons instead.
+export default function ReportActionsMenu({ actions, extraItems = [], hidePrimaryExports = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -23,14 +27,15 @@ export default function ReportActionsMenu({ actions }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  if (!actions) return null;
+  const items = (extraItems || []).filter(Boolean);
+  if (!actions && !items.length) return null;
 
   const {
     highlighterActive, onToggleHighlighter,
     onExportPdf, pdfBusy,
     onExportWord, docxBusy,
     canCopyInsights, onCopyInsights, copyDone,
-  } = actions;
+  } = actions || {};
 
   const itemStyle = {
     display: 'flex', alignItems: 'center', gap: 9, width: '100%',
@@ -61,6 +66,20 @@ export default function ReportActionsMenu({ actions }) {
           border: '1px solid var(--border-subtle)', borderRadius: 10,
           boxShadow: 'var(--shadow-lg, 0 12px 32px rgba(0,0,0,0.2))', padding: 6,
         }}>
+          {items.map((it) => (
+            <button key={it.key} type="button" disabled={it.disabled}
+              style={{ ...itemStyle, color: it.danger ? 'var(--danger)' : 'var(--text-primary)', opacity: it.disabled ? 0.6 : 1 }}
+              onMouseEnter={(e) => { if (!it.disabled) e.currentTarget.style.background = 'var(--surface-2)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              onClick={() => run(it.onClick)}>
+              <i className={`bi ${it.icon}`} style={{ color: it.iconColor || (it.danger ? 'var(--danger)' : 'var(--text-secondary)') }} />
+              {it.label}
+            </button>
+          ))}
+          {items.length > 0 && actions && (
+            <div style={{ height: 1, background: 'var(--border-subtle)', margin: '5px 6px' }} />
+          )}
+          {actions && !hidePrimaryExports && (
           <button
             type="button"
             style={itemStyle}
@@ -70,6 +89,7 @@ export default function ReportActionsMenu({ actions }) {
             <i className="bi bi-highlighter" style={{ color: 'var(--warning)' }} />
             {highlighterActive ? 'Highlighter — on (click to stop)' : 'Highlighter'}
           </button>
+          )}
           {canCopyInsights && (
             <button
               type="button"
@@ -82,6 +102,7 @@ export default function ReportActionsMenu({ actions }) {
               {copyDone ? 'Copied!' : 'Copy all insights'}
             </button>
           )}
+          {actions && !hidePrimaryExports && (
           <button
             type="button"
             style={{ ...itemStyle, opacity: pdfBusy ? 0.6 : 1 }}
@@ -92,6 +113,7 @@ export default function ReportActionsMenu({ actions }) {
             <i className="bi bi-file-earmark-pdf" style={{ color: 'var(--accent)' }} />
             {pdfBusy ? 'Exporting PDF…' : 'Export PDF'}
           </button>
+          )}
           {typeof onExportWord === 'function' && (
             <button
               type="button"

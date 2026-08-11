@@ -39,7 +39,7 @@ function formatTime(ts) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-const ROLE_LABELS = { tl: 'Team Lead', ol: 'Operation Lead', pctl: 'Paid Collab TL', apc: 'APC', ipc: 'IPC', boss: 'Boss' };
+const ROLE_LABELS = { tl: 'Team Lead', ol: 'Operation Lead', pctl: 'Paid Collab TL', apc: 'APC', ipc: 'IPC', ads_manager: 'Ads Manager', boss: 'Boss' };
 
 // ── Video Embed ───────────────────────────────────────────────────────────────
 

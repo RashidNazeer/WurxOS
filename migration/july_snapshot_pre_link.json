@@ -1,0 +1,1313 @@
+[
+ {
+  "id": "0edbf290-24f0-4974-a656-5732f70ed334",
+  "user_id": "c0fd1182-dff8-5027-b218-7ddfa54bf365",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "r8bddwgg",
+    "text": "Swisse Target GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3500,
+    "achievedValue": 0
+   },
+   {
+    "id": "53vwiph0",
+    "text": "Aurelia Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 2500,
+    "achievedValue": 0
+   },
+   {
+    "id": "5w46f41x",
+    "text": "InnoSupps Target ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 40000,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "id": "fe9b7c76-a4f5-413c-b60d-814252b9c496",
+  "user_id": "a3cbbb8e-d671-5c81-8379-c34f2166a83f",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "35a1tcap",
+    "text": "Vidge Pets Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 2000,
+    "achievedValue": 0
+   },
+   {
+    "id": "8vdbzdsd",
+    "text": "Penetrex Target GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 75000,
+    "achievedValue": 0
+   },
+   {
+    "id": "00z8z3cf",
+    "text": "Longevity Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 15000,
+    "achievedValue": 0
+   },
+   {
+    "id": "i6itmoaf",
+    "text": "Biostime Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0
+   },
+   {
+    "id": "7x8qjrsw",
+    "text": "Dr Harvey Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0
+   },
+   {
+    "id": "682rgofa",
+    "text": "AquaSonic",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 175000,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "id": "046e59ae-53b7-4fff-82c2-8c0cdc781545",
+  "user_id": "7ab9eeb2-0398-577d-b25e-d57075ac817c",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "bofbk3uu",
+    "text": "Klassy Network GMV Target ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 320000,
+    "achievedValue": 0
+   },
+   {
+    "id": "5y6bdzwq",
+    "text": "Obaji Skincare GMV Target",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100000,
+    "achievedValue": 0
+   },
+   {
+    "id": "vm1ok78n",
+    "text": "Cutler Nutrition GMV Target",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 400000,
+    "achievedValue": 0
+   },
+   {
+    "id": "w0f1wsx7",
+    "text": "Louisville GMV Target",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 4500,
+    "achievedValue": 0
+   },
+   {
+    "id": "sxwfmp1q",
+    "text": "Yesday Target GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 4500,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "id": "f3ed0899-cec3-4a76-9b76-142ace6b10fb",
+  "user_id": "f9c7bfb1-cf20-505d-afec-d4a459354216",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "jkp7fhth",
+    "text": "Brands hit their GMV Targets ",
+    "amount": 20000,
+    "source": "ol_brands",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 70,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "id": "0b8d2e24-8800-4e85-b0d7-74a05e791947",
+  "user_id": "8896792c-42fd-59e7-bdc8-db20ac482ddc",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "69wcj839",
+    "text": "Brands hit their GMV targets",
+    "amount": 20000,
+    "source": "ol_brands",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 70,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "id": "0ee56701-e31e-4024-be20-51d74561d18a",
+  "user_id": "5bdb63a9-af56-5342-a20a-25fa5dada47c",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "4xv35xuq",
+    "text": "Total Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Mian Hassan",
+    "targetValue": 95,
+    "achievedValue": 0
+   },
+   {
+    "id": "bqrmmod9",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 280,
+    "achievedValue": 0
+   },
+   {
+    "id": "qb5ks1a7",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Mian Hassan",
+    "targetValue": 375,
+    "achievedValue": 0
+   },
+   {
+    "id": "4xxf888i",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Mian Hassan",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "14a50i47",
+    "text": "Total Affiliate GMV",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 280000,
+    "achievedValue": 0
+   },
+   {
+    "id": "hcwd88p9",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 200,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "17ae6f15-6a60-41c5-9642-fea905ed18f0",
+  "user_id": "e3983541-0195-590c-a466-e61e2e430f1a",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "sua5pri3",
+    "text": "Bentgo Target GMV",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": true,
+    "completedBy": "Mustafa Jan",
+    "targetValue": 15000,
+    "achievedValue": 15100.14
+   },
+   {
+    "id": "jwm0qqn3",
+    "text": "Flywell Target GMV",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3500,
+    "achievedValue": 0
+   },
+   {
+    "id": "mj43hogr",
+    "text": "PDC Target GMV",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 170000,
+    "achievedValue": 0
+   },
+   {
+    "id": "tf5y4rwn",
+    "text": "JoyMode Target GMV ",
+    "amount": 5000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100000,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": []
+ },
+ {
+  "id": "b7da91a2-d2f9-452f-97ca-586292c22e57",
+  "user_id": "2552ed49-6c77-56ab-99c6-6a5ea005b1ea",
+  "month": "2026-07",
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "id": "2c4a8b64-fa12-44da-b365-c05f04e1fc9e",
+  "user_id": "5d463224-4e07-5e52-841a-f7dfb4dc3fb7",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "ch82n4js",
+    "text": "Authorized Videos ",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": true,
+    "completedAt": "2026-07-25T12:29:45.773Z",
+    "completedBy": "Ali Waseem",
+    "targetValue": 90,
+    "achievedValue": 92
+   },
+   {
+    "id": "x8m6z7t3",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 55,
+    "achievedValue": 15
+   },
+   {
+    "id": "zx8t8sr2",
+    "text": "Videos with $100+ GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 7,
+    "achievedValue": 2
+   },
+   {
+    "id": "yp260em2",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "mk2dkqqf",
+    "text": "Total GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": true,
+    "completedAt": "2026-07-25T12:29:45.773Z",
+    "completedBy": "Ali Waseem",
+    "targetValue": 2000,
+    "achievedValue": 1852
+   },
+   {
+    "id": "wszvv4q1",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": true,
+    "completedAt": "2026-07-25T12:29:45.773Z",
+    "completedBy": "Ali Waseem",
+    "targetValue": 10,
+    "achievedValue": 9
+   }
+  ]
+ },
+ {
+  "id": "a3c639c5-efef-4045-b209-ca1866e75f24",
+  "user_id": "9cf31cc3-96e0-5855-ae50-db4386db0c78",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "vbijq4qq",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 90,
+    "achievedValue": 0
+   },
+   {
+    "id": "zm8to4lr",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 115,
+    "achievedValue": 0
+   },
+   {
+    "id": "bp5s6mkd",
+    "text": "Videos with $100+ GMV",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 50,
+    "achievedValue": 0
+   },
+   {
+    "id": "mrnuxm2q",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "h77fzel0",
+    "text": "Affiliate GMV (Inno Supps)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 28000,
+    "achievedValue": 0
+   },
+   {
+    "id": "51e69cv1",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 25,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "c96bd291-96e4-4d35-b926-7dea75bec283",
+  "user_id": "0beaff2d-dc51-5cdb-a97e-a1f4a67b3f46",
+  "month": "2026-07",
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "id": "bcdac4dc-0855-42b6-83d9-19cb75717938",
+  "user_id": "bb4eb9a2-890f-4d53-9f7c-fdd885fe32cd",
+  "month": "2026-07",
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "id": "fec3dfe0-9920-43e1-86b4-056d191da754",
+  "user_id": "87cbdb86-c22a-5c17-9574-73fcb764b79e",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "6om7oeby",
+    "text": "Ad code Collected",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 50,
+    "achievedValue": 0
+   },
+   {
+    "id": "fgjchi54",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Farakh Farooq",
+    "targetValue": 22,
+    "achievedValue": 0
+   },
+   {
+    "id": "90rt9es1",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Farakh Farooq",
+    "targetValue": 20,
+    "achievedValue": 0
+   },
+   {
+    "id": "pzssay4z",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Farakh Farooq",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "lhke2ltg",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 8500,
+    "achievedValue": 0
+   },
+   {
+    "id": "jq4p8i37",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 35,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "2730be8a-d6e1-4387-a093-74c1857874eb",
+  "user_id": "a02eb90b-a2a5-5621-96b6-cf809dd9d6da",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "0u3g04jj",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 80,
+    "achievedValue": 0
+   },
+   {
+    "id": "jey46cuk",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 320,
+    "achievedValue": 0
+   },
+   {
+    "id": "lks1mzpa",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 320,
+    "achievedValue": 0
+   },
+   {
+    "id": "o3d2izcn",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "9j7kkwdc",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 180000,
+    "achievedValue": 0
+   },
+   {
+    "id": "06g2nss6",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 75,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "d75e4566-ebd3-455f-8157-9faeaefd4a2d",
+  "user_id": "27f2a01e-6816-5309-bed5-b05065a00007",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "9n68qlop",
+    "text": "Completion of all tasks by TL/Ops would lead to a 70,000 PKR fixed salary. Since you do not currently have any active brand, the bonus and incentive structure will start once your brand has been active for one month.",
+    "amount": 20000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "OL",
+    "targetValue": 30,
+    "achievedValue": 0
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "00dngq0y",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 0,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "c1c0c4d2-de1a-49ac-9215-d640aadb0d35",
+  "user_id": "2afc6ad4-312c-5f8b-af3e-9c786a856bf0",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "02k53wlk",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": true,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": "Umair Tariq",
+    "targetValue": 95,
+    "achievedValue": 90
+   },
+   {
+    "id": "eb94spla",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": true,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": "Umair Tariq",
+    "targetValue": 100,
+    "achievedValue": 93
+   },
+   {
+    "id": "3b8x8yig",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": true,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": "Umair Tariq",
+    "targetValue": 92,
+    "achievedValue": 96
+   },
+   {
+    "id": "h1z0vaqk",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "id979ebj",
+    "text": "Total Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": true,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": "Umair Tariq",
+    "targetValue": 150000,
+    "achievedValue": 135000
+   },
+   {
+    "id": "vkes5du2",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": true,
+    "completedAt": "2026-08-01T13:32:01.902Z",
+    "completedBy": "Umair Tariq",
+    "targetValue": 200,
+    "achievedValue": 185
+   }
+  ]
+ },
+ {
+  "id": "216789ef-b21b-4d60-9b88-363839843d5d",
+  "user_id": "5b55547a-90f1-51e3-ba42-62787703301b",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "pr07c84z",
+    "text": "Authorized Videos (Biostime)",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0
+   },
+   {
+    "id": "cemjc49x",
+    "text": "Creators with more than three video (Biostime)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 55,
+    "achievedValue": 0
+   },
+   {
+    "id": "4a6pvqd7",
+    "text": "Videos with $100+ GMV (Biostime)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 12,
+    "achievedValue": 0
+   },
+   {
+    "id": "epolz9o9",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "shupzsj6",
+    "text": "Total GMV (Dr. Harvey's)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 8708.76
+   },
+   {
+    "id": "nijsh860",
+    "text": "Onboarding L3+ Creators (Dr. Harvey's)",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 25,
+    "achievedValue": 15
+   }
+  ]
+ },
+ {
+  "id": "617e9b0a-7d31-4441-b637-412ddf8b4947",
+  "user_id": "8b3240ae-dece-5beb-b6ef-61f0c1dda984",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "i7r3g4ww",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 90,
+    "achievedValue": 0
+   },
+   {
+    "id": "esh01ky8",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 150,
+    "achievedValue": 0
+   },
+   {
+    "id": "uh33a2m0",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 190,
+    "achievedValue": 0
+   },
+   {
+    "id": "t8duociw",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "q4p18h8w",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 150000,
+    "achievedValue": 0
+   },
+   {
+    "id": "1i6tvqhw",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "225fb8f0-a41a-4230-96d8-921f0faf6aa9",
+  "user_id": "a62d33ef-3ece-4ba5-a41b-a6de0f367632",
+  "month": "2026-07",
+  "incentives": [],
+  "bonuses": []
+ },
+ {
+  "id": "116ac32a-1296-4dad-ad8a-d7729dad1185",
+  "user_id": "76cea800-34f9-5fcc-8489-0bfe405534ff",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "fb3tygav",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 90,
+    "achievedValue": 0
+   },
+   {
+    "id": "79ficgsj",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 32,
+    "achievedValue": 0
+   },
+   {
+    "id": "hadjb69a",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 18,
+    "achievedValue": 0
+   },
+   {
+    "id": "e2l0gkxr",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "w8w550dj",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 6000,
+    "achievedValue": 0
+   },
+   {
+    "id": "r9n9nqvd",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "80948bea-b9e8-4a10-922f-9f1837583f7a",
+  "user_id": "20f4156e-397a-52d7-8003-d00686630b32",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "t2y77cpb",
+    "text": "Authorized Videos ",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": true,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": "Haseeb",
+    "targetValue": 90,
+    "achievedValue": 89
+   },
+   {
+    "id": "ssazx37k",
+    "text": "Creators with more than three video ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": true,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": "Haseeb",
+    "targetValue": 120,
+    "achievedValue": 109
+   },
+   {
+    "id": "8fcc1wo2",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": true,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": "Haseeb",
+    "targetValue": 70,
+    "achievedValue": 80
+   },
+   {
+    "id": "127ujlev",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "i3i8r1i5",
+    "text": "Total GMV",
+    "amount": 10000,
+    "suffix": "£",
+    "completed": true,
+    "completedAt": "2026-08-01T14:16:46.530Z",
+    "completedBy": "Haseeb",
+    "targetValue": 60000,
+    "achievedValue": 69670
+   },
+   {
+    "id": "xiq2w1mu",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedAt": null,
+    "completedBy": null,
+    "targetValue": 50,
+    "achievedValue": 25
+   }
+  ]
+ },
+ {
+  "id": "be9ae802-db79-4714-9f53-d49d15270c7c",
+  "user_id": "5d15f70d-cf9f-5a4f-a936-1153d1b352e8",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "yvs6lpx1",
+    "text": "Authorized Videos (Yesday)",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 85,
+    "achievedValue": 0
+   },
+   {
+    "id": "wsr1zy9u",
+    "text": "Creators with more than three video (Yesday)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 26,
+    "achievedValue": 0
+   },
+   {
+    "id": "8w7q7asc",
+    "text": "Videos with $100+ GMV (Yesday)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3,
+    "achievedValue": 0
+   },
+   {
+    "id": "kxgzmcw8",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "dk6sqgbq",
+    "text": "Affiliate GMV (Dangle It)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 1500,
+    "achievedValue": 0
+   },
+   {
+    "id": "6u82bqmr",
+    "text": "Onboarding L3+ Creators (Dangle It)",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 20,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "6a4ae49c-072d-4fe6-a7be-b66ba472b4bc",
+  "user_id": "52569db0-55e6-532b-9055-a8c00064e1de",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "lajlnwjq",
+    "text": "Authorized Videos",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 90,
+    "achievedValue": 0
+   },
+   {
+    "id": "1gxgi0hn",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 20,
+    "achievedValue": 0
+   },
+   {
+    "id": "sqcja5hy",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 3,
+    "achievedValue": 0
+   },
+   {
+    "id": "doq7b5j0",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "eik3gww9",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 1500,
+    "achievedValue": 0
+   },
+   {
+    "id": "628nhshc",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "ad4966f3-4ca5-4105-8556-203560bcd1a5",
+  "user_id": "7deb55a6-3fcf-5151-915d-12d89398859f",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "2pdg2pdu",
+    "text": "Video authorized ",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Ibrahim Baloch",
+    "targetValue": 95,
+    "achievedValue": 0
+   },
+   {
+    "id": "55gpfzu2",
+    "text": "Creators with more than three video",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 40,
+    "achievedValue": 0
+   },
+   {
+    "id": "c6d7c01c",
+    "text": "Videos with $100+ GMV ",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 85,
+    "achievedValue": 0
+   },
+   {
+    "id": "766a6skt",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Ibrahim Baloch",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "umwroeil",
+    "text": "Affiliate GMV ",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 49998,
+    "achievedValue": 0
+   },
+   {
+    "id": "o3rj394h",
+    "text": "Onboarding L3+ Creators",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 25,
+    "achievedValue": 0
+   }
+  ]
+ },
+ {
+  "id": "74e211ad-ea84-4dea-ac74-0e57dc186f06",
+  "user_id": "44c1ec2b-5cd6-5d31-8760-9948aa067d97",
+  "month": "2026-07",
+  "incentives": [
+   {
+    "id": "0b1ods13",
+    "text": "Authorized Videos (Longevity Box)",
+    "amount": 5000,
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Ali Ahmad",
+    "targetValue": 95,
+    "achievedValue": 0
+   },
+   {
+    "id": "142vihas",
+    "text": "Creators with more than three video (Longevity Box)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 42,
+    "achievedValue": 0
+   },
+   {
+    "id": "rd5lvbep",
+    "text": "Videos with $100+ GMV  (Longevity Box)",
+    "amount": 5000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 28,
+    "achievedValue": 0
+   },
+   {
+    "id": "mftdx9f7",
+    "text": "Punctuality + Absences + General Review of performance from team lead",
+    "amount": 5000,
+    "source": "attendance",
+    "suffix": "%",
+    "completed": false,
+    "completedBy": "Arslan Sabir",
+    "targetValue": 100,
+    "achievedValue": null
+   }
+  ],
+  "bonuses": [
+   {
+    "id": "sy8ftqne",
+    "text": "Affiliate GMV (Longevity Box)",
+    "amount": 10000,
+    "suffix": "$",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10000,
+    "achievedValue": 0
+   },
+   {
+    "id": "ljmve3eg",
+    "text": "Onboarding L3+ Creators (Longevity Box)",
+    "amount": 10000,
+    "suffix": "",
+    "completed": false,
+    "completedBy": null,
+    "targetValue": 10,
+    "achievedValue": 0
+   }
+  ]
+ }
+]

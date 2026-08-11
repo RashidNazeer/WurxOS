@@ -87,7 +87,8 @@ async function _updateAndReturn(id, patch) {
   return { id, ...patch };
 }
 
-// ── approval workflow: draft → submitted → verified → approved ────────
+// ── workflow: draft → submitted → verified (DONE). APC ↔ TL only ──────
+// (No OL approval — mig 299. TL 'verify' is the terminal state.)
 // APC submits for the TL to verify. Clears any prior return note.
 export async function submitCheckpoint(id) {
   const me = await uid();
@@ -96,7 +97,7 @@ export async function submitCheckpoint(id) {
   });
 }
 
-// TL verifies; the OL then approves. Clears any prior return note.
+// TL verifies — the TERMINAL 'done' state (no OL step). Clears any return note.
 export async function verifyCheckpoint(id) {
   const me = await uid();
   return _updateAndReturn(id, {
@@ -104,37 +105,21 @@ export async function verifyCheckpoint(id) {
   });
 }
 
-// OL approves — the terminal state.
-export async function approveCheckpoint(id) {
+// TL returns the submitted checkpoint to the APC (→ draft) WITH a note. Status +
+// note in ONE update so the log trigger captures the note (and the caller then
+// docks the APC's reporting).
+export async function returnCheckpoint(id, { note } = {}) {
   const me = await uid();
   return _updateAndReturn(id, {
-    status: 'approved', approved_at: new Date().toISOString(), approved_by: me,
-  });
-}
-
-// Return down the chain WITH a note. Default drops one stage (verified →
-// submitted = OL back to TL; submitted → draft = TL back to APC). Status +
-// note are written in ONE update so the log trigger captures the note.
-export async function returnCheckpoint(id, { note, toStatus } = {}) {
-  const me = await uid();
-  let next = toStatus;
-  if (!next) {
-    const { data: cur } = await supabase.from(TABLE).select('status').eq('id', id).maybeSingle();
-    next = cur?.status === 'verified' ? 'submitted' : 'draft';
-  }
-  return _updateAndReturn(id, {
-    status: next, return_note: note || null,
+    status: 'draft', return_note: note || null,
     returned_at: new Date().toISOString(), returned_by: me,
   });
 }
 
-// OL reopens an approved checkpoint to edit (self-edit, no note, not a return).
+// TL reopens a DONE (verified) checkpoint back to editable ('submitted') — a
+// self-edit (no note, not a return) so the TL can fix something and re-verify.
 export async function reopenCheckpoint(id) {
-  const me = await uid();
-  return _updateAndReturn(id, {
-    status: 'verified', return_note: null,
-    returned_at: new Date().toISOString(), returned_by: me,
-  });
+  return _updateAndReturn(id, { status: 'submitted', return_note: null });
 }
 
 // Append-only return history (newest first) with the returner's name. Powers

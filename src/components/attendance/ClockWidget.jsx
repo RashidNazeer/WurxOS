@@ -14,6 +14,8 @@ import {
   setAutoClockOutNote as apiSetAutoClockOutNote,
 } from '../../lib/attendanceApi';
 import { getNow, getNowDate } from '../../lib/serverTime';
+import ApcGmvGateModal from './ApcGmvGateModal';
+import { apcGmvStatus, submitApcGmv } from '../../lib/apcGmvApi';
 
 const LOCATIONS = [
   { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: '#2563eb' },
@@ -255,6 +257,18 @@ export default function ClockWidget() {
   const [breakError, setBreakError]           = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  // APC GMV-on-clock-in gate (mig 311)
+  const [showGmvGate, setShowGmvGate] = useState(false);
+  const [gmvStatus, setGmvStatus] = useState(null);
+  const [pendingLocation, setPendingLocation] = useState(null);
+  const [clockedInToast, setClockedInToast] = useState(false);
+
+  // Auto-dismiss the "You're clocked in" confirmation toast.
+  useEffect(() => {
+    if (!clockedInToast) return undefined;
+    const t = setTimeout(() => setClockedInToast(false), 2800);
+    return () => clearTimeout(t);
+  }, [clockedInToast]);
 
   const isApcOrIpc = userRole === 'apc' || userRole === 'ipc';
   const isTL = userRole === 'tl';
@@ -465,20 +479,58 @@ export default function ClockWidget() {
 
   const locInfo = LOCATIONS.find(l => l.key === record?.location);
 
-  async function handleClockIn(location) {
+  // Low-level clock-in: write + refresh + confirmation toast. THROWS on error.
+  async function performClockIn(location) {
+    await clockIn({
+      userId: currentUser.uid, userName, userRole,
+      userEmail: currentUser.email || '',
+      ownerId, location,
+    });
+    setShowClockIn(false);
+    setShowGmvGate(false);
+    setPendingLocation(null);
+    // Force-refresh — realtime can be flaky and we never want the user
+    // to see stale state after their own action.
+    refetchRecord();
+    setClockedInToast(true);
+  }
+
+  // Direct clock-in (non-gate path); swallows errors into the widget banner.
+  async function doClockIn(location) {
     setAction('clockin');
-    try {
-      await clockIn({
-        userId: currentUser.uid, userName, userRole,
-        userEmail: currentUser.email || '',
-        ownerId, location,
-      });
-      setShowClockIn(false);
-      // Force-refresh — realtime can be flaky and we never want the user
-      // to see stale state after their own action.
-      refetchRecord();
-    } catch (err) { setTaskError(err.message); }
+    try { await performClockIn(location); }
+    catch (err) { setTaskError(err.message); }
     setAction('');
+  }
+
+  async function handleClockIn(location) {
+    // APC-only GMV gate BEFORE any attendance write. Fail-open if the check
+    // itself errors, so a glitch never locks an APC out of clocking in.
+    if (userRole === 'apc') {
+      setAction('clockin'); setTaskError('');
+      let st = null;
+      try { st = await apcGmvStatus(); } catch { st = null; }
+      setAction('');
+      if (st && st.needs_entry) {
+        setGmvStatus(st);
+        setPendingLocation(location);
+        setShowGmvGate(true);
+        return;
+      }
+    }
+    await doClockIn(location);
+  }
+
+  // The GMV modal's confirm handler: save GMV, then clock in. Errors propagate
+  // to the modal so it can show them and stay open for a retry.
+  async function handleGmvConfirm(payload) {
+    await submitApcGmv({
+      monthKey: gmvStatus.month_key,
+      rangeStart: payload.rangeStart,
+      rangeEnd: payload.rangeEnd,
+      entries: payload.entries,
+    });
+    await performClockIn(pendingLocation);
   }
 
   async function handleBreak() {
@@ -1115,6 +1167,27 @@ export default function ClockWidget() {
           />
         </div>
       </div>
+
+      {/* APC GMV-on-clock-in gate */}
+      {showGmvGate && gmvStatus && (
+        <ApcGmvGateModal
+          status={gmvStatus}
+          onConfirm={handleGmvConfirm}
+          onClose={() => { setShowGmvGate(false); setShowClockIn(false); setPendingLocation(null); }}
+        />
+      )}
+
+      {/* "You're clocked in" confirmation toast */}
+      {clockedInToast && (
+        <div style={{
+          position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 1100,
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 12,
+          background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
+          boxShadow: 'var(--shadow-lg)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
+        }}>
+          <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} /> You're clocked in
+        </div>
+      )}
 
       {/* Edit clock-in modal */}
       {showEditClockIn && (

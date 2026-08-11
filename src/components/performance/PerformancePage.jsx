@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   // Bulk loaders
@@ -13,9 +14,12 @@ import {
   fetchAttendanceBreakdown, fetchAttendanceBreakdownBulk,
   // Shared role/rating helpers — single source, no local copies.
   ROLE_LABEL, canRate,
+  // APC blend parity mirror (mig 304) — same math the SQL composite uses.
+  calcCheckpointAvg, apcPerfPillar,
 } from '../../lib/performanceApi';
 import {
   listPendingApcRatings, getWeeklyRatingsEnabled, setWeeklyRatingsEnabled,
+  listApcReporting, apcPerfPreview,
 } from '../../lib/weeklyRatingsApi';
 import {
   getTlPerfEnabled, setTlPerfEnabled, listTlReporting, tlPerfPreview,
@@ -843,7 +847,7 @@ function PillarBar({ pillar, score, weight, detail }) {
 // key events only — no raw dumps. Each block knows how to handle
 // missing data ("Not rated yet", "No incentives", etc.).
 function PillarDetail({ pillarKey, ctx }) {
-  const { myRecord, myIncRecord, myAttendanceDays, myFlags, month, effectiveRole, tlLive, myTlPreview } = ctx;
+  const { myRecord, myIncRecord, myAttendanceDays, myFlags, month, effectiveRole, tlLive, myTlPreview, weeklyLive, myApcPreview } = ctx;
 
   if (pillarKey === 'performance') {
     // Team Leads under the live method: the pillar is auto-derived (team + reporting),
@@ -863,6 +867,30 @@ function PillarDetail({ pillarKey, ctx }) {
           <div className="text-muted" style={{ fontSize: '0.68rem' }}>Auto-derived: 0.6 × team score + 0.4 × reporting.</div>
           <div className="d-flex justify-content-between"><span>Team score (avg of your APCs)</span><strong>{p.team == null ? '—' : Math.round(p.team)}/100</strong></div>
           <div className="d-flex justify-content-between"><span>Reporting ({p.n || 0} verified · {Number(p.deductions || 0)} docked)</span><strong>{p.reporting == null ? '—' : Math.round(p.reporting)}/100</strong></div>
+          <div className="d-flex justify-content-between pt-1" style={{ borderTop: '1px dashed var(--border-subtle)' }}><span className="fw-semibold">Performance pillar</span><strong>{p.blended}/100</strong></div>
+        </div>
+      );
+    }
+    // APCs under the live weekly method: pillar = 0.6 checkpoint (OL weekly rating)
+    // + 0.4 external report (TL star + return accountability).
+    if (effectiveRole === 'apc' && weeklyLive) {
+      const p = myApcPreview;
+      if (!p || p.blended == null) {
+        return (
+          <div className="text-muted small">
+            Auto-derived from your weekly checkpoint ratings and your report scores — it appears
+            once your OL rates you weekly and your TL rates your reports.
+          </div>
+        );
+      }
+      return (
+        <div className="d-flex flex-column gap-1" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          <div className="text-muted" style={{ fontSize: '0.68rem' }}>Auto-derived: 0.6 × checkpoint + 0.4 × external report.</div>
+          <div className="d-flex justify-content-between"><span>Weekly checkpoint (OL rating)</span><strong>{p.checkpoint == null ? '—' : Math.round(p.checkpoint)}/100</strong></div>
+          <div className="d-flex justify-content-between"><span>External report ({p.n || 0} verified · {Number(p.deductions || 0)} docked)</span><strong>{p.report == null ? '—' : Math.round(p.report)}/100</strong></div>
+          {p.starScore != null && (
+            <div className="d-flex justify-content-between text-muted" style={{ fontSize: '0.68rem' }}><span>· TL stars {p.starAvg == null ? '' : `(${p.starAvg}★ avg)`}</span><span>{Math.round(p.starScore)}/100</span></div>
+          )}
           <div className="d-flex justify-content-between pt-1" style={{ borderTop: '1px dashed var(--border-subtle)' }}><span className="fw-semibold">Performance pillar</span><strong>{p.blended}/100</strong></div>
         </div>
       );
@@ -1193,6 +1221,24 @@ export default function PerformancePage() {
     return () => { cancelled = true; };
   }, [effectiveRole, month]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // APC performance blend (mig 304): per-APC external-report scores for the team
+  // tab (managers) + the viewer's own preview. The checkpoint half is computed in
+  // JS from the monthly metrics; the report half (report_score) comes from here.
+  const [apcReporting, setApcReporting] = useState({});
+  const [myApcPreview, setMyApcPreview] = useState(null);
+  useEffect(() => {
+    if (!(isBoss || ['ol', 'tl', 'pctl'].includes(effectiveRole))) { setApcReporting({}); return undefined; }
+    let cancelled = false;
+    listApcReporting(month).then((m) => { if (!cancelled) setApcReporting(m || {}); }).catch(() => { if (!cancelled) setApcReporting({}); });
+    return () => { cancelled = true; };
+  }, [month, isBoss, effectiveRole]);
+  useEffect(() => {
+    if (effectiveRole !== 'apc' || !currentUser?.uid) { setMyApcPreview(null); return undefined; }
+    let cancelled = false;
+    apcPerfPreview(currentUser.uid, month).then((p) => { if (!cancelled) setMyApcPreview(p); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [effectiveRole, month]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Load ──
   useEffect(() => {
     // Stale-response guard: on a flaky connection a month switch can let the
@@ -1375,6 +1421,15 @@ export default function PerformancePage() {
   // month is >= the launch floor (mirrors the SQL gate in get_performance_composite).
   const tlSince = tlCfg.since ? String(tlCfg.since).slice(0, 7) : '2026-08';
   const tlLive = tlCfg.enabled && month >= tlSince;
+  // A month BEFORE the go-live floor keeps the original rating method even when the
+  // switch is Live (the floor protects already-scored/paid closed months). Surface
+  // that distinctly so a pre-floor month (e.g. July) doesn't read as "not switched".
+  const weeklySince = weeklyCfg.since ? String(weeklyCfg.since).slice(0, 7) : '2026-08';
+  const tlPreLaunch = tlCfg.enabled && month < tlSince;
+  const weeklyPreLaunch = weeklyCfg.enabled && month < weeklySince;
+  // When live (switch ON + month >= floor), an APC's perf pillar IS the blend
+  // (0.6 checkpoint + 0.4 external report), mirroring the SQL composite APC branch.
+  const weeklyLive = weeklyCfg.enabled && month >= weeklySince;
 
   // Effective composite for EVERY loaded user (null when not-rated / pending /
   // attendance-failed) — the APC composites a TL's team score averages. Mirrors
@@ -1383,7 +1438,12 @@ export default function PerformancePage() {
     const m = {};
     for (const u of teamUsers) {
       const rec = teamRecords[u.id];
-      const perfScore = rec ? calcMetricsAvg(rec.metrics) : null;
+      const isApc = (u.role || u.userRole) === 'apc';
+      // APC perf pillar under the live weekly method = the checkpoint+report blend
+      // (mirrors get_performance_composite so a TL's team-score average matches SQL).
+      const perfScore = (isApc && weeklyLive)
+        ? apcPerfPillar(rec ? calcCheckpointAvg(rec.metrics) : null, apcReporting[u.id]?.report_score ?? null)
+        : (rec ? calcMetricsAvg(rec.metrics) : null);
       if (perfScore === null || attError || isIncPending(teamIncentives[u.id])) { m[u.id] = null; continue; }
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attScore = attendanceScoreFrom(teamAttendance[u.id] || null);
@@ -1391,7 +1451,7 @@ export default function PerformancePage() {
       m[u.id] = calcComposite({ performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore }, weights);
     }
     return m;
-  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, month, weights, attError]);
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, month, weights, attError, weeklyLive, apcReporting]);
 
   // Per-TL blended pillar = round(0.6×team + 0.4×reporting). Always computed (the
   // preview); it becomes the OFFICIAL perf pillar for TL rows when tlLive.
@@ -1425,6 +1485,12 @@ export default function PerformancePage() {
         perfScore = tlBlend;
         rec = tlBlend == null ? null : (rec || { tl_derived: true });
       }
+      // Same for an APC under the live weekly method: pillar = checkpoint+report blend.
+      const isApcRow = (u.role || u.userRole) === 'apc';
+      if (isApcRow && weeklyLive) {
+        perfScore = apcPerfPillar(rec ? calcCheckpointAvg(rec.metrics) : null, apcReporting[u.id]?.report_score ?? null);
+        rec = perfScore == null ? null : (rec || { apc_derived: true });
+      }
       const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attData = teamAttendance[u.id] || null;
       const wd = attData ? attData.daysThisMonth : 0;
@@ -1454,7 +1520,7 @@ export default function PerformancePage() {
         && getLevel(u.composite).label.toLowerCase() === levelFilter);
     }
     return list;
-  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError, tlBlendById, tlLive]);
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError, tlBlendById, tlLive, weeklyLive, apcReporting]);
 
   // The attendance pillar failed to load → calcComposite silently re-weights
   // over the remaining pillars. Refuse to show a composite rather than show a
@@ -1465,6 +1531,8 @@ export default function PerformancePage() {
   // blended pillar (team + reporting) instead of the old OL rating.
   const myPerfScore = (effectiveRole === 'tl' && tlLive)
     ? (myTlPreview?.blended ?? null)
+    : (effectiveRole === 'apc' && weeklyLive)
+    ? (myApcPreview?.blended ?? null)
     : (myRecord ? calcMetricsAvg(myRecord.metrics) : null);
   const myIncScore  = calcIncentiveScore(myIncRecord);
   const myIncPending = isIncPending(myIncRecord);
@@ -1505,6 +1573,7 @@ export default function PerformancePage() {
     try {
       await setWeeklyRatingsEnabled(next);
       setWeeklyCfg((c) => ({ ...c, enabled: next }));
+      setAttReloadKey((k) => k + 1); // going Live backfills official scores — reload the grid so it isn't stale
     } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
     finally { setSwitchBusy(false); }
   }
@@ -1519,6 +1588,7 @@ export default function PerformancePage() {
     try {
       await setTlPerfEnabled(next);
       setTlCfg((c) => ({ ...c, enabled: next }));
+      setAttReloadKey((k) => k + 1); // on-read TL blend flips immediately — reload the grid so it isn't stale
     } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
     finally { setTlSwitchBusy(false); }
   }
@@ -1591,6 +1661,21 @@ export default function PerformancePage() {
           )}
         </div>
       </div>
+
+      {/* Pre-launch clarity: the switch IS Live, but the viewed month predates go-live
+          so it keeps the original method — say so, or it reads as "not switched". */}
+      {(tlPreLaunch || weeklyPreLaunch) && (
+        <div className="rounded-3 p-3 mb-3 d-flex align-items-start gap-2"
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <i className="bi bi-hourglass-split mt-1" style={{ color: 'var(--accent)' }} />
+          <div>
+            The new {[tlPreLaunch && 'Team-Lead performance', weeklyPreLaunch && 'weekly APC ratings'].filter(Boolean).join(' & ')} method
+            {' '}is <b>Live</b> from {getMonthLabel(tlPreLaunch ? tlSince : weeklySince)}.
+            You're viewing <b>{getMonthLabel(month)}</b>, which is before go-live, so it keeps the <b>original</b> rating —
+            that's why it shows “Preview”, not because the switch is off.
+          </div>
+        </div>
+      )}
 
       {/* OL / Boss: APC weekly ratings still pending from meetings 2+ days ago */}
       {(isBoss || effectiveRole === 'ol') && pendingRatings.length > 0 && (
@@ -1717,6 +1802,15 @@ export default function PerformancePage() {
             </div>
           )}
 
+          {/* Private what-if tool — see exactly how the score is built and
+              simulate reaching a goal. Read-only; never touches real data. */}
+          <Link to="/performance/simulator"
+            className="d-flex align-items-center justify-content-center gap-2 mb-4 text-decoration-none"
+            style={{ borderRadius: 12, fontWeight: 700, fontSize: '0.82rem', background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', padding: '11px 14px' }}>
+            <i className="bi bi-sliders" /> Simulate my performance
+            <span style={{ fontWeight: 500, fontSize: '0.7rem', opacity: 0.85 }}>· what would reach my goal?</span>
+          </Link>
+
           {/* Pillar breakdown — click any pillar to expand and see how
               its score was computed. */}
           <h6 className="fw-bold mb-3" style={{ fontSize: '0.9rem' }}>
@@ -1735,7 +1829,7 @@ export default function PerformancePage() {
                 detail={
                   <PillarDetail
                     pillarKey={p.key}
-                    ctx={{ myRecord, myIncRecord, myAttendanceDays, myFlags, month, effectiveRole, tlLive, myTlPreview }}
+                    ctx={{ myRecord, myIncRecord, myAttendanceDays, myFlags, month, effectiveRole, tlLive, myTlPreview, weeklyLive, myApcPreview }}
                   />
                 }
               />

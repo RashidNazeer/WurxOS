@@ -5,6 +5,7 @@ export const ROLES = [
   { value: 'pctl',      label: 'Paid Collab Team Lead', blurb: 'PCTL' },
   { value: 'apc',       label: 'Affiliate Coordinator', blurb: 'APC' },
   { value: 'ipc',       label: 'Influencer Coordinator',blurb: 'IPC' },
+  { value: 'ads_manager', label: 'Ads Manager',         blurb: 'Paid ads / GMV Max' },
   { value: 'developer', label: 'Developer',             blurb: 'Engineering' },
 ];
 
@@ -46,6 +47,11 @@ export const ROLE_EXTRAS = {
       { key: 'canManageTasks', label: 'Can create tasks', hint: 'Allow this IPC to create/edit tasks on their brands.' },
     ],
   },
+  // Ads Manager runs paid ads / GMV Max for a set of brands. No parent (an OL
+  // manages them directly) and no permission toggles — WHICH BRANDS they see is
+  // not a permission, it's the OL-curated list in Settings → Ads Manager Brands
+  // (ads_manager_brands, mig 316), which also drives their incentive plan.
+  ads_manager: { reportsToRole: null, permissions: [] },
   developer: { reportsToRole: null,   permissions: [] },
 };
 

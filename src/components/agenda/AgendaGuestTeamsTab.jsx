@@ -16,7 +16,7 @@ import {
 // eligible to be ticked into a team's meeting under Schedules.
 
 const ROLE_LABEL = {
-  boss: 'Boss', ol: 'Operation Lead', tl: 'Team Lead', pctl: 'Paid Collab TL',
+  boss: 'Boss', ol: 'Operation Lead', tl: 'Team Lead', pctl: 'Paid Collab TL', ads_manager: 'Ads Manager',
   apc: 'Affiliate Coordinator', ipc: 'Influencer Coordinator', developer: 'Developer',
 };
 
