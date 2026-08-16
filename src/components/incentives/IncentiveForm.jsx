@@ -36,59 +36,63 @@ function itemSuffix(item) {
 // it only when the row is already attendance-linked or its text names
 // attendance / punctuality / absence(s).
 const looksLikeAttendance = (text) => /attendance|punctual|absence/i.test(text || '');
-// The ol_brands toggle belongs on an OL "% of my brands hit their GMV target"
-// line — reveal it when the row is already flagged or its text names brands+GMV.
-const looksLikeOlBrands = (text) => /brand.*gmv|gmv.*brand|brands hit/i.test(text || '');
 // A per-brand GMV-Max line ("Total Revenue in GMV Max", "Total GMV from GMV Max",
 // "... (Inno Supps)"). Its Achieved is filled from Brand Analytics (mig 317).
-const looksLikeGmvMax = (text) => /gmvs*max/i.test(text || '');
+const looksLikeGmvMax = (text) => /gmv\s*max/i.test(text || '');
+
+// Where an item's "Achieved" comes from. Manual is the default; the rest are
+// read-time overlays (incentivesApi.applyDerivedAutofill) that fill the number
+// server-side data already knows.
+//
+// This is a SELECT, always rendered, and that is deliberate. It used to be
+// three switches, each shown only when the row's TEXT matched a regex. Two
+// things went wrong with that: switching a source off could hide the switch
+// itself (text didn't match → nothing to switch back on), and a typo in the
+// GMV-Max pattern meant brand lines never offered it at all. A control that
+// can disappear is worse than one that is occasionally irrelevant.
+const SOURCE_LABELS = {
+  '':           'Manual entry',
+  attendance:   'Auto — monthly attendance %',
+  ol_brands:    'Auto — OL brand roll-up %',
+  gmv_max:      "Auto — brand's GMV in Brand Analytics",
+};
+// Brand-linked rows can only mean GMV-Max; "Other" rows can't (no brand to
+// resolve), but they own the two person-level sources.
+const sourceOptionsFor = (hideToggles, current) => {
+  const opts = hideToggles ? ['', 'gmv_max'] : ['', 'attendance', 'ol_brands'];
+  // Never silently drop a source the row already carries.
+  if (current && !opts.includes(current)) opts.push(current);
+  return opts;
+};
 
 function LineRow({ item, onChange, onRemove, hideToggles }) {
-  const isAtt      = item.source === 'attendance';
-  const isOlBrands = item.source === 'ol_brands';
-  const isGmvMax   = item.source === 'gmv_max';
+  const source     = item.source || '';
+  const isAtt      = source === 'attendance';
+  const isOlBrands = source === 'ol_brands';
+  const isGmvMax   = source === 'gmv_max';
+  const isAuto     = !!source;
   // Brand rows only. Stamp the flag as soon as the line is recognisably a
   // GMV-Max one, so a new plan is auto-filled without anyone remembering to
-  // flip a switch. `source === undefined` means "never decided"; toggling the
-  // switch off writes null, which is a decision and is respected.
+  // set it. `source === undefined` means "never decided"; picking Manual
+  // writes null, which is a decision and is respected.
   const canGmvMax = !!hideToggles && looksLikeGmvMax(item.text);
   useEffect(() => {
     if (canGmvMax && item.source === undefined) onChange(item.id, 'source', 'gmv_max');
   }, [canGmvMax, item.source, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const suffix = isAtt ? '%' : (item.suffix ?? (item.unit === 'percent' ? '%' : ''));
-  // Brand-linked rows (hideToggles) never show the attendance/ol_brands source
-  // toggles — those only belong on "Other" (non-brand) lines.
-  const showAttToggle = !hideToggles && !isOlBrands && (isAtt || looksLikeAttendance(item.text));
-  const showOlToggle  = !hideToggles && !isAtt && (isOlBrands || looksLikeOlBrands(item.text));
-  const showGmvToggle = canGmvMax || isGmvMax;
 
-  // Toggling attendance mode pins Target=100 and unit=% so the ≥90% rule
-  // means "≥90% attendance". Achieved is then filled from live attendance.
-  function toggleAttendance(on) {
-    if (on) {
-      onChange(item.id, 'source', 'attendance');
+  // Picking a source applies the invariants that source implies: attendance is
+  // a /100 percentage, the OL roll-up defaults to a 70% threshold, GMV-Max
+  // keeps whatever money target the OL set.
+  function applySource(next) {
+    onChange(item.id, 'source', next || null);
+    if (next === 'attendance') {
       onChange(item.id, 'targetValue', 100);
       onChange(item.id, 'suffix', '%');
-    } else {
-      onChange(item.id, 'source', null);
-    }
-  }
-
-  // Toggling ol_brands mode flags the item so the read-time overlay fills its
-  // Achieved with the OL's brand roll-up %. Target stays editable (it's the
-  // threshold, default 70); unit pinned to %.
-  function toggleOlBrands(on) {
-    if (on) {
-      onChange(item.id, 'source', 'ol_brands');
+    } else if (next === 'ol_brands') {
       if (!Number(item.targetValue)) onChange(item.id, 'targetValue', 70);
       onChange(item.id, 'suffix', '%');
-    } else {
-      onChange(item.id, 'source', null);
     }
-  }
-
-  function toggleGmvMax(on) {
-    onChange(item.id, 'source', on ? 'gmv_max' : null);
   }
 
   const lockStyle = isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
@@ -114,62 +118,28 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
         </button>
       </div>
 
-      {/* Auto-fill from attendance toggle — only on the attendance line */}
-      {showAttToggle && (
-        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
-          <input
-            className="form-check-input flex-shrink-0 mt-0"
-            type="checkbox"
-            role="switch"
-            id={`att-${item.id}`}
-            checked={isAtt}
-            onChange={e => toggleAttendance(e.target.checked)}
-          />
-          <label className="form-check-label" htmlFor={`att-${item.id}`} style={{ fontSize: '0.72rem', color: isAtt ? '#1e40af' : '#6c757d' }}>
-            <i className="bi bi-calendar-check me-1" />
-            Auto-fill “Achieved” from monthly attendance
-          </label>
-        </div>
-      )}
+      {/* Where "Achieved" comes from — ALWAYS shown, on every line. */}
+      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span style={{ fontSize: '0.68rem', color: '#6c757d', fontWeight: 600 }}>
+          <i className={`bi ${isAuto ? 'bi-magic' : 'bi-pencil'} me-1`} />Achieved
+        </span>
+        <select
+          className="form-select form-select-sm"
+          style={{ width: 'auto', minWidth: 210, fontSize: '0.72rem', borderRadius: 6,
+            ...(isAuto ? { borderColor: '#bfdbfe', background: '#eff6ff', color: '#1e40af', fontWeight: 600 } : {}) }}
+          value={source}
+          onChange={e => applySource(e.target.value)}
+        >
+          {sourceOptionsFor(hideToggles, source).map(v => (
+            <option key={v || 'manual'} value={v}>{SOURCE_LABELS[v] || v}</option>
+          ))}
+        </select>
+      </div>
       {isAtt && (
         <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
           <i className="bi bi-info-circle me-1" />
           Achieved fills automatically from this person's attendance % — no manual entry.
           Target is pinned to 100% (≥90% attendance completes it).
-        </div>
-      )}
-
-      {/* Auto-fill from OL brand roll-up toggle — only on an OL brands+GMV line */}
-      {showOlToggle && (
-        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
-          <input
-            className="form-check-input flex-shrink-0 mt-0"
-            type="checkbox"
-            role="switch"
-            id={`olb-${item.id}`}
-            checked={isOlBrands}
-            onChange={e => toggleOlBrands(e.target.checked)}
-          />
-          <label className="form-check-label" htmlFor={`olb-${item.id}`} style={{ fontSize: '0.72rem', color: isOlBrands ? '#1e40af' : '#6c757d' }}>
-            <i className="bi bi-bullseye me-1" />
-            Auto-fill “Achieved” from this OL's incentive-brand roll-up
-          </label>
-        </div>
-      )}
-      {showGmvToggle && (
-        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2" style={{ paddingLeft: '2.4em' }}>
-          <input
-            className="form-check-input flex-shrink-0 mt-0"
-            type="checkbox"
-            role="switch"
-            id={`gmvmax-${item.id}`}
-            checked={isGmvMax}
-            onChange={e => toggleGmvMax(e.target.checked)}
-          />
-          <label className="form-check-label" htmlFor={`gmvmax-${item.id}`} style={{ fontSize: '0.72rem', color: isGmvMax ? '#1e40af' : '#6c757d' }}>
-            <i className="bi bi-graph-up-arrow me-1" />
-            Auto-fill “Achieved” from this brand's GMV in Brand Analytics
-          </label>
         </div>
       )}
       {isGmvMax && (
