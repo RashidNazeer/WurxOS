@@ -182,10 +182,22 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
         <div className="card-body p-3">
           <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
             <h5 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{teamName} — Agenda Meeting</h5>
-            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.62rem', fontWeight: 800 }}>
-              <i className="bi bi-check-circle-fill me-1" />Completed
-            </span>
+            {meeting.status === 'completed' ? (
+              <span className="rounded-pill px-2 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.62rem', fontWeight: 800 }}>
+                <i className="bi bi-check-circle-fill me-1" />Completed
+              </span>
+            ) : (
+              <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft, #fef3c7)', color: 'var(--warning, #b45309)', fontSize: '0.62rem', fontWeight: 800 }}>
+                <i className="bi bi-exclamation-triangle-fill me-1" />Missed — never started
+              </span>
+            )}
           </div>
+          {meeting.status !== 'completed' && (
+            <div className="mb-2" style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+              This meeting never ran. You can still score every APC for the week —
+              rate them below, and mark anyone who did present.
+            </div>
+          )}
           <div className="row g-2" style={{ fontSize: '0.78rem' }}>
             <Info icon="bi-calendar-event" label="Date" value={fmtDate(meeting.meeting_date)} />
             <Info icon="bi-clock" label="Scheduled time (PKT)" value={fmtTime(meeting.meeting_time)} />

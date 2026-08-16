@@ -18,6 +18,16 @@ function fmtTime(t) {
   return `${hh}:${m} ${ap}`;
 }
 
+// A meeting nobody ever started, whose day has been and gone. It stays at
+// status 'upcoming' forever, so without this it would never surface anywhere —
+// and the week would silently go unrated for the whole team.
+function isMissed(m) {
+  if (!m || m.status !== 'upcoming' || !m.meeting_date) return false;
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return m.meeting_date < todayStr;
+}
+
 export default function AgendaPriorPage() {
   const [meetings, setMeetings]   = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -49,9 +59,10 @@ export default function AgendaPriorPage() {
     const weekIndex = {};
     [...new Set(inMonth.map((m) => m.week_start))].sort()
       .forEach((ws, i) => { weekIndex[ws] = i + 1; });
-    // Group the completed meetings.
+    // Group completed meetings AND missed ones — an OL still has to score a
+    // week that never ran.
     const byWeek = new Map();
-    inMonth.filter((m) => m.status === 'completed').forEach((m) => {
+    inMonth.filter((m) => m.status === 'completed' || isMissed(m)).forEach((m) => {
       if (!byWeek.has(m.week_start)) byWeek.set(m.week_start, []);
       byWeek.get(m.week_start).push(m);
     });
@@ -86,7 +97,7 @@ export default function AgendaPriorPage() {
             <i className="bi bi-clock-history" style={{ fontSize: '1.15rem' }} />
             Prior Meetings
           </h5>
-          <p className="text-muted small mb-0">Completed agenda meetings — records, attendance and evaluations.</p>
+          <p className="text-muted small mb-0">Completed and missed agenda meetings — records, attendance and evaluations.</p>
         </div>
         <div className="d-flex align-items-center gap-2 flex-wrap">
           <select className="form-select form-select-sm" value={sortDir} onChange={(e) => setSortDir(e.target.value)}
@@ -111,7 +122,7 @@ export default function AgendaPriorPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-clock-history text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No completed meetings in {viewMonthLabel}</p>
+          <p className="fw-semibold text-dark mb-1">No completed or missed meetings in {viewMonthLabel}</p>
           <p className="text-muted small mb-0">Finished meetings appear here automatically.</p>
         </div>
       ) : (
@@ -136,16 +147,22 @@ export default function AgendaPriorPage() {
                           <span className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
                             {m.tl?.display_name || 'Team'}
                           </span>
-                          <span className="rounded-pill px-2 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.6rem', fontWeight: 800 }}>
-                            <i className="bi bi-check-circle-fill me-1" />Completed
-                          </span>
+                          {isMissed(m) ? (
+                            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft, #fef3c7)', color: 'var(--warning, #b45309)', fontSize: '0.6rem', fontWeight: 800 }}>
+                              <i className="bi bi-exclamation-triangle-fill me-1" />Missed
+                            </span>
+                          ) : (
+                            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.6rem', fontWeight: 800 }}>
+                              <i className="bi bi-check-circle-fill me-1" />Completed
+                            </span>
+                          )}
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.74rem' }}>
                           <i className="bi bi-calendar3 me-1" />{fmtDate(m.meeting_date)}
                           {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)} PKT
                         </div>
                         <div className="d-inline-flex align-items-center gap-1 mt-2" style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600 }}>
-                          View record <i className="bi bi-arrow-right" />
+                          {isMissed(m) ? 'Rate this week' : 'View record'} <i className="bi bi-arrow-right" />
                         </div>
                       </div>
                     </button>
