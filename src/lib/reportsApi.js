@@ -45,7 +45,11 @@ export const EMPTY_REPORT_DATA = () => ({
   gmvMaxInsights: '',
   productHighlights: [emptyProduct()],
   productHighlightsInsights: '',
-  offsitePerformance: { offsiteGmv: '', tiktokShopGmv: '', offsiteEffect: '' },
+  // dataFrom/dataTo: set ONLY when the week's own offsite numbers aren't
+  // published yet and the APC had to report an older window instead. Their
+  // presence is what makes the viewer print the period under the section
+  // heading — there is no separate "not available" flag to keep in sync.
+  offsitePerformance: { offsiteGmv: '', tiktokShopGmv: '', offsiteEffect: '', dataFrom: '', dataTo: '' },
   offsiteInsights: '',
   upcomingCampaigns: '',
   operationalUpdates: '',

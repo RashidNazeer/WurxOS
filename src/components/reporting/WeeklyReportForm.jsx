@@ -629,6 +629,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const setPerfNote = useCallback((key, val) => {
     setData(d => ({ ...d, overallNotes: { ...d.overallNotes, [key]: val } }));
   }, []);
+  // On/off state for the offsite "Latest Data Not available" period. Derived
+  // from the data on load (a saved period means it was on) and then owned by
+  // the user, so turning it off and clearing the dates sticks.
+  const [offsiteRangeOn, setOffsiteRangeOn] = useState(false);
+
+  // A saved period means the toggle was on — restore it on load. Only ever
+  // switches ON: clearing the dates is how the user switches it off, so this
+  // can't fight them (and can't loop).
+  useEffect(() => {
+    const o = data.offsitePerformance || {};
+    if (o.dataFrom || o.dataTo) setOffsiteRangeOn(true);
+  }, [data.offsitePerformance?.dataFrom, data.offsitePerformance?.dataTo]);
   const setOffsite = useCallback((key, val) => {
     setData(d => ({ ...d, offsitePerformance: { ...d.offsitePerformance, [key]: val } }));
   }, []);
@@ -1787,6 +1799,39 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
       <SectionCard id="sec-offsitePerformance" hue="#10b981" icon="bi-globe2" title="Offsite Performance"
         enabled={sectEnabled.offsitePerformance} onToggle={toggleSection('offsitePerformance')}>
+        {/* The week's own offsite figures are often not published yet, so the APC
+            reports an older window. Naming that window is the honest fix: the
+            viewer prints it under the heading, and the client sees the period the
+            numbers actually cover instead of assuming it's this week's. */}
+        <div className="form-check form-switch d-flex align-items-center gap-2 mb-2">
+          <input className="form-check-input flex-shrink-0 mt-0" type="checkbox" role="switch"
+            id="offsite-stale-range" checked={offsiteRangeOn}
+            onChange={(e) => {
+              setOffsiteRangeOn(e.target.checked);
+              if (!e.target.checked) { setOffsite('dataFrom', ''); setOffsite('dataTo', ''); }
+            }} />
+          <label className="form-check-label" htmlFor="offsite-stale-range"
+            style={{ fontSize: '0.78rem', color: offsiteRangeOn ? '#1e40af' : '#6c757d', fontWeight: 600 }}>
+            Latest Data Not available
+          </label>
+        </div>
+        {offsiteRangeOn && (
+          <div className="d-flex align-items-end gap-2 mb-3 flex-wrap">
+            <div>
+              <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Data from</label>
+              <input type="date" className="form-control form-control-sm" style={{ width: 165 }}
+                value={data.offsitePerformance.dataFrom || ''} onChange={e => setOffsite('dataFrom', e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Data to</label>
+              <input type="date" className="form-control form-control-sm" style={{ width: 165 }}
+                value={data.offsitePerformance.dataTo || ''} onChange={e => setOffsite('dataTo', e.target.value)} />
+            </div>
+            <div className="text-muted" style={{ fontSize: '0.68rem', paddingBottom: 6 }}>
+              Shown under the section heading in the report — nothing else is added.
+            </div>
+          </div>
+        )}
         <div className="d-flex flex-wrap gap-2 mb-2">
           <Field label={`Offsite GMV (${curSym})`} value={data.offsitePerformance.offsiteGmv} onChange={v => setOffsite('offsiteGmv', v)} type="number" placeholder="1725.49" />
           <Field label={`TikTok Shop GMV (${curSym})`} value={data.offsitePerformance.tiktokShopGmv} onChange={v => setOffsite('tiktokShopGmv', v)} type="number" placeholder="55834.62" />

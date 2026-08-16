@@ -218,7 +218,7 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
   );
 }
 
-function SectionHead({ title, eyebrow, action }) {
+function SectionHead({ title, eyebrow, sub, action }) {
   return (
     <div className="d-flex align-items-end justify-content-between mt-4 mb-3">
       <div>
@@ -226,10 +226,36 @@ function SectionHead({ title, eyebrow, action }) {
         {eyebrow && (
           <div style={{ fontSize: '0.74rem', color: C.muted, marginTop: 2 }}>{eyebrow}</div>
         )}
+        {sub && (
+          <div style={{ fontSize: '0.74rem', color: C.inkDim, marginTop: 3, fontWeight: 600 }}>
+            <i className="bi bi-calendar3 me-1" style={{ fontSize: '0.7rem' }} />{sub}
+          </div>
+        )}
       </div>
       {action}
     </div>
   );
+}
+
+// The period an offsite figure actually covers, printed under the heading when
+// the APC flagged the week's own data as unavailable. Deliberately just the
+// dates — no "latest data unavailable" caveat is shown to anyone.
+function fmtDataPeriod(from, to) {
+  const parse = (s) => {
+    if (!s) return null;
+    const d = new Date(`${s}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const a = parse(from), b = parse(to);
+  const full = { day: 'numeric', month: 'short', year: 'numeric' };
+  if (a && b) {
+    const sameYear = a.getFullYear() === b.getFullYear();
+    const left = a.toLocaleDateString('en-US', sameYear ? { day: 'numeric', month: 'short' } : full);
+    return `${left} – ${b.toLocaleDateString('en-US', full)}`;
+  }
+  if (a) return a.toLocaleDateString('en-US', full);
+  if (b) return b.toLocaleDateString('en-US', full);
+  return '';
 }
 
 // Sum a set of GMV Max rows into one overall, deriving ROI/CPO from the sums
@@ -1401,7 +1427,8 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         {sectEnabled.offsitePerformance && (num(offsite.offsiteGmv) > 0 || num(offsite.tiktokShopGmv) > 0) && (
           <>
             <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px', marginTop: 12 }}>
-              <SectionHead title="Offsite performance" eyebrow="Halo from non-TikTok channels" />
+              <SectionHead title="Offsite performance" eyebrow="Halo from non-TikTok channels"
+                sub={fmtDataPeriod(offsite.dataFrom, offsite.dataTo)} />
               <div className="d-flex align-items-center gap-4 flex-wrap">
                 <div style={{ width: 110, height: 110, position: 'relative', flexShrink: 0 }}>
                   <ResponsiveContainer width="100%" height="100%">
