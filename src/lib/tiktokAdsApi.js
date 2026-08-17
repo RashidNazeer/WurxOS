@@ -5,12 +5,33 @@ import { supabase } from './supabase';
 // Nothing here ever sees an access token — the function deliberately never
 // returns one. The browser only learns which advertiser accounts are connected.
 
+// WHY THIS HEADER IS NOT OPTIONAL.
+// Supabase edge functions run in the region nearest the caller. Our team is in
+// Pakistan, so that region is Mumbai (ap-south-1) — and TikTok's Business API
+// refuses every request from India, which has banned TikTok since 2020:
+//     code -1 "Client IP address is in banned Country list."
+// It looks exactly like a credentials failure and is not one. Pinning the
+// invocation is the fix.
+//
+// Tokyo is chosen over the other working regions because it is also the
+// Supabase project's own region, so the function sits next to the database it
+// queries instead of calling it across an ocean.
+//
+// Probed 2026-08-17 via the function's `diagnose` action:
+//     ap-south-1 BLOCKED · ap-northeast-1, ap-southeast-1, eu-west-2,
+//     us-east-1 all reachable.
+// Re-run that action before changing this, rather than guessing.
+const TIKTOK_SAFE_REGION = 'ap-northeast-1';
+
 async function call(body, { anon = false } = {}) {
   if (!anon) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not signed in.');
   }
-  const { data, error } = await supabase.functions.invoke('tiktok-oauth', { body });
+  const { data, error } = await supabase.functions.invoke('tiktok-oauth', {
+    body,
+    headers: { 'x-region': TIKTOK_SAFE_REGION },
+  });
   if (error) {
     // Edge Functions surface non-2xx as `error` with the response in context.
     let msg = error.message;

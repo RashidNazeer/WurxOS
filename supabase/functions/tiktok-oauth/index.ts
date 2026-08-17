@@ -60,11 +60,23 @@ const AUTH_PORTAL = 'https://business-api.tiktok.com/portal/auth';
 
 const STATE_TTL_MIN = 15;
 
+// `x-region` must be allowed through or the browser preflight blocks it, and
+// without it the call cannot be pinned away from a TikTok-banned region.
 const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-region',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+// WHERE THIS CODE RUNS MATTERS. Supabase edge functions execute in the region
+// nearest the caller, and TikTok's Business API refuses connections from
+// countries on its banned list — including India, whose Mumbai region is the
+// closest one to Pakistan. A caller in Karachi therefore gets:
+//     "Client IP address is in banned Country list" (code -1)
+// even with a perfectly valid app secret and redirect URL. The client pins
+// invocations with an `x-region` header; this value is reported back on
+// failures so the region is never left to guesswork.
+const REGION = Deno.env.get('SB_REGION') || 'unknown';
 
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -158,6 +170,29 @@ Deno.serve(async (req) => {
     const action = String(payload?.action || '');
 
     // ────────────────────────────────────────────────────────────────
+    // diagnose — is TikTok reachable from the region this ran in?
+    //
+    // Deliberately role-free (the anon key is still required) so the region
+    // can be probed before anyone burns a single-use auth code on a request
+    // that was always going to be refused. It makes exactly one fixed call,
+    // with an intentionally invalid token: a credentials error means the
+    // region is FINE, a "banned Country" error means it is not.
+    // ────────────────────────────────────────────────────────────────
+    if (action === 'diagnose') {
+      const probe = await fetchAdvertisers('probe-invalid-token');
+      const banned = /banned country|ip address/i.test(probe.message);
+      return json({
+        region: REGION,
+        reachable: !banned,
+        tiktokCode: probe.code,
+        tiktokMessage: probe.message,
+        verdict: banned
+          ? `BLOCKED — TikTok refuses requests from "${REGION}". Pin invocations to another region.`
+          : `OK — "${REGION}" is not blocked. TikTok answered with a normal credentials error, which is what an allowed region looks like.`,
+      });
+    }
+
+    // ────────────────────────────────────────────────────────────────
     // start — mint a nonce, hand back the URL to send the advertiser to
     // ────────────────────────────────────────────────────────────────
     if (action === 'start') {
@@ -232,11 +267,16 @@ Deno.serve(async (req) => {
       });
 
       if (!ex.ok || !ex.data?.access_token) {
-        // Surface TikTok's own wording — its messages are specific and are the
-        // fastest route to the cause (redirect mismatch, expired code, ...).
+        // Surface TikTok's own wording — its messages are specific. The hint
+        // must match the actual failure: a fixed "check your secret" guess sent
+        // someone chasing a correctly-set secret once already.
+        const banned = /banned country|ip address/i.test(ex.message);
         return json({
           error: `TikTok refused the exchange (code ${ex.code}): ${ex.message}`,
-          hint: 'The usual causes are a redirect URL that does not byte-match the portal, a reused auth code, or the wrong app secret.',
+          region: REGION,
+          hint: banned
+            ? `This is a location block, not a credentials problem. The request left from the "${REGION}" region, whose country TikTok blocks. Nothing is wrong with the app secret or the redirect URL.`
+            : 'The usual causes are a redirect URL that does not byte-match the portal, a reused auth code, or the wrong app secret.',
         }, 400);
       }
 
