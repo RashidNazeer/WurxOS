@@ -115,6 +115,12 @@ export function analyseHalo(periods, {
       controls: model.controls || [],
       controlsUnavailable: model.controlsUnavailable || [],
       maxVif: model.maxVif ?? null,
+      // Model-specific warnings (interval spans zero, influential observation,
+      // collinear lags). These also flow into the combined `warnings` array
+      // below, but Layer B renders them itself — the influential-observation
+      // one carries the row `index` that drives the "Run without it" refit, so
+      // it has to reach the model panel rather than only the summary list.
+      warnings: model.warnings || [],
       confidenceLabel: confidence.label,
       confidenceReasons: confidence.reasons,
       _model: model,          // for the sensitivity refit; not for display

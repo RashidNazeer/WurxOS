@@ -336,7 +336,9 @@ function AdjustedLayer({
           Those two are the most common reasons a halo estimate is overstated — add the columns to the sheet and the model will use them automatically.
         </Note>
       )}
-      {m.warnings.map((w) => (
+      {/* Guarded: a missing array here used to take the whole route down via
+          the error boundary. Degrading to "no warnings" beats a white screen. */}
+      {(m.warnings || []).map((w) => (
         <Note key={w.code} tone="warn">
           {w.message}
           {w.code === 'influential_observation' && (
@@ -401,7 +403,7 @@ function AdjustedLayer({
           <div style={{ fontWeight: 700, margin: '10px 0 4px' }}>Coefficients by lag</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
-              {m.lagCoefficients.map((c) => (
+              {(m.lagCoefficients || []).map((c) => (
                 <Row key={c.lag} k={c.label} v={`${c.coefficient >= 0 ? '+' : ''}${c.coefficient.toFixed(4)}${c.standardError != null ? `  (± ${(1.96 * c.standardError).toFixed(4)})` : ''}`} />
               ))}
               <Row k="Cumulative" v={`${m.cumulativeCoefficient >= 0 ? '+' : ''}${m.cumulativeCoefficient.toFixed(4)}`} />
@@ -409,7 +411,7 @@ function AdjustedLayer({
           </table>
           <div style={{ fontWeight: 700, margin: '10px 0 4px' }}>Why this confidence rating</div>
           <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)' }}>
-            {m.confidenceReasons.map((r, i) => <li key={i}>{r}</li>)}
+            {(m.confidenceReasons || []).map((r, i) => <li key={i}>{r}</li>)}
           </ul>
         </div>
       )}

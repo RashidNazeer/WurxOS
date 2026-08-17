@@ -12,6 +12,7 @@
 import { pearson, signedCorrelation } from '../src/lib/haloV2/correlation.js';
 import { lagCorrelations, bestObservedLag } from '../src/lib/haloV2/lagAnalysis.js';
 import { fitDistributedLag } from '../src/lib/haloV2/distributedLag.js';
+import { analyseHalo } from '../src/lib/haloV2/index.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -184,6 +185,40 @@ const periods = (xs, ys, controls = []) =>
   const fit = fitDistributedLag(periods(x, y), { maxLag: 2, controls: { trend: false, seasonality: false }, xKey: 'gmv', yKey: 'revenue_per_day' });
   check('12. A negative relationship survives the model (never floored)',
     fit.cumulativeCoefficient < 0, `cumulative=${fit.cumulativeCoefficient?.toFixed(3)}`);
+}
+
+// ── Extra: the §36 result CONTRACT ───────────────────────────────────
+// Regression guard. The 11 brief tests all call the maths modules directly, so
+// none of them ever built the result object the UI actually consumes. That gap
+// shipped a crash: adjustedModel had no `warnings` key while the Layer B panel
+// mapped over it, and because Layer B declines on thin data the bad line only
+// ran once a brand finally had enough history. Assert every array the UI maps
+// over really is an array — on BOTH the available and refused paths.
+{
+  const n = 80;
+  const x = Array.from({ length: n }, (_, i) => 1200 + i * 8 + rnd() * 40);
+  const y = x.map((v, i) => 5000 + 0.55 * v + i * 3 + rnd() * 80);
+
+  const arrayFields = ['lagCoefficients', 'controls', 'controlsUnavailable', 'confidenceReasons', 'warnings'];
+
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3 });
+  check('13. Enough history → Layer B is available', full.adjustedModel.available === true,
+    full.adjustedModel.message || '');
+  for (const f of arrayFields) {
+    check(`13.${f} is an array when the model is available`,
+      Array.isArray(full.adjustedModel[f]), `typeof=${typeof full.adjustedModel[f]}`);
+  }
+  check('13. Layer A lagCorrelations is an array', Array.isArray(full.observed.lagCorrelations));
+  check('13. Layer A warnings is an array', Array.isArray(full.observed.warnings));
+
+  // Same contract must hold when the model REFUSES — the refusal path renders
+  // a different branch today, but the shape should not depend on the verdict.
+  const thin = analyseHalo(periods(x.slice(0, 10), y.slice(0, 10)), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3 });
+  check('14. Thin data → Layer B refuses', thin.adjustedModel.available === false);
+  for (const f of arrayFields) {
+    check(`14.${f} is still an array when refused`,
+      Array.isArray(thin.adjustedModel[f]), `typeof=${typeof thin.adjustedModel[f]}`);
+  }
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
