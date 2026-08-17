@@ -106,13 +106,24 @@ async function requireRole(req: Request, roles: string[]) {
   if (!token) return { error: json({ error: 'unauthenticated' }, 401) };
   const { data: userData, error } = await admin.auth.getUser(token);
   if (error || !userData?.user) return { error: json({ error: 'unauthenticated' }, 401) };
-  const { data: profile } = await admin
+  // Select ONLY what this check uses. An earlier version also asked for
+  // `full_name`, which does not exist on profiles (the column is
+  // display_name) — PostgREST failed the whole select, `profile` came back
+  // null, and every role including Boss was told "forbidden". Reporting the
+  // read error separately is what keeps a schema mistake from masquerading
+  // as a permission problem again.
+  const { data: profile, error: profErr } = await admin
     .from('profiles')
-    .select('id, role, is_active, full_name')
+    .select('id, role, is_active')
     .eq('id', userData.user.id)
     .maybeSingle();
-  if (!profile || profile.is_active === false || !roles.includes(profile.role)) {
-    return { error: json({ error: `forbidden — ${roles.join('/')} only` }, 403) };
+  if (profErr) {
+    return { error: json({ error: `could not read your profile: ${profErr.message}` }, 500) };
+  }
+  if (!profile) return { error: json({ error: 'no profile found for this account' }, 403) };
+  if (profile.is_active === false) return { error: json({ error: 'your account is inactive' }, 403) };
+  if (!roles.includes(profile.role)) {
+    return { error: json({ error: `forbidden — ${roles.join('/')} only (you are ${profile.role})` }, 403) };
   }
   return { profile };
 }

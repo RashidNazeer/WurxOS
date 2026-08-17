@@ -130,7 +130,11 @@ export default function TikTokAdsSection() {
   }
 
   const accounts = state?.accounts || [];
-  const configured = state?.configured;
+  // Only trust a real answer from the server. Treating "we could not load"
+  // as "not configured" is what sent a permission error out as a misleading
+  // "set your secrets" banner, so the two states stay separate.
+  const configured = state?.configured === true;
+  const answered = !!state;
 
   return (
     <SectionShell
@@ -158,7 +162,7 @@ export default function TikTokAdsSection() {
             </div>
           )}
 
-          {!configured && (
+          {answered && !configured && (
             <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}>
               <AlertIcon width="16" height="16" />
               <span>
@@ -208,12 +212,17 @@ export default function TikTokAdsSection() {
           )}
 
           {/* ── Connected accounts ──────────────────────────────── */}
+          {/* Only claim a count once the server actually answered. Saying
+              "0 connected" after a failed load reads as a fact when it is
+              really "we do not know". */}
+          {answered && (
           <div style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase',
                         letterSpacing: 0.4, color: 'var(--text-muted)', marginBottom: 8 }}>
             Connected accounts ({accounts.length})
           </div>
+          )}
 
-          {accounts.length === 0 ? (
+          {!answered ? null : accounts.length === 0 ? (
             <div style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
               No TikTok ad account is connected yet. Until one is, no ad spend or GMV Max
               data can be read.
