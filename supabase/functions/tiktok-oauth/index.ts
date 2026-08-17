@@ -193,6 +193,55 @@ Deno.serve(async (req) => {
     }
 
     // ────────────────────────────────────────────────────────────────
+    // probe — raw read-only passthrough for working out response shapes.
+    //
+    // Exists because TikTok's docs portal is client-rendered and unreadable
+    // by fetch, and because a local script cannot make these calls at all:
+    // Pakistan's nearest region is on TikTok's banned list, so every TikTok
+    // call has to leave from this function.
+    //
+    // Gated on the SERVICE ROLE KEY, not a user session. That key is already
+    // full access to everything, so this adds no new privilege — and it means
+    // no new anonymous surface exists just to run diagnostics. Restricted to
+    // the read paths inside our five approved scopes.
+    // ────────────────────────────────────────────────────────────────
+    if (action === 'probe') {
+      const probeKey = Deno.env.get('TIKTOK_PROBE_KEY') || '';
+      if (!probeKey || req.headers.get('x-probe-key') !== probeKey) {
+        return json({ error: 'probe requires a valid x-probe-key' }, 403);
+      }
+
+      // Prefix allow-list rather than exact paths: TikTok's docs portal cannot
+      // be read programmatically, so the real endpoint names have to be found
+      // by trying them. Confined to the read families inside our approved
+      // scopes, and every call is a GET.
+      const path = String(payload?.path || '');
+      const allowed = /^\/(gmv_max|report|oauth2)\//.test(path) && path.endsWith('/');
+      if (!allowed) return json({ error: `path not in probe allow-list: ${path}` }, 400);
+      const version = String(payload?.version || API_VERSION);
+
+      const { data: conn } = await admin
+        .from('tiktok_connections')
+        .select('id, access_token')
+        .is('revoked_at', null)
+        .order('connected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!conn?.access_token) return json({ error: 'no live connection' }, 400);
+
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(payload?.query || {})) {
+        if (v !== undefined && v !== null && v !== '') qs.set(k, typeof v === 'string' ? v : JSON.stringify(v));
+      }
+      const url = `${API_BASE}/${version}${path}${qs.toString() ? `?${qs}` : ''}`;
+      const res = await tiktok(url, {
+        method: 'GET',
+        headers: { 'Access-Token': conn.access_token, 'Content-Type': 'application/json' },
+      });
+      return json({ region: REGION, url, code: res.code, message: res.message, data: res.data });
+    }
+
+    // ────────────────────────────────────────────────────────────────
     // start — mint a nonce, hand back the URL to send the advertiser to
     // ────────────────────────────────────────────────────────────────
     if (action === 'start') {
