@@ -24,6 +24,7 @@ const TASKS_ITEM        = { label: 'Tasks',         icon: ChecklistIcon, to: '/t
 const BRAND_ANALYTICS   = { label: 'Brand analytics', icon: ReportIcon, to: '/analytics/brands' };
 const EUKA_ANALYTICS_ITEM = { label: 'Euka Analytics', icon: StoreIcon,  to: '/euka' };
 const HALO_ITEM           = { label: 'Amazon Halo',    icon: DiagramIcon, to: '/halo' };
+const HALO_V2_ITEM        = { label: 'Amazon Halo V2', icon: DiagramIcon, to: '/halo-v2' };
 const VIDEO_REVIEWS_ITEM  = { label: 'Video Reviews', icon: PlayIcon, to: '/video-reviews' };
 const BRAND_SWITCHES    = { label: 'Brand Switcher',  icon: RefreshIcon,  to: '/brand-switcher', category: 'brand' };
 const AUDIT_LOG         = { label: 'Audit log',       icon: ShieldIcon, to: '/audit' };
@@ -220,6 +221,7 @@ export const MENUS = {
     BRAND_ANALYTICS,
     EUKA_ANALYTICS_ITEM,
     HALO_ITEM,
+    HALO_V2_ITEM,
     BRAND_SWITCHES,
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
@@ -252,6 +254,7 @@ export const MENUS = {
     CREATOR_LIBRARY_ITEM,
     BRAND_ANALYTICS,
     HALO_ITEM,
+    HALO_V2_ITEM,
     BRAND_SWITCHES,
     CLIENT_ACCESS_ITEM,
     CAMPAIGNS,
@@ -282,6 +285,7 @@ export const MENUS = {
     MY_BRANDS,
     CREATOR_LIBRARY_ITEM,
     HALO_ITEM,
+    HALO_V2_ITEM,
     { label: 'My team', icon: UsersIcon, to: '/tl/team' },
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,

@@ -106,6 +106,7 @@ const AgendaPriorPage       = lazy(() => import('./pages/agenda/AgendaPriorPage'
 const AgendaCheckpointPage  = lazy(() => import('./pages/agenda/AgendaCheckpointPage'));
 const EukaAnalyticsPage     = lazy(() => import('./pages/euka/EukaAnalyticsPage'));
 const AmazonHaloPage        = lazy(() => import('./pages/boss/AmazonHaloPage'));
+const HaloV2Page            = lazy(() => import('./pages/boss/HaloV2Page'));
 const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
@@ -266,6 +267,14 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss']}>
                     <EukaAnalyticsPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/halo-v2"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl']}>
+                    <HaloV2Page />
                   </RoleGuard>
                 }
               />
