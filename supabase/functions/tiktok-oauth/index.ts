@@ -172,13 +172,15 @@ Deno.serve(async (req) => {
     // ────────────────────────────────────────────────────────────────
     // diagnose — is TikTok reachable from the region this ran in?
     //
-    // Deliberately role-free (the anon key is still required) so the region
-    // can be probed before anyone burns a single-use auth code on a request
-    // that was always going to be refused. It makes exactly one fixed call,
+    // Staff-only. Lets the region be checked before anyone burns a single-use
+    // auth code on a request that was always going to be refused, which is the
+    // fastest way to tell a geoblock from a credentials fault. One fixed call,
     // with an intentionally invalid token: a credentials error means the
     // region is FINE, a "banned Country" error means it is not.
     // ────────────────────────────────────────────────────────────────
     if (action === 'diagnose') {
+      const { error } = await requireRole(req, ['boss', 'ol', 'ads_manager']);
+      if (error) return error;
       const probe = await fetchAdvertisers('probe-invalid-token');
       const banned = /banned country|ip address/i.test(probe.message);
       return json({
@@ -192,54 +194,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ────────────────────────────────────────────────────────────────
-    // probe — raw read-only passthrough for working out response shapes.
-    //
-    // Exists because TikTok's docs portal is client-rendered and unreadable
-    // by fetch, and because a local script cannot make these calls at all:
-    // Pakistan's nearest region is on TikTok's banned list, so every TikTok
-    // call has to leave from this function.
-    //
-    // Gated on the SERVICE ROLE KEY, not a user session. That key is already
-    // full access to everything, so this adds no new privilege — and it means
-    // no new anonymous surface exists just to run diagnostics. Restricted to
-    // the read paths inside our five approved scopes.
-    // ────────────────────────────────────────────────────────────────
-    if (action === 'probe') {
-      const probeKey = Deno.env.get('TIKTOK_PROBE_KEY') || '';
-      if (!probeKey || req.headers.get('x-probe-key') !== probeKey) {
-        return json({ error: 'probe requires a valid x-probe-key' }, 403);
-      }
-
-      // Prefix allow-list rather than exact paths: TikTok's docs portal cannot
-      // be read programmatically, so the real endpoint names have to be found
-      // by trying them. Confined to the read families inside our approved
-      // scopes, and every call is a GET.
-      const path = String(payload?.path || '');
-      const allowed = /^\/(gmv_max|report|oauth2)\//.test(path) && path.endsWith('/');
-      if (!allowed) return json({ error: `path not in probe allow-list: ${path}` }, 400);
-      const version = String(payload?.version || API_VERSION);
-
-      const { data: conn } = await admin
-        .from('tiktok_connections')
-        .select('id, access_token')
-        .is('revoked_at', null)
-        .order('connected_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!conn?.access_token) return json({ error: 'no live connection' }, 400);
-
-      const qs = new URLSearchParams();
-      for (const [k, v] of Object.entries(payload?.query || {})) {
-        if (v !== undefined && v !== null && v !== '') qs.set(k, typeof v === 'string' ? v : JSON.stringify(v));
-      }
-      const url = `${API_BASE}/${version}${path}${qs.toString() ? `?${qs}` : ''}`;
-      const res = await tiktok(url, {
-        method: 'GET',
-        headers: { 'Access-Token': conn.access_token, 'Content-Type': 'application/json' },
-      });
-      return json({ region: REGION, url, code: res.code, message: res.message, data: res.data });
-    }
+    // The `probe` action that used to live here has been REMOVED. It was a
+    // read-only passthrough used to reverse-engineer the GMV Max endpoints,
+    // which TikTok's client-rendered docs portal made impossible to read and
+    // which a local script could not call at all (Pakistan's nearest region is
+    // on TikTok's banned list). Discovery is finished and the whole contract is
+    // recorded in the commit history, so keeping a general passthrough — even
+    // behind a random key — was surface area with no remaining purpose.
 
     // ────────────────────────────────────────────────────────────────
     // start — mint a nonce, hand back the URL to send the advertiser to
