@@ -108,6 +108,7 @@ const EukaAnalyticsPage     = lazy(() => import('./pages/euka/EukaAnalyticsPage'
 const AmazonHaloPage        = lazy(() => import('./pages/boss/AmazonHaloPage'));
 const HaloV2Page            = lazy(() => import('./pages/boss/HaloV2Page'));
 const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
+const TikTokCallbackPage    = lazy(() => import('./pages/oauth/TikTokCallbackPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -193,6 +194,18 @@ export default function App() {
             <Route
               path="/portal/halo/:token"
               element={<Suspense fallback={<PageFallback />}><HaloPortalPage /></Suspense>}
+            />
+
+            {/* TikTok Business API OAuth redirect. PUBLIC because the advertiser
+                who approves the authorization may have no WurxOS session — a
+                client authorising their own ad account never does. The
+                single-use `state` nonce the server minted is what makes this
+                safe; see supabase/functions/tiktok-oauth. This path must stay
+                byte-identical to the redirect URL approved in the TikTok
+                developer portal. */}
+            <Route
+              path="/oauth/tiktok/callback"
+              element={<Suspense fallback={<PageFallback />}><TikTokCallbackPage /></Suspense>}
             />
 
             {/* Protected shell — NotificationsProvider needs an authenticated user.

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   ClockIcon, PaletteIcon, UserIcon, MegaphoneIcon, BoxIcon, StarIcon,
   BookmarkIcon, BellIcon, ReportIcon, HomeIcon, ShieldIcon, SearchIcon,
-  ChevronLeftIcon, TrashIcon, DiagramIcon,
+  ChevronLeftIcon, TrashIcon, DiagramIcon, TiktokIcon,
 } from '../../components/common/Icon';
 import TimeShiftSection      from './sections/TimeShiftSection';
 import ReportFieldsSection   from './sections/ReportFieldsSection';
@@ -20,6 +20,7 @@ import AmazonHaloSection     from './sections/AmazonHaloSection';
 import CreatorLibrarySection from './sections/CreatorLibrarySection';
 import OlIncentiveBrandsSection from './sections/OlIncentiveBrandsSection';
 import AdsManagerBrandsSection from './sections/AdsManagerBrandsSection';
+import TikTokAdsSection       from './sections/TikTokAdsSection';
 import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBrandsSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
@@ -91,6 +92,9 @@ const GROUPS = [
       { id: 'adsManagerBrands', label: 'Ads Manager Brands', sub: 'Which brands each ads manager runs ads for',
         icon: MegaphoneIcon, component: AdsManagerBrandsSection,
         roles: ['ol', 'boss'] },
+      { id: 'tiktokAds', label: 'TikTok Ads', sub: 'Connect ad accounts for GMV Max reporting',
+        icon: TiktokIcon, component: TikTokAdsSection,
+        roles: ['boss', 'ol', 'ads_manager'] },
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
         roles: ['boss'] },
