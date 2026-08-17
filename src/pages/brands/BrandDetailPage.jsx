@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { getBrand, setBrandLastSaleDate } from '../../lib/brandsApi';
 import { listTasks } from '../../lib/tasksApi';
-import { listReports } from '../../lib/reportsApi';
+import { listReports, setReportSharedWithClient } from '../../lib/reportsApi';
 import { listProducts } from '../../lib/productsApi';
 import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import { currencySymbol } from '../../utils/currencies';
@@ -697,7 +697,63 @@ function TasksPanel({ tasks, user, role, canCreate, isInactive, onCreate, onEdit
 }
 
 // ============================================================
+// One row's "Share with client" tick. Split out so its own pending/error state
+// cannot re-render the whole table on every keystroke of a save.
+//
+// Two things it must get right:
+//   * it lives inside a <Link>, so the click must be stopped or ticking a box
+//     navigates away from the page you are working on.
+//   * an unapproved report cannot be shared. The box is disabled rather than
+//     allowed-then-rejected, because a control that fails when you use it is
+//     worse than one that visibly cannot be used yet. The database refuses it
+//     regardless (mig 322/323) — this is the courtesy, not the guard.
+function ShareWithClientCell({ report, canShare }) {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const approved = report.status === 'approved';
+  const disabled = !canShare || !approved || saving;
+
+  async function toggle(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    setSaving(true); setErr('');
+    try {
+      await setReportSharedWithClient(report.id, !report.shared_with_client);
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    } catch (ex) {
+      setErr(ex.message || 'Could not change sharing.');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div
+      onClick={toggle}
+      title={
+        !canShare ? 'Only an Operations Lead or the Boss can share reports with clients'
+        : !approved ? 'This report must be approved before it can be shared with the client'
+        : report.shared_with_client ? 'Visible to the client. Click to withhold it.'
+        : 'Not visible to the client. Click to share it.'
+      }
+      style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: disabled ? 'default' : 'pointer' }}
+    >
+      <input
+        type="checkbox"
+        readOnly
+        checked={!!report.shared_with_client}
+        disabled={disabled}
+        style={{ width: 15, height: 15, accentColor: 'var(--primary)', cursor: disabled ? 'default' : 'pointer' }}
+      />
+      {saving && <span className="wx-spinner" style={{ width: 12, height: 12 }} />}
+      {err && <span style={{ fontSize: 10.5, color: 'var(--danger)' }} title={err}>failed</span>}
+    </div>
+  );
+}
+
 function ReportsPanel({ reports, brand }) {
+  const { profile } = useAuth();
+  const canShare = ['boss', 'ol', 'developer'].includes(profile?.role);
   if (reports.length === 0) {
     return (
       <div className="bd-empty">
@@ -710,13 +766,14 @@ function ReportsPanel({ reports, brand }) {
   const grouped = groupReportsByPeriod(reports);
   return (
     <div className="wx-list">
-      <div className="wx-list-row wx-list-header" style={{ gridTemplateColumns: '1.2fr 1fr 1fr 120px 100px' }}>
+      <div className="wx-list-row wx-list-header" style={{ gridTemplateColumns: '1.2fr 1fr 1fr 120px 100px 130px' }}>
         <div>Period</div><div>Type</div><div>Author</div><div>Updated</div><div>Status</div>
+        <div title="Only approved reports that are ticked here are visible in the client portal">Share with client</div>
       </div>
       {grouped.map((r) => (
         <Link key={r.id} to={`/reports?open=${r.id}`}
           className="wx-list-row"
-          style={{ gridTemplateColumns: '1.2fr 1fr 1fr 120px 100px', textDecoration: 'none', color: 'inherit' }}>
+          style={{ gridTemplateColumns: '1.2fr 1fr 1fr 120px 100px 130px', textDecoration: 'none', color: 'inherit' }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 13 }}>{r.period_label || '—'}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -742,6 +799,7 @@ function ReportsPanel({ reports, brand }) {
               );
             })()}
           </div>
+          <ShareWithClientCell report={r} canShare={canShare} />
         </Link>
       ))}
     </div>

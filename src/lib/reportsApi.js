@@ -1302,6 +1302,28 @@ export async function editMonthlyReportMonth(oldReportId, newYear, newMonthIndex
 // v1's status flipper — used by the listing pages' inline Verify/Approve
 // buttons. v2 has separate RPCs but they only read ids; this wrapper
 // dispatches to the right one and writes audit fields server-side.
+// --------------------------------------------------------------
+// Publish / withhold a report from the client portal (mig 322).
+//
+// Approval is the internal quality gate; this tick is the separate decision to
+// actually show the client. A report reaches the portal only when BOTH hold.
+//
+// The database is the real authority here, not this function: a CHECK plus two
+// triggers block ticking anything unapproved and restrict the tick to Boss/OL.
+// So a refusal comes back as a plain Postgres error, which we surface as-is —
+// its message is already written for a human.
+// --------------------------------------------------------------
+export async function setReportSharedWithClient(reportId, shared) {
+  const { data, error } = await supabase
+    .from('reports')
+    .update({ shared_with_client: !!shared })
+    .eq('id', reportId)
+    .select('id, status, shared_with_client')
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function updateReportStatus(reportId, nextStatus, auditData = null) {
   // v2 RPCs: submitReport, verifyReport, approveReport, rejectReport, reopenReport
   //
