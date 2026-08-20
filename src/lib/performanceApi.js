@@ -276,8 +276,16 @@ export function calcComposite(pillarScores, weights) {
 }
 
 export function canRate(viewer, target) {
-  if (viewer === 'boss' && target === 'ol') return true;
-  if (viewer === 'ol' && (target === 'tl' || target === 'apc')) return true;
+  // The Boss evaluates everyone. can_eval_perf (mig 213) has always allowed it
+  // server-side; this list only ever named 'ol', so the Rate button was hidden
+  // on every other role and the Boss appeared to have LESS access than an OL.
+  if (viewer === 'boss') return true;
+  // An OL evaluates the whole operation, PCTLs and IPCs included. Same story:
+  // can_eval_perf grants any active OL evaluation rights over any target, so
+  // this was a UI-only gap, not a permissions decision. It was never a
+  // regression either — git history shows 'ol' has covered only tl/apc since
+  // the v2 baseline commit, so this is a v1 behaviour that was never ported.
+  if (viewer === 'ol' && ['tl', 'apc', 'pctl', 'ipc'].includes(target)) return true;
   if (viewer === 'tl' && target === 'apc') return true;
   // PCTL is the IPCs' direct manager (profiles.reports_to), so they
   // rate / flag IPCs the same way a TL rates / flags APCs. A PCTL can also

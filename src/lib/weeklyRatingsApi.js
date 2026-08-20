@@ -113,15 +113,37 @@ export async function listApcMeetingsForMonth(apcId, month) {
   const [y, m] = month.split('-').map(Number);
   const next = new Date(Date.UTC(y, m, 1)); // first of next month
   const end = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`;
-  const { data, error } = await supabase
-    .from('agenda_presentations')
-    .select('meeting:meeting_id(id, week_start, meeting_date, status)')
-    .eq('apc_id', apcId);
-  if (error) throw new Error(error.message);
-  return (data || [])
-    .map((r) => r.meeting)
-    .filter((mt) => mt && mt.meeting_date >= start && mt.meeting_date < end)
-    .sort((a, b) => (a.meeting_date < b.meeting_date ? -1 : 1));
+  // TWO sources, unioned. Presentations alone are not enough.
+  //
+  // A rating can exist for a meeting the APC never has a presentation row for:
+  // the OL's catch-up flow rates after the fact (mig 307/320), and an APC who
+  // moves between teams mid-month ends up rated on the new team's meeting
+  // while their presentation sits on the old team's.
+  //
+  // That rating still counts toward the month average and the "N weeks rated"
+  // header, both of which read the ratings table. So if the row is missing
+  // here, a score silently moves with nothing on screen to inspect or correct.
+  // Faizan (Aug 2026) hit exactly this: three ratings, two rows.
+  const [pres, rated] = await Promise.all([
+    supabase
+      .from('agenda_presentations')
+      .select('meeting:meeting_id(id, week_start, meeting_date, status)')
+      .eq('apc_id', apcId),
+    supabase
+      .from('weekly_performance_ratings')
+      .select('meeting:meeting_id(id, week_start, meeting_date, status)')
+      .eq('apc_id', apcId)
+      .eq('month', month),
+  ]);
+  if (pres.error)  throw new Error(pres.error.message);
+  if (rated.error) throw new Error(rated.error.message);
+
+  const byId = new Map();
+  for (const row of [...(pres.data || []), ...(rated.data || [])]) {
+    const mt = row?.meeting;
+    if (mt && mt.meeting_date >= start && mt.meeting_date < end) byId.set(mt.id, mt);
+  }
+  return [...byId.values()].sort((a, b) => (a.meeting_date < b.meeting_date ? -1 : 1));
 }
 
 // OL/boss: APC+meeting pairs from meetings ≥2 days old with no rating yet.
