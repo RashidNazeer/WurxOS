@@ -616,8 +616,13 @@ export async function listPresentations(meetingId) {
   return data || [];
 }
 
-export async function startPresenting(meetingId) {
-  const { data, error } = await supabase.rpc('agenda_start_presenting', { p_meeting: meetingId });
+// apcId is optional. Omitted (or your own id) = an APC starting their own,
+// exactly as before. Passing someone else's id starts it ON THEIR BEHALF, which
+// the server allows only for that team's TL, an OL or the Boss (mig 324) and
+// records who actually clicked in started_by, so it is never mistaken for the
+// APC having been at the keyboard.
+export async function startPresenting(meetingId, apcId = null) {
+  const { data, error } = await supabase.rpc('agenda_start_presenting', { p_meeting: meetingId, p_apc: apcId });
   if (error) throw new Error(error.message);
   return data;
 }

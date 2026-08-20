@@ -1,0 +1,25 @@
+-- ============================================================
+-- WurxOS v2 — Migration 325: drop the old single-argument
+-- agenda_start_presenting, which 324 accidentally left in place.
+--
+-- 324 added agenda_start_presenting(uuid, uuid DEFAULT null) but did not remove
+-- agenda_start_presenting(uuid) from mig 180. Both then matched a one-argument
+-- call, so PostgREST refused every request:
+--
+--   PGRST203 "Could not choose the best candidate function between:
+--             agenda_start_presenting(p_meeting => uuid),
+--             agenda_start_presenting(p_meeting => uuid, p_apc => uuid)"
+--
+-- That is not a cosmetic problem: it broke Start Presenting for EVERY APC, the
+-- single most-used button in a live meeting. Caught by calling the endpoint
+-- immediately after deploying 324 rather than assuming the push had worked.
+--
+-- Dropping the one-argument version is safe and is what 324's comment claimed
+-- was already true: with only the two-argument function left, an existing
+-- one-argument call binds to it and p_apc defaults to null, which means
+-- "myself" — exactly the old behaviour.
+--
+-- Idempotent.
+-- ============================================================
+
+drop function if exists public.agenda_start_presenting(uuid);

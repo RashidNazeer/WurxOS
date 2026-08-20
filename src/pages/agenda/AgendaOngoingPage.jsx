@@ -223,6 +223,15 @@ export default function AgendaOngoingPage() {
     catch (e) { alert(e.message || 'Failed to start presenting'); }
     finally { setBusy(''); }
   }
+  // TL/OL starts a presentation FOR an APC who forgot to click (mig 324).
+  // Same RPC as an APC's own Start, just with a target; the server checks the
+  // caller really is that team's TL, an OL or the Boss, and stamps started_by.
+  async function handleStartFor(apcId) {
+    setBusy(`startfor-${apcId}`);
+    try { await startPresenting(meeting.id, apcId); await refresh(); }
+    catch (e) { alert(e.message || 'Failed to start presenting for that APC'); }
+    finally { setBusy(''); }
+  }
   async function handleStop(apcId) {
     setBusy('present');
     try { await stopPresenting(meeting.id, apcId); await refresh(); }
@@ -573,6 +582,8 @@ export default function AgendaOngoingPage() {
         <PresentationProgress apcs={apcs} presMap={presMap}
           onReopen={isOL ? handleReopen : null}
           onRemarks={isOL ? setReviewTargetId : null}
+          onStartFor={(isOL || isTL) ? handleStartFor : null}
+          someonePresenting={!!activePresentation}
           reviewTargetId={reviewTargetId}
           busy={busy} />
       )}
@@ -826,7 +837,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
 // For a Presented APC the OL gets two actions: "Remarks" (review their tasks
 // without changing status) and "Reopen" (mark not-presented so they can go
 // again). Handlers are null for non-OL observers, hiding the buttons.
-function PresentationProgress({ apcs, presMap, onReopen, onRemarks, reviewTargetId, busy }) {
+function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, someonePresenting, reviewTargetId, busy }) {
   const META = {
     done:       { label: 'Presented',  color: 'var(--success)',        bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
     presenting: { label: 'Presenting', color: 'var(--accent)',         bg: 'var(--accent-soft)',  icon: 'bi-easel2-fill' },
@@ -860,6 +871,25 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, reviewTarget
                 <span className="d-inline-flex align-items-center gap-1" style={{ fontSize: '0.62rem', fontWeight: 700, color: m.color }}>
                   <i className={`bi ${m.icon}`} />{m.label}
                 </span>
+                {/* Start on behalf — APCs routinely forget to click, because
+                    they are talking rather than looking at the screen. Only on
+                    a pending chip, and hidden while someone else is presenting
+                    (the server enforces one at a time anyway; hiding it here
+                    avoids offering a button that can only fail). */}
+                {!isDone && st !== 'presenting' && onStartFor && (
+                  <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1"
+                    title={someonePresenting
+                      ? 'Someone else is presenting right now'
+                      : `Start presenting for ${a.display_name} — use when they forgot to click`}
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
+                      background: 'var(--surface-1)', color: 'var(--accent)', border: '1px solid var(--accent)' }}
+                    disabled={busy === `startfor-${a.id}` || someonePresenting}
+                    onClick={() => onStartFor(a.id)}>
+                    {busy === `startfor-${a.id}`
+                      ? <span className="spinner-border spinner-border-sm" style={{ width: '0.6rem', height: '0.6rem' }} />
+                      : <><i className="bi bi-play-fill" />Start</>}
+                  </button>
+                )}
                 {isDone && onRemarks && (
                   <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1" title="Add remarks / review their tasks — no status change"
                     style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
