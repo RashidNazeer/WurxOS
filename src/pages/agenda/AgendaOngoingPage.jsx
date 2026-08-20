@@ -578,11 +578,17 @@ export default function AgendaOngoingPage() {
 
       {/* Presentation progress — who has presented / who is pending (read-only;
           OL and guest observers). */}
-      {canSeeRooms && apcs.length > 0 && (
+      {/* canSeeRooms is (OL || guest), so a TL never saw this panel and the
+          Start-on-behalf button below was dead code for them. The TL running
+          THIS meeting needs it most: they are the one watching an APC talk
+          without having clicked Start. isMyTeam, not isTL — a TL viewing
+          another team's room has no business starting presentations in it,
+          and the server refuses it anyway (mig 327). */}
+      {(canSeeRooms || isMyTeam) && apcs.length > 0 && (
         <PresentationProgress apcs={apcs} presMap={presMap}
           onReopen={isOL ? handleReopen : null}
           onRemarks={isOL ? setReviewTargetId : null}
-          onStartFor={(isOL || isTL) ? handleStartFor : null}
+          onStartFor={(isOL || isMyTeam) ? handleStartFor : null}
           someonePresenting={!!activePresentation}
           reviewTargetId={reviewTargetId}
           busy={busy} />
