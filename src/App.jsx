@@ -109,6 +109,7 @@ const AmazonHaloPage        = lazy(() => import('./pages/boss/AmazonHaloPage'));
 const HaloV2Page            = lazy(() => import('./pages/boss/HaloV2Page'));
 const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
 const TikTokCallbackPage    = lazy(() => import('./pages/oauth/TikTokCallbackPage'));
+const DevTasksPage          = lazy(() => import('./pages/devTasks/DevTasksPage'));
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -631,6 +632,16 @@ export default function App() {
               />
 
               {/* Bugs — everyone authenticated (RLS filters rows per role) */}
+              {/* Developer task management (mig 328) — Boss, OL and the
+                  developer only. :id opens one pipeline's board. */}
+              <Route
+                path="/dev-tasks/:id?"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                    <DevTasksPage />
+                  </RoleGuard>
+                }
+              />
               <Route path="/bugs"        element={<BugsPage />} />
               <Route path="/suggestions" element={<SuggestionsPage />} />
 

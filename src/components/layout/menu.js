@@ -211,9 +211,15 @@ const AGENDA_GROUP_GUEST = {
 // items (notifications/settings).
 
 const ASSISTANT_ITEM = { label: 'Assistant', icon: MessageIcon, to: '/assistant' };
+// Developer task management (mig 328). Boss and OL see it to know what is
+// coming and what is blocked; the developer works from it. Nobody else --
+// TLs, PCTLs, APCs and IPCs have no business in the dev pipeline, and the
+// route's RoleGuard agrees.
+const DEV_TASKS_ITEM = { label: 'Development', icon: ChecklistIcon, to: '/dev-tasks' };
 
 export const MENUS = {
   boss: [
+    DEV_TASKS_ITEM,
     DASHBOARD_ITEM,
     EMPLOYEES_GROUP,
     BRANDS_ITEM,
@@ -249,6 +255,7 @@ export const MENUS = {
     SETTINGS_ITEM,
   ],
   ol: [
+    DEV_TASKS_ITEM,
     DASHBOARD_ITEM,
     BRANDS_ITEM,
     CREATOR_LIBRARY_ITEM,
@@ -393,6 +400,7 @@ export const MENUS = {
   // App.jsx redirects /dashboard to /bugs for this role so they land
   // on triage by default.
   developer: [
+    DEV_TASKS_ITEM,
     { label: 'Bug Reports', icon: BugIcon, to: '/bugs', category: 'bug' },
     { label: 'Suggestions', icon: LightbulbIcon, to: '/suggestions', category: 'suggestion' },
     ATTENDANCE_ITEM,
