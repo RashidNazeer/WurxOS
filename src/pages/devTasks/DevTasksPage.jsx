@@ -337,23 +337,85 @@ function StatusNoteModal({ label, onCancel, onConfirm }) {
 
 // ── The list of pipelines ───────────────────────────────────────────
 
-// One bar split BY STATUS rather than a plain done/not-done fill. A glance
-// gives composition, not just a percentage: you can see a pipeline is "mostly
-// blocked" or "barely started" without reading a single number.
+// Clicking a status opens a proper menu of coloured options rather than a
+// native <select>, which cannot show the status colour, looks like a form
+// control in the middle of a board, and is miserable on touch.
+function StatusMenu({ value, onPick, size = 'sm', align = 'left' }) {
+  const [open, setOpen] = useState(false);
+  const m = STATUS_META[value] || STATUS_META.pending;
+  const pad = size === 'md' ? '5px 11px' : '3px 9px';
+  const font = size === 'md' ? 12.5 : 11;
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: pad,
+          fontSize: font, fontWeight: 700, cursor: 'pointer', borderRadius: 999,
+          background: `color-mix(in srgb, ${m.tone} 13%, transparent)`,
+          color: m.tone, border: `1px solid color-mix(in srgb, ${m.tone} 32%, transparent)`,
+        }}>
+        <i className={`bi ${m.icon}`} style={{ fontSize: font - 1 }} />
+        {m.label}
+        <i className="bi bi-chevron-down" style={{ fontSize: font - 3, opacity: 0.7 }} />
+      </button>
+
+      {open && (
+        <>
+          {/* Click-away catcher. Sits under the menu, over everything else. */}
+          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); }}
+            style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 41,
+            background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
+            borderRadius: 12, padding: 5, minWidth: 172,
+            boxShadow: '0 12px 32px rgba(16,24,40,.18)',
+          }}>
+            {Object.entries(STATUS_META).map(([k, mm]) => {
+              const on = k === value;
+              return (
+                <button key={k} type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); if (!on) onPick(k); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+                    padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                    background: on ? `color-mix(in srgb, ${mm.tone} 12%, transparent)` : 'transparent',
+                    color: on ? mm.tone : 'var(--text-primary)',
+                    fontSize: 12.5, fontWeight: on ? 700 : 500, textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                  onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = 'transparent'; }}>
+                  <i className={`bi ${mm.icon}`} style={{ color: mm.tone, fontSize: 12 }} />
+                  {mm.label}
+                  {on && <i className="bi bi-check2" style={{ marginLeft: 'auto' }} />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// One bar split BY STATUS rather than a done/not-done fill, so composition
+// reads at a glance: "mostly blocked" looks different from "barely started".
 function CompositionBar({ counts, total }) {
   const order = ['done', 'in_progress', 'blocked', 'paused', 'pending', 'cancelled'];
   const segs = order.map((k) => [k, counts?.[k] || 0]).filter(([, n]) => n > 0);
   if (!total) {
-    return <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }} />;
+    return <div style={{ height: 7, borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }} />;
   }
   return (
     <div style={{
-      height: 8, borderRadius: 999, overflow: 'hidden', display: 'flex',
-      border: '1px solid var(--border-subtle)', background: 'var(--surface-2)',
+      height: 7, borderRadius: 999, overflow: 'hidden', display: 'flex', gap: 2,
+      background: 'transparent',
     }}>
       {segs.map(([k, n]) => (
         <div key={k} title={`${n} ${STATUS_META[k].label}`} style={{
-          width: `${(n / total) * 100}%`,
+          width: `${(n / total) * 100}%`, borderRadius: 999,
           background: k === 'pending' ? 'var(--border-subtle)' : STATUS_META[k].tone,
           opacity: k === 'cancelled' ? 0.35 : 1,
         }} />
@@ -362,28 +424,79 @@ function CompositionBar({ counts, total }) {
   );
 }
 
-function TaskCard({ task, onOpen }) {
+// THE POINT OF THE CARD. "1 active" tells the Boss nothing — he then has to
+// open the pipeline to find out WHAT is active, which is the click this page
+// exists to remove. So name the live subtasks right here, in-progress and
+// blocked first, and only fall back to counts when there is nothing running.
+function LiveSubtasks({ subtasks, onOpen }) {
+  if (!subtasks?.length) return null;
+  const rank = { in_progress: 0, blocked: 1, paused: 2, pending: 3, done: 4, cancelled: 5 };
+  const live = [...subtasks]
+    .filter((s) => !['done', 'cancelled'].includes(s.status))
+    .sort((a, b) => (rank[a.status] - rank[b.status])
+      || ((PRIORITY_META[a.priority]?.rank ?? 9) - (PRIORITY_META[b.priority]?.rank ?? 9)));
+  if (!live.length) return null;
+  const shown = live.slice(0, 3);
+  const rest = live.length - shown.length;
+
+  return (
+    <div style={{ display: 'grid', gap: 5 }}>
+      {shown.map((s) => {
+        const m = STATUS_META[s.status] || STATUS_META.pending;
+        const running = s.status === 'in_progress';
+        const stuck = s.status === 'blocked';
+        return (
+          <div key={s.id} style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px',
+            borderRadius: 9, fontSize: 12.3,
+            background: running || stuck ? `color-mix(in srgb, ${m.tone} 9%, transparent)` : 'var(--surface-2)',
+            border: `1px solid ${running || stuck ? `color-mix(in srgb, ${m.tone} 26%, transparent)` : 'transparent'}`,
+          }}>
+            <i className={`bi ${m.icon}`} style={{ color: m.tone, fontSize: 11, flex: '0 0 auto' }} />
+            <span style={{
+              color: running || stuck ? 'var(--text-primary)' : 'var(--text-secondary)',
+              fontWeight: running || stuck ? 650 : 500,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{s.title}</span>
+            {s.due_date && (
+              <span style={{ marginLeft: 'auto', flex: '0 0 auto', fontSize: 10.5, color: 'var(--text-muted)' }}>
+                {fmtDate(s.due_date)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+      {rest > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 3 }}>
+          +{rest} more
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskCard({ task, subtasks, onOpen }) {
   const overdue = task.is_overdue;
   const accent = task.project_colour
     ? (PROJECT_COLOURS[task.project_colour] || PROJECT_COLOURS.slate)
     : 'var(--border-subtle)';
   const counts = task.status_counts || {};
-  const active = counts.in_progress || 0;
-  const stuck = counts.blocked || 0;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(task.id)}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 6px 18px rgba(16,24,40,.10)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,.05)'; e.currentTarget.style.transform = 'none'; }}
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(task.id); }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(16,24,40,.10)'; e.currentTarget.style.borderColor = accent; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,.05)'; e.currentTarget.style.borderColor = overdue ? 'var(--danger)' : 'var(--border-subtle)'; }}
       style={{
         textAlign: 'left', width: '100%', cursor: 'pointer',
         background: 'var(--surface-1)',
         border: `1px solid ${overdue ? 'var(--danger)' : 'var(--border-subtle)'}`,
         borderLeft: `3px solid ${accent}`,
-        borderRadius: 14, padding: '15px 16px 14px', display: 'grid', gap: 11,
-        boxShadow: '0 1px 2px rgba(16,24,40,.05)', transition: 'box-shadow .15s, transform .15s',
+        borderRadius: 14, padding: '15px 16px 13px', display: 'grid', gap: 12,
+        boxShadow: '0 1px 2px rgba(16,24,40,.05)', transition: 'box-shadow .16s, border-color .16s',
       }}>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
@@ -393,7 +506,7 @@ function TaskCard({ task, onOpen }) {
           </div>
           {task.description && (
             <div style={{
-              fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.45, marginTop: 3,
+              fontSize: 12.3, color: 'var(--text-muted)', lineHeight: 1.45, marginTop: 3,
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>{task.description}</div>
           )}
@@ -404,32 +517,28 @@ function TaskCard({ task, onOpen }) {
         </div>
       </div>
 
-      {/* The headline the Boss actually reads: how far along, and whether any
-          of it is moving or stuck. Big number first, chips second. */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
-          {task.progress_pct == null ? '—' : `${task.progress_pct}%`}
-        </span>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          {task.subtask_counted ? `${task.subtask_done} of ${task.subtask_counted} subtasks` : 'no subtasks yet'}
-        </span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          {active > 0 && <Chip tone={STATUS_META.in_progress.tone}>{active} active</Chip>}
-          {stuck > 0 && <Chip tone="var(--danger)" solid>{stuck} blocked</Chip>}
-        </span>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}>
+          <span style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+            {task.progress_pct == null ? '—' : `${task.progress_pct}%`}
+          </span>
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+            {task.subtask_counted ? `${task.subtask_done} of ${task.subtask_counted} done` : 'no subtasks yet'}
+          </span>
+        </div>
+        <CompositionBar counts={counts} total={task.subtask_total} />
       </div>
 
-      <CompositionBar counts={counts} total={task.subtask_total} />
+      <LiveSubtasks subtasks={subtasks} />
 
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap',
         borderTop: '1px solid var(--border-subtle)', paddingTop: 10,
-        fontSize: 11.5, color: 'var(--text-muted)',
+        fontSize: 11.3, color: 'var(--text-muted)',
       }}>
         {task.project_name
           ? <ProjectChip name={task.project_name} colour={task.project_colour} />
           : <span style={{ fontStyle: 'italic' }}>No project</span>}
-        <StatusChip status={task.status} />
         {task.due_date && (
           <span style={{ color: overdue ? 'var(--danger)' : 'var(--text-muted)', fontWeight: overdue ? 700 : 400 }}>
             <i className="bi bi-calendar3" style={{ marginRight: 4 }} />{fmtDate(task.due_date)}
@@ -445,7 +554,7 @@ function TaskCard({ task, onOpen }) {
           </span>
         )}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -560,7 +669,7 @@ function SummaryStrip({ tasks }) {
 }
 
 // Cards grouped under their project, so "which project" needs no reading.
-function ProjectGroup({ project, tasks, onOpen }) {
+function ProjectGroup({ project, tasks, subsByTask, onOpen }) {
   const c = project.colour ? (PROJECT_COLOURS[project.colour] || PROJECT_COLOURS.slate) : 'var(--text-muted)';
   const counted = tasks.reduce((n, t) => n + (t.subtask_counted || 0), 0);
   const done = tasks.reduce((n, t) => n + (t.subtask_done || 0), 0);
@@ -579,7 +688,7 @@ function ProjectGroup({ project, tasks, onOpen }) {
         </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 14 }}>
-        {tasks.map((t) => <TaskCard key={t.id} task={t} onOpen={onOpen} />)}
+        {tasks.map((t) => <TaskCard key={t.id} task={t} subtasks={subsByTask?.[t.id]} onOpen={onOpen} />)}
       </div>
     </div>
   );
@@ -614,12 +723,7 @@ function SubtaskCard({ sub, canEdit, onMove, onEdit, onDelete }) {
       </div>
       {canEdit && (
         <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--border-subtle)', paddingTop: 6 }}>
-          <select className="wx-input" style={{ fontSize: 11, padding: '2px 6px', height: 26, flex: 1 }}
-            value={sub.status} onChange={(e) => onMove(sub, e.target.value)}>
-            {Object.keys(STATUS_META).map((s) => (
-              <option key={s} value={s}>{STATUS_META[s].label}</option>
-            ))}
-          </select>
+          <StatusMenu value={sub.status} onPick={(to) => onMove(sub, to)} />
           <button className="wx-btn wx-btn-ghost" style={{ padding: '2px 7px', fontSize: 11 }}
             title="Edit" onClick={() => onEdit(sub)}><i className="bi bi-pencil" /></button>
           <button className="wx-btn wx-btn-ghost" style={{ padding: '2px 7px', fontSize: 11, color: 'var(--danger)' }}
@@ -722,8 +826,7 @@ export default function DevTasksPage() {
       setTasks(t); setRequesters(r); setProjects(pj);
       // "Next up" needs subtasks; one query per task is fine at this scale
       // (a single developer, a handful of live pipelines).
-      const open = t.filter((x) => !['done', 'cancelled'].includes(x.status));
-      const subs = await Promise.all(open.map((x) => listSubtasks(x.id).then((s) => [x.id, s])));
+      const subs = await Promise.all(t.map((x) => listSubtasks(x.id).then((s) => [x.id, s])));
       setSubsByTask(Object.fromEntries(subs));
     } catch (e) { setErr(e.message || String(e)); }
     finally { setLoading(false); }
@@ -849,11 +952,8 @@ export default function DevTasksPage() {
               <Progress pct={detail.progress_pct} done={detail.subtask_done} counted={detail.subtask_counted} />
               {canEdit && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-                  <select className="wx-input" style={{ fontSize: 12, height: 30, width: 140 }}
-                    value={detail.status}
-                    onChange={(e) => setPending({ kind: 'task', to: e.target.value, from: detail.status })}>
-                    {Object.keys(STATUS_META).map((s) => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
-                  </select>
+                  <StatusMenu value={detail.status} size="md"
+                    onPick={(to) => setPending({ kind: 'task', to, from: detail.status })} />
                   <button className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditTask(detail)}>
                     <i className="bi bi-pencil" /> Edit
                   </button>
@@ -1053,35 +1153,62 @@ export default function DevTasksPage() {
         <SummaryStrip tasks={tasks} />
       </div>
 
-      {/* Project row first: "which product" is the coarser question, so it
-          reads left-to-right as product then state. Hidden entirely until at
-          least one project exists, rather than showing a lone "All". */}
-      {projects.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginRight: 2 }}>
-            Project
-          </span>
-          {[{ id: 'all', name: 'All' }, ...projects, { id: 'none', name: 'Unassigned' }].map((p) => {
-            const on = projectFilter === p.id;
-            const c = p.colour ? (PROJECT_COLOURS[p.colour] || PROJECT_COLOURS.slate) : 'var(--text-secondary)';
+      {/* ONE toolbar, not two stacked rows of pills. The old version had two
+          separate "All" buttons meaning different things, which is genuinely
+          confusing. Now: state as a segmented control on the left (one thing,
+          one control), project as a labelled dropdown on the right. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 18,
+      }}>
+        <div style={{
+          display: 'inline-flex', padding: 3, gap: 2, borderRadius: 11,
+          background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
+        }}>
+          {[['open', 'Open'], ['blocked', 'Blocked'], ['overdue', 'Overdue'], ['done', 'Done'], ['all', 'Everything']].map(([k, label]) => {
+            const on = filter === k;
+            const count = k === 'open' ? tasks.filter((t) => !['done', 'cancelled'].includes(t.status)).length
+              : k === 'blocked' ? tasks.filter((t) => t.status === 'blocked').length
+              : k === 'overdue' ? tasks.filter((t) => t.is_overdue).length
+              : k === 'done' ? tasks.filter((t) => t.status === 'done').length
+              : tasks.length;
             return (
-              <button key={p.id} onClick={() => setProjectFilter(p.id)}
-                className={`wx-btn ${on ? 'wx-btn-primary' : 'wx-btn-ghost'}`}
-                style={{ fontSize: 12, padding: '3px 11px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                {p.colour && !on && <span style={{ width: 7, height: 7, borderRadius: 99, background: c }} />}
-                {p.name}
+              <button key={k} type="button" onClick={() => setFilter(k)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 13px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  fontSize: 12.5, fontWeight: on ? 700 : 500,
+                  background: on ? 'var(--surface-1)' : 'transparent',
+                  color: on ? 'var(--text-primary)' : 'var(--text-muted)',
+                  boxShadow: on ? '0 1px 3px rgba(16,24,40,.10)' : 'none',
+                  transition: 'background .12s, color .12s',
+                }}>
+                {label}
+                {/* The count is the useful part: an empty Blocked tab should
+                    look empty before you click it. */}
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
+                  background: on ? 'var(--surface-2)' : 'transparent',
+                  color: count === 0 ? 'var(--text-muted)'
+                    : (k === 'blocked' || k === 'overdue') ? 'var(--danger)' : 'var(--text-muted)',
+                }}>{count}</span>
               </button>
             );
           })}
         </div>
-      )}
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {[['open', 'Open'], ['overdue', 'Overdue'], ['blocked', 'Blocked'], ['done', 'Done'], ['all', 'All']].map(([k, label]) => (
-          <button key={k} className={`wx-btn ${filter === k ? 'wx-btn-primary' : 'wx-btn-ghost'}`}
-            style={{ fontSize: 12.5, padding: '4px 12px' }} onClick={() => setFilter(k)}>{label}</button>
-        ))}
+        {projects.length > 0 && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)' }}>Project</span>
+            <select className="wx-input" style={{ width: 190, height: 34, fontSize: 12.5 }}
+              value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+              <option value="all">All projects</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="none">Unassigned</option>
+            </select>
+          </label>
+        )}
       </div>
+
 
       {loading ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
@@ -1100,7 +1227,7 @@ export default function DevTasksPage() {
         </div>
       ) : (
         grouped.map(({ project, items }) => (
-          <ProjectGroup key={project.id} project={project} tasks={items}
+          <ProjectGroup key={project.id} project={project} tasks={items} subsByTask={subsByTask}
             onOpen={(tid) => navigate(`/dev-tasks/${tid}`)} />
         ))
       )}
