@@ -6,6 +6,7 @@ import {
   forceCompleteDevTask, confirmRequested, deleteDevTask,
   createSubtask, setSubtaskStatus, updateSubtask, deleteSubtask,
   listSubtasks, addNote, listRequesters,
+  listProjects, createProject, updateProject, archiveProject, PROJECT_COLOURS,
   STATUS_META, PRIORITY_META, DEV_PRIORITIES, BOARD_COLUMNS, sortTasks, nextUp,
 } from '../../lib/devTasksApi';
 
@@ -75,14 +76,139 @@ function Progress({ pct, done, counted }) {
   );
 }
 
+function ProjectChip({ name, colour }) {
+  if (!name) return null;
+  const c = PROJECT_COLOURS[colour] || PROJECT_COLOURS.slate;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11,
+      fontWeight: 700, color: c, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 7, height: 7, borderRadius: 99, background: c, flex: '0 0 auto' }} />
+      {name}
+    </span>
+  );
+}
+
+// The Boss's real question is "what is coming, what is moving, what is stuck".
+// The parent's own status cannot answer it: a pipeline sits at Pending while a
+// subtask inside it is already in progress, which is exactly what looked wrong
+// on the first version of this card.
+function StatusBreakdown({ counts }) {
+  const entries = Object.entries(counts || {})
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => Object.keys(STATUS_META).indexOf(a[0]) - Object.keys(STATUS_META).indexOf(b[0]));
+  if (!entries.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      {entries.map(([st, n]) => {
+        const m = STATUS_META[st] || STATUS_META.pending;
+        return (
+          <span key={st} title={`${n} ${m.label}`} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, fontWeight: 600, color: m.tone,
+          }}>
+            <i className={`bi ${m.icon}`} style={{ fontSize: 10 }} />
+            {n} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{m.label.toLowerCase()}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Projects manager ────────────────────────────────────────────────
+function ProjectsModal({ onClose, onChanged }) {
+  const [projects, setProjects] = useState([]);
+  const [name, setName] = useState('');
+  const [colour, setColour] = useState('blue');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    try { setProjects(await listProjects({ includeArchived: true })); }
+    catch (e) { setErr(e.message || String(e)); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function add() {
+    if (!name.trim()) return;
+    setBusy(true); setErr('');
+    try { await createProject({ name, colour }); setName(''); await load(); onChanged(); }
+    catch (e) { setErr(e.message || String(e)); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="wx-modal-backdrop" onClick={onClose}>
+      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="wx-modal-header">
+          <div className="wx-modal-title">Projects</div>
+          <button className="wx-btn wx-btn-ghost" onClick={onClose}><i className="bi bi-x-lg" /></button>
+        </div>
+        <div className="wx-modal-body" style={{ display: 'grid', gap: 14 }}>
+          {err && <div className="wx-alert wx-alert-danger"><span>{err}</span></div>}
+          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+            One per product you build, so the Boss can see what is being worked on without opening tasks.
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="wx-input" placeholder="e.g. WurxMediaHub" value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+            <select className="wx-input" style={{ width: 110 }} value={colour} onChange={(e) => setColour(e.target.value)}>
+              {Object.keys(PROJECT_COLOURS).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <button className="wx-btn wx-btn-primary" onClick={add} disabled={busy || !name.trim()}>Add</button>
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            {projects.map((p) => (
+              <div key={p.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                border: '1px solid var(--border-subtle)', borderRadius: 8,
+                opacity: p.is_active ? 1 : 0.5,
+              }}>
+                <ProjectChip name={p.name} colour={p.colour} />
+                {!p.is_active && <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>archived</span>}
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  {p.is_active ? (
+                    <button className="wx-btn wx-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
+                      title="Archive — tasks keep pointing at it"
+                      onClick={async () => { await archiveProject(p.id); await load(); onChanged(); }}>
+                      Archive
+                    </button>
+                  ) : (
+                    <button className="wx-btn wx-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={async () => { await updateProject(p.id, { is_active: true }); await load(); onChanged(); }}>
+                      Restore
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!projects.length && (
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>No projects yet.</div>
+            )}
+          </div>
+        </div>
+        <div className="wx-modal-footer">
+          <button className="wx-btn wx-btn-primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Create / edit task ──────────────────────────────────────────────
-function TaskModal({ task, requesters, me, onClose, onSaved }) {
+function TaskModal({ task, requesters, projects, me, onClose, onSaved }) {
   const editing = !!task;
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
   const [priority, setPriority] = useState(task?.priority || 'medium');
   const [dueDate, setDueDate] = useState(task?.due_date || '');
   const [requestedBy, setRequestedBy] = useState(task?.requested_by || '');
+  const [projectId, setProjectId] = useState(task?.project_id || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -94,9 +220,10 @@ function TaskModal({ task, requesters, me, onClose, onSaved }) {
         await updateDevTask(task.id, {
           title: title.trim(), description: description || null, priority,
           due_date: dueDate || null, requested_by: requestedBy || null,
+          project_id: projectId || null,
         });
       } else {
-        await createDevTask({ title, description, priority, dueDate, requestedBy });
+        await createDevTask({ title, description, priority, dueDate, requestedBy, projectId });
       }
       onSaved();
     } catch (e) { setErr(e.message || String(e)); }
@@ -134,6 +261,13 @@ function TaskModal({ task, requesters, me, onClose, onSaved }) {
               <label className="wx-label">Due date <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
               <input className="wx-input" type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} />
             </div>
+          </div>
+          <div>
+            <label className="wx-label">Project</label>
+            <select className="wx-input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+              <option value="">No project</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
           <div>
             <label className="wx-label">Requested by</label>
@@ -209,6 +343,8 @@ function TaskCard({ task, onOpen }) {
         <PriorityChip priority={task.priority} />
       </div>
 
+      {task.project_name && <ProjectChip name={task.project_name} colour={task.project_colour} />}
+
       {task.description && (
         <div style={{
           fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5,
@@ -217,6 +353,8 @@ function TaskCard({ task, onOpen }) {
       )}
 
       <Progress pct={task.progress_pct} done={task.subtask_done} counted={task.subtask_counted} />
+
+      <StatusBreakdown counts={task.status_counts} />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         <StatusChip status={task.status} />
@@ -360,6 +498,9 @@ export default function DevTasksPage() {
   const [subsByTask, setSubsByTask] = useState({});
   const [detail, setDetail] = useState(null);
   const [requesters, setRequesters] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [showProjects, setShowProjects] = useState(false);
+  const [projectFilter, setProjectFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState('open');
@@ -372,8 +513,8 @@ export default function DevTasksPage() {
   const loadList = useCallback(async () => {
     setErr('');
     try {
-      const [t, r] = await Promise.all([listDevTasks(), listRequesters()]);
-      setTasks(t); setRequesters(r);
+      const [t, r, pj] = await Promise.all([listDevTasks(), listRequesters(), listProjects()]);
+      setTasks(t); setRequesters(r); setProjects(pj);
       // "Next up" needs subtasks; one query per task is fine at this scale
       // (a single developer, a handful of live pipelines).
       const open = t.filter((x) => !['done', 'cancelled'].includes(x.status));
@@ -393,12 +534,15 @@ export default function DevTasksPage() {
   useEffect(() => { if (id) loadDetail(id); else setDetail(null); }, [id, loadDetail]);
 
   const visible = useMemo(() => {
-    const open = tasks.filter((t) => !['done', 'cancelled'].includes(t.status));
+    const scoped = projectFilter === 'all' ? tasks
+      : projectFilter === 'none' ? tasks.filter((t) => !t.project_id)
+      : tasks.filter((t) => t.project_id === projectFilter);
+    const open = scoped.filter((t) => !['done', 'cancelled'].includes(t.status));
     if (filter === 'open') return sortTasks(open);
-    if (filter === 'all') return sortTasks(tasks);
+    if (filter === 'all') return sortTasks(scoped);
     if (filter === 'overdue') return sortTasks(open.filter((t) => t.is_overdue));
-    return sortTasks(tasks.filter((t) => t.status === filter));
-  }, [tasks, filter]);
+    return sortTasks(scoped.filter((t) => t.status === filter));
+  }, [tasks, filter, projectFilter]);
 
   const next = useMemo(() => nextUp(tasks, subsByTask), [tasks, subsByTask]);
 
@@ -433,6 +577,7 @@ export default function DevTasksPage() {
                 <h1 style={{ fontSize: 21, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{detail.title}</h1>
                 <PriorityChip priority={detail.priority} />
                 <StatusChip status={detail.status} />
+                {detail.project_name && <ProjectChip name={detail.project_name} colour={detail.project_colour} />}
                 {detail.is_overdue && <Chip tone="var(--danger)" solid>Overdue</Chip>}
               </div>
               {detail.description && (
@@ -608,7 +753,7 @@ export default function DevTasksPage() {
 
         {/* Modals */}
         {editTask && (
-          <TaskModal task={editTask} requesters={requesters} me={profile}
+          <TaskModal task={editTask} requesters={requesters} projects={projects} me={profile}
             onClose={() => setEditTask(null)}
             onSaved={() => { setEditTask(null); refreshBoth(); }} />
         )}
@@ -655,9 +800,16 @@ export default function DevTasksPage() {
             Tasks between the Boss and the developer. Each one breaks into subtasks.
           </p>
         </div>
-        <button className="wx-btn wx-btn-primary" onClick={() => setShowNew(true)}>
-          <i className="bi bi-plus-lg" style={{ marginRight: 6 }} />New task
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {canEdit && (
+            <button className="wx-btn wx-btn-ghost" onClick={() => setShowProjects(true)}>
+              <i className="bi bi-folder2" style={{ marginRight: 6 }} />Projects
+            </button>
+          )}
+          <button className="wx-btn wx-btn-primary" onClick={() => setShowNew(true)}>
+            <i className="bi bi-plus-lg" style={{ marginRight: 6 }} />New task
+          </button>
+        </div>
       </div>
 
       {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}><span>{err}</span></div>}
@@ -690,6 +842,29 @@ export default function DevTasksPage() {
         </div>
       )}
 
+      {/* Project row first: "which product" is the coarser question, so it
+          reads left-to-right as product then state. Hidden entirely until at
+          least one project exists, rather than showing a lone "All". */}
+      {projects.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginRight: 2 }}>
+            Project
+          </span>
+          {[{ id: 'all', name: 'All' }, ...projects, { id: 'none', name: 'Unassigned' }].map((p) => {
+            const on = projectFilter === p.id;
+            const c = p.colour ? (PROJECT_COLOURS[p.colour] || PROJECT_COLOURS.slate) : 'var(--text-secondary)';
+            return (
+              <button key={p.id} onClick={() => setProjectFilter(p.id)}
+                className={`wx-btn ${on ? 'wx-btn-primary' : 'wx-btn-ghost'}`}
+                style={{ fontSize: 12, padding: '3px 11px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {p.colour && !on && <span style={{ width: 7, height: 7, borderRadius: 99, background: c }} />}
+                {p.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
         {[['open', 'Open'], ['overdue', 'Overdue'], ['blocked', 'Blocked'], ['done', 'Done'], ['all', 'All']].map(([k, label]) => (
           <button key={k} className={`wx-btn ${filter === k ? 'wx-btn-primary' : 'wx-btn-ghost'}`}
@@ -718,8 +893,11 @@ export default function DevTasksPage() {
         </div>
       )}
 
+      {showProjects && (
+        <ProjectsModal onClose={() => setShowProjects(false)} onChanged={loadList} />
+      )}
       {showNew && (
-        <TaskModal requesters={requesters} me={profile}
+        <TaskModal requesters={requesters} projects={projects} me={profile}
           onClose={() => setShowNew(false)}
           onSaved={() => { setShowNew(false); loadList(); }} />
       )}

@@ -79,7 +79,7 @@ export async function getDevTask(id) {
   };
 }
 
-export async function createDevTask({ title, description, priority = 'medium', dueDate = null, requestedBy = null, assignedTo = null }) {
+export async function createDevTask({ title, description, priority = 'medium', dueDate = null, requestedBy = null, assignedTo = null, projectId = null }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in.');
   const { data, error } = await supabase
@@ -89,6 +89,7 @@ export async function createDevTask({ title, description, priority = 'medium', d
       description: description || null,
       priority,
       due_date: dueDate || null,
+      project_id: projectId || null,
       requested_by: requestedBy || null,
       // created_by is the truth and is never chosen; the insert policy also
       // requires it to equal auth.uid().
@@ -199,6 +200,47 @@ export async function addNote({ taskId, subtaskId = null, statusFrom = null, sta
   });
   if (error) throw new Error(error.message);
   return true;
+}
+
+// ── Projects (WurxOS, WurxMediaHub, Wurx Ads Reporting, ...) ────────
+// Tokens rather than hex, so a project's colour stays legible in dark mode.
+export const PROJECT_COLOURS = {
+  slate:  'var(--text-muted)',
+  blue:   'var(--primary)',
+  green:  'var(--success)',
+  amber:  'var(--warning)',
+  violet: '#8b5cf6',
+  rose:   'var(--danger)',
+  teal:   '#14b8a6',
+};
+
+export async function listProjects({ includeArchived = false } = {}) {
+  let q = supabase.from('dev_projects').select('*').order('name');
+  if (!includeArchived) q = q.eq('is_active', true);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function createProject({ name, description = null, colour = 'slate' }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('dev_projects')
+    .insert({ name: String(name || '').trim(), description, colour, created_by: user?.id || null })
+    .select('id').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateProject(id, patch) {
+  const { error } = await supabase.from('dev_projects').update(patch).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// Archive rather than delete: tasks reference it, and the history of what was
+// worked on is worth more than a tidy list.
+export async function archiveProject(id) {
+  await updateProject(id, { is_active: false });
 }
 
 // ── People who may be named as the requester ────────────────────────
