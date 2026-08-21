@@ -405,19 +405,23 @@ function StatusMenu({ value, onPick, size = 'sm', align = 'left' }) {
 function CompositionBar({ counts, total }) {
   const order = ['done', 'in_progress', 'blocked', 'paused', 'pending', 'cancelled'];
   const segs = order.map((k) => [k, counts?.[k] || 0]).filter(([, n]) => n > 0);
-  if (!total) {
-    return <div style={{ height: 7, borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }} />;
-  }
+  // Solid track, contiguous segments, no gaps. The earlier version had a
+  // transparent background and 2px gaps, so a bar that was mostly "pending"
+  // (a near-invisible grey) read as a broken hairline floating in space.
+  const TRACK = {
+    height: 9, borderRadius: 999, overflow: 'hidden', display: 'flex',
+    background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
+  };
+  if (!total) return <div style={TRACK} />;
   return (
-    <div style={{
-      height: 7, borderRadius: 999, overflow: 'hidden', display: 'flex', gap: 2,
-      background: 'transparent',
-    }}>
+    <div style={TRACK}>
       {segs.map(([k, n]) => (
         <div key={k} title={`${n} ${STATUS_META[k].label}`} style={{
-          width: `${(n / total) * 100}%`, borderRadius: 999,
-          background: k === 'pending' ? 'var(--border-subtle)' : STATUS_META[k].tone,
-          opacity: k === 'cancelled' ? 0.35 : 1,
+          width: `${(n / total) * 100}%`,
+          // Pending is the empty state, so it stays as visible track rather
+          // than being painted a colour that implies progress.
+          background: k === 'pending' ? 'transparent' : STATUS_META[k].tone,
+          opacity: k === 'cancelled' ? 0.3 : 1,
         }} />
       ))}
     </div>
@@ -492,6 +496,7 @@ function TaskCard({ task, subtasks, onOpen }) {
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,.05)'; e.currentTarget.style.borderColor = overdue ? 'var(--danger)' : 'var(--border-subtle)'; }}
       style={{
         textAlign: 'left', width: '100%', cursor: 'pointer',
+        display: 'flex', flexDirection: 'column',
         background: 'var(--surface-1)',
         border: `1px solid ${overdue ? 'var(--danger)' : 'var(--border-subtle)'}`,
         borderLeft: `3px solid ${accent}`,
@@ -687,8 +692,16 @@ function ProjectGroup({ project, tasks, subsByTask, onOpen }) {
           {pct != null && <> · {pct}% complete</>}
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 14 }}>
-        {tasks.map((t) => <TaskCard key={t.id} task={t} subtasks={subsByTask?.[t.id]} onOpen={onOpen} />)}
+      {/* Flex, not an auto-fill grid. A grid reserves four tracks on a wide
+          screen, so a single pipeline sat in a narrow column with acres of
+          dead space beside it. Flex lets one card take a comfortable width and
+          still wraps cleanly once there are several. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'stretch' }}>
+        {tasks.map((t) => (
+          <div key={t.id} style={{ flex: '1 1 380px', maxWidth: 560, display: 'flex' }}>
+            <TaskCard task={t} subtasks={subsByTask?.[t.id]} onOpen={onOpen} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -893,7 +906,7 @@ export default function DevTasksPage() {
     const openCount = detail.subtasks.filter((s) => !['done', 'cancelled'].includes(s.status)).length;
 
     return (
-      <div style={{ padding: '24px 28px 48px', maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ padding: '24px 28px 48px', maxWidth: 1240, margin: '0 auto' }}>
         <button className="wx-btn wx-btn-ghost" style={{ marginBottom: 12, paddingLeft: 0 }}
           onClick={() => navigate('/dev-tasks')}>
           <i className="bi bi-arrow-left" style={{ marginRight: 6 }} />All tasks
@@ -1124,7 +1137,7 @@ export default function DevTasksPage() {
 
   // ── list view ─────────────────────────────────────────────────────
   return (
-    <div style={{ padding: '24px 28px 48px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '24px 28px 48px', maxWidth: 1240, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Development</h1>
@@ -1199,7 +1212,11 @@ export default function DevTasksPage() {
         {projects.length > 0 && (
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
             <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)' }}>Project</span>
-            <select className="wx-input" style={{ width: 190, height: 34, fontSize: 12.5 }}
+            {/* Do NOT set an explicit height here. .wx-input already carries
+                padding: 12px 14px and font-size: 14px, so a 34px height clips
+                the option text in half -- which is exactly what happened. Let
+                padding size it instead. */}
+            <select className="wx-input" style={{ width: 200, padding: '7px 12px', fontSize: 13 }}
               value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
               <option value="all">All projects</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
