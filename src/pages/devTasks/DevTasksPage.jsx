@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -139,7 +140,7 @@ function ProjectsModal({ onClose, onChanged }) {
     finally { setBusy(false); }
   }
 
-  return (
+  return createPortal(
     <div className="wx-modal-backdrop" onClick={onClose}>
       <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
         <div className="wx-modal-header">
@@ -196,7 +197,8 @@ function ProjectsModal({ onClose, onChanged }) {
           <button className="wx-btn wx-btn-primary" onClick={onClose}>Done</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -230,7 +232,7 @@ function TaskModal({ task, requesters, projects, me, onClose, onSaved }) {
     finally { setBusy(false); }
   }
 
-  return (
+  return createPortal(
     <div className="wx-modal-backdrop" onClick={onClose}>
       <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div className="wx-modal-header">
@@ -296,7 +298,8 @@ function TaskModal({ task, requesters, projects, me, onClose, onSaved }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -304,7 +307,7 @@ function TaskModal({ task, requesters, projects, me, onClose, onSaved }) {
 function StatusNoteModal({ label, onCancel, onConfirm }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  return (
+  return createPortal(
     <div className="wx-modal-backdrop" onClick={onCancel}>
       <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
         <div className="wx-modal-header"><div className="wx-modal-title">{label}</div></div>
@@ -322,65 +325,261 @@ function StatusNoteModal({ label, onCancel, onConfirm }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 // ── The list of pipelines ───────────────────────────────────────────
+
+// One bar split BY STATUS rather than a plain done/not-done fill. A glance
+// gives composition, not just a percentage: you can see a pipeline is "mostly
+// blocked" or "barely started" without reading a single number.
+function CompositionBar({ counts, total }) {
+  const order = ['done', 'in_progress', 'blocked', 'paused', 'pending', 'cancelled'];
+  const segs = order.map((k) => [k, counts?.[k] || 0]).filter(([, n]) => n > 0);
+  if (!total) {
+    return <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }} />;
+  }
+  return (
+    <div style={{
+      height: 8, borderRadius: 999, overflow: 'hidden', display: 'flex',
+      border: '1px solid var(--border-subtle)', background: 'var(--surface-2)',
+    }}>
+      {segs.map(([k, n]) => (
+        <div key={k} title={`${n} ${STATUS_META[k].label}`} style={{
+          width: `${(n / total) * 100}%`,
+          background: k === 'pending' ? 'var(--border-subtle)' : STATUS_META[k].tone,
+          opacity: k === 'cancelled' ? 0.35 : 1,
+        }} />
+      ))}
+    </div>
+  );
+}
+
 function TaskCard({ task, onOpen }) {
   const overdue = task.is_overdue;
+  const accent = task.project_colour
+    ? (PROJECT_COLOURS[task.project_colour] || PROJECT_COLOURS.slate)
+    : 'var(--border-subtle)';
+  const counts = task.status_counts || {};
+  const active = counts.in_progress || 0;
+  const stuck = counts.blocked || 0;
+
   return (
-    <button type="button" onClick={() => onOpen(task.id)} style={{
-      textAlign: 'left', width: '100%', cursor: 'pointer',
-      background: 'var(--surface-1)', border: `1px solid ${overdue ? 'var(--danger)' : 'var(--border-subtle)'}`,
-      borderRadius: 'var(--radius-lg, 14px)', padding: 16, display: 'grid', gap: 10,
-      boxShadow: '0 1px 2px rgba(16,24,40,.04)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between' }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', lineHeight: 1.35 }}>
-          {task.title}
+    <button
+      type="button"
+      onClick={() => onOpen(task.id)}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 6px 18px rgba(16,24,40,.10)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,.05)'; e.currentTarget.style.transform = 'none'; }}
+      style={{
+        textAlign: 'left', width: '100%', cursor: 'pointer',
+        background: 'var(--surface-1)',
+        border: `1px solid ${overdue ? 'var(--danger)' : 'var(--border-subtle)'}`,
+        borderLeft: `3px solid ${accent}`,
+        borderRadius: 14, padding: '15px 16px 14px', display: 'grid', gap: 11,
+        boxShadow: '0 1px 2px rgba(16,24,40,.05)', transition: 'box-shadow .15s, transform .15s',
+      }}>
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+            {task.title}
+          </div>
+          {task.description && (
+            <div style={{
+              fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.45, marginTop: 3,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            }}>{task.description}</div>
+          )}
         </div>
-        <PriorityChip priority={task.priority} />
+        <div style={{ display: 'grid', gap: 5, justifyItems: 'end', flex: '0 0 auto' }}>
+          <PriorityChip priority={task.priority} />
+          {overdue && <Chip tone="var(--danger)" solid>Overdue</Chip>}
+        </div>
       </div>
 
-      {task.project_name && <ProjectChip name={task.project_name} colour={task.project_colour} />}
+      {/* The headline the Boss actually reads: how far along, and whether any
+          of it is moving or stuck. Big number first, chips second. */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+          {task.progress_pct == null ? '—' : `${task.progress_pct}%`}
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          {task.subtask_counted ? `${task.subtask_done} of ${task.subtask_counted} subtasks` : 'no subtasks yet'}
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {active > 0 && <Chip tone={STATUS_META.in_progress.tone}>{active} active</Chip>}
+          {stuck > 0 && <Chip tone="var(--danger)" solid>{stuck} blocked</Chip>}
+        </span>
+      </div>
 
-      {task.description && (
-        <div style={{
-          fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>{task.description}</div>
-      )}
+      <CompositionBar counts={counts} total={task.subtask_total} />
 
-      <Progress pct={task.progress_pct} done={task.subtask_done} counted={task.subtask_counted} />
-
-      <StatusBreakdown counts={task.status_counts} />
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        borderTop: '1px solid var(--border-subtle)', paddingTop: 10,
+        fontSize: 11.5, color: 'var(--text-muted)',
+      }}>
+        {task.project_name
+          ? <ProjectChip name={task.project_name} colour={task.project_colour} />
+          : <span style={{ fontStyle: 'italic' }}>No project</span>}
         <StatusChip status={task.status} />
-        {overdue && <Chip tone="var(--danger)" solid>Overdue</Chip>}
-        {task.due_date && !overdue && (
-          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+        {task.due_date && (
+          <span style={{ color: overdue ? 'var(--danger)' : 'var(--text-muted)', fontWeight: overdue ? 700 : 400 }}>
             <i className="bi bi-calendar3" style={{ marginRight: 4 }} />{fmtDate(task.due_date)}
           </span>
         )}
-        {task.completed_override && <Chip tone="var(--text-muted)">Closed manually</Chip>}
+        {task.requester && (
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <i className="bi bi-person" />{task.requester.display_name}
+            {!task.requested_confirmed_at && (
+              <span title="Recorded by the developer; not yet confirmed by that person."
+                style={{ color: 'var(--warning)', fontWeight: 700 }}> · unconfirmed</span>
+            )}
+          </span>
+        )}
       </div>
-
-      {task.requester && (
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="bi bi-person" />
-          Requested by <strong style={{ color: 'var(--text-secondary)' }}>{task.requester.display_name}</strong>
-          {!task.requested_confirmed_at && (
-            <Chip tone="var(--warning)" title="The developer recorded this attribution; it has not been confirmed by that person yet.">
-              unconfirmed
-            </Chip>
-          )}
-        </div>
-      )}
     </button>
   );
 }
+
+
+// ── The "one glance" header ─────────────────────────────────────────
+
+// The Boss's question is literally "which project, which main task, which
+// subtask". So show that as a chain rather than making him infer it from a
+// card. This is the single most important element on the page.
+function ActiveChain({ next, onOpen }) {
+  if (!next) {
+    return (
+      <div style={{
+        border: '1px dashed var(--border-subtle)', borderRadius: 16, padding: '22px 20px',
+        textAlign: 'center', color: 'var(--text-muted)', fontSize: 13,
+      }}>
+        Nothing is in progress right now.
+      </div>
+    );
+  }
+  const { task, subtask } = next;
+  const accent = task.project_colour ? (PROJECT_COLOURS[task.project_colour] || PROJECT_COLOURS.slate) : 'var(--primary)';
+  const sub = STATUS_META[subtask.status] || STATUS_META.pending;
+
+  return (
+    <div style={{
+      position: 'relative', overflow: 'hidden', borderRadius: 16, padding: '18px 20px',
+      background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 10%, var(--surface-1)) 0%, var(--surface-1) 60%)`,
+      border: `1px solid color-mix(in srgb, ${accent} 32%, transparent)`,
+    }}>
+      <div style={{
+        position: 'absolute', inset: 0, width: 3, background: accent,
+      }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 260, flex: 1 }}>
+          <div style={{
+            fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase',
+            color: accent, marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: 99, background: accent,
+              boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 22%, transparent)`,
+            }} />
+            Working on now
+          </div>
+
+          {/* project › task › subtask */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5 }}>
+            <span style={{ fontWeight: 700, color: accent }}>{task.project_name || 'No project'}</span>
+            <i className="bi bi-chevron-right" style={{ fontSize: 9, color: 'var(--text-muted)' }} />
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{task.title}</span>
+          </div>
+
+          <div style={{
+            fontSize: 20, fontWeight: 800, color: 'var(--text-primary)',
+            lineHeight: 1.25, marginTop: 5,
+          }}>{subtask.title}</div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 9 }}>
+            <Chip tone={sub.tone}><i className={`bi ${sub.icon}`} style={{ marginRight: 4 }} />{sub.label}</Chip>
+            <PriorityChip priority={subtask.priority} />
+            {subtask.due_date && (
+              <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                <i className="bi bi-calendar3" style={{ marginRight: 4 }} />due {fmtDate(subtask.due_date)}
+              </span>
+            )}
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+              {task.progress_pct == null ? '' : `pipeline ${task.progress_pct}% complete`}
+            </span>
+          </div>
+        </div>
+
+        <button className="wx-btn wx-btn-primary" style={{ fontWeight: 700 }} onClick={() => onOpen(task.id)}>
+          Open pipeline <i className="bi bi-arrow-right" style={{ marginLeft: 6 }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Five numbers that answer "is anything wrong". Anything at zero stays grey so
+// only real problems draw the eye.
+function SummaryStrip({ tasks }) {
+  const open = tasks.filter((t) => !['done', 'cancelled'].includes(t.status));
+  const sum = (k) => open.reduce((n, t) => n + ((t.status_counts || {})[k] || 0), 0);
+  const stats = [
+    { label: 'Pipelines open', value: open.length, tone: 'var(--text-primary)' },
+    { label: 'Subtasks active', value: sum('in_progress'), tone: STATUS_META.in_progress.tone },
+    { label: 'Blocked', value: sum('blocked'), tone: 'var(--danger)', warn: true },
+    { label: 'Overdue', value: open.filter((t) => t.is_overdue).length, tone: 'var(--danger)', warn: true },
+    { label: 'Completed', value: tasks.filter((t) => t.status === 'done').length, tone: 'var(--success)' },
+  ];
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
+      {stats.map((s) => {
+        const live = s.value > 0;
+        const tone = s.warn && !live ? 'var(--text-muted)' : s.tone;
+        return (
+          <div key={s.label} style={{
+            background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
+            borderRadius: 12, padding: '12px 14px',
+          }}>
+            <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: live ? tone : 'var(--text-muted)' }}>
+              {s.value}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{s.label}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Cards grouped under their project, so "which project" needs no reading.
+function ProjectGroup({ project, tasks, onOpen }) {
+  const c = project.colour ? (PROJECT_COLOURS[project.colour] || PROJECT_COLOURS.slate) : 'var(--text-muted)';
+  const counted = tasks.reduce((n, t) => n + (t.subtask_counted || 0), 0);
+  const done = tasks.reduce((n, t) => n + (t.subtask_done || 0), 0);
+  const pct = counted ? Math.round((done / counted) * 100) : null;
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap',
+        paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)',
+      }}>
+        <span style={{ width: 9, height: 9, borderRadius: 99, background: c }} />
+        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{project.name}</span>
+        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+          {tasks.length} {tasks.length === 1 ? 'pipeline' : 'pipelines'}
+          {pct != null && <> · {pct}% complete</>}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 14 }}>
+        {tasks.map((t) => <TaskCard key={t.id} task={t} onOpen={onOpen} />)}
+      </div>
+    </div>
+  );
+}
+
 
 // ── The board for one pipeline ──────────────────────────────────────
 function SubtaskCard({ sub, canEdit, onMove, onEdit, onDelete }) {
@@ -437,7 +636,7 @@ function SubtaskModal({ sub, taskDue, onClose, onSaved }) {
   // real situation, and the honest response is to say so, not to refuse it.
   const late = dueDate && taskDue && dueDate > taskDue;
 
-  return (
+  return createPortal(
     <div className="wx-modal-backdrop" onClick={onClose}>
       <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
         <div className="wx-modal-header">
@@ -482,7 +681,8 @@ function SubtaskModal({ sub, taskDue, onClose, onSaved }) {
           }}>{busy ? 'Saving…' : 'Save'}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -545,6 +745,33 @@ export default function DevTasksPage() {
   }, [tasks, filter, projectFilter]);
 
   const next = useMemo(() => nextUp(tasks, subsByTask), [tasks, subsByTask]);
+
+  // Group the visible cards under their project. Projects with nothing to show
+  // are dropped rather than rendered as empty headings, and unassigned work
+  // sinks to the bottom so it reads as a loose end rather than a category.
+  const grouped = useMemo(() => {
+    const byId = new Map(projects.map((p) => [p.id, p]));
+    const buckets = new Map();
+    for (const t of visible) {
+      const key = t.project_id || '__none';
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(t);
+    }
+    const out = [];
+    for (const [key, items] of buckets) {
+      if (key === '__none') continue;
+      // An ARCHIVED project is not in `projects`, but its tasks still exist and
+      // the view carries its name and colour, so fall back to the row itself
+      // rather than dropping the group or labelling it "unknown".
+      const fallback = { id: key, name: items[0].project_name || 'Project', colour: items[0].project_colour || 'slate' };
+      out.push({ project: byId.get(key) || fallback, items });
+    }
+    out.sort((a, b) => a.project.name.localeCompare(b.project.name));
+    if (buckets.has('__none')) {
+      out.push({ project: { id: '__none', name: 'No project', colour: null }, items: buckets.get('__none') });
+    }
+    return out;
+  }, [visible, projects]);
 
   async function refreshBoth() {
     await loadList();
@@ -814,33 +1041,12 @@ export default function DevTasksPage() {
 
       {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}><span>{err}</span></div>}
 
-      {/* What the developer should do next. One person does not need a
-          dashboard, they need the next thing. */}
-      {next && (
-        <div style={{
-          background: 'color-mix(in srgb, var(--primary) 8%, var(--surface-1))',
-          border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
-          borderRadius: 14, padding: 16, marginBottom: 18,
-          display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap',
-        }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 10, flex: '0 0 auto', display: 'grid', placeItems: 'center',
-            background: 'var(--primary)', color: '#fff',
-          }}><i className="bi bi-lightning-charge-fill" /></div>
-          <div style={{ minWidth: 220, flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: 'var(--primary)', textTransform: 'uppercase' }}>
-              Next up
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{next.subtask.title}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              in {next.task.title}
-              {next.subtask.due_date && <> · due {fmtDate(next.subtask.due_date)}</>}
-            </div>
-          </div>
-          <PriorityChip priority={next.subtask.priority} />
-          <button className="wx-btn wx-btn-primary" onClick={() => navigate(`/dev-tasks/${next.task.id}`)}>Open</button>
-        </div>
-      )}
+      {/* One glance: what is being worked on right now, then the numbers
+          that say whether anything needs attention. */}
+      <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
+        <ActiveChain next={next} onOpen={(tid) => navigate(`/dev-tasks/${tid}`)} />
+        <SummaryStrip tasks={tasks} />
+      </div>
 
       {/* Project row first: "which product" is the coarser question, so it
           reads left-to-right as product then state. Hidden entirely until at
@@ -888,9 +1094,10 @@ export default function DevTasksPage() {
           <div style={{ fontSize: 12.5, marginTop: 4 }}>Create a task to get started.</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
-          {visible.map((t) => <TaskCard key={t.id} task={t} onOpen={(tid) => navigate(`/dev-tasks/${tid}`)} />)}
-        </div>
+        grouped.map(({ project, items }) => (
+          <ProjectGroup key={project.id} project={project} tasks={items}
+            onOpen={(tid) => navigate(`/dev-tasks/${tid}`)} />
+        ))
       )}
 
       {showProjects && (
