@@ -40,6 +40,7 @@ const PaidCollabDashboardPage = lazy(() => import('./pages/paidCollab/DashboardP
 const PCTLIPCsPage          = lazy(() => import('./pages/pctl/IPCsPage'));
 const ReportPortalPage      = lazy(() => import('./pages/portal/ReportPortalPage'));
 const HaloPortalPage        = lazy(() => import('./pages/portal/HaloPortalPage'));
+const HaloV2PortalPage      = lazy(() => import('./pages/portal/HaloV2PortalPage'));
 const ClientPortalPage      = lazy(() => import('./pages/portal/ClientPortalPage'));
 const GmvMaxReportingPage   = lazy(() => import('./components/reporting/GmvMaxReportingPage'));
 const WeeklyReportsRouter   = lazy(() => import('./components/reporting/WeeklyReportsRouter'));
@@ -195,6 +196,14 @@ export default function App() {
             <Route
               path="/portal/halo/:token"
               element={<Suspense fallback={<PageFallback />}><HaloPortalPage /></Suspense>}
+            />
+            {/* Halo V2 links are a SEPARATE route with separate tokens
+                (mig 330). A V1 token here resolves to nothing, which is the
+                intended outcome -- the two models say different things and one
+                must never silently render as the other. */}
+            <Route
+              path="/portal/halo-v2/:token"
+              element={<Suspense fallback={<PageFallback />}><HaloV2PortalPage /></Suspense>}
             />
 
             {/* TikTok Business API OAuth redirect. PUBLIC because the advertiser

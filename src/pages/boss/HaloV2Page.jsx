@@ -3,8 +3,12 @@
 //
 // A SEPARATE surface from /halo. V1 stays exactly as it is: this page reuses
 // the same brand list and the same uploaded sheets read-only, and adds no
-// upload, delete or share controls of its own — sheet management stays where it
+// upload or delete controls of its own — sheet management stays where it
 // already lives, on the V1 page.
+//
+// It DOES have its own client share links (mig 330): separate tokens, a
+// separate table and a separate /portal/halo-v2/:token route, so a V1 link
+// never renders V2 and revoking one does not touch the other.
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -12,12 +16,14 @@ import { Link } from 'react-router-dom';
 import { getHaloRows } from '../../lib/haloApi';
 import { listHaloEnabledBrands } from '../../lib/haloBrandsApi';
 import HaloV2Explorer from '../../components/haloV2/HaloV2Explorer';
+import HaloV2ShareModal from '../../components/haloV2/HaloV2ShareModal';
 
 export default function HaloV2Page() {
   const [brands, setBrands] = useState([]);
   const [selectedBrandId, setSelectedBrandId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -57,9 +63,21 @@ export default function HaloV2Page() {
                 <option key={x.brand.id} value={x.brand.id}>{x.brand.brand_name}</option>
               ))}
             </select>
+            {/* V2's own links. Separate tokens from V1's, so handing a client
+                the V2 view never disturbs a V1 link they already have. */}
+            <button type="button" className="wx-btn wx-btn-ghost"
+              onClick={() => setShareOpen(true)}>
+              <i className="bi bi-link-45deg" style={{ marginRight: 6 }} />Client links
+            </button>
           </div>
         )}
       </div>
+
+      {shareOpen && (
+        <HaloV2ShareModal
+          brands={brands.map((x) => x.brand)}
+          onClose={() => setShareOpen(false)} />
+      )}
 
       {error && <div className="wx-alert wx-alert-danger"><span>{error}</span></div>}
 
