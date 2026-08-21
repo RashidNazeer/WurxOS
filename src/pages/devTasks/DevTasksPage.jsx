@@ -10,6 +10,11 @@ import {
   listProjects, createProject, updateProject, archiveProject, PROJECT_COLOURS,
   STATUS_META, PRIORITY_META, DEV_PRIORITIES, BOARD_COLUMNS, sortTasks, nextUp,
 } from '../../lib/devTasksApi';
+// The .wx-modal / .wx-modal-backdrop overlay styles live here and are imported
+// PER PAGE, not globally (see the same import in HaloShareModal, AuditPage,
+// BrandDetailPage...). Without it the dialogs render as unstyled blocks in the
+// page flow, which is exactly what happened here.
+import '../../styles/table.css';
 
 // Developer task management. Two levels: a task (the "pipeline") holding
 // subtasks shown as a board. See mig 328 for the model and why the statuses
