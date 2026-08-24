@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useStickyState } from '../../lib/useStickyState';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
@@ -59,13 +60,13 @@ export default function AllBiWeeklyReportsPage() {
   const [calMonth, setCalMonth] = useState(now.getMonth());
 
   // Filters
-  const [filterBrand, setFilterBrand] = useState('');
-  const [filterClients, setFilterClients] = useState([]);
-  const [filterTeam, setFilterTeam] = useState('');
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterCreator, setFilterCreator] = useState('');
-  const [filterPeriod, setFilterPeriod] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterBrand, setFilterBrand] = useStickyState('reports.biweekly.filterBrand', '');
+  const [filterClients, setFilterClients] = useStickyState('reports.biweekly.filterClients', []);
+  const [filterTeam, setFilterTeam] = useStickyState('reports.biweekly.filterTeam', '');
+  const [filterSearch, setFilterSearch] = useStickyState('reports.biweekly.filterSearch', '');
+  const [filterCreator, setFilterCreator] = useStickyState('reports.biweekly.filterCreator', '');
+  const [filterPeriod, setFilterPeriod] = useStickyState('reports.biweekly.filterPeriod', '');
+  const [filterStatus, setFilterStatus] = useStickyState('reports.biweekly.filterStatus', '');
 
   const [viewReport, setViewReport] = useState(null);
   const [editReportId, setEditReportId] = useState(null);

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useStickyState } from '../../lib/useStickyState';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
@@ -124,14 +125,14 @@ export default function AllWeeklyReportsPage() {
   const [calMonth, setCalMonth] = useState(now.getMonth());
 
   // Filters
-  const [filterBrand, setFilterBrand] = useState('');
-  const [filterClients, setFilterClients] = useState([]);
-  const [filterTeam, setFilterTeam] = useState('');
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterCreator, setFilterCreator] = useState('');
-  const [filterWeek, setFilterWeek] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
+  const [filterBrand, setFilterBrand] = useStickyState('reports.weekly.filterBrand', '');
+  const [filterClients, setFilterClients] = useStickyState('reports.weekly.filterClients', []);
+  const [filterTeam, setFilterTeam] = useStickyState('reports.weekly.filterTeam', '');
+  const [filterSearch, setFilterSearch] = useStickyState('reports.weekly.filterSearch', '');
+  const [filterCreator, setFilterCreator] = useStickyState('reports.weekly.filterCreator', '');
+  const [filterWeek, setFilterWeek] = useStickyState('reports.weekly.filterWeek', '');
+  const [filterStatus, setFilterStatus] = useStickyState('reports.weekly.filterStatus', '');
+  const [sortBy, setSortBy] = useStickyState('reports.weekly.sortBy', 'newest');
 
   const [viewReport, setViewReport] = useState(null);
   const [editDatesReport, setEditDatesReport] = useState(null);

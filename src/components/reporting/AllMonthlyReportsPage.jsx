@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useStickyState } from '../../lib/useStickyState';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
@@ -66,13 +67,13 @@ export default function AllMonthlyReportsPage() {
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
 
-  const [filterBrand, setFilterBrand] = useState('');
-  const [filterClients, setFilterClients] = useState([]);
-  const [filterTeam, setFilterTeam] = useState('');
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterCreator, setFilterCreator] = useState('');
-  const [filterMonth, setFilterMonth] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterBrand, setFilterBrand] = useStickyState('reports.monthly.filterBrand', '');
+  const [filterClients, setFilterClients] = useStickyState('reports.monthly.filterClients', []);
+  const [filterTeam, setFilterTeam] = useStickyState('reports.monthly.filterTeam', '');
+  const [filterSearch, setFilterSearch] = useStickyState('reports.monthly.filterSearch', '');
+  const [filterCreator, setFilterCreator] = useStickyState('reports.monthly.filterCreator', '');
+  const [filterMonth, setFilterMonth] = useStickyState('reports.monthly.filterMonth', '');
+  const [filterStatus, setFilterStatus] = useStickyState('reports.monthly.filterStatus', '');
 
   const [viewReport, setViewReport] = useState(null);
   const [editReportId, setEditReportId] = useState(null);
