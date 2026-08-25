@@ -68,15 +68,16 @@ function stripAttendanceForSave(items) {
     // ticks it) and the TARGET is real money the OL set — so blank the achieved
     // only and leave both of those alone.
     if (it.source === 'gmv_max')    return { ...it, achievedValue: null };
-    // Commission tier: EVERYTHING except the OL's percentage is derived —
-    // including `amount`, which is the first derived money in this system. None
-    // of it may sit at rest: a mid-month figure baked into the JSONB is what
-    // every non-overlaying consumer (backups, ai-chat, the Performance page)
-    // would then read and quote as pay. The real numbers are written once,
-    // server-side, by _inc_freeze_commission_items at payout.
+    // Commission tier: the benchmark (targetValue), the achieved figure and the
+    // percentage are all TYPED by an OL, so they are real data and must persist.
+    // Only the money and the completion flag are derived — the money because the
+    // FX rate lives in another table and moves on its own, so a figure baked in
+    // here would be read as pay by every non-overlaying consumer (backups,
+    // ai-chat, the Performance page) long after the rate had changed. Both are
+    // written once, server-side, by _inc_freeze_commission_items at payout.
     if (it.source === 'commission_tier') {
       const { _commissionInfo, ...rest } = it;   // eslint-disable-line no-unused-vars
-      return { ...rest, achievedValue: null, targetValue: null, amount: 0, completed: false, completedBy: null };
+      return { ...rest, amount: 0, completed: false, completedBy: null };
     }
     return it;
   });
@@ -222,40 +223,31 @@ export async function applyGmvMaxAutofill(rows, month) {
   });
 }
 
-// ── Commission Based Tier auto-fill (mig 333) ─────────────────────
-// A brand-linked item flagged { source: 'commission_tier' } carries ONE typed
-// number, `commissionPct` — this person's percentage of that brand's GMV. The
-// rest of the line derives from Brand Analytics:
+// ── Commission Based Tier (migs 333-336) ──────────────────────────
+// A brand-linked item flagged { source: 'commission_tier' } carrying THREE
+// hand-entered numbers, all set by an OL:
 //
-//   completed = the brand's monthly goal is set, > 0, and achieved has reached it
-//   amount    = achieved x commissionPct% x that month's rate to PKR
+//   targetValue    the GMV benchmark
+//   achievedValue  what was actually achieved   (OL only — never APC/TL)
+//   commissionPct  this person's percentage
 //
-// TWO THINGS ARE DELIBERATELY UNLIKE THE OTHER THREE SOURCES.
+// and paying on the EXCESS above the benchmark, converted to PKR:
 //
-// 1. It writes `amount`. Every existing overlay only fills a progress number
-//    and a human types the money. Here the money IS the derived value, which is
-//    why the payout freeze had to grow a fourth wrapper in BOTH payout paths
-//    and why inc_reset_and_roll has to zero `amount` for this source alone.
+//   amount = (achieved - benchmark) x commissionPct% x rate-to-PKR
 //
-// 2. There is NO month-close money gate. attendance and ol_brands both have one
-//    because those figures can move DOWN during a month, so completing early
-//    would pay on a number that has not settled. Month-to-date GMV only climbs:
-//    once a goal is crossed it stays crossed, and only the amount keeps growing
-//    until a payout freezes it. So this reads 0 until the goal, then tracks
-//    daily — which is what was asked for.
+// e.g. benchmark $1,000, achieved $1,200, 0.5% -> $6 -> x280 -> PKR 1,680.
 //
-// The FX rate is per (month, currency) and Boss-set. When one is missing the
-// amount shows 0 and the UI says so loudly; clearing the payout then RAISES
-// rather than freezing a real commission at zero.
-export async function fetchCommissionMap(month) {
-  const { data, error } = await supabase.rpc('commission_tier_map', { p_month: month });
+// Only `amount` and `completed` are derived. The three numbers above are real
+// stored values — unlike migs 333-335, where the benchmark and achieved were
+// read from Brand Analytics and blanked at rest. The amount still has to be
+// derived because the FX rate lives in another table and moves on its own, and
+// it is still frozen server-side at payout so a later rate change can never
+// move a figure somebody has already been paid.
+export async function fetchCommissionFxMap(month) {
+  const { data, error } = await supabase.rpc('commission_fx_map', { p_month: month });
   if (error) throw new Error(error.message);
   const m = new Map();
   (data || []).forEach((r) => m.set(r.brand_id, {
-    achieved: Number(r.achieved) || 0,
-    // NOT coalesced to 0 — "no goal set" has to stay distinguishable from a
-    // goal of zero, or every unconfigured brand starts paying commission.
-    target:   r.target == null ? null : Number(r.target),
     currency: r.currency || 'USD',
     fxRate:   r.fx_rate == null ? null : Number(r.fx_rate),
     fxMonth:  r.fx_month || null,
@@ -263,23 +255,38 @@ export async function fetchCommissionMap(month) {
   return m;
 }
 
-// THE GATE. Must read identically to public.commission_goal_hit (mig 333).
-// Spelled out rather than `achieved >= target` because target is nullable and
-// the whole metrics row is DELETED when its metrics are cleared — and in JS
-// Number(null) >= Number(null) is 0 >= 0, i.e. TRUE. The lazy version pays
-// commission on every brand nobody has configured, while SQL's null >= null
-// says no, so the page and the payout would quietly disagree.
-export function commissionGoalHit(info) {
-  if (!info) return false;
-  const t = info.target;
-  if (t == null || !(Number(t) > 0)) return false;
-  return (Number(info.achieved) || 0) >= Number(t);
+// A benchmark of ZERO pays nothing, and that is deliberate rather than an
+// oversight: `achieved - 0` is the whole achieved figure, which is exactly the
+// behaviour this model replaced — and it would arrive silently, because an
+// empty numeric input coerces to 0 long before it reaches here, so "unset" and
+// "zero" are the same value. Must read identically to commission_line_state
+// and to perf_incentives_score's branch (mig 336).
+export function commissionBenchmark(item) { return Number(item?.targetValue) || 0; }
+export function commissionAchieved(item)  { return Number(item?.achievedValue) || 0; }
+
+export function commissionCompleted(item) {
+  const b = commissionBenchmark(item);
+  return b > 0 && commissionAchieved(item) >= b;
 }
 
-export function commissionAmount(info, pct) {
-  if (!commissionGoalHit(info) || info.fxRate == null) return 0;
-  const p = Math.min(Math.max(Number(pct) || 0, 0), 100);   // clamp, as the freeze does
-  return Math.round((Number(info.achieved) || 0) * (p / 100) * Number(info.fxRate));
+// The part of `achieved` the commission is actually paid on.
+export function commissionExcess(item) {
+  const b = commissionBenchmark(item);
+  if (!(b > 0)) return 0;
+  return Math.max(commissionAchieved(item) - b, 0);
+}
+
+// In the BRAND's currency, before conversion.
+export function commissionEarnedRaw(item) {
+  const pct = Math.min(Math.max(Number(item?.commissionPct) || 0, 0), 100);  // clamp, as the freeze does
+  return commissionExcess(item) * (pct / 100);
+}
+
+// In PKR. A missing rate pays 0 here, and clearing the payout is refused
+// server-side rather than freezing that zero.
+export function commissionAmount(item, fxRate) {
+  if (fxRate == null) return 0;
+  return Math.round(commissionEarnedRaw(item) * Number(fxRate));
 }
 
 function _hasCommissionItem(row) {
@@ -291,24 +298,21 @@ export async function applyCommissionAutofill(rows, month) {
   const list = Array.isArray(rows) ? rows : [];
   if (!list.some((r) => !_isPaid(r) && _hasCommissionItem(r))) return list;
   let byBrand;
-  try { byBrand = await fetchCommissionMap(month); }
+  try { byBrand = await fetchCommissionFxMap(month); }
   // eslint-disable-next-line no-console
   catch (e) { console.warn('commission autofill skipped:', e.message); return list; }
   const patchItem = (it) => {
     if (!it || it.source !== 'commission_tier' || !it.brandId) return it;
     const info = byBrand.get(it.brandId) || null;
-    const hit  = commissionGoalHit(info);
     return {
       ...it,
-      achievedValue: info ? info.achieved : 0,
-      targetValue:   info && info.target != null ? info.target : 0,
-      suffix:        info ? currencySymbol(info.currency) : (it.suffix || ''),
-      completed:     hit,
-      amount:        commissionAmount(info, it.commissionPct),
-      // For the UI only (why it pays 0, which month's rate is in play). Never
-      // reaches the database: stripAttendanceForSave drops it, and every save
-      // funnel rebuilds items from a fixed field list anyway.
-      _commissionInfo: info ? { ...info, hit } : null,
+      suffix:    info ? currencySymbol(info.currency) : (it.suffix || ''),
+      completed: commissionCompleted(it),
+      amount:    commissionAmount(it, info ? info.fxRate : null),
+      // For the UI only — why it pays what it pays, and which month's rate is
+      // in play. Never reaches the database: stripAttendanceForSave drops it,
+      // and every save funnel rebuilds items from a fixed field list anyway.
+      _commissionInfo: info ? { ...info, earnedRaw: commissionEarnedRaw(it), excess: commissionExcess(it) } : null,
     };
   };
   return list.map((r) => {

@@ -238,10 +238,15 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
   const isOlBrands = item.source === 'ol_brands';
   const isGmvMax   = item.source === 'gmv_max';
   const isComm     = item.source === 'commission_tier';
-  const isDerived  = isAtt || isOlBrands || isGmvMax || isComm;   // achieved is read-time-filled → locked
-  // GMV-Max differs from the others: only its ACHIEVED is derived. The target
-  // is the per-brand money figure the OL sets, so it stays editable here. A
-  // commission target is the brand's own GMV goal, so it locks like the rest.
+  // "Derived" here means the ACHIEVED figure is filled at read time and must be
+  // locked. A commission line is NOT one of those: its benchmark and achieved
+  // are typed by an OL — this row is the only place they can be — so both stay
+  // editable. Only its money and its completion flag are computed.
+  const isDerived  = isAtt || isOlBrands || isGmvMax;
+  // GMV-Max differs from the other two: only its ACHIEVED is derived. The target
+  // is the per-brand money figure the OL sets, so it stays editable here.
+  // A commission benchmark is likewise the OL's to set — except on their OWN
+  // line, where lockTarget applies as it does everywhere else.
   const lockTgt    = (isDerived && !isGmvMax) || lockTarget;
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
@@ -251,24 +256,25 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
   // ol_brands uses the exact ≥ target (≥70) rule the overlay + payout freeze use,
   // so this editor badge agrees with OlBrandPanel and the actual payout instead of
   // showing "Completed" at 65%.
-  // A commission line is the same story as ol_brands, one step stricter: it pays
-  // only when the brand's GMV goal is genuinely reached, so it takes the
-  // overlay's own verdict rather than the ≥90% ratio.
+  // A commission line is stricter still — it counts only once achieved reaches
+  // the benchmark exactly, and a benchmark of zero never counts. Computed here
+  // from what is being TYPED, so the badge tracks the edit rather than lagging
+  // a save behind the overlay.
   const done     = isComm
-    ? !!item.completed
+    ? (Number(target) > 0 && Number(achieved) >= Number(target))
     : isOlBrands
       ? (Number(achieved) >= (Number(target) || 70))
       : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isDerived ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isDerived ? '#bfdbfe' : '#e9ecef')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : ((isDerived || isComm) ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : ((isDerived || isComm) ? '#bfdbfe' : '#e9ecef')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
-          {isDerived && <AutoBadge source={item.source} />}
+          {(isDerived || isComm) && <AutoBadge source={item.source} />}
           <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? '#e6f4ea' : '#fff3e0', color: done ? '#198754' : '#fd7e14' }}>
             {done ? '✓ Completed' : `${p}%`}
           </span>
@@ -276,7 +282,7 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
       </div>
       <div className="row g-2">
         <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Target{lockTgt && !isDerived && <span className="text-muted" style={{ fontSize: '0.6rem' }}> (set by Boss · read-only)</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>{isComm ? 'GMV Benchmark' : 'Target'}{lockTgt && !isDerived && <span className="text-muted" style={{ fontSize: '0.6rem' }}> (set by Boss · read-only)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={target}
               onChange={e => onChange(cat, item.id, 'targetValue', e.target.value)}
@@ -297,11 +303,11 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
           <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Unit</label>
           <input type="text" className="form-control form-control-sm" placeholder="%" maxLength={6}
             value={sfx} onChange={e => onChange(cat, item.id, 'suffix', e.target.value)}
-            readOnly={isDerived} disabled={isDerived}
-            style={{ textAlign: 'center', fontSize: '0.78rem', ...(isDerived ? lock : {}) }} />
+            readOnly={isDerived || isComm} disabled={isDerived || isComm}
+            style={{ textAlign: 'center', fontSize: '0.78rem', ...((isDerived || isComm) ? lock : {}) }} />
         </div>
       </div>
-      {isDerived && (
+      {(isDerived || isComm) && (
         <div className="mt-2" style={{ fontSize: '0.66rem', color: isComm ? '#166534' : '#1e40af' }}>
           <i className={`bi ${isAtt ? 'bi-calendar-check' : isGmvMax ? 'bi-graph-up-arrow' : isComm ? 'bi-percent' : 'bi-bullseye'} me-1`} />
           {isAtt

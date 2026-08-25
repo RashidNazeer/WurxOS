@@ -668,7 +668,7 @@ async function overlayAttendanceIncentives(admin: any, rows: any[], month: strin
 // wrong about someone's pay.
 //
 // DELIBERATELY NOT a fourth hand-written copy of the formula. The gate, the
-// clamp and the FX conversion live once, in public._commission_state, and this
+// clamp and the FX conversion live once, in public.commission_line_state, and this
 // calls it — one lookup per distinct (brand, percentage) pair. The attendance
 // overlay above is a hand-maintained mirror and has already drifted from its
 // JS twin; this one cannot drift because there is nothing here to drift.
@@ -685,14 +685,18 @@ async function overlayCommissionIncentives(admin: any, rows: any[], month: strin
     if (r?.payout_cleared) continue;
     for (const it of [...(r.incentives || []), ...(r.bonuses || [])]) {
       if (it?.source !== 'commission_tier' || !it.brandId) continue;
-      const pct = Number(it.commissionPct) || 0;
-      wanted.set(`${it.brandId}|${pct}`, { brandId: it.brandId, pct });
+      const key = [it.brandId, it.targetValue, it.achievedValue, it.commissionPct].join('|');
+      wanted.set(key, { brandId: it.brandId,
+        benchmark: Number(it.targetValue) || 0,
+        achieved: Number(it.achievedValue) || 0,
+        pct: Number(it.commissionPct) || 0 });
     }
   }
   const state = new Map<string, any>();
   try {
-    for (const [key, { brandId, pct }] of wanted) {
-      const { data, error } = await admin.rpc('_commission_state', { p_brand: brandId, p_month: month, p_pct: pct });
+    for (const [key, { brandId, benchmark, achieved, pct }] of wanted) {
+      const { data, error } = await admin.rpc('commission_line_state', {
+        p_brand: brandId, p_month: month, p_benchmark: benchmark, p_achieved: achieved, p_pct: pct });
       if (error) throw error;
       if (data) state.set(key, data);
     }
@@ -703,7 +707,7 @@ async function overlayCommissionIncentives(admin: any, rows: any[], month: strin
   }
   const patch = (it: any) => {
     if (!it || it.source !== 'commission_tier' || !it.brandId) return it;
-    const s = state.get(`${it.brandId}|${Number(it.commissionPct) || 0}`);
+    const s = state.get([it.brandId, it.targetValue, it.achievedValue, it.commissionPct].join('|'));
     return s ? { ...it, ...s } : it;
   };
   return list.map((r) => {

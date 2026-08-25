@@ -64,21 +64,20 @@ for (const month of months) {
     const incHas = items.length >= 1;
     const monthClosed = month < khiNow;
     const paid = ir?.payout_cleared === true;
-    // Commission items (mig 333) are the second derived source whose `completed`
+    // Commission items (mig 336) are the second derived source whose `completed`
     // is false at rest, so — like attendance — reading the stored value here
-    // would report a divergence that is not real. No month-close gate on this
-    // one: crossing the brand's GMV goal is the entire condition.
-    const commBrands = [...new Set(items
-      .filter((it) => !paid && it.source === 'commission_tier' && it.brandId)
-      .map((it) => it.brandId))];
-    const commHit = new Map();
-    for (const bid of commBrands) {
-      const { data: hit } = await sb.rpc('commission_goal_hit', { p_brand: bid, p_month: month });
-      commHit.set(bid, hit === true);
-    }
+    // would report a divergence that is not real. Unlike attendance there is no
+    // month-close gate, and unlike migs 333-335 it needs no lookup: the
+    // benchmark and achieved are on the item. Must equal perf_incentives_score's
+    // branch and incentivesApi.commissionCompleted — benchmark > 0 AND
+    // achieved >= benchmark, so a blank benchmark never counts.
+    const commDone = (it) => {
+      const b = Number(it.targetValue) || 0;
+      return b > 0 && (Number(it.achievedValue) || 0) >= b;
+    };
     const doneCount = items.filter((it) => {
       if (!paid && it.source === 'attendance')      return monthClosed && attP >= 90;
-      if (!paid && it.source === 'commission_tier') return commHit.get(it.brandId) === true;
+      if (!paid && it.source === 'commission_tier') return commDone(it);
       return !!it.completed;
     }).length;
     const incVal = incHas ? R((doneCount / items.length) * 100) : null;

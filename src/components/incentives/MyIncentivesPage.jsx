@@ -101,7 +101,7 @@ function EditProgressRow({ item, cat, onChange, month }) {
           </div>
         </div>
         <div className="col-6">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAuto && <span className="text-muted"> (auto{isGmvMax ? ' · Brand Analytics' : ''})</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAuto && <span className="text-muted"> (auto{isGmvMax ? ' · Brand Analytics' : isComm ? ' · set by your Operations Lead' : ''})</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
               onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
@@ -169,7 +169,10 @@ function EditProgressModal({ record, onClose, onSaved }) {
       const mapItem = (it, orig) => {
         const o = orig.get(it.id) || {};
         const isAtt = o.source === 'attendance';
-        const isAuto = isAtt || o.source === 'gmv_max';
+        // commission_tier belongs here too: its benchmark and achieved are set by
+        // an OL, so an APC/TL progress save must write back what was already
+        // there rather than whatever arrived in the payload.
+        const isAuto = isAtt || o.source === 'gmv_max' || o.source === 'commission_tier';
         return {
           id: it.id, text: o.text, amount: o.amount,
           targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
@@ -357,7 +360,7 @@ export default function IncentivesPage() {
                   </div>
                 </div>
                 <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>
-                  * Most items auto-complete at ≥90% progress. A Commission Based Tier line is the exception — it pays only once the brand actually reaches its GMV goal. Final salary is verified by the boss.
+                  * Most items auto-complete at ≥90% progress. A Commission Based Tier line is the exception — it pays a percentage of whatever the brand earns above its benchmark, and nothing at or below it. Final salary is verified by the boss.
                 </p>
                 {!myRec.payoutCleared && (
                   <div className="d-flex gap-2">

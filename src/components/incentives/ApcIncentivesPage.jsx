@@ -233,6 +233,8 @@ function EditItemRow({ item, category, onChange, month }) {
               ? <span className="text-muted">(auto · attendance)</span>
               : isGmvMax
                 ? <span className="text-muted">(auto · Brand Analytics)</span>
+              : isComm
+                ? <span className="text-muted">(set by your Operations Lead)</span>
                 : (target ? <span className="text-muted">/ {fmtUnitValue(target, unitSfx)}</span> : '')}
           </label>
           <div className="input-group input-group-sm">
@@ -317,7 +319,10 @@ function EditModal({ record, items, onClose, onSaved }) {
         incentives: editItems.incentives.map(i => {
           const o = origInc.get(i.id) || {};
           const isAtt = o.source === 'attendance';
-          const isAuto = isAtt || o.source === 'gmv_max';
+          // commission_tier belongs here too: its benchmark and achieved are set by
+          // an OL, so an APC/TL progress save must write back what was already
+          // there rather than whatever arrived in the payload.
+          const isAuto = isAtt || o.source === 'gmv_max' || o.source === 'commission_tier';
           return {
             id: i.id, text: o.text, amount: o.amount,
             targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
@@ -338,7 +343,10 @@ function EditModal({ record, items, onClose, onSaved }) {
         bonuses: editItems.bonuses.map(b => {
           const o = origBon.get(b.id) || {};
           const isAtt = o.source === 'attendance';
-          const isAuto = isAtt || o.source === 'gmv_max';
+          // commission_tier belongs here too: its benchmark and achieved are set by
+          // an OL, so an APC/TL progress save must write back what was already
+          // there rather than whatever arrived in the payload.
+          const isAuto = isAtt || o.source === 'gmv_max' || o.source === 'commission_tier';
           return {
             id: b.id, text: o.text, amount: o.amount,
             targetValue:   isAtt ? 100 : (Number(o.targetValue) || 0),
@@ -659,7 +667,7 @@ export default function ApcIncentivesPage() {
             </div>
 
             <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>
-              * Most items count as completed at ≥90% of the target. A Commission Based Tier line is the exception — it pays only once the brand actually reaches its GMV goal. Final salary is subject to TL verification.
+              * Most items count as completed at ≥90% of the target. A Commission Based Tier line is the exception — it pays a percentage of whatever the brand earns above its benchmark, and nothing at or below it. Final salary is subject to TL verification.
             </p>
 
             {/* Action buttons */}

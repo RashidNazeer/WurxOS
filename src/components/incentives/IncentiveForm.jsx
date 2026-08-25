@@ -56,7 +56,7 @@ const SOURCE_LABELS = {
   attendance:       'Auto — monthly attendance %',
   ol_brands:        'Auto — OL brand roll-up %',
   gmv_max:          "Auto — brand's GMV in Brand Analytics",
-  commission_tier:  'Commission Based Tier — % of the brand’s GMV',
+  commission_tier:  'Commission Based Tier — % of GMV above a benchmark',
 };
 // Brand-linked rows own the two brand sources; "Other" rows can't have them
 // (no brand to resolve) but own the two person-level ones.
@@ -110,19 +110,26 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
       if (!Number(item.targetValue)) onChange(item.id, 'targetValue', 70);
       onChange(item.id, 'suffix', '%');
     } else if (next === 'commission_tier') {
-      // Target IS the brand's monthly GMV goal and Achieved IS its GMV, both
-      // read from Brand Analytics — nothing here is typed. Pin the unit to the
-      // brand's currency so the two figures read correctly before the first
-      // overlay lands.
+      // The benchmark and achieved are money in the BRAND's currency, so pin
+      // the unit to it rather than leaving a bare number.
       onChange(item.id, 'suffix', currencySymbol(brandCurrency));
     }
   }
 
-  // Everything on a commission line except the percentage is computed, so the
-  // whole row locks — including Compensation, which is the derived money.
-  const lockStyle = (isAtt || isComm) ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
+  const lockStyle = isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
   const pct = item.commissionPct ?? '';
   const pctOverAllocated = Number(pct) > 100;
+
+  // The commission arithmetic, shown live as it is typed. Mirrors
+  // incentivesApi.commissionExcess/commissionEarnedRaw — including the rule
+  // that a benchmark of zero yields nothing, because "achieved minus zero" is
+  // the whole achieved figure and that is the behaviour this model replaced.
+  const sym         = isComm ? currencySymbol(brandCurrency) : '';
+  const benchmark   = Number(item.targetValue) || 0;
+  const achieved    = Number(item.achievedValue) || 0;
+  const excess      = benchmark > 0 ? Math.max(achieved - benchmark, 0) : 0;
+  const pctClamped  = Math.min(Math.max(Number(pct) || 0, 0), 100);
+  const earnedRaw   = excess * (pctClamped / 100);
 
   return (
     <div className="rounded-3 p-2 mb-2" style={{ background: isAtt ? '#eff6ff' : '#f8f9fa', border: `1px solid ${isAtt ? '#bfdbfe' : '#e9ecef'}` }}>
@@ -187,55 +194,101 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
       )}
       {isComm && (
         <div className="rounded-3 p-2 mb-2" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-          <div style={{ fontSize: '0.68rem', color: '#166534', marginBottom: 6 }}>
+          <div style={{ fontSize: '0.68rem', color: '#166534', marginBottom: 8 }}>
             <i className="bi bi-percent me-1" />
-            Pays this person a share of the brand&apos;s GMV, but <strong>only once the
-            brand&apos;s monthly GMV goal in Brand Analytics is reached</strong> — below the
-            goal it stays at zero. After that it recalculates every day as the APC
-            enters GMV at clock-in. Target, Achieved and Compensation are all read
-            from Brand Analytics; the percentage below is the only thing you set.
+            Pays a percentage of whatever this brand earns <strong>above the benchmark</strong> —
+            not of the whole figure. All three numbers are yours to set, and only an
+            Operations Lead can change them afterwards.
           </div>
-          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600 }}>
-            This person&apos;s share of GMV
-          </label>
-          <div className="input-group input-group-sm" style={{ maxWidth: 200 }}>
-            <input
-              type="number"
-              className="form-control"
-              placeholder="e.g. 1.5"
-              min="0" max="100" step="0.01"
-              value={pct}
-              onChange={e => onChange(item.id, 'commissionPct', e.target.value)}
-              style={pctOverAllocated ? { borderColor: '#dc2626' } : undefined}
-            />
-            <span className="input-group-text" style={{ fontSize: '0.7rem' }}>% of GMV</span>
+          <div className="d-flex gap-2 flex-wrap">
+            <div style={{ flex: '1 1 120px', minWidth: 110 }}>
+              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
+                GMV Benchmark
+              </label>
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sym}</span>
+                <input type="number" className="form-control" placeholder="e.g. 1000" min="0" step="0.01"
+                  value={item.targetValue ?? ''}
+                  onChange={e => onChange(item.id, 'targetValue', e.target.value)}
+                  style={!(benchmark > 0) ? { borderColor: '#f59e0b' } : undefined} />
+              </div>
+            </div>
+            <div style={{ flex: '1 1 120px', minWidth: 110 }}>
+              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
+                Achieved
+              </label>
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sym}</span>
+                <input type="number" className="form-control" placeholder="e.g. 1200" min="0" step="0.01"
+                  value={item.achievedValue ?? ''}
+                  onChange={e => onChange(item.id, 'achievedValue', e.target.value)} />
+              </div>
+            </div>
+            <div style={{ flex: '0 1 110px', minWidth: 100 }}>
+              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
+                Commission
+              </label>
+              <div className="input-group input-group-sm">
+                <input type="number" className="form-control" placeholder="0.5" min="0" max="100" step="0.01"
+                  value={pct}
+                  onChange={e => onChange(item.id, 'commissionPct', e.target.value)}
+                  style={pctOverAllocated ? { borderColor: '#dc2626' } : undefined} />
+                <span className="input-group-text" style={{ fontSize: '0.7rem' }}>%</span>
+              </div>
+            </div>
           </div>
+
+          {/* Show the arithmetic rather than just the answer — the payout is
+              three numbers and an exchange rate deep, and an OL setting it
+              should be able to see where the figure came from. */}
+          <div style={{ fontSize: '0.66rem', color: '#166534', marginTop: 8, borderTop: '1px dashed #bbf7d0', paddingTop: 6 }}>
+            {!(benchmark > 0) ? (
+              <span style={{ color: '#92400e' }}>
+                <i className="bi bi-exclamation-triangle me-1" />
+                <strong>Set a benchmark above zero.</strong> Without one there is nothing to
+                measure the excess against, so this line pays nothing.
+              </span>
+            ) : !Number(pct) ? (
+              <span style={{ color: '#92400e' }}>
+                <i className="bi bi-exclamation-triangle me-1" />
+                No commission percentage set — this line will pay nothing.
+              </span>
+            ) : excess <= 0 ? (
+              <>Achieved is at or below the benchmark, so there is no excess yet and this
+                line pays nothing. It starts paying above {sym}{benchmark.toLocaleString()}.</>
+            ) : (
+              <>
+                {sym}{achieved.toLocaleString()} − {sym}{benchmark.toLocaleString()} = <strong>{sym}{excess.toLocaleString()}</strong> excess.{' '}
+                {pctClamped}% of that is <strong>{sym}{earnedRaw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>,
+                converted to PKR at the rate the Boss sets in Settings.
+              </>
+            )}
+          </div>
+
           {pctOverAllocated && (
             <div style={{ fontSize: '0.65rem', color: '#b91c1c', marginTop: 4 }}>
               <i className="bi bi-exclamation-triangle-fill me-1" />
-              Over 100% of the brand&apos;s GMV. It will be saved as 100%.
-            </div>
-          )}
-          {!pctOverAllocated && !Number(pct) && (
-            <div style={{ fontSize: '0.65rem', color: '#92400e', marginTop: 4 }}>
-              <i className="bi bi-exclamation-triangle me-1" />
-              No percentage set — this line will pay nothing.
+              Over 100%. It will be saved as 100%.
             </div>
           )}
           {/* Nothing in the data model knows about sibling lines: each person's
-              items are independent JSONB, so three people can each be given 3%
-              of the same brand and nothing would say so until payday. */}
+              items are independent JSONB, so several people can each be given a
+              cut of the same brand and nothing would say so until payday. */}
           {othersPct > 0 && (
             <div style={{ fontSize: '0.65rem', color: '#6c757d', marginTop: 4 }}>
               <i className="bi bi-people me-1" />
-              {othersPct}% of this brand&apos;s GMV is already promised elsewhere this month
-              {Number(pct) > 0 && <> — <strong>{Math.round((othersPct + Number(pct)) * 100) / 100}% in total</strong> with this line</>}.
+              Other commission lines on this brand this month total {othersPct}%
+              {Number(pct) > 0 && <> — <strong>{Math.round((othersPct + Number(pct)) * 100) / 100}% with this one</strong></>}.
+              Each has its own benchmark, so this is a rough guide, not a total.
             </div>
           )}
         </div>
       )}
 
-      {/* Target + Compensation on same row */}
+      {/* Target + Compensation on same row. A commission line sets its own
+          benchmark and achieved above, and its money is calculated, so none of
+          these three inputs apply to it. */}
+      {!isComm && (
       <div className="d-flex gap-2">
         <div className="flex-grow-1">
           <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
@@ -291,6 +344,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
