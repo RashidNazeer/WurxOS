@@ -78,7 +78,12 @@ export default function PayoutRatesSection() {
         setOk(`${code} rate cleared for ${getMonthLabel(month)}.`);
       } else {
         await setPayoutFxRate(month, code, v);
-        setSaved((s) => ({ ...s, [code]: String(Number(v)) }));
+        // Canonicalise BOTH sides. The dirty check compares them as strings, so
+        // storing String(Number(v)) while leaving the typed "279.50" in the box
+        // would leave a just-saved rate showing as unsaved forever.
+        const canon = String(Number(v));
+        setSaved((s) => ({ ...s, [code]: canon }));
+        setRates((r) => ({ ...r, [code]: canon }));
         setOk(`${code} → PKR set to ${Number(v).toLocaleString()} for ${getMonthLabel(month)}.`);
       }
       setTimeout(() => setOk(''), 3500);
@@ -124,6 +129,13 @@ export default function PayoutRatesSection() {
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
           <span className="wx-spinner" /> Loading…
         </div>
+      ) : err ? (
+        // Without this, a failed load falls through to the empty-list branch
+        // and reports "every brand bills in PKR" — an affirmative, wrong answer
+        // to a question that was never actually answered.
+        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+          Could not load the rates. The error is shown above.
+        </div>
       ) : currencies.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
           Every active brand already bills in PKR, so there is nothing to convert.
@@ -165,7 +177,9 @@ export default function PayoutRatesSection() {
                     disabled={!dirty || savingCur === code}
                     onClick={() => save(code)}
                   >
-                    {savingCur === code ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+                    {/* "Saved" would be a lie on a row that has never had a
+                        rate — nothing is saved, the box is simply empty. */}
+                    {savingCur === code ? 'Saving…' : dirty ? 'Save' : unset ? '—' : 'Saved'}
                   </button>
                   {unset && (
                     <span style={{ fontSize: 11, color: 'var(--warning, #fd7e14)', fontWeight: 600 }}>

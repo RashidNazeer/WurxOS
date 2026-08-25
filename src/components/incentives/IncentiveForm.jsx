@@ -67,14 +67,17 @@ const sourceOptionsFor = (hideToggles, current) => {
   return opts;
 };
 
-// Percentage of this brand already promised to OTHER people this month.
-// Excludes the person being edited (and this very line), so the number reads
-// as "on top of what you are about to set".
+// Percentage of this brand already promised across everyone this month, not
+// counting the line being edited — so it reads as "on top of what you are about
+// to set". Includes the same person's OTHER lines on the brand, because two
+// lines on one brand stack up exactly like two people do.
+// eslint-disable-next-line no-unused-vars
 function otherCommissionPct(commAlloc, brandId, targetId, itemId) {
   const rows = (commAlloc && commAlloc.get(brandId)) || [];
   return rows
-    .filter((r) => !(r.userId === targetId && r.itemId === itemId))
-    .filter((r) => r.userId !== targetId)
+    // Count this person's OTHER lines on the brand too — two lines on one
+    // brand for the same person stack up just the same. Exclude only THIS line.
+    .filter((r) => r.itemId !== itemId)
     .reduce((sum, r) => sum + (Number(r.pct) || 0), 0);
 }
 
@@ -210,7 +213,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           {pctOverAllocated && (
             <div style={{ fontSize: '0.65rem', color: '#b91c1c', marginTop: 4 }}>
               <i className="bi bi-exclamation-triangle-fill me-1" />
-              Over 100% of the brand&apos;s GMV. Saved as 100% at payout.
+              Over 100% of the brand&apos;s GMV. It will be saved as 100%.
             </div>
           )}
           {!pctOverAllocated && !Number(pct) && (
@@ -225,7 +228,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           {othersPct > 0 && (
             <div style={{ fontSize: '0.65rem', color: '#6c757d', marginTop: 4 }}>
               <i className="bi bi-people me-1" />
-              {othersPct}% of this brand&apos;s GMV is already promised to other people this month
+              {othersPct}% of this brand&apos;s GMV is already promised elsewhere this month
               {Number(pct) > 0 && <> — <strong>{Math.round((othersPct + Number(pct)) * 100) / 100}% in total</strong> with this line</>}.
             </div>
           )}
@@ -372,7 +375,7 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
             <div className="fw-semibold mb-2" style={{ fontSize: '0.7rem', color: '#b45309' }}>
               <i className="bi bi-exclamation-triangle me-1" />Linked to a brand no longer assigned{orphanItems[0]?.brandName ? ` (${orphanItems.map(o => o.brandName).filter((v, i, a) => v && a.indexOf(v) === i).join(', ')})` : ''} — remove, or it drops on the next carry-forward
             </div>
-            {orphanItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} hideToggles />)}
+            {orphanItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} hideToggles brandCurrency={item.brandCurrency} />)}
           </div>
         )}
 
@@ -568,9 +571,13 @@ export default function IncentiveForm() {
       ...(i.source ? { source: i.source } : {}),
       ...(i.commissionPct != null ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
     });
+    // Templates carry no brand link, and a commission line without one can
+    // never pay. New templates no longer store them at all; this also drops any
+    // that a template saved before that change is still carrying.
+    const templatable = (i) => i && i.source !== 'commission_tier';
     setBasicSalary(String(tplData.basicSalary || ''));
-    setIncentives((tplData.incentives || []).map(fromTemplate));
-    setBonuses((tplData.bonuses || []).map(fromTemplate));
+    setIncentives((tplData.incentives || []).filter(templatable).map(fromTemplate));
+    setBonuses((tplData.bonuses || []).filter(templatable).map(fromTemplate));
     setCarryoverInfo({ source: 'template' });
   }
 

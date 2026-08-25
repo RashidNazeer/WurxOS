@@ -659,7 +659,7 @@ export default function ApcIncentivesPage() {
             </div>
 
             <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>
-              * Items are counted as completed when you achieve ≥90% of the target. Final salary is subject to TL verification.
+              * Most items count as completed at ≥90% of the target. A Commission Based Tier line is the exception — it pays only once the brand actually reaches its GMV goal. Final salary is subject to TL verification.
             </p>
 
             {/* Action buttons */}

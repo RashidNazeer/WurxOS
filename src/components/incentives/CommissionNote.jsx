@@ -1,4 +1,5 @@
 import { currencySymbol } from '../../utils/currencies';
+import { getMonthLabel } from '../../lib/incentivesApi';
 
 // The one-line explanation under a Commission Based Tier item (mig 333).
 //
@@ -12,7 +13,10 @@ import { currencySymbol } from '../../utils/currencies';
 // `_commissionInfo` is attached by applyCommissionAutofill at read time and
 // never persisted; when it is absent the overlay has not run (a paid row reads
 // its frozen snapshot instead), so we say nothing rather than guess.
-export default function CommissionNote({ item, month }) {
+export default function CommissionNote({ item, month: monthKey }) {
+  // monthKey is the raw 'YYYY-MM' column value; every other date on these
+  // pages goes through getMonthLabel, so match them rather than printing 2026-08.
+  const month = monthKey ? getMonthLabel(monthKey) : null;
   const pct  = Number(item?.commissionPct) || 0;
   const info = item?._commissionInfo || null;
 
@@ -64,13 +68,14 @@ export default function CommissionNote({ item, month }) {
   }
 
   const inBrandCurrency = (Number(info.achieved) || 0) * (Math.min(Math.max(pct, 0), 100) / 100);
-  const stale = info.fxMonth && month && info.fxMonth !== month;
+  // Compare the RAW keys — `month` is now a display label and would never match.
+  const stale = info.fxMonth && monthKey && info.fxMonth !== monthKey;
   return (
     <>
       <strong>Goal reached</strong> — {sym}{n(info.achieved)} against {sym}{n(goal)}. {pct}% of that
       is {sym}{n(inBrandCurrency)}, paid as <strong>PKR {n(Math.round(inBrandCurrency * info.fxRate))}</strong>{' '}
       at {n(info.fxRate)}/{info.currency}
-      {stale && <> (carried from the {info.fxMonth} rate — no {month} rate set yet)</>}. Updates daily
+      {stale && <> (carried from the {getMonthLabel(info.fxMonth)} rate — no {month} rate set yet)</>}. Updates daily
       as GMV grows, and locks when the payout is cleared.
     </>
   );

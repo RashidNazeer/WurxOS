@@ -1012,20 +1012,28 @@ export async function getIncentivesTemplate() {
 }
 
 export async function setIncentivesTemplate({ basicSalary, incentives: inc, bonuses: bon, savedByName }) {
-  // NOTE: this rebuilds each item from a fixed field list, so anything not named
-  // here is dropped. commissionPct has to be one of them or a templated
-  // commission line comes back as "0% of GMV" and pays nothing.
+  // A template is the DEFAULT plan applied to whoever is being set up next, so
+  // it deliberately carries no brand link. A commission line is meaningless
+  // without one — the brand IS the whole calculation — so it is dropped here
+  // rather than templated into a line that shows a percentage and can never
+  // pay. (Keeping commissionPct while losing brandId is the worst of both: it
+  // looks configured and is permanently dead.)
+  const templatable = (i) => i && i.source !== 'commission_tier';
+  // NOTE: this rebuilds each item from a fixed field list, so anything not
+  // named here is dropped.
   const mapTemplateItem = (i) => ({
-    id: i.id, text: i.text, amount: Number(i.amount) || 0,
+    id: i.id, text: i.text,
+    // A derived source's amount is a live overlaid figure, not something a
+    // person typed. It must never be captured into a saved template.
+    amount: i.source ? 0 : (Number(i.amount) || 0),
     targetValue: Number(i.targetValue) || 0,
     suffix: itemSuffix(i),
     ...(i.source ? { source: i.source } : {}),
-    ...(i.commissionPct != null && i.commissionPct !== '' ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
   });
   const value = {
     basicSalary: Number(basicSalary) || 0,
-    incentives:  (inc || []).map(mapTemplateItem),
-    bonuses:     (bon || []).map(mapTemplateItem),
+    incentives:  (inc || []).filter(templatable).map(mapTemplateItem),
+    bonuses:     (bon || []).filter(templatable).map(mapTemplateItem),
     savedByName: savedByName || '',
     savedAt:     new Date().toISOString(),
   };

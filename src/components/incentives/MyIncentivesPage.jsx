@@ -357,7 +357,7 @@ export default function IncentivesPage() {
                   </div>
                 </div>
                 <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>
-                  * Items at ≥90% progress are auto-completed. Final salary is verified by the boss.
+                  * Most items auto-complete at ≥90% progress. A Commission Based Tier line is the exception — it pays only once the brand actually reaches its GMV goal. Final salary is verified by the boss.
                 </p>
                 {!myRec.payoutCleared && (
                   <div className="d-flex gap-2">
