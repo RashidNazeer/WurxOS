@@ -261,7 +261,7 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
   // from what is being TYPED, so the badge tracks the edit rather than lagging
   // a save behind the overlay.
   const done     = isComm
-    ? (Number(target) > 0 && Number(achieved) >= Number(target))
+    ? (Math.max(Number(target) || 0, 0) > 0 ? Number(achieved) >= Number(target) : Number(achieved) > 0)
     : isOlBrands
       ? (Number(achieved) >= (Number(target) || 70))
       : autoComplete({ ...item, achievedValue: achieved, targetValue: target });

@@ -30,29 +30,31 @@ export default function CommissionNote({ item, month: monthKey }) {
   const excess    = commissionExcess(item);
   const earnedRaw = commissionEarnedRaw(item);
 
-  // A benchmark of zero is not "a benchmark of zero" — it is almost always a
-  // field nobody filled in, and paying on `achieved - 0` would be the entire
-  // achieved figure. Say so instead of quietly showing nothing.
-  if (!(benchmark > 0)) {
-    return (
-      <>
-        <strong>No GMV benchmark set</strong> on this line, so there is nothing to measure the
-        excess against and it pays nothing. An Operations Lead sets it in the plan editor.
-      </>
-    );
-  }
+  // A blank benchmark is a real mode, not a missing field: with nothing to
+  // clear, the commission is paid on everything achieved. Say which mode the
+  // line is in, because "5% of $100" and "5% of the $200 above $1,000" are very
+  // different promises and the line itself does not look any different.
   if (!pct) {
     return <>No commission percentage set on this line, so it pays nothing.</>;
   }
 
   if (excess <= 0) {
-    return (
+    // With no benchmark, "no excess" can only mean nothing has been achieved —
+    // saying "above its $0 benchmark" there would be nonsense.
+    return benchmark > 0 ? (
       <>
         Pays {pct}% of whatever this brand earns above its {sym}{n(benchmark)} benchmark.
         Achieved so far is {sym}{n(achieved)}, so there is no excess yet and it stands at zero.
       </>
+    ) : (
+      <>Pays {pct}% of everything this brand achieves, with no benchmark to clear first.
+        Nothing recorded yet, so it stands at zero.</>
     );
   }
+
+  const basis = benchmark > 0
+    ? <>{sym}{n(achieved)} − {sym}{n(benchmark)} = <strong>{sym}{n(excess)}</strong> above the benchmark</>
+    : <><strong>No benchmark</strong>, so this pays on the whole {sym}{n(achieved)} achieved</>;
 
   // Earning, but no rate to convert with. The payout RPC refuses in this state
   // rather than freezing real earnings at zero, so say so plainly here instead
@@ -60,8 +62,7 @@ export default function CommissionNote({ item, month: monthKey }) {
   if (!info || info.fxRate == null) {
     return (
       <>
-        {sym}{n(achieved)} − {sym}{n(benchmark)} = <strong>{sym}{n(excess)}</strong> above the
-        benchmark, and {pct}% of that is <strong>{sym}{n(earnedRaw)}</strong> — but there is no{' '}
+        {basis}, and {pct}% of that is <strong>{sym}{n(earnedRaw)}</strong> — but there is no{' '}
         {info?.currency || 'currency'}&nbsp;&rarr;&nbsp;PKR rate for {month || 'this month'} yet, so
         it cannot be converted. A Boss sets it under <strong>Settings &rarr; Payout Rates</strong>.
       </>
@@ -71,8 +72,7 @@ export default function CommissionNote({ item, month: monthKey }) {
   const stale = info.fxMonth && monthKey && info.fxMonth !== monthKey;
   return (
     <>
-      {sym}{n(achieved)} − {sym}{n(benchmark)} = <strong>{sym}{n(excess)}</strong> above the
-      benchmark. {pct}% of that is {sym}{n(earnedRaw)}, paid as{' '}
+      {basis}. {pct}% of that is {sym}{n(earnedRaw)}, paid as{' '}
       <strong>PKR {n(Math.round(earnedRaw * info.fxRate))}</strong> at {n(info.fxRate)}/{info.currency}
       {stale && <> (carried from the {getMonthLabel(info.fxMonth)} rate — no {month} rate set yet)</>}.
       Locks when the payout is cleared.

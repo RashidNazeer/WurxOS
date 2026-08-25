@@ -122,12 +122,12 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
 
   // The commission arithmetic, shown live as it is typed. Mirrors
   // incentivesApi.commissionExcess/commissionEarnedRaw — including the rule
-  // that a benchmark of zero yields nothing, because "achieved minus zero" is
-  // the whole achieved figure and that is the behaviour this model replaced.
+  // that a blank benchmark means the commission is paid on EVERYTHING achieved,
+  // since "achieved minus zero" is simply the whole achieved figure.
   const sym         = isComm ? currencySymbol(brandCurrency) : '';
-  const benchmark   = Number(item.targetValue) || 0;
+  const benchmark   = Math.max(Number(item.targetValue) || 0, 0);
   const achieved    = Number(item.achievedValue) || 0;
-  const excess      = benchmark > 0 ? Math.max(achieved - benchmark, 0) : 0;
+  const excess      = Math.max(achieved - benchmark, 0);
   const pctClamped  = Math.min(Math.max(Number(pct) || 0, 0), 100);
   const earnedRaw   = excess * (pctClamped / 100);
 
@@ -197,20 +197,20 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           <div style={{ fontSize: '0.68rem', color: '#166534', marginBottom: 8 }}>
             <i className="bi bi-percent me-1" />
             Pays a percentage of whatever this brand earns <strong>above the benchmark</strong> —
-            not of the whole figure. All three numbers are yours to set, and only an
-            Operations Lead can change them afterwards.
+            leave the benchmark blank to pay on the whole figure. All three numbers are
+            yours to set, and only an Operations Lead can change them afterwards.
           </div>
           <div className="d-flex gap-2 flex-wrap">
             <div style={{ flex: '1 1 120px', minWidth: 110 }}>
               <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
-                GMV Benchmark
+                GMV Benchmark <span style={{ fontWeight: 400 }}>(blank = all)</span>
               </label>
               <div className="input-group input-group-sm">
                 <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sym}</span>
                 <input type="number" className="form-control" placeholder="e.g. 1000" min="0" step="0.01"
                   value={item.targetValue ?? ''}
                   onChange={e => onChange(item.id, 'targetValue', e.target.value)}
-                  style={!(benchmark > 0) ? { borderColor: '#f59e0b' } : undefined} />
+                  />
               </div>
             </div>
             <div style={{ flex: '1 1 120px', minWidth: 110 }}>
@@ -242,17 +242,22 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               three numbers and an exchange rate deep, and an OL setting it
               should be able to see where the figure came from. */}
           <div style={{ fontSize: '0.66rem', color: '#166534', marginTop: 8, borderTop: '1px dashed #bbf7d0', paddingTop: 6 }}>
-            {!(benchmark > 0) ? (
-              <span style={{ color: '#92400e' }}>
-                <i className="bi bi-exclamation-triangle me-1" />
-                <strong>Set a benchmark above zero.</strong> Without one there is nothing to
-                measure the excess against, so this line pays nothing.
-              </span>
-            ) : !Number(pct) ? (
+            {!Number(pct) ? (
               <span style={{ color: '#92400e' }}>
                 <i className="bi bi-exclamation-triangle me-1" />
                 No commission percentage set — this line will pay nothing.
               </span>
+            ) : benchmark <= 0 ? (
+              // A blank benchmark is a real mode — commission on everything —
+              // so it is stated, not warned about. Stating the actual figure is
+              // what makes a genuinely forgotten benchmark obvious: the OL sees
+              // the whole achieved amount being paid on, not a silent zero.
+              <>
+                <strong>No benchmark</strong>, so this pays on the whole achieved figure.{' '}
+                {pctClamped}% of {sym}{achieved.toLocaleString()} is{' '}
+                <strong>{sym}{earnedRaw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>,
+                converted to PKR at the rate the Boss sets in Settings.
+              </>
             ) : excess <= 0 ? (
               <>Achieved is at or below the benchmark, so there is no excess yet and this
                 line pays nothing. It starts paying above {sym}{benchmark.toLocaleString()}.</>

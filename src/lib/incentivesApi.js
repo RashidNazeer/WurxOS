@@ -255,25 +255,33 @@ export async function fetchCommissionFxMap(month) {
   return m;
 }
 
-// A benchmark of ZERO pays nothing, and that is deliberate rather than an
-// oversight: `achieved - 0` is the whole achieved figure, which is exactly the
-// behaviour this model replaced — and it would arrive silently, because an
-// empty numeric input coerces to 0 long before it reaches here, so "unset" and
-// "zero" are the same value. Must read identically to commission_line_state
-// and to perf_incentives_score's branch (mig 336).
-export function commissionBenchmark(item) { return Number(item?.targetValue) || 0; }
+// A benchmark is FLOORED at zero, and zero means "no benchmark": the commission
+// is then a straight percentage of everything achieved. That is a real mode,
+// not a blank field — leaving the box empty is how an OL asks for it.
+//
+// The floor is the one guard kept: `achieved - (-500)` would ADD 500 to the
+// excess and pay on money nobody earned, and no one means a negative benchmark.
+//
+// Must read identically to commission_line_state and to perf_incentives_score's
+// branch (mig 337), and to scripts/composite-parity.mjs.
+export function commissionBenchmark(item) { return Math.max(Number(item?.targetValue) || 0, 0); }
 export function commissionAchieved(item)  { return Number(item?.achievedValue) || 0; }
 
+// NOT decoration: earnedTotal and calcBreakdown sum `amount` ONLY over items
+// where this is true, so a line that pays but is not completed contributes
+// nothing to anyone's pay. The invariant to preserve is therefore "anything
+// paying above zero is completed" — with a benchmark, clearing it is the bar;
+// without one there is no bar, so anything achieved at all counts.
 export function commissionCompleted(item) {
   const b = commissionBenchmark(item);
-  return b > 0 && commissionAchieved(item) >= b;
+  const a = commissionAchieved(item);
+  return b > 0 ? a >= b : a > 0;
 }
 
-// The part of `achieved` the commission is actually paid on.
+// The part of `achieved` the commission is actually paid on. With no benchmark
+// that is the whole of it.
 export function commissionExcess(item) {
-  const b = commissionBenchmark(item);
-  if (!(b > 0)) return 0;
-  return Math.max(commissionAchieved(item) - b, 0);
+  return Math.max(commissionAchieved(item) - commissionBenchmark(item), 0);
 }
 
 // In the BRAND's currency, before conversion.

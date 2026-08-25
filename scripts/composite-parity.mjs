@@ -69,11 +69,12 @@ for (const month of months) {
     // would report a divergence that is not real. Unlike attendance there is no
     // month-close gate, and unlike migs 333-335 it needs no lookup: the
     // benchmark and achieved are on the item. Must equal perf_incentives_score's
-    // branch and incentivesApi.commissionCompleted — benchmark > 0 AND
-    // achieved >= benchmark, so a blank benchmark never counts.
+    // branch and incentivesApi.commissionCompleted: with a benchmark, clearing
+    // it is the bar; with none, anything achieved at all counts.
     const commDone = (it) => {
-      const b = Number(it.targetValue) || 0;
-      return b > 0 && (Number(it.achievedValue) || 0) >= b;
+      const b = Math.max(Number(it.targetValue) || 0, 0);
+      const a = Number(it.achievedValue) || 0;
+      return b > 0 ? a >= b : a > 0;
     };
     const doneCount = items.filter((it) => {
       if (!paid && it.source === 'attendance')      return monthClosed && attP >= 90;
