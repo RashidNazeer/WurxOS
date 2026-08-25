@@ -3,7 +3,7 @@ import {
   listMyReviewBrands, fetchTracker, markSent,
   downloadHandlesCsv, creatorKey,
 } from '../../lib/videoReviewFileApi';
-import { buildDueLists, markSentUpdates } from '../../lib/videoReviewQueue';
+import { buildDueLists, markSentUpdates, explainRun, previouslySentLists } from '../../lib/videoReviewQueue';
 
 // ── date helpers (PKT) ──────────────────────────────────────────────
 function pakistanToday() {
@@ -154,7 +154,15 @@ export default function FileMode() {
         if (days.length) creators.push({ creator: c.creator, days });
       }
       const lists = buildDueLists({ creators, startDate: runDate, runDate, tracker, keyOf: (c) => creatorKey(c.creator) });
-      setResult(lists);
+      // Why the run came out the way it did, and — when this day was already
+      // generated — the lists it produced, so they can be fetched again.
+      // "0 · 0 · 0" has now been reported as a counting bug twice when the real
+      // answer was "you already did this day", so the page has to say which.
+      const nameByKey = new Map(creators.map((c) => [creatorKey(c.creator), c.creator]));
+      const why = explainRun({ creators, tracker, runDate, keyOf: (c) => creatorKey(c.creator),
+        isExcluded: (c) => excludeSet.has(creatorKey(c.creator)) });
+      const prev = previouslySentLists({ tracker, runDate, nameFor: (k) => nameByKey.get(k) || k });
+      setResult({ ...lists, why, prev });
     } catch (e) {
       setGenErr(e?.message || 'Something went wrong.');
     } finally {
@@ -336,16 +344,17 @@ export default function FileMode() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 640 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', padding: '5px 11px', borderRadius: 999,
-                  background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)' }} />
-                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: 'var(--success)', letterSpacing: '0.04em' }}>READY</span>
+                  background: totalDue ? 'var(--success-soft)' : 'var(--surface-2)', border: `1px solid ${totalDue ? 'color-mix(in srgb, var(--success) 30%, transparent)' : 'var(--border-default)'}` }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: totalDue ? 'var(--success)' : 'var(--text-muted)' }} />
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: totalDue ? 'var(--success)' : 'var(--text-muted)', letterSpacing: '0.04em' }}>{totalDue ? 'READY' : 'NOTHING DUE'}</span>
                 </span>
                 <h1 style={{ margin: '8px 0 0', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25, color: 'var(--text-primary)' }}>
                   {brandLabel} review lists for {prettyDate(runDate)}
                 </h1>
                 <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
-                  {totalDue} creator{totalDue === 1 ? '' : 's'} due today
-                  {result.blockedToday.length ? ` · ${result.blockedToday.length} already messaged today` : ''}
+                  {totalDue} creator{totalDue === 1 ? '' : 's'} due for {prettyDate(runDate)}
+                  {result.why?.alreadySentForDate?.length ? ` · ${result.why.alreadySentForDate.length} already messaged for this day` : ''}
+                  {result.blockedToday.length ? ` · ${result.blockedToday.length} waiting for tomorrow` : ''}
                 </p>
               </div>
 
@@ -379,6 +388,88 @@ export default function FileMode() {
                   );
                 })}
               </div>
+
+              {/* Why nothing is due. An empty run is a legitimate answer and,
+                  worse, the SAME answer for several unrelated reasons — so it
+                  has to name which one, with the numbers behind it. */}
+              {totalDue === 0 && result.why && (
+                <div style={{ padding: '13px 15px', border: '1px solid var(--border-default)', borderRadius: 12,
+                  background: 'var(--surface-2)', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+                    <i className="bi bi-question-circle me-1" style={{ color: 'var(--accent)' }} />
+                    Why there is nothing to send for {prettyDate(runDate)}
+                  </div>
+                  {result.why.creatorsOnDate === 0 ? (
+                    <>No creator in this file posted a video on {prettyDate(runDate)}, so nobody reached a
+                      1st, 2nd or 3rd video that day.</>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 4 }}>
+                        <strong>{result.why.videosOnDate}</strong> video{result.why.videosOnDate === 1 ? '' : 's'} posted
+                        that day by <strong>{result.why.creatorsOnDate}</strong> creator{result.why.creatorsOnDate === 1 ? '' : 's'}.
+                        Every one of them is accounted for:
+                      </div>
+                      <ul style={{ margin: '0 0 0 2px', paddingLeft: 18 }}>
+                        {result.why.alreadySentForDate.length > 0 && (
+                          <li><strong>{result.why.alreadySentForDate.length}</strong> were already sent their
+                            message for this exact day — you have generated {prettyDate(runDate)} before.</li>
+                        )}
+                        {result.why.pastThirdVideo.length > 0 && (
+                          <li><strong>{result.why.pastThirdVideo.length}</strong> were past their 3rd video, so
+                            they are not owed a review message at all (we only ever send three).</li>
+                        )}
+                        {result.why.sentOnLaterDate.length > 0 && (
+                          <li><strong>{result.why.sentOnLaterDate.length}</strong> have already been messaged on a
+                            LATER date — this run date is behind where the queue has got to.</li>
+                        )}
+                        {result.why.finishedAllThree.length > 0 && (
+                          <li><strong>{result.why.finishedAllThree.length}</strong> have had all three of their
+                            messages already.</li>
+                        )}
+                        {result.why.excluded?.length > 0 && (
+                          <li><strong>{result.why.excluded.length}</strong> are on your exclude list,
+                            so they are never put on a list.</li>
+                        )}
+                        {result.why.blockedBySpacing.length > 0 && (
+                          <li><strong>{result.why.blockedBySpacing.length}</strong> are owed one but already got a
+                            message on this day — one per creator per day, so theirs comes tomorrow.</li>
+                        )}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* A day already generated can be fetched again. Downloading marks
+                  creators sent, which is irreversible, so without this there is
+                  no way back to a CSV you closed by accident. Reconstructed from
+                  the tracker (sentCount IS the milestone that was sent), and
+                  these buttons deliberately do NOT re-mark anything. */}
+              {result.prev && (result.prev.group1.length + result.prev.group2.length + result.prev.group3.length) > 0 && (
+                <div style={{ padding: '13px 15px', border: '1px solid var(--border-subtle)', borderRadius: 12, background: 'var(--surface-1)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
+                    <i className="bi bi-clock-history me-1" style={{ color: 'var(--text-muted)' }} />
+                    Already generated for {prettyDate(runDate)}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 9 }}>
+                    These are the lists this day produced. Downloading them again changes nothing — nobody is
+                    re-marked and nobody advances.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {FILE_DEFS.map((def) => {
+                      const list = applyExclude(result.prev[def.key] || []);
+                      return (
+                        <button key={def.key} className="wx-btn wx-btn-ghost" disabled={!list.length}
+                          onClick={() => downloadHandlesCsv(list, `${brandLabel} - ${def.ord} video review creators (${runDate}).csv`)}
+                          style={{ fontSize: 12.5, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <i className="bi bi-arrow-counterclockwise" />
+                          {def.ord} · {list.length}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div style={{ padding: '11px 14px', border: '1px dashed var(--border-default)', borderRadius: 12, background: 'var(--surface-2)', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <i className="bi bi-info-circle me-1" style={{ color: 'var(--accent)' }} />

@@ -119,3 +119,78 @@ export function markSentUpdates({ creators, group, runDate, startDate, tracker =
   }
   return updates;
 }
+
+// ── Why is a run empty? ─────────────────────────────────────────────
+// "0 · 0 · 0" is a legitimate answer and, worse, it is the answer you get for
+// several completely different reasons. The most common one by far is the least
+// obvious: you already generated this exact day, and downloading a list marks
+// it sent. Twice now that has been reported as a counting bug when the real
+// story was "the work is done" — so the page has to say which reason it is.
+//
+// Pure, like everything else here. `creators` are already clipped to
+// days <= runDate, exactly as buildDueLists receives them.
+export function explainRun({ creators, tracker = new Map(), runDate, keyOf, isExcluded }) {
+  const key = keyOf || defaultKey;
+  const out = {
+    videosOnDate: 0,
+    creatorsOnDate: 0,
+    alreadySentForDate: [],   // we generated this day already — the usual answer
+    sentOnLaterDate: [],      // the run date is BEHIND what has already been sent
+    finishedAllThree: [],     // past their 3 milestones, nothing left to send ever
+    pastThirdVideo: [],       // posted that day, but it was their 4th+ video
+    blockedBySpacing: [],     // owed one, but already messaged on/after runDate
+    excluded: [],             // due, but on the APC's exclude list so never listed
+  };
+  for (const c of creators) {
+    const idxs = [];
+    c.days.forEach((d, i) => { if (d === runDate) idxs.push(i); });
+    if (!idxs.length) continue;                 // did not post on the run date
+    out.videosOnDate += idxs.length;
+    out.creatorsOnDate += 1;
+
+    // The exclude list is applied to the LISTS, so an excluded creator can be
+    // genuinely due and still show nowhere. Without this bucket the panel would
+    // claim everyone is accounted for while quietly omitting them.
+    if (isExcluded && isExcluded(c)) { out.excluded.push(c.creator); continue; }
+
+    const t = tracker.get(key(c));
+    if (t && t.lastSentDate === runDate) { out.alreadySentForDate.push(c.creator); continue; }
+    if (t && cmp(t.lastSentDate, runDate) > 0) { out.sentOnLaterDate.push(c.creator); continue; }
+
+    // Precedence is deliberate: being MESSAGED on the run date outranks being
+    // past the 3rd video. Both can be true at once — a creator whose queue is
+    // catching up can get their 3rd message on a day they posted their 5th —
+    // and "we already messaged them that day" is the truer account of what
+    // happened than "they are past their milestones".
+    // A milestone is one of their first THREE videos ever (index 0,1,2).
+    const hasMilestoneOnDate = idxs.some((i) => i < 3);
+    if (!hasMilestoneOnDate) { out.pastThirdVideo.push(c.creator); continue; }
+
+    const st = creatorState({
+      days: c.days, startDate: runDate, runDate,
+      sentCount: t ? t.sentCount : null,
+      lastSentDate: t ? t.lastSentDate : null,
+    });
+    if (st.due) continue;                        // it IS due — not part of the explanation
+    if (st.blockedToday) out.blockedBySpacing.push(c.creator);
+    else out.finishedAllThree.push(c.creator);
+  }
+  return out;
+}
+
+// Reconstruct the three lists that were generated for `runDate` on an earlier
+// visit, so a day already sent can be downloaded again without touching the
+// tracker. Needs no new storage: after a send, a creator's sentCount IS the
+// milestone number they were sent, and lastSentDate is the day it happened.
+export function previouslySentLists({ tracker = new Map(), runDate, nameFor }) {
+  const group1 = [], group2 = [], group3 = [];
+  for (const [k, t] of tracker) {
+    if (!t || t.lastSentDate !== runDate) continue;
+    const name = (nameFor && nameFor(k)) || k;
+    if (t.sentCount === 1) group1.push(name);
+    else if (t.sentCount === 2) group2.push(name);
+    else if (t.sentCount === 3) group3.push(name);
+  }
+  group1.sort(cmp); group2.sort(cmp); group3.sort(cmp);
+  return { group1, group2, group3 };
+}
