@@ -3,6 +3,9 @@ import { supabase } from './supabase';
 // CLOSED" (the money gate). Do NOT reintroduce a local new Date() month here: it
 // drifts for the first ~5h of every UTC day and at every month boundary.
 import { karachiMonth } from './serverTime';
+// Commission lines measure achieved/target in the BRAND's currency (mig 280),
+// while `amount` stays PKR like every other incentive — see applyCommissionAutofill.
+import { currencySymbol } from '../utils/currencies';
 
 export function currentMonth() { return new Date().toISOString().slice(0, 7); }
 
@@ -65,6 +68,16 @@ function stripAttendanceForSave(items) {
     // ticks it) and the TARGET is real money the OL set — so blank the achieved
     // only and leave both of those alone.
     if (it.source === 'gmv_max')    return { ...it, achievedValue: null };
+    // Commission tier: EVERYTHING except the OL's percentage is derived —
+    // including `amount`, which is the first derived money in this system. None
+    // of it may sit at rest: a mid-month figure baked into the JSONB is what
+    // every non-overlaying consumer (backups, ai-chat, the Performance page)
+    // would then read and quote as pay. The real numbers are written once,
+    // server-side, by _inc_freeze_commission_items at payout.
+    if (it.source === 'commission_tier') {
+      const { _commissionInfo, ...rest } = it;   // eslint-disable-line no-unused-vars
+      return { ...rest, achievedValue: null, targetValue: null, amount: 0, completed: false, completedBy: null };
+    }
     return it;
   });
 }
@@ -209,13 +222,176 @@ export async function applyGmvMaxAutofill(rows, month) {
   });
 }
 
-// All three read-time overlays, in sequence — the single entry point every read
+// ── Commission Based Tier auto-fill (mig 333) ─────────────────────
+// A brand-linked item flagged { source: 'commission_tier' } carries ONE typed
+// number, `commissionPct` — this person's percentage of that brand's GMV. The
+// rest of the line derives from Brand Analytics:
+//
+//   completed = the brand's monthly goal is set, > 0, and achieved has reached it
+//   amount    = achieved x commissionPct% x that month's rate to PKR
+//
+// TWO THINGS ARE DELIBERATELY UNLIKE THE OTHER THREE SOURCES.
+//
+// 1. It writes `amount`. Every existing overlay only fills a progress number
+//    and a human types the money. Here the money IS the derived value, which is
+//    why the payout freeze had to grow a fourth wrapper in BOTH payout paths
+//    and why inc_reset_and_roll has to zero `amount` for this source alone.
+//
+// 2. There is NO month-close money gate. attendance and ol_brands both have one
+//    because those figures can move DOWN during a month, so completing early
+//    would pay on a number that has not settled. Month-to-date GMV only climbs:
+//    once a goal is crossed it stays crossed, and only the amount keeps growing
+//    until a payout freezes it. So this reads 0 until the goal, then tracks
+//    daily — which is what was asked for.
+//
+// The FX rate is per (month, currency) and Boss-set. When one is missing the
+// amount shows 0 and the UI says so loudly; clearing the payout then RAISES
+// rather than freezing a real commission at zero.
+export async function fetchCommissionMap(month) {
+  const { data, error } = await supabase.rpc('commission_tier_map', { p_month: month });
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  (data || []).forEach((r) => m.set(r.brand_id, {
+    achieved: Number(r.achieved) || 0,
+    // NOT coalesced to 0 — "no goal set" has to stay distinguishable from a
+    // goal of zero, or every unconfigured brand starts paying commission.
+    target:   r.target == null ? null : Number(r.target),
+    currency: r.currency || 'USD',
+    fxRate:   r.fx_rate == null ? null : Number(r.fx_rate),
+    fxMonth:  r.fx_month || null,
+  }));
+  return m;
+}
+
+// THE GATE. Must read identically to public.commission_goal_hit (mig 333).
+// Spelled out rather than `achieved >= target` because target is nullable and
+// the whole metrics row is DELETED when its metrics are cleared — and in JS
+// Number(null) >= Number(null) is 0 >= 0, i.e. TRUE. The lazy version pays
+// commission on every brand nobody has configured, while SQL's null >= null
+// says no, so the page and the payout would quietly disagree.
+export function commissionGoalHit(info) {
+  if (!info) return false;
+  const t = info.target;
+  if (t == null || !(Number(t) > 0)) return false;
+  return (Number(info.achieved) || 0) >= Number(t);
+}
+
+export function commissionAmount(info, pct) {
+  if (!commissionGoalHit(info) || info.fxRate == null) return 0;
+  const p = Math.min(Math.max(Number(pct) || 0, 0), 100);   // clamp, as the freeze does
+  return Math.round((Number(info.achieved) || 0) * (p / 100) * Number(info.fxRate));
+}
+
+function _hasCommissionItem(row) {
+  return [...(row?.incentives || []), ...(row?.bonuses || [])]
+    .some((it) => it && it.source === 'commission_tier' && it.brandId);
+}
+
+export async function applyCommissionAutofill(rows, month) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.some((r) => !_isPaid(r) && _hasCommissionItem(r))) return list;
+  let byBrand;
+  try { byBrand = await fetchCommissionMap(month); }
+  // eslint-disable-next-line no-console
+  catch (e) { console.warn('commission autofill skipped:', e.message); return list; }
+  const patchItem = (it) => {
+    if (!it || it.source !== 'commission_tier' || !it.brandId) return it;
+    const info = byBrand.get(it.brandId) || null;
+    const hit  = commissionGoalHit(info);
+    return {
+      ...it,
+      achievedValue: info ? info.achieved : 0,
+      targetValue:   info && info.target != null ? info.target : 0,
+      suffix:        info ? currencySymbol(info.currency) : (it.suffix || ''),
+      completed:     hit,
+      amount:        commissionAmount(info, it.commissionPct),
+      // For the UI only (why it pays 0, which month's rate is in play). Never
+      // reaches the database: stripAttendanceForSave drops it, and every save
+      // funnel rebuilds items from a fixed field list anyway.
+      _commissionInfo: info ? { ...info, hit } : null,
+    };
+  };
+  return list.map((r) => {
+    if (_isPaid(r)) return r;   // frozen at payout — never re-overlay
+    return {
+      ...r,
+      incentives: (r.incentives || []).map(patchItem),
+      bonuses:    (r.bonuses    || []).map(patchItem),
+    };
+  });
+}
+
+// All four read-time overlays, in sequence — the single entry point every read
 // path uses. Order is irrelevant: each only touches its own `source`.
 export async function applyDerivedAutofill(rows, month) {
-  return applyGmvMaxAutofill(
-    await applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month),
+  return applyCommissionAutofill(
+    await applyGmvMaxAutofill(
+      await applyOlBrandsAutofill(await applyAttendanceAutofill(rows, month), month),
+      month,
+    ),
     month,
   );
+}
+
+// Who else already has a commission line on a brand this month, and for how
+// much. Each item is independent JSONB on a different person's row, so nothing
+// in the data model knows about its siblings: three people can each be given
+// 3% of the same brand's GMV and nothing anywhere would say so until payday.
+// The editor shows this so the OL is dividing a visible total rather than
+// guessing. Read-only and advisory — it does not block, because the OL may
+// legitimately be mid-way through re-allocating.
+export async function fetchBrandCommissionAllocations(month) {
+  const { data, error } = await supabase
+    .from('incentives')
+    .select('user_id, incentives, bonuses, user:user_id(display_name)')
+    .eq('month', month);
+  if (error) throw new Error(error.message);
+  const byBrand = new Map();
+  (data || []).forEach((row) => {
+    [...(row.incentives || []), ...(row.bonuses || [])].forEach((it) => {
+      if (!it || it.source !== 'commission_tier' || !it.brandId) return;
+      const list = byBrand.get(it.brandId) || [];
+      list.push({
+        userId: row.user_id,
+        userName: row.user?.display_name || '—',
+        pct: Number(it.commissionPct) || 0,
+        itemId: it.id,
+      });
+      byBrand.set(it.brandId, list);
+    });
+  });
+  return byBrand;
+}
+
+// ── Payout FX rates (Boss-only, mig 333) ──────────────────────────
+export async function listPayoutFxRates(month) {
+  const { data, error } = await supabase
+    .from('payout_fx_rates')
+    .select('month_key, currency, rate, updated_at')
+    .eq('month_key', month)
+    .order('currency');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function setPayoutFxRate(month, currency, rate) {
+  const { data: me } = await supabase.auth.getUser();
+  const n = Number(rate);
+  if (!(n > 0)) throw new Error('Rate must be greater than zero.');
+  const { error } = await supabase
+    .from('payout_fx_rates')
+    .upsert({
+      month_key: month, currency: String(currency).toUpperCase(), rate: n,
+      updated_at: new Date().toISOString(), updated_by: me?.user?.id || null,
+    }, { onConflict: 'month_key,currency' });
+  if (error) throw new Error(error.message);
+}
+
+export async function deletePayoutFxRate(month, currency) {
+  const { error } = await supabase
+    .from('payout_fx_rates')
+    .delete().eq('month_key', month).eq('currency', String(currency).toUpperCase());
+  if (error) throw new Error(error.message);
 }
 
 // ── OL incentive-brands curation (Settings) + per-brand status (panel) ──────
@@ -255,7 +431,7 @@ export async function fetchAdsManagerBrandMap(userIds) {
   if (!ids.length) return new Map();
   const { data, error } = await supabase
     .from('ads_manager_brands')
-    .select('ads_manager_id, brand:brand_id(id, brand_name, tier, status, client_name)')
+    .select('ads_manager_id, brand:brand_id(id, brand_name, tier, status, client_name, currency)')
     .in('ads_manager_id', ids);
   if (error) throw new Error(error.message);
   const m = new Map();
@@ -621,7 +797,7 @@ export async function listUsersByRoles(roles) {
   if (userIds.length) {
     const { data: links, error: e3 } = await supabase
       .from('brand_assignments')
-      .select('user_id, brand:brand_id(id, brand_name, tier, status, client_name)')
+      .select('user_id, brand:brand_id(id, brand_name, tier, status, client_name, currency)')
       .in('user_id', userIds);
     if (e3) throw new Error(e3.message);
     (links || []).forEach((row) => pushBrand(row.user_id, row.brand));
@@ -665,10 +841,13 @@ export async function getUserForEditor(userId) {
   // (brands.owner_id); an APC/IPC gets them via brand_assignments. These drive
   // the brand-linked incentive sections, so they must be the live assignment.
   let assignedBrands = [];
-  const shape = (b) => ({ id: b.id, name: b.brand_name, tier: b.tier, status: b.status, client: b.client_name });
+  // `currency` is new here and load-bearing for commission lines: their Target
+  // and Achieved are the brand's GMV goal and GMV, which are in the CLIENT's
+  // currency, not PKR. Without it every brand would render a '$'.
+  const shape = (b) => ({ id: b.id, name: b.brand_name, tier: b.tier, status: b.status, client: b.client_name, currency: b.currency || 'USD' });
   if (data.role === 'tl') {
     const { data: bs, error: be } = await supabase
-      .from('brands').select('id, brand_name, tier, status, client_name')
+      .from('brands').select('id, brand_name, tier, status, client_name, currency')
       .eq('owner_id', userId).eq('status', 'active').order('brand_name');
     // Throw (never swallow) — a silent [] here would make the editor's carry-forward
     // reconcile DROP every brand-linked item as an orphan. Fail loud instead.
@@ -677,7 +856,7 @@ export async function getUserForEditor(userId) {
   } else if (data.role === 'apc' || data.role === 'ipc') {
     const { data: rows, error: ae } = await supabase
       .from('brand_assignments')
-      .select('brand:brand_id(id, brand_name, tier, status, client_name)')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name, currency)')
       .eq('user_id', userId);
     if (ae) throw new Error(ae.message);
     assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
@@ -689,9 +868,24 @@ export async function getUserForEditor(userId) {
     // TL branch — a swallowed [] would make carry-forward drop every linked item.
     const { data: rows, error: me } = await supabase
       .from('ads_manager_brands')
-      .select('brand:brand_id(id, brand_name, tier, status, client_name)')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name, currency)')
       .eq('ads_manager_id', userId);
     if (me) throw new Error(me.message);
+    assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
+      .filter((b) => b.status === 'active').map(shape)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else if (data.role === 'ol') {
+    // Fourth source. An OL owns no brands and is assigned none, so until now
+    // their plan had no brand groups at all and could hold no brand-linked
+    // line. Their CURATED incentive brands (mig 291, Settings -> My Incentive
+    // Brands) are already defined as "the brands that count toward my
+    // incentive", which is exactly the right set — needed so a Commission
+    // Based Tier line can be given to an OL as well as a TL/APC.
+    const { data: rows, error: oe } = await supabase
+      .from('ol_incentive_brands')
+      .select('brand:brand_id(id, brand_name, tier, status, client_name, currency)')
+      .eq('ol_id', userId);
+    if (oe) throw new Error(oe.message);
     assignedBrands = (rows || []).map((r) => r.brand).filter(Boolean)
       .filter((b) => b.status === 'active').map(shape)
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -818,20 +1012,20 @@ export async function getIncentivesTemplate() {
 }
 
 export async function setIncentivesTemplate({ basicSalary, incentives: inc, bonuses: bon, savedByName }) {
+  // NOTE: this rebuilds each item from a fixed field list, so anything not named
+  // here is dropped. commissionPct has to be one of them or a templated
+  // commission line comes back as "0% of GMV" and pays nothing.
+  const mapTemplateItem = (i) => ({
+    id: i.id, text: i.text, amount: Number(i.amount) || 0,
+    targetValue: Number(i.targetValue) || 0,
+    suffix: itemSuffix(i),
+    ...(i.source ? { source: i.source } : {}),
+    ...(i.commissionPct != null && i.commissionPct !== '' ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
+  });
   const value = {
     basicSalary: Number(basicSalary) || 0,
-    incentives:  (inc || []).map((i) => ({
-      id: i.id, text: i.text, amount: Number(i.amount) || 0,
-      targetValue: Number(i.targetValue) || 0,
-      suffix: itemSuffix(i),
-      ...(i.source ? { source: i.source } : {}),
-    })),
-    bonuses:     (bon || []).map((b) => ({
-      id: b.id, text: b.text, amount: Number(b.amount) || 0,
-      targetValue: Number(b.targetValue) || 0,
-      suffix: itemSuffix(b),
-      ...(b.source ? { source: b.source } : {}),
-    })),
+    incentives:  (inc || []).map(mapTemplateItem),
+    bonuses:     (bon || []).map(mapTemplateItem),
     savedByName: savedByName || '',
     savedAt:     new Date().toISOString(),
   };

@@ -660,6 +660,62 @@ async function overlayAttendanceIncentives(admin: any, rows: any[], month: strin
   });
 }
 
+// ── Commission Based Tier overlay (mig 333) ──────────────────────────
+// Same contract as the attendance overlay above: a { source:'commission_tier' }
+// item stores amount 0 / completed false BY DESIGN and derives everything at
+// read time. Without this the assistant would tell the Boss that an earned
+// commission is worth nothing — the single most expensive thing it could get
+// wrong about someone's pay.
+//
+// DELIBERATELY NOT a fourth hand-written copy of the formula. The gate, the
+// clamp and the FX conversion live once, in public._commission_state, and this
+// calls it — one lookup per distinct (brand, percentage) pair. The attendance
+// overlay above is a hand-maintained mirror and has already drifted from its
+// JS twin; this one cannot drift because there is nothing here to drift.
+const hasCommissionItem = (row: any) =>
+  [...(Array.isArray(row?.incentives) ? row.incentives : []), ...(Array.isArray(row?.bonuses) ? row.bonuses : [])]
+    .some((it: any) => it && it.source === 'commission_tier' && it.brandId);
+
+async function overlayCommissionIncentives(admin: any, rows: any[], month: string): Promise<any[]> {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.some((r) => !r?.payout_cleared && hasCommissionItem(r))) return list;
+
+  const wanted = new Map<string, { brandId: string; pct: number }>();
+  for (const r of list) {
+    if (r?.payout_cleared) continue;
+    for (const it of [...(r.incentives || []), ...(r.bonuses || [])]) {
+      if (it?.source !== 'commission_tier' || !it.brandId) continue;
+      const pct = Number(it.commissionPct) || 0;
+      wanted.set(`${it.brandId}|${pct}`, { brandId: it.brandId, pct });
+    }
+  }
+  const state = new Map<string, any>();
+  try {
+    for (const [key, { brandId, pct }] of wanted) {
+      const { data, error } = await admin.rpc('_commission_state', { p_brand: brandId, p_month: month, p_pct: pct });
+      if (error) throw error;
+      if (data) state.set(key, data);
+    }
+  } catch (e) {
+    // Fail soft, like the attendance overlay: stored values rather than a guess.
+    console.warn('ai-chat commission overlay skipped:', String((e as Error)?.message || e).slice(0, 150));
+    return list;
+  }
+  const patch = (it: any) => {
+    if (!it || it.source !== 'commission_tier' || !it.brandId) return it;
+    const s = state.get(`${it.brandId}|${Number(it.commissionPct) || 0}`);
+    return s ? { ...it, ...s } : it;
+  };
+  return list.map((r) => {
+    if (r?.payout_cleared) return r; // frozen — stored values verbatim
+    return {
+      ...r,
+      incentives: (Array.isArray(r.incentives) ? r.incentives : []).map(patch),
+      bonuses: (Array.isArray(r.bonuses) ? r.bonuses : []).map(patch),
+    };
+  });
+}
+
 // Run a tool. Returns a compact text block for the model. Boss-only (checked by caller).
 async function runTool(admin: any, name: string, args: any): Promise<string> {
   try {
@@ -744,7 +800,7 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       // agrees with the Incentives page (contract C1+C2). fmtIncentiveRow then
       // recomputes "Earned" from the OVERLAID completed flags, not the stale
       // stored ones.
-      const orows = await overlayAttendanceIncentives(admin, rows, month);
+      const orows = await overlayCommissionIncentives(admin, await overlayAttendanceIncentives(admin, rows, month), month);
       // attach names
       const ids = [...new Set(orows.map((r: any) => r.user_id))];
       const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);

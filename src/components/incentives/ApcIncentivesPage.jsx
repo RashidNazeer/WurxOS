@@ -5,6 +5,7 @@ import {
 } from '../../lib/incentivesApi';
 import { listBrandsForApc } from '../../lib/agendaApi';
 import BrandChip from './BrandChip';
+import CommissionNote from './CommissionNote';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -160,17 +161,24 @@ function DetailsModal({ record, items, onClose }) {
 }
 
 // ── Edit Item Row (defined outside EditModal to avoid remount on every render)
-function EditItemRow({ item, category, onChange }) {
+function EditItemRow({ item, category, onChange, month }) {
   const achieved = item.achievedValue ?? '';
   const target   = item.targetValue   ?? '';
   const unitSfx  = itemSuffix(item);
   const p        = pct(achieved, target);          // display % only (rounded, capped 100)
-  const isCompleted = autoComplete(item);           // completion = raw ratio >= 0.9 (single rule)
   const isAtt    = item.source === 'attendance';
   // GMV-Max achieved is derived from Brand Analytics (mig 317) — the APC no
   // longer types it, so the field is locked exactly like an attendance item.
   const isGmvMax = item.source === 'gmv_max';
-  const isAuto   = isAtt || isGmvMax;
+  // Commission tier (mig 333): target, achieved AND the money all derive, so
+  // nothing on this row is typed here.
+  const isComm   = item.source === 'commission_tier';
+  const isAuto   = isAtt || isGmvMax || isComm;
+  // completion = raw ratio >= 0.9 (single rule) — EXCEPT a commission line,
+  // which pays only once the brand's goal is genuinely reached. Under the 0.9
+  // rule this row would read "✓ Completed" at 90% of the goal while the client
+  // pays us, and therefore this person, nothing.
+  const isCompleted = isComm ? !!item.completed : autoComplete(item);
 
   return (
     <div
@@ -257,6 +265,12 @@ function EditItemRow({ item, category, onChange }) {
           </div>
         </div>
       )}
+      {isComm && (
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#166534' }}>
+          <i className="bi bi-percent me-1" />
+          <CommissionNote item={item} month={month} />
+        </div>
+      )}
     </div>
   );
 }
@@ -317,6 +331,8 @@ function EditModal({ record, items, onClose, onSaved }) {
             ...(o.source ? { source: o.source } : {}),
             // Preserve the hard brand link — an APC progress edit must never strip it.
             ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
+            // Same reason as brandId above: a fixed-field rebuild drops what it does not name.
+            ...(o.commissionPct != null ? { commissionPct: Number(o.commissionPct) || 0 } : {}),
           };
         }),
         bonuses: editItems.bonuses.map(b => {
@@ -334,6 +350,8 @@ function EditModal({ record, items, onClose, onSaved }) {
             ...(o.source ? { source: o.source } : {}),
             // Preserve the hard brand link on bonuses too (parity with incentives map).
             ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
+            // Same reason as brandId above: a fixed-field rebuild drops what it does not name.
+            ...(o.commissionPct != null ? { commissionPct: Number(o.commissionPct) || 0 } : {}),
           };
         }),
       });
@@ -388,7 +406,7 @@ function EditModal({ record, items, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-graph-up-arrow me-1 text-success" />Incentives
               </p>
-              {editItems.incentives.map(i => <EditItemRow key={i.id} item={i} category="incentives" onChange={handleChange} />)}
+              {editItems.incentives.map(i => <EditItemRow key={i.id} item={i} category="incentives" onChange={handleChange} month={record?.month} />)}
             </div>
           )}
 
@@ -397,7 +415,7 @@ function EditModal({ record, items, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-trophy me-1 text-primary" />Bonuses
               </p>
-              {editItems.bonuses.map(b => <EditItemRow key={b.id} item={b} category="bonuses" onChange={handleChange} />)}
+              {editItems.bonuses.map(b => <EditItemRow key={b.id} item={b} category="bonuses" onChange={handleChange} month={record?.month} />)}
             </div>
           )}
 

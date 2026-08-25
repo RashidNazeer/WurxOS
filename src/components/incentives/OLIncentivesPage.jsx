@@ -6,9 +6,10 @@ import {
   listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan,
   verifyIncentives, notifyIncentiveEmployee, autoComplete,
-  applyAttendanceAutofill, fetchOlBrandStatus, listOlBrandsByOl, brandHitByTL, fmtUnitValue,
+  applyAttendanceAutofill, applyDerivedAutofill, fetchOlBrandStatus, listOlBrandsByOl, brandHitByTL, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
+import CommissionNote from './CommissionNote';
 import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 function getCurrentMonth() {
@@ -172,8 +173,9 @@ function AttendanceBadge() {
 // Generic "Auto" marker for any read-time-derived item (attendance or ol_brands).
 function AutoBadge({ source }) {
   const meta = {
-    ol_brands: { title: 'Auto-filled from your incentive-brands roll-up', icon: 'bi-bullseye' },
-    gmv_max:   { title: "Auto-filled from the brand's GMV in Brand Analytics", icon: 'bi-graph-up-arrow' },
+    ol_brands:       { title: 'Auto-filled from your incentive-brands roll-up', icon: 'bi-bullseye' },
+    gmv_max:         { title: "Auto-filled from the brand's GMV in Brand Analytics", icon: 'bi-graph-up-arrow' },
+    commission_tier: { title: "Commission on the brand's GMV — pays once its monthly goal is reached", icon: 'bi-percent' },
   }[source] || { title: 'Auto-filled from monthly attendance %', icon: 'bi-calendar-check' };
   return (
     <span className="badge rounded-pill" title={meta.title}
@@ -231,13 +233,15 @@ function BrandTierChip({ brand }) {
 // lockTarget: when the OL edits their OWN progress, the Target is Boss-set and must
 // be read-only (an OL must not lower their own target to pass it) — same rule as
 // APC/TL. Left editable (default) when the OL manages an APC/IPC target.
-function EditRow({ item, cat, onChange, lockTarget = false }) {
+function EditRow({ item, cat, onChange, lockTarget = false, month }) {
   const isAtt      = item.source === 'attendance';
   const isOlBrands = item.source === 'ol_brands';
   const isGmvMax   = item.source === 'gmv_max';
-  const isDerived  = isAtt || isOlBrands || isGmvMax;   // achieved is read-time-filled → locked
-  // GMV-Max differs from the other two: only its ACHIEVED is derived. The target
-  // is the per-brand money figure the OL sets, so it stays editable here.
+  const isComm     = item.source === 'commission_tier';
+  const isDerived  = isAtt || isOlBrands || isGmvMax || isComm;   // achieved is read-time-filled → locked
+  // GMV-Max differs from the others: only its ACHIEVED is derived. The target
+  // is the per-brand money figure the OL sets, so it stays editable here. A
+  // commission target is the brand's own GMV goal, so it locks like the rest.
   const lockTgt    = (isDerived && !isGmvMax) || lockTarget;
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
@@ -247,9 +251,14 @@ function EditRow({ item, cat, onChange, lockTarget = false }) {
   // ol_brands uses the exact ≥ target (≥70) rule the overlay + payout freeze use,
   // so this editor badge agrees with OlBrandPanel and the actual payout instead of
   // showing "Completed" at 65%.
-  const done     = isOlBrands
-    ? (Number(achieved) >= (Number(target) || 70))
-    : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
+  // A commission line is the same story as ol_brands, one step stricter: it pays
+  // only when the brand's GMV goal is genuinely reached, so it takes the
+  // overlay's own verdict rather than the ≥90% ratio.
+  const done     = isComm
+    ? !!item.completed
+    : isOlBrands
+      ? (Number(achieved) >= (Number(target) || 70))
+      : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
   return (
     <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isDerived ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isDerived ? '#bfdbfe' : '#e9ecef')}` }}>
@@ -293,13 +302,15 @@ function EditRow({ item, cat, onChange, lockTarget = false }) {
         </div>
       </div>
       {isDerived && (
-        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
-          <i className={`bi ${isAtt ? 'bi-calendar-check' : isGmvMax ? 'bi-graph-up-arrow' : 'bi-bullseye'} me-1`} />
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: isComm ? '#166534' : '#1e40af' }}>
+          <i className={`bi ${isAtt ? 'bi-calendar-check' : isGmvMax ? 'bi-graph-up-arrow' : isComm ? 'bi-percent' : 'bi-bullseye'} me-1`} />
           {isAtt
             ? "Filled automatically from this month's attendance %."
-            : isGmvMax
-              ? "Achieved comes from this brand's GMV in Brand Analytics — the figure the APC enters at clock-in. Set the target here; tick the item yourself when it's earned."
-              : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
+            : isComm
+              ? <CommissionNote item={item} month={month} />
+              : isGmvMax
+                ? "Achieved comes from this brand's GMV in Brand Analytics — the figure the APC enters at clock-in. Set the target here; tick the item yourself when it's earned."
+                : 'Filled automatically from your incentive-brands roll-up (Settings → My Incentive Brands). Completes at month-end once you clear the target.'}
         </div>
       )}
     </div>
@@ -351,6 +362,8 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
           completedBy:   isAtt ? (o.completedBy || null) : (it.completed ? (o.completedBy || myName) : null),
           ...(o.source ? { source: o.source } : {}),
           ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
+          // Same reason as brandId above: a fixed-field rebuild drops what it does not name.
+          ...(o.commissionPct != null ? { commissionPct: Number(o.commissionPct) || 0 } : {}),
         };
       };
       await updateIncentivesProgress({
@@ -382,7 +395,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-graph-up-arrow me-1 text-success" />Incentives
               </p>
-              {editItems.incentives.map(i => <EditRow key={i.id} item={i} cat="incentives" onChange={handleChange} lockTarget />)}
+              {editItems.incentives.map(i => <EditRow key={i.id} item={i} cat="incentives" onChange={handleChange} lockTarget month={record?.month} />)}
             </div>
           )}
           {editItems.bonuses.length > 0 && (
@@ -390,7 +403,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-trophy me-1 text-primary" />Bonuses
               </p>
-              {editItems.bonuses.map(b => <EditRow key={b.id} item={b} cat="bonuses" onChange={handleChange} lockTarget />)}
+              {editItems.bonuses.map(b => <EditRow key={b.id} item={b} cat="bonuses" onChange={handleChange} lockTarget month={record?.month} />)}
             </div>
           )}
           {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}
@@ -488,10 +501,14 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
           </div>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
             {item.source === 'attendance' && <AttendanceBadge />}
+            {item.source === 'commission_tier' && <AutoBadge source="commission_tier" />}
             <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
               {item.completed ? '✓ Done' : `${p}%`}
             </span>
-            {!readOnly && item.source !== 'attendance' && (
+            {/* No manual tick for a commission line either: whether it is earned
+                is decided by the brand's GMV against its goal, and `completed`
+                is stripped at rest, so a tick here would not survive a save. */}
+            {!readOnly && item.source !== 'attendance' && item.source !== 'commission_tier' && (
               <button className="btn btn-sm btn-link p-0" style={{ fontSize: '0.7rem', color: item.completed ? '#dc3545' : '#198754' }}
                 onClick={() => onToggleItem(rec, category, item.id, !item.completed)}
                 title={item.completed ? 'Mark incomplete' : 'Mark complete'}>
@@ -579,7 +596,7 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
               </p>
               {(editMode ? editItems.incentives : rec.incentives).map(i =>
                 editMode
-                  ? <EditRow key={i.id} item={i} cat="incentives" onChange={handleEditChange} />
+                  ? <EditRow key={i.id} item={i} cat="incentives" onChange={handleEditChange} month={rec?.month} />
                   : <ItemDetail key={i.id} item={i} category="incentives" />
               )}
             </div>
@@ -591,7 +608,7 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
               </p>
               {(editMode ? editItems.bonuses : rec.bonuses).map(b =>
                 editMode
-                  ? <EditRow key={b.id} item={b} cat="bonuses" onChange={handleEditChange} />
+                  ? <EditRow key={b.id} item={b} cat="bonuses" onChange={handleEditChange} month={rec?.month} />
                   : <ItemDetail key={b.id} item={b} category="bonuses" />
               )}
             </div>
@@ -863,6 +880,8 @@ export default function OLIncentivesPage() {
           completedBy: i.completed ? (i.completedBy || myName) : null,
           ...(i.source ? { source: i.source } : {}),
           ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+          // Same reason as brandId above: a fixed-field rebuild drops what it does not name.
+          ...(i.commissionPct != null ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
         }));
         savedRec = await updateIncentivesProgress({
           rowId: rec.id,
@@ -873,7 +892,10 @@ export default function OLIncentivesPage() {
         // (achievedValue:null, completed:false). Re-apply the read-time overlay so
         // the row we write to state shows the live % / completion instead of the
         // stripped nulls (otherwise the Earned total visibly drops until reload).
-        const [overlaid] = await applyAttendanceAutofill([savedRec], rec.month);
+        // Re-overlay ALL derived sources, not just attendance: the row was just
+        // saved with commission/GMV-Max figures blanked at rest, so an
+        // attendance-only refresh would leave those reading zero until reload.
+        const [overlaid] = await applyDerivedAutofill([savedRec], rec.month);
         savedRec = overlaid;
       }
 

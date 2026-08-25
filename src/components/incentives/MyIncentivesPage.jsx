@@ -4,6 +4,7 @@ import {
   getIncentives, updateIncentivesProgress, autoComplete, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
+import CommissionNote from './CommissionNote';
 import InactiveBrandsNotice from './InactiveBrandsNotice';
 
 function getMonthLabel(ym) {
@@ -55,16 +56,21 @@ function calcBreakdown(rec) {
 // Boss and is read-only (a TL must not lower their own target to pass it). Mirrors
 // the APC page (ApcIncentivesPage EditItemRow). Save also re-reads the target from
 // the original record so a tampered client can't persist a changed target either.
-function EditProgressRow({ item, cat, onChange }) {
+function EditProgressRow({ item, cat, onChange, month }) {
   const isAtt    = item.source === 'attendance';
   // GMV-Max achieved comes from Brand Analytics (mig 317) — not typed here.
   const isGmvMax = item.source === 'gmv_max';
-  const isAuto   = isAtt || isGmvMax;
+  // Commission tier (mig 333) — target, achieved and the money are all derived.
+  const isComm   = item.source === 'commission_tier';
+  const isAuto   = isAtt || isGmvMax || isComm;
   const achieved = item.achievedValue ?? '';
   const target   = isAtt ? 100 : (item.targetValue ?? '');
   const sfx      = itemSuffix(item);
   const p        = pct(achieved, target);          // display % only (rounded, capped 100)
-  const done     = autoComplete({ ...item, achievedValue: achieved, targetValue: target }); // single rule: raw ratio >= 0.9
+  // single rule: raw ratio >= 0.9 — but a commission line only earns at the
+  // real goal, so showing "Completed" at 90% would promise money that is not coming.
+  const done     = isComm ? !!item.completed
+                          : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   return (
     <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAuto ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAuto ? '#bfdbfe' : '#e9ecef')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -113,6 +119,12 @@ function EditProgressRow({ item, cat, onChange }) {
         <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
           <i className="bi bi-graph-up-arrow me-1" />
           Achieved comes from this brand's GMV in Brand Analytics — no need to type it.
+        </div>
+      )}
+      {isComm && (
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#166534' }}>
+          <i className="bi bi-percent me-1" />
+          <CommissionNote item={item} month={month} />
         </div>
       )}
     </div>
@@ -168,6 +180,8 @@ function EditProgressModal({ record, onClose, onSaved }) {
           ...(o.source ? { source: o.source } : {}),
           // Preserve the hard brand link — a progress edit must never strip it.
           ...(o.brandId ? { brandId: o.brandId, brandName: o.brandName || null } : {}),
+          // Same reason as brandId above: a fixed-field rebuild drops what it does not name.
+          ...(o.commissionPct != null ? { commissionPct: Number(o.commissionPct) || 0 } : {}),
         };
       };
       await updateIncentivesProgress({
@@ -199,7 +213,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-graph-up-arrow me-1 text-success" />Incentives
               </p>
-              {items.incentives.map(i => <EditProgressRow key={i.id} item={i} cat="incentives" onChange={handleChange} />)}
+              {items.incentives.map(i => <EditProgressRow key={i.id} item={i} cat="incentives" onChange={handleChange} month={record?.month} />)}
             </div>
           )}
           {items.bonuses.length > 0 && (
@@ -207,7 +221,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-trophy me-1 text-primary" />Bonuses
               </p>
-              {items.bonuses.map(b => <EditProgressRow key={b.id} item={b} cat="bonuses" onChange={handleChange} />)}
+              {items.bonuses.map(b => <EditProgressRow key={b.id} item={b} cat="bonuses" onChange={handleChange} month={record?.month} />)}
             </div>
           )}
           {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}

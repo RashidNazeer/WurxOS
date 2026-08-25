@@ -16,6 +16,7 @@ import CampaignExpirySection from './sections/CampaignExpirySection';
 import TierNotificationsSection from './sections/TierNotificationsSection';
 import LeaveDefaultsSection  from './sections/LeaveDefaultsSection';
 import BackupSection         from './sections/BackupSection';
+import PayoutRatesSection    from './sections/PayoutRatesSection';
 import AmazonHaloSection     from './sections/AmazonHaloSection';
 import CreatorLibrarySection from './sections/CreatorLibrarySection';
 import OlIncentiveBrandsSection from './sections/OlIncentiveBrandsSection';
@@ -76,6 +77,9 @@ const GROUPS = [
     sections: [
       { id: 'leaveDefaults', label: 'Leave Defaults', sub: 'Starting quota for new hires',
         icon: ClockIcon, component: LeaveDefaultsSection,
+        roles: ['boss'] },
+      { id: 'payoutRates', label: 'Payout Rates', sub: 'Currency conversion for commission incentives',
+        icon: StarIcon, component: PayoutRatesSection,
         roles: ['boss'] },
       { id: 'backup', label: 'Data Backup', sub: 'Download a full snapshot of all data',
         icon: ShieldIcon, component: BackupSection,

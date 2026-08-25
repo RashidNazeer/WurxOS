@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { applyAttendanceAutofill } from './incentivesApi';
+import { applyAttendanceAutofill, applyCommissionAutofill } from './incentivesApi';
 
 // 5 metrics. Punctuality was dropped (mig 243) — attendance is already its own
 // auto-fetched pillar and the incentive items cover it, so rating it here was a
@@ -646,7 +646,16 @@ export async function listAllIncentivesForMonth(month) {
     incentives: r.incentives || [],
     bonuses:    r.bonuses || [],
   }));
-  return applyAttendanceAutofill(rows, month);
+  // Commission lines need the same treatment for the same reason: their
+  // `completed` is derived and therefore false at rest, so without the overlay
+  // this pillar would count an earned commission as an unmet item.
+  //
+  // ol_brands and gmv_max are deliberately NOT overlaid here. gmv_max does not
+  // derive `completed` at all, so it makes no difference. ol_brands does — and
+  // it has the same defect — but perf_incentives_score in SQL still reads its
+  // stored value, and contract C3 requires the two to agree. Fixing that one
+  // means moving live OL scores, which belongs in its own change.
+  return applyCommissionAutofill(await applyAttendanceAutofill(rows, month), month);
 }
 
 // ── Attendance ────────────────────────────────────────────────

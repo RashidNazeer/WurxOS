@@ -3,8 +3,9 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   getUserForEditor, getIncentives, getMostRecentPriorPlan, savePlan,
-  getIncentivesTemplate, setIncentivesTemplate,
+  getIncentivesTemplate, setIncentivesTemplate, fetchBrandCommissionAllocations,
 } from '../../lib/incentivesApi';
+import { currencySymbol } from '../../utils/currencies';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -51,25 +52,38 @@ const looksLikeGmvMax = (text) => /gmv\s*max/i.test(text || '');
 // GMV-Max pattern meant brand lines never offered it at all. A control that
 // can disappear is worse than one that is occasionally irrelevant.
 const SOURCE_LABELS = {
-  '':           'Manual entry',
-  attendance:   'Auto — monthly attendance %',
-  ol_brands:    'Auto — OL brand roll-up %',
-  gmv_max:      "Auto — brand's GMV in Brand Analytics",
+  '':               'Manual entry',
+  attendance:       'Auto — monthly attendance %',
+  ol_brands:        'Auto — OL brand roll-up %',
+  gmv_max:          "Auto — brand's GMV in Brand Analytics",
+  commission_tier:  'Commission Based Tier — % of the brand’s GMV',
 };
-// Brand-linked rows can only mean GMV-Max; "Other" rows can't (no brand to
-// resolve), but they own the two person-level sources.
+// Brand-linked rows own the two brand sources; "Other" rows can't have them
+// (no brand to resolve) but own the two person-level ones.
 const sourceOptionsFor = (hideToggles, current) => {
-  const opts = hideToggles ? ['', 'gmv_max'] : ['', 'attendance', 'ol_brands'];
+  const opts = hideToggles ? ['', 'gmv_max', 'commission_tier'] : ['', 'attendance', 'ol_brands'];
   // Never silently drop a source the row already carries.
   if (current && !opts.includes(current)) opts.push(current);
   return opts;
 };
 
-function LineRow({ item, onChange, onRemove, hideToggles }) {
+// Percentage of this brand already promised to OTHER people this month.
+// Excludes the person being edited (and this very line), so the number reads
+// as "on top of what you are about to set".
+function otherCommissionPct(commAlloc, brandId, targetId, itemId) {
+  const rows = (commAlloc && commAlloc.get(brandId)) || [];
+  return rows
+    .filter((r) => !(r.userId === targetId && r.itemId === itemId))
+    .filter((r) => r.userId !== targetId)
+    .reduce((sum, r) => sum + (Number(r.pct) || 0), 0);
+}
+
+function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersPct }) {
   const source     = item.source || '';
   const isAtt      = source === 'attendance';
   const isOlBrands = source === 'ol_brands';
   const isGmvMax   = source === 'gmv_max';
+  const isComm     = source === 'commission_tier';
   const isAuto     = !!source;
   // Brand rows only. Stamp the flag as soon as the line is recognisably a
   // GMV-Max one, so a new plan is auto-filled without anyone remembering to
@@ -92,10 +106,20 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
     } else if (next === 'ol_brands') {
       if (!Number(item.targetValue)) onChange(item.id, 'targetValue', 70);
       onChange(item.id, 'suffix', '%');
+    } else if (next === 'commission_tier') {
+      // Target IS the brand's monthly GMV goal and Achieved IS its GMV, both
+      // read from Brand Analytics — nothing here is typed. Pin the unit to the
+      // brand's currency so the two figures read correctly before the first
+      // overlay lands.
+      onChange(item.id, 'suffix', currencySymbol(brandCurrency));
     }
   }
 
-  const lockStyle = isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
+  // Everything on a commission line except the percentage is computed, so the
+  // whole row locks — including Compensation, which is the derived money.
+  const lockStyle = (isAtt || isComm) ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
+  const pct = item.commissionPct ?? '';
+  const pctOverAllocated = Number(pct) > 100;
 
   return (
     <div className="rounded-3 p-2 mb-2" style={{ background: isAtt ? '#eff6ff' : '#f8f9fa', border: `1px solid ${isAtt ? '#bfdbfe' : '#e9ecef'}` }}>
@@ -158,25 +182,74 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
           it completes at month-end once the % reaches it.
         </div>
       )}
+      {isComm && (
+        <div className="rounded-3 p-2 mb-2" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          <div style={{ fontSize: '0.68rem', color: '#166534', marginBottom: 6 }}>
+            <i className="bi bi-percent me-1" />
+            Pays this person a share of the brand&apos;s GMV, but <strong>only once the
+            brand&apos;s monthly GMV goal in Brand Analytics is reached</strong> — below the
+            goal it stays at zero. After that it recalculates every day as the APC
+            enters GMV at clock-in. Target, Achieved and Compensation are all read
+            from Brand Analytics; the percentage below is the only thing you set.
+          </div>
+          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#166534', fontWeight: 600 }}>
+            This person&apos;s share of GMV
+          </label>
+          <div className="input-group input-group-sm" style={{ maxWidth: 200 }}>
+            <input
+              type="number"
+              className="form-control"
+              placeholder="e.g. 1.5"
+              min="0" max="100" step="0.01"
+              value={pct}
+              onChange={e => onChange(item.id, 'commissionPct', e.target.value)}
+              style={pctOverAllocated ? { borderColor: '#dc2626' } : undefined}
+            />
+            <span className="input-group-text" style={{ fontSize: '0.7rem' }}>% of GMV</span>
+          </div>
+          {pctOverAllocated && (
+            <div style={{ fontSize: '0.65rem', color: '#b91c1c', marginTop: 4 }}>
+              <i className="bi bi-exclamation-triangle-fill me-1" />
+              Over 100% of the brand&apos;s GMV. Saved as 100% at payout.
+            </div>
+          )}
+          {!pctOverAllocated && !Number(pct) && (
+            <div style={{ fontSize: '0.65rem', color: '#92400e', marginTop: 4 }}>
+              <i className="bi bi-exclamation-triangle me-1" />
+              No percentage set — this line will pay nothing.
+            </div>
+          )}
+          {/* Nothing in the data model knows about sibling lines: each person's
+              items are independent JSONB, so three people can each be given 3%
+              of the same brand and nothing would say so until payday. */}
+          {othersPct > 0 && (
+            <div style={{ fontSize: '0.65rem', color: '#6c757d', marginTop: 4 }}>
+              <i className="bi bi-people me-1" />
+              {othersPct}% of this brand&apos;s GMV is already promised to other people this month
+              {Number(pct) > 0 && <> — <strong>{Math.round((othersPct + Number(pct)) * 100) / 100}% in total</strong> with this line</>}.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Target + Compensation on same row */}
       <div className="d-flex gap-2">
         <div className="flex-grow-1">
           <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
-            {isAtt
-              ? <>Target <span className="text-muted">(auto · attendance %)</span></>
-              : <>Target value <span className="text-muted">(suffix optional — e.g. %, $, pts)</span></>}
+            {isAtt   ? <>Target <span className="text-muted">(auto · attendance %)</span></>
+             : isComm ? <>Target <span className="text-muted">(auto · the brand&apos;s GMV goal)</span></>
+             : <>Target value <span className="text-muted">(suffix optional — e.g. %, $, pts)</span></>}
           </label>
           <div className="input-group input-group-sm">
             <input
               type="number"
               className="form-control"
-              placeholder="e.g. 250"
+              placeholder={isComm ? 'From Brand Analytics' : 'e.g. 250'}
               min="0"
-              value={isAtt ? 100 : (item.targetValue ?? '')}
+              value={isAtt ? 100 : isComm ? '' : (item.targetValue ?? '')}
               onChange={e => onChange(item.id, 'targetValue', e.target.value)}
-              readOnly={isAtt}
-              disabled={isAtt}
+              readOnly={isAtt || isComm}
+              disabled={isAtt || isComm}
               style={lockStyle}
             />
             <input
@@ -186,24 +259,30 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
               maxLength={6}
               value={suffix}
               onChange={e => onChange(item.id, 'suffix', e.target.value)}
-              readOnly={isAtt}
-              disabled={isAtt}
+              readOnly={isAtt || isComm}
+              disabled={isAtt || isComm}
               style={{ maxWidth: 60, fontSize: '0.78rem', textAlign: 'center', ...(lockStyle || {}) }}
               title="Optional unit (e.g. %, $, pts) — leave blank for plain numbers"
             />
           </div>
         </div>
         <div style={{ width: 150 }}>
-          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>Compensation if achieved</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
+            {isComm ? <>Compensation <span className="text-muted">(auto)</span></> : 'Compensation if achieved'}
+          </label>
           <div className="input-group input-group-sm">
             <span className="input-group-text text-success fw-semibold">+</span>
             <input
               type="number"
               className="form-control"
-              placeholder="Amount"
+              placeholder={isComm ? 'Calculated' : 'Amount'}
               min="0"
-              value={item.amount}
+              value={isComm ? '' : item.amount}
               onChange={e => onChange(item.id, 'amount', e.target.value)}
+              readOnly={isComm}
+              disabled={isComm}
+              style={lockStyle}
+              title={isComm ? 'Calculated from the brand’s GMV — see the Incentives page for the live figure' : undefined}
             />
             <span className="input-group-text" style={{ fontSize: '0.7rem' }}>PKR</span>
           </div>
@@ -214,7 +293,7 @@ function LineRow({ item, onChange, onRemove, hideToggles }) {
 }
 
 // ── One brand's group of items inside a section ──────────────────────────────
-function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun }) {
+function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, commAlloc, targetId }) {
   const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const tier = brand.tier ? TIER_STYLE[String(brand.tier).toLowerCase()] : null;
   return (
@@ -233,7 +312,8 @@ function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun }) {
       <div className="p-2">
         {items.length === 0
           ? <p className="text-muted mb-2 px-1" style={{ fontSize: '0.72rem' }}>No {noun} for this brand yet.</p>
-          : items.map((item) => <LineRow key={item.id} item={item} onChange={onChange} onRemove={onRemove} hideToggles />)}
+          : items.map((item) => <LineRow key={item.id} item={item} onChange={onChange} onRemove={onRemove} hideToggles brandCurrency={brand.currency}
+              othersPct={otherCommissionPct(commAlloc, brand.id, targetId, item.id)} />)}
         <button type="button" className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
           style={{ fontSize: '0.72rem' }} onClick={() => onAdd(brand)}>
           <i className="bi bi-plus-lg" /> Add {noun} for {brand.name}
@@ -248,7 +328,7 @@ function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun }) {
 // snapshot). Items are rendered grouped by their linked brand, driven by the
 // user's CURRENT brands — so a newly-assigned brand shows an empty group to fill
 // and an item linked to a brand the user no longer has surfaces as an orphan.
-function PlanSection({ title, color, icon, items, setItems, brands, noun }) {
+function PlanSection({ title, color, icon, items, setItems, brands, noun, commAlloc, targetId }) {
   const change = (id, field, val) => setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: val } : it));
   const remove = (id) => setItems(prev => prev.filter(it => it.id !== id));
   const addBrand = (brand) => setItems(prev => [...prev, { id: uid4(), text: '', amount: '', suffix: '', brandId: brand.id, brandName: brand.name }]);
@@ -278,7 +358,7 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun }) {
               <i className="bi bi-link-45deg me-1" />Brand {noun}s
             </div>
             {brands.map((brand) => (
-              <BrandGroup key={brand.id} brand={brand} color={color} noun={noun}
+              <BrandGroup key={brand.id} brand={brand} color={color} noun={noun} commAlloc={commAlloc} targetId={targetId}
                 items={items.filter(i => i.brandId === brand.id)}
                 onChange={change} onRemove={remove} onAdd={addBrand} />
             ))}
@@ -401,6 +481,9 @@ export default function IncentiveForm() {
   const [carryoverInfo, setCarryoverInfo] = useState(null); // { source: 'prior'|'template', sourceMonth?: string }
   const [hasTemplate, setHasTemplate] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
+  // brandId -> [{ userId, userName, pct }] across EVERYONE this month, so a
+  // commission line can show what is already promised on the same brand.
+  const [commAlloc, setCommAlloc] = useState(new Map());
 
   useEffect(() => {
     async function load() {
@@ -415,6 +498,12 @@ export default function IncentiveForm() {
         const tpl = await getIncentivesTemplate();
         setHasTemplate(!!tpl);
       } catch { /* ignore */ }
+
+      // Who else is already on a commission for these brands this month.
+      // Advisory only, so a failure here must never block opening the editor.
+      try {
+        setCommAlloc(await fetchBrandCommissionAllocations(currentMonth));
+      } catch { /* ignore — the hint just will not show */ }
 
       // Existing record for this (user, month)?
       const existing = await getIncentives(targetId, currentMonth);
@@ -448,6 +537,9 @@ export default function IncentiveForm() {
               achievedValue: 0, completed: false, completedBy: null,
               ...(i.source ? { source: i.source } : {}),
               ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+              // Carry the agreed share into the new month; without it the line
+              // arrives set to nothing and quietly pays nothing.
+              ...(i.commissionPct != null ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
             });
             // Drop links to brands the user no longer has — but NEVER when the brand
             // list is empty (that reconciles to "drop everything"); keep them as
@@ -469,19 +561,16 @@ export default function IncentiveForm() {
   }, [targetId]);
 
   function loadFromTemplate(tplData) {
-    setBasicSalary(String(tplData.basicSalary || ''));
-    setIncentives((tplData.incentives || []).map(i => ({
+    const fromTemplate = (i) => ({
       id: uid4(), text: i.text, amount: i.amount,
       targetValue: i.targetValue ?? '', suffix: itemSuffix(i),
       achievedValue: 0, completed: false, completedBy: null,
       ...(i.source ? { source: i.source } : {}),
-    })));
-    setBonuses((tplData.bonuses || []).map(b => ({
-      id: uid4(), text: b.text, amount: b.amount,
-      targetValue: b.targetValue ?? '', suffix: itemSuffix(b),
-      achievedValue: 0, completed: false, completedBy: null,
-      ...(b.source ? { source: b.source } : {}),
-    })));
+      ...(i.commissionPct != null ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
+    });
+    setBasicSalary(String(tplData.basicSalary || ''));
+    setIncentives((tplData.incentives || []).map(fromTemplate));
+    setBonuses((tplData.bonuses || []).map(fromTemplate));
     setCarryoverInfo({ source: 'template' });
   }
 
@@ -534,6 +623,11 @@ export default function IncentiveForm() {
         ...(i.source ? { source: i.source } : {}),
         // Hard brand link (new model). Kept only when set, so "Other" items stay unlinked.
         ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+        // The OL's typed share for a Commission Based Tier line. This map is a
+        // fixed field list, so an omitted field is a field deleted on save —
+        // and this one is the whole input to the payout calculation.
+        ...(i.commissionPct != null && i.commissionPct !== ''
+          ? { commissionPct: Math.min(Math.max(Number(i.commissionPct) || 0, 0), 100) } : {}),
       });
       const incPayload = incentives.map(mapItem);
       const bonPayload = bonuses.map(mapItem);
@@ -708,6 +802,8 @@ export default function IncentiveForm() {
           setItems={setIncentives}
           brands={brands}
           noun="incentive"
+          commAlloc={commAlloc}
+          targetId={targetId}
         />
 
         {/* Bonuses — brand groups + Other */}
@@ -719,6 +815,8 @@ export default function IncentiveForm() {
           setItems={setBonuses}
           brands={brands}
           noun="bonus"
+          commAlloc={commAlloc}
+          targetId={targetId}
         />
 
         {/* Summary */}

@@ -64,9 +64,23 @@ for (const month of months) {
     const incHas = items.length >= 1;
     const monthClosed = month < khiNow;
     const paid = ir?.payout_cleared === true;
-    const doneCount = items.filter((it) => (!paid && it.source === 'attendance')
-      ? (monthClosed && attP >= 90)
-      : !!it.completed).length;
+    // Commission items (mig 333) are the second derived source whose `completed`
+    // is false at rest, so — like attendance — reading the stored value here
+    // would report a divergence that is not real. No month-close gate on this
+    // one: crossing the brand's GMV goal is the entire condition.
+    const commBrands = [...new Set(items
+      .filter((it) => !paid && it.source === 'commission_tier' && it.brandId)
+      .map((it) => it.brandId))];
+    const commHit = new Map();
+    for (const bid of commBrands) {
+      const { data: hit } = await sb.rpc('commission_goal_hit', { p_brand: bid, p_month: month });
+      commHit.set(bid, hit === true);
+    }
+    const doneCount = items.filter((it) => {
+      if (!paid && it.source === 'attendance')      return monthClosed && attP >= 90;
+      if (!paid && it.source === 'commission_tier') return commHit.get(it.brandId) === true;
+      return !!it.completed;
+    }).length;
     const incVal = incHas ? R((doneCount / items.length) * 100) : null;
 
     // ---- flags pillar (both sides use Karachi month membership here) ----
