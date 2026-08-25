@@ -129,17 +129,16 @@ export function markSentUpdates({ creators, group, runDate, startDate, tracker =
 //
 // Pure, like everything else here. `creators` are already clipped to
 // days <= runDate, exactly as buildDueLists receives them.
-export function explainRun({ creators, tracker = new Map(), runDate, keyOf, isExcluded }) {
+export function explainRun({ creators, tracker = new Map(), runDate, keyOf }) {
   const key = keyOf || defaultKey;
   const out = {
     videosOnDate: 0,
     creatorsOnDate: 0,
-    alreadySentForDate: [],   // we generated this day already — the usual answer
+    alreadySentForDate: [],   // messaged on this exact day — the usual answer
+    moreComingTomorrow: 0,    // ...of whom this many are still owed one, tomorrow
     sentOnLaterDate: [],      // the run date is BEHIND what has already been sent
-    finishedAllThree: [],     // past their 3 milestones, nothing left to send ever
     pastThirdVideo: [],       // posted that day, but it was their 4th+ video
-    blockedBySpacing: [],     // owed one, but already messaged on/after runDate
-    excluded: [],             // due, but on the APC's exclude list so never listed
+    finishedAllThree: [],     // owed nothing further (not necessarily three sent)
   };
   for (const c of creators) {
     const idxs = [];
@@ -148,32 +147,33 @@ export function explainRun({ creators, tracker = new Map(), runDate, keyOf, isEx
     out.videosOnDate += idxs.length;
     out.creatorsOnDate += 1;
 
-    // The exclude list is applied to the LISTS, so an excluded creator can be
-    // genuinely due and still show nowhere. Without this bucket the panel would
-    // claim everyone is accounted for while quietly omitting them.
-    if (isExcluded && isExcluded(c)) { out.excluded.push(c.creator); continue; }
-
     const t = tracker.get(key(c));
-    if (t && t.lastSentDate === runDate) { out.alreadySentForDate.push(c.creator); continue; }
-    if (t && cmp(t.lastSentDate, runDate) > 0) { out.sentOnLaterDate.push(c.creator); continue; }
-
-    // Precedence is deliberate: being MESSAGED on the run date outranks being
-    // past the 3rd video. Both can be true at once — a creator whose queue is
-    // catching up can get their 3rd message on a day they posted their 5th —
-    // and "we already messaged them that day" is the truer account of what
-    // happened than "they are past their milestones".
-    // A milestone is one of their first THREE videos ever (index 0,1,2).
-    const hasMilestoneOnDate = idxs.some((i) => i < 3);
-    if (!hasMilestoneOnDate) { out.pastThirdVideo.push(c.creator); continue; }
-
     const st = creatorState({
       days: c.days, startDate: runDate, runDate,
       sentCount: t ? t.sentCount : null,
       lastSentDate: t ? t.lastSentDate : null,
     });
-    if (st.due) continue;                        // it IS due — not part of the explanation
-    if (st.blockedToday) out.blockedBySpacing.push(c.creator);
-    else out.finishedAllThree.push(c.creator);
+
+    // DUE FIRST, and that ordering is the whole correctness of this function.
+    // Classifying before asking "is it due" let a creator be bucketed as a
+    // reason AND appear in a list at the same time: someone catching up their
+    // 2nd message on a day they happened to post their 5th video is genuinely
+    // due, yet has no milestone that day. Counting them in both places is what
+    // would make the reconciliation — every creator either due or explained,
+    // never both — quietly untrue.
+    if (st.due) continue;
+
+    // Not due. Say why, most-actionable first: "you already did this day" is
+    // the misreading this whole function exists to prevent.
+    if (t && t.lastSentDate === runDate) {
+      out.alreadySentForDate.push(c.creator);
+      if (st.owed > 0) out.moreComingTomorrow += 1;   // spacing: one per day
+      continue;
+    }
+    if (t && cmp(t.lastSentDate, runDate) > 0) { out.sentOnLaterDate.push(c.creator); continue; }
+    // A milestone is one of their first THREE videos ever (index 0,1,2).
+    if (!idxs.some((i) => i < 3)) { out.pastThirdVideo.push(c.creator); continue; }
+    out.finishedAllThree.push(c.creator);
   }
   return out;
 }

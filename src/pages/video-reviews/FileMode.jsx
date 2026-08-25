@@ -141,6 +141,10 @@ export default function FileMode() {
     setGenErr('');
     if (!brandId) { setGenErr('Pick a brand first.'); return; }
     if (!parsed) { setGenErr('Upload the TikTok video file first.'); return; }
+    // A date input can be cleared to '', which every comparison below then
+    // silently loses to — and the explainer would announce that nobody posted
+    // a video on "".
+    if (!runDate) { setGenErr('Pick the day you are sending reviews for.'); return; }
     setGenerating(true); setResult(null); setSentGroups(new Set());
     try {
       const tracker = await fetchTracker(brandId);
@@ -159,8 +163,7 @@ export default function FileMode() {
       // "0 · 0 · 0" has now been reported as a counting bug twice when the real
       // answer was "you already did this day", so the page has to say which.
       const nameByKey = new Map(creators.map((c) => [creatorKey(c.creator), c.creator]));
-      const why = explainRun({ creators, tracker, runDate, keyOf: (c) => creatorKey(c.creator),
-        isExcluded: (c) => excludeSet.has(creatorKey(c.creator)) });
+      const why = explainRun({ creators, tracker, runDate, keyOf: (c) => creatorKey(c.creator) });
       const prev = previouslySentLists({ tracker, runDate, nameFor: (k) => nameByKey.get(k) || k });
       setResult({ ...lists, why, prev });
     } catch (e) {
@@ -197,7 +200,15 @@ export default function FileMode() {
         await markSent(brandId, updates);
         for (const u of updates) trackerRef.current.set(u.key, { sentCount: u.sentCount, lastSentDate: u.lastSentDate });
       }
+      // Recompute what this day has produced so the list just downloaded is
+      // immediately recoverable. Without this the recovery panel is frozen at
+      // generate time and claims a day produced less than it did — which is
+      // exactly when someone needs it back: they closed the CSV by mistake.
       setSentGroups((s) => new Set(s).add(def.key));
+      setResult((r) => (r ? { ...r, prev: previouslySentLists({
+        tracker: trackerRef.current, runDate,
+        nameFor: (k) => clippedCreators.find((c) => creatorKey(c.creator) === k)?.creator || k,
+      }) } : r));
     } catch (e) {
       setGenErr(e?.message || 'Downloaded, but could not mark the list as sent — those creators may re-appear next run.');
     } finally {
@@ -220,6 +231,14 @@ export default function FileMode() {
   }
 
   const totalDue = result ? FILE_DEFS.reduce((n, def) => n + applyExclude(result[def.key] || []).length, 0) : 0;
+  // Creators the queue says ARE due but the exclude list removes from the CSVs.
+  // Computed here rather than inside explainRun for two reasons: it stays in
+  // lockstep with totalDue when the exclude list is edited without
+  // re-generating, and an exclusion must not outrank the real reason a
+  // creator is not due (they may also be past their 3rd video, or already sent).
+  const excludedDue = result
+    ? FILE_DEFS.reduce((n, def) => n + (result[def.key] || []).filter((h) => excludeSet.has(creatorKey(h))).length, 0)
+    : 0;
 
   return (
     <div style={{ padding: '4px 2px 40px' }}>
@@ -299,7 +318,7 @@ export default function FileMode() {
               <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 11.5, lineHeight: 1.5,
                 background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', color: 'var(--warning)' }}>
                 <i className="bi bi-exclamation-triangle me-1" />
-                {prettyDate(runDate)} is outside this file's data ({parsed.stats.minDay} → {parsed.stats.maxDay}) — no videos fall on it, so all three lists come out empty. Pick a day within the range.
+                {prettyDate(runDate)} is outside this file's data ({parsed.stats.minDay} → {parsed.stats.maxDay}) — no videos fall on it, so nobody can reach a new 1st, 2nd or 3rd video that day. Pick a day within the range.
               </div>
             )}
           </Step>
@@ -354,7 +373,7 @@ export default function FileMode() {
                 <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
                   {totalDue} creator{totalDue === 1 ? '' : 's'} due for {prettyDate(runDate)}
                   {result.why?.alreadySentForDate?.length ? ` · ${result.why.alreadySentForDate.length} already messaged for this day` : ''}
-                  {result.blockedToday.length ? ` · ${result.blockedToday.length} waiting for tomorrow` : ''}
+                  {result.why?.moreComingTomorrow ? ` · ${result.why.moreComingTomorrow} of them have another due tomorrow` : ''}
                 </p>
               </div>
 
@@ -412,7 +431,11 @@ export default function FileMode() {
                       <ul style={{ margin: '0 0 0 2px', paddingLeft: 18 }}>
                         {result.why.alreadySentForDate.length > 0 && (
                           <li><strong>{result.why.alreadySentForDate.length}</strong> were already sent their
-                            message for this exact day — you have generated {prettyDate(runDate)} before.</li>
+                            message for this exact day — you have generated {prettyDate(runDate)} before.
+                            {result.why.moreComingTomorrow > 0 && (
+                              <> {result.why.moreComingTomorrow} of them are owed another, which comes
+                                tomorrow — one message per creator per day.</>
+                            )}</li>
                         )}
                         {result.why.pastThirdVideo.length > 0 && (
                           <li><strong>{result.why.pastThirdVideo.length}</strong> were past their 3rd video, so
@@ -423,16 +446,12 @@ export default function FileMode() {
                             LATER date — this run date is behind where the queue has got to.</li>
                         )}
                         {result.why.finishedAllThree.length > 0 && (
-                          <li><strong>{result.why.finishedAllThree.length}</strong> have had all three of their
-                            messages already.</li>
+                          <li><strong>{result.why.finishedAllThree.length}</strong> are not owed another
+                            message — they have had one for every video they have posted.</li>
                         )}
-                        {result.why.excluded?.length > 0 && (
-                          <li><strong>{result.why.excluded.length}</strong> are on your exclude list,
-                            so they are never put on a list.</li>
-                        )}
-                        {result.why.blockedBySpacing.length > 0 && (
-                          <li><strong>{result.why.blockedBySpacing.length}</strong> are owed one but already got a
-                            message on this day — one per creator per day, so theirs comes tomorrow.</li>
+                        {excludedDue > 0 && (
+                          <li><strong>{excludedDue}</strong> would be due but are on your exclude list,
+                            so they are left off the CSVs.</li>
                         )}
                       </ul>
                     </>
@@ -449,15 +468,18 @@ export default function FileMode() {
                 <div style={{ padding: '13px 15px', border: '1px solid var(--border-subtle)', borderRadius: 12, background: 'var(--surface-1)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
                     <i className="bi bi-clock-history me-1" style={{ color: 'var(--text-muted)' }} />
-                    Already generated for {prettyDate(runDate)}
+                    Last messaged on {prettyDate(runDate)}
                   </div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 9 }}>
-                    These are the lists this day produced. Downloading them again changes nothing — nobody is
-                    re-marked and nobody advances.
+                    Creators whose most recent message was this day. Downloading again changes nothing —
+                    nobody is re-marked and nobody advances. Anyone messaged again since appears under their newer date instead.
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {FILE_DEFS.map((def) => {
-                      const list = applyExclude(result.prev[def.key] || []);
+                      // NOT applyExclude: these creators were already messaged on this
+                      // day. Filtering history by a list edited since would hand back a
+                      // CSV that is not what was sent.
+                      const list = result.prev[def.key] || [];
                       return (
                         <button key={def.key} className="wx-btn wx-btn-ghost" disabled={!list.length}
                           onClick={() => downloadHandlesCsv(list, `${brandLabel} - ${def.ord} video review creators (${runDate}).csv`)}

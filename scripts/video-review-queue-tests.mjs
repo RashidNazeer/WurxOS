@@ -79,7 +79,7 @@ out.push('\n-- explainRun accounts for EVERY creator who posted --');
   const why = explainRun({ creators, tracker, runDate: RUN, keyOf: key });
   const lists = buildDueLists({ creators, startDate: RUN, runDate: RUN, tracker, keyOf: key });
   const bucketed = [...why.alreadySentForDate, ...why.sentOnLaterDate, ...why.pastThirdVideo,
-                    ...why.finishedAllThree, ...why.blockedBySpacing];
+                    ...why.finishedAllThree];
 
   check('counts only videos posted on the run date', why.videosOnDate === 5, `got ${why.videosOnDate}`);
   check('counts the creators behind them', why.creatorsOnDate === 5, `got ${why.creatorsOnDate}`);
@@ -127,26 +127,82 @@ out.push('\n-- a day already generated can be recovered --');
 
 out.push('\n-- the exclude list does not create a silent gap --');
 {
-  // totalDue is computed AFTER applyExclude, so an excluded creator can be
-  // genuinely due and yet appear in no list. Without its own bucket the panel
-  // would claim everyone is accounted for while quietly omitting them.
+  // The CSVs are filtered by the exclude list but explainRun is not, so a
+  // creator can be genuinely due and still appear nowhere. That gap is closed
+  // in the UI, which counts due-but-excluded creators from the SAME lists it
+  // filters — deliberately not inside explainRun, both so the two can never
+  // drift when the exclude list is edited without re-generating, and so an
+  // exclusion cannot outrank the real reason a creator is not due.
   const creators = clip([
     { creator: 'due',    days: ['2026-08-24'] },
     { creator: 'banned', days: ['2026-08-24'] },
     { creator: 'vet',    days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-24'] },
   ]);
-  const isExcluded = (c) => c.creator === 'banned';
-  const why = explainRun({ creators, tracker: new Map(), runDate: RUN, keyOf: key, isExcluded });
+  const isExcluded = (n) => n === 'banned';
+  const why = explainRun({ creators, tracker: new Map(), runDate: RUN, keyOf: key });
   const lists = buildDueLists({ creators, startDate: RUN, runDate: RUN, tracker: new Map(), keyOf: key });
-  const dueAfterExclude = [...lists.group1, ...lists.group2, ...lists.group3]
-    .filter((n) => !isExcluded({ creator: n })).length;
+  const due = [...lists.group1, ...lists.group2, ...lists.group3];
+  const excludedDue = due.filter(isExcluded).length;          // what the page shows
+  const dueAfterExclude = due.length - excludedDue;           // what totalDue shows
   const bucketed = [...why.alreadySentForDate, ...why.sentOnLaterDate, ...why.pastThirdVideo,
-                    ...why.finishedAllThree, ...why.blockedBySpacing, ...why.excluded];
-  check('an excluded creator is reported, not silently dropped', why.excluded.includes('banned'));
+                    ...why.finishedAllThree];
+
+  check('an excluded creator is still DUE as far as the queue is concerned', due.includes('banned'));
+  check('an excluded creator is not bucketed as un-due', !bucketed.includes('banned'));
   check('an excluded creator still counts as having posted', why.creatorsOnDate === 3);
-  check('the reconciliation survives the exclude list',
-    bucketed.length + dueAfterExclude === why.creatorsOnDate,
-    `${bucketed.length} explained + ${dueAfterExclude} due = ${bucketed.length + dueAfterExclude}, posted ${why.creatorsOnDate}`);
+  check('the page can account for everyone: explained + shown + excluded == posted',
+    bucketed.length + dueAfterExclude + excludedDue === why.creatorsOnDate,
+    `${bucketed.length} explained + ${dueAfterExclude} shown + ${excludedDue} excluded = ${bucketed.length + dueAfterExclude + excludedDue}, posted ${why.creatorsOnDate}`);
+}
+
+out.push('\n-- a creator catching up is never both due AND explained --');
+{
+  // The hole this closes: someone owed their 2nd message who happens to post
+  // their 5th video on the run date. They ARE due (the queue is catching up),
+  // but they have no milestone that day — so a classify-before-due-check would
+  // bucket them as "past their 3rd video" while ALSO listing them, making the
+  // reconciliation quietly untrue and overstating the explanation.
+  const creators = clip([
+    { creator: 'catchup', days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-10', '2026-08-24'] },
+  ]);
+  const tracker = new Map([['catchup', { sentCount: 1, lastSentDate: '2026-08-05' }]]);
+  const lists = buildDueLists({ creators, startDate: RUN, runDate: RUN, tracker, keyOf: key });
+  const why = explainRun({ creators, tracker, runDate: RUN, keyOf: key });
+  const bucketed = [...why.alreadySentForDate, ...why.sentOnLaterDate,
+                    ...why.pastThirdVideo, ...why.finishedAllThree];
+  check('the catching-up creator is genuinely due', lists.group2.includes('catchup'), lists.group2.join() || 'not due');
+  check('and is NOT also counted as an explanation', !bucketed.includes('catchup'),
+    bucketed.join() || 'no buckets');
+}
+
+out.push('\n-- "already sent" separates finished from more-to-come --');
+{
+  const creators = clip([
+    { creator: 'donetoday', days: ['2026-08-24'] },                                  // 1 video, 1 sent = finished
+    { creator: 'moretocome', days: ['2026-08-24', '2026-08-24', '2026-08-24'] },     // 3 videos, 1 sent
+  ]);
+  const tracker = new Map([
+    ['donetoday',  { sentCount: 1, lastSentDate: RUN }],
+    ['moretocome', { sentCount: 1, lastSentDate: RUN }],
+  ]);
+  const why = explainRun({ creators, tracker, runDate: RUN, keyOf: key });
+  check('both are reported as already messaged for this day', why.alreadySentForDate.length === 2);
+  check('only the one still owed a message is counted as coming tomorrow',
+    why.moreComingTomorrow === 1, `got ${why.moreComingTomorrow}`);
+}
+
+out.push('\n-- an exclusion never masks the real reason --');
+{
+  // 'banned' is excluded AND past their 3rd video. The permanent reason must
+  // survive: excluding somebody does not change why they were never due.
+  const creators = clip([
+    { creator: 'banned', days: ['2026-08-01', '2026-08-02', '2026-08-03', '2026-08-24'] },
+  ]);
+  const why = explainRun({ creators, tracker: new Map(), runDate: RUN, keyOf: key });
+  const lists = buildDueLists({ creators, startDate: RUN, runDate: RUN, tracker: new Map(), keyOf: key });
+  check('past-the-3rd is still reported for an excluded creator', why.pastThirdVideo.includes('banned'));
+  check('and they are not due, so the exclude count does not double-count them',
+    ![...lists.group1, ...lists.group2, ...lists.group3].includes('banned'));
 }
 
 out.push('\n-- the reported scenario, reproduced --');
