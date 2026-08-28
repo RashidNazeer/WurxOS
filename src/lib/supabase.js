@@ -22,8 +22,45 @@ if (!url || !anonKey) {
 // Stays a single retry — if the second call also fails, we surface
 // the error normally (real refresh-token revocation, etc.).
 let supabase;
+
+// ── Auth over our OWN origin, not supabase.co directly ──────────────
+// 2026-08-27 outage: staff in both offices could not sign in — the page just
+// span forever with no error. Reproduced from the office network: every
+// https://<project>.supabase.co/auth/v1/* request took ~300 SECONDS, while
+// /rest/v1/* on the exact same host answered in 0.2s. So it is not the app,
+// not the database and not Supabase — something on the ISP path mangles that
+// one URL prefix. It never errors, it just stalls, which is why the UI showed
+// a spinner and nothing else.
+//
+// Fix: send auth calls to /sb-auth/* on our own domain, which vercel.json
+// rewrites to the Supabase auth endpoint SERVER-SIDE. The browser only ever
+// talks to wurxos.vercel.app (already fast on those networks); the hop that
+// was being throttled now happens inside Vercel.
+//
+// Falls back to the direct URL if the proxy itself fails, so a bad rewrite
+// degrades to today's behaviour rather than locking everyone out.
+const AUTH_DIRECT = (url.endsWith('/') ? url : url + '/') + 'auth/v1/';
+const AUTH_PROXY  = '/sb-auth/';
+const canProxy = typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol);
+const toProxy = (u) => (canProxy && typeof u === 'string' && u.startsWith(AUTH_DIRECT))
+  ? AUTH_PROXY + u.slice(AUTH_DIRECT.length)
+  : null;
 const customFetch = async (input, init = {}) => {
-  const res = await fetch(input, init);
+  // Auth goes through our own origin first (see above). If the proxy itself
+  // fails — bad rewrite, Vercel hiccup — fall straight back to the direct URL,
+  // so this can never leave us worse off than not having the proxy at all.
+  const proxied = toProxy(input);
+  let res;
+  if (proxied) {
+    try {
+      res = await fetch(proxied, init);
+      if (res.status === 404 || res.status === 502 || res.status === 504) res = await fetch(input, init);
+    } catch {
+      res = await fetch(input, init);
+    }
+  } else {
+    res = await fetch(input, init);
+  }
   if (res.status !== 401) return res;
   // Read once to inspect, but keep the body available for the caller
   // if we decide not to retry.
@@ -41,7 +78,7 @@ const customFetch = async (input, init = {}) => {
     const newInit = { ...init, headers: new Headers(init.headers || {}) };
     newInit.headers.set('Authorization', `Bearer ${newToken}`);
     newInit.headers.set('apikey', anonKey);
-    return await fetch(input, newInit);
+    return await fetch(toProxy(input) || input, newInit);
   } catch {
     return res;
   }
