@@ -41,26 +41,44 @@ let supabase;
 // degrades to today's behaviour rather than locking everyone out.
 const AUTH_DIRECT = (url.endsWith('/') ? url : url + '/') + 'auth/v1/';
 const AUTH_PROXY  = '/sb-auth/';
+// How long to let a direct auth call stall before routing around it. The
+// healthy figure is ~0.3s; the outage figure was ~300s. 8s is far outside
+// normal and far inside a user's patience.
+const AUTH_STALL_MS = 8000;
+// Only calls that are safe to send a second time. A stalled request may
+// still have reached the server, so signup / recovery / verification are
+// deliberately NOT retried — a duplicate there means a second confirmation
+// email or a colliding account, which is worse than a slow request.
+const AUTH_REPEATABLE_PATHS = ['/token', '/user', '/logout', '/health', '/settings'];
+const isRepeatableAuthCall = (u) => {
+  const path = String(u).split('?')[0];
+  return AUTH_REPEATABLE_PATHS.some((p) => path.endsWith(p));
+};
 const canProxy = typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol);
 const toProxy = (u) => (canProxy && typeof u === 'string' && u.startsWith(AUTH_DIRECT))
   ? AUTH_PROXY + u.slice(AUTH_DIRECT.length)
   : null;
-const customFetch = async (input, init = {}) => {
-  // Auth goes through our own origin first (see above). If the proxy itself
-  // fails — bad rewrite, Vercel hiccup — fall straight back to the direct URL,
-  // so this can never leave us worse off than not having the proxy at all.
+
+// Direct first — that is the fast path on a healthy network and adds no hop.
+// Only if it STALLS do we abandon it and go via our own origin.
+const authAwareFetch = async (input, init) => {
   const proxied = toProxy(input);
-  let res;
-  if (proxied) {
-    try {
-      res = await fetch(proxied, init);
-      if (res.status === 404 || res.status === 502 || res.status === 504) res = await fetch(input, init);
-    } catch {
-      res = await fetch(input, init);
-    }
-  } else {
-    res = await fetch(input, init);
+  if (!proxied || !isRepeatableAuthCall(input) || init?.signal) {
+    return fetch(input, init);
   }
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), AUTH_STALL_MS);
+  try {
+    return await fetch(input, { ...init, signal: ac.signal });
+  } catch {
+    return await fetch(proxied, init);   // direct stalled — route around it
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const customFetch = async (input, init = {}) => {
+  const res = await authAwareFetch(input, init);
   if (res.status !== 401) return res;
   // Read once to inspect, but keep the body available for the caller
   // if we decide not to retry.
