@@ -55,6 +55,10 @@ function monthEndIso(monthKey) {
 export default function ApcGmvGateModal({ status, onConfirm, onClose }) {
   const brands = status?.brands || [];
   const monthKey = status?.month_key || '';
+  // mig 343: on the first clock-in of a new month the gate asks for the WHOLE of
+  // the month just finished, not a running total. Saying "today's GMV" and
+  // "month-to-date" there would be plainly wrong, so the copy follows the mode.
+  const closing = !!status?.closing_month;
   const firstOfMonth = status?.range_start || (monthKey ? `${monthKey}-01` : '');
   const monthEnd = monthEndIso(monthKey);
 
@@ -108,8 +112,14 @@ export default function ApcGmvGateModal({ status, onConfirm, onClose }) {
         <div className="wx-m-head">
           <div className="wx-m-head-icon"><i className="bi bi-graph-up-arrow" style={{ fontSize: 18 }} /></div>
           <div className="wx-m-head-text">
-            <div className="wx-m-head-title" id="apc-gmv-title">Enter today's GMV</div>
-            <div className="wx-m-head-sub">Add each brand's month-to-date GMV, then you'll be clocked in.</div>
+            <div className="wx-m-head-title" id="apc-gmv-title">
+              {closing ? `Close off ${monthLabel(monthKey)}` : "Enter today's GMV"}
+            </div>
+            <div className="wx-m-head-sub">
+              {closing
+                ? `${monthLabel(monthKey)} has finished — enter each brand's FINAL total for the whole month, then you'll be clocked in.`
+                : "Add each brand's month-to-date GMV, then you'll be clocked in."}
+            </div>
           </div>
           {!submitting && (
             <button type="button" className="wx-m-head-close" onClick={onClose} aria-label="Close">
@@ -171,7 +181,7 @@ export default function ApcGmvGateModal({ status, onConfirm, onClose }) {
                     <input
                       inputMode="decimal" autoComplete="off" placeholder="0"
                       autoFocus={i === 0}
-                      aria-label={`${b.name} month-to-date GMV in ${b.currency}`}
+                      aria-label={`${b.name} ${closing ? 'final' : 'month-to-date'} GMV in ${b.currency}`}
                       value={values[b.id] ?? ''}
                       onChange={(e) => setValues((prev) => ({ ...prev, [b.id]: sanitizeNum(e.target.value) }))}
                     />
