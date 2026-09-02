@@ -174,7 +174,7 @@ function AttendanceBadge() {
 function AutoBadge({ source }) {
   const meta = {
     ol_brands:       { title: 'Auto-filled from your incentive-brands roll-up', icon: 'bi-bullseye' },
-    gmv_max:         { title: "Auto-filled from the brand's GMV in Brand Analytics", icon: 'bi-graph-up-arrow' },
+    gmv_max:         { title: "Auto-filled from the brand's GMV in Brand Analytics — completes at 90% of its goal", icon: 'bi-graph-up-arrow' },
     commission_tier: { title: "Commission on the brand's GMV — pays once its monthly goal is reached", icon: 'bi-percent' },
   }[source] || { title: 'Auto-filled from monthly attendance %', icon: 'bi-calendar-check' };
   return (
@@ -507,14 +507,22 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
           </div>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
             {item.source === 'attendance' && <AttendanceBadge />}
-            {item.source === 'commission_tier' && <AutoBadge source="commission_tier" />}
+            {/* Every derived source gets the badge, not just commission. The
+                AutoBadge metadata already covered ol_brands and gmv_max but
+                nothing rendered it, so those lines showed a tick and no
+                explanation of where their number came from. */}
+            {item.source && item.source !== 'attendance' && <AutoBadge source={item.source} />}
             <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
               {item.completed ? '✓ Done' : `${p}%`}
             </span>
-            {/* No manual tick for a commission line either: whether it is earned
-                is decided by the brand's GMV against its goal, and `completed`
-                is stripped at rest, so a tick here would not survive a save. */}
-            {!readOnly && item.source !== 'attendance' && item.source !== 'commission_tier' && (
+            {/* No manual tick on ANY derived line. stripAttendanceForSave blanks
+                `completed` for all four sources (attendance, ol_brands, gmv_max,
+                commission_tier), so a tick was never going to survive the save —
+                it just turned the row green, moved the payout total on screen,
+                and silently reverted on the next load. Keyed off the presence of
+                `source` rather than a list of names, so a fifth derived source
+                cannot reintroduce the phantom button by being forgotten here. */}
+            {!readOnly && !item.source && (
               <button className="btn btn-sm btn-link p-0" style={{ fontSize: '0.7rem', color: item.completed ? '#dc3545' : '#198754' }}
                 onClick={() => onToggleItem(rec, category, item.id, !item.completed)}
                 title={item.completed ? 'Mark incomplete' : 'Mark complete'}>
