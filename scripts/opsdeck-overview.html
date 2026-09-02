@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpsDeck — Overview</title>
+<style>
+  @page { size: A4; margin: 14mm 13mm 12mm; }
+
+  :root{
+    --ink:#16110e;
+    --body:#3d3630;
+    --muted:#7d736b;
+    --accent:#b8613f;
+    --accent-soft:#fbf1ec;
+    --line:#e6ded8;
+    --panel:#faf7f5;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    color:var(--body);
+    font-size:9.1pt;
+    line-height:1.40;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  h1,h2,h3{ color:var(--ink); margin:0; font-weight:700; }
+
+  .top{ display:flex; align-items:center; gap:11px; padding-bottom:11px;
+        border-bottom:2.5px solid var(--accent); }
+  .mark{ width:34px; height:34px; flex:none; }
+  .wordmark{ font-size:21pt; letter-spacing:-0.5px; line-height:1; color:var(--ink); font-weight:700; }
+  .tag{ margin-left:auto; text-align:right; color:var(--muted); font-size:7.9pt; line-height:1.35; }
+
+  .lede{ margin:13px 0 0; font-size:11.4pt; line-height:1.42; color:var(--ink); font-weight:600; }
+  .sub{ margin:5px 0 0; color:var(--muted); font-size:9pt; }
+
+  h2{ font-size:8pt; letter-spacing:1.4px; text-transform:uppercase; color:var(--accent);
+      margin:12px 0 7px; padding-bottom:3px; border-bottom:1px solid var(--line); }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:5px 13px; }
+  .card{ break-inside:avoid; page-break-inside:avoid; }
+  .card h3{ font-size:9.6pt; margin-bottom:3px; }
+  .card h3 .n{ color:var(--accent); font-weight:700; margin-right:5px; }
+  ul{ margin:0; padding-left:13px; }
+  li{ margin:1.5px 0; }
+  li::marker{ color:var(--accent); }
+
+  .strip{ background:var(--panel); border-left:3px solid var(--accent);
+          padding:8px 12px; margin:9px 0 0; break-inside:avoid; }
+  .strip h3{ font-size:9.4pt; margin-bottom:4px; }
+  .strip p{ margin:0; font-size:8.7pt; }
+
+  .flow{ display:flex; gap:5px; margin-top:4px; }
+  .step{ flex:1; background:#fff; border:1px solid var(--line); border-top:2.5px solid var(--accent);
+         padding:7px 8px; break-inside:avoid; }
+  .step b{ display:block; color:var(--ink); font-size:8.4pt; margin-bottom:2px; }
+  .step span{ color:var(--muted); font-size:7.6pt; line-height:1.32; display:block; }
+
+  table{ width:100%; border-collapse:collapse; font-size:8.6pt; }
+  th{ text-align:left; font-size:7.4pt; letter-spacing:0.8px; text-transform:uppercase;
+      color:var(--muted); font-weight:600; padding:0 8px 4px 0; border-bottom:1px solid var(--line); }
+  td{ padding:3.1px 8px 3.1px 0; border-bottom:1px solid #f2ece8; vertical-align:top; }
+  td.role{ color:var(--ink); font-weight:600; white-space:nowrap; width:34%; }
+
+  .access{ background:var(--accent-soft); border:1px solid #f0d9cd; padding:10px 13px;
+           margin-top:9px; break-inside:avoid; }
+  .access h3{ font-size:9.4pt; margin-bottom:5px; }
+  .access dl{ margin:0; display:grid; grid-template-columns:auto 1fr; gap:2.5px 12px; font-size:8.7pt; }
+  .access dt{ color:var(--muted); }
+  .access dd{ margin:0; color:var(--ink); font-family:Consolas,"Courier New",monospace; font-size:8.4pt; }
+  .access p{ margin:7px 0 0; font-size:8.2pt; color:var(--muted); }
+
+  .foot{ margin-top:11px; padding-top:6px; border-top:1px solid var(--line);
+         color:var(--muted); font-size:7.6pt; display:flex; }
+  .foot span:last-child{ margin-left:auto; }
+
+  /* Two columns of short facts that do not each deserve a card. */
+  ul.inline{ columns:2; column-gap:20px; padding-left:13px; margin:0; }
+  ul.inline li{ break-inside:avoid; margin:1.5px 0; }
+
+  .pagebreak{ page-break-before:always; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+    <rect width="512" height="512" rx="112" fill="#16110e"/>
+    <g fill="none" stroke="#b8613f" stroke-width="26" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M256 108 408 190 256 272 104 190 Z"/>
+      <path d="M104 256 256 338 408 256" opacity="0.72"/>
+      <path d="M104 322 256 404 408 322" opacity="0.44"/>
+    </g>
+  </svg>
+  <div class="wordmark">OpsDeck</div>
+  <div class="tag">Operations platform for<br>creator-commerce agencies</div>
+</div>
+
+<p class="lede">One system that runs an entire affiliate agency &mdash; brands, people, client
+reporting, pay and performance.</p>
+<p class="sub">Replaces the usual pile of spreadsheets, chat threads and calendar reminders with a
+single place where work is assigned, done, reviewed, rated and paid for.</p>
+
+<h2>Why it exists</h2>
+<div class="grid">
+  <div class="card">
+    <h3>The problem</h3>
+    <ul>
+      <li>Client reports live in scattered docs with no review trail</li>
+      <li>Nobody can say who is accountable for which brand</li>
+      <li>Bonus calculations are manual, late and disputed</li>
+      <li>Performance reviews rely on memory, not evidence</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>What OpsDeck does</h3>
+    <ul>
+      <li>Every brand has one named owner and one coordinator</li>
+      <li>Reports follow a fixed approval chain, end to end</li>
+      <li>Pay is calculated from data the team already enters</li>
+      <li>Scores are built from attendance, output and reviews</li>
+    </ul>
+  </div>
+</div>
+
+<h2>How a week runs</h2>
+<div class="flow">
+  <div class="step"><b>1 &middot; Clock in</b><span>Shift starts, daily tasks appear</span></div>
+  <div class="step"><b>2 &middot; Checkpoint</b><span>Per-brand numbers prepared</span></div>
+  <div class="step"><b>3 &middot; Team meeting</b><span>Present, get rated, take actions</span></div>
+  <div class="step"><b>4 &middot; Client report</b><span>Draft &rarr; verified &rarr; approved</span></div>
+  <div class="step"><b>5 &middot; Month end</b><span>Incentives verified and paid</span></div>
+</div>
+
+<h2>Core modules</h2>
+<div class="grid">
+
+  <div class="card">
+    <h3><span class="n">01</span>Brands &amp; clients</h3>
+    <ul>
+      <li>Every brand with its owner, coordinator, tier and status</li>
+      <li>Monthly revenue, ROI and sampling goals per brand</li>
+      <li>Each brand reports in its own currency</li>
+      <li>Temporary cover with an expiry date when someone is away</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">02</span>Client reporting</h3>
+    <ul>
+      <li>Weekly, bi-weekly and monthly reports</li>
+      <li>Fixed sections: performance, creators, videos, ads, products</li>
+      <li>Draft &rarr; submitted &rarr; verified &rarr; approved, named at every step</li>
+      <li>Star-rated by the reviewer; ratings feed performance</li>
+      <li>Share a read-only link with the client, no login needed</li>
+      <li>Export to Word or PDF</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">03</span>Attendance &amp; leave</h3>
+    <ul>
+      <li>Clock in and out, breaks, office or working from home</li>
+      <li>Forgotten clock-outs auto-close and ask for acknowledgement</li>
+      <li>Correction requests routed to the team lead</li>
+      <li>Leave requests with an approval chain and paid/unpaid split</li>
+      <li>Monthly attendance % from real records, holidays excluded</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">04</span>Performance</h3>
+    <ul>
+      <li>One score per person per month, from four weighted pillars</li>
+      <li>Review scores, incentive completion, attendance, conduct flags</li>
+      <li>Bands: promotion &middot; good &middot; warning</li>
+      <li>Green and red flags with a written reason and an author</li>
+      <li>Simulator to test weighting changes before applying them</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">05</span>Incentives &amp; pay</h3>
+    <ul>
+      <li>A monthly plan per person, built from brand-linked targets</li>
+      <li>Four sources fill themselves in: attendance, team roll-up,
+          ad revenue, commission tier</li>
+      <li>Commission tier pays a % of revenue above a benchmark,
+          converted to local currency at a set rate</li>
+      <li>Verify &rarr; pay &rarr; freeze: a paid month never recalculates</li>
+      <li>Salary, history and total payout in one view</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">06</span>Weekly meetings</h3>
+    <ul>
+      <li>Each team has its own meeting day, time and link</li>
+      <li>A live presentation queue: start, present, rate, finish</li>
+      <li>Per-brand checkpoint decks prepared beforehand</li>
+      <li>Meeting ratings roll up into the monthly score</li>
+      <li>Action items become tracked tasks with owners</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="foot">
+  <span>OpsDeck &mdash; product overview</span>
+  <span>Page 1 of 2</span>
+</div>
+
+<div class="pagebreak"></div>
+
+<div class="top">
+  <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+    <rect width="512" height="512" rx="112" fill="#16110e"/>
+    <g fill="none" stroke="#b8613f" stroke-width="26" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M256 108 408 190 256 272 104 190 Z"/>
+      <path d="M104 256 256 338 408 256" opacity="0.72"/>
+      <path d="M104 322 256 404 408 322" opacity="0.44"/>
+    </g>
+  </svg>
+  <div class="wordmark">OpsDeck</div>
+  <div class="tag">Product overview<br>continued</div>
+</div>
+
+<h2>Core modules, continued</h2>
+<div class="grid">
+
+  <div class="card">
+    <h3><span class="n">07</span>Tasks</h3>
+    <ul>
+      <li>Assigned per person, optionally tied to a brand</li>
+      <li>Daily, weekly and monthly recurring, resetting on their own</li>
+      <li>Priorities, due dates, comments and attachments</li>
+      <li>Work reassigns automatically when someone goes on leave</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">08</span>Team &amp; access</h3>
+    <ul>
+      <li>Eight roles, each with its own navigation and permissions</li>
+      <li>Access enforced in the database, not just hidden in the interface</li>
+      <li>Org chart, lead reassignment and brand switching tools</li>
+      <li>Deactivating someone preserves everything they produced</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">09</span>Knowledge base</h3>
+    <ul>
+      <li>Standard procedures and how-to articles</li>
+      <li>Proposed, reviewed and approved before publishing</li>
+      <li>Acknowledgement tracking: who has read what</li>
+      <li>Visibility per role or per person</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">10</span>Notifications</h3>
+    <ul>
+      <li>In-app and push, on desktop and phone</li>
+      <li>Per-category preferences per person</li>
+      <li>Snooze or mark read straight from the notification</li>
+      <li>Reminders for reports, meetings and clock-ins</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">11</span>Analytics</h3>
+    <ul>
+      <li>Per-brand goal tracking, month on month</li>
+      <li>Revenue, ad spend, sampling and creator output in one view</li>
+      <li>Cross-channel lift analysis</li>
+      <li>Client portal for read-only sharing</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">12</span>Integrations &amp; admin</h3>
+    <ul>
+      <li>Pulls shop data to fill reports automatically</li>
+      <li>Ad account linking for spend and per-video results</li>
+      <li>An assistant answering questions from the team's own procedures</li>
+      <li>Full data export as a single backup file</li>
+    </ul>
+  </div>
+
+</div>
+
+<h2>Who sees what</h2>
+<table>
+  <thead><tr><th>Role</th><th>Scope</th></tr></thead>
+  <tbody>
+    <tr><td class="role">Founder</td><td>Everything &mdash; payroll, every brand, company-wide performance</td></tr>
+    <tr><td class="role">Operations Lead</td><td>Runs the week: verifies pay plans, rates the team, chairs meetings</td></tr>
+    <tr><td class="role">Team Lead</td><td>Their own group of brands and the coordinators running them</td></tr>
+    <tr><td class="role">Paid Collab Lead</td><td>Creator deals, budgets and the coordinators on that side</td></tr>
+    <tr><td class="role">Ads Manager</td><td>Ad performance on granted brands only, nothing else</td></tr>
+    <tr><td class="role">Brand Coordinator</td><td>The one to three brands they run, day to day</td></tr>
+    <tr><td class="role">Creator Coordinator</td><td>Paid collaborations; no affiliate brands, by design</td></tr>
+    <tr><td class="role">Developer</td><td>Build queue and bug reports</td></tr>
+  </tbody>
+</table>
+
+<div class="strip">
+  <h3>Access is real, not cosmetic</h3>
+  <p>Permissions are enforced by the database on every request. An Ads Manager signed in on
+  their own laptop cannot retrieve a brand they were not granted, even outside the app.
+  Hiding a menu item is not the same as denying access &mdash; here it is both.</p>
+</div>
+
+<h2>Also worth knowing</h2>
+<ul class="inline">
+  <li>Runs in any browser; installs as an app on desktop and phone</li>
+  <li>Survives unreliable connections without losing work</li>
+  <li>Live updates &mdash; changes appear without refreshing</li>
+  <li>Sensitive changes recorded with who and when</li>
+  <li>Paid and approved records frozen against later edits</li>
+  <li>Light and dark themes, per person</li>
+</ul>
+
+<div class="access">
+  <h3>Try it</h3>
+  <dl>
+    <dt>Demo</dt><dd>opsdeck-demo.vercel.app</dd>
+    <dt>Sign in</dt><dd>adrian.vance@meridian.example.com</dd>
+    <dt>Password</dt><dd>OpsDeckDemo!2026</dd>
+  </dl>
+  <p>Use the bar at the bottom of the screen to switch roles &mdash; it genuinely signs you in as
+  that person, so what you see is exactly what they are allowed to see. Every person, brand and
+  figure in the demo is invented.</p>
+</div>
+
+<div class="foot">
+  <span>OpsDeck &mdash; product overview</span>
+  <span>Page 2 of 2</span>
+</div>
+
+</body>
+</html>
