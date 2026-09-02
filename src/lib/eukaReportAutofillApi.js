@@ -2,12 +2,15 @@
 // on the weekly report form). Called via a direct fetch (like the AI assistant
 // and video reviews) because the per-product fan-out can take a while.
 import { supabase } from './supabase';
+import { assertAllowedInDemo } from './demoMode';
 
 // Runs the exact-match autofill for a brand + a 7-day stats window. Returns
 // { brandLabel, period:{startDate,endDate}, data (partial report), meta }.
 // Throws an Error whose `.detail` carries the structured error for the
 // copy-to-Discord message.
 export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
+  // Raw fetch, so the invoke wrapper in supabase.js does not cover this one.
+  assertAllowedInDemo('euka-report-autofill');
   const base = import.meta.env.VITE_SUPABASE_URL;
   const { data: sess } = await supabase.auth.getSession();
   const accessToken = sess?.session?.access_token;

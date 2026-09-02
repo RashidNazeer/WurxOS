@@ -11,6 +11,13 @@ import { BrandsProvider } from './contexts/BrandsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
 import AppShell from './components/layout/AppShell';
+import { DEMO_MODE } from './lib/demoMode';
+
+// Sales-demo role switcher. Behind DEMO_MODE *and* lazy, so a production build
+// resolves this to null and never downloads the chunk — the switcher cannot
+// appear at work even if someone sets the env var, because demoMode.js refuses
+// to turn on against the production database.
+const DemoBar = DEMO_MODE ? lazy(() => import('./components/demo/DemoBar')) : null;
 
 // Auth pages are eager — they're the first thing an unauthenticated
 // user hits, so we don't want a Suspense flash on the login screen.
@@ -667,6 +674,14 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          {/* Outside <Routes> so it survives navigation, inside the router so a
+              future version can link. Also renders on /login, which is where a
+              walkthrough starts. */}
+          {DemoBar && (
+            <Suspense fallback={null}>
+              <DemoBar />
+            </Suspense>
+          )}
         </BrowserRouter>
           </ErrorReporterProvider>
         </AuthProvider>

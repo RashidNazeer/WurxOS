@@ -5,6 +5,7 @@
 // .invoke comfortably allows. So we hit the function URL directly with the
 // caller's session token (same pattern as the AI assistant's streaming call).
 import { supabase } from './supabase';
+import { assertAllowedInDemo } from './demoMode';
 
 // Video Reviews is an APC-only feature: the Euka-linked brands the current APC
 // is ASSIGNED to. Returns [{ id, brand_name, euka_slug }] sorted by name.
@@ -27,6 +28,8 @@ export async function listMyEukaBrands() {
 // Returns { brandLabel, targetDate, missedDates, group1[], group2[], group3[],
 //           needsManual[], meta{ candidates, candidateWindow, dayBoundary } }.
 export async function runVideoReviewTargets({ brandId, targetDate, missedDates = [] }) {
+  // Raw fetch, so the invoke wrapper in supabase.js does not cover this one.
+  assertAllowedInDemo('video-review-targets');
   const base = import.meta.env.VITE_SUPABASE_URL;
   const { data: sess } = await supabase.auth.getSession();
   const accessToken = sess?.session?.access_token;

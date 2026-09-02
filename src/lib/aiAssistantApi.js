@@ -2,6 +2,7 @@
 // function (GPT_TOKEN stays server-side). Knowledge/config/history are plain
 // RLS-gated table reads/writes.
 import { supabase } from './supabase';
+import { assertAllowedInDemo } from './demoMode';
 
 // ── Chat ──────────────────────────────────────────────────────────
 export async function aiSend({ conversationId, message }) {
@@ -22,6 +23,8 @@ export async function aiSend({ conversationId, message }) {
 // once the stream completes. supabase.functions.invoke can't stream, so we hit
 // the function URL directly with the user's access token.
 export async function aiSendStream({ conversationId, message, onDelta, onStatus, signal }) {
+  // Raw fetch, so the invoke wrapper in supabase.js does not cover this path.
+  assertAllowedInDemo('ai-chat');
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;

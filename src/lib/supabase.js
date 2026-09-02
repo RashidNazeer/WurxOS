@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { DEMO_MODE, assertAllowedInDemo } from './demoMode';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -54,7 +55,16 @@ const isRepeatableAuthCall = (u) => {
   const path = String(u).split('?')[0];
   return AUTH_REPEATABLE_PATHS.some((p) => path.endsWith(p));
 };
-const canProxy = typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol);
+// The /sb-auth rewrite in vercel.json names the production project explicitly
+// (Vercel does not interpolate env vars into rewrites). A demo deployment
+// shares that file, so its fallback would aim at production's auth endpoint —
+// harmless, since a demo token means nothing there, but it is the wrong server
+// and would make a stalled demo login fail in a confusing way. The proxy is a
+// contingency for one ISP-level outage on the office network; a demo does not
+// need it, so demo builds go direct and only direct.
+const canProxy = typeof window !== 'undefined'
+  && /^https?:$/.test(window.location.protocol)
+  && !DEMO_MODE;
 const toProxy = (u) => (canProxy && typeof u === 'string' && u.startsWith(AUTH_DIRECT))
   ? AUTH_PROXY + u.slice(AUTH_DIRECT.length)
   : null;
@@ -112,6 +122,26 @@ supabase = createClient(url, anonKey, {
     fetch: customFetch,
   },
 });
+// In a demo build, stop the calls that would reach a third party (or erase the
+// sample data) before they leave the browser. Wrapping the client here means a
+// page added later is covered without anyone remembering to gate it — the only
+// gap is a call made by raw fetch instead of the client, and those two files
+// call assertAllowedInDemo themselves.
+//
+// Shaped to look exactly like a normal invoke failure ({ data, error }) so no
+// caller needs a demo-specific branch.
+if (DEMO_MODE) {
+  const realInvoke = supabase.functions.invoke.bind(supabase.functions);
+  supabase.functions.invoke = async (name, opts) => {
+    try {
+      assertAllowedInDemo(name);
+    } catch (e) {
+      return { data: null, error: e };
+    }
+    return realInvoke(name, opts);
+  };
+}
+
 export { supabase };
 
 // Debug helper — exposes the authenticated client on the window so
