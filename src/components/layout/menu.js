@@ -290,6 +290,7 @@ export const MENUS = {
   tl: [
     DASHBOARD_ITEM,
     MY_BRANDS,
+    BRAND_ANALYTICS,
     CREATOR_LIBRARY_ITEM,
     HALO_ITEM,
     HALO_V2_ITEM,
@@ -335,6 +336,7 @@ export const MENUS = {
   apc: [
     DASHBOARD_ITEM,
     MY_BRANDS,
+    BRAND_ANALYTICS,
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,

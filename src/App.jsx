@@ -561,7 +561,10 @@ export default function App() {
               <Route
                 path="/analytics/brands"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'pctl', 'ads_manager']}>
+                  /* TL/APC read their own brands only — scoped by RLS (mig 341),
+                     and the page hides every edit control for anyone who is not
+                     Boss/OL/developer. */
+                  <RoleGuard allow={['boss', 'ol', 'pctl', 'ads_manager', 'tl', 'apc']}>
                     <BrandAnalyticsPage />
                   </RoleGuard>
                 }
