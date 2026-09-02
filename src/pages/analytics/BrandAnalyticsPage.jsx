@@ -142,11 +142,13 @@ export default function BrandAnalyticsPage() {
   // brands, so nothing extra is needed here.
   const isAdmin = profile?.role === 'boss' || profile?.role === 'ol' || profile?.role === 'developer';
   const canEditGoals = isAdmin || profile?.role === 'tl';
-  // ...but NOT the achieved figures. gmv_achieved decides whether a TL's own GMV
-  // Max incentive line pays out, so a TL editing it would be paying themselves.
-  // A trigger enforces this server-side (mig 342); this only keeps the UI honest
-  // about it instead of showing a field the save will be rejected for.
-  const canEditActuals = isAdmin;
+  // Achieved figures too, for a TL's own brands (mig 346, Boss's call). Note
+  // what that means: gmv_achieved decides whether a TL's own GMV Max line pays,
+  // and since mig 345 it also feeds the OL's roll-up percentage — so this field
+  // lets a TL move their own bonus and their OL's. The control is review rather
+  // than prevention: every change is written to audit_log with the actor and
+  // the before/after values (mig 346).
+  const canEditActuals = canEditGoals;
   const [brandId, setBrandId] = useState('');
   const [month, setMonth] = useState(pakistanMonth);
   const [editing, setEditing] = useState(false);
