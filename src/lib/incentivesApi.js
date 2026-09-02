@@ -518,15 +518,30 @@ export async function listOlBrandsByOl() {
 // Does a brand "hit" for its owning TL? Mirrors the ol_brand_incentive_pct RPC
 // (mig 296): the TL has a COMPLETED item linked by brandId (or, for unlinked
 // legacy items, a normalised-text name match). Used client-side to badge OL cards.
+//
+// The source exclusion mirrors the RPC's, and is load-bearing rather than
+// cosmetic. commission_tier items DO carry a brandId, and applyCommissionAutofill
+// stamps completed:true on them whenever the commission is earned — which is a
+// statement about one TL's commission, not about the brand hitting its GMV goal.
+// mig 335 added commission_tier to the RPC's exclusion list for exactly that
+// reason. Without the same filter here, a TL with an earned commission on a
+// brand sitting at 73% of its GMV target would badge that brand GREEN on the OL
+// card while the Details panel and the payout both counted it a miss.
+// Invisible before mig 345 (the RPC's link_hit was always false, so the two
+// surfaces disagreed about everything); now that the panel is right, any
+// remaining disagreement reads as one of them lying.
+const _ROLLUP_EXCLUDED_SOURCES = new Set(['attendance', 'ol_brands', 'commission_tier']);
 const _normBrand = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 export function brandHitByTL(tlRecord, brand) {
   if (!tlRecord || !brand) return false;
   const nb = _normBrand(brand.name);
   const items = [...(tlRecord.incentives || []), ...(tlRecord.bonuses || [])];
-  return items.some((it) => it && it.completed && (
-    (it.brandId != null && String(it.brandId) === String(brand.id)) ||
-    (it.brandId == null && nb.length >= 3 && _normBrand(it.text).includes(nb))
-  ));
+  return items.some((it) => it && it.completed
+    && !_ROLLUP_EXCLUDED_SOURCES.has(it.source || '')
+    && (
+      (it.brandId != null && String(it.brandId) === String(brand.id)) ||
+      (it.brandId == null && nb.length >= 3 && _normBrand(it.text).includes(nb))
+    ));
 }
 
 export async function getIncentives(userId, month = currentMonth()) {
