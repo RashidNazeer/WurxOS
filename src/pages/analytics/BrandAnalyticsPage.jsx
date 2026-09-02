@@ -136,10 +136,17 @@ const STATUS_COLOR = { ontrack: 'var(--ba-ontrack)', met: 'var(--ba-ontrack)', b
 export default function BrandAnalyticsPage() {
   const qc = useQueryClient();
   const { profile } = useAuth();
-  // Goals are the Boss/OL's to set (bmm_all, mig 260). An Ads Manager reads the
-  // page for the brands they run ads for (bmm_select_ads_manager, mig 316), so
-  // hide every edit affordance rather than let RLS reject the save.
-  const canEditGoals = profile?.role === 'boss' || profile?.role === 'ol' || profile?.role === 'developer';
+  // Ads managers, PCTLs and APCs read this page but never write it, so hide
+  // every edit affordance rather than let RLS reject the save.
+  // TLs set the goals for the brands they own (mig 342) — RLS scopes which
+  // brands, so nothing extra is needed here.
+  const isAdmin = profile?.role === 'boss' || profile?.role === 'ol' || profile?.role === 'developer';
+  const canEditGoals = isAdmin || profile?.role === 'tl';
+  // ...but NOT the achieved figures. gmv_achieved decides whether a TL's own GMV
+  // Max incentive line pays out, so a TL editing it would be paying themselves.
+  // A trigger enforces this server-side (mig 342); this only keeps the UI honest
+  // about it instead of showing a field the save will be rejected for.
+  const canEditActuals = isAdmin;
   const [brandId, setBrandId] = useState('');
   const [month, setMonth] = useState(pakistanMonth);
   const [editing, setEditing] = useState(false);
@@ -383,6 +390,7 @@ export default function BrandAnalyticsPage() {
           month={month}
           data={data}
           metrics={visibleMetrics}
+          canEditActuals={canEditActuals}
           onClose={() => setEditing(false)}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
@@ -586,7 +594,7 @@ function MetricCard({ metric, target, achieved }) {
 }
 
 // ── Edit modal (centered overlay) ───────────────────────────────────
-function EditModal({ brand, month, data, metrics = METRICS, onClose, onSaved }) {
+function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = true, onClose, onSaved }) {
   const [form, setForm] = useState(() => {
     const f = {};
     for (const m of METRICS) {
@@ -602,7 +610,16 @@ function EditModal({ brand, month, data, metrics = METRICS, onClose, onSaved }) 
   async function save() {
     setSaving(true); setSaveErr('');
     try {
-      await saveBrandMonthlyMetrics(brand.id, month, form);
+      // Strip the achieved columns entirely when they are locked. Sending them
+      // back unchanged would usually pass the trigger, but an empty input would
+      // arrive as null against a real stored figure and be rejected — so a TL
+      // saving a goal would fail over a field they were never editing.
+      let payload = form;
+      if (!canEditActuals) {
+        payload = { ...form };
+        for (const m of METRICS) delete payload[m.aCol];
+      }
+      await saveBrandMonthlyMetrics(brand.id, month, payload);
       onSaved();
     } catch (e) {
       setSaveErr(e?.message || 'Could not save.');
@@ -636,7 +653,9 @@ function EditModal({ brand, month, data, metrics = METRICS, onClose, onSaved }) 
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <NumField label={m.tLabel} prefix={prefix(m.unit)} value={form[m.tCol]} onChange={(v) => set(m.tCol, v)} />
-                <NumField label={m.aLabel} prefix={prefix(m.unit)} value={form[m.aCol]} onChange={(v) => set(m.aCol, v)} />
+                <NumField label={m.aLabel} prefix={prefix(m.unit)} value={form[m.aCol]}
+                  onChange={(v) => set(m.aCol, v)} disabled={!canEditActuals}
+                  hint={canEditActuals ? null : 'Entered by the team'} />
               </div>
             </div>
           ))}
@@ -654,15 +673,16 @@ function EditModal({ brand, month, data, metrics = METRICS, onClose, onSaved }) 
   );
 }
 
-function NumField({ label, prefix, value, onChange }) {
+function NumField({ label, prefix, value, onChange, disabled = false, hint = null }) {
   return (
     <label style={{ display: 'block' }}>
       <span style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
       <div style={{ position: 'relative', marginTop: 4 }}>
         <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 13, pointerEvents: 'none' }}>{prefix}</span>
         <input type="number" className="wx-input" inputMode="decimal" value={value}
-          onChange={(e) => onChange(e.target.value)} placeholder="—"
-          style={{ paddingLeft: 26, width: '100%' }} />
+          onChange={(e) => onChange(e.target.value)} placeholder="—" disabled={disabled}
+          title={hint || undefined}
+          style={{ paddingLeft: 26, width: '100%', ...(disabled ? { opacity: 0.55, cursor: 'not-allowed' } : null) }} />
       </div>
     </label>
   );
