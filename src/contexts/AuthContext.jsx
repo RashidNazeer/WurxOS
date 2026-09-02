@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { getNow } from '../lib/serverTime';
 import { logAppEvent } from '../lib/appEvents';
 import { hasUnsavedWork } from '../lib/appUpdate';
 
@@ -9,6 +10,14 @@ const AuthContext = createContext(null);
 // Minimum gap between focus/online-triggered session rechecks.
 // Without this, rapidly switching tabs would fire one call per focus.
 const RECHECK_THROTTLE_MS = 15 * 1000;
+// Never let this path refresh more often than this. A token is good for an
+// hour, so a legitimate pre-emptive refresh happens at most once an hour. If
+// something asks far more often than that, the input is wrong (a skewed clock
+// before server-time sync has landed), and hammering /auth/v1/token is the
+// worst possible response — it trips Supabase's auth rate limit, after which
+// refreshSession fails, fail() fires, and the user is signed out. Below this
+// floor we defer to supabase-js's own autoRefreshToken timer.
+const MIN_FORCED_REFRESH_GAP_MS = 5 * 60 * 1000;
 // Require this many CONSECUTIVE failed checks before flagging the
 // session as dead. A single null from getSession() or a single
 // refresh error can fire during normal token rotation or a brief
@@ -48,6 +57,7 @@ export function AuthProvider({ children }) {
   // ms; without this guard, two parallel checks could each fail and
   // double-count, hitting the threshold faster than the user expects.
   const recheckInFlightRef = useRef(false);
+  const lastForcedRefreshRef = useRef(0);
 
   // Returns true on success, false on any failure (network, timeout, RLS
   // error, or row not found).
@@ -345,14 +355,33 @@ export function AuthProvider({ children }) {
         return;
       }
       const expiresAt = sess.session.expires_at;            // unix seconds
-      const nowSec    = Math.floor(Date.now() / 1000);
+      // SERVER-anchored clock, not Date.now(). expires_at is stamped by the
+      // auth server, so comparing it to a local clock measures the user's clock
+      // error as much as the time remaining. An APC whose PC ran ~59 minutes
+      // fast made every freshly-issued 60-minute token look 1 minute from
+      // death: this branch fired on every focus event, refreshed, got another
+      // 60-minute token that looked equally dead, and repeated — 53 refreshes
+      // in a day against a healthy 3-6, until Supabase rate-limited the
+      // account and refreshSession started failing, which signed him out every
+      // few minutes. getNow() applies the measured server drift, so a wrong
+      // system clock can no longer manufacture an expiry that is not real.
+      const nowSec    = Math.floor(getNow() / 1000);
       // Refresh slightly ahead of the deadline so a request fired
       // immediately after this check still has a fresh token.
       if (typeof expiresAt === 'number' && expiresAt - nowSec < 60) {
-        const { error: refreshErr } = await supabase.auth.refreshSession();
-        if (refreshErr) {
-          fail(`refreshSession error: ${refreshErr.message || refreshErr}`);
-          return;
+        // Backstop for the window before the first server-time sync lands,
+        // when getNow() is still just Date.now(). Without it a skewed clock can
+        // still storm during those first seconds.
+        if (Date.now() - lastForcedRefreshRef.current < MIN_FORCED_REFRESH_GAP_MS) {
+          // eslint-disable-next-line no-console
+          console.warn("[auth] skipping a pre-emptive refresh — asked again too soon; check the device clock on this machine");
+        } else {
+          lastForcedRefreshRef.current = Date.now();
+          const { error: refreshErr } = await supabase.auth.refreshSession();
+          if (refreshErr) {
+            fail(`refreshSession error: ${refreshErr.message || refreshErr}`);
+            return;
+          }
         }
         // refreshSession() updates the client's session in place;
         // onAuthStateChange will sync our state.
