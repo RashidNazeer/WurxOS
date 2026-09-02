@@ -37,11 +37,13 @@ const { data: users } = await sb.from('profiles').select('id,display_name,role')
 
 let totalMismatch = 0;
 for (const month of months) {
-  const [{ data: ratings }, { data: incs }, { data: flags }] = await Promise.all([
+  const [{ data: ratings }, { data: incs }, { data: flags }, { data: mets }] = await Promise.all([
     sb.from('performance_ratings').select('user_id,overall_score,metrics').eq('month', month),
     sb.from('incentives').select('user_id,incentives,bonuses,payout_cleared,verified').eq('month', month),
     sb.from('performance_flags').select('user_id,type,created_at'),
+    sb.from('brand_monthly_metrics').select('brand_id,gmv_achieved').eq('month_key', month),
   ]);
+  const gmvByBrand = new Map((mets || []).map((m) => [m.brand_id, Number(m.gmv_achieved) || 0]));
   const ratingOf = new Map((ratings || []).map((r) => [r.user_id, r]));
   const incOf = new Map((incs || []).map((r) => [r.user_id, r]));
 
@@ -76,9 +78,24 @@ for (const month of months) {
       const a = Number(it.achievedValue) || 0;
       return b > 0 ? a >= b : a > 0;
     };
+    // GMV Max (mig 339) is the third derived source whose stored `completed` is
+    // false at rest. Must equal perf_incentives_score's branch and
+    // incentivesApi.gmvMaxCompleted: 90% of the goal, and a goal of 0 never
+    // completes however much was achieved.
+    // Paid rows take the figure from the item's own frozen achievedValue, exactly
+    // as perf_incentives_score does since mig 340 — the freeze no longer stores a
+    // `completed` flag, because ol_brand_incentive_pct reads that back.
+    const gmvDone = (it) => {
+      const t = Number(it.targetValue) || 0;
+      const a = paid
+        ? Number(it.achievedValue) || 0
+        : (it.brandId && gmvByBrand.has(it.brandId) ? gmvByBrand.get(it.brandId) : 0);
+      return t > 0 && a >= t * 0.9;
+    };
     const doneCount = items.filter((it) => {
       if (!paid && it.source === 'attendance')      return monthClosed && attP >= 90;
       if (!paid && it.source === 'commission_tier') return commDone(it);
+      if (it.source === 'gmv_max')                 return gmvDone(it);
       return !!it.completed;
     }).length;
     const incVal = incHas ? R((doneCount / items.length) * 100) : null;

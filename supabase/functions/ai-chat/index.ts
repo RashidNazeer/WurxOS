@@ -660,6 +660,49 @@ async function overlayAttendanceIncentives(admin: any, rows: any[], month: strin
   });
 }
 
+// ── GMV Max overlay (mig 317 + 339) ──────────────────────────────────
+// A { source:'gmv_max' } item stores achievedValue null and completed false BY
+// DESIGN: the figure lives in brand_monthly_metrics and the flag is derived from
+// it. Without this the assistant reports every GMV Max goal as 0 and "not met" —
+// including the ones that just paid out.
+//
+// The 90% threshold and the target>0 guard are duplicated from mig 339 rather
+// than called, because there is no RPC that returns the flag alone. Keep the two
+// in step: a goal of 0 must NEVER read as met, whatever was achieved.
+const hasGmvMaxItem = (row: any) =>
+  [...(Array.isArray(row?.incentives) ? row.incentives : []), ...(Array.isArray(row?.bonuses) ? row.bonuses : [])]
+    .some((it: any) => it && it.source === 'gmv_max' && it.brandId);
+
+async function overlayGmvMaxIncentives(admin: any, rows: any[], month: string): Promise<any[]> {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.some((r) => !r?.payout_cleared && hasGmvMaxItem(r))) return list;
+
+  const { data: mets, error } = await admin
+    .from('brand_monthly_metrics').select('brand_id, gmv_achieved').eq('month_key', month);
+  if (error) return list;   // best effort: stale beats wrong-and-confident
+  const byBrand = new Map((mets || []).map((m: any) => [m.brand_id, Number(m.gmv_achieved) || 0]));
+
+  const patch = (it: any) => {
+    if (!it || it.source !== 'gmv_max' || !it.brandId) return it;
+    const achievedValue = byBrand.has(it.brandId) ? byBrand.get(it.brandId) : 0;
+    const target = Number(it.targetValue) || 0;
+    return { ...it, achievedValue, completed: target > 0 && achievedValue >= target * 0.9 };
+  };
+  // A PAID row keeps its frozen achievedValue but has no stored `completed`
+  // (mig 340 stopped the freeze writing that flag — the OL roll-up reads it).
+  // Derive the flag from the frozen figure so a paid month does not report every
+  // GMV Max goal as unmet.
+  const freezeFlag = (it: any) => {
+    if (!it || it.source !== 'gmv_max') return it;
+    const target = Number(it.targetValue) || 0;
+    const achieved = Number(it.achievedValue) || 0;
+    return { ...it, completed: target > 0 && achieved >= target * 0.9 };
+  };
+  return list.map((r: any) => {
+    const fn = r?.payout_cleared ? freezeFlag : patch;
+    return { ...r, incentives: (r.incentives || []).map(fn), bonuses: (r.bonuses || []).map(fn) };
+  });
+}
 // ── Commission Based Tier overlay (mig 333) ──────────────────────────
 // Same contract as the attendance overlay above: a { source:'commission_tier' }
 // item stores amount 0 / completed false BY DESIGN and derives everything at
@@ -804,7 +847,9 @@ async function runTool(admin: any, name: string, args: any): Promise<string> {
       // agrees with the Incentives page (contract C1+C2). fmtIncentiveRow then
       // recomputes "Earned" from the OVERLAID completed flags, not the stale
       // stored ones.
-      const orows = await overlayCommissionIncentives(admin, await overlayAttendanceIncentives(admin, rows, month), month);
+      const orows = await overlayCommissionIncentives(admin,
+        await overlayGmvMaxIncentives(admin,
+          await overlayAttendanceIncentives(admin, rows, month), month), month);
       // attach names
       const ids = [...new Set(orows.map((r: any) => r.user_id))];
       const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids);

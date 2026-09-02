@@ -15,6 +15,18 @@ export function autoComplete(item) {
   return (a / t) >= 0.9;
 }
 
+// A GMV Max line completes at 90% of the brand's goal (mig 339). Same threshold
+// autoComplete uses — kept as its own function because this one must NEVER fall
+// back to the stored flag: on a gmv_max line that flag is blanked at rest, and
+// the target is routinely 0 on a plan that has been created but not yet filled
+// in. `t > 0` is what stops a half-built plan marking itself complete and
+// becoming payable the moment it is saved.
+export function gmvMaxCompleted(item) {
+  const t = Number(item?.targetValue) || 0;
+  const a = Number(item?.achievedValue) || 0;
+  return t > 0 && a >= t * 0.9;
+}
+
 // ── Attendance auto-fill ──────────────────────────────────────────
 // An incentive/bonus line item flagged { source: 'attendance' } gets its
 // achievedValue filled from the user's monthly attendance % (the same
@@ -64,10 +76,11 @@ function stripAttendanceForSave(items) {
     // (e.g. 70). Both are read-time-derived, so never freeze achieved/completed.
     if (it.source === 'attendance') return { ...it, achievedValue: null, completed: false, completedBy: null, targetValue: 100, suffix: it.suffix || '%' };
     if (it.source === 'ol_brands')  return { ...it, achievedValue: null, completed: false, completedBy: null, suffix: it.suffix || '%' };
-    // GMV-Max: achieved is derived, but `completed` is a HUMAN decision (a TL/OL
-    // ticks it) and the TARGET is real money the OL set — so blank the achieved
-    // only and leave both of those alone.
-    if (it.source === 'gmv_max')    return { ...it, achievedValue: null };
+    // GMV-Max: the TARGET is real money the OL set, so it persists. Achieved AND
+    // completed are both derived (mig 339) — completed used to be a human tick,
+    // but a stored `true` is indistinguishable from a stale one once the brand's
+    // figure moves, so it is recomputed at read and frozen once at payout.
+    if (it.source === 'gmv_max')    return { ...it, achievedValue: null, completed: false, completedBy: null };
     // Commission tier: the benchmark (targetValue), the achieved figure and the
     // percentage are all TYPED by an OL, so they are real data and must persist.
     // Only the money and the completion flag are derived — the money because the
@@ -201,25 +214,47 @@ function _hasGmvMaxItem(row) {
 }
 export async function applyGmvMaxAutofill(rows, month) {
   const list = Array.isArray(rows) ? rows : [];
-  if (!list.some((r) => !_isPaid(r) && _hasGmvMaxItem(r))) return list;
-  let byBrand;
-  try { byBrand = await fetchGmvMaxAchieved(month); }
-  // eslint-disable-next-line no-console
-  catch (e) { console.warn('gmv-max autofill skipped:', e.message); return list; }
+  if (!list.some((r) => _hasGmvMaxItem(r))) return list;
+
+  // A PAID row still needs its `completed` derived — mig 340 stopped the payout
+  // freeze from writing that flag, because ol_brand_incentive_pct reads it back
+  // as another person's brand hit and the freeze order then decided their pay.
+  // Deriving it here from the item's OWN frozen achievedValue is stable forever
+  // (a frozen figure never moves) and reproduces exactly the number the payout
+  // was based on. Nothing live is consulted for a frozen row.
+  const freezeItem = (it) => (
+    !it || it.source !== 'gmv_max' ? it : { ...it, completed: gmvMaxCompleted(it) }
+  );
+
+  // The live figure is only needed if some row is still open.
+  const needsLive = list.some((r) => !_isPaid(r) && _hasGmvMaxItem(r));
+  let byBrand = null;
+  if (needsLive) {
+    try { byBrand = await fetchGmvMaxAchieved(month); }
+    // eslint-disable-next-line no-console
+    catch (e) { console.warn('gmv-max autofill skipped:', e.message); }
+  }
+
   const patchItem = (it) => {
     if (!it || it.source !== 'gmv_max' || !it.brandId) return it;
     // No metrics row yet for this brand+month → 0, not the stale typed figure.
     // Leaving the old number would be worse than an honest zero: it would read
     // as progress nobody can trace to a source.
-    return { ...it, achievedValue: byBrand.has(it.brandId) ? byBrand.get(it.brandId) : 0 };
+    const achievedValue = byBrand.has(it.brandId) ? byBrand.get(it.brandId) : 0;
+    // Completion is derived here as well, because `completed` is what earnedTotal
+    // pays on and it is blanked at rest (migs 339/340). Deriving the figure but
+    // not the flag is the bug that made these lines pay nothing for months.
+    return { ...it, achievedValue, completed: gmvMaxCompleted({ ...it, achievedValue }) };
   };
+  const map = (r, fn) => ({
+    ...r,
+    incentives: (r.incentives || []).map(fn),
+    bonuses:    (r.bonuses    || []).map(fn),
+  });
   return list.map((r) => {
-    if (_isPaid(r)) return r;   // frozen at payout — never re-overlay
-    return {
-      ...r,
-      incentives: (r.incentives || []).map(patchItem),
-      bonuses:    (r.bonuses    || []).map(patchItem),
-    };
+    if (_isPaid(r)) return map(r, freezeItem);   // flag only; the figure stays frozen
+    if (!byBrand) return r;                      // live lookup failed — leave it alone
+    return map(r, patchItem);
   });
 }
 
