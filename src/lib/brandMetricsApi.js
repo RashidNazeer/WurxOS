@@ -15,7 +15,7 @@ export const METRIC_COLUMNS = [
 export async function listActiveBrands() {
   const { data, error } = await supabase
     .from('brands')
-    .select('id, brand_name, client_name, logo_url, status, paid_collab_status, gmv_max_status')
+    .select('id, brand_name, client_name, logo_url, status, paid_collab_status, gmv_max_status, unlimited_sample_goal')
     .eq('status', 'active')
     .order('brand_name');
   if (error) throw new Error(error.message);

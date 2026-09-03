@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import ReportReturnNotice from './ReportReturnNotice';
-import GoalBar from './GoalBar';
+import GoalBar, { UnlimitedGoalNote } from './GoalBar';
 
 // Normalize a product name for matching report rows to brand-product goals
 // (productId is unreliable free text, so we key goals by trimmed lowercase name).
@@ -778,38 +778,39 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
   // fetched in the anonymous client portal (RLS would block it). A caller may
   // still pass productGoals to override.
   const [fetchedGoals, setFetchedGoals] = React.useState({});
+  // Brand-level "unlimited sample goal" (mig 348) — some contracts put no cap
+  // on approvals, and a progress bar against an invented target misleads the
+  // client. When this is on, every goal bar in the report is suppressed.
+  const [unlimitedSampleGoal, setUnlimitedSampleGoal] = React.useState(false);
   React.useEffect(() => {
     if (clientView || productGoalsProp || !report?.brandId) return undefined;
     let cancelled = false;
     import('../../lib/productsApi')
-      .then(({ listProducts }) => listProducts(report.brandId))
-      .then((rows) => {
+      .then(({ getBrandSampleGoals }) => getBrandSampleGoals(report.brandId))
+      .then(({ unlimited, goals }) => {
         if (cancelled) return;
-        // Key goals by TikTok Shop product ID (PRIMARY — report product names
-        // come from Euka and differ from the Brands→Products catalog names, so
-        // a name match silently misses) AND by normalized name (fallback for
-        // catalog products entered without an ID).
-        const map = {};
-        (rows || []).forEach((p) => {
-          if (p.monthly_sample_goal == null) return;
-          const pid = String(p.product_id || '').trim();
-          if (pid) map[pid] = p.monthly_sample_goal;
-          const pname = String(p.product_name || '').trim().toLowerCase();
-          if (pname) map[pname] = p.monthly_sample_goal;
-        });
-        setFetchedGoals(map);
+        // Goals arrive keyed by TikTok Shop product ID (PRIMARY — report product
+        // names come from Euka and differ from the Brands→Products catalog
+        // names, so a name match silently misses) AND by normalized name
+        // (fallback for catalog products entered without an ID).
+        setFetchedGoals(goals);
+        setUnlimitedSampleGoal(unlimited);
       })
-      .catch(() => { if (!cancelled) setFetchedGoals({}); });
+      .catch(() => { if (!cancelled) { setFetchedGoals({}); setUnlimitedSampleGoal(false); } });
     return () => { cancelled = true; };
   }, [report?.brandId, clientView, productGoalsProp]);
   const productGoals = productGoalsProp || fetchedGoals;
   // Resolve a report product's monthly sample goal: match its TikTok Shop
   // product ID against the catalog first (names differ between Euka reports and
   // the catalog), then fall back to a normalized-name match.
-  const goalForProduct = (p) => Number(
+  //
+  // An unlimited brand returns 0 for every product, which switches off the
+  // per-product bars AND the overall one (its total falls to 0) in a single
+  // place, so the two can never disagree about whether a goal exists.
+  const goalForProduct = (p) => (unlimitedSampleGoal ? 0 : Number(
     productGoals[String(p?.productId || '').trim()] ??
     productGoals[normName(p?.productName)] ?? 0,
-  ) || 0;
+  ) || 0);
   const [copyState, setCopyState] = React.useState('idle');
   const [highlighterActive, setHighlighterActive] = React.useState(false);
   const { color: highlightColor, setColor: setHighlightColor,
@@ -1330,11 +1331,19 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   unitsLabel={productUnitsLbl} />
               ))}
               {/* Overall sample goal — sum of per-product MTD approved vs
-                  sum of product goals. Only when at least one goal is set. */}
+                  sum of product goals. Only when at least one goal is set.
+                  An unlimited brand states that once, in place of the bar. */}
               {(() => {
+                const totalMtd = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedMtd), 0);
+                if (unlimitedSampleGoal) {
+                  return (
+                    <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+                      <UnlimitedGoalNote approved={totalMtd} label="Sample goal (MTD)" />
+                    </div>
+                  );
+                }
                 const totalGoal = sortedProducts.reduce((s, p) => s + goalForProduct(p), 0);
                 if (totalGoal <= 0) return null;
-                const totalMtd = sortedProducts.reduce((s, p) => s + num(p.samplesApprovedMtd), 0);
                 return (
                   <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
                     <GoalBar approved={totalMtd} goal={totalGoal} label="Overall sample goal (MTD)" />

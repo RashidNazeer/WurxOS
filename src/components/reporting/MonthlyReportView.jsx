@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import ReportReturnNotice from './ReportReturnNotice';
 import HierarchicalGmvDonut from './HierarchicalGmvDonut';
-import GoalBar from './GoalBar';
+import GoalBar, { UnlimitedGoalNote } from './GoalBar';
 
 const normName = (s) => String(s || '').trim().toLowerCase();
 import {
@@ -811,36 +811,36 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
   // normalized product name). Self-fetched like the weekly view; never in the
   // anonymous client portal.
   const [productGoals, setProductGoals] = React.useState({});
+  // Brand-level "unlimited sample goal" (mig 348) — see the weekly view: a
+  // progress bar against an invented target misleads the client, so an
+  // unlimited brand shows none.
+  const [unlimitedSampleGoal, setUnlimitedSampleGoal] = React.useState(false);
   React.useEffect(() => {
     if (clientView || !report?.brandId) return undefined;
     let cancelled = false;
     import('../../lib/productsApi')
-      .then(({ listProducts }) => listProducts(report.brandId))
-      .then((rows) => {
+      .then(({ getBrandSampleGoals }) => getBrandSampleGoals(report.brandId))
+      .then(({ unlimited, goals }) => {
         if (cancelled) return;
-        // Match by TikTok Shop product ID first (report names come from Euka
-        // and differ from the Brands→Products catalog names), then fall back to
-        // a normalized-name match.
-        const map = {};
-        (rows || []).forEach((p) => {
-          if (p.monthly_sample_goal == null) return;
-          const pid = String(p.product_id || '').trim();
-          if (pid) map[pid] = p.monthly_sample_goal;
-          const pname = normName(p.product_name);
-          if (pname) map[pname] = p.monthly_sample_goal;
-        });
-        setProductGoals(map);
+        // Goals arrive matched by TikTok Shop product ID first (report names
+        // come from Euka and differ from the Brands→Products catalog names),
+        // with a normalized-name fallback.
+        setProductGoals(goals);
+        setUnlimitedSampleGoal(unlimited);
       })
-      .catch(() => { if (!cancelled) setProductGoals({}); });
+      .catch(() => { if (!cancelled) { setProductGoals({}); setUnlimitedSampleGoal(false); } });
     return () => { cancelled = true; };
   }, [report?.brandId, clientView]);
   // Resolve a report product's monthly sample goal: match its TikTok Shop
   // product ID against the catalog first (Euka names differ from catalog
   // names), then fall back to a normalized-name match.
-  const goalForProduct = (p) => Number(
+  //
+  // An unlimited brand returns 0 for every product, switching off the
+  // per-product bars and the overall one together, from one place.
+  const goalForProduct = (p) => (unlimitedSampleGoal ? 0 : Number(
     productGoals[String(p?.productId || '').trim()] ??
     productGoals[normName(p?.productName)] ?? 0,
-  ) || 0;
+  ) || 0);
   // v2 auth shim → v1 shape (v1 destructures `userRole` directly; v2's
   // useAuth returns `{ user, profile }` so we derive role from profile).
   const { profile } = useAuth();
@@ -1225,11 +1225,19 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                       gmvShare={totalProductGmv > 0 ? (num(p.gmv) / totalProductGmv) * 100 : 0}
                       currency={currency} goal={goalForProduct(p)} />
                   ))}
-                  {/* Overall sample goal — Σ approved vs Σ product goals. */}
+                  {/* Overall sample goal — Σ approved vs Σ product goals, or a
+                      single "Unlimited" line for an uncapped brand. */}
                   {(() => {
+                    const totalApproved = sortedProducts.reduce((s, p) => s + num(p.samplesApproved), 0);
+                    if (unlimitedSampleGoal) {
+                      return (
+                        <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
+                          <UnlimitedGoalNote approved={totalApproved} />
+                        </div>
+                      );
+                    }
                     const totalGoal = sortedProducts.reduce((s, p) => s + goalForProduct(p), 0);
                     if (totalGoal <= 0) return null;
-                    const totalApproved = sortedProducts.reduce((s, p) => s + num(p.samplesApproved), 0);
                     return (
                       <div className="px-3 pb-3 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
                         <GoalBar approved={totalApproved} goal={totalGoal} label="Overall sample goal" />

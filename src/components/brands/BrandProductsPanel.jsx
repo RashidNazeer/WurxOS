@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   listProducts, createProduct, updateProduct, deleteProduct,
+  getBrandUnlimitedSampleGoal, setBrandUnlimitedSampleGoal,
 } from '../../lib/productsApi';
 import {
   PlusIcon, AlertIcon, RefreshIcon, XIcon, CheckIcon, TrashIcon,
@@ -15,6 +16,15 @@ export default function BrandProductsPanel({ brandId, canEdit }) {
   const { data: rows = [], isLoading, error } = useQuery({
     queryKey: ['brand-products', brandId],
     queryFn:  () => listProducts(brandId),
+    enabled:  !!brandId,
+  });
+
+  // Brand-level sample-goal mode (mig 348). Kept next to the products because
+  // that is where the per-product targets are typed — an APC setting goals
+  // shouldn't have to know it lives on the brand row.
+  const { data: unlimited = false } = useQuery({
+    queryKey: ['brand-sample-goal-mode', brandId],
+    queryFn:  () => getBrandUnlimitedSampleGoal(brandId),
     enabled:  !!brandId,
   });
 
@@ -41,6 +51,16 @@ export default function BrandProductsPanel({ brandId, canEdit }) {
           )}
         </div>
       </div>
+
+      <SampleGoalModeCard
+        brandId={brandId}
+        unlimited={unlimited}
+        canEdit={canEdit}
+        onChanged={() => {
+          qc.invalidateQueries({ queryKey: ['brand-sample-goal-mode', brandId] });
+          qc.invalidateQueries({ queryKey: ['brandMetrics', 'brands'] });
+        }}
+      />
 
       {error && (
         <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}>
@@ -79,11 +99,87 @@ export default function BrandProductsPanel({ brandId, canEdit }) {
         <ProductEditModal
           brandId={brandId}
           product={editRow}
+          unlimitedSampleGoal={unlimited}
           onClose={() => setEdit(null)}
           onSaved={() => { setEdit(null); load(); }}
         />
       )}
     </>
+  );
+}
+
+// ============================================================
+// Brand-level sample-goal mode — "fixed per-product targets" vs "unlimited"
+// (mig 348). Some contracts put no cap on sample approvals; setting that once
+// here beats opening every product to blank its goal, and it is what the
+// weekly/monthly report reads to decide whether to draw a progress bar at all.
+// ============================================================
+function SampleGoalModeCard({ brandId, unlimited, canEdit, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function pick(next) {
+    if (next === unlimited || busy) return;
+    setBusy(true); setErr('');
+    try {
+      await setBrandUnlimitedSampleGoal(brandId, next);
+      onChanged();
+    } catch (e) {
+      setErr(e.message || 'Could not change the sample-goal mode.');
+    } finally { setBusy(false); }
+  }
+
+  const OPTIONS = [
+    { value: false, label: 'Fixed targets' },
+    { value: true,  label: 'Unlimited' },
+  ];
+
+  return (
+    <div className="wx-card" style={{ padding: '12px 14px', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center',
+          background: 'color-mix(in srgb, var(--success) 14%, transparent)', color: 'var(--success)' }}>
+          <i className="bi bi-infinity" style={{ fontSize: '0.95rem' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>Monthly sample goal</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>
+            {unlimited
+              ? 'No cap on this brand’s approvals — reports show no goal progress, and per-product targets are kept but ignored.'
+              : 'Each product carries its own monthly target; the brand’s goal is their sum.'}
+          </div>
+        </div>
+        <div style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 999,
+          background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+          {OPTIONS.map((o) => {
+            const active = unlimited === o.value;
+            return (
+              <button
+                key={String(o.value)} type="button"
+                onClick={() => pick(o.value)}
+                disabled={!canEdit || busy}
+                title={canEdit ? undefined : 'Only this brand’s team can change the sample-goal mode'}
+                style={{
+                  border: 0, borderRadius: 999, padding: '5px 13px', fontSize: 12, fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  cursor: (!canEdit || busy) ? 'not-allowed' : 'pointer',
+                  opacity: (!canEdit || busy) ? 0.6 : 1,
+                  background: active ? 'var(--surface-1)' : 'transparent',
+                  color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                  boxShadow: active ? 'var(--shadow-sm)' : 'none',
+                }}>
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {err && (
+        <div className="wx-alert wx-alert-danger" style={{ marginTop: 10, marginBottom: 0 }}>
+          <AlertIcon width="14" height="14" /> <span>{err}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -136,7 +232,7 @@ function Mini({ label, value }) {
 // ============================================================
 // Edit modal — product + SKU editor
 // ============================================================
-function ProductEditModal({ brandId, product, onClose, onSaved }) {
+function ProductEditModal({ brandId, product, unlimitedSampleGoal = false, onClose, onSaved }) {
   const isNew = !product.id;
 
   const [productName, setName] = useState(product.product_name || '');
@@ -275,13 +371,17 @@ function ProductEditModal({ brandId, product, onClose, onSaved }) {
           <div className="wx-m-field">
             <div className="wx-m-field-head">
               <div className="wx-m-field-label">Monthly sample goal</div>
-              <div className="wx-m-field-meta">Optional</div>
+              <div className="wx-m-field-meta">{unlimitedSampleGoal ? 'Unlimited' : 'Optional'}</div>
             </div>
             <input type="number" step="1" min="0" className="wx-m-input"
               value={sampleGoal} onChange={(e) => setSG(e.target.value)}
-              placeholder="e.g. 500" />
+              disabled={unlimitedSampleGoal}
+              placeholder={unlimitedSampleGoal ? 'Unlimited — no monthly cap' : 'e.g. 500'}
+              style={unlimitedSampleGoal ? { opacity: 0.55, cursor: 'not-allowed' } : undefined} />
             <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-              Target samples approved per month for this product. Reports compare month-to-date approvals against it; the brand's overall goal is the sum of all products'.
+              {unlimitedSampleGoal
+                ? 'This brand’s sample goal is set to Unlimited, so per-product targets are ignored and reports show no goal progress. Any target already saved here is kept — switch the brand back to Fixed targets above to use it again.'
+                : 'Target samples approved per month for this product. Reports compare month-to-date approvals against it; the brand\'s overall goal is the sum of all products\'.'}
             </div>
           </div>
 

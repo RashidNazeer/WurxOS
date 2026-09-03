@@ -10,6 +10,7 @@ import {
   listBrandMetricsForMonth,
 } from '../../lib/brandMetricsApi';
 import { isManagedByUs } from '../../lib/roles';
+import { setBrandUnlimitedSampleGoal } from '../../lib/productsApi';
 
 // ── The 5 metrics (each a target/achieved pair) ─────────────────────
 const METRICS = [
@@ -364,7 +365,8 @@ export default function BrandAnalyticsPage() {
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
                 {visibleMetrics.map((m) => (
-                  <MetricCard key={m.key} metric={m} target={data?.[m.tCol]} achieved={data?.[m.aCol]} />
+                  <MetricCard key={m.key} metric={m} target={data?.[m.tCol]} achieved={data?.[m.aCol]}
+                    unlimited={m.key === 'samples' && selectedBrand?.unlimited_sample_goal === true} />
                 ))}
               </div>
               {hiddenGroups.length > 0 && (
@@ -398,6 +400,10 @@ export default function BrandAnalyticsPage() {
             qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'months', brandId] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'monthMap', month] });
+            // The sample-goal mode lives on the brand row, so the brand list
+            // (and the Products tab's copy of it) has to be refetched too.
+            qc.invalidateQueries({ queryKey: ['brandMetrics', 'brands'] });
+            qc.invalidateQueries({ queryKey: ['brand-sample-goal-mode', brandId] });
             setEditing(false);
           }}
         />
@@ -549,8 +555,11 @@ function BrandDashCard({ brand, stat, onOpen, onSetGoals }) {
 }
 
 // ── One metric card with a progress bar (detail view) ───────────────
-function MetricCard({ metric, target, achieved }) {
-  const pct = pctOf(target, achieved);
+// `unlimited` is the brand's sample-goal flag (mig 348). It suppresses the
+// target, the percentage and the bar — there is nothing to be a percentage OF —
+// while leaving the achieved figure exactly where the reader expects it.
+function MetricCard({ metric, target, achieved, unlimited = false }) {
+  const pct = unlimited ? null : pctOf(target, achieved);
   const over = pct != null && pct > 100;
   const met = pct != null && pct >= 100;
   const barColor = pct == null ? 'var(--border-default)'
@@ -566,15 +575,26 @@ function MetricCard({ metric, target, achieved }) {
           <i className={`bi ${metric.icon}`} style={{ fontSize: '1rem' }} />
         </div>
         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{metric.label}</div>
-        <div style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 18, fontVariantNumeric: 'tabular-nums',
-          color: pct == null ? 'var(--text-muted)' : (over && !metric.higherBetter ? 'var(--danger)' : (met ? 'var(--success)' : 'var(--text-primary)')) }}>
-          {pctText}
-        </div>
+        {unlimited ? (
+          <div style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+            color: 'var(--success)',
+            background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--success) 32%, transparent)' }}>
+            Unlimited
+          </div>
+        ) : (
+          <div style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 18, fontVariantNumeric: 'tabular-nums',
+            color: pct == null ? 'var(--text-muted)' : (over && !metric.higherBetter ? 'var(--danger)' : (met ? 'var(--success)' : 'var(--text-primary)')) }}>
+            {pctText}
+          </div>
+        )}
       </div>
 
-      <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct == null ? 0 : Math.min(pct, 100)}%`, background: barColor, borderRadius: 999, transition: 'width .3s' }} />
-      </div>
+      {!unlimited && (
+        <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct == null ? 0 : Math.min(pct, 100)}%`, background: barColor, borderRadius: 999, transition: 'width .3s' }} />
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, gap: 12 }}>
         <div>
@@ -583,7 +603,9 @@ function MetricCard({ metric, target, achieved }) {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{metric.tLabel}</div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-secondary)' }}>{fmt(metric.unit, target)}</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-secondary)' }}>
+            {unlimited ? 'No cap' : fmt(metric.unit, target)}
+          </div>
         </div>
       </div>
       {over && !metric.higherBetter && (
@@ -609,9 +631,20 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
   const [saveErr, setSaveErr] = useState('');
   const set = (col, v) => setForm((f) => ({ ...f, [col]: v }));
 
+  // Sample-goal mode (mig 348). This one is a property of the BRAND, not of the
+  // month being edited — the same contract applies to every month — so it is
+  // labelled as such rather than sitting silently among the month's figures.
+  const wasUnlimited = brand?.unlimited_sample_goal === true;
+  const [unlimitedSamples, setUnlimitedSamples] = useState(wasUnlimited);
+
   async function save() {
     setSaving(true); setSaveErr('');
     try {
+      // Brand flag first: if it fails on permissions there is no point writing
+      // the month's numbers under a goal mode the user could not change.
+      if (unlimitedSamples !== wasUnlimited) {
+        await setBrandUnlimitedSampleGoal(brand.id, unlimitedSamples);
+      }
       // Strip the achieved columns entirely when they are locked. Sending them
       // back unchanged would usually pass the trigger, but an empty input would
       // arrive as null against a real stored figure and be rejected — so a TL
@@ -647,20 +680,52 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
         </div>
 
         <div style={{ padding: '16px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {metrics.map((m) => (
-            <div key={m.key}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <i className={`bi ${m.icon}`} style={{ color: m.tint }} />
-                <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>{m.label}</span>
+          {metrics.map((m) => {
+            const isSamples = m.key === 'samples';
+            return (
+              <div key={m.key}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <i className={`bi ${m.icon}`} style={{ color: m.tint }} />
+                  <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>{m.label}</span>
+                  {isSamples && (
+                    <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2, padding: 2, borderRadius: 999,
+                      background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+                      {[{ v: false, l: 'Fixed goal' }, { v: true, l: 'Unlimited' }].map((o) => {
+                        const active = unlimitedSamples === o.v;
+                        return (
+                          <button key={String(o.v)} type="button" disabled={saving}
+                            onClick={() => setUnlimitedSamples(o.v)}
+                            style={{
+                              border: 0, borderRadius: 999, padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
+                              whiteSpace: 'nowrap', cursor: saving ? 'not-allowed' : 'pointer',
+                              background: active ? 'var(--surface-1)' : 'transparent',
+                              color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                              boxShadow: active ? 'var(--shadow-sm)' : 'none',
+                            }}>
+                            {o.l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <NumField label={m.tLabel} prefix={prefix(m.unit)} value={form[m.tCol]} onChange={(v) => set(m.tCol, v)}
+                    disabled={isSamples && unlimitedSamples}
+                    hint={isSamples && unlimitedSamples ? 'No cap on this brand’s approvals' : null} />
+                  <NumField label={m.aLabel} prefix={prefix(m.unit)} value={form[m.aCol]}
+                    onChange={(v) => set(m.aCol, v)} disabled={!canEditActuals}
+                    hint={canEditActuals ? null : 'Entered by the team'} />
+                </div>
+                {isSamples && unlimitedSamples && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                    <i className="bi bi-info-circle me-1" />
+                    Applies to <strong>{brand?.brand_name}</strong> in every month, not just {prettyMonth(month)} — it is the contract, not a target. Reports show no sample-goal progress while it is on.
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <NumField label={m.tLabel} prefix={prefix(m.unit)} value={form[m.tCol]} onChange={(v) => set(m.tCol, v)} />
-                <NumField label={m.aLabel} prefix={prefix(m.unit)} value={form[m.aCol]}
-                  onChange={(v) => set(m.aCol, v)} disabled={!canEditActuals}
-                  hint={canEditActuals ? null : 'Entered by the team'} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {saveErr && <div className="wx-alert wx-alert-danger" style={{ margin: 0 }}><AlertIcon width="15" height="15" /> {saveErr}</div>}
         </div>
 

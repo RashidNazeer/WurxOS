@@ -6,6 +6,34 @@ import React from 'react';
 //
 // Props: approved (MTD samples approved), goal (monthly goal), label (optional),
 //        compact (smaller, for per-product rows).
+// Replaces the whole progress bar when the brand's sample goal is UNLIMITED
+// (mig 348). Shown once per report, not once per product row: repeating
+// "Unlimited" on every line is noise, but saying nothing at all reads as a
+// missing goal rather than a deliberate one.
+export function UnlimitedGoalNote({ approved, label = 'Sample goal', note = 'No monthly cap on approvals' }) {
+  const a = Number(approved) || 0;
+  return (
+    <div className="d-flex justify-content-between align-items-center" style={{ fontSize: '0.7rem', gap: 10 }}>
+      <span style={{ color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {label}
+      </span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <span style={{
+          padding: '2px 9px', borderRadius: 999, fontWeight: 700, letterSpacing: '0.02em',
+          color: 'var(--success)',
+          background: 'color-mix(in srgb, var(--success) 12%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--success) 32%, transparent)',
+        }}>
+          Unlimited
+        </span>
+        <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {note}{a > 0 ? ` · ${a.toLocaleString()} approved` : ''}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export default function GoalBar({ approved, goal, label, compact = false }) {
   const a = Number(approved) || 0;
   const g = Number(goal) || 0;
