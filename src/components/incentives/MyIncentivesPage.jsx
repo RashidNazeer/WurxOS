@@ -331,7 +331,7 @@ export default function IncentivesPage() {
                 <div className="d-flex flex-column align-items-end gap-1">
                   {myRec.verified && (
                     <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem' }}>
-                      <i className="bi bi-patch-check-fill me-1" />Boss Verified
+                      <i className="bi bi-patch-check-fill me-1" />{myRec.verifiedByName ? `Verified by ${myRec.verifiedByName}` : 'Verified'}
                     </span>
                   )}
                   {myRec.payoutCleared && (

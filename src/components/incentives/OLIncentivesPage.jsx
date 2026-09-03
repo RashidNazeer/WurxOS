@@ -426,7 +426,13 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
 }
 
 // ── User Details Modal (OL viewing an APC/IPC, with edit/toggle/verify) ──────
-function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, onVerify, onUnverify, verifying }) {
+// `readOnly` governs EDITING the plan (targets, item toggles, Save & Verify).
+// `canVerify` governs only the verified flag. They split on the OL tab (mig
+// 350): an OL signs off OL incentives, their own included, but still may not
+// touch an OL's targets — that is the self-set-your-own-target hole the whole
+// incentive model is built to avoid. Defaults to !readOnly so every other tab
+// behaves exactly as before.
+function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, onClose, onToggleItem, onVerify, onUnverify, verifying }) {
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState({ incentives: [], bonuses: [] });
 
@@ -645,9 +651,13 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
             ) : (
               <>
                 <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Close</button>
-                {!readOnly && !rec.verified && (
+                {canVerify && !rec.verified && (
                   <button className="btn btn-sm btn-success px-3 d-inline-flex align-items-center gap-1"
-                    onClick={() => onVerify(rec)} disabled={verifying === rec.id}>
+                    onClick={() => onVerify(rec)}
+                    disabled={verifying === rec.id || (readOnly && rec.ghosted)}
+                    title={readOnly && rec.ghosted
+                      ? 'This plan is carried over and has not been saved for this month yet. Only the Boss can create an OL plan — ask them to set it up first.'
+                      : undefined}>
                     {verifying === rec.id ? <><span className="spinner-border spinner-border-sm" /> Verifying…</> : <><i className="bi bi-patch-check-fill" /> Verify</>}
                   </button>
                 )}
@@ -657,7 +667,11 @@ function UserDetailsModal({ rec, user, readOnly = false, onClose, onToggleItem, 
                     <i className="bi bi-patch-check-fill" /> Verified{rec.verifiedByRole ? ` by ${rec.verifiedByRole === 'boss' ? 'Boss' : rec.verifiedByRole.toUpperCase()}` : ''}
                   </span>
                 )}
-                {!readOnly && rec.verified && (
+                {/* On the OL tab only: once the Boss has cleared the payout, the
+                    server refuses an OL un-verify (it would reset payout_cleared
+                    and erase the Boss's record), so don't offer a button that
+                    can only fail. Other tabs are unchanged. */}
+                {canVerify && rec.verified && !(readOnly && rec.payoutCleared) && (
                   <button className="btn btn-sm btn-outline-warning px-3 d-inline-flex align-items-center gap-1"
                     onClick={() => onUnverify(rec)} disabled={verifying === rec.id}
                     title="Mark as unverified and notify the user">
@@ -828,10 +842,11 @@ export default function OLIncentivesPage() {
   const ipcs = allUsers.filter(u => u.userType === 'ipc');
   const baseList = tab === 'apcs' ? apcs : tab === 'ipcs' ? ipcs : tab === 'tls' ? tlUsers
     : tab === 'ols' ? olUsers : tab === 'ams' ? amUsers : [];
-  // The OL manages APC/IPC, TL and Ads Manager incentives. OL incentives are the
-  // Boss's to manage, so only the OL tab is read-only here. (Server-side too: mig
-  // 301 lets an OL write/verify any target except roles ol/developer/boss, and
-  // hard-locks the OL/admin rows — so every editable tab is backed by RLS.)
+  // The OL manages APC/IPC, TL and Ads Manager incentives. OL PLANS stay the
+  // Boss's to set, so the OL tab is read-only for editing — but since mig 350
+  // an OL verifies OL incentives, their own included, and the Boss keeps the
+  // payout. (Server-side: mig 301 still hard-locks OL/admin row edits, salary
+  // and payout; mig 350 relaxed the verified flag alone, inside inc_verify.)
   const readOnly = tab === 'ols';
   const tabNoun = tab === 'apcs' ? 'APCs' : tab === 'ipcs' ? 'IPCs' : tab === 'tls' ? 'TLs'
     : tab === 'ams' ? 'Ads Managers' : 'OLs';
@@ -925,6 +940,10 @@ export default function OLIncentivesPage() {
         verifiedByRole: 'ol',
       };
       setRecords(prev => ({ ...prev, [key]: updatedRec }));
+      // An OL can now verify their OWN row from the OL tab (mig 350). The
+      // "My Incentives" card is separate state, so mirror the flip into it or
+      // the badge stays orange until a reload.
+      if (key === currentUser?.uid) setMyRecord(prev => (prev ? { ...prev, ...updatedRec } : prev));
 
       setDetailsTarget(null);
     } finally { setVerifying(null); }
@@ -945,7 +964,9 @@ export default function OLIncentivesPage() {
       await verifyIncentives(rec.id, false);
       try { await notifyIncentiveEmployee(rec.id); } catch { /* non-fatal */ }
       const key = rec.userId;
-      setRecords(prev => ({ ...prev, [key]: { ...rec, verified: false, verifiedByName: null, verifiedByRole: null, payoutCleared: false } }));
+      const cleared = { ...rec, verified: false, verifiedByName: null, verifiedByRole: null, payoutCleared: false };
+      setRecords(prev => ({ ...prev, [key]: cleared }));
+      if (key === currentUser?.uid) setMyRecord(prev => (prev ? { ...prev, ...cleared } : prev));
       setDetailsTarget(null);
     } finally { setVerifying(null); }
   }
@@ -1048,7 +1069,7 @@ export default function OLIncentivesPage() {
                 </div>
                 {myRecord.verified && (
                   <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem' }}>
-                    <i className="bi bi-patch-check-fill me-1" />Boss Verified
+                    <i className="bi bi-patch-check-fill me-1" />{myRecord.verifiedByName ? `Verified by ${myRecord.verifiedByName}` : 'Verified'}
                   </span>
                 )}
               </div>
@@ -1257,10 +1278,12 @@ export default function OLIncentivesPage() {
         <UserDetailsModal
           rec={detailsTarget.rec}
           user={detailsTarget.user}
-          // Only the OL section is read-only (Boss-managed). Drive off the section's
-          // readOnly flag so the OL Details modal keeps hiding Verify/Edit/toggle,
-          // while the TL modal now exposes them (OL manages TL incentives).
+          // The OL section stays read-only for the PLAN (targets are the Boss's
+          // to set), but since mig 350 an OL signs off OL incentives — their own
+          // included — so verification is unlocked separately. Every other tab is
+          // unchanged: canVerify defaults to !readOnly.
           readOnly={readOnly}
+          canVerify
           onClose={() => setDetailsTarget(null)}
           onToggleItem={handleToggleItem}
           onVerify={handleVerify}
