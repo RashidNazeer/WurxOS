@@ -816,6 +816,10 @@ export function _normReport(row) {
     brandName: row.brand?.brand_name || data.brandName || '',
     status: row.status || 'approved',
     sectionsEnabled: row.sections_enabled || data.sectionsEnabled || null,
+    // The brand sample-goal state this report was written against (mig 349),
+    // frozen at submit. Views prefer it over a live lookup so changing a goal
+    // today never redraws a report that was already finished.
+    sampleGoals: row.sample_goal_snapshot || null,
 
     // Audit (v1-style camelCase)
     createdBy:        row.author_id || null,

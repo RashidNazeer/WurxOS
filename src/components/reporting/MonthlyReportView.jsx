@@ -810,13 +810,19 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
   // Per-product monthly sample goals for this report's brand (keyed by
   // normalized product name). Self-fetched like the weekly view; never in the
   // anonymous client portal.
-  const [productGoals, setProductGoals] = React.useState({});
+  const [fetchedGoals, setFetchedGoals] = React.useState({});
   // Brand-level "unlimited sample goal" (mig 348) — see the weekly view: a
   // progress bar against an invented target misleads the client, so an
   // unlimited brand shows none.
-  const [unlimitedSampleGoal, setUnlimitedSampleGoal] = React.useState(false);
+  const [fetchedUnlimited, setFetchedUnlimited] = React.useState(false);
+  // The goal state frozen onto the report when it was written (mig 349) wins
+  // whenever present, so a goal changed today cannot redraw a finished report.
+  // Suppressed in the client portal, which has never shown goal bars.
+  const sampleGoalSnapshot = clientView
+    ? null
+    : (report?.sampleGoals || report?.sample_goal_snapshot || null);
   React.useEffect(() => {
-    if (clientView || !report?.brandId) return undefined;
+    if (clientView || sampleGoalSnapshot || !report?.brandId) return undefined;
     let cancelled = false;
     import('../../lib/productsApi')
       .then(({ getBrandSampleGoals }) => getBrandSampleGoals(report.brandId))
@@ -825,12 +831,16 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
         // Goals arrive matched by TikTok Shop product ID first (report names
         // come from Euka and differ from the Brands→Products catalog names),
         // with a normalized-name fallback.
-        setProductGoals(goals);
-        setUnlimitedSampleGoal(unlimited);
+        setFetchedGoals(goals);
+        setFetchedUnlimited(unlimited);
       })
-      .catch(() => { if (!cancelled) { setProductGoals({}); setUnlimitedSampleGoal(false); } });
+      .catch(() => { if (!cancelled) { setFetchedGoals({}); setFetchedUnlimited(false); } });
     return () => { cancelled = true; };
-  }, [report?.brandId, clientView]);
+  }, [report?.brandId, clientView, sampleGoalSnapshot]);
+  const productGoals = sampleGoalSnapshot?.goals || fetchedGoals;
+  const unlimitedSampleGoal = sampleGoalSnapshot
+    ? sampleGoalSnapshot.unlimited === true
+    : fetchedUnlimited;
   // Resolve a report product's monthly sample goal: match its TikTok Shop
   // product ID against the catalog first (Euka names differ from catalog
   // names), then fall back to a normalized-name match.

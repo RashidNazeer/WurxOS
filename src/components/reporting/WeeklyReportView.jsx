@@ -781,9 +781,18 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
   // Brand-level "unlimited sample goal" (mig 348) — some contracts put no cap
   // on approvals, and a progress bar against an invented target misleads the
   // client. When this is on, every goal bar in the report is suppressed.
-  const [unlimitedSampleGoal, setUnlimitedSampleGoal] = React.useState(false);
+  const [fetchedUnlimited, setFetchedUnlimited] = React.useState(false);
+  // The goal state FROZEN onto the report when it was written (mig 349). It is
+  // the source of truth whenever present: a goal changed today must not redraw
+  // a report that was already finished. The live fetch below survives only as
+  // the fallback for rows the trigger never saw. Never in the client portal,
+  // which has always shown no goal bars at all — the snapshot travels on the
+  // row, so without this guard clients would suddenly start seeing them.
+  const sampleGoalSnapshot = clientView
+    ? null
+    : (report?.sampleGoals || report?.sample_goal_snapshot || null);
   React.useEffect(() => {
-    if (clientView || productGoalsProp || !report?.brandId) return undefined;
+    if (clientView || productGoalsProp || sampleGoalSnapshot || !report?.brandId) return undefined;
     let cancelled = false;
     import('../../lib/productsApi')
       .then(({ getBrandSampleGoals }) => getBrandSampleGoals(report.brandId))
@@ -794,12 +803,15 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
         // names, so a name match silently misses) AND by normalized name
         // (fallback for catalog products entered without an ID).
         setFetchedGoals(goals);
-        setUnlimitedSampleGoal(unlimited);
+        setFetchedUnlimited(unlimited);
       })
-      .catch(() => { if (!cancelled) { setFetchedGoals({}); setUnlimitedSampleGoal(false); } });
+      .catch(() => { if (!cancelled) { setFetchedGoals({}); setFetchedUnlimited(false); } });
     return () => { cancelled = true; };
-  }, [report?.brandId, clientView, productGoalsProp]);
-  const productGoals = productGoalsProp || fetchedGoals;
+  }, [report?.brandId, clientView, productGoalsProp, sampleGoalSnapshot]);
+  const productGoals = productGoalsProp || sampleGoalSnapshot?.goals || fetchedGoals;
+  const unlimitedSampleGoal = sampleGoalSnapshot
+    ? sampleGoalSnapshot.unlimited === true
+    : fetchedUnlimited;
   // Resolve a report product's monthly sample goal: match its TikTok Shop
   // product ID against the catalog first (names differ between Euka reports and
   // the catalog), then fall back to a normalized-name match.
