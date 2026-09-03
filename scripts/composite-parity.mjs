@@ -25,7 +25,19 @@ function khiMonth(ts) {
 }
 
 const { data: cfg } = await sb.from('performance_config').select('*').eq('id', 1).maybeSingle();
-const W = { performance: +cfg.weight_performance, incentives: +cfg.weight_incentives, attendance: +cfg.weight_attendance, flags: +cfg.weight_flags };
+// Weights are DATED since mig 347 — a month is scored with the weights that were
+// in force when it was lived. Reading the live config row here would make this
+// harness disagree with SQL for every month before the last weight change, which
+// is exactly the bug 347 fixed.
+const weightsFor = async (month) => {
+  const { data } = await sb.rpc('perf_weights_for_month', { p_month: month });
+  const r = Array.isArray(data) ? data[0] : data;
+  return r
+    ? { performance: +r.weight_performance, incentives: +r.weight_incentives,
+        attendance: +r.weight_attendance, flags: +r.weight_flags }
+    : { performance: +cfg.weight_performance, incentives: +cfg.weight_incentives,
+        attendance: +cfg.weight_attendance, flags: +cfg.weight_flags };
+};
 const TH = { promo: +cfg.threshold_promotion, good: +cfg.threshold_good, warn: +cfg.threshold_warning };
 const level = (s) => s == null ? 'not_rated' : s >= TH.promo ? 'promotion' : s >= TH.good ? 'good' : s >= TH.warn ? 'warning' : 'termination';
 // Current Karachi 'YYYY-MM' — an attendance incentive item completes only once its month is strictly past.
@@ -37,6 +49,7 @@ const { data: users } = await sb.from('profiles').select('id,display_name,role')
 
 let totalMismatch = 0;
 for (const month of months) {
+  const W = await weightsFor(month);
   const [{ data: ratings }, { data: incs }, { data: flags }, { data: mets }] = await Promise.all([
     sb.from('performance_ratings').select('user_id,overall_score,metrics').eq('month', month),
     sb.from('incentives').select('user_id,incentives,bonuses,payout_cleared,verified').eq('month', month),

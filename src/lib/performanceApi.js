@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { karachiMonth } from './serverTime';
 import { applyAttendanceAutofill, applyCommissionAutofill, applyGmvMaxAutofill } from './incentivesApi';
 
 // 5 metrics. Punctuality was dropped (mig 243) — attendance is already its own
@@ -546,16 +547,26 @@ export async function saveWarning({ userId, reason }) {
 // Boss config: pillar weights. v2 stores per-pillar columns; v1's
 // UI uses a {performance, incentives, attendance, flags} object.
 // Converts both ways.
-export async function getV1Weights() {
-  const { data, error } = await supabase
-    .from('performance_config').select('*').eq('id', 1).maybeSingle();
+// Weights for a SPECIFIC month (mig 347). The Performance page does all of its
+// composite maths in JS, so reading the live performance_config row here was the
+// client-side half of the retroactive-rescore bug: a weight change re-scored
+// every month ever displayed, including closed ones. perf_weights_for_month
+// returns the weights that were in force for that month.
+//
+// Pass the month the page is showing. Omitting it falls back to the current
+// Karachi month, which is the right default for any caller that has no month —
+// never the raw config row, or the bug comes back.
+export async function getV1Weights(month) {
+  const target = month || karachiMonth();
+  const { data, error } = await supabase.rpc('perf_weights_for_month', { p_month: target });
   if (error) throw new Error(error.message);
-  if (!data) return { ...V1_DEFAULT_WEIGHTS };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ...V1_DEFAULT_WEIGHTS };
   return {
-    performance: Number(data.weight_performance) || V1_DEFAULT_WEIGHTS.performance,
-    incentives:  Number(data.weight_incentives)  || V1_DEFAULT_WEIGHTS.incentives,
-    attendance:  Number(data.weight_attendance)  || V1_DEFAULT_WEIGHTS.attendance,
-    flags:       Number(data.weight_flags)       || V1_DEFAULT_WEIGHTS.flags,
+    performance: Number(row.weight_performance) || V1_DEFAULT_WEIGHTS.performance,
+    incentives:  Number(row.weight_incentives)  || V1_DEFAULT_WEIGHTS.incentives,
+    attendance:  Number(row.weight_attendance)  || V1_DEFAULT_WEIGHTS.attendance,
+    flags:       Number(row.weight_flags)       || V1_DEFAULT_WEIGHTS.flags,
   };
 }
 

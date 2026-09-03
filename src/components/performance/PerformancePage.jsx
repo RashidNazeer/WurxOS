@@ -1250,10 +1250,14 @@ export default function PerformancePage() {
       setLoading(true);
       setAttError('');
 
-      // Pillar weights (Boss-editable). v2 stores per-pillar columns
-      // and getV1Weights converts to the v1 {performance,...} shape.
+      // Pillar weights (Boss-editable) FOR THE MONTH BEING VIEWED — mig 347.
+      // This page does its composite maths in JS, so passing the month is what
+      // stops a weight change re-scoring closed months: August keeps August's
+      // weights however many times the Boss moves the sliders afterwards.
+      // This effect already re-runs on month change, so switching month
+      // re-fetches the right set.
       try {
-        const w = await getV1Weights();
+        const w = await getV1Weights(month);
         if (cancelled) return;
         setWeights(w);
       } catch { /* keep defaults */ }
