@@ -44,22 +44,7 @@ export default function AchievementCelebration() {
     return () => { supabase.removeChannel(ch); };
   }, [uid, refresh]);
 
-  // The page behind must not scroll while this is up.
-  useEffect(() => {
-    if (!pending) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [pending]);
-
-  const confetti = useMemo(() => makeConfetti(), []);
-
-  if (!pending) return null;
-
-  const messages = [
-    { who: pending.boss_name, role: pending.boss_role, text: pending.boss_message },
-    { who: pending.ol_name,   role: pending.ol_role,   text: pending.ol_message },
-  ].filter((m) => m.text);
+  if (!pending) return null;   // scroll lock lives in CelebrationView below
 
   async function close() {
     setSaving(true); setErr('');
@@ -74,6 +59,30 @@ export default function AchievementCelebration() {
     }
   }
 
+  return <CelebrationView data={pending} onClose={close} saving={saving} error={err} />;
+}
+
+// The celebration itself, with no opinion about where its data came from.
+// Split out so the Achievements page can show a Boss or OL exactly what the
+// winner will see BEFORE anything is announced — they can never be winners
+// themselves, so without this the only way to check the design would be to
+// announce for real, which notifies a person and books money.
+export function CelebrationView({ data, onClose, saving = false, error = '', preview = false }) {
+  const confetti = useMemo(() => makeConfetti(), []);
+
+  // The page behind must not scroll while this is up.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const messages = [
+    { who: data.boss_name, role: data.boss_role, text: data.boss_message },
+    { who: data.ol_name,   role: data.ol_role,   text: data.ol_message },
+  ].filter((m) => m.text);
+
+  const pending = data;
   const first = String(pending.winner_name || '').trim().split(/\s+/)[0] || 'you';
 
   return (
@@ -131,14 +140,18 @@ export default function AchievementCelebration() {
           </div>
         )}
 
-        {err && (
-          <div style={{ marginBottom: 14, fontSize: '0.8rem', color: 'var(--cel-gold)' }}>{err}</div>
+        {error && (
+          <div style={{ marginBottom: 14, fontSize: '0.8rem', color: 'var(--cel-gold)' }}>{error}</div>
         )}
 
-        <button type="button" className="cel-btn" onClick={close} disabled={saving}>
-          {saving ? 'One moment…' : 'Thank you — I’ll keep it up'}
+        <button type="button" className="cel-btn" onClick={onClose} disabled={saving}>
+          {saving ? 'One moment…' : preview ? 'Close preview' : 'Thank you — I’ll keep it up'}
         </button>
-        {Number(pending.reward_amount) > 0 && (
+        {preview ? (
+          <div className="cel-foot">
+            Preview only — nothing has been announced. Toggle your theme to see it the other way.
+          </div>
+        ) : Number(pending.reward_amount) > 0 && (
           <div className="cel-foot">Your reward has been added to this month’s incentives.</div>
         )}
       </div>

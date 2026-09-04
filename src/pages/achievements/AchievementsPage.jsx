@@ -7,6 +7,7 @@ import {
   monthLabel,
 } from '../../lib/achievementsApi';
 import { AlertIcon, CheckIcon, StarIcon } from '../../components/common/Icon';
+import { CelebrationView } from '../../components/achievements/AchievementCelebration';
 
 const MAX_MSG = 100;
 
@@ -134,6 +135,21 @@ function AchievementCard({ type, month, record, me, onChanged }) {
   const theirMessage = record?.[theirField];
   const canAnnounce = !!record?.winner_id && !!record?.boss_message && !!record?.ol_message;
 
+  // Exactly what the winner will see, from whatever has been filled in so far.
+  // Neither a Boss nor an OL can ever win an award themselves, so without this
+  // the only way to check the celebration would be to announce it for real.
+  const [previewing, setPreviewing] = useState(false);
+  const previewData = record && {
+    ...record,
+    type_label:   type.label,
+    blurb:        type.blurb,
+    winner_name:  record.winner?.display_name || 'Your winner',
+    boss_name:    record.bossAuthor?.display_name || 'The Boss',
+    ol_name:      record.olAuthor?.display_name || 'Operations Lead',
+    boss_role:    record.bossAuthor?.role || 'boss',
+    ol_role:      record.olAuthor?.role || 'ol',
+  };
+
   return (
     <div className="wx-card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -248,8 +264,19 @@ function AchievementCard({ type, month, record, me, onChanged }) {
           )}
       </div>
 
+      {previewing && previewData && (
+        <CelebrationView data={previewData} preview onClose={() => setPreviewing(false)} />
+      )}
+
       {/* ── Announce ───────────────────────────────────────────────── */}
       <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+        {record?.winner_id && (
+          <button type="button" className="wx-btn wx-btn-ghost"
+            style={{ width: '100%', marginBottom: 8 }}
+            onClick={() => setPreviewing(true)}>
+            Preview what the winner sees
+          </button>
+        )}
         {seen ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--success)' }}>
             <CheckIcon width="14" height="14" />
