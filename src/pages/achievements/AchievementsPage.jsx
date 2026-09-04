@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../../contexts/AuthContext';
 import {
   listAchievementTypes, listAchievements, listCandidates,
   saveAchievement, saveAchievementMessage, announceAchievement,
@@ -24,7 +23,6 @@ function karachiMonth(offset = 0) {
 
 export default function AchievementsPage() {
   const qc = useQueryClient();
-  const { profile } = useAuth();
   const [month, setMonth] = useState(() => karachiMonth(-1));
 
   const { data: types = [], isLoading: typesLoading } = useQuery({
@@ -49,7 +47,7 @@ export default function AchievementsPage() {
         <div>
           <h1 className="page-title">Achievements</h1>
           <p className="page-subtitle">
-            Pick each month&rsquo;s winners, write a line each, set the reward, then announce.
+            Pick each month&rsquo;s winners, write them a line, set the reward, then announce.
             The winner gets a full-screen celebration they have to acknowledge — and the
             reward is added to their incentives for this month.
           </p>
@@ -79,7 +77,6 @@ export default function AchievementsPage() {
               type={t}
               month={month}
               record={byType[t.key] || null}
-              me={profile}
               onChanged={reload}
             />
           ))}
@@ -89,30 +86,25 @@ export default function AchievementsPage() {
   );
 }
 
-function AchievementCard({ type, month, record, me, onChanged }) {
-  const isBoss = me?.role === 'boss';
-  const myField = isBoss ? 'boss_message' : 'ol_message';
-  const theirField = isBoss ? 'ol_message' : 'boss_message';
-  const theirWho = isBoss ? 'the OL' : 'the Boss';
-
+function AchievementCard({ type, month, record, onChanged }) {
   const announced = record?.status === 'announced';
   const seen = record?.status === 'acknowledged';
   const locked = announced || seen;
 
   const [winnerId, setWinnerId] = useState(record?.winner_id || '');
   const [reward, setReward] = useState(record?.reward_amount ?? '');
-  const [msg, setMsg] = useState(record?.[myField] || '');
+  const [msg, setMsg] = useState(record?.message || '');
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
 
-  // A different month (or someone else's save) replaces the record underneath
-  // us; the form must follow it rather than keep stale text.
+  // A different month (or the other manager's save) replaces the record
+  // underneath us; the form must follow it rather than keep stale text.
   useEffect(() => {
     setWinnerId(record?.winner_id || '');
     setReward(record?.reward_amount ?? '');
-    setMsg(record?.[myField] || '');
+    setMsg(record?.message || '');
     setErr('');
-  }, [record?.id, record?.status, record?.winner_id, record?.reward_amount, record?.[myField], myField]);
+  }, [record?.id, record?.status, record?.winner_id, record?.reward_amount, record?.message]);
 
   const { data: candidates = [] } = useQuery({
     queryKey: ['achievement-candidates', type.key, month],
@@ -132,8 +124,7 @@ function AchievementCard({ type, month, record, me, onChanged }) {
   const saveWinner = (id, amount) => run('winner', () =>
     saveAchievement({ typeKey: type.key, month, winnerId: id, reward: amount }));
 
-  const theirMessage = record?.[theirField];
-  const canAnnounce = !!record?.winner_id && !!record?.boss_message && !!record?.ol_message;
+  const canAnnounce = !!record?.winner_id && !!record?.message;
 
   // Exactly what the winner will see, from whatever has been filled in so far.
   // Neither a Boss nor an OL can ever win an award themselves, so without this
@@ -144,10 +135,6 @@ function AchievementCard({ type, month, record, me, onChanged }) {
     type_label:   type.label,
     blurb:        type.blurb,
     winner_name:  record.winner?.display_name || 'Your winner',
-    boss_name:    record.bossAuthor?.display_name || 'The Boss',
-    ol_name:      record.olAuthor?.display_name || 'Operations Lead',
-    boss_role:    record.bossAuthor?.role || 'boss',
-    ol_role:      record.olAuthor?.role || 'ol',
   };
 
   return (
@@ -220,10 +207,10 @@ function AchievementCard({ type, month, record, me, onChanged }) {
         )}
       </div>
 
-      {/* ── The two messages ───────────────────────────────────────── */}
+      {/* ── The message — one line, either of you, shown unattributed ── */}
       <div>
         <FieldLabel>
-          Your message
+          Message to the winner
           {!locked && (
             <span style={{ float: 'right', fontWeight: 400, color: msg.length > MAX_MSG ? 'var(--danger)' : 'var(--text-muted)' }}>
               {msg.length}/{MAX_MSG}
@@ -231,7 +218,7 @@ function AchievementCard({ type, month, record, me, onChanged }) {
           )}
         </FieldLabel>
         {locked ? (
-          <Quote text={record?.[myField]} who="You" />
+          <Quote text={record?.message} />
         ) : (
           <>
             <textarea className="wx-input" rows={2} maxLength={MAX_MSG} value={msg}
@@ -240,28 +227,17 @@ function AchievementCard({ type, month, record, me, onChanged }) {
               disabled={!record?.id || busy === 'msg'}
               style={{ width: '100%', resize: 'vertical' }} />
             <button type="button" className="wx-btn wx-btn-ghost" style={{ marginTop: 6, fontSize: 12 }}
-              disabled={!record?.id || busy === 'msg' || msg === (record?.[myField] || '')}
+              disabled={!record?.id || busy === 'msg' || msg === (record?.message || '')}
               onClick={() => run('msg', () => saveAchievementMessage(record.id, msg))}>
-              {busy === 'msg' ? 'Saving…' : 'Save my message'}
+              {busy === 'msg' ? 'Saving…' : 'Save message'}
             </button>
-            {!record?.id && (
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                Pick a winner first.
-              </div>
-            )}
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+              {record?.id
+                ? 'The Boss or an OL can write this — whoever gets to it. The winner sees it without a name attached.'
+                : 'Pick a winner first.'}
+            </div>
           </>
         )}
-      </div>
-
-      <div>
-        <FieldLabel>Message from {theirWho}</FieldLabel>
-        {theirMessage
-          ? <Quote text={theirMessage} who={(isBoss ? record?.olAuthor : record?.bossAuthor)?.display_name} />
-          : (
-            <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Not written yet — {theirWho} adds this themselves.
-            </div>
-          )}
       </div>
 
       {previewing && previewData && (
@@ -297,7 +273,7 @@ function AchievementCard({ type, month, record, me, onChanged }) {
                 ? `Announced — waiting for ${record?.winner?.display_name?.split(' ')[0] || 'them'} to open it. Announcing again just re-sends the notification; the reward is only ever paid once.`
                 : canAnnounce
                   ? 'Fires the celebration and adds the reward to this month’s incentives.'
-                  : 'Needs a winner and both messages.'}
+                  : 'Needs a winner and a message.'}
             </div>
           </>
         )}

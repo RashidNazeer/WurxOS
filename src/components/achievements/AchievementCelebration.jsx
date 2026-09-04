@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getMyAchievement, acknowledgeAchievement, monthLabel, roleLabel,
+  getMyAchievement, acknowledgeAchievement, monthLabel,
 } from '../../lib/achievementsApi';
 import '../../styles/celebration.css';
 
@@ -77,11 +77,6 @@ export function CelebrationView({ data, onClose, saving = false, error = '', pre
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  const messages = [
-    { who: data.boss_name, role: data.boss_role, text: data.boss_message },
-    { who: data.ol_name,   role: data.ol_role,   text: data.ol_message },
-  ].filter((m) => m.text);
-
   const pending = data;
   const first = String(pending.winner_name || '').trim().split(/\s+/)[0] || 'you';
 
@@ -124,19 +119,12 @@ export function CelebrationView({ data, onClose, saving = false, error = '', pre
           </div>
         </div>
 
-        {messages.length > 0 && (
+        {/* One message, deliberately unattributed (mig 354): it reads as a
+            word from the company rather than from a particular person. */}
+        {pending.message && (
           <div className="cel-messages">
-            <div className="cel-messages-k">Messages from the team</div>
-            {messages.map((m, i) => (
-              <div className="cel-msg" key={i}>
-                <div className="cel-avatar">{initials(m.who)}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div className="cel-msg-who">{m.who || 'Management'}</div>
-                  <div className="cel-msg-role">{roleLabel(m.role)}</div>
-                  <div className="cel-msg-text">&ldquo;{m.text}&rdquo;</div>
-                </div>
-              </div>
-            ))}
+            <div className="cel-messages-k">A word from the team</div>
+            <blockquote className="cel-quote">&ldquo;{pending.message}&rdquo;</blockquote>
           </div>
         )}
 
@@ -157,12 +145,6 @@ export function CelebrationView({ data, onClose, saving = false, error = '', pre
       </div>
     </div>
   );
-}
-
-function initials(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '★';
-  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 }
 
 // Fixed palette rather than theme tokens — confetti is confetti in both modes.

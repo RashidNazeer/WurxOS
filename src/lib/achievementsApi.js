@@ -7,8 +7,8 @@ import { supabase } from './supabase';
 // Every mutation is an RPC. The table carries SELECT policies and no
 // insert/update/delete policies at all, because announcing moves money: it
 // writes a bonus onto the winner's incentive plan, and the rules that make
-// that safe (who may write which message, both messages required, the reward
-// booked exactly once) are not expressible as row policies.
+// that safe (a winner and a message before announcing, an eligible role, the
+// reward booked exactly once) are not expressible as row policies.
 // --------------------------------------------------------------
 
 export async function listAchievementTypes() {
@@ -28,8 +28,6 @@ export async function listAchievements(month) {
     .from('achievements')
     .select(`*,
       winner:winner_id(id, display_name, avatar_url, role),
-      bossAuthor:boss_message_by(display_name, role),
-      olAuthor:ol_message_by(display_name, role),
       announcer:announced_by(display_name)`)
     .eq('month', month);
   if (error) throw new Error(error.message);
@@ -58,8 +56,9 @@ export async function saveAchievement({ typeKey, month, winnerId, reward }) {
   return data;
 }
 
-// Writes the caller's OWN message — the server decides which slot from the
-// caller's role, so there is no way to sign a line as someone else.
+// The one message on the award (mig 354). Either the Boss or an OL writes it —
+// whoever gets to it — and the winner sees it with no name attached, so there
+// is no slot to pick and the last edit wins.
 export async function saveAchievementMessage(id, message) {
   const { data, error } = await supabase.rpc('achievement_set_message', {
     p_id: id, p_message: message ?? null,
@@ -97,13 +96,4 @@ export function monthLabel(month) {
   if (!y || !m) return month;
   return new Date(Date.UTC(y, m - 1, 1))
     .toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-}
-
-// "Boss" / "OL" rather than the raw role string, for the popup bylines.
-export function roleLabel(role) {
-  if (role === 'boss') return 'Founder';
-  if (role === 'ol') return 'Operations Lead';
-  if (role === 'developer') return 'Developer';
-  if (role === 'tl') return 'Team Lead';
-  return '';
 }

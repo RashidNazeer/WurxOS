@@ -159,35 +159,32 @@
   .cel-fact + .cel-fact { border-left: 0; border-top: 1px solid var(--cel-line); }
 }
 
+/* One unattributed message (mig 354). With no name or avatar to anchor it
+   left, it is centred and given room to read as a pull quote rather than a
+   chat line in an empty list. */
 .cel-messages {
+  position: relative;
   border: 1px solid var(--cel-line);
   border-radius: 16px;
   background: var(--cel-panel);
-  padding: 18px;
-  text-align: left;
+  padding: 20px 22px 22px;
+  text-align: center;
   margin-bottom: 24px;
 }
 .cel-messages-k {
   font-size: 0.62rem; font-weight: 700;
   letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--cel-ink-soft);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
-.cel-msg { display: flex; gap: 12px; align-items: flex-start; }
-.cel-msg + .cel-msg { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--cel-line); }
-.cel-avatar {
-  width: 42px; height: 42px; flex: 0 0 42px;
-  border-radius: 50%;
-  display: grid; place-items: center;
-  font-weight: 800; font-size: 0.8rem;
-  color: #2a1b00;
-  background: linear-gradient(135deg, var(--cel-gold), color-mix(in srgb, var(--cel-gold) 55%, white));
-}
-.cel-msg-who { font-weight: 700; font-size: 0.9rem; }
-.cel-msg-role { font-size: 0.72rem; color: var(--cel-ink-soft); }
-.cel-msg-text {
-  margin-top: 4px; font-size: 0.9rem; line-height: 1.55;
-  color: var(--cel-ink-soft); font-style: italic;
+.cel-quote {
+  margin: 0 auto;
+  max-width: 44ch;
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: 1.06rem;
+  line-height: 1.62;
+  font-style: italic;
+  color: var(--cel-ink);
 }
 
 .cel-btn {
