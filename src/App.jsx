@@ -79,6 +79,7 @@ const PerformanceSimulatorPage = lazy(() => import('./components/performance/Per
 // per-role pages, dispatched by IncentivesRouter. The plan editor
 // (IncentiveForm) is shared between Boss and OL via /incentives/edit/:userId.
 const IncentivesPage        = lazy(() => import('./components/incentives/IncentivesRouter'));
+const AchievementsPage      = lazy(() => import('./pages/achievements/AchievementsPage'));
 const CreatorLibraryPage    = lazy(() => import('./pages/creators/CreatorLibraryPage'));
 const IncentivePlanEditorPage = lazy(() => import('./components/incentives/IncentiveForm'));
 const BroadcastsPage        = lazy(() => import('./pages/broadcasts/BroadcastsPage'));
@@ -456,6 +457,14 @@ export default function App() {
                 element={
                   <RoleGuard allow={['boss','ol']}>
                     <TeamHierarchyPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/achievements"
+                element={
+                  <RoleGuard allow={['boss','ol']}>
+                    <AchievementsPage />
                   </RoleGuard>
                 }
               />

@@ -1,0 +1,246 @@
+/* ============================================================
+   Achievement celebration — the full-screen moment a winner gets.
+   Deliberately NOT dismissable: no backdrop click, no ESC, no close X. The
+   only way out is the button, because acknowledging is what tells the Boss the
+   award landed.
+
+   Its own palette rather than the app's surface tokens: this is a set piece,
+   and it should feel unlike every other screen. Light and dark are two
+   different treatments of the same idea, not one washed out into the other.
+   ============================================================ */
+
+.cel-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;                    /* above every modal in the app */
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow-y: auto;
+
+  --cel-ink:      #f4f7f4;
+  --cel-ink-soft: rgba(244, 247, 244, 0.74);
+  --cel-gold:     #f0b429;
+  --cel-mint:     #5fd8a4;
+  --cel-panel:    rgba(255, 255, 255, 0.06);
+  --cel-line:     rgba(255, 255, 255, 0.14);
+  --cel-bg-1:     #0b2b22;
+  --cel-bg-2:     #06201a;
+  --cel-bg-3:     #041713;
+}
+
+/* Light mode is a warm parchment-and-gold treatment: keeping the dark green
+   would have read as a modal stuck in the wrong theme. */
+:root:not([data-theme="dark"]) .cel-root {
+  --cel-ink:      #17301f;
+  --cel-ink-soft: rgba(23, 48, 31, 0.72);
+  --cel-gold:     #a9741a;
+  --cel-mint:     #12805a;
+  --cel-panel:    rgba(255, 255, 255, 0.66);
+  --cel-line:     rgba(23, 48, 31, 0.14);
+  --cel-bg-1:     #fdf8ec;
+  --cel-bg-2:     #f4efe0;
+  --cel-bg-3:     #ebe4d2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .cel-root {
+    --cel-ink:      #f4f7f4;
+    --cel-ink-soft: rgba(244, 247, 244, 0.74);
+    --cel-gold:     #f0b429;
+    --cel-mint:     #5fd8a4;
+    --cel-panel:    rgba(255, 255, 255, 0.06);
+    --cel-line:     rgba(255, 255, 255, 0.14);
+    --cel-bg-1:     #0b2b22;
+    --cel-bg-2:     #06201a;
+    --cel-bg-3:     #041713;
+  }
+}
+
+.cel-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 14, 11, 0.72);
+  backdrop-filter: blur(6px);
+}
+:root:not([data-theme="dark"]) .cel-scrim { background: rgba(40, 34, 18, 0.42); }
+
+.cel-card {
+  position: relative;
+  width: min(760px, 100%);
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid var(--cel-line);
+  color: var(--cel-ink);
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--cel-bg-1) 0%, var(--cel-bg-2) 55%, var(--cel-bg-3) 100%);
+  box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.55);
+  animation: cel-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  text-align: center;
+  padding: 40px 28px 28px;
+}
+@keyframes cel-rise {
+  from { opacity: 0; transform: translateY(26px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Soft light bloom behind the trophy. */
+.cel-card::before {
+  content: '';
+  position: absolute;
+  top: -160px; left: 50%;
+  width: 460px; height: 320px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--cel-gold) 26%, transparent) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.cel-trophy {
+  position: relative;
+  width: 92px; height: 92px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--cel-gold);
+  border: 1px solid color-mix(in srgb, var(--cel-gold) 42%, transparent);
+  background: color-mix(in srgb, var(--cel-gold) 10%, transparent);
+  box-shadow: 0 0 0 12px color-mix(in srgb, var(--cel-gold) 6%, transparent);
+  animation: cel-pulse 2.8s ease-in-out infinite;
+}
+@keyframes cel-pulse {
+  0%, 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--cel-gold) 6%, transparent); }
+  50%      { box-shadow: 0 0 0 20px color-mix(in srgb, var(--cel-gold) 3%, transparent); }
+}
+
+.cel-eyebrow {
+  font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--cel-mint);
+  margin-bottom: 10px;
+}
+
+.cel-title {
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: clamp(2rem, 5.4vw, 3.3rem);
+  line-height: 1.08;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.cel-name { color: var(--cel-gold); }
+
+.cel-sub {
+  max-width: 46ch;
+  margin: 0 auto 26px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--cel-ink-soft);
+}
+
+.cel-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--cel-line);
+  border-radius: 16px;
+  background: var(--cel-panel);
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.cel-fact { padding: 16px 12px; }
+.cel-fact + .cel-fact { border-left: 1px solid var(--cel-line); }
+.cel-fact-k {
+  font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--cel-ink-soft);
+  margin-bottom: 6px;
+}
+.cel-fact-v { font-size: 1.02rem; font-weight: 700; }
+.cel-fact-v.is-gold { color: var(--cel-gold); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) {
+  .cel-facts { grid-template-columns: 1fr; }
+  .cel-fact + .cel-fact { border-left: 0; border-top: 1px solid var(--cel-line); }
+}
+
+.cel-messages {
+  border: 1px solid var(--cel-line);
+  border-radius: 16px;
+  background: var(--cel-panel);
+  padding: 18px;
+  text-align: left;
+  margin-bottom: 24px;
+}
+.cel-messages-k {
+  font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--cel-ink-soft);
+  margin-bottom: 14px;
+}
+.cel-msg { display: flex; gap: 12px; align-items: flex-start; }
+.cel-msg + .cel-msg { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--cel-line); }
+.cel-avatar {
+  width: 42px; height: 42px; flex: 0 0 42px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 0.8rem;
+  color: #2a1b00;
+  background: linear-gradient(135deg, var(--cel-gold), color-mix(in srgb, var(--cel-gold) 55%, white));
+}
+.cel-msg-who { font-weight: 700; font-size: 0.9rem; }
+.cel-msg-role { font-size: 0.72rem; color: var(--cel-ink-soft); }
+.cel-msg-text {
+  margin-top: 4px; font-size: 0.9rem; line-height: 1.55;
+  color: var(--cel-ink-soft); font-style: italic;
+}
+
+.cel-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 34px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  color: #2a1b00;
+  background: linear-gradient(135deg, var(--cel-gold), color-mix(in srgb, var(--cel-gold) 62%, white));
+  box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--cel-gold) 70%, transparent);
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+.cel-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.cel-btn:disabled { opacity: 0.65; cursor: progress; }
+.cel-foot { margin-top: 12px; font-size: 0.72rem; color: var(--cel-ink-soft); }
+
+/* ── Confetti ──────────────────────────────────────────────────────────────
+   Plain CSS on a handful of spans rather than a canvas library: this renders
+   once, in a modal, and pulling a dependency in for it would be daft. */
+.cel-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.cel-piece {
+  position: absolute;
+  top: -12%;
+  width: 8px; height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: cel-fall linear forwards;
+}
+@keyframes cel-fall {
+  0%   { opacity: 0; transform: translateY(-10vh) rotate(0deg); }
+  8%   { opacity: 1; }
+  100% { opacity: 0; transform: translateY(105vh) rotate(720deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cel-confetti { display: none; }
+  .cel-card, .cel-trophy { animation: none; }
+}
+
+/* ── The lingering line on the clock-in widget ─────────────────────────── */
+.cel-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, transparent);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--warning) 14%, transparent),
+    color-mix(in srgb, var(--success) 10%, transparent)
+  );
+}
+.cel-banner-icon { color: var(--warning); flex: 0 0 auto; display: grid; place-items: center; }
+.cel-banner strong { font-weight: 700; }

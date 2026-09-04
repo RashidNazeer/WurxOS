@@ -260,6 +260,13 @@ export const StarIcon = (p) => (
   </svg>
 );
 
+export const TrophyIcon = (p) => (
+  <svg {...base} {...p}>
+    <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+    <path d="M17 5h2.5a1.5 1.5 0 0 1 0 5H17M7 5H4.5a1.5 1.5 0 0 0 0 5H7" />
+  </svg>
+);
+
 export const BookmarkIcon = (p) => (
   <svg {...base} {...p}>
     <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />

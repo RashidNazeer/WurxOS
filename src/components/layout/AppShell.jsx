@@ -5,6 +5,7 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import NotificationToaster from './NotificationToaster';
 import ClockInReminder from '../attendance/ClockInReminder';
+import AchievementCelebration from '../achievements/AchievementCelebration';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
@@ -153,6 +154,10 @@ export default function AppShell() {
       <NotificationToaster />
       {/* "You forgot to clock in" reminder — silent unless a shift start is set. */}
       <ClockInReminder />
+      {/* Renders nothing unless this user has an announced award waiting. It
+          must be able to appear over any page, because the winner could be
+          anywhere when the Boss hits Announce. */}
+      <AchievementCelebration />
     </div>
   );
 }

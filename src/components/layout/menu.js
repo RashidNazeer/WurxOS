@@ -2,6 +2,7 @@ import {
   HomeIcon, UsersIcon, ShieldIcon, StoreIcon, ChecklistIcon, SettingsIcon, BellIcon, ReportIcon,
   MegaphoneIcon, ClockIcon, BookmarkIcon, StarIcon, RefreshIcon, DiagramIcon,
   BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon, PlayIcon,
+  TrophyIcon,
 } from '../common/Icon';
 
 // Each role gets its own menu. Structure mirrors v1 layouts:
@@ -43,6 +44,10 @@ const ATTENDANCE_ITEM = { label: 'Attendance', icon: ClockIcon, to: '/attendance
 const HOLIDAYS_ITEM   = { label: 'Holidays',   icon: CalendarIcon, to: '/holidays' };
 const RESOURCES_ITEM  = { label: 'Resources',  icon: BookmarkIcon, to: '/resources' };
 const PERFORMANCE_ITEM = { label: 'Performance', icon: StarIcon, to: '/performance' };
+// Boss + OL only. Announcing an achievement writes a bonus onto the winner's
+// incentives, so it sits with the people who already manage pay. The route
+// carries the same RoleGuard — the menu is convenience, not the boundary.
+const ACHIEVEMENTS_ITEM = { label: 'Achievements', icon: TrophyIcon, to: '/achievements' };
 const INCENTIVES_ITEM = { label: 'Incentives',  icon: ReportIcon, to: '/incentives' };
 // `alert:true` — when this category has unread notifications the sidebar item
 // doesn't just show a dot, it inverts + blinks (IPCs nudge TL/OLs to review;
@@ -239,6 +244,7 @@ export const MENUS = {
     ATTENDANCE_ITEM,
     HOLIDAYS_ITEM,
     PERFORMANCE_ITEM,
+    ACHIEVEMENTS_ITEM,
     BROADCASTS_ITEM,
     REMINDERS_ITEM,
     KNOWLEDGE_ITEM,
@@ -272,6 +278,7 @@ export const MENUS = {
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
     PERFORMANCE_ITEM,
+    ACHIEVEMENTS_ITEM,
     BROADCASTS_ITEM,
     REMINDERS_ITEM,
     KNOWLEDGE_ITEM,

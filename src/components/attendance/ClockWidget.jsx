@@ -16,6 +16,8 @@ import {
 import { getNow, getNowDate } from '../../lib/serverTime';
 import ApcGmvGateModal from './ApcGmvGateModal';
 import { apcGmvStatus, submitApcGmv } from '../../lib/apcGmvApi';
+import { getMyAchievement, monthLabel } from '../../lib/achievementsApi';
+import '../../styles/celebration.css';
 
 const LOCATIONS = [
   { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: '#2563eb' },
@@ -262,6 +264,18 @@ export default function ClockWidget() {
   const [gmvStatus, setGmvStatus] = useState(null);
   const [pendingLocation, setPendingLocation] = useState(null);
   const [clockedInToast, setClockedInToast] = useState(false);
+
+  // "You were APC of the Month" — shown every day the winner comes here, from
+  // the moment they acknowledge the award until the end of the month after the
+  // one they won (mig 353). Null for everyone else, which is nearly everyone.
+  const [award, setAward] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    getMyAchievement()
+      .then((r) => { if (alive) setAward(r?.banner || null); })
+      .catch(() => { /* a missing garland must never break the clock */ });
+    return () => { alive = false; };
+  }, []);
 
   // Auto-dismiss the "You're clocked in" confirmation toast.
   useEffect(() => {
@@ -882,6 +896,17 @@ export default function ClockWidget() {
                   </div>
                 )}
               </div>
+
+              {award && (
+                <div className="cel-banner" style={{ margin: '4px 0 16px', textAlign: 'left' }}>
+                  <span className="cel-banner-icon">
+                    <i className="bi bi-trophy-fill" />
+                  </span>
+                  <span>
+                    You were <strong>{award.type_label}</strong> for {monthLabel(award.month)} — keep the momentum going.
+                  </span>
+                </div>
+              )}
 
               {/* Big digital clock — HH:MM black, SS lighter */}
               <div className="att-digit fw-bold" style={{
