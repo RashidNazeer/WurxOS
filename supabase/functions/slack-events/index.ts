@@ -94,6 +94,61 @@ const slackGet = async (method: string, params: Record<string, string>) => {
   return res.json().catch(() => ({ ok: false, error: 'bad json' }));
 };
 
+// ── Markdown → Slack mrkdwn ─────────────────────────────────────────────────
+// Slack does NOT render standard markdown. Its own dialect differs in every
+// construct the assistant actually uses, which is why answers arrived showing
+// literal **asterisks**:
+//
+//   bold      **x**            ->  *x*
+//   italic    *x* / _x_        ->  _x_
+//   strike    ~~x~~            ->  ~x~
+//   link      [text](url)      ->  <url|text>
+//   heading   ### Title        ->  *Title*   (no headings in mrkdwn)
+//
+// Order matters: ** must be converted before single *, or the bold markers get
+// eaten as italics. Code spans and fences are pulled out first and put back
+// afterwards, so nothing inside them is rewritten.
+function toSlackMrkdwn(md: string): string {
+  // Markers, not raw output. Bold has to be PARKED behind one: convert ** to *
+  // directly and the single-asterisk italic pass below immediately eats it, so
+  // every bold phrase arrives in Slack as italics. Restored last, after the
+  // italic pass can no longer see them.
+  //
+  // Both regexes below are literals for a reason — a previous version built
+  // them with new RegExp("(\\d+)") and one escaping level was lost in editing,
+  // leaving a pattern that matched the letter d. Code spans were silently never
+  // restored and shipped as @@CODE@@0@@CODE@@.
+  const stash: string[] = [];
+  const keep = (s: string) => `@@C${stash.push(s) - 1}@@`;
+
+  let t = String(md || '')
+    .replace(/```[\s\S]*?```/g, (m) => keep(m))
+    .replace(/`[^`\n]+`/g, (m) => keep(m));
+
+  t = t
+    // Links before emphasis: the label can contain formatting.
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<$2|$1>')
+    // Bold -> marker. Longest form first.
+    .replace(/\*\*\*(.+?)\*\*\*/g, '@@B_$1_@@')
+    .replace(/\*\*(.+?)\*\*/g, '@@B$1@@')
+    .replace(/__(.+?)__/g, '@@B$1@@')
+    .replace(/~~(.+?)~~/g, '~$1~')
+    // Whatever single asterisks remain really are italics.
+    .replace(/(^|[^*\w])\*([^*\n]+)\*(?![*\w])/g, '$1_$2_')
+    // Slack has no headings; bold is the closest thing.
+    .replace(/^#{1,6}\s*(.+)$/gm, '@@B$1@@')
+    // And no list syntax either.
+    .replace(/^(\s*)[-+]\s+/gm, '$1• ')
+    // Horizontal rules are noise in a chat message.
+    .replace(/^\s*(?:---|\*\*\*|___)\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
+
+  return t
+    .replace(/@@C(\d+)@@/g, (_, i) => stash[Number(i)])
+    .replace(/@@B([\s\S]*?)@@/g, '*$1*')
+    .trim();
+}
+
 /** Slack writes mentions as <@U123>. Strip them and tidy for the assistant. */
 function cleanQuestion(text: string): string {
   return String(text || '')
@@ -185,10 +240,14 @@ async function handleEvent(ev: Record<string, any>, eventId: string) {
     nameOf(user), nameOf(mentioned), chanOf(channel),
   ]);
 
+  // The assistant writes standard markdown; Slack does not read it. Without
+  // this every answer arrives full of literal **asterisks**.
+  const pretty = toSlackMrkdwn(answer);
+
   const header = `*${askerName}* asked in ${chanName} (tagged *${taggedName}*):\n> ${question}`;
   const bodyText = failure
     ? `${header}\n\n:warning: Could not answer — ${failure}`
-    : `${header}\n\n${answer}`;
+    : `${header}\n\n${pretty}`;
 
   const posted = await slack('chat.postMessage', {
     channel: cfg.dest_channel_id,
@@ -197,10 +256,27 @@ async function handleEvent(ev: Record<string, any>, eventId: string) {
     unfurl_media: false,
   });
 
+  // ── Also DM the person who was tagged ────────────────────────────────────
+  // They are the one being asked, so they should not have to watch another
+  // channel to see the answer. Best-effort and deliberately non-fatal: the
+  // internal channel is the system of record, and a DM that cannot be opened
+  // (bot lacks im:write, or the tagged account is deactivated) must never cost
+  // us the delivery that matters.
+  let dmError: string | null = null;
+  if (!failure && mentioned) {
+    const dm = await slack('chat.postMessage', {
+      channel: mentioned,
+      text: `You were tagged by *${askerName}* in ${chanName}:\n> ${question}\n\n${pretty}`,
+      unfurl_links: false,
+      unfurl_media: false,
+    }).catch(() => ({ ok: false, error: 'request failed' }));
+    if (!dm?.ok) dmError = `dm: ${dm?.error}`;
+  }
+
   await admin.from('slack_relay_log').update({
     answer: answer || null,
     posted: posted?.ok === true,
-    error: failure || (posted?.ok ? null : `slack: ${posted?.error}`),
+    error: failure || (posted?.ok ? dmError : `slack: ${posted?.error}`),
     finished_at: new Date().toISOString(),
   }).eq('id', claim.id);
 }
