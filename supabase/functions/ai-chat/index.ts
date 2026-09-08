@@ -115,6 +115,25 @@ const MAX_TOOL_ROUND_TOKENS = 1200;
 //     a data-heavy answer can't balloon the prompt as the DB grows.
 const COST_CEILING_TOKENS = 60000;
 const REASONING_EFFORT = 'low';
+// ── OpenAI stopped accepting reasoning_effort ALONGSIDE function tools ──────
+// Every question began failing with "AI service error (400)". The key, the
+// models and the quota all tested fine; the request body was the problem:
+//
+//   "Function tools with reasoning_effort are not supported for gpt-5.4-mini
+//    in /v1/chat/completions. To use function tools, use /v1/responses or set
+//    reasoning_effort to 'none'."
+//
+// Verified 2026-09-08 on BOTH allowed models: with tools, reasoning_effort
+// 'low' returns 400 while 'none' and omitting it both return 200 and still
+// produce tool calls. Only the two TOOL-ROUND calls send tools; the final
+// answer call does not, so it keeps 'low' and loses nothing.
+//
+// It surfaced as a total outage rather than a degradation because tool rounds
+// only run for the Boss — and the assistant is Boss-only, so every user hit it.
+//
+// Migrating to /v1/responses would also fix it and is the longer-term move, but
+// it is a rewrite of every call site; this is the one-word version.
+const TOOL_ROUND_REASONING_EFFORT = 'none';
 const TOOL_RESULT_CHAR_CAP = 6000;
 
 const cors = {
@@ -133,6 +152,23 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 //   {"error":"..."}                       — failure (client shows it)
 const sseHeaders = { ...cors, 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', Connection: 'keep-alive' };
 const sseLine = (obj: unknown) => `data: ${JSON.stringify(obj)}\n\n`;
+
+// Pull the human-readable reason out of an OpenAI error body.
+//
+// The streamed path used to report only "AI service error (400)". The API had
+// in fact explained itself precisely — "Function tools with reasoning_effort
+// are not supported for gpt-5.4-mini..." — but the body was logged server-side
+// and thrown away, so a one-word config problem read as a total mystery and
+// sent someone checking the key, the models and the billing first. Surfacing
+// the reason costs nothing: this assistant is Boss-only and the text is a
+// truncated API message, not anything secret.
+const reason = (body: string): string => {
+  try {
+    const m = JSON.parse(body)?.error?.message;
+    if (m) return String(m).slice(0, 200);
+  } catch { /* not JSON — fall through to the raw text */ }
+  return body ? String(body).slice(0, 200) : 'no detail returned';
+};
 
 // Run the WHOLE conversation inside one SSE stream: emit live {status} events
 // while tool rounds run ("Checking incentives…"), then stream the answer as
@@ -174,11 +210,11 @@ function streamConversation(opts: {
           // Cost backstop: if earlier rounds already spent the ceiling, stop
           // fetching more data and go straight to writing the answer.
           if (tokensUsed >= COST_CEILING_TOKENS) break;
-          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, reasoning_effort: REASONING_EFFORT, tools: TOOLS, tool_choice: 'auto' });
+          const r = await callOpenAI({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, reasoning_effort: TOOL_ROUND_REASONING_EFFORT, tools: TOOLS, tool_choice: 'auto' });
           if (!r.ok) {
             const t = await r.text().catch(() => '');
             console.error('model error (stream tool round)', r.status, t.slice(0, 200));
-            emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}).` });
+            emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}): ${reason(t)}` });
             controller.close(); return;
           }
           let parsed: any = null;
@@ -215,7 +251,7 @@ function streamConversation(opts: {
           if (!r.ok || !r.body) {
             const t = await r.text().catch(() => '');
             console.error('model error (stream final)', r.status, t.slice(0, 200));
-            emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}).` });
+            emit({ error: r.status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.' : `AI service error (${r.status}): ${reason(t)}` });
             controller.close(); return;
           }
           const reader = r.body.getReader();
@@ -1612,7 +1648,7 @@ Deno.serve(async (req) => {
       const aiRes = await fetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, reasoning_effort: REASONING_EFFORT, tools: TOOLS, tool_choice: 'auto' }),
+        body: JSON.stringify({ model, messages: convo, max_completion_tokens: MAX_TOOL_ROUND_TOKENS, reasoning_effort: TOOL_ROUND_REASONING_EFFORT, tools: TOOLS, tool_choice: 'auto' }),
       });
       const aiText = await aiRes.text();
       if (!aiRes.ok) {
