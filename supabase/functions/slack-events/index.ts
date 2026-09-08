@@ -69,12 +69,28 @@ async function verifySlack(req: Request, raw: string): Promise<string | null> {
   return diff === 0 ? null : 'signature mismatch';
 }
 
+// POST with a JSON body — correct for chat.postMessage and the other write
+// methods.
 const slack = async (method: string, payload: unknown) => {
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify(payload),
   });
+  return res.json().catch(() => ({ ok: false, error: 'bad json' }));
+};
+
+// GET with query params — required for the lookup methods.
+//
+// users.info and conversations.info do NOT accept a JSON body: they return
+// invalid_arguments and the caller falls back to whatever it had. That is why
+// the first relayed messages read "U0C09MWH64W asked in C0C162ZK2GY" instead of
+// "Mr Rashid asked in #pure-daily-care" — the failure was silent, because a
+// fallback that looks like data hides a broken call.
+const slackGet = async (method: string, params: Record<string, string>) => {
+  const url = new URL(`https://slack.com/api/${method}`);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${BOT_TOKEN}` } });
   return res.json().catch(() => ({ ok: false, error: 'bad json' }));
 };
 
@@ -119,6 +135,20 @@ async function handleEvent(ev: Record<string, any>, eventId: string) {
   }).select('id').single();
   if (claimErr || !claim) return;   // already handled
 
+  // ── Channel context ──────────────────────────────────────────────────────
+  // A question asked in #pure-daily-care is about Pure Daily Care. The person
+  // asking knows that and does not say it, so "how are we doing?" would reach
+  // the assistant with no subject and get answered across every brand.
+  //
+  // Phrased as a DEFAULT, not a constraint: a question that names a different
+  // brand must still be answered about that brand. Prefixing "only answer about
+  // X" would break the perfectly reasonable act of asking about another brand
+  // from this channel.
+  const brand = (cfg.channel_brands || {})[channel];
+  const asked = brand
+    ? `[Context: this was asked in the Slack channel for the brand "${brand}". If the question does not name a brand, it is about "${brand}" — resolve "we", "our" and "us" to that brand. If it names a different brand, answer about that one instead.]\n\n${question}`
+    : question;
+
   let answer = '';
   let failure = '';
   try {
@@ -130,7 +160,7 @@ async function handleEvent(ev: Record<string, any>, eventId: string) {
         // The platform still wants a bearer on function-to-function calls.
         Authorization: `Bearer ${SERVICE_ROLE}`,
       },
-      body: JSON.stringify({ message: question, as_user_id: cfg.answer_as_user_id }),
+      body: JSON.stringify({ message: asked, as_user_id: cfg.answer_as_user_id }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || j?.error) failure = j?.error || `assistant HTTP ${res.status}`;
@@ -144,11 +174,11 @@ async function handleEvent(ev: Record<string, any>, eventId: string) {
   // an unresolvable name must never stop the answer being delivered.
   const nameOf = async (id: string) => {
     if (!id) return 'someone';
-    const r = await slack('users.info', { user: id }).catch(() => null);
+    const r = await slackGet('users.info', { user: id }).catch(() => null);
     return r?.ok ? (r.user.real_name || r.user.name) : id;
   };
   const chanOf = async (id: string) => {
-    const r = await slack('conversations.info', { channel: id }).catch(() => null);
+    const r = await slackGet('conversations.info', { channel: id }).catch(() => null);
     return r?.ok ? `#${r.channel.name}` : id;
   };
   const [askerName, taggedName, chanName] = await Promise.all([
