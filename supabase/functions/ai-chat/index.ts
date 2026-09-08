@@ -1357,6 +1357,12 @@ Deno.serve(async (req) => {
     // stale value, incompatible model) falls back to the safe default. This
     // keeps Boss choice without letting a bad value break the assistant.
     const model = ALLOWED_MODELS.includes(cfg?.model) ? cfg.model : DEFAULT_MODEL;
+    // Boss switch for the TikTok Shop Academy source (mig 355). Derived here,
+    // beside the other config, so it is in scope for BOTH the retrieval below
+    // and the system prompt — the prompt has to change too, or the model is
+    // told to cite an Academy it was never given, which is how invented
+    // citations happen. Defaults to on when the column or row is missing.
+    const useTts = cfg ? cfg.use_tts_academy !== false : true;
 
     // ── Conversation (own it, or create) ───────────────────────────
     if (conversationId) {
@@ -1507,7 +1513,11 @@ Deno.serve(async (req) => {
       // hybrid RPC (through the caller's client so RLS/is_boss applies), and
       // append the top chunks WITH their source URLs so the model can cite.
       // Degrades silently to nothing if embedding/RPC fails — never blocks.
-      if (userClient) {
+      //
+      // Skipped entirely when the Boss turns it off (mig 355). The guard is on
+      // the OUTSIDE of the embedding call deliberately: this is not just about
+      // a shorter prompt, it also drops one paid OpenAI request per question.
+      if (userClient && useTts) {
         const qEmbed = await embedQuery(message);
         if (qEmbed) {
           const { data: tts } = await userClient.rpc('tts_knowledge_search', {
@@ -1555,20 +1565,33 @@ Deno.serve(async (req) => {
     const pageList = pagesForRole(roleKey)
       .map((p) => `- ${p.label} (${p.path}): ${p.purpose}`).join('\n');
 
-    const groundingRules = [
-      'HOW TO ANSWER:',
-      `- The person you are helping is a ${roleLabel}. Explain actions in a way that fits this role, using "WHAT THEY CAN DO" and the page list above.`,
+    // The Academy-specific rules are only included when that source is actually
+    // switched on (mig 355). Left in with the source off, they instruct the
+    // model to check a "TIKTOK SHOP KNOWLEDGE block" that is not in the prompt
+    // and to end TikTok answers with an Academy citation — an invitation to
+    // invent both. Turning the source off has to turn its instructions off too.
+    const ttsRules = useTts ? [
       '- The KNOWLEDGE comes in TWO kinds and you must NOT confuse or mislabel them: (1) the WurxOS how-to guides + company SOP library (about OUR app and internal process), and (2) the TIKTOK SHOP KNOWLEDGE block (official TikTok Shop Academy — about TikTok Shop itself). NEVER call TikTok Shop Academy content "the SOP" / "our knowledge"; NEVER call a WurxOS SOP "TikTok". Attribute each fact to its real source.',
       '- USE BOTH SOURCES TOGETHER. If a question has relevant material in BOTH the WurxOS/SOP knowledge AND the TikTok Shop Academy block, answer from BOTH — do not stop at the first source. Present each side clearly labelled (e.g. a "Per the TikTok Shop Academy" part and a "In WurxOS / our process" part), and then add a short SUMMARY paragraph that ties them together so the user gets one clear takeaway. Only use a single source when the other genuinely has nothing relevant.',
       '- IF THE TWO SOURCES DISAGREE (e.g. the TikTok Shop Academy says one thing and our WurxOS SOP says another, or one says yes and the other no), do NOT silently pick one or average them. State plainly what each source says, flag that they differ, and in the summary advise the user to CONFIRM WITH THEIR TEAM LEAD OR THE BOSS before acting. Never hide a conflict.',
+    ] : [
+      '- Your knowledge is the WurxOS how-to guides and the company SOP library — OUR app and OUR internal process. You have NOT been given any TikTok Shop Academy material on this question. For TikTok Shop topics, answer only from what our own SOPs say, make clear that is our internal guidance rather than TikTok\'s official documentation, and suggest confirming with the Team Lead or Boss. NEVER cite or link the TikTok Shop Academy, and never claim TikTok "states" or "recommends" something — you have no such source here.',
+    ];
+
+    const groundingRules = [
+      'HOW TO ANSWER:',
+      `- The person you are helping is a ${roleLabel}. Explain actions in a way that fits this role, using "WHAT THEY CAN DO" and the page list above.`,
+      ...ttsRules,
       '- If they ask how to do something their role cannot do (e.g. a Boss asking how to apply for leave), do NOT invent steps. Briefly say it is not part of their role and point them to what they CAN do instead.',
       '- Never invent pages, buttons, tools, or steps that are not in the knowledge or the page list. If the knowledge does not cover it, say you are not certain and suggest asking their Team Lead, Operation Lead, or the Boss — do NOT guess.',
       '- MATCH BY MEANING, not exact words. If the user phrases something differently from the SOP (e.g. "time off" vs "leave", "budget" vs "target ROI"), still find and use the relevant SOP; never say you have nothing just because the wording differs.',
       '- If a question is relevant but unclear or could mean several things, ask ONE short clarifying question instead of guessing or refusing.',
       '- When you mention an in-app page, link it INLINE using markdown to its exact path, e.g. [Leave](/leave). Only link to paths in the list above; never invent a path.',
       '- Some knowledge entries are only a title + a link to a full guide. For those, point the user to the guide with a markdown link; recite detailed steps only when the knowledge actually contains them.',
-      '- For TikTok Shop topics (GMV Max / ads, affiliate & creators, product policy, SPS / AHR / violations / shop health, listings, promotions, LIVE, seller setup), the TIKTOK SHOP KNOWLEDGE section is the authoritative source — ALWAYS check it and use it when it has anything relevant, even if the WurxOS SOP already gives a partial answer. ALWAYS end an answer that used it with a markdown link to the article via its Source URL, e.g. [TikTok Shop Academy](<source url>). This citation is REQUIRED whenever you used any TikTok fact.',
-      '- Give the concrete guidance the TikTok knowledge contains rather than over-hedging. If the Academy states a specific number, rule, or recommendation, state it plainly as TikTok\'s guidance. Only say "not specified" when the knowledge genuinely lacks it.',
+      ...(useTts ? [
+        '- For TikTok Shop topics (GMV Max / ads, affiliate & creators, product policy, SPS / AHR / violations / shop health, listings, promotions, LIVE, seller setup), the TIKTOK SHOP KNOWLEDGE section is the authoritative source — ALWAYS check it and use it when it has anything relevant, even if the WurxOS SOP already gives a partial answer. ALWAYS end an answer that used it with a markdown link to the article via its Source URL, e.g. [TikTok Shop Academy](<source url>). This citation is REQUIRED whenever you used any TikTok fact.',
+        '- Give the concrete guidance the TikTok knowledge contains rather than over-hedging. If the Academy states a specific number, rule, or recommendation, state it plainly as TikTok\'s guidance. Only say "not specified" when the knowledge genuinely lacks it.',
+      ] : []),
       '- When BRAND LIVE DATA is also relevant (the Boss tools), fold it in too: the TikTok best practice + our WurxOS process/SOP + what the brand\'s actual numbers show, and point to the right WurxOS page for the live view.',
       '- Read short follow-up questions in the context of the conversation so far — they usually continue the previous topic.',
       '- NEVER invent the name of a person, brand, or assignment. If asked who handles something and you were not given that fact, say you do not have it.',

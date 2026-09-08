@@ -267,7 +267,7 @@ function TrainView({ onBack }) {
     // `model` is Boss-selectable but allow-list-guarded server-side (the ai-chat
     // function falls back to the safe default for any value not in its
     // ALLOWED_MODELS), so a bad value can never break the assistant.
-    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled, use_kb: cfg.use_kb !== false, model: cfg.model }); setFlash('Saved.'); }
+    try { await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled, use_kb: cfg.use_kb !== false, use_tts_academy: cfg.use_tts_academy !== false, model: cfg.model }); setFlash('Saved.'); }
     catch (e) { setFlash('Error: ' + e.message); }
     finally { setSavingCfg(false); setTimeout(() => setFlash(''), 2500); }
   }
@@ -320,6 +320,17 @@ function TrainView({ onBack }) {
               <div className="form-check mt-3">
                 <input className="form-check-input" type="checkbox" id="ai-usekb" checked={cfg.use_kb !== false} onChange={(e) => setCfg({ ...cfg, use_kb: e.target.checked })} />
                 <label className="form-check-label small" htmlFor="ai-usekb" title="Also answer from the company Knowledge Base (each user only sees articles they're allowed to)">Use Knowledge Base</label>
+              </div>
+              <div className="form-check mt-3">
+                <input className="form-check-input" type="checkbox" id="ai-usetts" checked={cfg.use_tts_academy !== false} onChange={(e) => setCfg({ ...cfg, use_tts_academy: e.target.checked })} />
+                <label className="form-check-label small" htmlFor="ai-usetts" title="Off = the assistant never reads TikTok Shop Academy: no search, no citations, and a shorter prompt. Answers come only from WurxOS guides and our SOPs.">
+                  Use TikTok Shop Academy
+                </label>
+                <div className="small text-muted mt-1" style={{ lineHeight: 1.45 }}>
+                  {cfg.use_tts_academy !== false
+                    ? 'On — official TikTok Shop Academy articles are searched alongside our own SOPs, and cited.'
+                    : 'Off — answers come only from WurxOS guides and our SOPs. Nothing is read from the Academy, so TikTok questions get our internal guidance only.'}
+                </div>
               </div>
             </div>
             <button className="btn btn-sm btn-primary" style={{ borderRadius: 9 }} disabled={savingCfg} onClick={saveConfig}>
