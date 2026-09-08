@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   aiSendStream, listConversations, getMessages, deleteConversation,
   getAiConfig, updateAiConfig, listDocs, saveDoc, deleteDoc,
+  getSlackConfig, setSlackEnabled, listSlackRelayLog,
 } from '../../lib/aiAssistantApi';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
 import '../../styles/assistant.css';
@@ -337,6 +338,7 @@ function TrainView({ onBack }) {
               {savingCfg ? <span className="spinner-border spinner-border-sm" /> : 'Save behaviour'}
             </button>
             {flash && <span className="ms-2 small text-muted">{flash}</span>}
+            <SlackRelayPanel />
           </div>
         </div>
 
@@ -381,6 +383,91 @@ function TrainView({ onBack }) {
               <button className="btn btn-sm btn-primary" style={{ borderRadius: 9 }} disabled={!editing.title.trim() || !editing.content.trim()} onClick={persistDoc}>Save</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Slack relay switch ────────────────────────────────────────────
+// Questions asked in a watched Slack channel are answered by the assistant and
+// posted into ONE internal channel. Routing is set by migration 357 and shown
+// here read-only — the only decision this panel offers is on or off, because
+// that is the only one that should be casual. Changing where answers land is
+// a security decision, not a settings change.
+function SlackRelayPanel() {
+  const [cfg, setCfg] = useState(null);
+  const [log, setLog] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    getSlackConfig().then(setCfg).catch((e) => setErr(e.message));
+    listSlackRelayLog(8).then(setLog).catch(() => {});
+  };
+  useEffect(load, []);
+
+  async function toggle(on) {
+    setBusy(true); setErr('');
+    try { await setSlackEnabled(on); setCfg((c) => ({ ...c, enabled: on })); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  if (!cfg) return null;
+  const ready = !!cfg.dest_channel_id && !!cfg.answer_as_user_id
+    && (cfg.source_channel_ids || []).length > 0 && (cfg.watch_user_ids || []).length > 0;
+
+  return (
+    <div className="mt-4 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+      <div className="d-flex align-items-center gap-2 mb-2">
+        <i className="bi bi-slack" style={{ color: 'var(--accent)' }} />
+        <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>Slack relay</span>
+        <span className={`badge ${cfg.enabled ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>
+          {cfg.enabled ? 'ON' : 'OFF'}
+        </span>
+      </div>
+
+      <div className="text-muted mb-2" style={{ fontSize: '0.74rem', lineHeight: 1.5 }}>
+        When someone tags a watched person in a watched channel, the assistant answers the question
+        with real WurxOS data and posts it into the destination channel. The answer is <strong>never</strong>{' '}
+        posted back where it was asked — it goes only to the internal channel, whose members already
+        have full access in the app.
+      </div>
+
+      <div className="text-muted mb-2" style={{ fontSize: '0.72rem', fontFamily: 'monospace' }}>
+        watching {(cfg.source_channel_ids || []).length} channel(s) · {(cfg.watch_user_ids || []).length} tagged
+        {' '}person(s) → answers to <code>{cfg.dest_channel_id || '—'}</code>
+      </div>
+
+      {!ready && (
+        <div className="small text-warning mb-2">
+          Routing is incomplete — the relay cannot be switched on until a destination, a source channel,
+          a watched person and a Boss to answer as are all set.
+        </div>
+      )}
+
+      <div className="form-check form-switch">
+        <input className="form-check-input" type="checkbox" id="slack-relay" role="switch"
+          disabled={busy || !ready} checked={!!cfg.enabled}
+          onChange={(e) => toggle(e.target.checked)} />
+        <label className="form-check-label small" htmlFor="slack-relay">
+          Answer questions from Slack
+        </label>
+      </div>
+      {err && <div className="small text-danger mt-1">{err}</div>}
+
+      {log.length > 0 && (
+        <div className="mt-3">
+          <div className="text-muted mb-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>Recent</div>
+          {log.map((r) => (
+            <div key={r.id} className="d-flex align-items-start gap-2 py-1"
+              style={{ fontSize: '0.72rem', borderTop: '1px solid var(--border-subtle)' }}>
+              <i className={`bi ${r.posted ? 'bi-check-circle text-success' : 'bi-exclamation-circle text-warning'}`} />
+              <span className="text-truncate flex-grow-1" title={r.question}>{r.question}</span>
+              <span className="text-muted flex-shrink-0">{new Date(r.created_at).toLocaleTimeString()}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -136,3 +136,25 @@ export async function deleteDoc(id) {
   const { error } = await supabase.from('ai_assistant_docs').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+// ── Slack relay (Boss only; RLS enforces it) ──────────────────────
+// The relay answers questions asked in Slack and posts them into one internal
+// channel. Routing is seeded by migration 357; this is just the on/off switch
+// and a read-only view of where things are pointed.
+export async function getSlackConfig() {
+  const { data, error } = await supabase.from('slack_config').select('*').eq('id', 1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+export async function setSlackEnabled(enabled) {
+  const { error } = await supabase.from('slack_config')
+    .update({ enabled, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
+}
+export async function listSlackRelayLog(limit = 20) {
+  const { data, error } = await supabase.from('slack_relay_log')
+    .select('id, question, answer, posted, error, source_channel, created_at')
+    .order('created_at', { ascending: false }).limit(limit);
+  if (error) throw new Error(error.message);
+  return data || [];
+}

@@ -39,6 +39,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const OPENAI_KEY = Deno.env.get('OPEN_AI_API_KEY') ?? Deno.env.get('OPENAI_API_KEY') ?? '';
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''; // used to read KB as the caller (RLS applies)
+const AI_INTERNAL_SECRET = Deno.env.get('AI_INTERNAL_SECRET') ?? ''; // server-to-server (Slack relay) — see the auth block
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const EMBED_URL = 'https://api.openai.com/v1/embeddings';
 const EMBED_MODEL = 'text-embedding-3-small'; // 1536-dim; matches tts_knowledge.embedding
@@ -1325,21 +1326,53 @@ Deno.serve(async (req) => {
   try {
     if (!OPENAI_KEY) return json({ error: 'OPEN_AI_API_KEY not configured' }, 500);
 
-    // ── Auth: active employee, AND role must be allowed ────────────
-    const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-    if (!token) return json({ error: 'unauthenticated' }, 401);
-    const { data: u } = await admin.auth.getUser(token);
-    if (!u?.user) return json({ error: 'unauthenticated' }, 401);
-    const { data: profile } = await admin.from('profiles')
-      .select('display_name, role, is_active').eq('id', u.user.id).maybeSingle();
-    if (!profile || profile.is_active === false) return json({ error: 'forbidden' }, 403);
-    // Boss-only during the test phase — enforced server-side so it can't be
-    // reached by calling the function directly, not just hidden in the UI.
-    if (!ALLOWED_ROLES.includes(String(profile.role || '').toLowerCase())) {
-      return json({ error: 'The assistant is currently in limited testing and not available for your role yet.' }, 403);
-    }
-
     const body = await req.json().catch(() => ({}));
+
+    // ── Auth ───────────────────────────────────────────────────────
+    // Two ways in. A normal browser call carries the user's JWT. The Slack
+    // relay has no JWT — Slack users have no WurxOS login — so it authenticates
+    // server-to-server with a shared secret and names the profile to answer AS.
+    //
+    // That impersonation is fenced: the secret must match exactly, the named
+    // profile must exist, be active, AND be a boss. It is the same pattern
+    // send-push already uses (PUSH_WEBHOOK_SECRET), and the secret is a
+    // function secret so it is never in the repo or a browser.
+    const internalSecret = req.headers.get('x-internal-secret') || '';
+    const isInternal = !!AI_INTERNAL_SECRET && internalSecret === AI_INTERNAL_SECRET;
+
+    let userId: string;
+    let profile: { display_name?: string; role?: string; is_active?: boolean } | null = null;
+    let token = '';
+
+    if (isInternal) {
+      userId = String(body?.as_user_id || '');
+      if (!userId) return json({ error: 'as_user_id required for an internal call' }, 400);
+      const { data: p } = await admin.from('profiles')
+        .select('display_name, role, is_active').eq('id', userId).maybeSingle();
+      profile = p;
+      if (!profile || profile.is_active === false) return json({ error: 'forbidden' }, 403);
+      // Never let an internal caller impersonate a non-boss: the whole point of
+      // the relay is that answers land somewhere already trusted with Boss-level
+      // information, and that only holds if the answer was generated at that level.
+      if (String(profile.role || '').toLowerCase() !== 'boss') {
+        return json({ error: 'internal calls may only answer as a boss' }, 403);
+      }
+    } else {
+      token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+      if (!token) return json({ error: 'unauthenticated' }, 401);
+      const { data: u } = await admin.auth.getUser(token);
+      if (!u?.user) return json({ error: 'unauthenticated' }, 401);
+      userId = u.user.id;
+      const { data: p } = await admin.from('profiles')
+        .select('display_name, role, is_active').eq('id', userId).maybeSingle();
+      profile = p;
+      if (!profile || profile.is_active === false) return json({ error: 'forbidden' }, 403);
+      // Boss-only during the test phase — enforced server-side so it can't be
+      // reached by calling the function directly, not just hidden in the UI.
+      if (!ALLOWED_ROLES.includes(String(profile.role || '').toLowerCase())) {
+        return json({ error: 'The assistant is currently in limited testing and not available for your role yet.' }, 403);
+      }
+    }
     const message = String(body?.message || '').trim();
     let conversationId: string | null = body?.conversationId || null;
     const wantStream = body?.stream === true; // client opts into SSE token streaming
@@ -1368,11 +1401,11 @@ Deno.serve(async (req) => {
     if (conversationId) {
       const { data: conv } = await admin.from('ai_conversations')
         .select('id, user_id').eq('id', conversationId).maybeSingle();
-      if (!conv || conv.user_id !== u.user.id) return json({ error: 'conversation not found' }, 404);
+      if (!conv || conv.user_id !== userId) return json({ error: 'conversation not found' }, 404);
     } else {
       const title = message.slice(0, 60);
       const { data: created, error: cErr } = await admin.from('ai_conversations')
-        .insert({ user_id: u.user.id, title }).select('id').single();
+        .insert({ user_id: userId, title }).select('id').single();
       if (cErr) return json({ error: cErr.message }, 500);
       conversationId = created.id;
     }
@@ -1380,12 +1413,21 @@ Deno.serve(async (req) => {
     // ── Caller-scoped client (RLS applies) ─────────────────────────
     // Used to read the company Knowledge Base AS THE USER, so the database
     // itself guarantees they only ever see articles they're allowed to.
-    const userClient = ANON_KEY
-      ? createClient(SUPABASE_URL, ANON_KEY, {
-          global: { headers: { Authorization: `Bearer ${token}` } },
-          auth: { persistSession: false, autoRefreshToken: false },
-        })
-      : null;
+    // An internal (Slack relay) call has no JWT to scope by, so it reads with
+    // the service role. That is Boss-equivalent by construction: the auth block
+    // above already refused to answer as anyone but a boss, and a boss sees the
+    // whole Knowledge Base anyway. Building this client with an empty
+    // Authorization header instead would silently return nothing and the
+    // assistant would answer with no knowledge at all — a quiet wrong answer
+    // rather than a loud failure.
+    const userClient = isInternal
+      ? admin
+      : (ANON_KEY
+          ? createClient(SUPABASE_URL, ANON_KEY, {
+              global: { headers: { Authorization: `Bearer ${token}` } },
+              auth: { persistSession: false, autoRefreshToken: false },
+            })
+          : null);
 
     // ── Cost guard: skip heavy knowledge retrieval for pure DATA questions ──
     // The SOP/KB + TikTok-Academy retrieval (an embedding API call, a vector
