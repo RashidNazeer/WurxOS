@@ -393,7 +393,7 @@ export default function App() {
               />
               <Route
                 path="/pctl/ipcs"
-                element={<RoleGuard allow="pctl"><PCTLIPCsPage /></RoleGuard>}
+                element={<RoleGuard allow={['boss', 'ol', 'pctl']}><PCTLIPCsPage /></RoleGuard>}
               />
 
               {/* Tasks — everyone authenticated (RLS enforces row visibility) */}
@@ -570,10 +570,10 @@ export default function App() {
               <Route
                 path="/analytics/brands"
                 element={
-                  /* TL/APC read their own brands only — scoped by RLS (mig 341),
+                  /* TL/APC/IPC read their own brands only — scoped by RLS (mig 341 & 359),
                      and the page hides every edit control for anyone who is not
                      Boss/OL/developer. */
-                  <RoleGuard allow={['boss', 'ol', 'pctl', 'ads_manager', 'tl', 'apc']}>
+                  <RoleGuard allow={['boss', 'ol', 'pctl', 'ads_manager', 'tl', 'apc', 'ipc']}>
                     <BrandAnalyticsPage />
                   </RoleGuard>
                 }

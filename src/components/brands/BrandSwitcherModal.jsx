@@ -61,7 +61,10 @@ export default function BrandSwitcherModal({ brand, onClose, onDone }) {
     try {
       await updateBrand(brand.id, { ownerId: newOwnerId });
       if (dropAssignments) {
-        await setBrandAssignments(brand.id, []);
+        // Changing the owning TL drops the APC assignments that belonged to the
+        // old team. IPC allocations are managed by OL/PCTL on a different screen
+        // and are not this modal to clear.
+        await setBrandAssignments(brand.id, [], ['apc']);
       }
       onDone();
     } catch (err) {

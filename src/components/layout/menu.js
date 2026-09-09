@@ -126,8 +126,10 @@ const PAID_COLLAB_BOSS_OL = {
     { label: 'Brands',   to: '/paid-collab/brands' },
     { label: 'Creators', to: '/paid-collab/creators' },
     { label: 'Videos',   to: '/paid-collab/videos' },
+    { label: 'IPCs',     to: '/pctl/ipcs' },
   ],
 };
+
 const PAID_COLLAB_PCTL = {
   label: 'Paid Collab',
   icon: MegaphoneIcon,

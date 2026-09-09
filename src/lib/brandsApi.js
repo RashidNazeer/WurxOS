@@ -183,18 +183,45 @@ export async function reactivateBrand(id) {
 // Brand ↔ APC assignments
 // --------------------------------------------------------------
 // Replace the full assignment set for a brand: diff + add/remove.
-export async function setBrandAssignments(brandId, userIds) {
+/**
+ * Set the users assigned to a brand.
+ *
+ * ── `roles` IS NOT OPTIONAL DECORATION ─────────────────────────────────────
+ * This function owned every row for the brand: anything not in `userIds` was
+ * deleted. BrandForm calls it with a list it has pruned down to APCs under the
+ * owning TL (BrandForm.jsx:89-94 filters against listAPCsUnderTL, which is
+ * hard-scoped to role 'apc'). So the moment IPCs also hold brand_assignments
+ * rows, saving ANY field on ANY brand — a name, a tier — silently revoked every
+ * IPC's access to it. Not just on this screen: brand_assignments is what
+ * can_view_brand reads, so the brand would vanish from the IPC's reports,
+ * tasks, resources, credentials, agenda and checkpoints at once, with no error
+ * and nothing on screen to explain it.
+ *
+ * The caller now declares which roles it is authoritative for, and the delete
+ * is confined to those. A screen that only knows about APCs can no longer
+ * delete an IPC's row by omission. Passing no roles keeps the old
+ * delete-everything behaviour, so callers that genuinely own the whole set
+ * (an admin tool) still work — but BrandForm must always pass its roles.
+ */
+export async function setBrandAssignments(brandId, userIds, roles = null) {
   const { data: current, error: curErr } = await supabase
     .from('brand_assignments')
-    .select('user_id')
+    .select('user_id, profiles!inner(role)')
     .eq('brand_id', brandId);
   if (curErr) throw new Error(curErr.message);
 
   const currentIds = new Set((current || []).map((r) => r.user_id));
   const nextIds    = new Set(userIds);
 
+  // Only rows whose role the caller is responsible for may be removed.
+  const owns = (id) => {
+    if (!roles) return true;
+    const row = (current || []).find((r) => r.user_id === id);
+    return row ? roles.includes(row.profiles?.role) : true;
+  };
+
   const toAdd    = [...nextIds].filter((id) => !currentIds.has(id));
-  const toRemove = [...currentIds].filter((id) => !nextIds.has(id));
+  const toRemove = [...currentIds].filter((id) => !nextIds.has(id) && owns(id));
 
   if (toAdd.length) {
     const { data: me } = await supabase.auth.getUser();
@@ -371,4 +398,34 @@ export async function listAPCsUnderTLWithLoad(tlId) {
     byUser.set(r.user_id, (byUser.get(r.user_id) || 0) + 1);
   }
   return apcs.map((a) => ({ ...a, brand_count: byUser.get(a.id) || 0 }));
+}
+
+// Active IPCs across the agency (for BrandForm IPC assignment)
+export async function listActiveIPCs() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, email, reports_to, manager:reports_to(id, display_name)')
+    .eq('role', 'ipc')
+    .eq('is_active', true)
+    .order('display_name', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function listActiveIPCsWithLoad() {
+  const ipcs = await listActiveIPCs();
+  if (ipcs.length === 0) return [];
+
+  const ids = ipcs.map((i) => i.id);
+  const { data: rows, error } = await supabase
+    .from('brand_assignments')
+    .select('user_id')
+    .in('user_id', ids);
+  if (error) throw new Error(error.message);
+
+  const byUser = new Map();
+  for (const r of rows || []) {
+    byUser.set(r.user_id, (byUser.get(r.user_id) || 0) + 1);
+  }
+  return ipcs.map((i) => ({ ...i, brand_count: byUser.get(i.id) || 0 }));
 }
