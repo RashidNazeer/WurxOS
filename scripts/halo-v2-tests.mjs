@@ -19,7 +19,7 @@ import {
 import {
   planningEligibility, modelDerivedAssumptions, planningModel, PLANNING_CONFIDENCE_FLOOR,
 } from '../src/lib/haloV2/planningScenarios.js';
-import { atLeastConfidence } from '../src/lib/haloV2/confidence.js';
+import { atLeastConfidence, historyPhrase } from '../src/lib/haloV2/confidence.js';
 import {
   assessGrain, recommendGrain, grainSwitchSuggestion,
 } from '../src/lib/haloV2/grainRecommendation.js';
@@ -1098,6 +1098,122 @@ function haloFinderTest(res) {
     !/\b(proves|proven|causes|causal lift)\b/i.test(allText));
   check('QA-E3. validation stage states why nothing is incremental',
     /incremental/i.test(st.find((s) => s.key === 'validation').detail));
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CLIENT-UX REWRITE — the builder prompt's confirmed bugs
+// ════════════════════════════════════════════════════════════════════
+
+// ── Bug A — the empty state must name the SELECTED view ──────────────
+// Repro: brand with limited monthly history, View = Monthly, and the warning
+// body said "Weekly does not have enough history…" — a stale sentence about a
+// view nobody had chosen.
+{
+  const mk = (n) => {
+    const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+    return periods(x, x.map((v, i) => 4000 + 0.2 * v + (i >= 1 ? 0.3 * x[i - 1] : 0) + rnd() * 30));
+  };
+  const assess = {
+    day: assessGrain('day', mk(120), { maxLag: 3, controls: NO_CTL }),
+    week: assessGrain('week', mk(5), { maxLag: 3, controls: NO_CTL }),
+    month: assessGrain('month', mk(4), { maxLag: 3, controls: NO_CTL }),
+  };
+
+  const onMonthly = recommendGrain(assess, { currentGrain: 'month' });
+  check('BugA. viewing Monthly → the reason names Monthly',
+    /Monthly does not have enough history/.test(onMonthly.reason), onMonthly.reason);
+  check('BugA2. …and does NOT mention Weekly',
+    !/Weekly/.test(onMonthly.reason), onMonthly.reason);
+  check('BugA3. …and quotes the MONTHLY shortfall, not the weekly one',
+    new RegExp(`${assess.month.usable} of about ${assess.month.required} usable months`).test(onMonthly.reason),
+    onMonthly.reason);
+
+  const onWeekly = recommendGrain(assess, { currentGrain: 'week' });
+  check('BugA4. viewing Weekly still says Weekly',
+    /Weekly does not have enough history/.test(onWeekly.reason) && !/Monthly does not/.test(onWeekly.reason),
+    onWeekly.reason);
+
+  // No currentGrain supplied → falls back to the weekly phrasing, unchanged.
+  check('BugA5. omitting currentGrain keeps the previous behaviour',
+    /Weekly does not have enough history/.test(recommendGrain(assess).reason));
+}
+
+// ── Bug C — usable-period copy must match the grain ──────────────────
+// Repro: model details on a short DAILY window claimed "52 usable periods —
+// about a year of history". 52 days is seven weeks.
+{
+  check('BugC. 52 weeks reads as about a year',
+    /about a year/.test(historyPhrase(52, 'week')), historyPhrase(52, 'week'));
+  check('BugC2. 52 DAYS does not claim a year',
+    !/year/.test(historyPhrase(52, 'day')), historyPhrase(52, 'day'));
+  check('BugC3. …it is described in weeks instead',
+    /about 7 weeks/.test(historyPhrase(52, 'day')), historyPhrase(52, 'day'));
+  check('BugC4. 365 days reads as about a year',
+    /about a year/.test(historyPhrase(365, 'day')), historyPhrase(365, 'day'));
+  check('BugC5. 12 months reads as about a year',
+    /about a year/.test(historyPhrase(12, 'month')), historyPhrase(12, 'month'));
+  check('BugC6. 104 weeks reads as about two years',
+    /about 2\.0 years/.test(historyPhrase(104, 'week')), historyPhrase(104, 'week'));
+  check('BugC7. the unit is always named and pluralised',
+    historyPhrase(1, 'day').startsWith('1 usable day') && historyPhrase(2, 'day').startsWith('2 usable days'),
+    `${historyPhrase(1, 'day')} | ${historyPhrase(2, 'day')}`);
+
+  // End to end: the confidence reasons on a daily view must not say "year".
+  const n = 60;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((_, t) => 4000 + 0.2 * x[t] + (t >= 1 ? 0.3 * x[t - 1] : 0) + rnd() * 25);
+  const daily = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: NO_CTL });
+  check('BugC8. a 60-day model never claims a year of history',
+    !daily.adjustedModel.confidenceReasons.some((r) => /year/.test(r)),
+    daily.adjustedModel.confidenceReasons[0]);
+  check('BugC9. …and names days explicitly',
+    daily.adjustedModel.confidenceReasons.some((r) => /usable day/.test(r)),
+    daily.adjustedModel.confidenceReasons[0]);
+
+  const weekly = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'week', controls: NO_CTL });
+  check('BugC10. the same 60 periods as WEEKS do claim about a year',
+    weekly.adjustedModel.confidenceReasons.some((r) => /about a year/.test(r)),
+    weekly.adjustedModel.confidenceReasons[0]);
+}
+
+// ── Bug C (model side) — annual seasonality is grain-dependent ───────
+// A flat 52 fitted a 52-DAY cycle on daily data and called it annual
+// seasonality, switching itself on at 52 days — two parameters spent on a
+// seven-and-a-half-week wave that does not exist, on the grain now recommended
+// for young brands.
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((v) => 4000 + 0.4 * v + rnd() * 30);
+  const p = periods(x, y);
+
+  const asWeeks = analyseHalo(p, { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'week', controls: { trend: true, seasonality: true } });
+  const asDays = analyseHalo(p, { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: { trend: true, seasonality: true } });
+
+  check('BugC11. 120 WEEKS clears the annual gate → seasonality included',
+    asWeeks.adjustedModel.seasonalityIncluded === true);
+  check('BugC12. 120 DAYS does NOT → a 52-day "annual" cycle is not fitted',
+    asDays.adjustedModel.seasonalityIncluded === false);
+  check('BugC13. …and it says why, in days',
+    /365 days/.test(asDays.adjustedModel.seasonalityReason || ''), asDays.adjustedModel.seasonalityReason);
+  check('BugC14. not fitting it also costs fewer parameters',
+    asDays.adjustedModel.parameterCount < asWeeks.adjustedModel.parameterCount,
+    `days=${asDays.adjustedModel.parameterCount} weeks=${asWeeks.adjustedModel.parameterCount}`);
+
+  // 400 days DOES clear a real annual cycle.
+  const long = 400;
+  const lx = Array.from({ length: long }, () => 1000 + rnd() * 500);
+  const ly = lx.map((v) => 4000 + 0.4 * v + rnd() * 30);
+  const longDaily = analyseHalo(periods(lx, ly), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: { trend: true, seasonality: true } });
+  check('BugC15. 400 days DOES clear the annual gate',
+    longDaily.adjustedModel.seasonalityIncluded === true);
+
+  // assessGrain must use each grain's own cycle, not the caller's.
+  const aDay = assessGrain('day', p, { maxLag: 1, controls: { trend: true, seasonality: true } });
+  const aWeek = assessGrain('week', p, { maxLag: 1, controls: { trend: true, seasonality: true } });
+  check('BugC16. assessGrain gives each grain its own seasonality gate',
+    aDay.seasonalityIncluded === false && aWeek.seasonalityIncluded === true,
+    `day=${aDay.seasonalityIncluded} week=${aWeek.seasonalityIncluded}`);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');

@@ -29,6 +29,7 @@ import { fmtSignedPct, signedCorrColor, signedCorrTextColor, describeCorrelation
 import { haloFinder } from '../../lib/haloV2/lagAnalysis.js';
 import { refitWithout } from '../../lib/haloV2/distributedLag.js';
 import { assessGrains, recommendGrain, grainSwitchSuggestion, GRAIN_LABEL, GRAIN_UNIT } from '../../lib/haloV2/grainRecommendation.js';
+import { PERIODS_PER_YEAR } from '../../lib/haloV2/controls.js';
 import { stageStatuses } from '../../lib/haloV2/stages.js';
 import { REFERENCE_METHOD_SPECS } from '../../lib/haloV2/counterfactual.js';
 import { inverseNote, metricLabel } from '../../lib/haloV2/metricMetadata.js';
@@ -99,9 +100,11 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
   useEffect(() => { if (tiktokFields.length && !tiktokFields.some((f) => f.key === xKey)) setXKey(tiktokFields[0].key); }, [tiktokFields, xKey]);
   useEffect(() => { if (amazonFields.length && !amazonFields.some((f) => f.key === yKey)) setYKey(amazonFields[0].key); }, [amazonFields, yKey]);
 
+  // periodsPerYear is what makes seasonality ANNUAL rather than a fixed
+  // 52-period wave: 365 on daily, 52 on weekly, 12 on monthly.
   const controlOpts = useMemo(
-    () => ({ trend: useTrend, seasonality: useSeasonality }),
-    [useTrend, useSeasonality],
+    () => ({ trend: useTrend, seasonality: useSeasonality, periodsPerYear: PERIODS_PER_YEAR[gran] }),
+    [useTrend, useSeasonality, gran],
   );
 
   // ── Grain assessment across EVERY grain (§A1) ────────────────────
@@ -121,7 +124,12 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dsKey, rowsById, grans, xKey, yKey, range, maxLag, controlOpts, srcRows]);
 
-  const recommendation = useMemo(() => recommendGrain(assessments), [assessments]);
+  // currentGrain so the empty-state copy names the view the user is actually
+  // on — selecting Monthly used to be explained with a sentence about Weekly.
+  const recommendation = useMemo(
+    () => recommendGrain(assessments, { currentGrain: gran }),
+    [assessments, gran],
+  );
   const assessment = assessments[gran] || null;
   const suggestion = useMemo(
     () => grainSwitchSuggestion(gran, assessments, recommendation),
@@ -171,6 +179,7 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
   const result = useMemo(() => analyseHalo(periods, {
     xKey, yKey,
     maxLag: effectiveMaxLag,
+    unit: gran,
     controls: controlOpts,
     reference: refMethod ? { method: refMethod, customValue: customRef === '' ? null : Number(customRef) } : null,
     scenarioSpec: customChange !== '' ? { type: 'absolute', value: Number(customChange) } : { type: 'percent', value: Number(scenarioPct) || 10 },

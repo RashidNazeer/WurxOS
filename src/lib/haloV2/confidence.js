@@ -44,7 +44,37 @@ function applyCeiling(label, ceiling) {
   return RANK[label] > RANK[ceiling] ? ceiling : label;
 }
 
-export function modelConfidence({ model, lagRows = [], controlsIncluded = [], controlsUnavailable = [], missingMajor = null }) {
+// ── History described in the grain the user is actually looking at ──
+// The sample-size reasons used a week-shaped template: at n >= 52 they said
+// "about a year of history" whatever the grain. On a daily view 52 usable
+// periods is seven weeks, and the model details cheerfully called that a year —
+// the single most misleading sentence on the page, because sample size is the
+// first thing anyone checks before trusting a figure.
+//
+// The score thresholds below are deliberately unchanged; only the description
+// is derived from the real grain.
+const PER_YEAR = { day: 365, week: 52, month: 12 };
+
+export function historyPhrase(n, unit = 'period') {
+  const count = `${n} usable ${unit}${n === 1 ? '' : 's'}`;
+  const perYear = PER_YEAR[unit];
+  if (!perYear) return count;
+  const years = n / perYear;
+  if (years >= 1.85) return `${count} — about ${years.toFixed(1)} years of history`;
+  if (years >= 0.85) return `${count} — about a year of history`;
+  // Below a year, describe it in the next unit UP where that reads better than
+  // a bare count ("118 usable days — about 17 weeks"). Three weeks is the floor:
+  // below it "about 1 weeks" is worse than the plain day count.
+  if (unit === 'day' && n >= 21) return `${count} — about ${Math.round(n / 7)} weeks`;
+  if (unit === 'month' && n >= 6) return `${count} — about ${(n / 12).toFixed(1)} of a year`;
+  return count;
+}
+
+export function modelConfidence({
+  model, lagRows = [], controlsIncluded = [], controlsUnavailable = [], missingMajor = null,
+  // The grain being viewed, so the history description matches it.
+  unit = 'period',
+}) {
   const reasons = [];
 
   if (!model?.available) {
@@ -57,12 +87,13 @@ export function modelConfidence({ model, lagRows = [], controlsIncluded = [], co
 
   let score = 0;
 
-  // 1. Sample size.
+  // 1. Sample size. Thresholds unchanged; the wording now names the grain.
   const n = model.sampleSize;
-  if (n >= 78) { score += 2; reasons.push(`${n} usable periods — a long history.`); }
-  else if (n >= 52) { score += 1.5; reasons.push(`${n} usable periods — about a year of history.`); }
-  else if (n >= 26) { score += 1; reasons.push(`${n} usable periods.`); }
-  else { score += 0.25; reasons.push(`Only ${n} usable periods — estimates move easily.`); }
+  const span = historyPhrase(n, unit);
+  if (n >= 78) { score += 2; reasons.push(`${span} — plenty to estimate on.`); }
+  else if (n >= 52) { score += 1.5; reasons.push(`${span}.`); }
+  else if (n >= 26) { score += 1; reasons.push(`${span}.`); }
+  else { score += 0.25; reasons.push(`${span} — few enough that the estimate moves easily.`); }
 
   // 2. Interval: does it agree on a direction, and how wide is it?
   const { lower, upper } = model.confidenceInterval || {};

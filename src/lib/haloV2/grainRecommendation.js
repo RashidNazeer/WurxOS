@@ -16,6 +16,7 @@
 
 import { capacityOf, bestFeasibleLag, MAX_SUPPORTED_LAG } from './distributedLag.js';
 import { MIN_CORRELATION_OBS } from './correlation.js';
+import { PERIODS_PER_YEAR } from './controls.js';
 
 export const GRAIN_LABEL = { day: 'Daily', week: 'Weekly', month: 'Monthly' };
 export const GRAIN_UNIT = { day: 'day', week: 'week', month: 'month' };
@@ -32,6 +33,12 @@ export const ALMOST_THERE_FRACTION = 0.9;
  */
 export function assessGrain(grain, periods, { maxLag = MAX_SUPPORTED_LAG, controls = {} } = {}) {
   const rows = Array.isArray(periods) ? periods : [];
+  // Seasonality's period is annual, so it depends on the grain being assessed —
+  // NOT on whatever grain the caller happens to be viewing. Deriving it here
+  // means assessGrains can loop over every grain with one controls object and
+  // still get each grain's own seasonality gate right; a caller passing the
+  // current view's value would make Daily assessed with a weekly cycle.
+  const ctl = { ...controls, periodsPerYear: PERIODS_PER_YEAR[grain] ?? controls.periodsPerYear };
 
   // Correlation only needs both sides present in the same period. It is far
   // cheaper in data than the regression, which is why it stays available on
@@ -40,8 +47,8 @@ export function assessGrain(grain, periods, { maxLag = MAX_SUPPORTED_LAG, contro
   const canCorrelate = correlationObs >= MIN_CORRELATION_OBS;
 
   // The requested window, and the best window this data can actually carry.
-  const requested = capacityOf(rows, { maxLag, controls });
-  const feasible = bestFeasibleLag(rows, { maxLag, controls });
+  const requested = capacityOf(rows, { maxLag, controls: ctl });
+  const feasible = bestFeasibleLag(rows, { maxLag, controls: ctl });
 
   return {
     grain,
@@ -69,6 +76,12 @@ export function assessGrain(grain, periods, { maxLag = MAX_SUPPORTED_LAG, contro
     correlationRequired: MIN_CORRELATION_OBS,
     controlsIncluded: requested.controlsIncluded,
     controlsUnavailable: requested.controlsUnavailable,
+    // Surfaced so a grain can be described honestly BEFORE it is selected —
+    // "Daily (no seasonality adjustment at this range)" is useful in the picker,
+    // and capacityOf has already worked it out for this grain's own cycle.
+    seasonalityIncluded: requested.seasonalityIncluded,
+    seasonalityReason: requested.seasonalityReason,
+    periodsPerYear: ctl.periodsPerYear ?? null,
   };
 }
 
@@ -110,7 +123,7 @@ export function assessGrains(grains, periodsFor, opts = {}) {
  * from "here is your model" to "here is what is needed", which is the
  * difference between the page feeling broken and feeling like a next step.
  */
-export function recommendGrain(assessments) {
+export function recommendGrain(assessments, { currentGrain = null } = {}) {
   const list = Object.values(assessments || {});
   if (!list.length) {
     return { grain: null, guided: true, reason: 'No sheet data is available for any grain.', assessment: null };
@@ -120,6 +133,10 @@ export function recommendGrain(assessments) {
   const week = byGrain('week');
   const day = byGrain('day');
   const month = byGrain('month');
+  const current = currentGrain ? byGrain(currentGrain) : null;
+
+  // "N of about M usable weeks" for whichever grain is being described.
+  const shortOf = (a) => (a ? `${a.usable} of about ${a.required} usable ${a.unit}s` : 'no data at that grain');
 
   if (week?.canModelAtRequested) {
     return {
@@ -128,9 +145,13 @@ export function recommendGrain(assessments) {
     };
   }
   if (day?.canModel) {
+    // Name the grain the USER IS ON, not always Weekly. Selecting Monthly used
+    // to produce "Weekly does not have enough history…" in the Monthly empty
+    // state — a stale sentence about a view nobody had chosen.
+    const blocked = (current && current.grain !== 'day') ? current : week;
     return {
       grain: 'day', guided: false, assessment: day,
-      reason: `Weekly does not have enough history yet (${week ? `${week.usable} of about ${week.required} usable weeks` : 'no weekly data'}), but Daily does: ${day.usable} usable days supports a ${day.feasibleLag === 0 ? 'same-day' : `${day.feasibleLag}-day`} model over this same date range.`,
+      reason: `${blocked?.label || 'This view'} does not have enough history yet (${shortOf(blocked)}), but Daily does: ${day.usable} usable days supports a ${day.feasibleLag === 0 ? 'same-day' : `${day.feasibleLag}-day`} model over this same date range.`,
     };
   }
   if (week?.canModel) {
