@@ -88,6 +88,9 @@ export function capacityOf(periods, { maxLag = MAX_SUPPORTED_LAG, controls = {} 
     shortfall: Math.max(0, check.required - usable.length),
     controlsIncluded: ctrl.included,
     controlsUnavailable: ctrl.unavailable,
+    controlsMissingMajor: ctrl.missingMajor || [],
+    seasonalityIncluded: !!ctrl.seasonalityIncluded,
+    seasonalityReason: ctrl.seasonalityReason || null,
     _usable: usable,
     _controls: ctrl,
   };
@@ -147,6 +150,13 @@ export function fitDistributedLag(periods, { maxLag = MAX_SUPPORTED_LAG, control
     shortfall: cap.shortfall,
     controls: ctrl.included,
     controlsUnavailable: ctrl.unavailable,
+    // Structural control facts. `seasonalityIncluded` in particular must reach
+    // the UI: copy that claims an adjustment the model did not make is the
+    // specific dishonesty §E2 calls out.
+    controlsMissingMajor: ctrl.missingMajor || [],
+    seasonalityIncluded: !!ctrl.seasonalityIncluded,
+    seasonalityReason: ctrl.seasonalityReason || null,
+    trendIncluded: !!ctrl.trendIncluded,
     xKey,
     yKey,
     warnings: [],

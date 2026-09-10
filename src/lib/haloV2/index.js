@@ -74,6 +74,9 @@ export function analyseHalo(periods, {
     lagRows,
     controlsIncluded: model.controls || [],
     controlsUnavailable: model.controlsUnavailable || [],
+    // Passed structurally so the ceiling rule doesn't have to parse English out
+    // of the display strings.
+    missingMajor: model.controlsMissingMajor || [],
   });
 
   // ── Modelled outputs ──────────────────────────────────────────────
@@ -128,6 +131,11 @@ export function analyseHalo(periods, {
       covarianceKind: model.covarianceKind ?? null,
       controls: model.controls || [],
       controlsUnavailable: model.controlsUnavailable || [],
+      // §E — the controls panel must state what was ACTUALLY in the regression.
+      controlsMissingMajor: model.controlsMissingMajor || [],
+      seasonalityIncluded: !!model.seasonalityIncluded,
+      seasonalityReason: model.seasonalityReason ?? null,
+      trendIncluded: !!model.trendIncluded,
       maxVif: model.maxVif ?? null,
       // Model-specific warnings (interval spans zero, influential observation,
       // collinear lags). These also flow into the combined `warnings` array
@@ -137,6 +145,10 @@ export function analyseHalo(periods, {
       warnings: model.warnings || [],
       confidenceLabel: confidence.label,
       confidenceReasons: confidence.reasons,
+      // What the score alone would have said, and why it was held below that.
+      confidenceEarned: confidence.earnedLabel ?? confidence.label,
+      confidenceCeiling: confidence.ceiling ?? null,
+      confidenceCappedBy: confidence.cappedBy || [],
       _model: model,          // for the sensitivity refit; not for display
     },
     historicalContribution: contribution,

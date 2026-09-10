@@ -369,6 +369,100 @@ const NO_CTL = { trend: false, seasonality: false };
     `required=${fit.requiredObservations}`);
 }
 
+// ── 22 — controls honesty: seasonality must not be claimed falsely ───
+// The explorer printed "adjusted for trend and seasonality" whenever promo and
+// stock-out were absent, regardless of whether seasonality was estimable.
+{
+  const short = 40, long = 120;   // 40 sits BELOW the ~52-period seasonality gate
+  const mk = (n) => {
+    const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+    return periods(x, x.map((v) => 4000 + 0.4 * v + rnd() * 40));
+  };
+  const below = fitDistributedLag(mk(short), { maxLag: 1, controls: { trend: true, seasonality: true }, xKey: 'gmv', yKey: 'revenue_per_day' });
+  const above = fitDistributedLag(mk(long), { maxLag: 1, controls: { trend: true, seasonality: true }, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('22. below ~52 periods → seasonality NOT included', below.seasonalityIncluded === false,
+    `included=${below.seasonalityIncluded}`);
+  check('22b. …and it says why', typeof below.seasonalityReason === 'string' && /52/.test(below.seasonalityReason),
+    below.seasonalityReason);
+  check('22c. …and it is not in the included list', !below.controls.some((c) => /season/i.test(c)),
+    below.controls.join(', '));
+  check('22d. above ~52 periods → seasonality IS included', above.seasonalityIncluded === true);
+  check('22e. …and appears in the included list', above.controls.some((c) => /season/i.test(c)),
+    above.controls.join(', '));
+}
+
+// ── 23 — a flat control is dropped AND stops being advertised ────────
+// The removal looked a column's `name` up in a list of LABELS, so it never
+// matched: a promotions column that never varied was dropped from the
+// regression and still rendered as an included control.
+{
+  const n = 80;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((v) => 4000 + 0.4 * v + rnd() * 40);
+  const flat = Array.from({ length: n }, () => ({ promo: 1 }));   // constant
+  const fit = fitDistributedLag(periods(x, y, flat), { maxLag: 1, controls: { trend: true, seasonality: false }, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('23. a constant control is NOT listed as included', !fit.controls.includes('Promotions'),
+    fit.controls.join(', '));
+  check('23b. …it is listed as unavailable, with the reason',
+    fit.controlsUnavailable.some((u) => /Promotions/.test(u) && /no variation/.test(u)),
+    fit.controlsUnavailable.join(' | '));
+  check('23c. …and it still counts as a MISSING major control',
+    fit.controlsMissingMajor.some((m) => m.name === 'promo'),
+    JSON.stringify(fit.controlsMissingMajor.map((m) => m.name)));
+}
+
+// ── 24 — a registered control is used without being opted in (§E5) ───
+{
+  const n = 80;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const ads = Array.from({ length: n }, () => ({ amazon_ads_spend: 200 + rnd() * 400 }));
+  const y = x.map((v, i) => 4000 + 0.4 * v + 1.5 * ads[i].amazon_ads_spend + rnd() * 30);
+  // NOTE: amazon_ads_spend is never mentioned in the options.
+  const fit = fitDistributedLag(periods(x, y, ads), { maxLag: 1, controls: { trend: true, seasonality: false }, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('24. a registered control present in the sheet is auto-included',
+    fit.controls.includes('Amazon Ads spend'), fit.controls.join(', '));
+  check('24b. …and no longer counts as missing',
+    !fit.controlsMissingMajor.some((m) => m.name === 'amazon_ads_spend'));
+  check('24c. an explicit false still switches it off',
+    !fitDistributedLag(periods(x, y, ads), { maxLag: 1, controls: { trend: true, seasonality: false, amazon_ads_spend: false }, xKey: 'gmv', yKey: 'revenue_per_day' })
+      .controls.includes('Amazon Ads spend'));
+}
+
+// ── 25 — confidence ceiling: missing confounders cap at Moderate ─────
+// A long history with a tight interval and nothing controlled for but a time
+// trend would otherwise score "Strong Evidence" — which is exactly the shape a
+// promotion calendar both series respond to produces.
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.20 * x[t] + (t >= 1 ? 0.30 * x[t - 1] : 0) + (t >= 2 ? 0.15 * x[t - 2] : 0) + (rnd() - 0.5) * 20);
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 2, controls: { trend: true, seasonality: false } });
+  const m = full.adjustedModel;
+  check('25. the score alone would have said Strong Evidence', m.confidenceEarned === 'Strong Evidence',
+    `earned=${m.confidenceEarned}`);
+  check('25b. …but it is capped at Moderate Confidence', m.confidenceLabel === 'Moderate Confidence',
+    `label=${m.confidenceLabel} ceiling=${m.confidenceCeiling}`);
+  check('25c. …and the cap explains itself', m.confidenceCappedBy.length > 0 && /not in the model/.test(m.confidenceCappedBy[0]),
+    m.confidenceCappedBy[0]);
+  check('25d. a ceiling never RAISES a label',
+    analyseHalo(periods(x.slice(0, 30), y.slice(0, 30)), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: { trend: true, seasonality: false } })
+      .adjustedModel.confidenceLabel !== 'Strong Evidence');
+}
+
+// ── 26 — confidence ceiling: an unsigned delay caps at Directional ───
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((v) => 4000 + 0.5 * v + (rnd() - 0.5) * 30);   // same-period ONLY
+  const m = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 2, controls: { trend: true, seasonality: false } }).adjustedModel;
+  check('26. lagged-only spanning zero caps confidence at Directional',
+    m.confidenceCeiling === 'Directional' && m.confidenceLabel === 'Directional',
+    `ceiling=${m.confidenceCeiling} label=${m.confidenceLabel}`);
+  check('26b. …and the stricter of two ceilings wins',
+    m.confidenceCappedBy.some((r) => /lagged-only interval includes zero/.test(r)),
+    m.confidenceCappedBy.join(' | '));
+}
+
 console.log('\nHalo V2 — brief §33 test suite\n');
 console.log(results.join('\n'));
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
