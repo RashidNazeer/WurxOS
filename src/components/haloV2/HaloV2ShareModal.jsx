@@ -61,7 +61,7 @@ export default function HaloV2ShareModal({ brands = [], onClose }) {
   }
 
   async function handleRevoke(token) {
-    if (!confirm('Revoke this link? Anyone with it will no longer be able to open the Amazon Halo explorer.')) return;
+    if (!confirm('Revoke this link? Anyone with it will no longer be able to open the Amazon Halo V2 explorer.')) return;
     try { await revokeHaloV2Share(token); await load(); }
     catch (e) { setErr(e.message); }
   }
@@ -71,7 +71,7 @@ export default function HaloV2ShareModal({ brands = [], onClose }) {
       <div className="wx-modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="wx-modal-header">
           <div className="wx-modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <LinkIcon width="16" height="16" style={{ color: 'var(--accent)' }} /> Share Amazon Halo
+            <LinkIcon width="16" height="16" style={{ color: 'var(--accent)' }} /> Share Amazon Halo V2
           </div>
           <button type="button" className="shell-icon-btn" onClick={onClose} aria-label="Close">
             <XIcon width="16" height="16" />
@@ -86,7 +86,7 @@ export default function HaloV2ShareModal({ brands = [], onClose }) {
           )}
 
           <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 14 }}>
-            Anyone with the link can view the Amazon Halo explorer for the <strong>selected brands</strong> (read-only) — no login required. Revoke any time.
+            Anyone with the link can view the <strong>Amazon Halo V2</strong> explorer for the <strong>selected brands</strong> (read-only) — no login required. Revoke any time.
           </div>
 
           <div style={{ marginBottom: 14 }}>
