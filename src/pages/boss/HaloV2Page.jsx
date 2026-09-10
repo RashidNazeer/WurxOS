@@ -46,13 +46,15 @@ export default function HaloV2Page() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 40 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <h1 className="page-title" style={{ margin: 0 }}>Amazon Halo</h1>
-            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: '0.62rem', fontWeight: 800 }}>MODEL V2</span>
-          </div>
+          {/* The version belongs IN the title. It used to be an "Amazon Halo"
+              H1 with a separate MODEL V2 pill, so the page read as the original
+              tool at a glance and the share modal said "Share Amazon Halo" —
+              a client could not tell which model they were looking at, and the
+              two say materially different things. */}
+          <h1 className="page-title" style={{ margin: 0 }}>Amazon Halo V2</h1>
           <p className="page-subtitle" style={{ margin: '4px 0 0' }}>
-            A neutral measurement model: signed relationships, an adjusted estimate with its uncertainty, and planning
-            assumptions kept separate. <Link to="/halo" style={{ color: 'var(--accent)' }}>The original Halo tool</Link> is unchanged.
+            Here&apos;s how TikTok Shop activity moved with Amazon outcomes in this period — and how sure we are.
+            {' '}<Link to="/halo" style={{ color: 'var(--accent)' }}>The original Halo tool</Link> is unchanged.
           </p>
         </div>
         {!loading && brands.length > 0 && (
@@ -89,7 +91,12 @@ export default function HaloV2Page() {
           <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
         </div>
       ) : brandDatasets.length ? (
-        <HaloV2Explorer key={selectedBrandId} datasets={brandDatasets} loadRows={loadRows} />
+        <HaloV2Explorer
+          key={selectedBrandId}
+          datasets={brandDatasets}
+          loadRows={loadRows}
+          brandName={selected?.brand?.brand_name || null}
+        />
       ) : (
         <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
           No sheets for <strong>{selected?.brand?.brand_name}</strong> yet — upload one on the{' '}

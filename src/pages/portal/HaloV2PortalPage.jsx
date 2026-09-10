@@ -80,28 +80,36 @@ export default function HaloV2PortalPage() {
   const label = data?.label;
 
   return (
-    <div className="portal-page" style={{ minHeight: '100vh', background: 'var(--surface-0, var(--surface-2))', padding: '32px 16px' }}>
+    <div
+      className="portal-page"
+      style={{
+        minHeight: '100vh', background: 'var(--surface-0, var(--surface-2))', padding: '32px 16px',
+        // No app shell here, so there is no topbar for a sticky header to clear.
+        // The explorer's key-takeaway card pins at var(--topbar-h) — which is
+        // what it must do inside the shell — so zero it out for the portal
+        // rather than teaching the shared component about two layouts.
+        '--topbar-h': '0px',
+      }}
+    >
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
         <div className="wx-card portal-header" style={{ padding: 24, marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
             Read-only explorer
           </div>
+          {/* The version goes in the title, not a pill beside it. A client who
+              cannot tell V1 from V2 cannot tell which set of claims they are
+              reading, and the two models say materially different things. */}
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-            Amazon Halo <span style={{
-              fontSize: 11, fontWeight: 800, letterSpacing: 0.6, verticalAlign: 'middle',
-              padding: '3px 8px', borderRadius: 999, marginLeft: 8,
-              background: 'color-mix(in srgb, var(--accent, #6366f1) 15%, transparent)',
-              color: 'var(--accent, #6366f1)',
-            }}>MODEL V2</span>
+            Amazon Halo V2
           </h1>
           {label && <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 6 }}>{label}</div>}
           {/* Set expectations before the numbers appear. V2 is willing to say
               "we cannot confidently detect a halo", and a client who was not
               told that reads a missing figure as a broken page. */}
           <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '10px 0 0', maxWidth: 720 }}>
-            This measures whether TikTok activity and Amazon sales move together, in both
-            directions. It reports negative results as readily as positive ones, and where
-            there is not enough history it will say so rather than estimate. A missing
+            Here&apos;s how TikTok Shop activity moved with Amazon outcomes in this period — and how
+            sure we are. It reports movement in both directions, negative as readily as positive,
+            and where there is not enough history it says so rather than estimating. A missing
             figure is a deliberate answer, not a fault.
           </p>
         </div>
@@ -122,7 +130,12 @@ export default function HaloV2PortalPage() {
         ) : (
           // key on the brand so switching resets the explorer's own state
           // rather than carrying one brand's selections onto another's data.
-          <HaloV2Explorer key={brandId} datasets={brandDatasets} loadRows={loadRows} />
+          <HaloV2Explorer
+            key={brandId}
+            datasets={brandDatasets}
+            loadRows={loadRows}
+            brandName={brands.find((b) => b.id === brandId)?.brand_name || null}
+          />
         )}
       </div>
     </div>

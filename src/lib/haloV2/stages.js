@@ -19,7 +19,10 @@ export const STAGE_STATUS = {
   done: 'Done',
   partial: 'In progress',
   needs_data: 'Needs data',
-  later: 'Coming later',
+  // "Coming later" read as though validation were queued and nearly here —
+  // which would imply the results are on their way to being proven. This tool
+  // does not run validation at all, and saying so is the point.
+  later: 'Not done — needs a controlled test',
 };
 
 export const STAGES = [

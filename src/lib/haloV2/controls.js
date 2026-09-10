@@ -14,7 +14,26 @@
 // did and did not adjust for.
 // ============================================================
 
-// Seasonality needs a year of history before it means anything (§12).
+// ── Seasonality is annual, so its period depends on the GRAIN ───────
+// Seasonality needs a year of history before it means anything (§12) — and a
+// year is 365 days, 52 weeks or 12 months depending on what a "period" is here.
+//
+// This used to be a flat 52 applied to every grain: the Fourier basis was
+// sin(2*pi*t/52) and the gate was 52 periods, regardless. On weekly data that
+// is correct. On DAILY data it fitted a 52-DAY cycle and called it annual
+// seasonality — roughly a seven-and-a-half-week wave with no meaning — and it
+// switched itself on at 52 days, so almost every daily window silently spent
+// two parameters modelling a cycle that does not exist, and could absorb real
+// signal doing it. That went unnoticed while weekly was the only recommended
+// grain; it matters now that daily is recommended for young brands.
+//
+// So the period and the minimum history are both derived from the grain, and a
+// grain with less than one full cycle of history reports seasonality as
+// unavailable rather than fitting a fictional one.
+export const PERIODS_PER_YEAR = { day: 365, week: 52, month: 12 };
+export const DEFAULT_PERIODS_PER_YEAR = 52;        // weekly — the model's native grain
+
+// Kept for back-compatibility with anything reading the old constant names.
 export const SEASONALITY_MIN_WEEKS = 52;
 export const SEASONALITY_SECOND_HARMONIC_MIN_WEEKS = 104;
 
@@ -117,22 +136,26 @@ export function buildControls(periods, options = {}) {
   // so the UI claimed an adjustment the model never made.
   let seasonalityIncluded = false;
   let seasonalityReason = null;
+  // One full year in THIS grain's periods. Caller supplies it; weekly is the
+  // fallback because it is the model's native frequency.
+  const perYear = Number(options.periodsPerYear) || DEFAULT_PERIODS_PER_YEAR;
+  const unitWord = perYear === 365 ? 'days' : perYear === 12 ? 'months' : 'weeks';
   if (options.seasonality === false) {
     seasonalityReason = 'switched off';
-  } else if (n >= SEASONALITY_MIN_WEEKS) {
+  } else if (n >= perYear) {
     const t = periods.map((_, i) => i + 1);
-    columns.push({ name: 'season_sin1', label: 'Annual seasonality', values: t.map((v) => Math.sin((2 * Math.PI * v) / 52)), source: 'derived' });
-    columns.push({ name: 'season_cos1', label: 'Annual seasonality', values: t.map((v) => Math.cos((2 * Math.PI * v) / 52)), source: 'derived' });
+    columns.push({ name: 'season_sin1', label: 'Annual seasonality', values: t.map((v) => Math.sin((2 * Math.PI * v) / perYear)), source: 'derived' });
+    columns.push({ name: 'season_cos1', label: 'Annual seasonality', values: t.map((v) => Math.cos((2 * Math.PI * v) / perYear)), source: 'derived' });
     included.push('Annual seasonality');
     seasonalityIncluded = true;
-    if (n >= SEASONALITY_SECOND_HARMONIC_MIN_WEEKS) {
-      columns.push({ name: 'season_sin2', label: 'Seasonality (2nd harmonic)', values: t.map((v) => Math.sin((4 * Math.PI * v) / 52)), source: 'derived' });
-      columns.push({ name: 'season_cos2', label: 'Seasonality (2nd harmonic)', values: t.map((v) => Math.cos((4 * Math.PI * v) / 52)), source: 'derived' });
+    if (n >= perYear * 2) {
+      columns.push({ name: 'season_sin2', label: 'Seasonality (2nd harmonic)', values: t.map((v) => Math.sin((4 * Math.PI * v) / perYear)), source: 'derived' });
+      columns.push({ name: 'season_cos2', label: 'Seasonality (2nd harmonic)', values: t.map((v) => Math.cos((4 * Math.PI * v) / perYear)), source: 'derived' });
       included.push('Seasonality (2nd harmonic)');
     }
   } else {
-    seasonalityReason = `needs about ${SEASONALITY_MIN_WEEKS} periods, this window has ${n}`;
-    unavailable.push(`Seasonality — limited history (needs ~${SEASONALITY_MIN_WEEKS} periods)`);
+    seasonalityReason = `annual seasonality needs about ${perYear} ${unitWord} of history, this window has ${n}`;
+    unavailable.push(`Seasonality — limited history (needs ~${perYear} ${unitWord})`);
   }
 
   // A control that never varies explains nothing and only costs a degree of
