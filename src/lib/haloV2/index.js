@@ -31,6 +31,8 @@ export * from './counterfactual.js';
 export * from './confidence.js';
 export * from './planningScenarios.js';
 export * from './metricMetadata.js';
+export * from './grainRecommendation.js';
+export * from './stages.js';
 
 /**
  * Run the whole V2 analysis for one metric pair.

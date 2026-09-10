@@ -263,6 +263,9 @@ export function historicalContribution(model, { method = 'low_activity', customV
  * SIGN, or differ by enough in magnitude to change a decision.
  */
 export const SENSITIVITY_SPREAD_THRESHOLD = 0.5;   // 50% of the largest magnitude
+// A figure below this share of the largest one is treated as ~zero and does not
+// get a vote on the SIGN. See the reasoning in referenceSensitivity.
+export const SENSITIVITY_SIGN_MATERIALITY = 0.05;
 
 export function referenceSensitivity(model) {
   if (!model?.available) return null;
@@ -276,9 +279,25 @@ export function referenceSensitivity(model) {
   if (entries.length < 2) return null;
 
   const amounts = entries.map((e) => e.amount);
-  const signs = new Set(amounts.map((a) => (a > 0 ? 1 : a < 0 ? -1 : 0)).filter((s) => s !== 0));
-  const signFlip = signs.size > 1;
   const maxAbs = Math.max(...amounts.map((a) => Math.abs(a)));
+
+  // Only MATERIAL figures vote on the sign.
+  //
+  // Contribution measured against the period AVERAGE is approximately zero by
+  // construction: it sums beta * (x - mean) over every period, and the
+  // deviations from the mean cancel. Its sign is therefore noise on any
+  // well-behaved series. Letting that near-zero figure disagree with a large
+  // positive one produced "the rules disagree about whether the contribution is
+  // positive or negative" — a genuinely alarming sentence — on data where
+  // nothing was wrong at all.
+  //
+  // A spread is still reported in that situation, because the baseline choice
+  // really does move the number a long way and the user should know. The
+  // difference is that a spread is a caveat, whereas a sign flip claims the
+  // DIRECTION is unresolved, and that claim has to be earned.
+  const signMaterial = amounts.filter((a) => Math.abs(a) > maxAbs * SENSITIVITY_SIGN_MATERIALITY);
+  const signs = new Set(signMaterial.map((a) => (a > 0 ? 1 : -1)));
+  const signFlip = signs.size > 1;
   const spread = maxAbs > 0 ? (Math.max(...amounts) - Math.min(...amounts)) / maxAbs : 0;
   const materialSpread = spread > SENSITIVITY_SPREAD_THRESHOLD;
 

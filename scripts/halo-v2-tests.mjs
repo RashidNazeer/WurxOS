@@ -20,6 +20,10 @@ import {
   planningEligibility, modelDerivedAssumptions, planningModel, PLANNING_CONFIDENCE_FLOOR,
 } from '../src/lib/haloV2/planningScenarios.js';
 import { atLeastConfidence } from '../src/lib/haloV2/confidence.js';
+import {
+  assessGrain, recommendGrain, grainSwitchSuggestion,
+} from '../src/lib/haloV2/grainRecommendation.js';
+import { stageStatuses, stageProgress } from '../src/lib/haloV2/stages.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -777,6 +781,130 @@ const NO_CTL = { trend: false, seasonality: false };
     full.planningDerived.usable === true, JSON.stringify(full.planningDerived.assumptions || {}));
   check('38e. …and defaults planning to model mode, not assumptions',
     full.planning.mode === 'model', `mode=${full.planning.mode}`);
+}
+
+// ── 39 — the grain ladder: Daily gets discovered ─────────────────────
+// The pain point by name: ~5 weeks of history blanks the weekly view while the
+// SAME date range at daily grain carries a working model, and nothing told the
+// user. 35 days is 5 weeks.
+{
+  const days = 35;
+  const dx = Array.from({ length: days }, () => 1000 + rnd() * 500);
+  const dy = dx.map((_, t) => 4000 + 0.2 * dx[t] + (t >= 1 ? 0.3 * dx[t - 1] : 0) + rnd() * 30);
+  const dailyPeriods = periods(dx, dy);
+  // The same span bucketed weekly: 5 periods.
+  const weeklyPeriods = periods(dx.slice(0, 5), dy.slice(0, 5));
+
+  const assessments = {
+    day: assessGrain('day', dailyPeriods, { maxLag: 3, controls: NO_CTL }),
+    week: assessGrain('week', weeklyPeriods, { maxLag: 3, controls: NO_CTL }),
+  };
+  check('39. weekly cannot model 5 periods', assessments.week.canModel === false,
+    `usable=${assessments.week.usable} required=${assessments.week.required}`);
+  check('39b. daily CAN model the same span', assessments.day.canModel === true,
+    `usable=${assessments.day.usable} feasibleLag=${assessments.day.feasibleLag}`);
+
+  const rec = recommendGrain(assessments);
+  check('39c. the recommendation is Daily, not a hardcoded Weekly', rec.grain === 'day', `grain=${rec.grain}`);
+  check('39d. it is not guided mode — a model IS available', rec.guided === false);
+  check('39e. the reason names both grains and the date range', /Weekly/.test(rec.reason) && /Daily/.test(rec.reason), rec.reason);
+
+  const sug = grainSwitchSuggestion('week', assessments, rec);
+  check('39f. a concrete switch CTA is offered', sug != null && /Switch to Daily/.test(sug.cta), sug?.cta);
+  check('39g. …and it is silent when already on the recommendation',
+    grainSwitchSuggestion('day', assessments, rec) === null);
+}
+
+// ── 40 — weekly wins outright when it can carry the full window ──────
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((_, t) => 4000 + 0.2 * x[t] + (t >= 1 ? 0.3 * x[t - 1] : 0) + rnd() * 30);
+  const p = periods(x, y);
+  const assessments = {
+    day: assessGrain('day', p, { maxLag: 3, controls: NO_CTL }),
+    week: assessGrain('week', p, { maxLag: 3, controls: NO_CTL }),
+  };
+  const rec = recommendGrain(assessments);
+  check('40. weekly is recommended when it supports the requested window',
+    rec.grain === 'week' && rec.guided === false, `grain=${rec.grain}`);
+  check('40b. …and says so', /natural frequency/.test(rec.reason), rec.reason);
+}
+
+// ── 41 — guided mode when NO grain can model ─────────────────────────
+{
+  const tiny = periods([100, 200, 300, 400, 500, 600], [1, 2, 3, 4, 5, 6]);
+  const assessments = { week: assessGrain('week', tiny, { maxLag: 3, controls: NO_CTL }) };
+  const rec = recommendGrain(assessments);
+  check('41. no modellable grain → guided mode', rec.guided === true);
+  check('41b. …but a grain is still recommended for the charts', rec.grain === 'week');
+  check('41c. …and correlations are acknowledged as still meaningful',
+    /correlations are still meaningful/.test(rec.reason), rec.reason);
+  check('41d. correlations ARE computable at n=6', assessments.week.canCorrelate === true,
+    `obs=${assessments.week.correlationObs} need=${assessments.week.correlationRequired}`);
+  check('41e. no grains at all → guided with a null grain',
+    recommendGrain({}).guided === true && recommendGrain({}).grain === null);
+}
+
+// ── 42 — "almost there" fires near the threshold, not far from it ─────
+{
+  const mk = (n) => {
+    const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+    return periods(x, x.map((v) => 4000 + 0.4 * v + rnd() * 30));
+  };
+  // maxLag 3, no controls → 5 params, required 20, usable = n-3.
+  const edge = assessGrain('week', mk(22), { maxLag: 3, controls: NO_CTL });   // usable 19 of 20
+  const far  = assessGrain('week', mk(8),  { maxLag: 3, controls: NO_CTL });   // usable 5 of 20
+  check('42. 19 of 20 is "almost there"', edge.almostThere === true,
+    `usable=${edge.usable} required=${edge.required}`);
+  check('42b. 5 of 20 is not', far.almostThere === false,
+    `usable=${far.usable} required=${far.required}`);
+  check('42c. the shortfall is exposed for a progress meter',
+    edge.shortfall === 1 && far.shortfall === 15, `edge=${edge.shortfall} far=${far.shortfall}`);
+  check('42d. the knife-edge case still offers a reduced window',
+    edge.canModel === true && edge.lagReduced === true && edge.feasibleLag < 3,
+    `feasibleLag=${edge.feasibleLag} reduced=${edge.lagReduced}`);
+}
+
+// ── 43 — the stage ladder reports position, not just failure ─────────
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.1 * x[t] + (t >= 1 ? 0.35 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const healthy = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  const st = stageStatuses(healthy, { periodsWithData: n });
+  const byKey = Object.fromEntries(st.map((s) => [s.key, s]));
+
+  check('43. six stages are reported', st.length === 6);
+  check('43b. descriptive is done', byKey.descriptive.status === 'done');
+  check('43c. correlations are done', byKey.correlations.status === 'done');
+  check('43d. regression is done', byKey.regression.status === 'done');
+  check('43e. distributed lag is done with a real lag window', byKey.distributedLag.status === 'done');
+  check('43f. counterfactual is done', byKey.counterfactual.status === 'done', byKey.counterfactual.detail);
+  check('43g. validation is "coming later", never a failure',
+    byKey.validation.status === 'later' && /not part of this tool/i.test(byKey.validation.detail));
+  check('43h. …and validation is why nothing is called incremental',
+    /incremental/i.test(byKey.validation.detail));
+  check('43i. progress excludes the out-of-scope stage',
+    stageProgress(st).total === 5 && stageProgress(st).done === 5, JSON.stringify(stageProgress(st)));
+
+  // Thin data: Stage 1 must still be DONE, so the page reads as progress.
+  const thin = analyseHalo(periods(x.slice(0, 8), y.slice(0, 8)), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3 });
+  const thinSt = Object.fromEntries(stageStatuses(thin, { periodsWithData: 8 }).map((s) => [s.key, s]));
+  check('43j. thin data still completes Stage 1', thinSt.descriptive.status === 'done');
+  check('43k. …regression needs data, and explains what is missing',
+    thinSt.regression.status === 'needs_data' && /usable period/.test(thinSt.regression.detail),
+    thinSt.regression.detail);
+  check('43l. …and the later stages say "needs the model first" rather than failing',
+    /needs the adjusted model/i.test(thinSt.counterfactual.detail), thinSt.counterfactual.detail);
+
+  // A same-period-only model has NOT completed the distributed-lag stage.
+  const samePeriod = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 0, controls: NO_CTL });
+  const spSt = Object.fromEntries(stageStatuses(samePeriod, { periodsWithData: n }).map((s) => [s.key, s]));
+  check('43m. a lag-0 model marks distributed lag as only in progress',
+    spSt.distributedLag.status === 'partial', `status=${spSt.distributedLag.status}`);
+  check('43n. …and says no delayed effect was looked for',
+    /no delayed effect has been looked for/.test(spSt.distributedLag.detail), spSt.distributedLag.detail);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
