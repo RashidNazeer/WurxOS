@@ -103,13 +103,27 @@ export function analyseHalo(periods, {
     adjustedModel: {
       available: model.available,
       reason: model.reason,
+      // Separate from `message` on purpose — see the comment in
+      // distributedLag.js. The UI prints headline THEN message; if the message
+      // repeated the headline the user saw the same sentence twice.
+      headline: model.headline ?? null,
       message: model.message,
       sampleSize: model.sampleSize,
       droppedToLags: model.droppedToLags,
+      requiredObservations: model.requiredObservations ?? null,
+      shortfall: model.shortfall ?? null,
+      parameterCount: model.parameterCount ?? null,
       maxLag: model.maxLag,
       lagCoefficients: model.lagCoefficients || [],
       cumulativeCoefficient: model.cumulativeCoefficient ?? null,
       confidenceInterval: model.confidenceInterval || { lower: null, upper: null },
+      // §F — the delayed-only relationship is the halo claim; the full
+      // cumulative includes same-period co-movement and is labelled as such.
+      laggedOnlyAvailable: !!model.laggedOnlyAvailable,
+      laggedOnly: model.laggedOnly || null,
+      samePeriodCoefficient: model.samePeriodCoefficient ?? null,
+      samePeriodShare: model.samePeriodShare ?? null,
+      mixedLagSigns: !!model.mixedLagSigns,
       adjustedR2: model.adjustedR2 ?? null,
       covarianceKind: model.covarianceKind ?? null,
       controls: model.controls || [],

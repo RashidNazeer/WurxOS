@@ -11,7 +11,7 @@
 
 import { pearson, signedCorrelation } from '../src/lib/haloV2/correlation.js';
 import { lagCorrelations, bestObservedLag } from '../src/lib/haloV2/lagAnalysis.js';
-import { fitDistributedLag } from '../src/lib/haloV2/distributedLag.js';
+import { fitDistributedLag, capacityOf, bestFeasibleLag } from '../src/lib/haloV2/distributedLag.js';
 import { analyseHalo } from '../src/lib/haloV2/index.js';
 
 let passed = 0, failed = 0;
@@ -219,6 +219,154 @@ const periods = (xs, ys, controls = []) =>
     check(`14.${f} is still an array when refused`,
       Array.isArray(thin.adjustedModel[f]), `typeof=${typeof thin.adjustedModel[f]}`);
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Measurement-upgrade tests (lagged-only, capacity, graceful degradation)
+// ════════════════════════════════════════════════════════════════════
+const NO_CTL = { trend: false, seasonality: false };
+
+// ── 15 — capacity accounting must not drift from the fit ─────────────
+// The whole reason capacityOf exists is that the status panel and the grain
+// recommender must agree with the model about what "usable" means. If these
+// two ever disagree the UI promises an estimate the model then refuses.
+{
+  const n = 60;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((v) => 4000 + 0.4 * v + rnd() * 50);
+  const p = periods(x, y);
+  for (const L of [0, 1, 2, 3]) {
+    const cap = capacityOf(p, { maxLag: L, controls: NO_CTL });
+    const fit = fitDistributedLag(p, { maxLag: L, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+    check(`15.L${L} capacity usable === fit sampleSize`, cap.usable === fit.sampleSize,
+      `capacity=${cap.usable} fit=${fit.sampleSize}`);
+    check(`15.L${L} capacity parameterCount === fit parameterCount`, cap.parameterCount === fit.parameterCount,
+      `capacity=${cap.parameterCount} fit=${fit.parameterCount}`);
+    check(`15.L${L} capacity.ok agrees with fit.available`, cap.ok === fit.available,
+      `capacity.ok=${cap.ok} available=${fit.available}`);
+  }
+}
+
+// ── 16 — lagged-only EXCLUDES the same-period term ───────────────────
+// The headline measurement fix. Known truth b0=0.20, b1=0.30, b2=0.15:
+// cumulative must recover 0.65 and lagged-only must recover 0.45, NOT 0.65.
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const TRUE = { b0: 0.20, b1: 0.30, b2: 0.15 };
+  const y = x.map((_, t) => 4000
+    + TRUE.b0 * x[t]
+    + (t >= 1 ? TRUE.b1 * x[t - 1] : 0)
+    + (t >= 2 ? TRUE.b2 * x[t - 2] : 0)
+    + (rnd() - 0.5) * 20);
+  const fit = fitDistributedLag(periods(x, y), { maxLag: 2, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  const fullTruth = TRUE.b0 + TRUE.b1 + TRUE.b2;      // 0.65
+  const laggedTruth = TRUE.b1 + TRUE.b2;              // 0.45
+
+  check('16. full cumulative ≈ b0+b1+b2', near(fit.cumulativeCoefficient, fullTruth, 0.05),
+    `cumulative=${fit.cumulativeCoefficient?.toFixed(4)} truth=${fullTruth}`);
+  check('16b. lagged-only ≈ b1+b2 (same-period excluded)',
+    near(fit.laggedOnly?.coefficient, laggedTruth, 0.05),
+    `laggedOnly=${fit.laggedOnly?.coefficient?.toFixed(4)} truth=${laggedTruth}`);
+  check('16c. lagged-only is STRICTLY smaller than full cumulative here',
+    fit.laggedOnly.coefficient < fit.cumulativeCoefficient - 0.1,
+    `lagged=${fit.laggedOnly.coefficient.toFixed(3)} full=${fit.cumulativeCoefficient.toFixed(3)}`);
+  check('16d. same-period coefficient ≈ b0', near(fit.samePeriodCoefficient, TRUE.b0, 0.05),
+    `b0=${fit.samePeriodCoefficient?.toFixed(4)}`);
+  check('16e. same-period share ≈ b0 / total', near(fit.samePeriodShare, TRUE.b0 / fullTruth, 0.06),
+    `share=${(fit.samePeriodShare * 100).toFixed(1)}% expected=${((TRUE.b0 / fullTruth) * 100).toFixed(1)}%`);
+  check('16f. lagged-only interval is reported', fit.laggedOnly.lower != null && fit.laggedOnly.upper != null,
+    `[${fit.laggedOnly.lower?.toFixed(3)}, ${fit.laggedOnly.upper?.toFixed(3)}]`);
+}
+
+// ── 17 — a PURE same-period relationship must expose itself ──────────
+// This is the case the old UI hid: no delayed effect at all, yet the cumulative
+// figure was published as "the halo". Share must be ~100% and lagged-only ~0
+// with an interval spanning zero.
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((v) => 4000 + 0.5 * v + (rnd() - 0.5) * 30);   // same-period ONLY
+  const fit = fitDistributedLag(periods(x, y), { maxLag: 2, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('17. pure same-period → share ≈ 100%', fit.samePeriodShare > 0.9,
+    `share=${(fit.samePeriodShare * 100).toFixed(1)}%`);
+  check('17b. pure same-period → lagged-only ≈ 0', Math.abs(fit.laggedOnly.coefficient) < 0.05,
+    `laggedOnly=${fit.laggedOnly.coefficient.toFixed(4)}`);
+  check('17c. pure same-period → lagged-only interval spans zero', fit.laggedOnly.spansZero === true,
+    `[${fit.laggedOnly.lower?.toFixed(3)}, ${fit.laggedOnly.upper?.toFixed(3)}]`);
+  check('17d. …and it warns that no delayed effect is established',
+    fit.warnings.some((w) => w.code === 'lagged_only_spans_zero'));
+  check('17e. …and that same-period dominates',
+    fit.warnings.some((w) => w.code === 'same_period_dominant'));
+}
+
+// ── 18 — L=0 has no lagged-only quantity ─────────────────────────────
+// Reporting zero would read as "measured no delayed effect" when we simply
+// never looked for one.
+{
+  const n = 60;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((v) => 4000 + 0.4 * v + rnd() * 40);
+  const fit = fitDistributedLag(periods(x, y), { maxLag: 0, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('18. maxLag 0 → laggedOnlyAvailable is false', fit.laggedOnlyAvailable === false);
+  check('18b. maxLag 0 → laggedOnly is null, not 0', fit.laggedOnly === null, `laggedOnly=${JSON.stringify(fit.laggedOnly)}`);
+  check('18c. maxLag 0 → same-period share is 100%', near(fit.samePeriodShare, 1, 1e-6),
+    `share=${fit.samePeriodShare}`);
+}
+
+// ── 19 — mixed lag signs withhold the share rather than exceed 100% ──
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  // b0 strongly positive, b1 strongly negative → parts exceed the whole.
+  const y = x.map((_, t) => 5000 + 0.9 * x[t] - (t >= 1 ? 0.6 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const fit = fitDistributedLag(periods(x, y), { maxLag: 1, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('19. opposing lag signs are detected', fit.mixedLagSigns === true,
+    `b0=${fit.samePeriodCoefficient?.toFixed(3)} b1=${fit.lagCoefficients[1]?.coefficient?.toFixed(3)}`);
+  check('19b. share is withheld rather than printed above 100%', fit.samePeriodShare === null,
+    `share=${fit.samePeriodShare}`);
+  check('19c. the negative lag is NOT floored away', fit.lagCoefficients[1].coefficient < -0.3,
+    `b1=${fit.lagCoefficients[1].coefficient.toFixed(3)}`);
+}
+
+// ── 20 — graceful lag degradation at the knife-edge (§F) ─────────────
+// n=21 with no controls: L=3 needs 20 and has 18; L=2 has 19; L=1 has 20 and
+// needs 20 — so stepping down succeeds where the requested window fails.
+// Reducing the window drops a parameter AND recovers a row, moving both sides.
+{
+  const n = 21;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 500);
+  const y = x.map((v) => 4000 + 0.4 * v + rnd() * 40);
+  const p = periods(x, y);
+  const best = bestFeasibleLag(p, { maxLag: 3, controls: NO_CTL });
+  check('20. n=21 → requested 3 lags is reduced, not refused', best.lag === 1 && best.reduced === true,
+    `lag=${best.lag} reduced=${best.reduced}`);
+  check('20b. the reduced window actually fits',
+    fitDistributedLag(p, { maxLag: best.lag, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' }).available === true);
+  check('20c. the requested window genuinely did NOT fit',
+    fitDistributedLag(p, { maxLag: 3, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' }).available === false);
+
+  // And when even same-period cannot be supported, say so instead of pretending.
+  const tiny = periods(x.slice(0, 19), y.slice(0, 19));
+  const none = bestFeasibleLag(tiny, { maxLag: 3, controls: NO_CTL });
+  check('20d. n=19 → no feasible lag at all', none.lag === null, `lag=${none.lag}`);
+  check('20e. …and the shortfall is reported for the progress meter',
+    none.capacity.shortfall > 0, `shortfall=${none.capacity.shortfall}`);
+}
+
+// ── 21 — the refusal must not say the same sentence twice ────────────
+// The explorer renders a bold headline followed by `message`; the message used
+// to open with the identical sentence, so users saw it duplicated.
+{
+  const x = Array.from({ length: 10 }, () => 1000 + rnd() * 500);
+  const y = Array.from({ length: 10 }, () => 4000 + rnd() * 500);
+  const fit = fitDistributedLag(periods(x, y), { maxLag: 3, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('21. refusal exposes a separate headline', typeof fit.headline === 'string' && fit.headline.length > 10, fit.headline);
+  check('21b. message does NOT repeat the headline',
+    !fit.message.includes(fit.headline), fit.message.slice(0, 60) + '…');
+  check('21c. message still states the arithmetic', /usable period/.test(fit.message) && /needs about/.test(fit.message));
+  check('21d. requiredObservations is exposed on the refusal', typeof fit.requiredObservations === 'number' && fit.requiredObservations >= 20,
+    `required=${fit.requiredObservations}`);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
