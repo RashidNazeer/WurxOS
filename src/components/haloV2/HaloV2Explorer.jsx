@@ -128,13 +128,30 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
     [gran, assessments, recommendation],
   );
 
-  // Follow the recommendation until the user takes the wheel.
+  // Follow the recommendation ONCE per context, until the user takes the wheel.
+  //
+  // "Once" is load-bearing, not caution. Weekly and Daily can come from
+  // DIFFERENT sheets (sourceForGran falls back to the day sheet for week, but
+  // uses the week sheet when one exists), with different spans. Switching grain
+  // therefore changes src.dataset.id, which resets the date range to that
+  // sheet's span, which changes what every grain can support — so an unlatched
+  // effect can oscillate forever: recommend Daily → switch → range widens →
+  // Weekly now fits → recommend Weekly → switch → range narrows → recommend
+  // Daily again.
+  //
+  // Applying it once per (sheets, metric pair) keeps the behaviour that matters
+  // — landing on a grain that works instead of a blank Weekly — while making
+  // the loop impossible. Every later change still surfaces the recommendation
+  // as a button; it just stops moving the view under the user.
+  const autoAppliedFor = useRef(null);
   useEffect(() => {
     if (grainPinned.current) return;
-    if (!recommendation?.grain || recommendation.grain === gran) return;
-    if (!grans.includes(recommendation.grain)) return;
-    setGran(recommendation.grain);
-  }, [recommendation?.grain, gran, grans]);
+    const ctx = `${dsKey}|${xKey}|${yKey}`;
+    if (autoAppliedFor.current === ctx) return;
+    if (!recommendation?.grain || !grans.includes(recommendation.grain)) return;
+    autoAppliedFor.current = ctx;
+    if (recommendation.grain !== gran) setGran(recommendation.grain);
+  }, [recommendation?.grain, gran, grans, dsKey, xKey, yKey]);
 
   const pickGrain = (g) => { grainPinned.current = true; setGran(g); setChartsOnly(false); };
 
