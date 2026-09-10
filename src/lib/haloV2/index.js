@@ -14,7 +14,9 @@
 import { signedCorrelation } from './correlation.js';
 import { lagCorrelations, bestObservedLag, lagWarnings, DEFAULT_MAX_LAG } from './lagAnalysis.js';
 import { fitDistributedLag } from './distributedLag.js';
-import { historicalContribution, marginalScenario } from './counterfactual.js';
+import {
+  historicalContribution, marginalScenario, referenceSensitivity, recommendedReferenceMethod,
+} from './counterfactual.js';
 import { modelConfidence } from './confidence.js';
 import { planningModel, DEFAULT_ASSUMPTIONS } from './planningScenarios.js';
 import { isMonetaryMetric, metricLabel } from './metricMetadata.js';
@@ -39,7 +41,10 @@ export function analyseHalo(periods, {
   yKey,
   maxLag = DEFAULT_MAX_LAG,
   controls = {},
-  reference = { method: 'period_median', customValue: null },
+  // null → use the recommended rule for this model (a low-activity baseline
+  // where there is enough history for a quietest-quarter to mean anything, the
+  // window median otherwise). Passing an explicit method overrides that.
+  reference = null,
   scenarioSpec = { type: 'percent', value: 10 },
   planning = null,
 } = {}) {
@@ -80,7 +85,13 @@ export function analyseHalo(periods, {
   });
 
   // ── Modelled outputs ──────────────────────────────────────────────
-  const contribution = historicalContribution(model, reference);
+  const recommendedReference = recommendedReferenceMethod(model);
+  const refOpts = reference || { method: recommendedReference, customValue: null };
+  const contribution = historicalContribution(model, refOpts);
+  // How much the contribution moves if a different reference rule is chosen.
+  // The brief flags this because median vs average can flip the sign, and a
+  // number that swings on an unconsidered dropdown is not a finding.
+  const sensitivity = referenceSensitivity(model);
   const avgX = mean(series.filter((p) => p.x != null).map((p) => p.x));
   const marginal = marginalScenario(model, avgX, scenarioSpec);
 
@@ -152,6 +163,10 @@ export function analyseHalo(periods, {
       _model: model,          // for the sensitivity refit; not for display
     },
     historicalContribution: contribution,
+    // §G1 — the contribution is a comparison against a baseline, so which
+    // baseline is part of the claim. This says whether that choice matters here.
+    referenceSensitivity: sensitivity,
+    recommendedReference,
     marginal,
     planning: planningOut,
     meta: {

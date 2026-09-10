@@ -334,6 +334,12 @@ export function fitDistributedLag(periods, { maxLag = MAX_SUPPORTED_LAG, control
     _design: design,
     _usable: usable,
     _controlColumns: ctrl.columns,
+    // The covariance actually used for the intervals above (HAC where it could
+    // be computed, classical otherwise). Exposed because the counterfactual
+    // contribution is a LINEAR COMBINATION of these same lag coefficients, so
+    // it can carry an exact interval instead of an invented band — but only if
+    // it can see this matrix.
+    _cov: cov,
   };
 }
 

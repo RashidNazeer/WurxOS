@@ -13,6 +13,9 @@ import { pearson, signedCorrelation } from '../src/lib/haloV2/correlation.js';
 import { lagCorrelations, bestObservedLag } from '../src/lib/haloV2/lagAnalysis.js';
 import { fitDistributedLag, capacityOf, bestFeasibleLag } from '../src/lib/haloV2/distributedLag.js';
 import { analyseHalo } from '../src/lib/haloV2/index.js';
+import {
+  historicalContribution, resolveReference, referenceSensitivity, marginalScenario,
+} from '../src/lib/haloV2/counterfactual.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -461,6 +464,135 @@ const NO_CTL = { trend: false, seasonality: false };
   check('26b. …and the stricter of two ceilings wins',
     m.confidenceCappedBy.some((r) => /lagged-only interval includes zero/.test(r)),
     m.confidenceCappedBy.join(' | '));
+}
+
+// ── 27 — Stage 5: the contribution interval is exact, not invented ───
+// amount (sum of per-period differences) and totalFromContrast (the same
+// quantity as a linear combination of the lag betas) are algebraically
+// identical. If they diverge, the design and the contrast weights have fallen
+// out of step — which is exactly the bug an invented band would have hidden.
+{
+  const n = 100;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.20 * x[t] + (t >= 1 ? 0.30 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const model = fitDistributedLag(periods(x, y), { maxLag: 1, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  const c = historicalContribution(model, { method: 'period_median' });
+
+  check('27. contribution is available', c != null && Number.isFinite(c.amount), `amount=${c?.amount?.toFixed(2)}`);
+  check('27b. the two derivations of the total agree',
+    near(c.amount, c.totalFromContrast, Math.max(1e-6, Math.abs(c.amount) * 1e-9)),
+    `sum=${c.amount?.toFixed(6)} contrast=${c.totalFromContrast?.toFixed(6)}`);
+  check('27c. the total carries a real interval', c.lower != null && c.upper != null && c.lower < c.upper,
+    `[${c.lower?.toFixed(0)}, ${c.upper?.toFixed(0)}]`);
+  check('27d. per-period rows carry both predicted series for the chart',
+    c.perPeriod.every((p) => Number.isFinite(p.predictedActual) && Number.isFinite(p.predictedBaseline)));
+  check('27e. per-period contribution is exactly the difference of the two series',
+    c.perPeriod.every((p) => near(p.contribution, p.predictedActual - p.predictedBaseline, 1e-9)));
+  check('27f. per-period rows carry their own interval for the band',
+    c.perPeriod.every((p) => p.lower != null && p.upper != null));
+
+  // Negative periods must survive (§9): below-reference periods pull down.
+  check('27g. below-reference periods contribute negatively',
+    c.perPeriod.some((p) => p.contribution < 0) && c.negativeAmount < 0,
+    `negative=${c.negativeAmount?.toFixed(0)}`);
+}
+
+// ── 28 — the low-activity baseline rule, and its documented fallback ─
+{
+  // Deliberately skewed: a long quiet stretch then a spike, so the quartile
+  // median and the window median are meaningfully different.
+  const quiet = Array.from({ length: 60 }, () => 100 + rnd() * 20);
+  const loud  = Array.from({ length: 40 }, () => 900 + rnd() * 200);
+  const xs = [...quiet, ...loud];
+
+  const low = resolveReference(xs, 'low_activity');
+  const med = resolveReference(xs, 'period_median');
+  const avg = resolveReference(xs, 'period_average');
+  check('28. low-activity baseline sits below the window median',
+    low.value < med.value, `low=${low.value?.toFixed(1)} median=${med.value?.toFixed(1)}`);
+  check('28b. low-activity baseline comes from the quiet stretch',
+    low.value >= 100 && low.value <= 130, `low=${low.value?.toFixed(1)}`);
+  check('28c. it did not fall back', low.fellBack === false && low.method === 'low_activity');
+  check('28d. the average is dragged up by the spike', avg.value > med.value,
+    `avg=${avg.value?.toFixed(1)} median=${med.value?.toFixed(1)}`);
+
+  // Too few points for a quartile → documented fallback, not a silent one.
+  const tiny = resolveReference([10, 20, 30, 40, 50], 'low_activity');
+  check('28e. below the minimum it falls back to the window median',
+    tiny.method === 'period_median' && tiny.fellBack === true, `method=${tiny.method}`);
+  check('28f. …and says so', typeof tiny.note === 'string' && /at least 8 periods/.test(tiny.note), tiny.note);
+
+  // A custom method with no value must not silently become zero.
+  const noCustom = resolveReference(xs, 'custom', null);
+  check('28g. custom with no value falls back rather than using zero',
+    noCustom.fellBack === true && noCustom.value > 0, `value=${noCustom.value}`);
+}
+
+// ── 29 — reference sensitivity is surfaced, not buried ───────────────
+{
+  const n = 100;
+  // Skewed activity so median and average genuinely disagree.
+  const x = Array.from({ length: n }, (_, i) => (i % 10 === 0 ? 4000 + rnd() * 500 : 300 + rnd() * 80));
+  const y = x.map((v) => 5000 + 0.5 * v + (rnd() - 0.5) * 40);
+  const model = fitDistributedLag(periods(x, y), { maxLag: 1, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  const s = referenceSensitivity(model);
+  check('29. sensitivity reports every non-custom rule', s != null && s.entries.length === 3,
+    `entries=${s?.entries?.length}`);
+  check('29b. the rules produce different totals on skewed activity',
+    new Set(s.entries.map((e) => Math.round(e.amount))).size > 1,
+    s.entries.map((e) => `${e.method}=${Math.round(e.amount)}`).join(' '));
+  check('29c. a material spread is flagged with a message',
+    !s.sensitive || (typeof s.message === 'string' && s.message.length > 20),
+    `sensitive=${s.sensitive} spread=${(s.spread * 100).toFixed(0)}%`);
+
+  // A flat, well-behaved series should NOT be flagged as sensitive.
+  const fx = Array.from({ length: n }, () => 1000 + rnd() * 60);
+  const fy = fx.map((v) => 4000 + 0.4 * v + rnd() * 20);
+  const flatModel = fitDistributedLag(periods(fx, fy), { maxLag: 1, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  const fs = referenceSensitivity(flatModel);
+  check('29d. an unskewed series is not falsely flagged as sensitive',
+    fs != null && fs.signFlip === false, `signFlip=${fs?.signFlip} spread=${(fs?.spread * 100).toFixed(0)}%`);
+}
+
+// ── 30 — the what-if leads on the DELAYED basis, and says which ──────
+// "Spend more on TikTok, get more on Amazon" is a halo claim, so it must not be
+// answered with a coefficient that includes same-period co-movement.
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.60 * x[t] + (t >= 1 ? 0.10 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const model = fitDistributedLag(periods(x, y), { maxLag: 1, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+
+  const lagged = marginalScenario(model, 1400, { type: 'percent', value: 10 });
+  const cumul  = marginalScenario(model, 1400, { type: 'percent', value: 10 }, { basis: 'cumulative' });
+  check('30. the what-if defaults to the lagged-only basis', lagged.basis === 'lagged_only', `basis=${lagged.basis}`);
+  check('30b. …and names the basis it used', /lagged-only/.test(lagged.basisLabel), lagged.basisLabel);
+  check('30c. same-period-heavy data → the lagged answer is much smaller',
+    Math.abs(lagged.estimated) < Math.abs(cumul.estimated) * 0.5,
+    `lagged=${lagged.estimated.toFixed(0)} cumulative=${cumul.estimated.toFixed(0)}`);
+
+  // With no lags there IS no delayed basis — it must fall back and say so.
+  const same = fitDistributedLag(periods(x, y), { maxLag: 0, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  const fallback = marginalScenario(same, 1400, { type: 'percent', value: 10 });
+  check('30d. with no lags it falls back to cumulative and labels it',
+    fallback.basis === 'cumulative' && /same-period included/.test(fallback.basisLabel), fallback.basisLabel);
+}
+
+// ── 31 — analyseHalo picks the recommended reference by default ──────
+{
+  const n = 100;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.2 * x[t] + (t >= 1 ? 0.3 * x[t - 1] : 0) + rnd() * 20);
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  check('31. the recommended reference is the low-activity baseline at this n',
+    full.recommendedReference === 'low_activity', `recommended=${full.recommendedReference}`);
+  check('31b. …and the contribution actually used it',
+    full.historicalContribution.referenceMethod === 'low_activity',
+    `used=${full.historicalContribution.referenceMethod}`);
+  check('31c. an explicit reference still overrides it',
+    analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL, reference: { method: 'period_average' } })
+      .historicalContribution.referenceMethod === 'period_average');
+  check('31d. sensitivity is exposed on the result', full.referenceSensitivity != null);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
