@@ -41,7 +41,7 @@ let supabase;
 // Falls back to the direct URL if the proxy itself fails, so a bad rewrite
 // degrades to today's behaviour rather than locking everyone out.
 const AUTH_DIRECT = (url.endsWith('/') ? url : url + '/') + 'auth/v1/';
-const AUTH_PROXY  = '/sb-auth/';
+
 // How long to let a direct auth call stall before routing around it. The
 // healthy figure is ~0.3s; the outage figure was ~300s. 8s is far outside
 // normal and far inside a user's patience.
@@ -55,18 +55,41 @@ const isRepeatableAuthCall = (u) => {
   const path = String(u).split('?')[0];
   return AUTH_REPEATABLE_PATHS.some((p) => path.endsWith(p));
 };
-// The /sb-auth rewrite in vercel.json names the production project explicitly
-// (Vercel does not interpolate env vars into rewrites). A demo deployment
-// shares that file, so its fallback would aim at production's auth endpoint —
-// harmless, since a demo token means nothing there, but it is the wrong server
-// and would make a stalled demo login fail in a confusing way. The proxy is a
-// contingency for one ISP-level outage on the office network; a demo does not
-// need it, so demo builds go direct and only direct.
+// ── ONE vercel.json, SEVERAL environments ───────────────────────────
+// Vercel does not interpolate env vars into rewrites, so a rewrite has to name
+// its Supabase project literally. That made vercel.json a per-environment file:
+// the tracked copy names PRODUCTION, and the dev copy existed only on one
+// laptop, untracked. Nobody else could deploy dev, and connecting Vercel to Git
+// would have built dev from the tracked file and pointed dev logins at the
+// PRODUCTION auth server.
+//
+// So each environment gets its OWN proxy path, all of them declared in the one
+// committed vercel.json, and the client picks the path matching the project it
+// is actually configured for. An environment with no entry here simply goes
+// direct — which is what a demo build already did, and is a safe default rather
+// than a wrong server.
+//
+// Adding an environment = one entry here and one rewrite in vercel.json. The
+// production entry and its rewrite are unchanged, so production behaviour is
+// exactly what it was.
+const AUTH_PROXY_BY_PROJECT = {
+  xoaaidgvblondjpvxjqp: '/sb-auth/',       // production
+  vyvkwbvreeycmmnikqbz: '/sb-auth-dev/',   // dev
+};
+
+const projectRef = String(url).match(/https:\/\/([a-z0-9]+)\.supabase\.co/i)?.[1] || '';
+const AUTH_PROXY_PATH = AUTH_PROXY_BY_PROJECT[projectRef] || null;
+
+// The proxy is a contingency for one ISP-level outage on the office network.
+// A demo does not need it, and an environment we hold no rewrite for must not
+// borrow another environment's — sending a dev token to production's auth
+// server would fail in a thoroughly confusing way.
 const canProxy = typeof window !== 'undefined'
   && /^https?:$/.test(window.location.protocol)
-  && !DEMO_MODE;
+  && !DEMO_MODE
+  && !!AUTH_PROXY_PATH;
 const toProxy = (u) => (canProxy && typeof u === 'string' && u.startsWith(AUTH_DIRECT))
-  ? AUTH_PROXY + u.slice(AUTH_DIRECT.length)
+  ? AUTH_PROXY_PATH + u.slice(AUTH_DIRECT.length)
   : null;
 
 // Direct first — that is the fast path on a healthy network and adds no hop.
