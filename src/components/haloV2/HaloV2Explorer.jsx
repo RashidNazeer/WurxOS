@@ -692,6 +692,17 @@ function AdjustedLayer({
         )}
       </p>
 
+      {/* Inline definitions for the four terms this section leans on. A client
+          reading "95% interval" and "lagged-only" without them is guessing. */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)' }}>
+        <span>What these mean:</span>
+        <Term term="Modelled" />
+        <Term term="95% interval" />
+        <Term term="Confidence" />
+        <Term term="Lag" />
+        <Term term="Incremental" />
+      </div>
+
       {sharePct != null && (
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 4 }}>
@@ -783,7 +794,9 @@ function AdjustedLayer({
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', color: 'var(--accent)' }}>STAGE 5</div>
-            <h3 style={{ fontSize: '.98rem', fontWeight: 800, margin: '2px 0 0' }}>Counterfactual contribution</h3>
+            <h3 style={{ fontSize: '.98rem', fontWeight: 800, margin: '2px 0 0' }}>
+              <Term term="Counterfactual">Counterfactual contribution</Term>
+            </h3>
           </div>
           <ModelledBadge />
         </div>
