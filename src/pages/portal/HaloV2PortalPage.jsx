@@ -80,7 +80,17 @@ export default function HaloV2PortalPage() {
   const label = data?.label;
 
   return (
-    <div className="portal-page" style={{ minHeight: '100vh', background: 'var(--surface-0, var(--surface-2))', padding: '32px 16px' }}>
+    <div
+      className="portal-page"
+      style={{
+        minHeight: '100vh', background: 'var(--surface-0, var(--surface-2))', padding: '32px 16px',
+        // No app shell here, so there is no topbar for a sticky header to clear.
+        // The explorer's key-takeaway card pins at var(--topbar-h) — which is
+        // what it must do inside the shell — so zero it out for the portal
+        // rather than teaching the shared component about two layouts.
+        '--topbar-h': '0px',
+      }}
+    >
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
         <div className="wx-card portal-header" style={{ padding: 24, marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
@@ -120,7 +130,12 @@ export default function HaloV2PortalPage() {
         ) : (
           // key on the brand so switching resets the explorer's own state
           // rather than carrying one brand's selections onto another's data.
-          <HaloV2Explorer key={brandId} datasets={brandDatasets} loadRows={loadRows} />
+          <HaloV2Explorer
+            key={brandId}
+            datasets={brandDatasets}
+            loadRows={loadRows}
+            brandName={brands.find((b) => b.id === brandId)?.brand_name || null}
+          />
         )}
       </div>
     </div>

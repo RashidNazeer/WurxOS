@@ -1,6 +1,6 @@
-# WurxOS-V2 — Project Context for Claude
+# WurxOS-V2 — Project Context for Codex
 
-This file is auto-loaded by Claude Code on every session. Read it first before
+This file is auto-loaded by Codex on every session. Read it first before
 making any non-trivial change. Other context files live in `.claude/memory/` —
 those are project-knowledge memories accumulated across sessions; read them
 when relevant to the task.

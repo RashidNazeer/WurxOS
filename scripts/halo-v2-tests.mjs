@@ -1398,6 +1398,125 @@ function haloFinderTest(res) {
       .planningEligibility.eligible === true);
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SMOKE — degenerate inputs must not produce NaN, Infinity or "undefined"
+//
+// Checklist item 12 ("no NaN, blank charts, or dead controls") is partly a
+// browser question, but the NaN half is not: every one of those leaks starts as
+// a number the maths produced and the UI then printed. These feed the shapes a
+// real sheet actually throws — an empty window, one row, a flat series, all
+// nulls, zeros, a single non-zero spike — through every function whose output
+// reaches the screen, and assert nothing unrenderable comes back.
+// ════════════════════════════════════════════════════════════════════
+{
+  const BAD = /NaN|Infinity|undefined|\[object/;
+
+  // Every user-visible string this result can produce, flattened.
+  const visibleStrings = (res, unit) => {
+    const t = keyTakeaway(res, { unit, xKey: 'gmv', yKey: 'revenue_per_day' });
+    const st = stageStatuses(res, { periodsWithData: res.meta.periodsSupplied });
+    const m = res.adjustedModel;
+    return [
+      t.headline, t.caveat, t.soWhat, String(t.observations),
+      m.headline, m.message, m.confidenceLabel, m.seasonalityReason,
+      ...(m.confidenceReasons || []), ...(m.controls || []), ...(m.controlsUnavailable || []),
+      ...(m.warnings || []).map((w) => w.message),
+      ...(res.warnings || []).map((w) => w.message),
+      ...(res.planningEligibility?.blockers || []).flatMap((b) => [b.message, b.fix]),
+      res.referenceSensitivity?.message,
+      res.historicalContribution?.referenceLabel,
+      res.historicalContribution?.referenceNote,
+      ...st.flatMap((s) => [s.statusLabel, s.detail]),
+      coverageNote({ periodsSupplied: res.meta.periodsSupplied, completeObservations: res.meta.completeObservations, unit }),
+    ].filter((s) => typeof s === 'string');
+  };
+
+  const CASES = {
+    'empty window':      [],
+    'one row':           [{ key: 'a', label: 'a', x: 100, y: 200 }],
+    'two rows':          [{ key: 'a', label: 'a', x: 100, y: 200 }, { key: 'b', label: 'b', x: 110, y: 210 }],
+    'all x null':        Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: null, y: 100 + i })),
+    'all y null':        Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: 100 + i, y: null })),
+    'all zeros':         Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: 0, y: 0 })),
+    'flat series':       Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: 5, y: 9 })),
+    'single spike':      Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: i === 20 ? 9999 : 0, y: i === 20 ? 5000 : 0 })),
+    'negative values':   Array.from({ length: 40 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: -100 - i, y: -50 - i })),
+    'alternating gaps':  Array.from({ length: 60 }, (_, i) => ({ key: `k${i}`, label: `k${i}`, x: i % 2 ? null : 100 + i, y: i % 3 ? 200 + i : null })),
+  };
+
+  let clean = 0;
+  for (const [name, rows] of Object.entries(CASES)) {
+    for (const unit of ['day', 'week', 'month']) {
+      let res, strings, csv;
+      try {
+        res = analyseHalo(rows, {
+          xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3, unit,
+          controls: { trend: true, seasonality: true },
+          planning: { ttsRevenue: 100000, marketingSpend: 30000 },
+        });
+        strings = visibleStrings(res, unit);
+        csv = buildHaloV2Csv({ result: res, periods: rows, gran: unit, range: {}, xKey: 'gmv', yKey: 'revenue_per_day' });
+      } catch (e) {
+        check(`SMOKE. "${name}" @ ${unit} does not throw`, false, String(e.message || e));
+        continue;
+      }
+      const bad = strings.filter((s) => BAD.test(s));
+      check(`SMOKE. "${name}" @ ${unit} produces no NaN/undefined in visible text`,
+        bad.length === 0, bad.slice(0, 2).join(' || '));
+      if (BAD.test(csv)) check(`SMOKE. "${name}" @ ${unit} CSV is clean`, false, (csv.match(/.*(NaN|undefined).*/) || [''])[0]);
+      else clean++;
+
+      // A grain assessment must survive the same shapes — it drives the picker
+      // labels and the status panel, so a throw here is a dead control.
+      try {
+        const a = assessGrain(unit, rows, { maxLag: 3, controls: { trend: true, seasonality: true } });
+        check(`SMOKE. "${name}" @ ${unit} assessment yields finite counts`,
+          Number.isFinite(a.usable) && Number.isFinite(a.required) && Number.isFinite(a.correlationObs),
+          `usable=${a.usable} required=${a.required} obs=${a.correlationObs}`);
+      } catch (e) {
+        check(`SMOKE. "${name}" @ ${unit} assessment does not throw`, false, String(e.message || e));
+      }
+    }
+  }
+  check(`SMOKE. all ${Object.keys(CASES).length} shapes x 3 grains exported clean CSV`, clean === 30, `${clean}/30`);
+
+  // Formatters, fed the values that actually break them.
+  const NASTY = [0, -0, null, undefined, NaN, Infinity, -Infinity, 1e21, -1e-9, 0.005, 733.3333333333333];
+  const keys = ['gmv', 'ntb', 'keyword_search_rank', 'video_per_day', 'revenue_per_day'];
+  const formatted = [];
+  for (const k of keys) for (const v of NASTY) {
+    formatted.push(formatMetricValue(v, k));
+    formatted.push(formatMetricValue(v, k, { indexed: true }));
+  }
+  check('SMOKE. no formatter output contains NaN or undefined',
+    !formatted.some((s) => /NaN|undefined/.test(s)),
+    formatted.filter((s) => /NaN|undefined/.test(s)).slice(0, 3).join(' | '));
+  check('SMOKE. every formatter output is a non-empty string',
+    formatted.every((s) => typeof s === 'string' && s.length > 0));
+  check('SMOKE. Infinity is not printed raw',
+    !formatted.some((s) => /Infinity|∞/.test(s)),
+    formatted.filter((s) => /Infinity/.test(s)).slice(0, 2).join(' | '));
+
+  // historyPhrase across the whole plausible range and every unit.
+  const phrases = [];
+  for (const u of ['day', 'week', 'month', 'period']) {
+    for (const n of [0, 1, 2, 5, 6, 11, 12, 20, 21, 25, 26, 51, 52, 60, 77, 78, 104, 365, 366, 1000]) {
+      phrases.push(historyPhrase(n, u));
+    }
+  }
+  check('SMOKE. historyPhrase never emits NaN or a bare "1 weeks"',
+    !phrases.some((s) => /NaN|undefined|\b1 weeks\b|\b1 days\b|\b1 months\b/.test(s)),
+    phrases.filter((s) => /NaN|undefined|\b1 weeks\b/.test(s)).slice(0, 3).join(' | '));
+  check('SMOKE. historyPhrase only claims a year when the span really is one',
+    phrases.filter((s) => /about a year/.test(s)).every((s) => {
+      const n = Number((s.match(/^(\d+)/) || [])[1]);
+      const u = (s.match(/usable (\w+?)s? /) || [])[1];
+      const per = { day: 365, week: 52, month: 12 }[u];
+      return per ? n / per >= 0.85 : false;
+    }),
+    phrases.filter((s) => /about a year/.test(s)).slice(0, 3).join(' | '));
+}
+
 console.log('\nHalo V2 — brief §33 test suite\n');
 console.log(results.join('\n'));
 console.log(`\n  ${passed} passed, ${failed} failed\n`);

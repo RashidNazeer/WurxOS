@@ -31,8 +31,18 @@ export default function KeyTakeaway({ takeaway, sticky = true, onOpenGlossary })
         padding: '18px 20px',
         borderLeft: `4px solid ${dirColor}`,
         // Sticky so the answer stays on screen while the reader scrolls into
-        // the evidence. Disabled in the portal print/export path.
-        ...(sticky ? { position: 'sticky', top: 0, zIndex: 5 } : null),
+        // the evidence.
+        //
+        // top MUST be var(--topbar-h) rather than 0: the page itself scrolls
+        // (.shell is a grid with min-height:100vh; only the sidebar nav has its
+        // own overflow) and .shell-topbar is sticky at the top of that scroll.
+        // At top:0 this card slid underneath the topbar. shell.css says as much
+        // where it declares the variable, and every other sticky header in the
+        // app pins the same way.
+        //
+        // The portal renders no shell, so it sets --topbar-h: 0px on its root
+        // and the same expression resolves to a flush 0 there.
+        ...(sticky ? { position: 'sticky', top: 'var(--topbar-h, 68px)', zIndex: 5 } : null),
         background: 'var(--surface-1)',
         boxShadow: sticky ? '0 2px 12px rgba(0,0,0,.08)' : undefined,
       }}

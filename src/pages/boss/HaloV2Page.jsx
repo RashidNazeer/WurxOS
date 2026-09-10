@@ -91,7 +91,12 @@ export default function HaloV2Page() {
           <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
         </div>
       ) : brandDatasets.length ? (
-        <HaloV2Explorer key={selectedBrandId} datasets={brandDatasets} loadRows={loadRows} />
+        <HaloV2Explorer
+          key={selectedBrandId}
+          datasets={brandDatasets}
+          loadRows={loadRows}
+          brandName={selected?.brand?.brand_name || null}
+        />
       ) : (
         <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
           No sheets for <strong>{selected?.brand?.brand_name}</strong> yet — upload one on the{' '}

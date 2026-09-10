@@ -56,7 +56,12 @@ export function comparisonSentence(xKey, yKey) {
 // numbers, rates to two decimals, and an indexed series to one with no unit
 // (an index is not dollars).
 export function formatMetricValue(v, key, { indexed = false } = {}) {
-  if (v == null || Number.isNaN(Number(v))) return '—';
+  // Non-FINITE, not merely non-NaN. A ratio metric (ROI, CPO, videos per day)
+  // divided by a zero denominator arrives here as Infinity, and both
+  // toLocaleString and toFixed render that verbatim — so a client tooltip could
+  // read "Infinity". haloFields.fmtValue guards null and NaN but not this, and
+  // it is shared with V1, so the guard belongs in the V2 presentation layer.
+  if (v == null || !Number.isFinite(Number(v))) return '—';
   if (indexed) return Number(v).toFixed(1);
   const fmt = FIELD_BY_KEY[key]?.fmt || 'num';
   return fmtValue(Number(v), fmt);
