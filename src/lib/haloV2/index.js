@@ -14,6 +14,7 @@
 import { signedCorrelation } from './correlation.js';
 import { lagCorrelations, bestObservedLag, lagWarnings, DEFAULT_MAX_LAG } from './lagAnalysis.js';
 import { fitDistributedLag } from './distributedLag.js';
+import { PERIODS_PER_YEAR } from './controls.js';
 import {
   historicalContribution, marginalScenario, referenceSensitivity, recommendedReferenceMethod,
 } from './counterfactual.js';
@@ -44,6 +45,9 @@ export function analyseHalo(periods, {
   xKey,
   yKey,
   maxLag = DEFAULT_MAX_LAG,
+  // The grain being viewed ('day' | 'week' | 'month'). Used for copy that has
+  // to name the unit, and to give seasonality the right annual period.
+  unit = 'period',
   controls = {},
   // null → use the recommended rule for this model (a low-activity baseline
   // where there is enough history for a quietest-quarter to mean anything, the
@@ -73,9 +77,12 @@ export function analyseHalo(periods, {
 
   // ── Layer B — adjusted model ──────────────────────────────────────
   const complete = series.filter((p) => p.x != null && p.y != null).length;
+  // Seasonality is annual, so its period is grain-dependent: 365 days, 52 weeks
+  // or 12 months. Omitting `unit` keeps the previous weekly behaviour.
+  const fitControls = { ...controls, periodsPerYear: PERIODS_PER_YEAR[unit] ?? controls.periodsPerYear };
   const model = fitDistributedLag(
     rows.map((p) => ({ key: p.key, x: numOrNull(p.x), y: numOrNull(p.y), controls: p.controls })),
-    { maxLag, controls, xKey, yKey },
+    { maxLag, controls: fitControls, xKey, yKey },
   );
 
   const confidence = modelConfidence({
@@ -86,6 +93,9 @@ export function analyseHalo(periods, {
     // Passed structurally so the ceiling rule doesn't have to parse English out
     // of the display strings.
     missingMajor: model.controlsMissingMajor || [],
+    // So "52 usable periods" is described as seven weeks on a daily view rather
+    // than as "about a year of history".
+    unit,
   });
 
   // ── Modelled outputs ──────────────────────────────────────────────

@@ -28,7 +28,7 @@ export default function StageStepper({ statuses }) {
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>
           <strong style={{ color: 'var(--text-primary)' }}>{done}</strong> of {total} complete
-          <span style={{ color: 'var(--text-muted)' }}> · validation comes later</span>
+          <span style={{ color: 'var(--text-muted)' }}> · validation not performed</span>
         </div>
       </div>
 
