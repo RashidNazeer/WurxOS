@@ -9,9 +9,15 @@
 // They are kept visually and structurally apart on purpose: the entire point of
 // V2 is that these three things stop being blended into one confident number.
 // Nothing here writes; nothing here touches V1.
+//
+// This file is the composition and the state. Everything with its own reason to
+// exist lives beside it: the stage stepper, the guided status panel, the
+// actual-vs-counterfactual chart, the planning layer, and the shared
+// primitives (including the one definition of the MODELLED · NOT INCREMENTAL
+// badge, which is worthless if a second panel renders its own variant).
 // ============================================================
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ScatterChart, Scatter, ZAxis,
@@ -19,35 +25,48 @@ import {
 import { setHaloCurrency, getHaloCurrency, fmtValue } from '../../lib/haloFields';
 import { sourceForGran, availableGrans, availableFields, buildPeriods, detectControls } from '../../lib/haloV2/dataAdapter';
 import { analyseHalo } from '../../lib/haloV2/index.js';
-import { fmtSignedPct, signedCorrColor, signedCorrTextColor, describeCorrelation } from '../../lib/haloV2/correlation.js';
+import { fmtSignedPct, signedCorrColor, signedCorrTextColor, describeCorrelation, MIN_CORRELATION_OBS } from '../../lib/haloV2/correlation.js';
 import { haloFinder } from '../../lib/haloV2/lagAnalysis.js';
 import { refitWithout } from '../../lib/haloV2/distributedLag.js';
-import { modelEstimateAsAssumption, DEFAULT_ASSUMPTIONS } from '../../lib/haloV2/planningScenarios.js';
+import { assessGrains, recommendGrain, grainSwitchSuggestion, GRAIN_LABEL, GRAIN_UNIT } from '../../lib/haloV2/grainRecommendation.js';
+import { stageStatuses } from '../../lib/haloV2/stages.js';
+import { REFERENCE_METHOD_SPECS } from '../../lib/haloV2/counterfactual.js';
 import { inverseNote, metricLabel } from '../../lib/haloV2/metricMetadata.js';
-
-const TT_STYLE = { background: 'var(--surface-1, #16161c)', border: '1px solid var(--border-default, #2b2b35)', borderRadius: 8, fontSize: 12, color: 'var(--text-primary, #e8e8ee)' };
-const GRID = 'var(--border-subtle, #2b2b3522)';
-const UNIT = { day: 'day', week: 'week', month: 'month' };
+import StageStepper from './StageStepper.jsx';
+import StatusPanel from './StatusPanel.jsx';
+import ContributionChart from './ContributionChart.jsx';
+import PlanningLayer from './PlanningLayer.jsx';
+import {
+  TT_STYLE, GRID, SERIES_TIKTOK, SERIES_AMAZON,
+  FieldLabel, Picker, Check, Stat, Note, Row, Layer, ModelledBadge, ProgressMeter, indexToHundred,
+} from './shared.jsx';
 
 export default function HaloV2Explorer({ datasets, loadRows }) {
   const [rowsById, setRowsById] = useState({});
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
 
-  const [gran, setGran]   = useState('week');            // §14 — weekly is the model's frequency
+  const [gran, setGran]   = useState('week');
   const [range, setRange] = useState({ start: '', end: '' });
   const [xKey, setXKey]   = useState('gmv');
   const [yKey, setYKey]   = useState('revenue_per_day');
   const [maxLag, setMaxLag] = useState(3);
   const [useTrend, setUseTrend] = useState(true);
   const [useSeasonality, setUseSeasonality] = useState(true);
-  const [refMethod, setRefMethod] = useState('period_median');
+  const [refMethod, setRefMethod] = useState(null);       // null → the model's recommendation
+  const [customRef, setCustomRef] = useState('');
   const [scenarioPct, setScenarioPct] = useState(10);
   const [customChange, setCustomChange] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [excludeIndex, setExcludeIndex] = useState(null);
+  const [normalize, setNormalize] = useState(false);
+  const [chartsOnly, setChartsOnly] = useState(false);
+  const [planning, setPlanning] = useState({ ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null });
 
-  const [planning, setPlanning] = useState({ ttsRevenue: '', marketingSpend: '', assumptions: { ...DEFAULT_ASSUMPTIONS } });
+  // Once the user picks a grain deliberately, stop moving it under them. The
+  // recommendation is still computed and still offered as a button — it just
+  // stops being applied automatically.
+  const grainPinned = useRef(false);
 
   const list = datasets || [];
   const dsKey = list.map((d) => d.id).join(',');
@@ -80,37 +99,114 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
   useEffect(() => { if (tiktokFields.length && !tiktokFields.some((f) => f.key === xKey)) setXKey(tiktokFields[0].key); }, [tiktokFields, xKey]);
   useEffect(() => { if (amazonFields.length && !amazonFields.some((f) => f.key === yKey)) setYKey(amazonFields[0].key); }, [amazonFields, yKey]);
 
+  const controlOpts = useMemo(
+    () => ({ trend: useTrend, seasonality: useSeasonality }),
+    [useTrend, useSeasonality],
+  );
+
+  // ── Grain assessment across EVERY grain (§A1) ────────────────────
+  // Recomputed on load, brand change, metric change, lag change and date
+  // change — which is exactly the trigger list the brief specifies, because
+  // each of them can move which grain is viable.
+  const assessments = useMemo(() => {
+    if (!srcRows?.length) return {};
+    const periodsFor = (g) => {
+      const s = sourceForGran(list, g);
+      if (!s) return [];
+      const rows = s.dataset?.id ? rowsById[s.dataset.id] : null;
+      if (!rows?.length) return [];
+      return buildPeriods({ rows, sourceGran: s.sourceGran, gran: g, xKey, yKey, range }).periods;
+    };
+    return assessGrains(grans, periodsFor, { maxLag, controls: controlOpts });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dsKey, rowsById, grans, xKey, yKey, range, maxLag, controlOpts, srcRows]);
+
+  const recommendation = useMemo(() => recommendGrain(assessments), [assessments]);
+  const assessment = assessments[gran] || null;
+  const suggestion = useMemo(
+    () => grainSwitchSuggestion(gran, assessments, recommendation),
+    [gran, assessments, recommendation],
+  );
+
+  // Follow the recommendation until the user takes the wheel.
+  useEffect(() => {
+    if (grainPinned.current) return;
+    if (!recommendation?.grain || recommendation.grain === gran) return;
+    if (!grans.includes(recommendation.grain)) return;
+    setGran(recommendation.grain);
+  }, [recommendation?.grain, gran, grans]);
+
+  const pickGrain = (g) => { grainPinned.current = true; setGran(g); setChartsOnly(false); };
+
   const { periods } = useMemo(() => buildPeriods({
     rows: srcRows, sourceGran: src?.sourceGran, gran, xKey, yKey, range,
   }), [srcRows, src?.sourceGran, gran, xKey, yKey, range]);
 
   const controlsFound = useMemo(() => detectControls(periods), [periods]);
 
+  // ── Graceful lag degradation (§F) ────────────────────────────────
+  // A hard fail at 23 usable against 24 required is a worse product than a
+  // 1-lag model plus a sentence saying why. Stepping the window down drops a
+  // parameter AND recovers a row, so it moves both sides of the inequality.
+  const effectiveMaxLag = assessment?.feasibleLag != null ? assessment.feasibleLag : maxLag;
+  const lagWasReduced = assessment?.canModel === true && effectiveMaxLag < maxLag;
+
   const result = useMemo(() => analyseHalo(periods, {
-    xKey, yKey, maxLag,
-    controls: { trend: useTrend, seasonality: useSeasonality, promo: true, stockout: true },
-    reference: { method: refMethod },
+    xKey, yKey,
+    maxLag: effectiveMaxLag,
+    controls: controlOpts,
+    reference: refMethod ? { method: refMethod, customValue: customRef === '' ? null : Number(customRef) } : null,
     scenarioSpec: customChange !== '' ? { type: 'absolute', value: Number(customChange) } : { type: 'percent', value: Number(scenarioPct) || 10 },
-    planning: (planning.ttsRevenue !== '' || planning.marketingSpend !== '') ? planning : null,
-  }), [periods, xKey, yKey, maxLag, useTrend, useSeasonality, refMethod, scenarioPct, customChange, planning]);
+    planning: (planning.ttsRevenue !== '' || planning.marketingSpend !== '')
+      ? { ...planning, grainLabel: GRAIN_LABEL[gran], rangeLabel: rangeText(range) }
+      : null,
+  }), [periods, xKey, yKey, effectiveMaxLag, controlOpts, refMethod, customRef, scenarioPct, customChange, planning, gran, range]);
+
+  const periodsWithData = useMemo(() => periods.filter((p) => p.x != null || p.y != null).length, [periods]);
+  const stages = useMemo(() => stageStatuses(result, { periodsWithData }), [result, periodsWithData]);
 
   const cur = getHaloCurrency();
-  const unit = UNIT[gran];
+  const unit = GRAIN_UNIT[gran];
 
   if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 13 }}><span className="wx-spinner" /> Loading data…</div>;
   if (error) return <div className="wx-alert wx-alert-danger"><span>{error}</span></div>;
   if (!srcRows?.length) return <div className="wx-card" style={{ padding: 24, color: 'var(--text-muted)' }}>No rows in this sheet yet.</div>;
 
+  const m = result.adjustedModel;
+  const anyCorrelation = result.observed.lagCorrelations.some((r) => r.correlation != null);
+  const blockedModel = !m.available;
+  const blockedCorrelations = !anyCorrelation;
+  const showStatusPanel = (blockedModel || blockedCorrelations) && !chartsOnly;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Stage ladder (§J) ───────────────────────────────────── */}
+      <StageStepper statuses={stages} />
+
       {/* ── Controls bar ─────────────────────────────────────────── */}
       <div className="wx-card" style={{ padding: 14, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <Picker label="View" value={gran} onChange={setGran}
-          options={grans.map((g) => ({ value: g, label: `${g === 'day' ? 'Daily' : g === 'week' ? 'Weekly' : 'Monthly'}${g === 'week' ? ' — recommended' : ''}` }))} />
+        <Picker
+          label="View"
+          value={gran}
+          onChange={pickGrain}
+          options={grans.map((g) => {
+            const a = assessments[g];
+            const tag = recommendation?.grain === g ? ' — recommended'
+              : a && !a.canModel ? ' — charts only'
+              : '';
+            return { value: g, label: `${GRAIN_LABEL[g]}${tag}` };
+          })}
+          hint={assessment ? `${assessment.usable} usable ${assessment.unit}s here` : null}
+        />
         <Picker label="TikTok metric" value={xKey} onChange={setXKey} options={tiktokFields.map((f) => ({ value: f.key, label: f.label }))} />
         <Picker label="Amazon metric" value={yKey} onChange={setYKey} options={amazonFields.map((f) => ({ value: f.key, label: f.label }))} />
-        <Picker label="Max halo lag" value={String(maxLag)} onChange={(v) => setMaxLag(Number(v))}
-          options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))} />
+        <Picker
+          label="Max halo lag"
+          value={String(maxLag)}
+          onChange={(v) => setMaxLag(Number(v))}
+          options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
+          width={130}
+        />
         <div>
           <FieldLabel>Date range</FieldLabel>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -118,124 +214,222 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
             <input type="date" className="wx-input" style={{ width: 145 }} value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} />
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 6 }}>
-          <Check label="Trend" checked={useTrend} onChange={setUseTrend} />
-          <Check label="Seasonality" checked={useSeasonality} onChange={setUseSeasonality} />
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
+          <Check label="Trend" checked={useTrend} onChange={setUseTrend} title="Adjust for a linear time trend" />
+          <Check label="Seasonality" checked={useSeasonality} onChange={setUseSeasonality} title="Adjust for annual seasonality — needs about 52 periods" />
+          <Check label="Index to 100" checked={normalize} onChange={setNormalize} title="Index both series to 100 at the start so metrics on different scales can be compared for co-movement" />
         </div>
       </div>
 
-      {gran !== 'week' && (
+      {lagWasReduced && (
         <Note tone="info">
-          Recommended for the Halo Model: <strong>Weekly</strong>. Daily data is usually too noisy and monthly leaves too few
-          observations to estimate a lag model — {gran === 'day' ? 'daily' : 'monthly'} is here for exploration.
+          Reduced to <strong>{effectiveMaxLag} {unit}{effectiveMaxLag === 1 ? '' : 's'}</strong> because
+          this view has {assessment.usable} usable {assessment.unit}s — a {maxLag}-{unit} window would need
+          about {assessment.required}. Dropping a lag removes a parameter and recovers a period, so the
+          shorter window fits where the requested one did not.
+        </Note>
+      )}
+
+      {/* ── Guided status panel (§A3) ───────────────────────────── */}
+      {showStatusPanel && (
+        <StatusPanel
+          assessment={assessment}
+          recommendation={recommendation}
+          suggestion={suggestion}
+          onSwitchGrain={pickGrain}
+          onKeepExploring={() => setChartsOnly(true)}
+          hasSeries={periodsWithData >= 2}
+          blockedCorrelations={blockedCorrelations}
+          blockedModel={blockedModel}
+        />
+      )}
+
+      {/* A working alternative should be offered even when nothing is blocked
+          at all — but quietly, as a line rather than a panel. */}
+      {!showStatusPanel && suggestion && (
+        <Note tone="info">
+          {recommendation.reason}{' '}
+          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginLeft: 6 }}
+            onClick={() => pickGrain(suggestion.grain)}>{suggestion.cta}</button>
         </Note>
       )}
 
       {/* ══ LAYER A — OBSERVED ═══════════════════════════════════ */}
       <Layer letter="A" title="Observed Relationship" subtitle="What the data shows. Correlation is evidence of movement together — not proof that one caused the other.">
-        <ObservedLayer result={result} unit={unit} xKey={xKey} yKey={yKey} periods={periods} />
+        <ObservedLayer
+          result={result} unit={unit} xKey={xKey} yKey={yKey} periods={periods}
+          normalize={normalize} assessment={assessment}
+        />
       </Layer>
 
       {/* ══ LAYER B — ADJUSTED MODEL ═════════════════════════════ */}
-      <Layer letter="B" title="Adjusted Halo Model" subtitle="A distributed-lag estimate that adjusts for the other variables we have. An estimate, not a measurement of cause.">
+      <Layer
+        letter="B"
+        title="Adjusted Halo Model"
+        subtitle="A distributed-lag estimate that adjusts for the variables we have. An estimate of association, not a measurement of cause."
+        right={m.available ? <ModelledBadge /> : null}
+      >
         <AdjustedLayer
           result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
           controlsFound={controlsFound}
           refMethod={refMethod} setRefMethod={setRefMethod}
+          customRef={customRef} setCustomRef={setCustomRef}
           scenarioPct={scenarioPct} setScenarioPct={setScenarioPct}
           customChange={customChange} setCustomChange={setCustomChange}
           showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
-          periods={periods} maxLag={maxLag} useTrend={useTrend} useSeasonality={useSeasonality}
+          periods={periods} maxLag={effectiveMaxLag} controlOpts={controlOpts}
           excludeIndex={excludeIndex} setExcludeIndex={setExcludeIndex}
+          assessment={assessment} gran={gran} range={range}
         />
       </Layer>
 
       {/* ══ LAYER C — PLANNING ═══════════════════════════════════ */}
-      <Layer letter="C" title="Investment Planning" subtitle="Planning assumptions — not measured results." tone="planning">
+      <Layer
+        letter="C"
+        title="Investment Planning"
+        subtitle="A business decision informed by the model — never a measurement of it."
+        tone="planning"
+        right={<ModelledBadge />}
+      >
         <PlanningLayer result={result} planning={planning} setPlanning={setPlanning} cur={cur} />
       </Layer>
 
-      {/* Halo Finder V2 + heatmap */}
-      <HaloFinderV2 periods={periods} srcRows={srcRows} src={src} gran={gran} yKey={yKey} range={range} tiktokFields={tiktokFields} maxLag={maxLag} unit={unit} />
+      {/* Halo Finder V2 + provenance */}
+      <HaloFinderV2
+        periods={periods} srcRows={srcRows} src={src} gran={gran} yKey={yKey} range={range}
+        tiktokFields={tiktokFields} maxLag={effectiveMaxLag} unit={unit}
+        suggestion={suggestion} onSwitchGrain={pickGrain}
+      />
+      <Provenance
+        result={result} gran={gran} range={range} unit={unit}
+        xKey={xKey} yKey={yKey} cur={cur}
+      />
     </div>
   );
 }
 
+const rangeText = (range) => (range?.start && range?.end ? `${range.start} to ${range.end}` : null);
+
 // ────────────────────────────────────────────────────────────────
 // Layer A
 // ────────────────────────────────────────────────────────────────
-function ObservedLayer({ result, unit, xKey, yKey, periods }) {
+function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessment }) {
   const o = result.observed;
   const best = o.lagCorrelations.find((r) => r.lag === o.bestObservedLag);
   const invNoteX = inverseNote(xKey), invNoteY = inverseNote(yKey);
+  const anyCorrelation = o.lagCorrelations.some((r) => r.correlation != null);
 
-  const chartData = periods.filter((p) => p.x != null || p.y != null).map((p) => ({ label: p.label || p.key, x: p.x, y: p.y }));
+  const withData = periods.filter((p) => p.x != null || p.y != null);
+  const xs = withData.map((p) => p.x);
+  const ys = withData.map((p) => p.y);
+  const nx = normalize ? indexToHundred(xs) : xs;
+  const ny = normalize ? indexToHundred(ys) : ys;
+  const chartData = withData.map((p, i) => ({ label: p.label || p.key, x: nx[i], y: ny[i] }));
   const scatter = periods.filter((p) => p.x != null && p.y != null).map((p) => ({ x: p.x, y: p.y, label: p.label }));
+
+  const xName = metricLabel(xKey);
+  const yName = metricLabel(yKey);
+  const axisSuffix = normalize ? ' (indexed to 100)' : '';
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
-        {o.lagCorrelations.map((r) => {
-          const isBest = r.lag === o.bestObservedLag;
-          return (
-            <div key={r.lag} style={{
-              padding: '12px 14px', borderRadius: 10, background: signedCorrColor(r.correlation),
-              border: `1.5px solid ${isBest ? 'var(--accent)' : 'var(--border-subtle)'}`,
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                {r.lag === 0 ? `Same ${unit}` : `+${r.lag} ${unit}${r.lag === 1 ? '' : 's'}`}
-              </div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 800, color: signedCorrTextColor(r.correlation) }}>
-                {fmtSignedPct(r.correlation) ?? '—'}
-              </div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
-                {r.numberOfObservations} pts · {r.sufficiency?.label}
-              </div>
-              {isBest && <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginTop: 2 }}>STRONGEST OBSERVED</div>}
-            </div>
-          );
-        })}
-      </div>
+      {/* §A4 — when correlations cannot be computed, ONE compact row rather
+          than four cards of em dashes. Four blank cards read as breakage; one
+          sentence reads as a threshold not yet met. */}
+      {!anyCorrelation ? (
+        <div style={{
+          padding: '10px 14px', borderRadius: 8, background: 'var(--surface-2)',
+          border: '1px dashed var(--border-default)', fontSize: 12.5, color: 'var(--text-secondary)',
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        }}>
+          <i className="bi bi-hourglass" style={{ color: 'var(--text-muted)' }} />
+          <span>
+            Correlations unlock at <strong>≥ {MIN_CORRELATION_OBS}</strong> overlapping {unit}s
+            {assessment ? <> — this view has <strong>{assessment.correlationObs}</strong></> : null}.
+            The charts below do not need that much data and are shown regardless.
+          </span>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 14 }}>
+            {o.lagCorrelations.map((r) => {
+              const isBest = r.lag === o.bestObservedLag;
+              return (
+                <div key={r.lag} title={r.reason || undefined} style={{
+                  padding: '12px 14px', borderRadius: 10, background: signedCorrColor(r.correlation),
+                  border: `1.5px solid ${isBest ? 'var(--accent)' : 'var(--border-subtle)'}`,
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {r.lag === 0 ? `Same ${unit}` : `+${r.lag} ${unit}${r.lag === 1 ? '' : 's'}`}
+                  </div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: signedCorrTextColor(r.correlation) }}>
+                    {fmtSignedPct(r.correlation) ?? '—'}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                    {r.numberOfObservations} pts · {r.sufficiency?.label}
+                  </div>
+                  {isBest && <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginTop: 2 }}>STRONGEST OBSERVED</div>}
+                </div>
+              );
+            })}
+          </div>
 
-      <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 10px' }}>
-        {best?.correlation != null ? (
-          <>Strongest observed relationship: <strong>{best.lag === 0 ? `same ${unit}` : `+${best.lag} ${unit}${best.lag === 1 ? '' : 's'}`}</strong>{' '}
-            ({fmtSignedPct(best.correlation)}) — {describeCorrelation(best.correlation).toLowerCase()} between {o.xLabel} and {o.yLabel}.
-            This is the strongest relationship <em>observed in this period</em>, not a measured halo delay.</>
-        ) : 'No correlation could be computed for this pair over this period.'}
-      </p>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 10px' }}>
+            {best?.correlation != null ? (
+              <>Strongest observed relationship: <strong>{best.lag === 0 ? `same ${unit}` : `+${best.lag} ${unit}${best.lag === 1 ? '' : 's'}`}</strong>{' '}
+                ({fmtSignedPct(best.correlation)}) — {describeCorrelation(best.correlation).toLowerCase()} between {o.xLabel} and {o.yLabel}.
+                This is the strongest relationship <em>observed in this period</em>, not a measured halo delay.</>
+            ) : 'No correlation could be computed for this pair over this period.'}
+          </p>
 
-      {(invNoteX || invNoteY) && <Note tone="info">{invNoteX || invNoteY}{' '}
-        Raw correlation at the strongest lag: <strong>{fmtSignedPct(best?.rawCorrelation) ?? '—'}</strong>; business-adjusted: <strong>{fmtSignedPct(best?.correlation) ?? '—'}</strong>.</Note>}
+          {(invNoteX || invNoteY) && <Note tone="info">{invNoteX || invNoteY}{' '}
+            Raw correlation at the strongest lag: <strong>{fmtSignedPct(best?.rawCorrelation) ?? '—'}</strong>; business-adjusted: <strong>{fmtSignedPct(best?.correlation) ?? '—'}</strong>.</Note>}
 
-      {o.warnings.map((w) => <Note key={w.code} tone="warn">{w.message}</Note>)}
+          {o.warnings.map((w) => <Note key={w.code} tone="warn">{w.message}</Note>)}
+        </>
+      )}
+
+      {normalize && (
+        <Note tone="info">
+          Both series are indexed to 100 at the first period, so two metrics on different
+          scales can be compared for co-movement. Index values are for reading the SHAPE only —
+          every figure elsewhere on this page uses the real units.
+        </Note>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, marginTop: 12 }}>
-        <div style={{ height: 240 }}>
+        <div style={{ height: 260 }}>
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Over time</div>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData}>
+            <ComposedChart data={chartData} margin={{ top: 6, right: 10, bottom: 24, left: 6 }}>
               <CartesianGrid stroke={GRID} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={20} />
-              <YAxis yAxisId="l" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10 }} />
+              <XAxis
+                dataKey="label" tick={{ fontSize: 10 }} minTickGap={20}
+                label={{ value: `Period (${unit})`, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }}
+              />
+              <YAxis yAxisId="l" tick={{ fontSize: 10 }}
+                label={{ value: `${xName}${axisSuffix}`, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
+              <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10 }}
+                label={{ value: `${yName}${axisSuffix}`, angle: 90, position: 'insideRight', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
               <Tooltip contentStyle={TT_STYLE} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar yAxisId="l" dataKey="x" name={metricLabel(xKey)} fill="#6366f1" opacity={0.65} />
-              <Line yAxisId="r" dataKey="y" name={metricLabel(yKey)} stroke="#22c55e" dot={false} strokeWidth={2} />
+              <Bar yAxisId="l" dataKey="x" name={xName} fill={SERIES_TIKTOK} opacity={0.65} />
+              <Line yAxisId="r" dataKey="y" name={yName} stroke={SERIES_AMAZON} dot={false} strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <div style={{ height: 240 }}>
+        <div style={{ height: 260 }}>
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Scatter</div>
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart>
+            <ScatterChart margin={{ top: 6, right: 12, bottom: 24, left: 6 }}>
               <CartesianGrid stroke={GRID} />
-              <XAxis type="number" dataKey="x" name={metricLabel(xKey)} tick={{ fontSize: 10 }} />
-              <YAxis type="number" dataKey="y" name={metricLabel(yKey)} tick={{ fontSize: 10 }} />
+              <XAxis type="number" dataKey="x" name={xName} tick={{ fontSize: 10 }}
+                label={{ value: xName, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }} />
+              <YAxis type="number" dataKey="y" name={yName} tick={{ fontSize: 10 }}
+                label={{ value: yName, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
               <ZAxis range={[45, 45]} />
               <Tooltip contentStyle={TT_STYLE} cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter data={scatter} fill="#6366f1" />
+              <Scatter data={scatter} fill={SERIES_TIKTOK} />
             </ScatterChart>
           </ResponsiveContainer>
         </div>
@@ -249,71 +443,136 @@ function ObservedLayer({ result, unit, xKey, yKey, periods }) {
 // ────────────────────────────────────────────────────────────────
 function AdjustedLayer({
   result, unit, cur, xKey, yKey, controlsFound, refMethod, setRefMethod,
-  scenarioPct, setScenarioPct, customChange, setCustomChange,
-  showAdvanced, setShowAdvanced, periods, maxLag, useTrend, useSeasonality,
-  excludeIndex, setExcludeIndex,
+  customRef, setCustomRef, scenarioPct, setScenarioPct, customChange, setCustomChange,
+  showAdvanced, setShowAdvanced, periods, maxLag, controlOpts,
+  excludeIndex, setExcludeIndex, assessment,
 }) {
   const m = result.adjustedModel;
   const contrib = result.historicalContribution;
+  const sens = result.referenceSensitivity;
   const marg = result.marginal;
 
   const refit = useMemo(() => {
     if (excludeIndex == null) return null;
-    return refitWithout(periods, excludeIndex, {
-      maxLag, controls: { trend: useTrend, seasonality: useSeasonality, promo: true, stockout: true }, xKey, yKey,
-    });
-  }, [excludeIndex, periods, maxLag, useTrend, useSeasonality, xKey, yKey]);
+    return refitWithout(periods, excludeIndex, { maxLag, controls: controlOpts, xKey, yKey });
+  }, [excludeIndex, periods, maxLag, controlOpts, xKey, yKey]);
 
   if (!m.available) {
     return (
       <>
-        <Note tone="warn"><strong>Not enough history for an adjusted halo estimate.</strong> {m.message}</Note>
-        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0 }}>
-          The signed correlations and lag relationships above are still valid — they need far less data than a
-          distributed-lag regression with controls.
-        </p>
+        {/* headline and message are separate fields precisely so this does not
+            print the same sentence twice, as it used to. */}
+        <Note tone="warn"><strong>{m.headline}</strong> {m.message}</Note>
+        {assessment && m.requiredObservations && (
+          <ProgressMeter
+            usable={m.sampleSize}
+            required={m.requiredObservations}
+            unit={unit}
+            almostThere={assessment.almostThere}
+          />
+        )}
       </>
     );
   }
 
-  const cumLabel = `${cur}${m.cumulativeCoefficient.toFixed(2)}`;
+  const lagged = m.laggedOnly;
+  const hasLagged = m.laggedOnlyAvailable && lagged;
+  const fullLabel = `${cur}${m.cumulativeCoefficient.toFixed(2)}`;
   const spansZero = m.confidenceInterval.lower != null && m.confidenceInterval.lower < 0 && m.confidenceInterval.upper > 0;
+  const sharePct = m.samePeriodShare == null ? null : Math.round(m.samePeriodShare * 100);
 
   return (
     <>
+      {/* ── The hero, split (§F) ────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {hasLagged ? (
+          <Stat
+            label="Delayed halo (lagged only)"
+            value={`${cur}${lagged.coefficient.toFixed(2)} per ${cur}1`}
+            sub={lagged.lower == null ? 'No interval available'
+              : `95%: ${cur}${lagged.lower.toFixed(2)} to ${cur}${lagged.upper.toFixed(2)}${lagged.spansZero ? ' — includes zero' : ''}`}
+            tone={lagged.spansZero ? 'warn' : lagged.coefficient >= 0 ? 'pos' : 'neg'}
+            badge={<ModelledBadge compact />}
+            emphasis
+          />
+        ) : (
+          <Stat
+            label="Same-period association"
+            value={`${fullLabel} per ${cur}1`}
+            sub={`No lag window selected, so no delayed effect has been looked for.`}
+            tone="warn"
+            badge={<ModelledBadge compact weakHalo />}
+            emphasis
+          />
+        )}
         <Stat
-          label="Cumulative relationship"
-          value={`${cumLabel} per ${cur}1`}
-          sub={`${metricLabel(yKey)} per 1 unit of ${metricLabel(xKey)}, across ${m.maxLag === 0 ? `the same ${unit}` : `this ${unit} + ${m.maxLag}`}`}
-          tone={m.cumulativeCoefficient >= 0 ? 'pos' : 'neg'}
+          label="Full cumulative"
+          value={`${fullLabel} per ${cur}1`}
+          sub={`Includes same-${unit} co-movement (not a delay)${sharePct != null ? ` — ${sharePct}% of this figure` : ''}`}
+          tone="muted"
         />
         <Stat
-          label="95% interval"
-          value={m.confidenceInterval.lower == null ? '—'
-            : `${cur}${m.confidenceInterval.lower.toFixed(2)} to ${cur}${m.confidenceInterval.upper.toFixed(2)}`}
-          sub={spansZero ? 'Includes zero — direction uncertain' : 'Interval excludes zero'}
-          tone={spansZero ? 'warn' : 'pos'}
+          label="Model confidence"
+          value={m.confidenceLabel}
+          sub={`${m.sampleSize} usable ${unit}s · adj R² ${m.adjustedR2 == null ? '—' : m.adjustedR2.toFixed(2)}`}
+          tone={m.confidenceCeiling ? 'warn' : undefined}
         />
-        <Stat label="Model confidence" value={m.confidenceLabel} sub={`${m.sampleSize} usable ${unit}s · adj R² ${m.adjustedR2 == null ? '—' : m.adjustedR2.toFixed(2)}`} />
         <Stat
           label="Modelled contribution"
           value={contrib ? fmtValue(contrib.amount, 'money') : '—'}
-          sub={contrib ? contrib.referenceLabel : 'Unavailable'}
+          sub={contrib
+            ? (contrib.lower != null ? `95%: ${fmtValue(contrib.lower, 'money')} to ${fmtValue(contrib.upper, 'money')}` : contrib.referenceLabel)
+            : 'Unavailable'}
           tone={contrib && contrib.amount < 0 ? 'neg' : 'pos'}
+          badge={<ModelledBadge compact />}
         />
       </div>
 
+      {/* The sentence that used to promote the combined figure as "the halo". */}
       <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 12 }}>
-        Across the current and following {m.maxLag} {unit}{m.maxLag === 1 ? '' : 's'}, an additional {cur}1 of{' '}
-        {metricLabel(xKey)} is <strong>associated with</strong> approximately <strong>{cumLabel}</strong> of {metricLabel(yKey)},
-        after the included controls. {contrib && <>{contrib.label}</>}
+        {hasLagged ? (
+          <>Across the {maxLag} {unit}{maxLag === 1 ? '' : 's'} FOLLOWING a change, an additional {cur}1 of{' '}
+            {metricLabel(xKey)} is <strong>associated with</strong> approximately{' '}
+            <strong>{cur}{lagged.coefficient.toFixed(2)}</strong> of {metricLabel(yKey)}, after the included controls.
+            Adding the same-{unit} movement brings the total to {fullLabel} — but movement inside one {unit} is
+            not a delay, and a shared cause such as a promotion produces it just as readily.</>
+        ) : (
+          <>An additional {cur}1 of {metricLabel(xKey)} moves with approximately <strong>{fullLabel}</strong> of{' '}
+            {metricLabel(yKey)} in the SAME {unit}. Nothing here separates a spillover from a shared cause —
+            select a lag window above to look for a delayed effect.</>
+        )}
       </p>
 
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 10, fontSize: 12 }}>
+      {sharePct != null && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 4 }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Same-{unit} share of the cumulative figure</span>
+            <strong style={{ color: sharePct >= 60 ? 'var(--warning, #f59e0b)' : 'var(--text-primary)' }}>{sharePct}%</strong>
+          </div>
+          <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-3, rgba(148,163,184,.18))', overflow: 'hidden', display: 'flex' }}>
+            <div style={{ width: `${Math.min(100, Math.max(0, sharePct))}%`, background: 'var(--warning, #f59e0b)' }} />
+            <div style={{ flex: 1, background: 'var(--success, #22c55e)' }} />
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 3 }}>
+            Amber is same-{unit} co-movement; green is the delayed part.
+          </div>
+        </div>
+      )}
+      {m.mixedLagSigns && (
+        <Note tone="warn">
+          The lag coefficients point in opposite directions, so the split between same-{unit} and
+          delayed movement cannot be expressed as a share — the parts would exceed the whole.
+          Read the two figures above separately.
+        </Note>
+      )}
+
+      {/* ── Controls honesty (§E) ───────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 14, fontSize: 12 }}>
         <div>
           <FieldLabel>Controls included</FieldLabel>
-          <div style={{ color: 'var(--success, #22c55e)' }}>{m.controls.length ? m.controls.map((c) => `✓ ${c}`).join('  ') : '—'}</div>
+          <div style={{ color: 'var(--success, #22c55e)' }}>
+            {m.controls.length ? m.controls.map((c) => `✓ ${c}`).join('  ') : '— none'}
+          </div>
         </div>
         <div>
           <FieldLabel>Not controlled for</FieldLabel>
@@ -321,23 +580,35 @@ function AdjustedLayer({
             {m.controlsUnavailable.length ? m.controlsUnavailable.map((c) => `✗ ${c}`).join('  ') : 'Nothing outstanding'}
           </div>
         </div>
-        <div>
-          <FieldLabel>Reference for contribution</FieldLabel>
-          <select className="wx-input" style={{ width: 210 }} value={refMethod} onChange={(e) => setRefMethod(e.target.value)}>
-            <option value="period_median">Median activity (default)</option>
-            <option value="period_average">Period average</option>
-          </select>
-        </div>
       </div>
 
-      {!controlsFound.promo && !controlsFound.stockout && (
-        <Note tone="info">
-          No promotion or stock-out columns exist in this sheet, so the estimate is adjusted for trend and seasonality only.
-          Those two are the most common reasons a halo estimate is overstated — add the columns to the sheet and the model will use them automatically.
+      {/* The copy is now driven by what the model ACTUALLY did. It used to
+          claim "adjusted for trend and seasonality" whenever promo and
+          stock-out were missing, regardless of whether seasonality had been
+          estimated — and below ~52 periods it had not. */}
+      {m.controlsMissingMajor.length > 0 && (
+        <Note tone="warn">
+          Not adjusted for <strong>{m.controlsMissingMajor.map((c) => c.label).join(', ')}</strong>.
+          {' '}These are the most common reasons a halo estimate is overstated: a promotion lifts both
+          series at once, and a stock-out drops Amazon while TikTok keeps running.
+          {!m.seasonalityIncluded && <> Seasonality is <strong>not</strong> controlled either ({m.seasonalityReason}).</>}
+          {' '}Add the columns to the sheet and the model will use them automatically.
         </Note>
       )}
-      {/* Guarded: a missing array here used to take the whole route down via
-          the error boundary. Degrading to "no warnings" beats a white screen. */}
+      {m.controlsMissingMajor.length === 0 && !m.seasonalityIncluded && (
+        <Note tone="info">
+          Seasonality is <strong>not</strong> controlled for — {m.seasonalityReason}.
+        </Note>
+      )}
+      {m.confidenceCappedBy?.length > 0 && (
+        <Note tone="warn">
+          {m.confidenceCappedBy.map((r, i) => <div key={i}>{r}</div>)}
+          <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+            Without that cap the score alone would have read “{m.confidenceEarned}”.
+          </div>
+        </Note>
+      )}
+
       {(m.warnings || []).map((w) => (
         <Note key={w.code} tone="warn">
           {w.message}
@@ -353,38 +624,122 @@ function AdjustedLayer({
         <Note tone="info">
           Without that period the cumulative relationship is{' '}
           <strong>{refit.available ? `${cur}${refit.cumulativeCoefficient.toFixed(2)}` : 'not estimable'}</strong>
-          {refit.available && <> (was {cumLabel}).</>}
+          {refit.available && <> (was {fullLabel})</>}
+          {refit.available && refit.laggedOnly && <>, and the delayed-only part is <strong>{cur}{refit.laggedOnly.coefficient.toFixed(2)}</strong></>}.
         </Note>
       )}
 
-      {/* Forward scenario (§18) */}
-      <div className="wx-card" style={{ padding: 12, marginTop: 12, background: 'var(--surface-2)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>What if TikTok activity increases?</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      {/* ══ STAGE 5 — counterfactual contribution (§G) ═══════════ */}
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
           <div>
-            <FieldLabel>By percent</FieldLabel>
-            <select className="wx-input" style={{ width: 110 }} value={String(scenarioPct)}
-              onChange={(e) => { setScenarioPct(Number(e.target.value)); setCustomChange(''); }}>
-              {[5, 10, 20, 50].map((p) => <option key={p} value={p}>+{p}%</option>)}
-            </select>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', color: 'var(--accent)' }}>STAGE 5</div>
+            <h3 style={{ fontSize: '.98rem', fontWeight: 800, margin: '2px 0 0' }}>Counterfactual contribution</h3>
           </div>
-          <div>
-            <FieldLabel>Or by amount</FieldLabel>
-            <input className="wx-input" style={{ width: 150 }} placeholder={`e.g. 2000`} value={customChange}
-              onChange={(e) => setCustomChange(e.target.value)} />
-          </div>
-          {marg && (
-            <div style={{ fontSize: 13 }}>
-              <span style={{ color: 'var(--text-muted)' }}>{marg.changeLabel} on an average {unit} of {fmtValue(marg.basePeriodActivity, 'num')} →{' '}</span>
-              <strong style={{ color: marg.estimated >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtValue(marg.estimated, 'money')}</strong>
-              {marg.lower != null && <span style={{ color: 'var(--text-muted)' }}> ({fmtValue(marg.lower, 'money')} to {fmtValue(marg.upper, 'money')})</span>}
+          <ModelledBadge />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 12px', maxWidth: 720 }}>
+          Amazon revenue predicted under the TikTok activity that happened, minus the same
+          prediction with TikTok held at a reference level. The reference is never zero — that
+          would be far outside anything the model has seen.
+        </p>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <Picker
+            label="Reference level"
+            value={refMethod || result.recommendedReference}
+            onChange={(v) => setRefMethod(v)}
+            options={REFERENCE_METHOD_SPECS.map((s) => ({
+              value: s.name,
+              label: s.name === result.recommendedReference ? `${s.short} — recommended` : s.short,
+            }))}
+            width={230}
+            hint={contrib?.referenceDescribe}
+          />
+          {(refMethod || result.recommendedReference) === 'custom' && (
+            <div>
+              <FieldLabel>Custom baseline</FieldLabel>
+              <input className="wx-input" style={{ width: 150 }} value={customRef}
+                onChange={(e) => setCustomRef(e.target.value)} placeholder="e.g. 1200" />
             </div>
           )}
+        </div>
+
+        {contrib?.referenceNote && <Note tone="info">{contrib.referenceNote}</Note>}
+        {sens?.message && (
+          <Note tone={sens.signFlip ? 'danger' : 'warn'}>
+            {sens.message}
+            <table style={{ marginTop: 6, fontSize: 11.5, borderCollapse: 'collapse' }}>
+              <tbody>
+                {sens.entries.map((e) => (
+                  <tr key={e.method}>
+                    <td style={{ padding: '2px 10px 2px 0', color: 'var(--text-muted)' }}>{e.label}</td>
+                    <td style={{ padding: '2px 0', fontVariantNumeric: 'tabular-nums' }}>{fmtValue(e.amount, 'money')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Note>
+        )}
+
+        {contrib && (
+          <>
+            <ContributionChart contribution={contrib} unit={unit} yLabel={metricLabel(yKey)} />
+            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 10, fontSize: 12 }}>
+              <span style={{ color: 'var(--text-muted)' }}>
+                Periods above reference: <strong style={{ color: 'var(--success, #22c55e)' }}>{fmtValue(contrib.positiveAmount, 'money')}</strong>
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>
+                Periods below reference: <strong style={{ color: 'var(--danger, #ef4444)' }}>{fmtValue(contrib.negativeAmount, 'money')}</strong>
+              </span>
+              <span style={{ color: 'var(--text-muted)' }}>
+                Net over {contrib.periods} {unit}s: <strong style={{ color: 'var(--text-primary)' }}>{fmtValue(contrib.amount, 'money')}</strong>
+              </span>
+            </div>
+            {contrib.spansZero && (
+              <Note tone="warn">
+                The interval on the contribution includes zero, so the total cannot be
+                distinguished from no contribution at all over this period.
+              </Note>
+            )}
+          </>
+        )}
+
+        {/* §G3 — the what-if belongs UNDER Stage 5, clearly forward-looking. */}
+        <div className="wx-card" style={{ padding: 12, marginTop: 14, background: 'var(--surface-2)' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>Forward scenario — what if TikTok activity increases?</span>
+            <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Forward-looking, not historical contribution</span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <Picker
+              label="By percent"
+              value={String(scenarioPct)}
+              onChange={(v) => { setScenarioPct(Number(v)); setCustomChange(''); }}
+              options={[5, 10, 20, 50].map((p) => ({ value: String(p), label: `+${p}%` }))}
+              width={110}
+            />
+            <div>
+              <FieldLabel>Or by amount</FieldLabel>
+              <input className="wx-input" style={{ width: 150 }} placeholder="e.g. 2000" value={customChange}
+                onChange={(e) => setCustomChange(e.target.value)} />
+            </div>
+            {marg && (
+              <div style={{ fontSize: 13 }}>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {marg.changeLabel} on an average {unit} of {fmtValue(marg.basePeriodActivity, 'num')} →{' '}
+                </span>
+                <strong style={{ color: marg.estimated >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmtValue(marg.estimated, 'money')}</strong>
+                {marg.lower != null && <span style={{ color: 'var(--text-muted)' }}> ({fmtValue(marg.lower, 'money')} to {fmtValue(marg.upper, 'money')})</span>}
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Basis: {marg.basisLabel}</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Advanced diagnostics (§21) */}
-      <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginTop: 12 }} onClick={() => setShowAdvanced((s) => !s)}>
+      <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginTop: 14 }} onClick={() => setShowAdvanced((s) => !s)}>
         <i className={`bi bi-chevron-${showAdvanced ? 'up' : 'down'}`} /> Model details
       </button>
       {showAdvanced && (
@@ -392,11 +747,16 @@ function AdjustedLayer({
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               <Row k="Observations (after lagging)" v={`${m.sampleSize}${m.droppedToLags ? ` — ${m.droppedToLags} dropped to lags` : ''}`} />
+              <Row k="Parameters estimated" v={m.parameterCount ?? '—'} />
               <Row k="Adjusted R²" v={m.adjustedR2 == null ? '—' : m.adjustedR2.toFixed(3)} />
               <Row k="Selected max lag" v={`${m.maxLag} ${unit}${m.maxLag === 1 ? '' : 's'}`} />
               <Row k="Standard errors" v={m.covarianceKind} />
-              <Row k="Cumulative coefficient" v={m.cumulativeCoefficient.toFixed(4)} />
-              <Row k="95% confidence interval" v={m.confidenceInterval.lower == null ? '—' : `${m.confidenceInterval.lower.toFixed(4)} to ${m.confidenceInterval.upper.toFixed(4)}`} />
+              <Row k="Full cumulative coefficient" v={m.cumulativeCoefficient.toFixed(4)} />
+              <Row k="Full cumulative 95% interval" v={m.confidenceInterval.lower == null ? '—' : `${m.confidenceInterval.lower.toFixed(4)} to ${m.confidenceInterval.upper.toFixed(4)}`} />
+              <Row k="Lagged-only coefficient" v={hasLagged ? lagged.coefficient.toFixed(4) : 'n/a (no lag window)'} />
+              <Row k="Lagged-only 95% interval" v={hasLagged && lagged.lower != null ? `${lagged.lower.toFixed(4)} to ${lagged.upper.toFixed(4)}` : '—'} />
+              <Row k="Same-period coefficient" v={m.samePeriodCoefficient == null ? '—' : m.samePeriodCoefficient.toFixed(4)} />
+              <Row k="Same-period share" v={sharePct == null ? 'withheld (opposing signs)' : `${sharePct}%`} />
               <Row k="Max VIF (lag terms)" v={m.maxVif == null ? '—' : m.maxVif.toFixed(1)} />
             </tbody>
           </table>
@@ -406,13 +766,19 @@ function AdjustedLayer({
               {(m.lagCoefficients || []).map((c) => (
                 <Row key={c.lag} k={c.label} v={`${c.coefficient >= 0 ? '+' : ''}${c.coefficient.toFixed(4)}${c.standardError != null ? `  (± ${(1.96 * c.standardError).toFixed(4)})` : ''}`} />
               ))}
-              <Row k="Cumulative" v={`${m.cumulativeCoefficient >= 0 ? '+' : ''}${m.cumulativeCoefficient.toFixed(4)}`} />
+              <Row k="Cumulative (all lags)" v={`${m.cumulativeCoefficient >= 0 ? '+' : ''}${m.cumulativeCoefficient.toFixed(4)}`} />
             </tbody>
           </table>
           <div style={{ fontWeight: 700, margin: '10px 0 4px' }}>Why this confidence rating</div>
           <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)' }}>
             {(m.confidenceReasons || []).map((r, i) => <li key={i}>{r}</li>)}
           </ul>
+          {!controlsFound.promo && !controlsFound.stockout && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
+              This sheet carries no promotion or stock-out column. The model reads them
+              automatically as soon as one appears.
+            </div>
+          )}
         </div>
       )}
     </>
@@ -420,76 +786,9 @@ function AdjustedLayer({
 }
 
 // ────────────────────────────────────────────────────────────────
-// Layer C
+// Halo Finder V2 (§26, §I)
 // ────────────────────────────────────────────────────────────────
-function PlanningLayer({ result, planning, setPlanning, cur }) {
-  const p = result.planning;
-  const meta = result.meta;
-  const fromModel = modelEstimateAsAssumption(result.adjustedModel._model || result.adjustedModel, {
-    xIsMonetary: meta.xIsMonetary, yIsMonetary: meta.yIsMonetary,
-  });
-  const set = (k, v) => setPlanning((s) => ({ ...s, [k]: v }));
-  const setA = (k, v) => setPlanning((s) => ({ ...s, assumptions: { ...s.assumptions, [k]: Number(v) || 0 } }));
-
-  return (
-    <>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
-        <div><FieldLabel>TikTok Shop revenue</FieldLabel>
-          <input className="wx-input" style={{ width: 160 }} value={planning.ttsRevenue} onChange={(e) => set('ttsRevenue', e.target.value)} placeholder="100000" /></div>
-        <div><FieldLabel>TikTok marketing spend</FieldLabel>
-          <input className="wx-input" style={{ width: 160 }} value={planning.marketingSpend} onChange={(e) => set('marketingSpend', e.target.value)} placeholder="30000" /></div>
-        <div><FieldLabel>Conservative %</FieldLabel>
-          <input className="wx-input" style={{ width: 110 }} value={planning.assumptions.conservative} onChange={(e) => setA('conservative', e.target.value)} /></div>
-        <div><FieldLabel>Base %</FieldLabel>
-          <input className="wx-input" style={{ width: 110 }} value={planning.assumptions.base} onChange={(e) => setA('base', e.target.value)} /></div>
-        <div><FieldLabel>Upside %</FieldLabel>
-          <input className="wx-input" style={{ width: 110 }} value={planning.assumptions.upside} onChange={(e) => setA('upside', e.target.value)} /></div>
-        {fromModel.usable && (
-          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm"
-            title={fromModel.note}
-            onClick={() => setA('base', fromModel.haloPercent)}>
-            Use adjusted model estimate as Base ({fromModel.haloPercent}%)
-          </button>
-        )}
-      </div>
-
-      {!p.base ? (
-        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: 0 }}>
-          Enter a TikTok Shop revenue figure to model conservative, base and upside halo assumptions.
-        </p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead>
-            <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-              <th style={{ padding: '6px 8px' }}>Scenario</th>
-              <th style={{ padding: '6px 8px' }}>Halo</th>
-              <th style={{ padding: '6px 8px' }}>Off-platform</th>
-              <th style={{ padding: '6px 8px' }}>Total influenced</th>
-              <th style={{ padding: '6px 8px' }}>Blended multiple</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[['Conservative', p.conservative], ['Base', p.base], ['Upside', p.upside]].map(([name, s]) => (
-              <tr key={name} style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '6px 8px', fontWeight: 600 }}>{name}</td>
-                <td style={{ padding: '6px 8px' }}>{s.haloPercent}% ({cur}{s.haloPerCurrencyUnit.toFixed(2)} per {cur}1)</td>
-                <td style={{ padding: '6px 8px' }}>{fmtValue(s.offPlatformRevenue, 'money')}</td>
-                <td style={{ padding: '6px 8px', fontWeight: 700 }}>{fmtValue(s.totalInfluencedRevenue, 'money')}</td>
-                <td style={{ padding: '6px 8px' }}>{s.blendedMultiple == null ? '—' : `${s.blendedMultiple.toFixed(2)}x`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <Note tone="planning">Planning assumptions — not measured results. The model estimate is only applied here when you explicitly choose it.</Note>
-    </>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────
-// Halo Finder V2 (§26)
-// ────────────────────────────────────────────────────────────────
-function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, unit }) {
+function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, unit, suggestion, onSwitchGrain }) {
   const rows = useMemo(() => {
     if (!srcRows?.length || !src) return [];
     const keys = tiktokFields.map((f) => f.key);
@@ -498,7 +797,38 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
   }, [srcRows, src, gran, yKey, range, tiktokFields, maxLag]);
 
   if (!rows.length) return null;
+  const usable = rows.filter((r) => r.correlation != null);
   const sorted = [...rows].sort((a, b) => Math.abs(b.correlation ?? 0) - Math.abs(a.correlation ?? 0));
+
+  // §I — a table of zeros is worse than no table. When nothing is computable,
+  // say why and offer the grain that would work.
+  if (!usable.length) {
+    return (
+      <div className="wx-card" style={{ padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>Halo Finder</div>
+        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+          No TikTok metric has {MIN_CORRELATION_OBS} or more overlapping {unit}s against{' '}
+          {metricLabel(yKey)} over this range, so there is nothing to rank yet — a row of zeros
+          would imply we had measured no relationship, rather than that we could not look.
+        </div>
+        {suggestion && (
+          <button type="button" className="wx-btn wx-btn-primary wx-btn-sm" style={{ marginTop: 10 }}
+            onClick={() => onSwitchGrain(suggestion.grain)}>{suggestion.cta}</button>
+        )}
+      </div>
+    );
+  }
+
+  // Which metric has the strongest DELAYED relationship — the halo question,
+  // as distinct from strongest overall (which same-period usually wins).
+  const laggedBest = [...usable]
+    .map((r) => {
+      const best = (r.lags || []).filter((l) => l.lag >= 1 && l.correlation != null)
+        .reduce((a, b) => (Math.abs(b.correlation) > Math.abs(a?.correlation ?? 0) ? b : a), null);
+      return best ? { metric: r.metric, lag: best.lag, correlation: best.correlation } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation))[0];
 
   return (
     <div className="wx-card" style={{ padding: 16 }}>
@@ -507,89 +837,108 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
         Strongest observed lag relationship for every TikTok metric against {metricLabel(yKey)}. Negative rows are kept —
         they are findings, not omissions.
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-        <thead>
-          <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-            <th style={{ padding: '6px 8px' }}>TikTok metric</th>
-            <th style={{ padding: '6px 8px' }}>Best observed lag</th>
-            <th style={{ padding: '6px 8px' }}>Correlation</th>
-            <th style={{ padding: '6px 8px' }}>Observations</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((r) => (
-            <tr key={r.metric} style={{ borderTop: '1px solid var(--border-subtle)' }}>
-              <td style={{ padding: '6px 8px' }}>{metricLabel(r.metric)}</td>
-              <td style={{ padding: '6px 8px' }}>{r.bestLag == null ? '—' : r.bestLag === 0 ? `Same ${unit}` : `+${r.bestLag} ${unit}${r.bestLag === 1 ? '' : 's'}`}</td>
-              <td style={{ padding: '6px 8px', fontWeight: 700, color: signedCorrTextColor(r.correlation) }}>{fmtSignedPct(r.correlation) ?? '—'}</td>
-              <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{r.numberOfObservations}</td>
+      {laggedBest && (
+        <Note tone="info">
+          Strongest <strong>delayed</strong> relationship: {metricLabel(laggedBest.metric)} at{' '}
+          +{laggedBest.lag} {unit}{laggedBest.lag === 1 ? '' : 's'} ({fmtSignedPct(laggedBest.correlation)}).
+          That is a different question from the strongest overall, which same-{unit} movement usually wins.
+        </Note>
+      )}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 520 }}>
+          <thead>
+            <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
+              <th style={{ padding: '6px 8px' }}>TikTok metric</th>
+              <th style={{ padding: '6px 8px' }}>Best observed lag</th>
+              <th style={{ padding: '6px 8px' }}>Correlation</th>
+              <th style={{ padding: '6px 8px' }}>Observations</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((r) => (
+              <tr key={r.metric} style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <td style={{ padding: '6px 8px' }}>{metricLabel(r.metric)}</td>
+                <td style={{ padding: '6px 8px' }}>{r.bestLag == null ? '—' : r.bestLag === 0 ? `Same ${unit}` : `+${r.bestLag} ${unit}${r.bestLag === 1 ? '' : 's'}`}</td>
+                <td style={{ padding: '6px 8px', fontWeight: 700, color: signedCorrTextColor(r.correlation) }}>{fmtSignedPct(r.correlation) ?? '—'}</td>
+                <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{r.numberOfObservations}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────────
-// Small shared bits
+// Provenance (§B)
 // ────────────────────────────────────────────────────────────────
-function Layer({ letter, title, subtitle, tone, children }) {
-  const accent = tone === 'planning' ? 'var(--warning, #f59e0b)' : 'var(--accent)';
+// Everything the brief requires to travel WITH a modelled figure: n, the
+// interval, controls included and missing, grain, date range, the same-period
+// share, and the badge.
+//
+// It is rendered on the page rather than only attached to a file export,
+// because the realistic way one of these numbers leaves the tool is a
+// screenshot — and a caveat that only exists in a download does not survive
+// that. The copy button produces the same block as text for pasting under a
+// figure in a deck.
+function Provenance({ result, gran, range, unit, xKey, yKey, cur }) {
+  const m = result.adjustedModel;
+  const [copied, setCopied] = useState(false);
+  if (!m.available) return null;
+
+  const lines = [
+    `Halo V2 — modelled association, NOT incremental.`,
+    `Metrics: ${metricLabel(xKey)} → ${metricLabel(yKey)}`,
+    `Grain: ${GRAIN_LABEL[gran]}${rangeText(range) ? ` · ${rangeText(range)}` : ''}`,
+    `Observations: ${m.sampleSize} usable ${unit}s (${m.parameterCount} parameters)`,
+    m.laggedOnlyAvailable && m.laggedOnly
+      ? `Delayed (lagged-only): ${cur}${m.laggedOnly.coefficient.toFixed(2)} per ${cur}1`
+        + (m.laggedOnly.lower != null ? ` · 95% ${cur}${m.laggedOnly.lower.toFixed(2)} to ${cur}${m.laggedOnly.upper.toFixed(2)}` : '')
+      : `No lag window selected — same-period association only.`,
+    `Full cumulative: ${cur}${m.cumulativeCoefficient.toFixed(2)} per ${cur}1`
+      + (m.confidenceInterval.lower != null ? ` · 95% ${cur}${m.confidenceInterval.lower.toFixed(2)} to ${cur}${m.confidenceInterval.upper.toFixed(2)}` : ''),
+    m.samePeriodShare != null
+      ? `Same-${unit} share of cumulative: ${Math.round(m.samePeriodShare * 100)}%`
+      : `Same-${unit} share: withheld (lag coefficients oppose each other)`,
+    `Standard errors: ${m.covarianceKind}`,
+    `Controls included: ${m.controls.length ? m.controls.join(', ') : 'none'}`,
+    `Controls missing: ${m.controlsUnavailable.length ? m.controlsUnavailable.join('; ') : 'none'}`,
+    `Confidence: ${m.confidenceLabel}${m.confidenceCeiling ? ` (capped from ${m.confidenceEarned})` : ''}`,
+    result.historicalContribution
+      ? `Contribution vs ${result.historicalContribution.referenceLabel}: ${fmtValue(result.historicalContribution.amount, 'money')}`
+      : null,
+    `Incremental lift requires geo/holdout validation (Stage 6), which this tool does not perform.`,
+  ].filter(Boolean);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked — the block is on screen to read anyway */ }
+  };
+
   return (
-    <div className="wx-card" style={{ padding: 18, borderLeft: `3px solid ${accent}` }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 2 }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: accent, letterSpacing: '.08em' }}>LAYER {letter}</span>
-        <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>{title}</h2>
+    <div className="wx-card" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>Methodology &amp; provenance</span>
+          <ModelledBadge />
+        </div>
+        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={copy}>
+          <i className={`bi ${copied ? 'bi-check2' : 'bi-clipboard'}`} style={{ marginRight: 6 }} />
+          {copied ? 'Copied' : 'Copy methodology'}
+        </button>
       </div>
-      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 14px' }}>{subtitle}</p>
-      {children}
+      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8, maxWidth: 720 }}>
+        Everything a figure from this page needs carried with it. If a number here reaches a deck,
+        this block should go under it.
+      </div>
+      <pre style={{
+        margin: 0, fontSize: 11.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+        color: 'var(--text-secondary)', fontFamily: 'inherit',
+      }}>{lines.join('\n')}</pre>
     </div>
   );
 }
-const FieldLabel = ({ children }) => (
-  <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700, marginBottom: 4 }}>{children}</div>
-);
-function Picker({ label, value, onChange, options }) {
-  return (
-    <div>
-      <FieldLabel>{label}</FieldLabel>
-      <select className="wx-input" style={{ minWidth: 150 }} value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  );
-}
-const Check = ({ label, checked, onChange }) => (
-  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-    <input type="checkbox" className="form-check-input mt-0" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    {label}
-  </label>
-);
-function Stat({ label, value, sub, tone }) {
-  const color = tone === 'pos' ? 'var(--success, #22c55e)' : tone === 'neg' ? 'var(--danger, #ef4444)' : tone === 'warn' ? 'var(--warning, #f59e0b)' : 'var(--text-primary)';
-  return (
-    <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
-      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: '1.25rem', fontWeight: 800, color, lineHeight: 1.25 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
-}
-function Note({ tone = 'info', children }) {
-  const c = tone === 'warn' ? { bg: 'rgba(245,158,11,.10)', bd: 'rgba(245,158,11,.35)', ic: 'bi-exclamation-triangle' }
-    : tone === 'planning' ? { bg: 'rgba(245,158,11,.07)', bd: 'rgba(245,158,11,.25)', ic: 'bi-sliders' }
-    : { bg: 'rgba(99,102,241,.08)', bd: 'rgba(99,102,241,.28)', ic: 'bi-info-circle' };
-  return (
-    <div style={{ background: c.bg, border: `1px solid ${c.bd}`, borderRadius: 8, padding: '8px 12px', fontSize: 12, marginTop: 10, display: 'flex', gap: 8 }}>
-      <i className={`bi ${c.ic}`} style={{ marginTop: 1 }} />
-      <div>{children}</div>
-    </div>
-  );
-}
-const Row = ({ k, v }) => (
-  <tr style={{ borderTop: '1px solid var(--border-subtle)' }}>
-    <td style={{ padding: '5px 8px', color: 'var(--text-muted)' }}>{k}</td>
-    <td style={{ padding: '5px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{v}</td>
-  </tr>
-);

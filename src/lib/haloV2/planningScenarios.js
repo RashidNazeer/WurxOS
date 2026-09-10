@@ -241,26 +241,10 @@ export function planningModel({
   };
 }
 
-/**
- * Superseded by modelDerivedAssumptions, which sets all three scenarios from
- * the interval instead of pushing a point estimate into Base alone.
- *
- * Kept so nothing breaks mid-series; the explorer no longer calls it.
- * @deprecated
- */
-export function modelEstimateAsAssumption(model, { xIsMonetary, yIsMonetary } = {}) {
-  if (!model?.available || model.cumulativeCoefficient == null) {
-    return { usable: false, reason: 'No adjusted estimate is available for this period.' };
-  }
-  if (!xIsMonetary || !yIsMonetary) {
-    return { usable: false, reason: 'The model estimate can only become a halo % when both metrics are monetary (e.g. TikTok GMV vs Amazon revenue).' };
-  }
-  const pct = model.cumulativeCoefficient * 100;
-  return {
-    usable: true,
-    haloPercent: Math.round(pct * 10) / 10,
-    lowerPercent: model.confidenceInterval?.lower == null ? null : Math.round(model.confidenceInterval.lower * 1000) / 10,
-    upperPercent: model.confidenceInterval?.upper == null ? null : Math.round(model.confidenceInterval.upper * 1000) / 10,
-    note: 'Taken from the adjusted model for this period. It remains a planning assumption once applied.',
-  };
-}
+// modelEstimateAsAssumption used to live here: it turned the FULL cumulative
+// coefficient into a single Base percentage for the one-click button. It is
+// deliberately gone rather than deprecated — leaving it available would leave a
+// working path to the exact behaviour §H removes, which is pushing a
+// same-period-inclusive figure into a plan as though it were halo.
+// modelDerivedAssumptions replaces it and sets all three scenarios from the
+// interval on the lagged-only basis.
