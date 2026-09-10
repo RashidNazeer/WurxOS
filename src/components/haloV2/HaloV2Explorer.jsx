@@ -43,12 +43,14 @@ import ContributionChart from './ContributionChart.jsx';
 import PlanningLayer from './PlanningLayer.jsx';
 import KeyTakeaway from './KeyTakeaway.jsx';
 import { GlossaryPanel, Term } from './Glossary.jsx';
+import ClientSummarySheet, { summaryFilename } from './ClientSummarySheet.jsx';
+import { exportReportToPdf } from '../../utils/exportReportPdf';
 import {
   TT_STYLE, GRID, SERIES_TIKTOK, SERIES_AMAZON,
   FieldLabel, Picker, Check, Stat, Note, Row, Layer, ModelledBadge, ProgressMeter, indexToHundred,
 } from './shared.jsx';
 
-export default function HaloV2Explorer({ datasets, loadRows }) {
+export default function HaloV2Explorer({ datasets, loadRows, brandName = null }) {
   const [rowsById, setRowsById] = useState({});
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
@@ -98,6 +100,8 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
   // recommendation is still computed and still offered as a button — it just
   // stops being applied automatically.
   const grainPinned = useRef(false);
+  // The off-screen one-page document the PDF export rasterises.
+  const summaryRef = useRef(null);
 
   const list = datasets || [];
   const dsKey = list.map((d) => d.id).join(',');
@@ -425,7 +429,17 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
       />
       <Provenance
         result={result} gran={gran} range={range} unit={unit}
-        xKey={xKey} yKey={yKey} cur={cur} periods={periods}
+        xKey={xKey} yKey={yKey} cur={cur} periods={periods} brandName={brandName}
+        takeaway={takeaway} summaryRef={summaryRef}
+      />
+
+      {/* Off-screen document for the one-page PDF. Always mounted so the
+          export has something laid out to rasterise the moment it is asked;
+          it is aria-hidden and outside the flow, so it costs a client nothing. */}
+      <ClientSummarySheet
+        sheetRef={summaryRef}
+        result={result} takeaway={takeaway} gran={gran} range={range}
+        xKey={xKey} yKey={yKey} cur={cur} brandName={brandName}
       />
     </div>
   );
@@ -1053,27 +1067,53 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
 // screenshot — and a caveat that only exists in a download does not survive
 // that. The copy button produces the same block as text for pasting under a
 // figure in a deck.
-function Provenance({ result, gran, range, unit, xKey, yKey, cur, periods }) {
+function Provenance({ result, gran, range, unit, xKey, yKey, cur, periods, brandName, takeaway, summaryRef }) {
   const m = result.adjustedModel;
   const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   // CSV is offered even when the model refused: the series is still real data
   // the client may want, and the summary block then records WHY there is no
   // estimate — which is more useful than no file at all.
   const exportCsv = () => {
-    const text = buildHaloV2Csv({ result, periods, gran, range, xKey, yKey, currency: cur });
-    downloadHaloV2Csv(text, haloV2CsvFilename({ gran, range }));
+    const text = buildHaloV2Csv({ result, periods, gran, range, xKey, yKey, currency: cur, brandName });
+    downloadHaloV2Csv(text, haloV2CsvFilename({ brandName, gran, range }));
   };
+
+  // Rasterises the off-screen one-page document. Awaited with a busy state
+  // because font loading plus the capture takes a beat on a long window, and a
+  // button that looks inert gets clicked three times.
+  const exportPdf = async () => {
+    if (!summaryRef?.current || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await exportReportToPdf(summaryRef.current, { title: summaryFilename({ brandName, gran, range }) });
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
+  const ExportButtons = () => (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={exportPdf} disabled={pdfBusy}>
+        {pdfBusy
+          ? <><span className="wx-spinner" style={{ marginRight: 6 }} />Building…</>
+          : <><i className="bi bi-file-earmark-pdf" style={{ marginRight: 6 }} />One-page summary (PDF)</>}
+      </button>
+      <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={exportCsv}>
+        <i className="bi bi-download" style={{ marginRight: 6 }} />Download CSV
+      </button>
+    </div>
+  );
 
   if (!m.available) {
     return (
       <div className="wx-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-          No modelled estimate for this window — the series is still available to download.
+          No modelled estimate for this window — the series and the summary are still
+          available, and both record why there is no estimate.
         </div>
-        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={exportCsv}>
-          <i className="bi bi-download" style={{ marginRight: 6 }} />Download CSV
-        </button>
+        <ExportButtons />
       </div>
     );
   }
@@ -1118,9 +1158,7 @@ function Provenance({ result, gran, range, unit, xKey, yKey, cur, periods }) {
           <ModelledBadge />
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={exportCsv}>
-            <i className="bi bi-download" style={{ marginRight: 6 }} />Download CSV
-          </button>
+          <ExportButtons />
           <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={copy}>
             <i className={`bi ${copied ? 'bi-check2' : 'bi-clipboard'}`} style={{ marginRight: 6 }} />
             {copied ? 'Copied' : 'Copy methodology'}

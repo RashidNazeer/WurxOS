@@ -7,7 +7,11 @@
       "destination": "https://xoaaidgvblondjpvxjqp.supabase.co/auth/v1/:path*"
     },
     {
-      "source": "/((?!assets/|sb-auth/|sw\\.js|logo\\.svg|favicon\\.ico|manifest\\.webmanifest).*)",
+      "source": "/sb-auth-dev/:path*",
+      "destination": "https://vyvkwbvreeycmmnikqbz.supabase.co/auth/v1/:path*"
+    },
+    {
+      "source": "/((?!assets/|sb-auth/|sb-auth-dev/|sw\\.js|logo\\.svg|favicon\\.ico|manifest\\.webmanifest).*)",
       "destination": "/index.html"
     }
   ],
