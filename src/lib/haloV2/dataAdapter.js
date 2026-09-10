@@ -11,11 +11,16 @@
 
 import { buildBucketsFromSource } from '../haloMath';
 import { KSV_KEY, KSR_KEY, PRODUCT_REVENUE_FIELD, availSetForRows, fieldsAvail } from '../haloFields';
+import { ALL_CONTROL_COLUMNS } from './controls.js';
 
 // Control columns the model will look for on each row, if a sheet ever carries
 // them. Absent → reported as unavailable rather than assumed zero (§11).
-export const CONTROL_KEYS = ['promo', 'discount_pct', 'stockout', 'stockout_days',
-  'amazon_ads_spend', 'meta_spend', 'google_spend', 'amazon_price', 'tiktok_price', 'dtc_price'];
+//
+// The list itself now lives in the control register (controls.js) so the
+// adapter and the regression cannot drift apart: a column this file carried
+// through but buildControls did not know about would be read off the sheet and
+// then silently never used.
+export const CONTROL_KEYS = ALL_CONTROL_COLUMNS;
 
 // Same source-selection rule as the V1 explorer: exact sheet for the view
 // granularity, else the finest FINER sheet rolled up.

@@ -13,7 +13,38 @@
 
 export const CONFIDENCE_LEVELS = ['Insufficient Data', 'Low Confidence', 'Directional', 'Moderate Confidence', 'Strong Evidence'];
 
-export function modelConfidence({ model, lagRows = [], controlsIncluded = [], controlsUnavailable = [] }) {
+// Ordered weakest → strongest, so a ceiling is just an index comparison.
+const RANK = Object.fromEntries(CONFIDENCE_LEVELS.map((l, i) => [l, i]));
+
+/** Rank of a confidence label, or -1 for anything unrecognised. */
+export const confidenceRank = (label) => (label in RANK ? RANK[label] : -1);
+
+/**
+ * Is `label` at least as strong as `floor`?
+ *
+ * Exported so the planning layer can express its floor as a level name rather
+ * than duplicating this ordering — a second copy of the ladder is how the
+ * planner and the model end up disagreeing about what "Moderate" means.
+ * An unrecognised label is treated as NOT meeting the floor: failing closed is
+ * the only safe direction when the thing being gated is investment planning.
+ */
+export function atLeastConfidence(label, floor) {
+  const l = confidenceRank(label);
+  const f = confidenceRank(floor);
+  if (l < 0 || f < 0) return false;
+  return l >= f;
+}
+
+/**
+ * Cap a label at a ceiling. Returns the ceiling when the score earned more.
+ * Never RAISES a label — a ceiling can only ever hold confidence down.
+ */
+function applyCeiling(label, ceiling) {
+  if (!ceiling) return label;
+  return RANK[label] > RANK[ceiling] ? ceiling : label;
+}
+
+export function modelConfidence({ model, lagRows = [], controlsIncluded = [], controlsUnavailable = [], missingMajor = null }) {
   const reasons = [];
 
   if (!model?.available) {
@@ -70,10 +101,53 @@ export function modelConfidence({ model, lagRows = [], controlsIncluded = [], co
   if (model.warnings?.some((w) => w.code === 'multicollinearity')) reasons.push('Individual lag coefficients are collinear — read the cumulative figure, not the parts.');
   if (model.adjustedR2 != null && model.adjustedR2 < 0.1) { score -= 0.25; reasons.push('The model explains little of the variation in Amazon revenue.'); }
 
-  const label = score >= 4 ? 'Strong Evidence'
+  const earned = score >= 4 ? 'Strong Evidence'
     : score >= 3 ? 'Moderate Confidence'
     : score >= 2 ? 'Directional'
     : 'Low Confidence';
 
-  return { label, score: Math.round(score * 100) / 100, reasons };
+  // ── Ceilings (brief §E4) ─────────────────────────────────────────
+  // Scoring alone could reach "Strong Evidence" on a long history with a tight
+  // interval and NOTHING controlled for but a time trend. That is precisely the
+  // combination that produces a confident wrong answer: a promotion calendar
+  // both series respond to will deliver a long, tight, entirely spurious
+  // relationship. So two hard ceilings sit on top of the score, and a ceiling
+  // can only ever hold the label DOWN.
+  let ceiling = null;
+  const ceilingReasons = [];
+
+  // 1. A missing major confounder caps at Moderate. There is no amount of
+  //    sample size that substitutes for knowing whether a promotion ran.
+  const missing = Array.isArray(missingMajor) ? missingMajor : (model?.controlsMissingMajor || []);
+  if (missing.length) {
+    ceiling = 'Moderate Confidence';
+    ceilingReasons.push(
+      `Capped at Moderate Confidence: ${missing.map((m) => m.label).join(', ')} ${missing.length === 1 ? 'is' : 'are'} not in the model, and ${missing.length === 1 ? 'it is' : 'they are'} a plausible rival explanation for the movement.`,
+    );
+  }
+
+  // 2. If the DELAYED relationship cannot be signed, confidence in a HALO is
+  //    capped regardless of how well the combined figure is estimated — the
+  //    combined figure includes same-period co-movement, which is not a halo.
+  //    Only applies where lags were actually estimated.
+  if (model?.laggedOnlyAvailable && model?.laggedOnly?.spansZero) {
+    ceiling = applyCeiling(ceiling || 'Strong Evidence', 'Directional');
+    ceilingReasons.push(
+      'Capped at Directional: the lagged-only interval includes zero, so a delayed off-platform effect is not established over this period.',
+    );
+  }
+
+  const label = applyCeiling(earned, ceiling);
+  if (ceiling && label !== earned) reasons.push(...ceilingReasons);
+
+  return {
+    label,
+    score: Math.round(score * 100) / 100,
+    reasons,
+    // Exposed so the UI can explain a cap rather than leave the reader
+    // wondering why a long, tight model reads only "Moderate".
+    earnedLabel: earned,
+    ceiling,
+    cappedBy: label !== earned ? ceilingReasons : [],
+  };
 }
