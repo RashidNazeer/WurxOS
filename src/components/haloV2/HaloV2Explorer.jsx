@@ -32,11 +32,17 @@ import { assessGrains, recommendGrain, grainSwitchSuggestion, GRAIN_LABEL, GRAIN
 import { PERIODS_PER_YEAR } from '../../lib/haloV2/controls.js';
 import { stageStatuses } from '../../lib/haloV2/stages.js';
 import { REFERENCE_METHOD_SPECS } from '../../lib/haloV2/counterfactual.js';
-import { inverseNote, metricLabel } from '../../lib/haloV2/metricMetadata.js';
+import { inverseNote } from '../../lib/haloV2/metricMetadata.js';
+import {
+  plainMetricLabel, comparisonSentence, formatMetricValue, keyTakeaway, coverageNote,
+} from '../../lib/haloV2/plainLanguage.js';
+import { buildHaloV2Csv, downloadHaloV2Csv, haloV2CsvFilename } from '../../lib/haloV2/exportCsv.js';
 import StageStepper from './StageStepper.jsx';
 import StatusPanel from './StatusPanel.jsx';
 import ContributionChart from './ContributionChart.jsx';
 import PlanningLayer from './PlanningLayer.jsx';
+import KeyTakeaway from './KeyTakeaway.jsx';
+import { GlossaryPanel, Term } from './Glossary.jsx';
 import {
   TT_STYLE, GRID, SERIES_TIKTOK, SERIES_AMAZON,
   FieldLabel, Picker, Check, Stat, Note, Row, Layer, ModelledBadge, ProgressMeter, indexToHundred,
@@ -58,11 +64,35 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
   const [customRef, setCustomRef] = useState('');
   const [scenarioPct, setScenarioPct] = useState(10);
   const [customChange, setCustomChange] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);      // model diagnostics
+  const [scopeAdvanced, setScopeAdvanced] = useState(false);    // analyst knobs
+  const [showScatter, setShowScatter] = useState(false);
   const [excludeIndex, setExcludeIndex] = useState(null);
   const [normalize, setNormalize] = useState(false);
   const [chartsOnly, setChartsOnly] = useState(false);
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [planning, setPlanning] = useState({ ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null });
+
+  // Everything a "Reset to defaults" should put back. Kept as one list so the
+  // button cannot drift from the initial state as options are added.
+  const resetDefaults = () => {
+    setMaxLag(3);
+    setUseTrend(true);
+    setUseSeasonality(true);
+    setRefMethod(null);
+    setCustomRef('');
+    setScenarioPct(10);
+    setCustomChange('');
+    setNormalize(false);
+    setExcludeIndex(null);
+    setChartsOnly(false);
+    setPlanning({ ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null });
+    // srcRows / grainPinned / autoAppliedFor are declared below; this closure
+    // only ever runs from a click, long after the render that defines them.
+    if (srcRows?.length) setRange({ start: srcRows[0].date, end: srcRows[srcRows.length - 1].date });
+    grainPinned.current = false;
+    autoAppliedFor.current = null;
+  };
 
   // Once the user picks a grain deliberately, stop moving it under them. The
   // recommendation is still computed and still offered as a button — it just
@@ -190,6 +220,10 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
 
   const periodsWithData = useMemo(() => periods.filter((p) => p.x != null || p.y != null).length, [periods]);
   const stages = useMemo(() => stageStatuses(result, { periodsWithData }), [result, periodsWithData]);
+  const takeaway = useMemo(
+    () => keyTakeaway(result, { unit: GRAIN_UNIT[gran], xKey, yKey }),
+    [result, gran, xKey, yKey],
+  );
 
   const cur = getHaloCurrency();
   const unit = GRAIN_UNIT[gran];
@@ -206,45 +240,99 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* ── Stage ladder (§J) ───────────────────────────────────── */}
-      <StageStepper statuses={stages} />
+      {glossaryOpen && <GlossaryPanel onClose={() => setGlossaryOpen(false)} />}
 
-      {/* ── Controls bar ─────────────────────────────────────────── */}
-      <div className="wx-card" style={{ padding: 14, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <Picker
-          label="View"
-          value={gran}
-          onChange={pickGrain}
-          options={grans.map((g) => {
-            const a = assessments[g];
-            const tag = recommendation?.grain === g ? ' — recommended'
-              : a && !a.canModel ? ' — charts only'
-              : '';
-            return { value: g, label: `${GRAIN_LABEL[g]}${tag}` };
-          })}
-          hint={assessment ? `${assessment.usable} usable ${assessment.unit}s here` : null}
-        />
-        <Picker label="TikTok metric" value={xKey} onChange={setXKey} options={tiktokFields.map((f) => ({ value: f.key, label: f.label }))} />
-        <Picker label="Amazon metric" value={yKey} onChange={setYKey} options={amazonFields.map((f) => ({ value: f.key, label: f.label }))} />
-        <Picker
-          label="Max halo lag"
-          value={String(maxLag)}
-          onChange={(v) => setMaxLag(Number(v))}
-          options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
-          width={130}
-        />
-        <div>
-          <FieldLabel>Date range</FieldLabel>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input type="date" className="wx-input" style={{ width: 145 }} value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} />
-            <input type="date" className="wx-input" style={{ width: 145 }} value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} />
+      {/* ══ 1 — KEY TAKEAWAY (first viewport) ════════════════════ */}
+      <KeyTakeaway takeaway={takeaway} onOpenGlossary={() => setGlossaryOpen(true)} />
+
+      {/* ══ 2 — SCOPE ════════════════════════════════════════════
+          Only what a client needs to frame the question. Every analyst knob
+          moved into Advanced below: the review's complaint was that the first
+          screen was apparatus, and a lag selector is apparatus. */}
+      <div className="wx-card" style={{ padding: 14 }}>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <Picker
+            label="View"
+            value={gran}
+            onChange={pickGrain}
+            options={grans.map((g) => {
+              const a = assessments[g];
+              const tag = recommendation?.grain === g ? ' — recommended'
+                : a && !a.canModel ? ' — charts only'
+                : '';
+              return { value: g, label: `${GRAIN_LABEL[g]}${tag}` };
+            })}
+            hint={assessment ? `${assessment.usable} usable ${assessment.unit}s here` : null}
+          />
+          <div>
+            <FieldLabel>Date range</FieldLabel>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input type="date" className="wx-input" style={{ width: 145 }} value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} />
+              <input type="date" className="wx-input" style={{ width: 145 }} value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} />
+            </div>
+          </div>
+          <Picker
+            label="TikTok activity"
+            value={xKey}
+            onChange={setXKey}
+            options={tiktokFields.map((f) => ({ value: f.key, label: plainMetricLabel(f.key) }))}
+            width={210}
+          />
+          <Picker
+            label="Amazon outcome"
+            value={yKey}
+            onChange={setYKey}
+            options={amazonFields.map((f) => ({ value: f.key, label: plainMetricLabel(f.key) }))}
+            width={210}
+          />
+          <div style={{ paddingBottom: 4 }}>
+            <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={resetDefaults}>
+              <i className="bi bi-arrow-counterclockwise" style={{ marginRight: 6 }} />Reset to defaults
+            </button>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
-          <Check label="Trend" checked={useTrend} onChange={setUseTrend} title="Adjust for a linear time trend" />
-          <Check label="Seasonality" checked={useSeasonality} onChange={setUseSeasonality} title="Adjust for annual seasonality — needs about 52 periods" />
-          <Check label="Index to 100" checked={normalize} onChange={setNormalize} title="Index both series to 100 at the start so metrics on different scales can be compared for co-movement" />
+
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 10 }}>
+          <strong>What are we comparing?</strong> {comparisonSentence(xKey, yKey)}
+          {' '}— bucketed by {GRAIN_LABEL[gran].toLowerCase()}.
         </div>
+
+        {/* ── Advanced (collapsed by default) ─────────────────── */}
+        <button
+          type="button"
+          className="wx-btn wx-btn-ghost wx-btn-sm"
+          style={{ marginTop: 10 }}
+          aria-expanded={scopeAdvanced}
+          onClick={() => setScopeAdvanced((s) => !s)}
+        >
+          <i className={`bi bi-chevron-${scopeAdvanced ? 'up' : 'down'}`} style={{ marginRight: 6 }} />
+          Advanced options
+        </button>
+        {scopeAdvanced && (
+          <div style={{
+            marginTop: 10, paddingTop: 12, borderTop: '1px solid var(--border-subtle)',
+            display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end',
+          }}>
+            <Picker
+              label="Halo window"
+              value={String(maxLag)}
+              onChange={(v) => setMaxLag(Number(v))}
+              options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
+              width={150}
+              hint={`Effects that may show up over several ${unit}s.`}
+            />
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
+              <Check label="Adjust for trend" checked={useTrend} onChange={setUseTrend}
+                title="Adjust for a steady rise or fall over time, so growth the brand had anyway is not credited to TikTok" />
+              <Check label="Adjust for seasonality" checked={useSeasonality} onChange={setUseSeasonality}
+                title={`Adjust for an annual cycle — needs about ${PERIODS_PER_YEAR[gran]} ${unit}s of history`} />
+              <Check label="Index to 100" checked={normalize} onChange={setNormalize}
+                title="Index both series to 100 at the start so metrics on different scales can be compared for shape" />
+              <Check label="Show scatter" checked={showScatter} onChange={setShowScatter}
+                title="Show the scatter plot alongside the over-time chart" />
+            </div>
+          </div>
+        )}
       </div>
 
       {lagWasReduced && (
@@ -280,19 +368,23 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
         </Note>
       )}
 
-      {/* ══ LAYER A — OBSERVED ═══════════════════════════════════ */}
-      <Layer letter="A" title="Observed Relationship" subtitle="What the data shows. Correlation is evidence of movement together — not proof that one caused the other.">
+      {/* ══ 3 — EVIDENCE ═════════════════════════════════════════ */}
+      <Layer
+        letter="1"
+        title="What the data shows"
+        subtitle="How the two moved together over this period. Moving together is evidence — it is never proof that one caused the other."
+      >
         <ObservedLayer
           result={result} unit={unit} xKey={xKey} yKey={yKey} periods={periods}
-          normalize={normalize} assessment={assessment}
+          normalize={normalize} assessment={assessment} showScatter={showScatter}
         />
       </Layer>
 
-      {/* ══ LAYER B — ADJUSTED MODEL ═════════════════════════════ */}
+      {/* ══ 4 — ESTIMATE ═════════════════════════════════════════ */}
       <Layer
-        letter="B"
-        title="Adjusted Halo Model"
-        subtitle="A distributed-lag estimate that adjusts for the variables we have. An estimate of association, not a measurement of cause."
+        letter="2"
+        title="What the model suggests"
+        subtitle="An estimate after adjusting for the other factors we have data for. An estimate of association — not proof of cause, and not incremental lift."
         right={m.available ? <ModelledBadge /> : null}
       >
         <AdjustedLayer
@@ -309,18 +401,23 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
         />
       </Layer>
 
-      {/* ══ LAYER C — PLANNING ═══════════════════════════════════ */}
+      {/* ══ 5 — SCENARIOS ════════════════════════════════════════ */}
       <Layer
-        letter="C"
-        title="Investment Planning"
-        subtitle="A business decision informed by the model — never a measurement of it."
+        letter="3"
+        title="What if we invest more?"
+        subtitle="Planning is a decision informed by the model, never a measurement of it. Every figure here is an assumption, not a forecast."
         tone="planning"
-        right={<ModelledBadge />}
+        right={result.planningEligibility?.eligible ? <ModelledBadge /> : null}
       >
         <PlanningLayer result={result} planning={planning} setPlanning={setPlanning} cur={cur} />
       </Layer>
 
-      {/* Halo Finder V2 + provenance */}
+      {/* ── Secondary: progress, ranking, provenance and export ──
+          The measurement stages used to open the page. They are real and worth
+          keeping, but they are apparatus: a client wants the answer first and
+          the ladder second, so they sit down here as progress rather than as
+          the story. */}
+      <StageStepper statuses={stages} />
       <HaloFinderV2
         periods={periods} srcRows={srcRows} src={src} gran={gran} yKey={yKey} range={range}
         tiktokFields={tiktokFields} maxLag={effectiveMaxLag} unit={unit}
@@ -328,7 +425,7 @@ export default function HaloV2Explorer({ datasets, loadRows }) {
       />
       <Provenance
         result={result} gran={gran} range={range} unit={unit}
-        xKey={xKey} yKey={yKey} cur={cur}
+        xKey={xKey} yKey={yKey} cur={cur} periods={periods}
       />
     </div>
   );
@@ -339,7 +436,7 @@ const rangeText = (range) => (range?.start && range?.end ? `${range.start} to ${
 // ────────────────────────────────────────────────────────────────
 // Layer A
 // ────────────────────────────────────────────────────────────────
-function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessment }) {
+function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessment, showScatter }) {
   const o = result.observed;
   const best = o.lagCorrelations.find((r) => r.lag === o.bestObservedLag);
   const invNoteX = inverseNote(xKey), invNoteY = inverseNote(yKey);
@@ -353,9 +450,18 @@ function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessmen
   const chartData = withData.map((p, i) => ({ label: p.label || p.key, x: nx[i], y: ny[i] }));
   const scatter = periods.filter((p) => p.x != null && p.y != null).map((p) => ({ x: p.x, y: p.y, label: p.label }));
 
-  const xName = metricLabel(xKey);
-  const yName = metricLabel(yKey);
+  const xName = plainMetricLabel(xKey);
+  const yName = plainMetricLabel(yKey);
   const axisSuffix = normalize ? ' (indexed to 100)' : '';
+
+  // Bug B — the tooltip printed raw floats like 733.3333333333333, because
+  // Recharts renders whatever it is handed and this tooltip had no formatter.
+  // A tooltip is where a client reads an actual number, so it has to carry the
+  // unit and stop at a sensible precision.
+  const seriesFormatter = (v, name) => {
+    const key = name === xName ? xKey : yKey;
+    return [formatMetricValue(v, key, { indexed: normalize }), name];
+  };
 
   return (
     <>
@@ -423,8 +529,12 @@ function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessmen
         </Note>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, marginTop: 12 }}>
-        <div style={{ height: 260 }}>
+      {/* ONE primary chart (§3). The scatter is a diagnostic that answers a
+          different question and used to sit at equal weight beside this one,
+          which made the section read as two things to interpret rather than
+          one. It moves behind Advanced → Show scatter. */}
+      <div style={{ display: 'grid', gridTemplateColumns: showScatter ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr', gap: 14, marginTop: 12 }}>
+        <div style={{ height: 280 }}>
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Over time</div>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 6, right: 10, bottom: 24, left: 6 }}>
@@ -433,32 +543,45 @@ function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessmen
                 dataKey="label" tick={{ fontSize: 10 }} minTickGap={20}
                 label={{ value: `Period (${unit})`, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }}
               />
-              <YAxis yAxisId="l" tick={{ fontSize: 10 }}
+              <YAxis yAxisId="l" tick={{ fontSize: 10 }} tickFormatter={(v) => formatMetricValue(v, xKey, { indexed: normalize })}
                 label={{ value: `${xName}${axisSuffix}`, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
-              <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10 }}
+              <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10 }} tickFormatter={(v) => formatMetricValue(v, yKey, { indexed: normalize })}
                 label={{ value: `${yName}${axisSuffix}`, angle: 90, position: 'insideRight', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
-              <Tooltip contentStyle={TT_STYLE} />
+              <Tooltip contentStyle={TT_STYLE} formatter={seriesFormatter} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar yAxisId="l" dataKey="x" name={xName} fill={SERIES_TIKTOK} opacity={0.65} />
               <Line yAxisId="r" dataKey="y" name={yName} stroke={SERIES_AMAZON} dot={false} strokeWidth={2} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <div style={{ height: 260 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Scatter</div>
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 6, right: 12, bottom: 24, left: 6 }}>
-              <CartesianGrid stroke={GRID} />
-              <XAxis type="number" dataKey="x" name={xName} tick={{ fontSize: 10 }}
-                label={{ value: xName, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }} />
-              <YAxis type="number" dataKey="y" name={yName} tick={{ fontSize: 10 }}
-                label={{ value: yName, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
-              <ZAxis range={[45, 45]} />
-              <Tooltip contentStyle={TT_STYLE} cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter data={scatter} fill={SERIES_TIKTOK} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
+        {showScatter && (
+          <div style={{ height: 280 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Scatter</div>
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 6, right: 12, bottom: 24, left: 6 }}>
+                <CartesianGrid stroke={GRID} />
+                <XAxis type="number" dataKey="x" name={xName} tick={{ fontSize: 10 }} tickFormatter={(v) => formatMetricValue(v, xKey)}
+                  label={{ value: xName, position: 'insideBottom', offset: -16, style: { fontSize: 10.5, fill: 'var(--text-muted)' } }} />
+                <YAxis type="number" dataKey="y" name={yName} tick={{ fontSize: 10 }} tickFormatter={(v) => formatMetricValue(v, yKey)}
+                  label={{ value: yName, angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'var(--text-muted)', textAnchor: 'middle' } }} />
+                <ZAxis range={[45, 45]} />
+                <Tooltip contentStyle={TT_STYLE} cursor={{ strokeDasharray: '3 3' }}
+                  formatter={(v, name) => [formatMetricValue(v, name === xName ? xKey : yKey), name]} />
+                <Scatter data={scatter} fill={SERIES_TIKTOK} />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Coverage note (§3) — plain, factual, never phrased as an error. Thin
+          data is a fact about a young brand, not a fault in the page. */}
+      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
+        {coverageNote({
+          periodsSupplied: result.meta.periodsSupplied,
+          completeObservations: result.meta.completeObservations,
+          unit,
+        })}
       </div>
     </>
   );
@@ -558,13 +681,13 @@ function AdjustedLayer({
       <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 12 }}>
         {hasLagged ? (
           <>Across the {maxLag} {unit}{maxLag === 1 ? '' : 's'} FOLLOWING a change, an additional {cur}1 of{' '}
-            {metricLabel(xKey)} is <strong>associated with</strong> approximately{' '}
-            <strong>{cur}{lagged.coefficient.toFixed(2)}</strong> of {metricLabel(yKey)}, after the included controls.
+            {plainMetricLabel(xKey)} is <strong>associated with</strong> approximately{' '}
+            <strong>{cur}{lagged.coefficient.toFixed(2)}</strong> of {plainMetricLabel(yKey)}, after the included controls.
             Adding the same-{unit} movement brings the total to {fullLabel} — but movement inside one {unit} is
             not a delay, and a shared cause such as a promotion produces it just as readily.</>
         ) : (
-          <>An additional {cur}1 of {metricLabel(xKey)} moves with approximately <strong>{fullLabel}</strong> of{' '}
-            {metricLabel(yKey)} in the SAME {unit}. Nothing here separates a spillover from a shared cause —
+          <>An additional {cur}1 of {plainMetricLabel(xKey)} moves with approximately <strong>{fullLabel}</strong> of{' '}
+            {plainMetricLabel(yKey)} in the SAME {unit}. Nothing here separates a spillover from a shared cause —
             select a lag window above to look for a delayed effect.</>
         )}
       </p>
@@ -710,7 +833,7 @@ function AdjustedLayer({
 
         {contrib && (
           <>
-            <ContributionChart contribution={contrib} unit={unit} yLabel={metricLabel(yKey)} />
+            <ContributionChart contribution={contrib} unit={unit} yLabel={plainMetricLabel(yKey)} />
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 10, fontSize: 12 }}>
               <span style={{ color: 'var(--text-muted)' }}>
                 Periods above reference: <strong style={{ color: 'var(--success, #22c55e)' }}>{fmtValue(contrib.positiveAmount, 'money')}</strong>
@@ -765,8 +888,17 @@ function AdjustedLayer({
       </div>
 
       {/* Advanced diagnostics (§21) */}
-      <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginTop: 14 }} onClick={() => setShowAdvanced((s) => !s)}>
-        <i className={`bi bi-chevron-${showAdvanced ? 'up' : 'down'}`} /> Model details
+      {/* Coefficients, HAC standard errors, adjusted R2 and VIF live behind
+          this disclosure only (§4). They are the reason an analyst trusts the
+          number and the reason a client cannot read the page. */}
+      <button
+        type="button"
+        className="wx-btn wx-btn-ghost wx-btn-sm"
+        style={{ marginTop: 14 }}
+        aria-expanded={showAdvanced}
+        onClick={() => setShowAdvanced((s) => !s)}
+      >
+        <i className={`bi bi-chevron-${showAdvanced ? 'up' : 'down'}`} /> Technical details
       </button>
       {showAdvanced && (
         <div className="wx-card" style={{ padding: 12, marginTop: 8, fontSize: 12 }}>
@@ -834,7 +966,7 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>Halo Finder</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
           No TikTok metric has {MIN_CORRELATION_OBS} or more overlapping {unit}s against{' '}
-          {metricLabel(yKey)} over this range, so there is nothing to rank yet — a row of zeros
+          {plainMetricLabel(yKey)} over this range, so there is nothing to rank yet — a row of zeros
           would imply we had measured no relationship, rather than that we could not look.
         </div>
         {suggestion && (
@@ -860,12 +992,12 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
     <div className="wx-card" style={{ padding: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>Halo Finder</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-        Strongest observed lag relationship for every TikTok metric against {metricLabel(yKey)}. Negative rows are kept —
+        Strongest observed lag relationship for every TikTok metric against {plainMetricLabel(yKey)}. Negative rows are kept —
         they are findings, not omissions.
       </div>
       {laggedBest && (
         <Note tone="info">
-          Strongest <strong>delayed</strong> relationship: {metricLabel(laggedBest.metric)} at{' '}
+          Strongest <strong>delayed</strong> relationship: {plainMetricLabel(laggedBest.metric)} at{' '}
           +{laggedBest.lag} {unit}{laggedBest.lag === 1 ? '' : 's'} ({fmtSignedPct(laggedBest.correlation)}).
           That is a different question from the strongest overall, which same-{unit} movement usually wins.
         </Note>
@@ -883,7 +1015,7 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
           <tbody>
             {sorted.map((r) => (
               <tr key={r.metric} style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '6px 8px' }}>{metricLabel(r.metric)}</td>
+                <td style={{ padding: '6px 8px' }}>{plainMetricLabel(r.metric)}</td>
                 <td style={{ padding: '6px 8px' }}>{r.bestLag == null ? '—' : r.bestLag === 0 ? `Same ${unit}` : `+${r.bestLag} ${unit}${r.bestLag === 1 ? '' : 's'}`}</td>
                 <td style={{ padding: '6px 8px', fontWeight: 700, color: signedCorrTextColor(r.correlation) }}>{fmtSignedPct(r.correlation) ?? '—'}</td>
                 <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{r.numberOfObservations}</td>
@@ -908,14 +1040,34 @@ function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, u
 // screenshot — and a caveat that only exists in a download does not survive
 // that. The copy button produces the same block as text for pasting under a
 // figure in a deck.
-function Provenance({ result, gran, range, unit, xKey, yKey, cur }) {
+function Provenance({ result, gran, range, unit, xKey, yKey, cur, periods }) {
   const m = result.adjustedModel;
   const [copied, setCopied] = useState(false);
-  if (!m.available) return null;
+
+  // CSV is offered even when the model refused: the series is still real data
+  // the client may want, and the summary block then records WHY there is no
+  // estimate — which is more useful than no file at all.
+  const exportCsv = () => {
+    const text = buildHaloV2Csv({ result, periods, gran, range, xKey, yKey, currency: cur });
+    downloadHaloV2Csv(text, haloV2CsvFilename({ gran, range }));
+  };
+
+  if (!m.available) {
+    return (
+      <div className="wx-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+          No modelled estimate for this window — the series is still available to download.
+        </div>
+        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={exportCsv}>
+          <i className="bi bi-download" style={{ marginRight: 6 }} />Download CSV
+        </button>
+      </div>
+    );
+  }
 
   const lines = [
     `Halo V2 — modelled association, NOT incremental.`,
-    `Metrics: ${metricLabel(xKey)} → ${metricLabel(yKey)}`,
+    `Metrics: ${plainMetricLabel(xKey)} → ${plainMetricLabel(yKey)}`,
     `Grain: ${GRAIN_LABEL[gran]}${rangeText(range) ? ` · ${rangeText(range)}` : ''}`,
     `Observations: ${m.sampleSize} usable ${unit}s (${m.parameterCount} parameters)`,
     m.laggedOnlyAvailable && m.laggedOnly
@@ -952,10 +1104,15 @@ function Provenance({ result, gran, range, unit, xKey, yKey, cur }) {
           <span style={{ fontSize: 13, fontWeight: 800 }}>Methodology &amp; provenance</span>
           <ModelledBadge />
         </div>
-        <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={copy}>
-          <i className={`bi ${copied ? 'bi-check2' : 'bi-clipboard'}`} style={{ marginRight: 6 }} />
-          {copied ? 'Copied' : 'Copy methodology'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={exportCsv}>
+            <i className="bi bi-download" style={{ marginRight: 6 }} />Download CSV
+          </button>
+          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={copy}>
+            <i className={`bi ${copied ? 'bi-check2' : 'bi-clipboard'}`} style={{ marginRight: 6 }} />
+            {copied ? 'Copied' : 'Copy methodology'}
+          </button>
+        </div>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 8, maxWidth: 720 }}>
         Everything a figure from this page needs carried with it. If a number here reaches a deck,

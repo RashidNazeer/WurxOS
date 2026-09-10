@@ -24,6 +24,12 @@ import {
   assessGrain, recommendGrain, grainSwitchSuggestion,
 } from '../src/lib/haloV2/grainRecommendation.js';
 import { stageStatuses, stageProgress } from '../src/lib/haloV2/stages.js';
+import {
+  plainMetricLabel, comparisonSentence, formatMetricValue, keyTakeaway, coverageNote,
+  GLOSSARY, glossaryFor,
+} from '../src/lib/haloV2/plainLanguage.js';
+import { buildHaloV2Csv, haloV2CsvFilename } from '../src/lib/haloV2/exportCsv.js';
+import { HALO_FIELDS } from '../src/lib/haloFields.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -881,8 +887,11 @@ const NO_CTL = { trend: false, seasonality: false };
   check('43d. regression is done', byKey.regression.status === 'done');
   check('43e. distributed lag is done with a real lag window', byKey.distributedLag.status === 'done');
   check('43f. counterfactual is done', byKey.counterfactual.status === 'done', byKey.counterfactual.detail);
-  check('43g. validation is "coming later", never a failure',
+  check('43g. validation is a future stage, never a failure',
     byKey.validation.status === 'later' && /not part of this tool/i.test(byKey.validation.detail));
+  check('43g2. …and its label does not imply it is queued or nearly done',
+    !/coming/i.test(byKey.validation.statusLabel) && /needs a controlled test/i.test(byKey.validation.statusLabel),
+    byKey.validation.statusLabel);
   check('43h. …and validation is why nothing is called incremental',
     /incremental/i.test(byKey.validation.detail));
   check('43i. progress excludes the out-of-scope stage',
@@ -1214,6 +1223,179 @@ function haloFinderTest(res) {
   check('BugC16. assessGrain gives each grain its own seasonality gate',
     aDay.seasonalityIncluded === false && aWeek.seasonalityIncluded === true,
     `day=${aDay.seasonalityIncluded} week=${aWeek.seasonalityIncluded}`);
+}
+
+// ── Bug B — tooltip values must be readable, with units ──────────────
+// Repro: hovering the "Over time" chart showed 733.3333333333333.
+{
+  check('BugB. money is formatted as currency, not a raw float',
+    /^\$?[\d,]+(\.\d{1,2})?$/.test(formatMetricValue(733.3333333333333, 'gmv').replace(/^\$/, '$')),
+    formatMetricValue(733.3333333333333, 'gmv'));
+  check('BugB2. …and never shows more than 2 decimals',
+    !/\.\d{3}/.test(formatMetricValue(733.3333333333333, 'gmv')), formatMetricValue(733.3333333333333, 'gmv'));
+  check('BugB3. counts are whole numbers',
+    formatMetricValue(41.7, 'ntb') === '42', formatMetricValue(41.7, 'ntb'));
+  check('BugB4. rates keep at most 2 decimals',
+    !/\.\d{3}/.test(formatMetricValue(3.14159, 'keyword_search_rank')), formatMetricValue(3.14159, 'keyword_search_rank'));
+  check('BugB5. an indexed series shows 1 decimal and no currency',
+    formatMetricValue(733.3333333333333, 'gmv', { indexed: true }) === '733.3',
+    formatMetricValue(733.3333333333333, 'gmv', { indexed: true }));
+  check('BugB6. missing stays a dash, not NaN',
+    formatMetricValue(null, 'gmv') === '—' && formatMetricValue(undefined, 'gmv') === '—');
+  check('BugB7. no formatted value anywhere contains NaN',
+    !['gmv', 'ntb', 'keyword_search_rank', 'video_per_day'].some((k) => /NaN/.test(formatMetricValue(0, k))));
+}
+
+// ── Plain language — a client can read the metric names ──────────────
+{
+  check('PL1. GMV is translated on first use',
+    plainMetricLabel('gmv') === 'TikTok Shop sales (GMV)', plainMetricLabel('gmv'));
+  check('PL2. NTB is translated and keeps its acronym',
+    /new-to-brand/i.test(plainMetricLabel('ntb')) && /NTB/.test(plainMetricLabel('ntb')), plainMetricLabel('ntb'));
+  check('PL3. an unknown key degrades to the dictionary label rather than blank',
+    plainMetricLabel('nonsense_key') === 'nonsense_key');
+  check('PL4. every non-hidden field has a plain label that is not just its key',
+    HALO_FIELDS.filter((f) => !f.hidden).every((f) => plainMetricLabel(f.key) !== f.key),
+    HALO_FIELDS.filter((f) => !f.hidden && plainMetricLabel(f.key) === f.key).map((f) => f.key).join(',') || 'all covered');
+  check('PL5. the comparison reads as a sentence',
+    comparisonSentence('gmv', 'revenue_per_day') === 'TikTok Shop sales (GMV) vs Amazon revenue',
+    comparisonSentence('gmv', 'revenue_per_day'));
+}
+
+// ── Glossary — every term the brief lists must be defined ────────────
+{
+  const REQUIRED = ['GMV', 'NTB', 'Halo', 'incremental', 'attributed', 'lag',
+    'counterfactual', 'confidence', '95% interval', 'modelled'];
+  const missing = REQUIRED.filter((t) => !glossaryFor(t));
+  check('GL1. every required glossary term is defined', missing.length === 0, missing.join(', ') || 'all present');
+  check('GL2. lookup is case-insensitive', !!glossaryFor('gmv') && !!glossaryFor('GMV'));
+  check('GL3. every definition is a real sentence, not a stub',
+    GLOSSARY.every((g) => g.def.length > 40 && g.short.length > 3),
+    GLOSSARY.filter((g) => g.def.length <= 40).map((g) => g.term).join(',') || 'all substantial');
+  check('GL4. "incremental" is defined as something this tool does NOT do',
+    /does not run|not run|cannot/i.test(glossaryFor('incremental').def), glossaryFor('incremental').def);
+  check('GL5. an unknown term returns null so a typo cannot ship a dead tooltip',
+    glossaryFor('sparkle') === null);
+}
+
+// ── Key takeaway — the first-viewport answer ─────────────────────────
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.15 * x[t] + (t >= 1 ? 0.35 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const healthy = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: NO_CTL });
+  const t1 = keyTakeaway(healthy, { unit: 'day', xKey: 'gmv', yKey: 'revenue_per_day' });
+
+  check('KT1. the headline is one plain sentence naming both metrics',
+    /TikTok Shop sales/.test(t1.headline) && /Amazon revenue/.test(t1.headline) && (t1.headline.match(/\./g) || []).length === 1,
+    t1.headline);
+  check('KT2. it states a signed percentage', /[+-]\d+%/.test(t1.headline), t1.headline);
+  check('KT3. it says whether it was the same period or later',
+    /same day|days later|day later/.test(t1.headline), t1.headline);
+  check('KT4. the caveat is always present and says correlation',
+    /correlation, not proof/i.test(t1.caveat), t1.caveat);
+  check('KT5. confidence and observation count are carried',
+    t1.confidenceLabel != null && t1.observations > 0, `${t1.confidenceLabel} / ${t1.observations}`);
+  check('KT6. the "so what" matches the planning gate',
+    t1.canPlan === healthy.planningEligibility.eligible, `canPlan=${t1.canPlan} eligible=${healthy.planningEligibility.eligible}`);
+  check('KT7. …and does not invite planning when planning is locked',
+    t1.canPlan || !/can use this for spend/i.test(t1.soWhat), t1.soWhat);
+
+  // A negative relationship must be described as such, not softened.
+  const ny = x.map((v) => 9000 - 0.4 * v + rnd() * 40);
+  const neg = analyseHalo(periods(x, ny), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: NO_CTL });
+  const t2 = keyTakeaway(neg, { unit: 'day', xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('KT8. a negative relationship says "opposite directions"',
+    /opposite directions/.test(t2.headline) && t2.direction === 'negative', t2.headline);
+  check('KT9. …with a negative percentage', /-\d+%/.test(t2.headline), t2.headline);
+
+  // Thin data must still produce a readable sentence, not a blank.
+  const thin = analyseHalo(periods(x.slice(0, 4), y.slice(0, 4)), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3, unit: 'week' });
+  const t3 = keyTakeaway(thin, { unit: 'week', xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('KT10. thin data still yields a sentence, not an empty headline',
+    typeof t3.headline === 'string' && t3.headline.length > 40, t3.headline);
+  check('KT11. …which names what is missing', /Not enough overlapping weeks/.test(t3.headline), t3.headline);
+  check('KT12. …and refuses to invite planning', t3.canPlan === false && !/can use this/i.test(t3.soWhat), t3.soWhat);
+  check('KT13. the caveat survives even with no finding', /correlation/i.test(t3.caveat));
+}
+
+// ── Coverage note (§3) ───────────────────────────────────────────────
+{
+  const full = coverageNote({ periodsSupplied: 30, completeObservations: 30, unit: 'day' });
+  const gappy = coverageNote({ periodsSupplied: 30, completeObservations: 24, unit: 'day' });
+  check('CN1. a complete window says so without alarm',
+    /30 of 30/.test(full) && !/missing/.test(full), full);
+  check('CN2. gaps are stated as left out, never as zeros',
+    /6 days are missing one side/.test(gappy) && /rather than counted as zero/.test(gappy), gappy);
+}
+
+// ── CSV export (§6) ──────────────────────────────────────────────────
+{
+  const n = 90;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.15 * x[t] + (t >= 1 ? 0.35 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const p = periods(x, y).map((r, i) => ({ ...r, label: `2026-01-${String((i % 28) + 1).padStart(2, '0')}` }));
+  const res = analyseHalo(p, { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: NO_CTL });
+  const csv = buildHaloV2Csv({ result: res, periods: p, gran: 'day', range: { start: '2026-01-01', end: '2026-03-31' }, xKey: 'gmv', yKey: 'revenue_per_day', brandName: 'Acme, Inc.' });
+
+  check('CSV1. it names the tool AND the not-incremental caveat up front',
+    /Amazon Halo V2/.test(csv) && /NOT incremental/.test(csv));
+  check('CSV2. it has both a SUMMARY and a SERIES block', /SUMMARY/.test(csv) && /SERIES/.test(csv));
+  check('CSV3. the summary carries n, the interval and the controls',
+    /Usable periods,\d+/.test(csv) && /95% interval/.test(csv) && /Controls included/.test(csv));
+  check('CSV4. the same-period share is carried', /Same-period share of cumulative/.test(csv));
+  check('CSV5. a brand name containing a comma is quoted',
+    /"Acme, Inc\."/.test(csv), (csv.match(/.*Acme.*/) || [''])[0]);
+  check('CSV6. the series has one row per period plus a header',
+    csv.split('\r\n').filter((l) => /^2026-01-/.test(l)).length === p.length,
+    `${csv.split('\r\n').filter((l) => /^2026-01-/.test(l)).length} of ${p.length}`);
+  check('CSV7. the series includes both predicted columns',
+    /predicted_actual,predicted_at_reference/.test(csv));
+  check('CSV8. no NaN or undefined leaks into the file',
+    !/NaN|undefined/.test(csv), (csv.match(/.*(NaN|undefined).*/) || [''])[0]);
+  check('CSV9. the filename is safe and descriptive',
+    haloV2CsvFilename({ brandName: 'Acme, Inc.', gran: 'day', range: { start: '2026-01-01', end: '2026-03-31' } })
+      === 'halo-v2_acme-inc_day_2026-01-01_2026-03-31.csv',
+    haloV2CsvFilename({ brandName: 'Acme, Inc.', gran: 'day', range: { start: '2026-01-01', end: '2026-03-31' } }));
+
+  // A refused model must still export the series, with the reason recorded.
+  const thin = analyseHalo(p.slice(0, 8), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3, unit: 'day' });
+  const thinCsv = buildHaloV2Csv({ result: thin, periods: p.slice(0, 8), gran: 'day', range: {}, xKey: 'gmv', yKey: 'revenue_per_day' });
+  check('CSV10. a refused model still exports the series',
+    /SERIES/.test(thinCsv) && thinCsv.split('\r\n').filter((l) => /^2026-01-/.test(l)).length === 8);
+  check('CSV11. …and records WHY there is no estimate',
+    /not estimated/.test(thinCsv) && /Reason,/.test(thinCsv));
+}
+
+// ── P0 gate — Items sold vs NTB must lock planning ──────────────────
+// The builder prompt names this pair explicitly: neither side is money, so a
+// "halo %" of items per order is not a percentage of anything.
+{
+  const n = 120;
+  const x = Array.from({ length: n }, () => 400 + rnd() * 200);
+  const y = x.map((_, t) => 30 + 0.05 * x[t] + (t >= 1 ? 0.08 * x[t - 1] : 0) + rnd() * 2);
+  const res = analyseHalo(periods(x, y), { xKey: 'items_sold', yKey: 'ntb', maxLag: 1, unit: 'day', controls: NO_CTL });
+  check('P0-1. Items sold vs NTB → planning is NOT eligible',
+    res.planningEligibility.eligible === false);
+  check('P0-2. …because neither metric is money',
+    res.planningEligibility.blockers.some((b) => b.code === 'not_monetary'));
+  check('P0-3. …so no scenarios are derivable at all',
+    res.planningDerived.usable === false);
+  check('P0-4. …and the fix names a money-to-money pair',
+    /monetary|money/i.test(res.planningEligibility.blockers.find((b) => b.code === 'not_monetary').fix),
+    res.planningEligibility.blockers.find((b) => b.code === 'not_monetary').fix);
+  check('P0-5. the key takeaway still renders for this pair',
+    keyTakeaway(res, { unit: 'day', xKey: 'items_sold', yKey: 'ntb' }).headline.length > 40);
+  check('P0-6. …and does not invite spend scenarios',
+    keyTakeaway(res, { unit: 'day', xKey: 'items_sold', yKey: 'ntb' }).canPlan === false);
+
+  // Money x money on the SAME data shape stays eligible, so the gate is about
+  // the metrics and not an accident of this series.
+  const mx = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const my = mx.map((_, t) => 4000 + 0.15 * mx[t] + (t >= 1 ? 0.35 * mx[t - 1] : 0) + (rnd() - 0.5) * 20);
+  check('P0-7. a money-to-money pair on comparable data IS eligible',
+    analyseHalo(periods(mx, my), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, unit: 'day', controls: NO_CTL })
+      .planningEligibility.eligible === true);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
