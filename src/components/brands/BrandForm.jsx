@@ -170,7 +170,11 @@ export default function BrandForm({ brand, onClose, onSaved }) {
         });
       }
 
-      await setBrandAssignments(saved.id, assignedIds);
+      // ROLE-SCOPED. This picker only ever lists APCs under the owning TL, so
+      // it is authoritative for APCs and nothing else. Without this argument the
+      // save deletes every IPC assignment on the brand by omission — see the
+      // note on setBrandAssignments.
+      await setBrandAssignments(saved.id, assignedIds, ['apc']);
       onSaved(saved);
     } catch (err) {
       setError(err.message || 'Failed to save brand.');

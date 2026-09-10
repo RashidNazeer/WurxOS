@@ -42,15 +42,35 @@ export async function unselectBrand(pctlId, brandId) {
 }
 
 // --------------------------------------------------------------
-// IPC management (PCTL-facing)
+// IPC management (PCTL & OL-facing)
 // --------------------------------------------------------------
 export async function listMyIPCs(pctlId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, email, is_active, leave_quota, created_at')
+    .select('id, display_name, email, is_active, leave_quota, created_at, reports_to, manager:reports_to(id, display_name, role)')
     .eq('role', 'ipc')
     .eq('reports_to', pctlId)
     .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function listAllIPCs() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, email, is_active, leave_quota, created_at, reports_to, manager:reports_to(id, display_name, role)')
+    .eq('role', 'ipc')
+    .order('display_name', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function listAssignableBrandsForIPC() {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('id, brand_name, logo_url, paid_collab_status, status, owner:owner_id(id, display_name)')
+    .eq('status', 'active')
+    .order('brand_name', { ascending: true });
   if (error) throw new Error(error.message);
   return data || [];
 }
@@ -69,10 +89,46 @@ export async function updateIPCProfile(ipcId, patch) {
 export async function listIPCAssignedBrands(ipcId) {
   const { data, error } = await supabase
     .from('brand_assignments')
-    .select('brand_id, brand:brand_id(id, brand_name, logo_url, paid_collab_status)')
+    .select('brand_id, brand:brand_id(id, brand_name, logo_url, paid_collab_status, status)')
     .eq('user_id', ipcId);
   if (error) throw new Error(error.message);
   return (data || []).map((r) => r.brand).filter(Boolean);
+}
+
+/**
+ * Set an IPC's brand allocation. Server-side, or not at all.
+ *
+ * ── WHY THERE IS NO FALLBACK HERE ──────────────────────────────────────────
+ * The first draft, on ANY rpc error, silently retried the same writes directly
+ * against brand_assignments — with a comment saying "fallback if RPC is not
+ * deployed yet". Two things were wrong with that.
+ *
+ * A "not authorised" error is an rpc error. So the fallback fired precisely
+ * when the permission check had just refused, and attempted the write again by
+ * another route. The RPC's guard was therefore not the boundary at all; the
+ * table's RLS policy was, and any gap between the two was reachable.
+ *
+ * It also broke atomicity. The RPC diffs inside one transaction; the fallback
+ * did a separate insert and a separate delete, so a failure between them left
+ * the allocation half-applied with no error the operator could act on.
+ *
+ * If the function is missing the correct outcome is a visible failure, not a
+ * quieter path around the check.
+ */
+export async function setIPCBrandAssignments(ipcId, brandIds) {
+  const { data, error } = await supabase.rpc('ipc_set_brand_assignments', {
+    p_ipc_id: ipcId,
+    p_brand_ids: brandIds || [],
+  });
+  if (error) throw new Error(error.message);
+  // The function returns what actually changed, so the caller can say
+  // "2 added, 1 removed" rather than assuming the save did what was asked.
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    added: Number(row?.added) || 0,
+    removed: Number(row?.removed) || 0,
+    unchanged: Number(row?.unchanged) || 0,
+  };
 }
 
 export async function assignIPCToBrand(ipcId, brandId) {
