@@ -4,6 +4,12 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+# Per-environment env files (.env.dev, .env.staging, …). These hold project
+# refs, DB passwords and service-role keys, and the three patterns above do
+# NOT match them — `.env.dev` slipped through and would have been committed.
+.env.dev
+.env.staging
+.env.production
 *.log
 .DS_Store
 .vscode/*
