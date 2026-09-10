@@ -18,7 +18,9 @@ import {
   historicalContribution, marginalScenario, referenceSensitivity, recommendedReferenceMethod,
 } from './counterfactual.js';
 import { modelConfidence } from './confidence.js';
-import { planningModel, DEFAULT_ASSUMPTIONS } from './planningScenarios.js';
+import {
+  planningModel, DEFAULT_ASSUMPTIONS, planningEligibility, modelDerivedAssumptions,
+} from './planningScenarios.js';
 import { isMonetaryMetric, metricLabel } from './metricMetadata.js';
 import { mean } from './matrix.js';
 
@@ -95,14 +97,45 @@ export function analyseHalo(periods, {
   const avgX = mean(series.filter((p) => p.x != null).map((p) => p.x));
   const marginal = marginalScenario(model, avgX, scenarioSpec);
 
-  // ── Layer C — planning (only what the user supplied) ──────────────
+  // ── Layer C — planning ────────────────────────────────────────────
+  // Whether the model is ALLOWED to drive scenarios, and what they would be,
+  // are computed regardless of whether revenue figures have been entered — the
+  // UI needs to know before it decides what to render, and the blockers are
+  // what it shows instead when the answer is no.
+  // confidence.label is passed EXPLICITLY: it is computed above from the model
+  // plus the lag correlations plus the control lists, so the raw model object
+  // does not carry it, and the floor check fails closed on a missing label.
+  const monetary = {
+    xIsMonetary: isMonetaryMetric(xKey),
+    yIsMonetary: isMonetaryMetric(yKey),
+    confidenceLabel: confidence.label,
+  };
+  const eligibility = planningEligibility(model, monetary);
+  const derived = modelDerivedAssumptions(model, {
+    ...monetary,
+    grainLabel: planning?.grainLabel || null,
+    rangeLabel: planning?.rangeLabel || null,
+  });
+
+  // Mode and the live assumption values are the COMPONENT's state — a user can
+  // override any figure and only the component knows whether they have. It
+  // passes both in; this does the arithmetic and carries the labelling through,
+  // so "From adjusted model" can never sit next to numbers someone has edited.
+  const planningMode = planning?.mode || (derived.usable ? 'model' : 'assumptions');
   const planningOut = planning
     ? planningModel({
         ttsRevenue: planning.ttsRevenue,
         marketingSpend: planning.marketingSpend,
-        assumptions: planning.assumptions || DEFAULT_ASSUMPTIONS,
+        assumptions: planning.assumptions || (derived.usable ? derived.assumptions : DEFAULT_ASSUMPTIONS),
+        mode: planningMode,
+        source: planningMode === 'model' ? derived.source : null,
+        blockers: eligibility.blockers,
+        weakHaloClaim: eligibility.weakHaloClaim,
       })
-    : { conservative: null, base: null, upside: null };
+    : {
+        conservative: null, base: null, upside: null,
+        mode: planningMode, blockers: eligibility.blockers, weakHaloClaim: eligibility.weakHaloClaim,
+      };
 
   const warnings = [
     ...observed.warnings,
@@ -169,6 +202,11 @@ export function analyseHalo(periods, {
     recommendedReference,
     marginal,
     planning: planningOut,
+    // §H — may the model drive Conservative/Base/Upside, and what would they
+    // be? Kept beside `planning` rather than inside it because the UI needs the
+    // verdict to choose what to render at all.
+    planningEligibility: eligibility,
+    planningDerived: derived,
     meta: {
       xKey, yKey,
       xIsMonetary: isMonetaryMetric(xKey),

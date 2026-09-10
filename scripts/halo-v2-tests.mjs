@@ -16,6 +16,10 @@ import { analyseHalo } from '../src/lib/haloV2/index.js';
 import {
   historicalContribution, resolveReference, referenceSensitivity, marginalScenario,
 } from '../src/lib/haloV2/counterfactual.js';
+import {
+  planningEligibility, modelDerivedAssumptions, planningModel, PLANNING_CONFIDENCE_FLOOR,
+} from '../src/lib/haloV2/planningScenarios.js';
+import { atLeastConfidence } from '../src/lib/haloV2/confidence.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -593,6 +597,186 @@ const NO_CTL = { trend: false, seasonality: false };
     analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL, reference: { method: 'period_average' } })
       .historicalContribution.referenceMethod === 'period_average');
   check('31d. sensitivity is exposed on the result', full.referenceSensitivity != null);
+}
+
+// ── 32 — planning: all three scenarios come from the interval ────────
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  // A real DELAYED effect, so the lagged-only interval excludes zero.
+  const y = x.map((_, t) => 4000 + 0.10 * x[t] + (t >= 1 ? 0.35 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const model = fitDistributedLag(periods(x, y), { maxLag: 1, controls: NO_CTL, xKey: 'gmv', yKey: 'revenue_per_day' });
+  // Confidence has to be computed for the floor gate to be meaningful.
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  // The confidence label is computed alongside the model, not on it — attach it
+  // so the floor gate has something to read (see test 38 for the explicit path).
+  const m = { ...full.adjustedModel._model, confidenceLabel: full.adjustedModel.confidenceLabel };
+
+  const el = planningEligibility(m, { xIsMonetary: true, yIsMonetary: true });
+  check('32. a fitted, signed, monetary model is eligible', el.eligible === true,
+    el.blockers.map((b) => b.code).join(',') || 'no blockers');
+  check('32b. …on the lagged-only basis', el.basis === 'lagged_only', `basis=${el.basis}`);
+
+  const d = modelDerivedAssumptions(m, { xIsMonetary: true, yIsMonetary: true, grainLabel: 'Daily', rangeLabel: '2026-01-01 to 2026-05-20' });
+  check('32c. all three scenarios are derived', d.usable === true
+    && Number.isFinite(d.assumptions.conservative)
+    && Number.isFinite(d.assumptions.base)
+    && Number.isFinite(d.assumptions.upside),
+    JSON.stringify(d.assumptions));
+  check('32d. Conservative < Base < Upside', d.assumptions.conservative < d.assumptions.base
+    && d.assumptions.base < d.assumptions.upside,
+    `${d.assumptions.conservative} / ${d.assumptions.base} / ${d.assumptions.upside}`);
+  check('32e. Base is the point estimate, not a round number',
+    near(d.assumptions.base, m.laggedOnly.coefficient * 100, 0.2),
+    `base=${d.assumptions.base} point=${(m.laggedOnly.coefficient * 100).toFixed(1)}`);
+  check('32f. Conservative is the lower bound', near(d.assumptions.conservative, m.laggedOnly.lower * 100, 0.2),
+    `cons=${d.assumptions.conservative} lower=${(m.laggedOnly.lower * 100).toFixed(1)}`);
+  check('32g. Upside is the upper bound', near(d.assumptions.upside, m.laggedOnly.upper * 100, 0.2),
+    `up=${d.assumptions.upside} upper=${(m.laggedOnly.upper * 100).toFixed(1)}`);
+  check('32h. the scenarios are NOT the 50/100/150 placeholders',
+    !(d.assumptions.conservative === 50 && d.assumptions.base === 100 && d.assumptions.upside === 150));
+  check('32i. the source names the basis, grain and range',
+    /lagged-only/.test(d.source) && /Daily/.test(d.source) && /2026/.test(d.source), d.source);
+}
+
+// ── 33 — THE regression the brief calls out by name ──────────────────
+// "If full cumulative is 167% but lagged-only is much lower, never push 167%
+// into Base by default." Same-period-heavy data: the old one-click button would
+// have put the full cumulative into Base.
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 1.30 * x[t] + (t >= 1 ? 0.30 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  // The confidence label is computed alongside the model, not on it — attach it
+  // so the floor gate has something to read (see test 38 for the explicit path).
+  const m = { ...full.adjustedModel._model, confidenceLabel: full.adjustedModel.confidenceLabel };
+  const d = modelDerivedAssumptions(m, { xIsMonetary: true, yIsMonetary: true });
+
+  const fullPct = m.cumulativeCoefficient * 100;      // ≈ 160
+  const laggedPct = m.laggedOnly.coefficient * 100;   // ≈ 30
+  check('33. the full cumulative really is much larger here', fullPct > laggedPct * 2,
+    `full=${fullPct.toFixed(0)}% lagged=${laggedPct.toFixed(0)}%`);
+  check('33b. Base is the LAGGED figure, not the full cumulative',
+    d.usable && Math.abs(d.assumptions.base - laggedPct) < 2 && Math.abs(d.assumptions.base - fullPct) > 50,
+    `base=${d.assumptions.base}% (lagged=${laggedPct.toFixed(0)}%, full=${fullPct.toFixed(0)}%)`);
+}
+
+// ── 34 — every gate refuses, and says why + how to fix it ────────────
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+
+  // (a) interval spans zero → not eligible.
+  const noise = analyseHalo(periods(x, x.map(() => 5000 + rnd() * 400)),
+    { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  const elNoise = planningEligibility(noise.adjustedModel._model, { xIsMonetary: true, yIsMonetary: true });
+  check('34. an interval spanning zero blocks planning', elNoise.eligible === false
+    && elNoise.blockers.some((b) => b.code === 'ci_spans_zero'),
+    elNoise.blockers.map((b) => b.code).join(','));
+
+  // (b) non-monetary metrics → a "halo %" would be dollars per view.
+  const y = x.map((_, t) => 4000 + 0.1 * x[t] + (t >= 1 ? 0.35 * x[t - 1] : 0) + rnd() * 20);
+  const good = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  const elUnit = planningEligibility(good.adjustedModel._model, { xIsMonetary: false, yIsMonetary: true });
+  check('34b. non-monetary metrics block planning', elUnit.eligible === false
+    && elUnit.blockers.some((b) => b.code === 'not_monetary'));
+
+  // (c) no model at all.
+  const thin = analyseHalo(periods(x.slice(0, 10), y.slice(0, 10)), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 3 });
+  const elThin = planningEligibility(thin.adjustedModel._model, { xIsMonetary: true, yIsMonetary: true });
+  check('34c. no model blocks planning', elThin.eligible === false
+    && elThin.blockers.some((b) => b.code === 'no_model'));
+
+  // Every blocker must be actionable, not just a refusal.
+  const allBlockers = [...elNoise.blockers, ...elUnit.blockers, ...elThin.blockers];
+  check('34d. every blocker carries a message AND a fix',
+    allBlockers.every((b) => typeof b.message === 'string' && b.message.length > 25
+      && typeof b.fix === 'string' && b.fix.length > 10),
+    `${allBlockers.length} blockers checked`);
+
+  // And an ineligible model must NOT hand back usable scenarios.
+  check('34e. an ineligible model yields no derived scenarios',
+    modelDerivedAssumptions(elNoise.eligible ? null : noise.adjustedModel._model, { xIsMonetary: true, yIsMonetary: true }).usable === false);
+}
+
+// ── 35 — a same-period-only window is allowed but badged weak ────────
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((v) => 4000 + 0.55 * v + (rnd() - 0.5) * 20);
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 0, controls: NO_CTL });
+  // The confidence label is computed alongside the model, not on it — attach it
+  // so the floor gate has something to read (see test 38 for the explicit path).
+  const m = { ...full.adjustedModel._model, confidenceLabel: full.adjustedModel.confidenceLabel };
+  const el = planningEligibility(m, { xIsMonetary: true, yIsMonetary: true });
+  check('35. max lag 0 → basis is same-period', el.basis === 'cumulative' && el.basisLabel === 'same-period');
+  check('35b. …and it is flagged as a weak halo claim', el.weakHaloClaim === true);
+  const d = modelDerivedAssumptions(m, { xIsMonetary: true, yIsMonetary: true });
+  check('35c. …scenarios are still derivable', d.usable === true, JSON.stringify(d.assumptions || {}));
+  check('35d. …and the note says it is a weak halo claim', /weak halo claim/.test(d.note || ''), d.note);
+}
+
+// ── 36 — planningModel labels the mode honestly ──────────────────────
+{
+  const modelled = planningModel({ ttsRevenue: 100000, marketingSpend: 30000, assumptions: { conservative: 12, base: 34, upside: 56 }, mode: 'model', source: 'From adjusted model · lagged-only · Daily' });
+  check('36. model mode carries its source', modelled.mode === 'model' && /adjusted model/.test(modelled.source));
+  check('36b. …and still disclaims that it is not incremental', /not incremental/i.test(modelled.disclaimer), modelled.disclaimer);
+  check('36c. arithmetic is unchanged: 34% of 100k is 34k off-platform',
+    near(modelled.base.offPlatformRevenue, 34000, 1), `off=${modelled.base.offPlatformRevenue}`);
+  check('36d. blended multiple uses total influenced revenue',
+    near(modelled.base.blendedMultiple, 134000 / 30000, 1e-9), `blended=${modelled.base.blendedMultiple}`);
+
+  const override = planningModel({ ttsRevenue: 100000, marketingSpend: 30000, assumptions: { conservative: 10, base: 20, upside: 30 }, mode: 'override' });
+  check('36e. an override never claims to be from the model',
+    override.source === null && !/adjusted model/.test(override.disclaimer), override.disclaimer);
+
+  const assumed = planningModel({ ttsRevenue: 100000, marketingSpend: 30000 });
+  check('36f. assumptions mode uses the placeholders and says so',
+    assumed.base.haloPercent === 100 && /not measured results/.test(assumed.disclaimer));
+}
+
+// ── 37 — the confidence floor gates auto-apply ───────────────────────
+{
+  check('37. Moderate meets the floor', atLeastConfidence('Moderate Confidence', PLANNING_CONFIDENCE_FLOOR) === true);
+  check('37b. Strong meets the floor', atLeastConfidence('Strong Evidence', PLANNING_CONFIDENCE_FLOOR) === true);
+  check('37c. Directional does NOT', atLeastConfidence('Directional', PLANNING_CONFIDENCE_FLOOR) === false);
+  check('37d. Low does NOT', atLeastConfidence('Low Confidence', PLANNING_CONFIDENCE_FLOOR) === false);
+  check('37e. an unknown label fails closed', atLeastConfidence('Excellent', PLANNING_CONFIDENCE_FLOOR) === false);
+}
+
+// ── 38 — the confidence label must be passed, and fail closed ────────
+// Regression guard. planningEligibility read `model.confidenceLabel`, which the
+// raw fit object never carries (confidence is computed from the model PLUS the
+// lag correlations PLUS the control lists). Because the floor check fails
+// closed, that silently refused planning for every model ever fitted — the
+// feature would have shipped permanently stuck in assumptions mode.
+{
+  const n = 140;
+  const x = Array.from({ length: n }, () => 1000 + rnd() * 800);
+  const y = x.map((_, t) => 4000 + 0.10 * x[t] + (t >= 1 ? 0.35 * x[t - 1] : 0) + (rnd() - 0.5) * 20);
+  const full = analyseHalo(periods(x, y), { xKey: 'gmv', yKey: 'revenue_per_day', maxLag: 1, controls: NO_CTL });
+  const raw = full.adjustedModel._model;          // deliberately WITHOUT the label
+
+  const explicit = planningEligibility(raw, {
+    xIsMonetary: true, yIsMonetary: true, confidenceLabel: full.adjustedModel.confidenceLabel,
+  });
+  check('38. passing the confidence label explicitly makes the model eligible',
+    explicit.eligible === true, explicit.blockers.map((b) => b.code).join(',') || 'none');
+
+  const missing = planningEligibility(raw, { xIsMonetary: true, yIsMonetary: true });
+  check('38b. a missing label fails CLOSED, not open',
+    missing.eligible === false && missing.blockers.some((b) => b.code === 'low_confidence'),
+    missing.blockers.map((b) => b.code).join(','));
+
+  // And the wiring in analyseHalo must actually pass it.
+  check('38c. analyseHalo wires the label through to eligibility',
+    full.planningEligibility.eligible === true,
+    full.planningEligibility.blockers.map((b) => b.code).join(',') || 'none');
+  check('38d. analyseHalo exposes usable derived scenarios',
+    full.planningDerived.usable === true, JSON.stringify(full.planningDerived.assumptions || {}));
+  check('38e. …and defaults planning to model mode, not assumptions',
+    full.planning.mode === 'model', `mode=${full.planning.mode}`);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');

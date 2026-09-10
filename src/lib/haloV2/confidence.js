@@ -16,6 +16,25 @@ export const CONFIDENCE_LEVELS = ['Insufficient Data', 'Low Confidence', 'Direct
 // Ordered weakest → strongest, so a ceiling is just an index comparison.
 const RANK = Object.fromEntries(CONFIDENCE_LEVELS.map((l, i) => [l, i]));
 
+/** Rank of a confidence label, or -1 for anything unrecognised. */
+export const confidenceRank = (label) => (label in RANK ? RANK[label] : -1);
+
+/**
+ * Is `label` at least as strong as `floor`?
+ *
+ * Exported so the planning layer can express its floor as a level name rather
+ * than duplicating this ordering — a second copy of the ladder is how the
+ * planner and the model end up disagreeing about what "Moderate" means.
+ * An unrecognised label is treated as NOT meeting the floor: failing closed is
+ * the only safe direction when the thing being gated is investment planning.
+ */
+export function atLeastConfidence(label, floor) {
+  const l = confidenceRank(label);
+  const f = confidenceRank(floor);
+  if (l < 0 || f < 0) return false;
+  return l >= f;
+}
+
 /**
  * Cap a label at a ceiling. Returns the ceiling when the score earned more.
  * Never RAISES a label — a ceiling can only ever hold confidence down.
