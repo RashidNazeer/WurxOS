@@ -21,9 +21,14 @@ export async function submitBrandSwitch({ brandId, fromOwnerId, toOwnerId, reaso
 }
 
 // New canonical shape: an OL proposes moving a brand's APC to
-// `toApcId`. On Boss approval, the DB trigger calls
-// `brand_switch_apc` which retargets the TL, tasks, and notifications.
-export async function submitApcSwitchRequest({ brandId, toApcId, reason = '', notify = false }) {
+// `toApcId`. On Boss approval, the DB trigger calls brand_assign_apc
+// (mode 'assign') or brand_switch_apc (mode 'swap') — mig 360.
+//
+// `mode` must be explicit on the insert: the column defaults to 'swap' so
+// that requests created before assign existed keep their meaning, which
+// means a caller who forgets to pass it gets the high-impact action.
+export async function submitApcSwitchRequest({ brandId, toApcId, reason = '', notify = false, mode = 'assign' }) {
+  if (mode !== 'assign' && mode !== 'swap') throw new Error(`unknown switch mode: ${mode}`);
   const { data: me } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('brand_switch_requests')
@@ -33,6 +38,7 @@ export async function submitApcSwitchRequest({ brandId, toApcId, reason = '', no
       requested_by: me?.user?.id,
       reason,
       notify_on_approve: notify,
+      mode,
     })
     .select()
     .single();
