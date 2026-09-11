@@ -1,19 +1,34 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listAssignableApcs, switchBrandApc, listBrandsForUsers } from '../../lib/brandsApi';
+import { listAssignableApcs, switchBrandApc, assignBrandApc, listBrandsForUsers } from '../../lib/brandsApi';
 import { submitApcSwitchRequest } from '../../lib/brandSwitchApi';
+import {
+  permanentSameRole, swapPartner, assignReplaced, assignKept,
+  assignOutcome, swapOutcome, SWITCH_ACTIONS,
+} from '../../lib/brandSwitchRules';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   XIcon, AlertIcon, CheckIcon, SearchIcon, RefreshIcon,
 } from '../common/Icon';
 
 /**
- * Modal for moving a brand to a different APC.
+ * Modal for giving a brand to a different APC.
  *
- * Two modes, picked automatically by role:
- *   * Boss → always applies directly via `brand_switch_apc`.
- *   * OL   → defaults to direct but can flip to "Request from Boss",
- *            which writes a pending row to brand_switch_requests.
+ * Two independent choices:
+ *
+ *   ACTION — what moves (mig 360)
+ *     * Assign only     → brand_assign_apc. This one brand moves; the new APC
+ *                         keeps everything they already hold.
+ *     * Swap portfolios → brand_switch_apc. Both APCs exchange their whole book.
+ *
+ *   MODE — who applies it
+ *     * Boss → always applies directly.
+ *     * OL   → defaults to direct but can flip to "Request from Boss", which
+ *              writes a pending row carrying the chosen action.
+ *
+ * Assign is the default. A swap moves two people's entire portfolios; picking
+ * it by accident is far costlier than picking Assign by accident, which moves
+ * one brand and is undone by assigning it back.
  */
 export default function SwitchApcModal({ brand, onClose, onDone }) {
   const { profile } = useAuth();
@@ -21,6 +36,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
   const canDirectSwitch = ['boss', 'ol', 'developer'].includes(role);
   const canRequest      = role === 'ol';        // OL is the only role that benefits from the toggle
   const [mode, setMode] = useState(canDirectSwitch ? 'direct' : 'request');
+  const [action, setAction] = useState('assign');
 
   const [q, setQ] = useState('');
   const [pickedId, setPickedId] = useState('');
@@ -58,21 +74,35 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
 
   const picked = candidates.find((c) => c.id === pickedId) || null;
 
-  // The first assignee is the "other side" of the swap — the old
-  // APC whose book of brands will move to the picked APC and vice
-  // versa. If the brand has no APC yet, the swap degenerates to a
-  // one-way assignment; we don't render the Y→X column in that case.
-  const oldApc = current[0] || null;
-  const { data: swapLoads = {}, isLoading: loadingLoads } = useQuery({
-    queryKey: ['swap-brand-loads', oldApc?.id, pickedId],
-    queryFn: () => listBrandsForUsers([oldApc?.id, pickedId].filter(Boolean)),
+  // Computed by the SAME rules the database applies (lib/brandSwitchRules),
+  // so what this previews is what will happen.
+  const seat     = useMemo(() => permanentSameRole(current, picked), [current, picked]);
+  const partner  = useMemo(() => swapPartner(current, picked), [current, picked]);
+  const replaced = useMemo(() => assignReplaced(current, picked), [current, picked]);
+  const kept     = useMemo(() => assignKept(current, picked), [current, picked]);
+
+  // Brand lists for everyone whose portfolio can change: the target, and
+  // every permanent same-role assignee (the swap partner is the first of
+  // those; Assign replaces all of them).
+  const involvedIds = useMemo(
+    () => [pickedId, ...seat.map((u) => u.id)].filter(Boolean),
+    [pickedId, seat],
+  );
+  const { data: brandsByUser = {}, isLoading: loadingLoads } = useQuery({
+    queryKey: ['swap-brand-loads', ...involvedIds],
+    queryFn: () => listBrandsForUsers(involvedIds),
     enabled: !!pickedId,
   });
-  const brandsXtoY = oldApc ? (swapLoads[oldApc.id] || []) : [];
-  const brandsYtoX = picked ? (swapLoads[picked.id] || []) : [];
+
+  const thisBrand = { id: brand.id, brand_name: brand.brand_name };
+  const outcome = picked
+    ? (action === 'assign'
+      ? assignOutcome({ brand: thisBrand, picked, replaced, brandsByUser })
+      : swapOutcome({ brand: thisBrand, picked, partner, brandsByUser }))
+    : null;
 
   async function confirm() {
-    if (!pickedId) return setErr('Pick an APC to switch the brand to.');
+    if (!pickedId) return setErr('Pick an APC to give the brand to.');
     setBusy(true); setErr('');
     try {
       if (mode === 'request') {
@@ -81,7 +111,10 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
           toApcId: pickedId,
           reason: note.trim() || '',
           notify,
+          mode: action,
         });
+      } else if (action === 'assign') {
+        await assignBrandApc(brand.id, pickedId, note.trim() || null, notify);
       } else {
         await switchBrandApc(brand.id, pickedId, note.trim() || null, notify);
       }
@@ -90,11 +123,13 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
     finally { setBusy(false); }
   }
 
+  const verb = action === 'assign' ? 'assign' : 'swap';
+
   return (
     <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580 }}>
         <div className="wx-modal-header">
-          <div className="wx-modal-title">Switch APC — {brand.brand_name}</div>
+          <div className="wx-modal-title">Reassign APC — {brand.brand_name}</div>
           <button type="button" className="shell-icon-btn" onClick={onClose}>
             <XIcon width="16" height="16" />
           </button>
@@ -113,7 +148,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
               <button type="button" role="tab" aria-selected={mode === 'direct'}
                 className={`wx-seg-btn ${mode === 'direct' ? 'is-active' : ''}`}
                 onClick={() => setMode('direct')}>
-                Switch directly
+                Apply directly
               </button>
               <button type="button" role="tab" aria-selected={mode === 'request'}
                 className={`wx-seg-btn ${mode === 'request' ? 'is-active' : ''}`}
@@ -123,7 +158,39 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             </div>
           )}
 
-          {/* Current APC summary */}
+          {/* Action — what moves. Each option carries its one-line consequence
+              so the difference is read before it is picked, not after. */}
+          <div role="radiogroup" aria-label="What should happen"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            {Object.entries(SWITCH_ACTIONS).map(([key, a]) => {
+              const on = action === key;
+              return (
+                <button key={key} type="button" role="radio" aria-checked={on}
+                  onClick={() => setAction(key)}
+                  style={{
+                    textAlign: 'left', padding: '10px 12px', cursor: 'pointer',
+                    borderRadius: 'var(--radius-md)',
+                    border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border-subtle)'}`,
+                    background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
+                    color: 'var(--text-primary)',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13 }}>
+                    <span style={{
+                      width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${on ? 'var(--accent)' : 'var(--border-strong, var(--border-default))'}`,
+                      background: on ? 'var(--accent)' : 'transparent',
+                    }} />
+                    {a.label}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>
+                    {a.blurb}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Current assignees summary */}
           <div style={{
             padding: '10px 12px',
             background: 'var(--surface-2)',
@@ -139,11 +206,16 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             ) : current.map((u) => (
               <span key={u.id} style={{
                 display: 'inline-block',
-                marginRight: 8, padding: '2px 8px',
+                marginRight: 8, marginBottom: 4, padding: '2px 8px',
                 background: 'var(--surface-1)',
                 borderRadius: 'var(--radius-pill)',
                 fontWeight: 700,
-              }}>{u.display_name} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· {u.role}</span></span>
+              }}>
+                {u.display_name}{' '}
+                <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                  · {u.role}{u.expiresAt ? ' · temporary cover' : ''}
+                </span>
+              </span>
             ))}
             {brand.owner?.display_name && (
               <div style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 11.5 }}>
@@ -161,7 +233,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
 
           {/* Candidate list */}
           <div style={{
-            maxHeight: 280, overflowY: 'auto',
+            maxHeight: 240, overflowY: 'auto',
             display: 'flex', flexDirection: 'column', gap: 4,
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-md)',
@@ -204,7 +276,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             })}
           </div>
 
-          {/* Swap preview — shows exactly which brands move which way. */}
+          {/* Outcome preview — each person's brands before and after. */}
           {picked && (
             <div style={{
               marginTop: 12, padding: '12px 14px',
@@ -216,40 +288,57 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             }}>
               <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <RefreshIcon width="12" height="12" />
-                {mode === 'request' ? 'On approval — swap:' : 'On confirm — swap:'}
+                {mode === 'request' ? 'If Boss approves:' : 'On confirm:'}
               </div>
 
-              {loadingLoads ? (
+              {loadingLoads || !outcome ? (
                 <div style={{ color: 'var(--text-muted)' }}>
                   <span className="wx-spinner" /> Checking current brand lists…
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <SwapColumn
-                    from={oldApc}
-                    to={picked}
-                    brands={brandsXtoY}
-                    fallback="Only this brand will move."
-                  />
-                  <SwapColumn
-                    from={picked}
-                    to={oldApc}
-                    brands={brandsYtoX}
-                    fallback={oldApc
-                      ? `${picked.display_name} has no brands to send back.`
-                      : 'No current APC — nothing comes back.'}
-                  />
-                </div>
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+                    <Portfolio who={outcome.target.user} before={outcome.target.before} after={outcome.target.after} highlight={brand.id} />
+                    {action === 'assign'
+                      ? outcome.losers.map((l) => (
+                          <Portfolio key={l.user.id} who={l.user} before={l.before} after={l.after} highlight={brand.id} />
+                        ))
+                      : outcome.partner && (
+                          <Portfolio who={outcome.partner.user} before={outcome.partner.before} after={outcome.partner.after} highlight={brand.id} />
+                        )}
+                  </div>
+
+                  {action === 'assign' && outcome.losers.length === 0 && (
+                    <Hint>Nobody currently holds this brand in that role, so it is simply added to {picked.display_name}.</Hint>
+                  )}
+                  {action === 'swap' && outcome.degenerate && (
+                    <Hint>
+                      No {picked.role.toUpperCase()} holds this brand right now, so there is nothing to swap
+                      with — this behaves exactly like <strong>Assign only</strong>.
+                    </Hint>
+                  )}
+                  {action === 'assign' && kept.length > 0 && (
+                    <Hint>
+                      Stays on the brand: {kept.map((u) => `${u.display_name} (${u.role}${u.expiresAt ? ', temporary' : ''})`).join(', ')}.
+                    </Hint>
+                  )}
+                </>
               )}
 
               <div style={{
                 marginTop: 10, paddingTop: 8,
                 borderTop: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
-                fontSize: 11.5, color: 'var(--text-secondary)',
+                fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5,
               }}>
-                Each moved brand retargets its TL, reassigns open tasks, and is
-                audit-logged.
-                {mode === 'request' && ' Nothing moves until Boss approves the request.'}
+                {action === 'assign' ? (
+                  <>Only <strong>{brand.brand_name}</strong> moves. Its TL becomes {picked.display_name}&apos;s TL, and its
+                  open tasks, reports and resources move with it.</>
+                ) : (
+                  <>Every moved brand retargets its TL, and its open tasks, reports and resources move with it.
+                  Each moved brand is given to a single person, so <strong>anyone else assigned to those brands —
+                  IPCs, temporary cover — is removed</strong>.</>
+                )}
+                {mode === 'request' && ' Nothing changes until Boss approves.'}
               </div>
             </div>
           )}
@@ -260,8 +349,8 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             </label>
             <input className="wx-input" value={note} onChange={(e) => setNote(e.target.value)}
               placeholder={mode === 'request'
-                ? 'Why are you proposing this switch?'
-                : 'Reason for the switch (kept in audit log)…'} />
+                ? `Why are you proposing this ${verb}?`
+                : `Reason for the ${verb} (kept in audit log)…`} />
           </div>
 
           {/* Notifications are opt-in. Scoped to the new APC + TL only. */}
@@ -283,7 +372,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
               <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
                 {mode === 'request'
                   ? 'When Boss approves this request, the new APC and their TL will get an in-app + push notification.'
-                  : 'The new APC and their TL will get an in-app + push notification. Leave off for a silent switch.'}
+                  : 'The new APC and their TL will get an in-app + push notification. Leave off for a silent change.'}
               </div>
             </span>
           </label>
@@ -292,10 +381,10 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
           <button type="button" className="wx-btn wx-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="wx-btn wx-btn-primary" onClick={confirm} disabled={busy || !pickedId}>
             {busy
-              ? <><span className="wx-spinner" />{mode === 'request' ? ' Submitting…' : ' Switching…'}</>
+              ? <><span className="wx-spinner" />{mode === 'request' ? ' Submitting…' : action === 'assign' ? ' Assigning…' : ' Swapping…'}</>
               : mode === 'request'
-                ? <><CheckIcon width="14" height="14" /> Submit request</>
-                : <><CheckIcon width="14" height="14" /> Confirm switch</>}
+                ? <><CheckIcon width="14" height="14" /> Submit {verb} request</>
+                : <><CheckIcon width="14" height="14" /> Confirm {verb}</>}
           </button>
         </div>
       </div>
@@ -312,28 +401,48 @@ function Avatar({ user }) {
   return <div style={style}>{init}</div>;
 }
 
-// One side of the swap preview. Renders the list of brand names that
-// will move from `from` to `to`. Brands have `id, brand_name, logo_url`.
-function SwapColumn({ from, to, brands, fallback }) {
-  if (!from || !to) return null;
+const Hint = ({ children }) => (
+  <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{children}</div>
+);
+
+// One person's brands, before → after. Brands gained are marked + and brands
+// lost are struck through, so the effect of the action reads at a glance —
+// which matters most for a swap, where the whole list changes hands.
+function Portfolio({ who, before, after, highlight }) {
+  if (!who) return null;
+  const beforeIds = new Set((before || []).map((b) => b.id));
+  const afterIds = new Set((after || []).map((b) => b.id));
+  const lost = (before || []).filter((b) => !afterIds.has(b.id));
   return (
-    <div>
+    <div style={{ background: 'var(--surface-1)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
         fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase',
-        letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6,
+        letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 6,
       }}>
-        <strong style={{ color: 'var(--text-secondary)' }}>{from.display_name}</strong>
-        → <strong style={{ color: 'var(--text-secondary)' }}>{to.display_name}</strong>
+        {who.display_name}
+        <span style={{ fontWeight: 600, textTransform: 'none', letterSpacing: 0 }}>
+          {' '}· {before.length} → {after.length} brand{after.length === 1 ? '' : 's'}
+        </span>
       </div>
-      {brands.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-          {fallback}
-        </div>
+      {after.length === 0 && lost.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>No brands</div>
       ) : (
-        <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12.5, lineHeight: 1.45 }}>
-          {brands.map((b) => <li key={b.id}><strong>{b.brand_name}</strong></li>)}
+        <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12.5, lineHeight: 1.5 }}>
+          {after.map((b) => (
+            <li key={b.id} style={{ fontWeight: b.id === highlight ? 800 : 500 }}>
+              {!beforeIds.has(b.id) && <span style={{ color: 'var(--success)', fontWeight: 800 }}>+ </span>}
+              {b.brand_name}
+            </li>
+          ))}
+          {lost.map((b) => (
+            <li key={`x-${b.id}`} style={{ color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+              {b.brand_name}
+            </li>
+          ))}
         </ul>
+      )}
+      {after.length === 0 && lost.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>Left with no brands</div>
       )}
     </div>
   );
