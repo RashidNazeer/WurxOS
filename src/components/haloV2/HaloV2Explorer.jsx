@@ -23,7 +23,9 @@ import {
   ScatterChart, Scatter, ZAxis,
 } from 'recharts';
 import { setHaloCurrency, getHaloCurrency, fmtValue } from '../../lib/haloFields';
-import { sourceForGran, availableGrans, availableFields, buildPeriods, detectControls } from '../../lib/haloV2/dataAdapter';
+import {
+  sourceForGran, dailySourceFor, availableGrans, availableFields, dataSpan, buildPeriods, detectControls,
+} from '../../lib/haloV2/dataAdapter';
 import { analyseHalo } from '../../lib/haloV2/index.js';
 import { fmtSignedPct, signedCorrColor, signedCorrTextColor, describeCorrelation, MIN_CORRELATION_OBS } from '../../lib/haloV2/correlation.js';
 import { haloFinder } from '../../lib/haloV2/lagAnalysis.js';
@@ -89,9 +91,10 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
     setExcludeIndex(null);
     setChartsOnly(false);
     setPlanning({ ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null });
-    // srcRows / grainPinned / autoAppliedFor are declared below; this closure
-    // only ever runs from a click, long after the render that defines them.
-    if (srcRows?.length) setRange({ start: srcRows[0].date, end: srcRows[srcRows.length - 1].date });
+    // srcRows / dailyRows / grainPinned / autoAppliedFor are declared below;
+    // this closure only ever runs from a click, long after the render that
+    // defines them.
+    if (srcRows?.length) setRange(dataSpan(srcRows, dailyRows));
     grainPinned.current = false;
     autoAppliedFor.current = null;
   };
@@ -108,6 +111,11 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
   const grans = useMemo(() => availableGrans(list), [dsKey]);        // eslint-disable-line react-hooks/exhaustive-deps
   const src = useMemo(() => sourceForGran(list, gran), [dsKey, gran]); // eslint-disable-line react-hooks/exhaustive-deps
   const srcRows = src?.dataset?.id ? (rowsById[src.dataset.id] || null) : null;
+  // Weekly and monthly take the charted metrics from the daily sheet wherever it
+  // covers a whole period, so a weekly sheet built before the latest daily
+  // upload cannot hold them back (dailyFill.js).
+  const dailySrc = useMemo(() => dailySourceFor(list, src), [dsKey, src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dailyRows = dailySrc?.id ? (rowsById[dailySrc.id] || null) : null;
 
   useEffect(() => {
     const present = list.filter((d) => d.id);
@@ -124,11 +132,11 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
   useEffect(() => { if (grans.length && !grans.includes(gran)) setGran(grans.includes('week') ? 'week' : grans[0]); }, [grans, gran]);
   useEffect(() => { setHaloCurrency(src?.dataset?.currency || '$'); }, [src]);
   useEffect(() => {
-    if (srcRows && srcRows.length) setRange({ start: srcRows[0].date, end: srcRows[srcRows.length - 1].date });
+    if (srcRows && srcRows.length) setRange(dataSpan(srcRows, dailyRows));
     else setRange({ start: '', end: '' });
-  }, [src?.dataset?.id, srcRows]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [src?.dataset?.id, srcRows, dailyRows]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fields = useMemo(() => availableFields(srcRows), [srcRows]);
+  const fields = useMemo(() => availableFields(srcRows, dailyRows), [srcRows, dailyRows]);
   const tiktokFields = fields.filter((f) => f.group === 'tiktok');
   const amazonFields = fields.filter((f) => f.group === 'amazon');
   useEffect(() => { if (tiktokFields.length && !tiktokFields.some((f) => f.key === xKey)) setXKey(tiktokFields[0].key); }, [tiktokFields, xKey]);
@@ -152,7 +160,11 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
       if (!s) return [];
       const rows = s.dataset?.id ? rowsById[s.dataset.id] : null;
       if (!rows?.length) return [];
-      return buildPeriods({ rows, sourceGran: s.sourceGran, gran: g, xKey, yKey, range }).periods;
+      const daily = dailySourceFor(list, s);
+      return buildPeriods({
+        rows, sourceGran: s.sourceGran, gran: g, xKey, yKey, range,
+        dailyRows: daily?.id ? rowsById[daily.id] : null,
+      }).periods;
     };
     return assessGrains(grans, periodsFor, { maxLag, controls: controlOpts });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,9 +209,9 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
 
   const pickGrain = (g) => { grainPinned.current = true; setGran(g); setChartsOnly(false); };
 
-  const { periods } = useMemo(() => buildPeriods({
-    rows: srcRows, sourceGran: src?.sourceGran, gran, xKey, yKey, range,
-  }), [srcRows, src?.sourceGran, gran, xKey, yKey, range]);
+  const { periods, filledFromDaily } = useMemo(() => buildPeriods({
+    rows: srcRows, sourceGran: src?.sourceGran, gran, xKey, yKey, range, dailyRows,
+  }), [srcRows, src?.sourceGran, gran, xKey, yKey, range, dailyRows]);
 
   const controlsFound = useMemo(() => detectControls(periods), [periods]);
 
@@ -381,6 +393,7 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
         <ObservedLayer
           result={result} unit={unit} xKey={xKey} yKey={yKey} periods={periods}
           normalize={normalize} assessment={assessment} showScatter={showScatter}
+          filledFromDaily={filledFromDaily}
         />
       </Layer>
 
@@ -423,7 +436,7 @@ export default function HaloV2Explorer({ datasets, loadRows, brandName = null })
           the story. */}
       <StageStepper statuses={stages} />
       <HaloFinderV2
-        periods={periods} srcRows={srcRows} src={src} gran={gran} yKey={yKey} range={range}
+        periods={periods} srcRows={srcRows} dailyRows={dailyRows} src={src} gran={gran} yKey={yKey} range={range}
         tiktokFields={tiktokFields} maxLag={effectiveMaxLag} unit={unit}
         suggestion={suggestion} onSwitchGrain={pickGrain}
       />
@@ -450,7 +463,7 @@ const rangeText = (range) => (range?.start && range?.end ? `${range.start} to ${
 // ────────────────────────────────────────────────────────────────
 // Layer A
 // ────────────────────────────────────────────────────────────────
-function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessment, showScatter }) {
+function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessment, showScatter, filledFromDaily = [] }) {
   const o = result.observed;
   const best = o.lagCorrelations.find((r) => r.lag === o.bestObservedLag);
   const invNoteX = inverseNote(xKey), invNoteY = inverseNote(yKey);
@@ -596,6 +609,12 @@ function ObservedLayer({ result, unit, xKey, yKey, periods, normalize, assessmen
           completeObservations: result.meta.completeObservations,
           unit,
         })}
+        {filledFromDaily.length > 0 && (
+          <>
+            {' '}{filledFromDaily.map(plainMetricLabel).join(' and ')} per {unit}{' '}
+            {filledFromDaily.length > 1 ? 'are' : 'is'} totalled from the daily sheet for every {unit} it covers.
+          </>
+        )}
       </div>
     </>
   );
@@ -973,13 +992,15 @@ function AdjustedLayer({
 // ────────────────────────────────────────────────────────────────
 // Halo Finder V2 (§26, §I)
 // ────────────────────────────────────────────────────────────────
-function HaloFinderV2({ srcRows, src, gran, yKey, range, tiktokFields, maxLag, unit, suggestion, onSwitchGrain }) {
+function HaloFinderV2({ srcRows, dailyRows, src, gran, yKey, range, tiktokFields, maxLag, unit, suggestion, onSwitchGrain }) {
   const rows = useMemo(() => {
     if (!srcRows?.length || !src) return [];
     const keys = tiktokFields.map((f) => f.key);
-    const seriesFor = (k) => buildPeriods({ rows: srcRows, sourceGran: src.sourceGran, gran, xKey: k, yKey, range }).periods;
+    const seriesFor = (k) => buildPeriods({
+      rows: srcRows, sourceGran: src.sourceGran, gran, xKey: k, yKey, range, dailyRows,
+    }).periods;
     return haloFinder(keys, yKey, seriesFor, maxLag);
-  }, [srcRows, src, gran, yKey, range, tiktokFields, maxLag]);
+  }, [srcRows, dailyRows, src, gran, yKey, range, tiktokFields, maxLag]);
 
   if (!rows.length) return null;
   const usable = rows.filter((r) => r.correlation != null);

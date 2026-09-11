@@ -9,6 +9,7 @@
 // is refused rather than answered.
 // ============================================================
 
+import { register } from 'node:module';
 import { pearson, signedCorrelation } from '../src/lib/haloV2/correlation.js';
 import { lagCorrelations, bestObservedLag } from '../src/lib/haloV2/lagAnalysis.js';
 import { fitDistributedLag, capacityOf, bestFeasibleLag } from '../src/lib/haloV2/distributedLag.js';
@@ -30,6 +31,17 @@ import {
 } from '../src/lib/haloV2/plainLanguage.js';
 import { buildHaloV2Csv, haloV2CsvFilename } from '../src/lib/haloV2/exportCsv.js';
 import { HALO_FIELDS } from '../src/lib/haloFields.js';
+import { fillFromDaily } from '../src/lib/haloV2/dailyFill.js';
+
+// dataAdapter reaches V1's haloMath, whose imports are extensionless (Vite
+// resolves them). Resolve them the same way here so the adapter can be tested
+// end to end; static imports are hoisted, so the adapter loads afterwards.
+register('data:text/javascript,' + encodeURIComponent(`
+export async function resolve(spec, ctx, next) {
+  try { return await next(spec, ctx); }
+  catch (e) { if (spec.startsWith('.') && !/\\.m?js$/.test(spec)) return next(spec + '.js', ctx); throw e; }
+}`));
+const { buildPeriods } = await import('../src/lib/haloV2/dataAdapter.js');
 
 let passed = 0, failed = 0;
 const results = [];
@@ -1515,6 +1527,109 @@ function haloFinderTest(res) {
       return per ? n / per >= 0.85 : false;
     }),
     phrases.filter((s) => /about a year/.test(s)).slice(0, 3).join(' | '));
+}
+
+// ── DAILY FILL — weekly/monthly take the charted metrics from the daily sheet ─
+// Longevity's shape: a weekly sheet built from an older daily upload (revenue
+// missing, zero or stale) beside a daily sheet with "Total Revenue/Day" every
+// day. Weekly and monthly must show the daily totals, not the stale snapshot.
+{
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const dailyFrom = (start, end, metricsFor, skip = []) => {
+    const out = [];
+    for (let d = new Date(`${start}T00:00:00Z`); iso(d) <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+      if (!skip.includes(iso(d))) out.push({ date: iso(d), metrics: metricsFor(iso(d)) });
+    }
+    return out;
+  };
+  // 1 Mar 2026 is a Sunday, so the weekly sheet's anchors are Sundays, as built.
+  const daily = dailyFrom('2026-03-01', '2026-04-30',
+    () => ({ revenue_per_day: 100, gmv: 10, aov: 20, ntb: 0 }), ['2026-03-18']);
+  const weekSheet = [
+    { key: '2026-03-01', label: 'wk1', metrics: { gmv: 70, keyword_search_volume: 5000, ntb: 7 } },        // no revenue key
+    { key: '2026-03-08', label: 'wk2', metrics: { gmv: 70, revenue_per_day: 0, keyword_search_volume: 5000, ntb: 7 } },
+    { key: '2026-03-15', label: 'wk3', metrics: { gmv: 70, revenue_per_day: 155, keyword_search_volume: 5000, ntb: 7 } },
+    { key: '2026-03-22', label: 'wk4', metrics: { gmv: 70, revenue_per_day: 999, keyword_search_volume: 5000, ntb: 7 } },
+  ];
+  const run = (opts) => fillFromDaily({ buckets: weekSheet, dailyRows: daily, gran: 'week', keys: ['gmv', 'revenue_per_day'], ...opts });
+  const at = (res, key) => res.buckets.find((b) => b.key === key)?.metrics || {};
+
+  const r = run();
+  check('FILL 1. a week the weekly sheet has no revenue for takes the daily total',
+    at(r, '2026-03-01').revenue_per_day === 700, `got ${at(r, '2026-03-01').revenue_per_day}`);
+  check('FILL 2. a weekly-sheet 0 ("not tracked") is replaced by the daily total',
+    at(r, '2026-03-08').revenue_per_day === 700, `got ${at(r, '2026-03-08').revenue_per_day}`);
+  check('FILL 3. a stale weekly figure is replaced by the daily total',
+    at(r, '2026-03-22').revenue_per_day === 700, `got ${at(r, '2026-03-22').revenue_per_day}`);
+  check('FILL 4. one row missing mid-sheet still fills the week (6 of 7 days)',
+    at(r, '2026-03-15').revenue_per_day === 600, `got ${at(r, '2026-03-15').revenue_per_day}`);
+  check('FILL 5. weekly-only metrics (search volume, NTB) are left as the weekly sheet has them',
+    at(r, '2026-03-01').keyword_search_volume === 5000 && at(r, '2026-03-01').ntb === 7);
+  check('FILL 6. full weeks the daily sheet covers past the weekly sheet are added, on the same Sunday anchors',
+    r.buckets.map((b) => b.key).join(',') === '2026-03-01,2026-03-08,2026-03-15,2026-03-22,2026-03-29,2026-04-05,2026-04-12,2026-04-19',
+    r.buckets.map((b) => b.key).join(','));
+  check('FILL 7. an added week carries the daily totals and a readable label',
+    at(r, '2026-04-19').revenue_per_day === 700 && r.buckets.at(-1).label === '19 Apr – 25 Apr 2026',
+    `${at(r, '2026-04-19').revenue_per_day} "${r.buckets.at(-1).label}"`);
+  check('FILL 8. filled reports the metrics the daily sheet changed',
+    r.filled.includes('revenue_per_day') && !r.filled.includes('ntb'), JSON.stringify(r.filled));
+  check('FILL 9. the input buckets are not mutated',
+    weekSheet[0].metrics.revenue_per_day === undefined && weekSheet[3].metrics.revenue_per_day === 999);
+
+  const zero = run({ keys: ['ntb'] });
+  check('FILL 10. a daily zero never overwrites a real weekly figure',
+    at(zero, '2026-03-01').ntb === 7 && !zero.filled.length, JSON.stringify(zero.filled));
+
+  const avg = fillFromDaily({ buckets: weekSheet, dailyRows: daily, gran: 'week', keys: ['aov'] });
+  check('FILL 11. an average metric is averaged over the week, not summed',
+    at(avg, '2026-03-01').aov === 20, `got ${at(avg, '2026-03-01').aov}`);
+
+  const lateDaily = daily.filter((d) => d.date >= '2026-03-03');
+  const edge = fillFromDaily({ buckets: weekSheet, dailyRows: lateDaily, gran: 'week', keys: ['revenue_per_day'] });
+  check('FILL 12. a week the daily sheet only partly reaches keeps the weekly sheet value',
+    at(edge, '2026-03-01').revenue_per_day === undefined && at(edge, '2026-03-22').revenue_per_day === 700);
+
+  const ranged = run({ range: { start: '2026-03-01', end: '2026-03-10' } });
+  check('FILL 13. daily rows outside the date range are not used, and nothing is added past it',
+    at(ranged, '2026-03-08').revenue_per_day === 0 && ranged.buckets.length === 4
+      && at(ranged, '2026-03-01').revenue_per_day === 700);
+
+  const months = fillFromDaily({
+    buckets: [{ key: '2026-03', label: '2026-03', metrics: { revenue_per_day: 50, keyword_search_volume: 20000 } }],
+    dailyRows: daily, gran: 'month', keys: ['revenue_per_day'],
+  });
+  check('FILL 14. monthly is the calendar-month daily total (30 of 31 days present)',
+    at(months, '2026-03').revenue_per_day === 3000 && at(months, '2026-03').keyword_search_volume === 20000,
+    `got ${at(months, '2026-03').revenue_per_day}`);
+  check('FILL 15. a later month the daily sheet covers is added',
+    months.buckets.map((b) => b.key).join(',') === '2026-03,2026-04' && at(months, '2026-04').revenue_per_day === 3000);
+
+  const same = fillFromDaily({
+    buckets: [{ key: '2026-03-01', label: 'wk1', metrics: { revenue_per_day: 700 } }],
+    dailyRows: daily.filter((d) => d.date <= '2026-03-07'), gran: 'week', keys: ['revenue_per_day'],
+  });
+  check('FILL 16. a weekly sheet that already agrees with the daily sheet is reported as unchanged',
+    !same.filled.length && at(same, '2026-03-01').revenue_per_day === 700);
+  check('FILL 17. a daily view is never filled',
+    fillFromDaily({ buckets: weekSheet, dailyRows: daily, gran: 'day', keys: ['revenue_per_day'] }).buckets === weekSheet);
+
+  // End to end through buildPeriods, which the explorer calls.
+  const weekRows = weekSheet.map((b) => ({ date: b.key, periodLabel: b.label, metrics: b.metrics }));
+  const base = { rows: weekRows, sourceGran: 'week', gran: 'week', xKey: 'gmv', yKey: 'revenue_per_day', range: {} };
+  const without = buildPeriods(base);
+  const withDaily = buildPeriods({ ...base, dailyRows: daily });
+  check('FILL 18. buildPeriods without daily rows behaves exactly as before',
+    without.periods[0].y === null && without.periods.length === 4 && !without.filledFromDaily.length);
+  check('FILL 19. buildPeriods with daily rows shows revenue from the first week',
+    withDaily.periods[0].y === 700 && withDaily.periods[0].x === 70 && withDaily.filledFromDaily.includes('revenue_per_day'),
+    `y=${withDaily.periods[0].y} filled=${JSON.stringify(withDaily.filledFromDaily)}`);
+  const monthly = buildPeriods({ ...base, gran: 'month', dailyRows: daily });
+  check('FILL 20. buildPeriods monthly from a weekly sheet uses the daily month totals',
+    monthly.periods.map((p) => `${p.key}=${p.y}`).join(',') === '2026-03=3000,2026-04=3000',
+    monthly.periods.map((p) => `${p.key}=${p.y}`).join(','));
+  const fromDaily = buildPeriods({ ...base, rows: daily, sourceGran: 'day', dailyRows: daily });
+  check('FILL 21. a view already rolled up from the daily sheet is not filled a second time',
+    fromDaily.periods.find((p) => p.key === '2026-03-07')?.y === 700 && !fromDaily.filledFromDaily.length);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
