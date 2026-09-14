@@ -62,12 +62,12 @@ export default function StatusPanel({
         <div>
           <SectionLabel>What you can still see</SectionLabel>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: 'var(--text-secondary)' }}>
-            {hasSeries && <li>Descriptive charts over time and the scatter — Stage 1 is complete.</li>}
+            {hasSeries && <li>The charts over time, which are already complete for this window.</li>}
             {!blockedCorrelations && <li>Signed correlations at every lag with enough overlap.</li>}
             {blockedCorrelations && (
               <li>
-                Correlations unlock at ≥ {assessment.correlationRequired} overlapping periods
-                — this view has {assessment.correlationObs}.
+                Correlations need {assessment.correlationRequired} overlapping periods, and this view
+                has {assessment.correlationObs}.
               </li>
             )}
             {assessment.canModel && assessment.lagReduced && (

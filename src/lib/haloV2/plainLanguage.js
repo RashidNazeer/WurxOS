@@ -61,7 +61,7 @@ export function formatMetricValue(v, key, { indexed = false } = {}) {
   // toLocaleString and toFixed render that verbatim — so a client tooltip could
   // read "Infinity". haloFields.fmtValue guards null and NaN but not this, and
   // it is shared with V1, so the guard belongs in the V2 presentation layer.
-  if (v == null || !Number.isFinite(Number(v))) return '—';
+  if (v == null || !Number.isFinite(Number(v))) return 'n/a';
   if (indexed) return Number(v).toFixed(1);
   const fmt = FIELD_BY_KEY[key]?.fmt || 'num';
   return fmtValue(Number(v), fmt);
@@ -84,7 +84,7 @@ export const GLOSSARY = [
   {
     term: 'GMV',
     short: 'TikTok Shop sales',
-    def: 'Gross Merchandise Value — the total value of goods sold through TikTok Shop before returns, fees or discounts.',
+    def: 'Gross Merchandise Value: the total value of goods sold through TikTok Shop before returns, fees or discounts.',
   },
   {
     term: 'NTB',
@@ -94,7 +94,7 @@ export const GLOSSARY = [
   {
     term: 'Halo',
     short: 'Off-platform movement',
-    def: 'The idea that TikTok activity moves demand on OTHER channels — here, Amazon. This tool measures whether the two move together; it cannot prove one caused the other.',
+    def: 'The idea that TikTok activity moves demand on OTHER channels, here Amazon. This tool measures whether the two move together. It cannot prove one drove the other.',
   },
   {
     term: 'Modelled',
@@ -104,7 +104,7 @@ export const GLOSSARY = [
   {
     term: 'Incremental',
     short: 'Extra sales that would not have happened',
-    def: 'Sales that genuinely would not have occurred without the activity. Establishing this needs a controlled test — a geo holdout or similar — which this tool does not run. Nothing here is incremental.',
+    def: 'Sales that genuinely would not have occurred without the activity. Establishing this needs a controlled test (a geo holdout or similar), which this tool does not run. Nothing here is incremental.',
   },
   {
     term: 'Attributed',
@@ -114,7 +114,7 @@ export const GLOSSARY = [
   {
     term: 'Lag',
     short: 'A delay before an effect shows',
-    def: 'How many days, weeks or months later an effect might appear. A lag of 0 means the same period — which is co-movement, not a delay.',
+    def: 'How many days, weeks or months later an effect might appear. A lag of 0 means the same period, which is co-movement rather than a delay.',
   },
   {
     term: 'Counterfactual',
@@ -188,7 +188,7 @@ export function keyTakeaway(result, { unit = 'period', xKey, yKey } = {}) {
       // requires to stay visible. Phrased conditionally because on this branch
       // no correlation has been computed yet — but the caveat has to be on
       // screen BEFORE the first number arrives, not after.
-      caveat: 'Even where these move together, that is correlation — not proof TikTok caused Amazon sales.',
+      caveat: 'Even where these move together, that is correlation. Moving together is not proof of cause.',
       soWhat: 'Widen the date range or switch view to get a first read. The charts below still show what data there is.',
       canPlan: false,
       hasFinding: false,
@@ -211,9 +211,9 @@ export function keyTakeaway(result, { unit = 'period', xKey, yKey } = {}) {
   // reading "use this for planning" next to a locked planning section learns
   // that the page contradicts itself.
   const soWhat = canPlan
-    ? 'You can use this for spend scenarios — as a planning assumption, not a forecast of lift.'
+    ? 'You can use this for spend scenarios, as a planning assumption rather than a forecast of lift.'
     : m.available
-      ? 'Treat this as supporting evidence, not a basis for spend scenarios yet — the planning section explains what is missing.'
+      ? 'Treat this as supporting evidence, not a basis for spend scenarios yet. The Plan step lists what is missing.'
       : 'Treat this as a first look. There is not enough history for a modelled estimate, so no spend scenarios.';
 
   return {
@@ -223,7 +223,7 @@ export function keyTakeaway(result, { unit = 'period', xKey, yKey } = {}) {
     confidenceLabel: m.available ? m.confidenceLabel : null,
     observations: obs,
     observationUnit: unitWord,
-    caveat: 'This is correlation, not proof TikTok caused Amazon sales.',
+    caveat: 'This is correlation. Moving together is not proof of cause.',
     soWhat,
     canPlan,
     hasFinding: strength !== 'negligible',

@@ -53,7 +53,7 @@ export default function HaloV2Page() {
               two say materially different things. */}
           <h1 className="page-title" style={{ margin: 0 }}>Amazon Halo V2</h1>
           <p className="page-subtitle" style={{ margin: '4px 0 0' }}>
-            Here&apos;s how TikTok Shop activity moved with Amazon outcomes in this period — and how sure we are.
+            How TikTok Shop activity moved with Amazon outcomes in this period, and how sure we are.
             {' '}<Link to="/halo" style={{ color: 'var(--accent)' }}>The original Halo tool</Link> is unchanged.
           </p>
         </div>
@@ -96,10 +96,13 @@ export default function HaloV2Page() {
           datasets={brandDatasets}
           loadRows={loadRows}
           brandName={selected?.brand?.brand_name || null}
+          // Internal users move between both views all day, so this page
+          // remembers the last one. A client link always opens in Meeting.
+          rememberMode
         />
       ) : (
         <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-          No sheets for <strong>{selected?.brand?.brand_name}</strong> yet — upload one on the{' '}
+          No sheets for <strong>{selected?.brand?.brand_name}</strong> yet. Upload one on the{' '}
           <Link to="/halo" style={{ color: 'var(--accent)' }}>Amazon Halo</Link> page.
         </div>
       )}

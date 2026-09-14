@@ -86,7 +86,7 @@ export default function HaloV2ShareModal({ brands = [], onClose }) {
           )}
 
           <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 14 }}>
-            Anyone with the link can view the <strong>Amazon Halo V2</strong> explorer for the <strong>selected brands</strong> (read-only) — no login required. Revoke any time.
+            Anyone with the link can view the <strong>Amazon Halo V2</strong> explorer for the <strong>selected brands</strong> (read-only) with no login required. Revoke any time.
           </div>
 
           <div style={{ marginBottom: 14 }}>
