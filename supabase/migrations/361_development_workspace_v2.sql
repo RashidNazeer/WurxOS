@@ -1,7 +1,7 @@
 -- ============================================================
--- WurxOS v2 — Migration 360: Development workspace v2.
+-- WurxOS v2 — Migration 361: Development workspace v2.
 --
--- Keeps the data introduced by 328/329, while promoting the old levels:
+-- Keeps existing data introduced by 328/329, while promoting the old levels:
 --   dev_projects -> products, dev_tasks -> features, dev_subtasks -> tasks.
 -- Status changes and planning moves are RPC-only so review authority cannot
 -- be bypassed by editing a request in the browser console.
