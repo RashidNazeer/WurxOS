@@ -13,6 +13,7 @@ import '../../styles/notifications.css';
 // Category metadata (icon + class suffix used in the avatar badge color).
 const CATEGORY_META = {
   task:         { label: 'Tasks',        icon: ChecklistIcon },
+  dev_task:     { label: 'Development',  icon: ChecklistIcon },
   report:       { label: 'Reports',      icon: ReportIcon },
   brand:        { label: 'Brands',       icon: StoreIcon },
   paid_collab:  { label: 'Paid Collab',  icon: MegaphoneIcon },
