@@ -1724,6 +1724,16 @@ function haloFinderTest(res) {
   check('PLAN 5. assumptions mode still lists what would unlock the model',
     (planAssumed.planningEligibility.blockers || []).length > 0
       && planAssumed.planningEligibility.blockers.every((b) => b.message && b.fix));
+  // The state says 'model' but the model is no longer eligible: the tag must
+  // fall back rather than travel with figures the model may not set.
+  const planStale = withRevenue(periods(noiseX, noiseY), { maxLag: 2 }, {
+    ttsRevenue: '100000', marketingSpend: '30000', assumptions: { conservative: 5, base: 10, upside: 20 }, mode: 'model',
+  });
+  check('PLAN 5b. a stored "model" mode degrades to ASSUMED once the model stops qualifying',
+    planStale.planning.mode === 'assumptions' && planStale.planning.base.haloPercent === 10
+      && planStale.planning.source == null,
+    `mode=${planStale.planning.mode}`);
+
   check('PLAN 6. a manual edit is labelled an override, not the model',
     planOverride.planning.mode === 'override' && planOverride.planning.modeLabel === 'Manual override'
       && planOverride.planning.base.haloPercent === 10);

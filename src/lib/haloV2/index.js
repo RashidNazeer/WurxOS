@@ -133,7 +133,13 @@ export function analyseHalo(periods, {
   // override any figure and only the component knows whether they have. It
   // passes both in; this does the arithmetic and carries the labelling through,
   // so "From adjusted model" can never sit next to numbers someone has edited.
-  const planningMode = planning?.mode || (derived.usable ? 'model' : 'assumptions');
+  // Eligibility decides the mode, not the caller's stored preference. A user
+  // can apply the model, then narrow the date range until the model no longer
+  // qualifies; the state still says 'model', and without this the scenarios
+  // would keep the MODELLED tag while resting on figures the model is no
+  // longer allowed to set. Failing back to 'assumptions' is the safe
+  // direction: the numbers survive, the claim about them does not.
+  const planningMode = derived.usable ? (planning?.mode || 'model') : 'assumptions';
   const planningOut = planning
     ? planningModel({
         ttsRevenue: planning.ttsRevenue,
