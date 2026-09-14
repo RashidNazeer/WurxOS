@@ -660,12 +660,11 @@ export default function App() {
               />
 
               {/* Bugs — everyone authenticated (RLS filters rows per role) */}
-              {/* Developer task management (mig 328) — Boss, OL and the
-                  developer only. :id opens one pipeline's board. */}
+              {/* Development workspace — private to the Boss and developers. */}
               <Route
                 path="/dev-tasks/:id?"
                 element={
-                  <RoleGuard allow={['boss', 'ol', 'developer']}>
+                  <RoleGuard allow={['boss', 'developer']}>
                     <DevTasksPage />
                   </RoleGuard>
                 }

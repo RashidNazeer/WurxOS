@@ -1,1262 +1,327 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  listDevTasks, getDevTask, createDevTask, updateDevTask, setDevTaskStatus,
-  forceCompleteDevTask, confirmRequested, deleteDevTask,
-  createSubtask, setSubtaskStatus, updateSubtask, deleteSubtask,
-  listSubtasks, addNote, listRequesters,
-  listProjects, createProject, updateProject, archiveProject, PROJECT_COLOURS,
-  STATUS_META, PRIORITY_META, DEV_PRIORITIES, BOARD_COLUMNS, sortTasks, nextUp,
+  STATUS_META, PRIORITY_META, ROLLUP_META, DEV_PRIORITIES,
+  loadDevelopmentWorkspace, listTaskActivity, createFeature,
+  moveFeature, createWorkTask, updateWorkTask, transitionWorkTask,
+  addActivity, postEod, markBugDuplicate, issueScreenshotUrl,
+  allowedTaskActions, sortWorkTasks, waitingLabel,
 } from '../../lib/devTasksApi';
-// The .wx-modal / .wx-modal-backdrop overlay styles live here and are imported
-// PER PAGE, not globally (see the same import in HaloShareModal, AuditPage,
-// BrandDetailPage...). Without it the dialogs render as unstyled blocks in the
-// page flow, which is exactly what happened here.
 import '../../styles/table.css';
+import '../../styles/development.css';
 
-// Developer task management. Two levels: a task (the "pipeline") holding
-// subtasks shown as a board. See mig 328 for the model and why the statuses
-// are what they are.
-
-const todayKarachi = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }))
+const isoToday = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }))
   .toISOString().slice(0, 10);
 
-function fmtDate(d) {
-  if (!d) return null;
-  const [y, m, day] = d.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, day))
-    .toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' });
-}
-function relTime(iso) {
-  const ms = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? 'yesterday' : `${d}d ago`;
+function shortDate(value) {
+  if (!value) return '—';
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-GB', {
+    timeZone: 'UTC', day: 'numeric', month: 'short',
+  });
 }
 
-function Chip({ tone, children, title, solid }) {
+function age(value) {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
+function initials(person) {
+  return String(person?.display_name || '?').split(/\s+/).map((word) => word[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function Avatar({ person, alert = false }) {
   return (
-    <span title={title} style={{
-      fontSize: 10.5, fontWeight: 700, letterSpacing: 0.2, padding: '2.5px 8px',
-      borderRadius: 999, whiteSpace: 'nowrap',
-      background: solid ? tone : `color-mix(in srgb, ${tone} 14%, transparent)`,
-      color: solid ? '#fff' : tone,
-      border: `1px solid color-mix(in srgb, ${tone} 30%, transparent)`,
-    }}>{children}</span>
-  );
-}
-
-function StatusChip({ status }) {
-  const m = STATUS_META[status] || STATUS_META.pending;
-  return <Chip tone={m.tone}><i className={`bi ${m.icon}`} style={{ marginRight: 4 }} />{m.label}</Chip>;
-}
-function PriorityChip({ priority }) {
-  const m = PRIORITY_META[priority] || PRIORITY_META.medium;
-  return <Chip tone={m.tone} solid={priority === 'urgent'}>{m.label}</Chip>;
-}
-
-function Progress({ pct, done, counted }) {
-  const has = pct != null;
-  return (
-    <div>
-      <div style={{
-        height: 6, borderRadius: 999, background: 'var(--surface-2)',
-        overflow: 'hidden', border: '1px solid var(--border-subtle)',
-      }}>
-        <div style={{
-          width: `${has ? pct : 0}%`, height: '100%',
-          background: pct === 100 ? 'var(--success)' : 'var(--primary)',
-          transition: 'width .3s ease',
-        }} />
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-        {has ? <>{done}/{counted} subtasks · {pct}%</> : 'No subtasks'}
-      </div>
-    </div>
-  );
-}
-
-function ProjectChip({ name, colour }) {
-  if (!name) return null;
-  const c = PROJECT_COLOURS[colour] || PROJECT_COLOURS.slate;
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11,
-      fontWeight: 700, color: c, whiteSpace: 'nowrap',
-    }}>
-      <span style={{ width: 7, height: 7, borderRadius: 99, background: c, flex: '0 0 auto' }} />
-      {name}
+    <span className={`dev-avatar${alert ? ' is-alert' : ''}`} title={person?.display_name || 'Unassigned'}>
+      {person?.avatar_url ? <img src={person.avatar_url} alt="" /> : initials(person)}
     </span>
   );
 }
 
-// The Boss's real question is "what is coming, what is moving, what is stuck".
-// The parent's own status cannot answer it: a pipeline sits at Pending while a
-// subtask inside it is already in progress, which is exactly what looked wrong
-// on the first version of this card.
-function StatusBreakdown({ counts }) {
-  const entries = Object.entries(counts || {})
-    .filter(([, n]) => n > 0)
-    .sort((a, b) => Object.keys(STATUS_META).indexOf(a[0]) - Object.keys(STATUS_META).indexOf(b[0]));
-  if (!entries.length) return null;
+function StatusPill({ status }) {
+  const meta = STATUS_META[status] || STATUS_META.backlog;
+  return <span className={`dev-pill is-${meta.tone}`}><i className={`bi ${meta.icon}`} />{meta.label}</span>;
+}
+
+function PriorityPill({ priority }) {
+  const meta = PRIORITY_META[priority] || PRIORITY_META.normal;
+  return <span className={`dev-priority is-${meta.tone}`}>{meta.label}</span>;
+}
+
+function Empty({ icon = 'bi-inbox', title, body }) {
   return (
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-      {entries.map(([st, n]) => {
-        const m = STATUS_META[st] || STATUS_META.pending;
-        return (
-          <span key={st} title={`${n} ${m.label}`} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, fontWeight: 600, color: m.tone,
-          }}>
-            <i className={`bi ${m.icon}`} style={{ fontSize: 10 }} />
-            {n} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{m.label.toLowerCase()}</span>
-          </span>
-        );
-      })}
+    <div className="dev-empty">
+      <i className={`bi ${icon}`} />
+      <strong>{title}</strong>
+      {body && <span>{body}</span>}
     </div>
   );
 }
 
-// ── Projects manager ────────────────────────────────────────────────
-function ProjectsModal({ onClose, onChanged }) {
-  const [projects, setProjects] = useState([]);
-  const [name, setName] = useState('');
-  const [colour, setColour] = useState('blue');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
+function WaitingStrip({ tasks, features, onOpen }) {
+  const featureById = Object.fromEntries(features.map((feature) => [feature.id, feature]));
+  const waiting = tasks.filter((task) => task.status === 'your_review'
+      || task.status === 'blocked' && (!featureById[task.task_id]?.block_id || /usman/i.test(task.blocked_reason || '')))
+    .sort((a, b) => new Date(a.status_changed_at) - new Date(b.status_changed_at));
+  if (!waiting.length) return null;
+  return (
+    <section className="dev-waiting">
+      <div className="dev-waiting-title"><i className="bi bi-hourglass-split" /> Waiting on you <b>{waiting.length}</b></div>
+      <div className="dev-waiting-list">
+        {waiting.map((task) => {
+          const feature = featureById[task.task_id];
+          const late = Date.now() - new Date(task.status_changed_at).getTime() >= 48 * 3600000;
+          return (
+            <button type="button" className="dev-waiting-row" key={task.id} onClick={() => onOpen(task)}>
+              <span className="dev-waiting-copy">
+                <strong>{task.title}</strong>
+                <small>{feature?.project_name} › {feature?.title} · owner {task.owner?.display_name || 'unassigned'}{task.blocked_reason ? ` · “${task.blocked_reason}”` : ''}</small>
+              </span>
+              <StatusPill status={task.status} />
+              <PriorityPill priority={task.priority} />
+              <span className={`dev-age${late ? ' is-late' : ''}`}>{age(task.status_changed_at)}</span>
+              <i className="bi bi-chevron-right" />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
-  const load = useCallback(async () => {
-    try { setProjects(await listProjects({ includeArchived: true })); }
-    catch (e) { setErr(e.message || String(e)); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+function FeatureCard({ feature, tasks, now, draggable, overload, onOpen, onDragStart }) {
+  const rollup = ROLLUP_META[feature.rollup_status] || ROLLUP_META.backlog;
+  return (
+    <button type="button" draggable={draggable} onDragStart={(event) => onDragStart?.(event, feature)}
+      onClick={() => onOpen(feature)} className={`dev-feature is-${rollup.tone}${now ? ' in-now' : ''}`}>
+      <span className="dev-feature-main">
+        <strong>{feature.title}</strong>
+        <span><PriorityPill priority={feature.priority} />{feature.scope_added > 0 && <em>+{feature.scope_added} since planning</em>}</span>
+      </span>
+      <Avatar person={feature.owner} alert={overload} />
+      <span className="dev-feature-progress">{feature.subtask_done}/{feature.subtask_total}</span>
+      {Number(feature.status_counts?.blocked || 0) > 0 && <span className="dev-feature-blocked">{feature.status_counts.blocked} blocked</span>}
+    </button>
+  );
+}
 
-  async function add() {
-    if (!name.trim()) return;
-    setBusy(true); setErr('');
-    try { await createProject({ name, colour }); setName(''); await load(); onChanged(); }
-    catch (e) { setErr(e.message || String(e)); }
-    finally { setBusy(false); }
+function Roadmap({ products, blocks, features, tasksByFeature, canPlan, onOpen, onMove }) {
+  const [over, setOver] = useState(null);
+  const today = isoToday();
+  const current = blocks.find((block) => block.starts_on <= today && block.ends_on >= today);
+  const columns = [...blocks, { id: 'later', starts_on: null, ends_on: null }];
+  const nowCounts = {};
+  features.filter((feature) => feature.block_id === current?.id).forEach((feature) => {
+    if (feature.owner_id) nowCounts[feature.owner_id] = (nowCounts[feature.owner_id] || 0) + 1;
+  });
+
+  function drop(event, block) {
+    event.preventDefault();
+    setOver(null);
+    const featureId = event.dataTransfer.getData('text/dev-feature');
+    const feature = features.find((item) => item.id === featureId);
+    if (!feature) return;
+    if (block?.id === current?.id && block.starts_on < today && feature.block_id !== current.id) {
+      if (!window.confirm('This block is already running. Move anyway?')) return;
+    }
+    onMove(feature, block?.id === 'later' ? null : block?.id);
   }
-
-  return createPortal(
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
-        <div className="wx-modal-header">
-          <div className="wx-modal-title">Projects</div>
-          <button className="wx-btn wx-btn-ghost" onClick={onClose}><i className="bi bi-x-lg" /></button>
-        </div>
-        <div className="wx-modal-body" style={{ display: 'grid', gap: 14 }}>
-          {err && <div className="wx-alert wx-alert-danger"><span>{err}</span></div>}
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-            One per product you build, so the Boss can see what is being worked on without opening tasks.
-          </div>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="wx-input" placeholder="e.g. WurxMediaHub" value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-            <select className="wx-input" style={{ width: 110 }} value={colour} onChange={(e) => setColour(e.target.value)}>
-              {Object.keys(PROJECT_COLOURS).map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <button className="wx-btn wx-btn-primary" onClick={add} disabled={busy || !name.trim()}>Add</button>
-          </div>
-
-          <div style={{ display: 'grid', gap: 6 }}>
-            {projects.map((p) => (
-              <div key={p.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-                border: '1px solid var(--border-subtle)', borderRadius: 8,
-                opacity: p.is_active ? 1 : 0.5,
-              }}>
-                <ProjectChip name={p.name} colour={p.colour} />
-                {!p.is_active && <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>archived</span>}
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                  {p.is_active ? (
-                    <button className="wx-btn wx-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
-                      title="Archive — tasks keep pointing at it"
-                      onClick={async () => { await archiveProject(p.id); await load(); onChanged(); }}>
-                      Archive
-                    </button>
-                  ) : (
-                    <button className="wx-btn wx-btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }}
-                      onClick={async () => { await updateProject(p.id, { is_active: true }); await load(); onChanged(); }}>
-                      Restore
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            {!projects.length && (
-              <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>No projects yet.</div>
-            )}
-          </div>
-        </div>
-        <div className="wx-modal-footer">
-          <button className="wx-btn wx-btn-primary" onClick={onClose}>Done</button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-// ── Create / edit task ──────────────────────────────────────────────
-function TaskModal({ task, requesters, projects, me, onClose, onSaved }) {
-  const editing = !!task;
-  const [title, setTitle] = useState(task?.title || '');
-  const [description, setDescription] = useState(task?.description || '');
-  const [priority, setPriority] = useState(task?.priority || 'medium');
-  const [dueDate, setDueDate] = useState(task?.due_date || '');
-  const [requestedBy, setRequestedBy] = useState(task?.requested_by || '');
-  const [projectId, setProjectId] = useState(task?.project_id || '');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  async function save() {
-    if (!title.trim()) { setErr('A title is required.'); return; }
-    setBusy(true); setErr('');
-    try {
-      if (editing) {
-        await updateDevTask(task.id, {
-          title: title.trim(), description: description || null, priority,
-          due_date: dueDate || null, requested_by: requestedBy || null,
-          project_id: projectId || null,
-        });
-      } else {
-        await createDevTask({ title, description, priority, dueDate, requestedBy, projectId });
-      }
-      onSaved();
-    } catch (e) { setErr(e.message || String(e)); }
-    finally { setBusy(false); }
-  }
-
-  return createPortal(
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
-        <div className="wx-modal-header">
-          <div className="wx-modal-title">{editing ? 'Edit task' : 'New development task'}</div>
-          <button className="wx-btn wx-btn-ghost" onClick={onClose}><i className="bi bi-x-lg" /></button>
-        </div>
-        <div className="wx-modal-body" style={{ display: 'grid', gap: 12 }}>
-          {err && <div className="wx-alert wx-alert-danger"><span>{err}</span></div>}
-          <div>
-            <label className="wx-label">Title</label>
-            <input className="wx-input" value={title} autoFocus
-              placeholder="e.g. Update UI/UX" onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div>
-            <label className="wx-label">Description</label>
-            <textarea className="wx-input" rows={3} value={description}
-              placeholder="What needs doing, and why"
-              onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="wx-label">Priority</label>
-              <select className="wx-input" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                {DEV_PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_META[p].label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="wx-label">Due date <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-              <input className="wx-input" type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label className="wx-label">Project</label>
-            <select className="wx-input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-              <option value="">No project</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="wx-label">Requested by</label>
-            <select className="wx-input" value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)}>
-              <option value="">Nobody in particular</option>
-              {requesters.map((r) => (
-                <option key={r.id} value={r.id}>{r.display_name} ({r.role.toUpperCase()})</option>
-              ))}
-            </select>
-            {/* Says out loud what the record will show. The developer picks who
-                WANTED the work; who logged it is recorded separately and is
-                never chosen, so the trail cannot claim someone clicked
-                something they did not. */}
-            {requestedBy && requestedBy !== me?.id && (
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 5 }}>
-                This will record <strong>requested by {requesters.find((r) => r.id === requestedBy)?.display_name}</strong>,
-                logged by you. They will be asked to confirm.
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="wx-modal-footer">
-          <button className="wx-btn wx-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="wx-btn wx-btn-primary" onClick={save} disabled={busy}>
-            {busy ? 'Saving…' : editing ? 'Save' : 'Create task'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-// ── Ask for a note when a status changes ────────────────────────────
-function StatusNoteModal({ label, onCancel, onConfirm }) {
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-  return createPortal(
-    <div className="wx-modal-backdrop" onClick={onCancel}>
-      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
-        <div className="wx-modal-header"><div className="wx-modal-title">{label}</div></div>
-        <div className="wx-modal-body">
-          <label className="wx-label">Add a note <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-          <textarea className="wx-input" rows={3} value={note} autoFocus
-            placeholder="Why? Anything the Boss should know."
-            onChange={(e) => setNote(e.target.value)} />
-        </div>
-        <div className="wx-modal-footer">
-          <button className="wx-btn wx-btn-ghost" onClick={onCancel}>Cancel</button>
-          <button className="wx-btn wx-btn-primary" disabled={busy}
-            onClick={async () => { setBusy(true); await onConfirm(note); }}>
-            {busy ? 'Saving…' : 'Confirm'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-// ── The list of pipelines ───────────────────────────────────────────
-
-// Clicking a status opens a proper menu of coloured options rather than a
-// native <select>, which cannot show the status colour, looks like a form
-// control in the middle of a board, and is miserable on touch.
-function StatusMenu({ value, onPick, size = 'sm', align = 'left' }) {
-  const [open, setOpen] = useState(false);
-  const m = STATUS_META[value] || STATUS_META.pending;
-  const pad = size === 'md' ? '5px 11px' : '3px 9px';
-  const font = size === 'md' ? 12.5 : 11;
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        type="button"
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, padding: pad,
-          fontSize: font, fontWeight: 700, cursor: 'pointer', borderRadius: 999,
-          background: `color-mix(in srgb, ${m.tone} 13%, transparent)`,
-          color: m.tone, border: `1px solid color-mix(in srgb, ${m.tone} 32%, transparent)`,
-        }}>
-        <i className={`bi ${m.icon}`} style={{ fontSize: font - 1 }} />
-        {m.label}
-        <i className="bi bi-chevron-down" style={{ fontSize: font - 3, opacity: 0.7 }} />
-      </button>
-
-      {open && (
-        <>
-          {/* Click-away catcher. Sits under the menu, over everything else. */}
-          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); }}
-            style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{
-            position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 41,
-            background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-            borderRadius: 12, padding: 5, minWidth: 172,
-            boxShadow: '0 12px 32px rgba(16,24,40,.18)',
-          }}>
-            {Object.entries(STATUS_META).map(([k, mm]) => {
-              const on = k === value;
+    <div className="dev-roadmap-scroll">
+      <div className="dev-roadmap" style={{ '--dev-cols': columns.length }}>
+        <div className="dev-roadmap-head product">Product</div>
+        {columns.map((block, index) => {
+          const isNow = block.id === current?.id;
+          return (
+            <div key={block.id} className={`dev-roadmap-head${isNow ? ' is-now' : ''}`}>
+              <b>{block.id === 'later' ? 'Later' : isNow ? 'Now' : index === blocks.indexOf(current) + 1 ? 'Next' : 'After'}</b>
+              <small>{block.id === 'later' ? 'unscheduled' : `${shortDate(block.starts_on)} – ${shortDate(block.ends_on)}`}</small>
+            </div>
+          );
+        })}
+        {products.map((product) => (
+          <div className="dev-roadmap-product-row" key={product.id}>
+            <div className="dev-product">
+              <span className={`dev-product-dot is-${product.colour}`} />
+              <strong>{product.name}</strong>
+              <small>{product.stage === 'live' ? 'live' : 'pre-launch'}</small>
+            </div>
+            {columns.map((block) => {
+              const isLater = block.id === 'later';
+              const isNow = block.id === current?.id;
+              const cellFeatures = features.filter((feature) => feature.project_id === product.id
+                && (isLater ? !feature.block_id : feature.block_id === block.id));
               return (
-                <button key={k} type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); if (!on) onPick(k); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-                    padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                    background: on ? `color-mix(in srgb, ${mm.tone} 12%, transparent)` : 'transparent',
-                    color: on ? mm.tone : 'var(--text-primary)',
-                    fontSize: 12.5, fontWeight: on ? 700 : 500, textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => { if (!on) e.currentTarget.style.background = 'var(--surface-2)'; }}
-                  onMouseLeave={(e) => { if (!on) e.currentTarget.style.background = 'transparent'; }}>
-                  <i className={`bi ${mm.icon}`} style={{ color: mm.tone, fontSize: 12 }} />
-                  {mm.label}
-                  {on && <i className="bi bi-check2" style={{ marginLeft: 'auto' }} />}
-                </button>
+                <div key={block.id} className={`dev-roadmap-cell${isNow ? ' is-now' : ''}${over === `${product.id}:${block.id}` ? ' is-over' : ''}`}
+                  onDragOver={(event) => { if (canPlan) { event.preventDefault(); setOver(`${product.id}:${block.id}`); } }}
+                  onDragLeave={() => setOver(null)} onDrop={(event) => drop(event, block)}>
+                  {cellFeatures.map((feature) => <FeatureCard key={feature.id} feature={feature}
+                    tasks={tasksByFeature[feature.id] || []} now={isNow} draggable={canPlan}
+                    overload={isNow && nowCounts[feature.owner_id] > 3} onOpen={onOpen}
+                    onDragStart={(event) => { event.dataTransfer.setData('text/dev-feature', feature.id); event.dataTransfer.effectAllowed = 'move'; }} />)}
+                </div>
               );
             })}
           </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// One bar split BY STATUS rather than a done/not-done fill, so composition
-// reads at a glance: "mostly blocked" looks different from "barely started".
-function CompositionBar({ counts, total }) {
-  const order = ['done', 'in_progress', 'blocked', 'paused', 'pending', 'cancelled'];
-  const segs = order.map((k) => [k, counts?.[k] || 0]).filter(([, n]) => n > 0);
-  // Solid track, contiguous segments, no gaps. The earlier version had a
-  // transparent background and 2px gaps, so a bar that was mostly "pending"
-  // (a near-invisible grey) read as a broken hairline floating in space.
-  const TRACK = {
-    height: 9, borderRadius: 999, overflow: 'hidden', display: 'flex',
-    background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-  };
-  if (!total) return <div style={TRACK} />;
-  return (
-    <div style={TRACK}>
-      {segs.map(([k, n]) => (
-        <div key={k} title={`${n} ${STATUS_META[k].label}`} style={{
-          width: `${(n / total) * 100}%`,
-          // Pending is the empty state, so it stays as visible track rather
-          // than being painted a colour that implies progress.
-          background: k === 'pending' ? 'transparent' : STATUS_META[k].tone,
-          opacity: k === 'cancelled' ? 0.3 : 1,
-        }} />
-      ))}
-    </div>
-  );
-}
-
-// THE POINT OF THE CARD. "1 active" tells the Boss nothing — he then has to
-// open the pipeline to find out WHAT is active, which is the click this page
-// exists to remove. So name the live subtasks right here, in-progress and
-// blocked first, and only fall back to counts when there is nothing running.
-function LiveSubtasks({ subtasks, onOpen }) {
-  if (!subtasks?.length) return null;
-  const rank = { in_progress: 0, blocked: 1, paused: 2, pending: 3, done: 4, cancelled: 5 };
-  const live = [...subtasks]
-    .filter((s) => !['done', 'cancelled'].includes(s.status))
-    .sort((a, b) => (rank[a.status] - rank[b.status])
-      || ((PRIORITY_META[a.priority]?.rank ?? 9) - (PRIORITY_META[b.priority]?.rank ?? 9)));
-  if (!live.length) return null;
-  const shown = live.slice(0, 3);
-  const rest = live.length - shown.length;
-
-  return (
-    <div style={{ display: 'grid', gap: 5 }}>
-      {shown.map((s) => {
-        const m = STATUS_META[s.status] || STATUS_META.pending;
-        const running = s.status === 'in_progress';
-        const stuck = s.status === 'blocked';
-        return (
-          <div key={s.id} style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 9px',
-            borderRadius: 9, fontSize: 12.3,
-            background: running || stuck ? `color-mix(in srgb, ${m.tone} 9%, transparent)` : 'var(--surface-2)',
-            border: `1px solid ${running || stuck ? `color-mix(in srgb, ${m.tone} 26%, transparent)` : 'transparent'}`,
-          }}>
-            <i className={`bi ${m.icon}`} style={{ color: m.tone, fontSize: 11, flex: '0 0 auto' }} />
-            <span style={{
-              color: running || stuck ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontWeight: running || stuck ? 650 : 500,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{s.title}</span>
-            {s.due_date && (
-              <span style={{ marginLeft: 'auto', flex: '0 0 auto', fontSize: 10.5, color: 'var(--text-muted)' }}>
-                {fmtDate(s.due_date)}
-              </span>
-            )}
-          </div>
-        );
-      })}
-      {rest > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: 3 }}>
-          +{rest} more
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TaskCard({ task, subtasks, onOpen }) {
-  const overdue = task.is_overdue;
-  const accent = task.project_colour
-    ? (PROJECT_COLOURS[task.project_colour] || PROJECT_COLOURS.slate)
-    : 'var(--border-subtle)';
-  const counts = task.status_counts || {};
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(task.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(task.id); }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px rgba(16,24,40,.10)'; e.currentTarget.style.borderColor = accent; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(16,24,40,.05)'; e.currentTarget.style.borderColor = overdue ? 'var(--danger)' : 'var(--border-subtle)'; }}
-      style={{
-        textAlign: 'left', width: '100%', cursor: 'pointer',
-        display: 'flex', flexDirection: 'column',
-        background: 'var(--surface-1)',
-        border: `1px solid ${overdue ? 'var(--danger)' : 'var(--border-subtle)'}`,
-        borderLeft: `3px solid ${accent}`,
-        borderRadius: 14, padding: '15px 16px 13px', display: 'grid', gap: 12,
-        boxShadow: '0 1px 2px rgba(16,24,40,.05)', transition: 'box-shadow .16s, border-color .16s',
-      }}>
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-            {task.title}
-          </div>
-          {task.description && (
-            <div style={{
-              fontSize: 12.3, color: 'var(--text-muted)', lineHeight: 1.45, marginTop: 3,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-            }}>{task.description}</div>
-          )}
-        </div>
-        <div style={{ display: 'grid', gap: 5, justifyItems: 'end', flex: '0 0 auto' }}>
-          <PriorityChip priority={task.priority} />
-          {overdue && <Chip tone="var(--danger)" solid>Overdue</Chip>}
-        </div>
-      </div>
-
-      <div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}>
-          <span style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
-            {task.progress_pct == null ? '—' : `${task.progress_pct}%`}
-          </span>
-          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-            {task.subtask_counted ? `${task.subtask_done} of ${task.subtask_counted} done` : 'no subtasks yet'}
-          </span>
-        </div>
-        <CompositionBar counts={counts} total={task.subtask_total} />
-      </div>
-
-      <LiveSubtasks subtasks={subtasks} />
-
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap',
-        borderTop: '1px solid var(--border-subtle)', paddingTop: 10,
-        fontSize: 11.3, color: 'var(--text-muted)',
-      }}>
-        {task.project_name
-          ? <ProjectChip name={task.project_name} colour={task.project_colour} />
-          : <span style={{ fontStyle: 'italic' }}>No project</span>}
-        {task.due_date && (
-          <span style={{ color: overdue ? 'var(--danger)' : 'var(--text-muted)', fontWeight: overdue ? 700 : 400 }}>
-            <i className="bi bi-calendar3" style={{ marginRight: 4 }} />{fmtDate(task.due_date)}
-          </span>
-        )}
-        {task.requester && (
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <i className="bi bi-person" />{task.requester.display_name}
-            {!task.requested_confirmed_at && (
-              <span title="Recorded by the developer; not yet confirmed by that person."
-                style={{ color: 'var(--warning)', fontWeight: 700 }}> · unconfirmed</span>
-            )}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-// ── The "one glance" header ─────────────────────────────────────────
-
-// The Boss's question is literally "which project, which main task, which
-// subtask". So show that as a chain rather than making him infer it from a
-// card. This is the single most important element on the page.
-function ActiveChain({ next, onOpen }) {
-  if (!next) {
-    return (
-      <div style={{
-        border: '1px dashed var(--border-subtle)', borderRadius: 16, padding: '22px 20px',
-        textAlign: 'center', color: 'var(--text-muted)', fontSize: 13,
-      }}>
-        Nothing is in progress right now.
-      </div>
-    );
-  }
-  const { task, subtask } = next;
-  const accent = task.project_colour ? (PROJECT_COLOURS[task.project_colour] || PROJECT_COLOURS.slate) : 'var(--primary)';
-  const sub = STATUS_META[subtask.status] || STATUS_META.pending;
-
-  return (
-    <div style={{
-      position: 'relative', overflow: 'hidden', borderRadius: 16, padding: '18px 20px',
-      background: `linear-gradient(135deg, color-mix(in srgb, ${accent} 10%, var(--surface-1)) 0%, var(--surface-1) 60%)`,
-      border: `1px solid color-mix(in srgb, ${accent} 32%, transparent)`,
-    }}>
-      <div style={{
-        position: 'absolute', inset: 0, width: 3, background: accent,
-      }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 260, flex: 1 }}>
-          <div style={{
-            fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase',
-            color: accent, marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span style={{
-              width: 6, height: 6, borderRadius: 99, background: accent,
-              boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 22%, transparent)`,
-            }} />
-            Working on now
-          </div>
-
-          {/* project › task › subtask */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5 }}>
-            <span style={{ fontWeight: 700, color: accent }}>{task.project_name || 'No project'}</span>
-            <i className="bi bi-chevron-right" style={{ fontSize: 9, color: 'var(--text-muted)' }} />
-            <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{task.title}</span>
-          </div>
-
-          <div style={{
-            fontSize: 20, fontWeight: 800, color: 'var(--text-primary)',
-            lineHeight: 1.25, marginTop: 5,
-          }}>{subtask.title}</div>
-
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 9 }}>
-            <Chip tone={sub.tone}><i className={`bi ${sub.icon}`} style={{ marginRight: 4 }} />{sub.label}</Chip>
-            <PriorityChip priority={subtask.priority} />
-            {subtask.due_date && (
-              <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                <i className="bi bi-calendar3" style={{ marginRight: 4 }} />due {fmtDate(subtask.due_date)}
-              </span>
-            )}
-            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-              {task.progress_pct == null ? '' : `pipeline ${task.progress_pct}% complete`}
-            </span>
-          </div>
-        </div>
-
-        <button className="wx-btn wx-btn-primary" style={{ fontWeight: 700 }} onClick={() => onOpen(task.id)}>
-          Open pipeline <i className="bi bi-arrow-right" style={{ marginLeft: 6 }} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Five numbers that answer "is anything wrong". Anything at zero stays grey so
-// only real problems draw the eye.
-function SummaryStrip({ tasks }) {
-  const open = tasks.filter((t) => !['done', 'cancelled'].includes(t.status));
-  const sum = (k) => open.reduce((n, t) => n + ((t.status_counts || {})[k] || 0), 0);
-  const stats = [
-    { label: 'Pipelines open', value: open.length, tone: 'var(--text-primary)' },
-    { label: 'Subtasks active', value: sum('in_progress'), tone: STATUS_META.in_progress.tone },
-    { label: 'Blocked', value: sum('blocked'), tone: 'var(--danger)', warn: true },
-    { label: 'Overdue', value: open.filter((t) => t.is_overdue).length, tone: 'var(--danger)', warn: true },
-    { label: 'Completed', value: tasks.filter((t) => t.status === 'done').length, tone: 'var(--success)' },
-  ];
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
-      {stats.map((s) => {
-        const live = s.value > 0;
-        const tone = s.warn && !live ? 'var(--text-muted)' : s.tone;
-        return (
-          <div key={s.label} style={{
-            background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-            borderRadius: 12, padding: '12px 14px',
-          }}>
-            <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: live ? tone : 'var(--text-muted)' }}>
-              {s.value}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{s.label}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Cards grouped under their project, so "which project" needs no reading.
-function ProjectGroup({ project, tasks, subsByTask, onOpen }) {
-  const c = project.colour ? (PROJECT_COLOURS[project.colour] || PROJECT_COLOURS.slate) : 'var(--text-muted)';
-  const counted = tasks.reduce((n, t) => n + (t.subtask_counted || 0), 0);
-  const done = tasks.reduce((n, t) => n + (t.subtask_done || 0), 0);
-  const pct = counted ? Math.round((done / counted) * 100) : null;
-  return (
-    <div style={{ marginBottom: 22 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap',
-        paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)',
-      }}>
-        <span style={{ width: 9, height: 9, borderRadius: 99, background: c }} />
-        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{project.name}</span>
-        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-          {tasks.length} {tasks.length === 1 ? 'pipeline' : 'pipelines'}
-          {pct != null && <> · {pct}% complete</>}
-        </span>
-      </div>
-      {/* Flex, not an auto-fill grid. A grid reserves four tracks on a wide
-          screen, so a single pipeline sat in a narrow column with acres of
-          dead space beside it. Flex lets one card take a comfortable width and
-          still wraps cleanly once there are several. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'stretch' }}>
-        {tasks.map((t) => (
-          <div key={t.id} style={{ flex: '1 1 380px', maxWidth: 560, display: 'flex' }}>
-            <TaskCard task={t} subtasks={subsByTask?.[t.id]} onOpen={onOpen} />
-          </div>
         ))}
       </div>
+      <div className="dev-legend">
+        {Object.entries(ROLLUP_META).map(([key, meta]) => <span key={key}><i className={`is-${meta.tone}`} />{meta.label}</span>)}
+      </div>
     </div>
   );
 }
 
-
-// ── The board for one pipeline ──────────────────────────────────────
-function SubtaskCard({ sub, canEdit, onMove, onEdit, onDelete }) {
-  const overdue = sub.due_date && sub.due_date < todayKarachi() && !['done', 'cancelled'].includes(sub.status);
+function TaskRow({ task, feature, onOpen }) {
   return (
-    <div
-      draggable={canEdit}
-      onDragStart={(e) => { e.dataTransfer.setData('text/plain', sub.id); e.dataTransfer.effectAllowed = 'move'; }}
-      style={{
-        background: 'var(--surface-1)', border: `1px solid ${overdue ? 'var(--danger)' : 'var(--border-subtle)'}`,
-        borderRadius: 10, padding: 10, display: 'grid', gap: 7,
-        cursor: canEdit ? 'grab' : 'default',
-      }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
-        {sub.title}
-      </div>
-      {sub.description && (
-        <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{sub.description}</div>
-      )}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <PriorityChip priority={sub.priority} />
-        {sub.due_date && (
-          <span style={{ fontSize: 11, color: overdue ? 'var(--danger)' : 'var(--text-muted)', fontWeight: overdue ? 700 : 400 }}>
-            <i className="bi bi-calendar3" style={{ marginRight: 3 }} />{fmtDate(sub.due_date)}
-          </span>
-        )}
-      </div>
-      {canEdit && (
-        <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--border-subtle)', paddingTop: 6 }}>
-          <StatusMenu value={sub.status} onPick={(to) => onMove(sub, to)} />
-          <button className="wx-btn wx-btn-ghost" style={{ padding: '2px 7px', fontSize: 11 }}
-            title="Edit" onClick={() => onEdit(sub)}><i className="bi bi-pencil" /></button>
-          <button className="wx-btn wx-btn-ghost" style={{ padding: '2px 7px', fontSize: 11, color: 'var(--danger)' }}
-            title="Delete" onClick={() => onDelete(sub)}><i className="bi bi-trash" /></button>
-        </div>
-      )}
-    </div>
+    <button type="button" className="dev-task-row" onClick={() => onOpen(task)}>
+      <StatusPill status={task.status} />
+      <span className="dev-task-copy"><strong>{task.title}</strong><small>{task.acceptance_check || 'Acceptance check not added yet.'}</small></span>
+      <span className="dev-task-context">{feature?.project_name}<small>{feature?.title}</small></span>
+      <PriorityPill priority={task.priority} />
+      <span className="dev-task-due">{task.due_date ? `due ${shortDate(task.due_date)}` : 'no due date'}</span>
+      <Avatar person={task.owner} />
+      <i className="bi bi-chevron-right" />
+    </button>
   );
 }
 
-function SubtaskModal({ sub, taskDue, onClose, onSaved }) {
-  const [title, setTitle] = useState(sub?.title || '');
-  const [description, setDescription] = useState(sub?.description || '');
-  const [priority, setPriority] = useState(sub?.priority || 'medium');
-  const [dueDate, setDueDate] = useState(sub?.due_date || '');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  // Warn, never block: a subtask legitimately running past its parent is a
-  // real situation, and the honest response is to say so, not to refuse it.
-  const late = dueDate && taskDue && dueDate > taskDue;
-
-  return createPortal(
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
-        <div className="wx-modal-header">
-          <div className="wx-modal-title">{sub ? 'Edit subtask' : 'New subtask'}</div>
-        </div>
-        <div className="wx-modal-body" style={{ display: 'grid', gap: 12 }}>
-          {err && <div className="wx-alert wx-alert-danger"><span>{err}</span></div>}
-          <div>
-            <label className="wx-label">Title</label>
-            <input className="wx-input" value={title} autoFocus
-              placeholder="e.g. Update the dashboard UI" onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div>
-            <label className="wx-label">Description</label>
-            <textarea className="wx-input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label className="wx-label">Priority</label>
-              <select className="wx-input" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                {DEV_PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_META[p].label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="wx-label">Due date</label>
-              <input className="wx-input" type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
-          </div>
-          {late && (
-            <div className="wx-alert wx-alert-info" style={{ fontSize: 12 }}>
-              <span>This is due after the task itself ({fmtDate(taskDue)}), so the task will run late.</span>
-            </div>
-          )}
-        </div>
-        <div className="wx-modal-footer">
-          <button className="wx-btn wx-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="wx-btn wx-btn-primary" disabled={busy} onClick={async () => {
-            if (!title.trim()) { setErr('A title is required.'); return; }
-            setBusy(true); setErr('');
-            try { await onSaved({ title, description, priority, dueDate }); }
-            catch (e) { setErr(e.message || String(e)); setBusy(false); }
-          }}>{busy ? 'Saving…' : 'Save'}</button>
-        </div>
+function ListView({ tasks, features, onOpen, source = null }) {
+  const [status, setStatus] = useState('open');
+  const featureById = Object.fromEntries(features.map((feature) => [feature.id, feature]));
+  const rows = sortWorkTasks(tasks.filter((task) => (!source || task.source === source)
+    && (status === 'all' || status === 'open' && task.status !== 'live' || task.status === status)));
+  return (
+    <>
+      <div className="dev-list-toolbar">
+        <select className="wx-input" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="open">Open work</option><option value="all">Every status</option>
+          {Object.entries(STATUS_META).map(([value, meta]) => <option value={value} key={value}>{meta.label}</option>)}
+        </select>
+        <span>{rows.length} task{rows.length === 1 ? '' : 's'}</span>
       </div>
-    </div>,
-    document.body,
+      <div className="dev-task-list">
+        {rows.map((task) => <TaskRow key={task.id} task={task} feature={featureById[task.task_id]} onOpen={onOpen} />)}
+        {!rows.length && <Empty title="Nothing here" body="Change the filter or add a task to a feature." />}
+      </div>
+    </>
   );
+}
+
+function DoneView({ features, products, blocks, onOpen }) {
+  const done = features.filter((feature) => feature.subtask_total > 0 && feature.subtask_live === feature.subtask_total);
+  if (!done.length) return <Empty icon="bi-check2-circle" title="No shipped features yet" body="Features appear here when every task is Live." />;
+  const groups = [...blocks, { id: 'later', starts_on: null }].map((block) => ({
+    block, features: done.filter((feature) => block.id === 'later' ? !feature.block_id : feature.block_id === block.id),
+  })).filter((group) => group.features.length).reverse();
+  return <div className="dev-done-groups">{groups.map(({ block, features: items }) => (
+    <section key={block.id}><h3>{block.id === 'later' ? 'Unscheduled' : `Shipped · ${shortDate(block.starts_on)}`}</h3>
+      {items.map((feature) => <button type="button" key={feature.id} className="dev-done-row" onClick={() => onOpen(feature)}>
+        <i className="bi bi-check-circle-fill" /><span><strong>{feature.title}</strong><small>{products.find((p) => p.id === feature.project_id)?.name}</small></span><Avatar person={feature.owner} /><i className="bi bi-chevron-right" />
+      </button>)}
+    </section>
+  ))}</div>;
+}
+
+function MyWeek({ data, me, onOpen, onRefresh }) {
+  const today = isoToday();
+  const block = data.blocks.find((item) => item.starts_on <= today && item.ends_on >= today);
+  const featureById = Object.fromEntries(data.features.map((feature) => [feature.id, feature]));
+  const mine = sortWorkTasks(data.tasks.filter((task) => task.owner_id === me.id
+    && featureById[task.task_id]?.block_id === block?.id && task.status !== 'live'));
+  const reviews = sortWorkTasks(data.tasks.filter((task) => task.reviewer_id === me.id && task.owner_id !== me.id && task.status === 'dev_review'));
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  async function submit() {
+    setBusy(true); setNotice('');
+    try { const count = await postEod(message, mine); setMessage(''); setNotice(`Posted to ${count} task${count === 1 ? '' : 's'}.`); onRefresh(); }
+    catch (error) { setNotice(error.message); }
+    finally { setBusy(false); }
+  }
+  return (
+    <>
+      <div className="dev-week-heading"><div><span>Now block</span><h2>{block ? `${shortDate(block.starts_on)} – ${shortDate(block.ends_on)}` : 'Unscheduled'}</h2></div><strong>{mine.length} active task{mine.length === 1 ? '' : 's'}</strong></div>
+      <div className="dev-week-grid">
+        <div className="dev-week-work">
+          {reviews.length > 0 && <section className="dev-review-queue"><h3><i className="bi bi-code-slash" /> Ready for your review <b>{reviews.length}</b></h3>{reviews.map((task) => <TaskRow key={task.id} task={task} feature={featureById[task.task_id]} onOpen={onOpen} />)}</section>}
+          <section><h3>My work</h3><div className="dev-task-list">{mine.map((task) => <TaskRow key={task.id} task={task} feature={featureById[task.task_id]} onOpen={onOpen} />)}{!mine.length && <Empty title="Your block is clear" body="There is no open work assigned to you in this block." />}</div></section>
+        </div>
+        <aside className="dev-eod"><span>End of day · {shortDate(today)}</span><h3>What moved today?</h3><textarea className="wx-input" rows={8} value={message} onChange={(event) => setMessage(event.target.value)} placeholder={'Task name: what changed\nAnother task: waiting on review\nBlocked: none'} /><small>One line per task. This posts to each task’s activity and the development audience.</small>{notice && <div className="dev-eod-notice">{notice}</div>}<button className="wx-btn wx-btn-primary" disabled={busy || !message.trim()} onClick={submit}>{busy ? 'Posting…' : 'Post update'}</button></aside>
+      </div>
+    </>
+  );
+}
+
+function Modal({ title, children, onClose, footer, wide = false }) {
+  return createPortal(<div className="wx-modal-backdrop" onMouseDown={onClose}><div className="wx-modal" style={{ maxWidth: wide ? 680 : 540 }} onMouseDown={(event) => event.stopPropagation()}>
+    <div className="wx-modal-header"><div className="wx-modal-title">{title}</div><button className="wx-btn wx-btn-ghost" onClick={onClose} aria-label="Close"><i className="bi bi-x-lg" /></button></div>
+    <div className="wx-modal-body">{children}</div>{footer && <div className="wx-modal-footer">{footer}</div>}
+  </div></div>, document.body);
+}
+
+function FeatureModal({ products, developers, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: '', description: '', productId: products[0]?.id || '', ownerId: developers[0]?.id || '', priority: 'normal' });
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const set = (key, value) => setForm((old) => ({ ...old, [key]: value }));
+  async function save() { setBusy(true); setError(''); try { if (!form.name.trim()) throw new Error('Feature name is required.'); await createFeature(form); onSaved(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  return <Modal title="New feature" onClose={onClose} footer={<><button className="wx-btn wx-btn-ghost" onClick={onClose}>Cancel</button><button className="wx-btn wx-btn-primary" disabled={busy} onClick={save}>{busy ? 'Creating…' : 'Create in Later'}</button></>}>
+    <div className="dev-form">{error && <div className="wx-alert wx-alert-danger">{error}</div>}<label>Feature name<input className="wx-input" autoFocus maxLength={40} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Landing page" /></label><label>Description<textarea className="wx-input" rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} /></label><div className="dev-form-pair"><label>Product<select className="wx-input" value={form.productId} onChange={(e) => set('productId', e.target.value)}>{products.map((p) => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label><label>Owner<select className="wx-input" value={form.ownerId} onChange={(e) => set('ownerId', e.target.value)}>{developers.map((p) => <option value={p.id} key={p.id}>{p.display_name}</option>)}</select></label></div><label>Priority<select className="wx-input" value={form.priority} onChange={(e) => set('priority', e.target.value)}>{DEV_PRIORITIES.map((p) => <option value={p} key={p}>{PRIORITY_META[p].label}</option>)}</select></label>
+    </div>
+  </Modal>;
+}
+
+function WorkTaskModal({ feature, developers, task = null, onClose, onSaved }) {
+  const [form, setForm] = useState({ title: task?.title || '', acceptance: task?.acceptance_check || '', ownerId: task?.owner_id || feature.owner_id || developers[0]?.id || '', priority: task?.priority || feature.priority || 'normal', due: task?.due_date || feature.block_ends_on || '' });
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const set = (key, value) => setForm((old) => ({ ...old, [key]: value }));
+  async function save() { setBusy(true); setError(''); try { if (!form.title.trim()) throw new Error('Task title is required.'); if (task) await updateWorkTask(task.id, { title: form.title.trim(), acceptance_check: form.acceptance.trim() || null, owner_id: form.ownerId, priority: form.priority, due_date: form.due || null }); else await createWorkTask(feature, form); onSaved(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  return <Modal title={task ? 'Edit task' : `Add task · ${feature.title}`} onClose={onClose} footer={<><button className="wx-btn wx-btn-ghost" onClick={onClose}>Cancel</button><button className="wx-btn wx-btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save task'}</button></>}>
+    <div className="dev-form">{error && <div className="wx-alert wx-alert-danger">{error}</div>}<label>Task title<input className="wx-input" autoFocus value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="Fix landing CTA link" /></label><label>Acceptance check <span>required before planning</span><textarea className="wx-input dev-acceptance-input" rows={4} value={form.acceptance} onChange={(e) => set('acceptance', e.target.value)} placeholder="What should be true when this is done?" /></label><div className="dev-form-pair"><label>Owner<select className="wx-input" value={form.ownerId} onChange={(e) => set('ownerId', e.target.value)}>{developers.map((p) => <option value={p.id} key={p.id}>{p.display_name}</option>)}</select></label><label>Priority<select className="wx-input" value={form.priority} onChange={(e) => set('priority', e.target.value)}>{DEV_PRIORITIES.map((p) => <option value={p} key={p}>{PRIORITY_META[p].label}</option>)}</select></label></div><label>Due date<input className="wx-input" type="date" value={form.due} onChange={(e) => set('due', e.target.value)} /></label></div>
+  </Modal>;
+}
+
+function FeatureDrawer({ feature, tasks, developers, canEdit, onClose, onOpenTask, onRefresh }) {
+  const [adding, setAdding] = useState(false);
+  return <><div className="dev-drawer-backdrop" onMouseDown={onClose} /><aside className="dev-drawer"><header><button onClick={onClose} aria-label="Close"><i className="bi bi-x-lg" /></button><span>{feature.project_name} › feature</span><h2>{feature.title}</h2><div><PriorityPill priority={feature.priority} /><span className={`dev-rollup is-${ROLLUP_META[feature.rollup_status]?.tone}`}>{ROLLUP_META[feature.rollup_status]?.label}</span></div></header><div className="dev-drawer-body"><div className="dev-feature-summary"><span><small>Owner</small><b><Avatar person={feature.owner} />{feature.owner?.display_name || 'Unassigned'}</b></span><span><small>Progress</small><b>{feature.subtask_done}/{feature.subtask_total} tested</b></span></div>{feature.description && <p className="dev-feature-description">{feature.description}</p>}<div className="dev-drawer-section-head"><h3>Tasks</h3>{canEdit && <button className="wx-btn wx-btn-primary" onClick={() => setAdding(true)}><i className="bi bi-plus-lg" /> Add task</button>}</div><div className="dev-task-list compact">{sortWorkTasks(tasks).map((task) => <TaskRow key={task.id} task={task} feature={feature} onOpen={onOpenTask} />)}{!tasks.length && <Empty title="No tasks yet" body="Break this feature into testable pieces." />}</div></div></aside>{adding && <WorkTaskModal feature={feature} developers={developers} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); onRefresh(); }} />}</>;
+}
+
+function TaskDrawer({ task, feature, data, me, onClose, onRefresh }) {
+  const [activity, setActivity] = useState([]); const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false); const [note, setNote] = useState('');
+  const [action, setAction] = useState(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [screenshot, setScreenshot] = useState(null); const [duplicate, setDuplicate] = useState('');
+  const teamMember = data.team.find((member) => member.user_id === me.id);
+  const actions = allowedTaskActions(task, me.id, data.team);
+  useEffect(() => { let live = true; setLoading(true); listTaskActivity(feature.id).then((rows) => { if (live) setActivity(rows.filter((item) => !item.subtask_id || item.subtask_id === task.id)); }).catch((e) => setError(e.message)).finally(() => { if (live) setLoading(false); }); return () => { live = false; }; }, [feature.id, task.id]);
+  useEffect(() => { if (!task.screenshot_path) return; issueScreenshotUrl(task.screenshot_path).then(setScreenshot).catch(() => {}); }, [task.screenshot_path]);
+  async function run(item) { setError(''); if (item.note) { setNote(''); setAction(item); return; } setBusy(true); try { await transitionWorkTask(task.id, item.to); await onRefresh(); onClose(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  async function confirmAction() { setBusy(true); setError(''); try { await transitionWorkTask(task.id, action.to, { note, blockedReason: action.note === 'blocked' ? note : '' }); setAction(null); await onRefresh(); onClose(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  async function postNote() { if (!note.trim()) return; setBusy(true); try { await addActivity(feature.id, task.id, note); setNote(''); const rows = await listTaskActivity(feature.id); setActivity(rows.filter((item) => !item.subtask_id || item.subtask_id === task.id)); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  async function closeDuplicate() { if (!duplicate) return; setBusy(true); try { await markBugDuplicate(task.id, duplicate); await onRefresh(); onClose(); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+  const otherBugs = data.tasks.filter((item) => item.source === 'bug_report' && item.id !== task.id);
+  return <><div className="dev-drawer-backdrop" onMouseDown={onClose} /><aside className="dev-drawer task-panel"><header><button onClick={onClose} aria-label="Close"><i className="bi bi-x-lg" /></button><span>{feature.project_name} › {feature.title} › task</span><h2>{task.title}</h2><div><StatusPill status={task.status} /><PriorityPill priority={task.priority} />{feature.block_starts_on && <em>{shortDate(feature.block_starts_on)} – {shortDate(feature.block_ends_on)}</em>}</div></header><div className="dev-drawer-body">{error && <div className="wx-alert wx-alert-danger">{error}</div>}<section className="dev-acceptance"><small>Acceptance check</small><p>{task.acceptance_check || 'Not added yet. This task cannot be scheduled without one.'}</p></section>{task.blocked_reason && <section className="dev-block-reason"><small>Blocked because</small><p>{task.blocked_reason}</p></section>}<dl className="dev-task-facts"><dt>Owner</dt><dd><Avatar person={task.owner} />{task.owner?.display_name || 'Unassigned'}</dd><dt>Reviewer</dt><dd>{task.reviewer?.display_name || '—'}</dd><dt>Final review</dt><dd>{task.finalReviewer?.display_name || 'Usman'}</dd><dt>Due</dt><dd>{shortDate(task.due_date)}</dd><dt>Source</dt><dd>{task.source === 'bug_report' ? `Reported by ${task.reporter?.display_name || 'employee'}` : 'Manual'}</dd>{task.page_url && <><dt>Page</dt><dd className="break">{task.page_url}</dd></>}</dl>{task.expected && <section className="dev-expected"><small>Reporter expected</small><p>{task.expected}</p></section>}{screenshot && <a className="dev-screenshot" href={screenshot} target="_blank" rel="noreferrer"><img src={screenshot} alt="Issue screenshot" /></a>}<div className="dev-drawer-section-head"><h3>Activity</h3>{me.id === task.owner_id || me.id === task.reviewer_id || me.id === task.final_reviewer_id ? <button className="wx-btn wx-btn-ghost" onClick={() => setEditing(true)}><i className="bi bi-pencil" /> Edit</button> : null}</div><div className="dev-activity">{loading ? <span>Loading…</span> : activity.map((item) => <div key={item.id}><time>{new Date(item.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time><p><b>{item.author?.display_name || 'System'}</b>{item.status_to && <> moved <StatusPill status={item.status_to} /></>}{item.body && <> {item.body}</>}</p></div>)}{!loading && !activity.length && <span>No activity yet.</span>}</div><div className="dev-note-box"><textarea className="wx-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note…" /><button className="wx-btn wx-btn-ghost" disabled={busy || !note.trim()} onClick={postNote}>Post</button></div>{task.source === 'bug_report' && teamMember?.level === 'senior' && task.status !== 'live' && <div className="dev-duplicate"><select className="wx-input" value={duplicate} onChange={(e) => setDuplicate(e.target.value)}><option value="">Duplicate of…</option>{otherBugs.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button className="wx-btn wx-btn-ghost" disabled={!duplicate || busy} onClick={closeDuplicate}>Close duplicate</button></div>}</div><footer>{actions.length ? actions.map((item) => <button key={item.to + item.label} className={`wx-btn ${item.primary ? 'wx-btn-primary' : 'wx-btn-ghost'}`} disabled={busy} onClick={() => run(item)}>{item.label}</button>) : <span>Waiting on {waitingLabel(task)}.</span>}</footer></aside>{editing && <WorkTaskModal feature={feature} developers={data.people.filter((p) => p.role === 'developer')} task={task} onClose={() => setEditing(false)} onSaved={async () => { setEditing(false); await onRefresh(); onClose(); }} />}{action && <Modal title={action.note === 'blocked' ? 'What is blocking this?' : 'Send back with a note'} onClose={() => setAction(null)} footer={<><button className="wx-btn wx-btn-ghost" onClick={() => setAction(null)}>Cancel</button><button className="wx-btn wx-btn-primary" disabled={busy || !note.trim()} onClick={confirmAction}>Confirm</button></>}><label className="dev-modal-note">Note<textarea className="wx-input" autoFocus rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder={action.note === 'blocked' ? 'Who or what is holding this up?' : 'What needs to change?'} /></label></Modal>}</>;
 }
 
 export default function DevTasksPage() {
-  const { profile } = useAuth();
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const role = profile?.role;
-  const canEdit = role === 'boss' || role === 'developer';
-  const isBoss = role === 'boss';
-
-  const [tasks, setTasks] = useState([]);
-  const [subsByTask, setSubsByTask] = useState({});
-  const [detail, setDetail] = useState(null);
-  const [requesters, setRequesters] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [showProjects, setShowProjects] = useState(false);
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState('');
-  const [filter, setFilter] = useState('open');
-  const [showNew, setShowNew] = useState(false);
-  const [editTask, setEditTask] = useState(null);
-  const [subModal, setSubModal] = useState(null);   // {sub} | {new:true}
-  const [pending, setPending] = useState(null);     // status change awaiting a note
-  const [comment, setComment] = useState('');
-
-  const loadList = useCallback(async () => {
-    setErr('');
-    try {
-      const [t, r, pj] = await Promise.all([listDevTasks(), listRequesters(), listProjects()]);
-      setTasks(t); setRequesters(r); setProjects(pj);
-      // "Next up" needs subtasks; one query per task is fine at this scale
-      // (a single developer, a handful of live pipelines).
-      const subs = await Promise.all(t.map((x) => listSubtasks(x.id).then((s) => [x.id, s])));
-      setSubsByTask(Object.fromEntries(subs));
-    } catch (e) { setErr(e.message || String(e)); }
-    finally { setLoading(false); }
-  }, []);
-
-  const loadDetail = useCallback(async (tid) => {
-    setErr('');
-    try { setDetail(await getDevTask(tid)); }
-    catch (e) { setErr(e.message || String(e)); }
-  }, []);
-
-  useEffect(() => { loadList(); }, [loadList]);
-  useEffect(() => { if (id) loadDetail(id); else setDetail(null); }, [id, loadDetail]);
-
-  const visible = useMemo(() => {
-    const scoped = projectFilter === 'all' ? tasks
-      : projectFilter === 'none' ? tasks.filter((t) => !t.project_id)
-      : tasks.filter((t) => t.project_id === projectFilter);
-    const open = scoped.filter((t) => !['done', 'cancelled'].includes(t.status));
-    if (filter === 'open') return sortTasks(open);
-    if (filter === 'all') return sortTasks(scoped);
-    if (filter === 'overdue') return sortTasks(open.filter((t) => t.is_overdue));
-    return sortTasks(scoped.filter((t) => t.status === filter));
-  }, [tasks, filter, projectFilter]);
-
-  const next = useMemo(() => nextUp(tasks, subsByTask), [tasks, subsByTask]);
-
-  // Group the visible cards under their project. Projects with nothing to show
-  // are dropped rather than rendered as empty headings, and unassigned work
-  // sinks to the bottom so it reads as a loose end rather than a category.
-  const grouped = useMemo(() => {
-    const byId = new Map(projects.map((p) => [p.id, p]));
-    const buckets = new Map();
-    for (const t of visible) {
-      const key = t.project_id || '__none';
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(t);
-    }
-    const out = [];
-    for (const [key, items] of buckets) {
-      if (key === '__none') continue;
-      // An ARCHIVED project is not in `projects`, but its tasks still exist and
-      // the view carries its name and colour, so fall back to the row itself
-      // rather than dropping the group or labelling it "unknown".
-      const fallback = { id: key, name: items[0].project_name || 'Project', colour: items[0].project_colour || 'slate' };
-      out.push({ project: byId.get(key) || fallback, items });
-    }
-    out.sort((a, b) => a.project.name.localeCompare(b.project.name));
-    if (buckets.has('__none')) {
-      out.push({ project: { id: '__none', name: 'No project', colour: null }, items: buckets.get('__none') });
-    }
-    return out;
-  }, [visible, projects]);
-
-  async function refreshBoth() {
-    await loadList();
-    if (id) await loadDetail(id);
-  }
-
-  // ── detail view ───────────────────────────────────────────────────
-  if (id && detail) {
-    const byCol = Object.fromEntries(BOARD_COLUMNS.map((c) => [c, detail.subtasks.filter((s) => s.status === c)]));
-    const finished = detail.subtasks.filter((s) => ['done', 'cancelled'].includes(s.status));
-    const openCount = detail.subtasks.filter((s) => !['done', 'cancelled'].includes(s.status)).length;
-
-    return (
-      <div style={{ padding: '24px 28px 48px', maxWidth: 1240, margin: '0 auto' }}>
-        <button className="wx-btn wx-btn-ghost" style={{ marginBottom: 12, paddingLeft: 0 }}
-          onClick={() => navigate('/dev-tasks')}>
-          <i className="bi bi-arrow-left" style={{ marginRight: 6 }} />All tasks
-        </button>
-
-        {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}><span>{err}</span></div>}
-
-        {/* Header */}
-        <div style={{
-          background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-          borderRadius: 14, padding: 20, marginBottom: 18,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 260, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                <h1 style={{ fontSize: 21, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{detail.title}</h1>
-                <PriorityChip priority={detail.priority} />
-                <StatusChip status={detail.status} />
-                {detail.project_name && <ProjectChip name={detail.project_name} colour={detail.project_colour} />}
-                {detail.is_overdue && <Chip tone="var(--danger)" solid>Overdue</Chip>}
-              </div>
-              {detail.description && (
-                <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 10px' }}>
-                  {detail.description}
-                </p>
-              )}
-              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-muted)' }}>
-                {detail.due_date && <span><i className="bi bi-calendar3" style={{ marginRight: 5 }} />Due {fmtDate(detail.due_date)}</span>}
-                {detail.requester && (
-                  <span>
-                    <i className="bi bi-person" style={{ marginRight: 5 }} />
-                    Requested by <strong style={{ color: 'var(--text-secondary)' }}>{detail.requester.display_name}</strong>
-                    {detail.creator && detail.creator.id !== detail.requested_by && (
-                      <> · logged by {detail.creator.display_name}</>
-                    )}
-                  </span>
-                )}
-              </div>
-              {/* The person named as requester can confirm it was really them. */}
-              {detail.requested_by && !detail.requested_confirmed_at && (
-                <div className="wx-alert wx-alert-info" style={{ marginTop: 10, fontSize: 12.5 }}>
-                  <span>
-                    This was logged as <strong>{detail.requester?.display_name}</strong>&apos;s request but has not been confirmed.
-                  </span>
-                  {detail.requested_by === profile?.id && (
-                    <button className="wx-btn wx-btn-primary" style={{ marginLeft: 10, padding: '2px 10px', fontSize: 12 }}
-                      onClick={async () => { await confirmRequested(detail.id); refreshBoth(); }}>
-                      Yes, I asked for this
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div style={{ minWidth: 220 }}>
-              <Progress pct={detail.progress_pct} done={detail.subtask_done} counted={detail.subtask_counted} />
-              {canEdit && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-                  <StatusMenu value={detail.status} size="md"
-                    onPick={(to) => setPending({ kind: 'task', to, from: detail.status })} />
-                  <button className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditTask(detail)}>
-                    <i className="bi bi-pencil" /> Edit
-                  </button>
-                </div>
-              )}
-              {isBoss && openCount > 0 && detail.status !== 'done' && (
-                <button className="wx-btn wx-btn-ghost" style={{ fontSize: 11.5, marginTop: 8, color: 'var(--warning)' }}
-                  onClick={() => setPending({ kind: 'force', from: detail.status })}>
-                  Close anyway ({openCount} still open)
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Board */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Subtasks</h2>
-          {canEdit && (
-            <button className="wx-btn wx-btn-primary" style={{ fontSize: 12.5 }} onClick={() => setSubModal({ new: true })}>
-              <i className="bi bi-plus-lg" style={{ marginRight: 5 }} />Add subtask
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginBottom: 20 }}>
-          {BOARD_COLUMNS.map((col) => {
-            const m = STATUS_META[col];
-            return (
-              <div key={col}
-                onDragOver={(e) => { if (canEdit) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } }}
-                onDrop={(e) => {
-                  if (!canEdit) return;
-                  e.preventDefault();
-                  const sid = e.dataTransfer.getData('text/plain');
-                  const sub = detail.subtasks.find((s) => s.id === sid);
-                  if (sub && sub.status !== col) setPending({ kind: 'sub', sub, to: col, from: sub.status });
-                }}
-                style={{
-                  background: 'var(--surface-2)', borderRadius: 12, padding: 10,
-                  border: '1px solid var(--border-subtle)', minHeight: 120,
-                }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-                  fontSize: 11.5, fontWeight: 800, color: m.tone, textTransform: 'uppercase', letterSpacing: 0.3,
-                }}>
-                  <i className={`bi ${m.icon}`} />{m.label}
-                  <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>{byCol[col].length}</span>
-                </div>
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {byCol[col].map((s) => (
-                    <SubtaskCard key={s.id} sub={s} canEdit={canEdit}
-                      onMove={(sub, to) => setPending({ kind: 'sub', sub, to, from: sub.status })}
-                      onEdit={(sub) => setSubModal({ sub })}
-                      onDelete={async (sub) => {
-                        if (!window.confirm(`Delete subtask "${sub.title}"?`)) return;
-                        await deleteSubtask(sub.id); refreshBoth();
-                      }} />
-                  ))}
-                  {!byCol[col].length && (
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                      Nothing here
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {finished.length > 0 && (
-          <details style={{ marginBottom: 22 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)' }}>
-              Finished ({finished.length})
-            </summary>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 8, marginTop: 10 }}>
-              {finished.map((s) => (
-                <SubtaskCard key={s.id} sub={s} canEdit={canEdit}
-                  onMove={(sub, to) => setPending({ kind: 'sub', sub, to, from: sub.status })}
-                  onEdit={(sub) => setSubModal({ sub })}
-                  onDelete={async (sub) => {
-                    if (!window.confirm(`Delete subtask "${sub.title}"?`)) return;
-                    await deleteSubtask(sub.id); refreshBoth();
-                  }} />
-              ))}
-            </div>
-          </details>
-        )}
-
-        {/* Timeline */}
-        <h2 style={{ fontSize: 14, fontWeight: 800, margin: '0 0 10px', color: 'var(--text-primary)' }}>Activity</h2>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input className="wx-input" placeholder="Add a note…" value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={async (e) => {
-              if (e.key === 'Enter' && comment.trim()) {
-                await addNote({ taskId: detail.id, body: comment }); setComment(''); loadDetail(detail.id);
-              }
-            }} />
-          <button className="wx-btn wx-btn-primary" disabled={!comment.trim()} onClick={async () => {
-            await addNote({ taskId: detail.id, body: comment }); setComment(''); loadDetail(detail.id);
-          }}>Post</button>
-        </div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {detail.notes.map((n) => (
-            <div key={n.id} style={{
-              background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-              borderRadius: 10, padding: '10px 12px',
-            }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-muted)' }}>
-                <strong style={{ color: 'var(--text-secondary)' }}>{n.author?.display_name || 'Someone'}</strong>
-                {n.status_to && (
-                  <span>
-                    moved {n.status_from ? <>from <StatusChip status={n.status_from} /> </> : ''}
-                    to <StatusChip status={n.status_to} />
-                  </span>
-                )}
-                <span style={{ marginLeft: 'auto' }}>{relTime(n.created_at)}</span>
-              </div>
-              {n.body && (
-                <div style={{ fontSize: 13, color: 'var(--text-primary)', marginTop: 6, whiteSpace: 'pre-wrap' }}>{n.body}</div>
-              )}
-            </div>
-          ))}
-          {!detail.notes.length && (
-            <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Nothing yet.</div>
-          )}
-        </div>
-
-        {/* Modals */}
-        {editTask && (
-          <TaskModal task={editTask} requesters={requesters} projects={projects} me={profile}
-            onClose={() => setEditTask(null)}
-            onSaved={() => { setEditTask(null); refreshBoth(); }} />
-        )}
-        {subModal && (
-          <SubtaskModal sub={subModal.sub} taskDue={detail.due_date}
-            onClose={() => setSubModal(null)}
-            onSaved={async (vals) => {
-              if (subModal.sub) {
-                await updateSubtask(subModal.sub.id, {
-                  title: vals.title.trim(), description: vals.description || null,
-                  priority: vals.priority, due_date: vals.dueDate || null,
-                });
-              } else {
-                await createSubtask(detail.id, vals);
-              }
-              setSubModal(null); refreshBoth();
-            }} />
-        )}
-        {pending && (
-          <StatusNoteModal
-            label={pending.kind === 'force' ? 'Close this task with subtasks still open?'
-              : `Move to ${STATUS_META[pending.to]?.label}`}
-            onCancel={() => setPending(null)}
-            onConfirm={async (note) => {
-              try {
-                if (pending.kind === 'force') await forceCompleteDevTask(detail.id, pending.from, note);
-                else if (pending.kind === 'task') await setDevTaskStatus(detail.id, pending.from, pending.to, note);
-                else await setSubtaskStatus(pending.sub, pending.to, note);
-              } catch (e) { setErr(e.message || String(e)); }
-              setPending(null); refreshBoth();
-            }} />
-        )}
-      </div>
-    );
-  }
-
-  // ── list view ─────────────────────────────────────────────────────
-  return (
-    <div style={{ padding: '24px 28px 48px', maxWidth: 1240, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>Development</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Tasks between the Boss and the developer. Each one breaks into subtasks.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {canEdit && (
-            <button className="wx-btn wx-btn-ghost" onClick={() => setShowProjects(true)}>
-              <i className="bi bi-folder2" style={{ marginRight: 6 }} />Projects
-            </button>
-          )}
-          <button className="wx-btn wx-btn-primary" onClick={() => setShowNew(true)}>
-            <i className="bi bi-plus-lg" style={{ marginRight: 6 }} />New task
-          </button>
-        </div>
-      </div>
-
-      {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}><span>{err}</span></div>}
-
-      {/* One glance: what is being worked on right now, then the numbers
-          that say whether anything needs attention. */}
-      <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
-        <ActiveChain next={next} onOpen={(tid) => navigate(`/dev-tasks/${tid}`)} />
-        <SummaryStrip tasks={tasks} />
-      </div>
-
-      {/* ONE toolbar, not two stacked rows of pills. The old version had two
-          separate "All" buttons meaning different things, which is genuinely
-          confusing. Now: state as a segmented control on the left (one thing,
-          one control), project as a labelled dropdown on the right. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 18,
-      }}>
-        <div style={{
-          display: 'inline-flex', padding: 3, gap: 2, borderRadius: 11,
-          background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-        }}>
-          {[['open', 'Open'], ['blocked', 'Blocked'], ['overdue', 'Overdue'], ['done', 'Done'], ['all', 'Everything']].map(([k, label]) => {
-            const on = filter === k;
-            const count = k === 'open' ? tasks.filter((t) => !['done', 'cancelled'].includes(t.status)).length
-              : k === 'blocked' ? tasks.filter((t) => t.status === 'blocked').length
-              : k === 'overdue' ? tasks.filter((t) => t.is_overdue).length
-              : k === 'done' ? tasks.filter((t) => t.status === 'done').length
-              : tasks.length;
-            return (
-              <button key={k} type="button" onClick={() => setFilter(k)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 13px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  fontSize: 12.5, fontWeight: on ? 700 : 500,
-                  background: on ? 'var(--surface-1)' : 'transparent',
-                  color: on ? 'var(--text-primary)' : 'var(--text-muted)',
-                  boxShadow: on ? '0 1px 3px rgba(16,24,40,.10)' : 'none',
-                  transition: 'background .12s, color .12s',
-                }}>
-                {label}
-                {/* The count is the useful part: an empty Blocked tab should
-                    look empty before you click it. */}
-                <span style={{
-                  fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
-                  background: on ? 'var(--surface-2)' : 'transparent',
-                  color: count === 0 ? 'var(--text-muted)'
-                    : (k === 'blocked' || k === 'overdue') ? 'var(--danger)' : 'var(--text-muted)',
-                }}>{count}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {projects.length > 0 && (
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)' }}>Project</span>
-            {/* Do NOT set an explicit height here. .wx-input already carries
-                padding: 12px 14px and font-size: 14px, so a 34px height clips
-                the option text in half -- which is exactly what happened. Let
-                padding size it instead. */}
-            <select className="wx-input" style={{ width: 200, padding: '7px 12px', fontSize: 13 }}
-              value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
-              <option value="all">All projects</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              <option value="none">Unassigned</option>
-            </select>
-          </label>
-        )}
-      </div>
-
-
-      {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          <span className="wx-spinner" style={{ width: 16, height: 16, marginRight: 8 }} />Loading…
-        </div>
-      ) : !visible.length ? (
-        <div style={{
-          textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)',
-          border: '1px dashed var(--border-subtle)', borderRadius: 14,
-        }}>
-          <i className="bi bi-kanban" style={{ fontSize: 28, opacity: 0.5 }} />
-          <div style={{ marginTop: 10, fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)' }}>
-            {filter === 'open' ? 'Nothing in progress' : 'Nothing here'}
-          </div>
-          <div style={{ fontSize: 12.5, marginTop: 4 }}>Create a task to get started.</div>
-        </div>
-      ) : (
-        grouped.map(({ project, items }) => (
-          <ProjectGroup key={project.id} project={project} tasks={items} subsByTask={subsByTask}
-            onOpen={(tid) => navigate(`/dev-tasks/${tid}`)} />
-        ))
-      )}
-
-      {showProjects && (
-        <ProjectsModal onClose={() => setShowProjects(false)} onChanged={loadList} />
-      )}
-      {showNew && (
-        <TaskModal requesters={requesters} projects={projects} me={profile}
-          onClose={() => setShowNew(false)}
-          onSaved={() => { setShowNew(false); loadList(); }} />
-      )}
-    </div>
-  );
+  const { profile } = useAuth(); const { id } = useParams(); const navigate = useNavigate();
+  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const [tab, setTab] = useState(profile?.role === 'boss' ? 'roadmap' : 'week'); const [feature, setFeature] = useState(null); const [task, setTask] = useState(null); const [showFeatureModal, setShowFeatureModal] = useState(false);
+  const isBoss = profile?.role === 'boss'; const developers = data?.people.filter((person) => person.role === 'developer') || [];
+  const load = useCallback(async () => { setError(''); try { const result = await loadDevelopmentWorkspace(); setData(result); if (id) { const directTask = result.tasks.find((item) => item.id === id); if (directTask) { setTask(directTask); setFeature(result.features.find((item) => item.id === directTask.task_id)); } else { setFeature(result.features.find((item) => item.id === id) || null); } } } catch (e) { setError(e.message); } finally { setLoading(false); } }, [id]);
+  useEffect(() => { load(); }, [load]);
+  const openFeature = (item) => { setFeature(item); setTask(null); navigate(`/dev-tasks/${item.id}`, { replace: true }); };
+  const openTask = (item) => { setTask(item); setFeature(data.features.find((f) => f.id === item.task_id)); navigate(`/dev-tasks/${item.id}`, { replace: true }); };
+  const closeDrawer = () => { setFeature(null); setTask(null); navigate('/dev-tasks', { replace: true }); };
+  async function plan(item, blockId) { setError(''); try { await moveFeature(item.id, blockId); await load(); } catch (e) { setError(e.message); } }
+  if (loading) return <div className="dev-loading"><span className="wx-spinner" /> Loading development workspace…</div>;
+  if (!data) return <div className="wx-alert wx-alert-danger">{error || 'Could not load Development.'}</div>;
+  const openFeatures = data.features.filter((item) => !(item.subtask_total > 0 && item.subtask_live === item.subtask_total));
+  return <div className="dev-page"><header className="dev-page-head"><div><span className="dev-eyebrow">Product delivery</span><h1>Development</h1><p>{isBoss ? 'Three products, two developers, one queue.' : 'Your block, reviews and daily update in one place.'}</p></div><div className="dev-head-actions">{isBoss && <button className="wx-btn wx-btn-ghost" onClick={() => setTab('roadmap')}><i className="bi bi-calendar2-range" /> Plan next block</button>}<button className="wx-btn wx-btn-primary" onClick={() => setShowFeatureModal(true)}><i className="bi bi-plus-lg" /> New feature</button></div></header>{error && <div className="wx-alert wx-alert-danger dev-error">{error}<button onClick={() => setError('')}><i className="bi bi-x" /></button></div>}{isBoss ? <><WaitingStrip tasks={data.tasks} features={data.features} onOpen={openTask} /><nav className="dev-tabs">{[['roadmap', 'Roadmap'], ['list', 'List'], ['bugs', `Bugs · ${data.tasks.filter((item) => item.source === 'bug_report' && item.status !== 'live').length}`], ['done', 'Done']].map(([value, label]) => <button className={tab === value ? 'is-active' : ''} key={value} onClick={() => setTab(value)}>{label}</button>)}</nav><main className="dev-surface">{tab === 'roadmap' && <Roadmap products={data.products} blocks={data.blocks} features={openFeatures} tasksByFeature={data.tasksByFeature} canPlan onOpen={openFeature} onMove={plan} />}{tab === 'list' && <ListView tasks={data.tasks} features={data.features} onOpen={openTask} />}{tab === 'bugs' && <ListView tasks={data.tasks} features={data.features} source="bug_report" onOpen={openTask} />}{tab === 'done' && <DoneView features={data.features} products={data.products} blocks={data.blocks} onOpen={openFeature} />}</main></> : <><nav className="dev-tabs">{[['week', 'My week'], ['roadmap', 'Roadmap'], ['list', 'All tasks']].map(([value, label]) => <button className={tab === value ? 'is-active' : ''} key={value} onClick={() => setTab(value)}>{label}</button>)}</nav><main className={`dev-surface${tab === 'week' ? ' dev-week-surface' : ''}`}>{tab === 'week' && <MyWeek data={data} me={profile} onOpen={openTask} onRefresh={load} />}{tab === 'roadmap' && <Roadmap products={data.products} blocks={data.blocks} features={openFeatures} tasksByFeature={data.tasksByFeature} canPlan={false} onOpen={openFeature} onMove={() => {}} />}{tab === 'list' && <ListView tasks={data.tasks} features={data.features} onOpen={openTask} />}</main></>}{feature && !task && <FeatureDrawer feature={feature} tasks={data.tasksByFeature[feature.id] || []} developers={developers} canEdit onClose={closeDrawer} onOpenTask={openTask} onRefresh={load} />}{task && feature && <TaskDrawer task={task} feature={feature} data={data} me={profile} onClose={closeDrawer} onRefresh={load} />}{showFeatureModal && <FeatureModal products={data.products} developers={developers} onClose={() => setShowFeatureModal(false)} onSaved={async () => { setShowFeatureModal(false); await load(); }} />}</div>;
 }
