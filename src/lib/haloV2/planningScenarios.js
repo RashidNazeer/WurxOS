@@ -143,7 +143,7 @@ export function planningEligibility(model, { xIsMonetary = false, yIsMonetary = 
     blockers.push({
       code: 'low_confidence',
       message: `Model confidence is "${confLabel || 'unknown'}", below the ${PLANNING_CONFIDENCE_FLOOR} needed to drive planning automatically.`,
-      fix: 'The confidence panel lists what is holding it down — usually sample size or a missing control.',
+      fix: 'The Adjust step lists what is holding it down, usually sample size or a missing control.',
     });
   }
 
@@ -236,8 +236,8 @@ export function planningModel({
     disclaimer: mode === 'model'
       ? 'Derived from the adjusted model, then used as a planning assumption. Not a measured result and not incremental.'
       : mode === 'override'
-        ? 'Manually entered planning assumptions — not measured results.'
-        : 'Planning assumptions — not measured results. The model is not eligible to drive these.',
+        ? 'Manually entered planning assumptions. Not measured results.'
+        : 'Planning assumptions, not measured results. The model is not eligible to set these.',
   };
 }
 

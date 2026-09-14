@@ -67,7 +67,7 @@ export function lagWarnings(rows) {
   if (top >= 0.3 && top > runnerUp * 2.5) {
     warnings.push({
       code: 'dominant_lag',
-      message: 'One lag is far stronger than the others. Testing several lags makes an occasional strong result likely by chance — treat this as a lead to investigate, not a finding.',
+      message: 'One lag is far stronger than the others. Testing several lags makes an occasional strong result likely by chance, so treat this as a lead to investigate rather than a finding.',
     });
   }
 

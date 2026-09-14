@@ -22,7 +22,7 @@ export const STAGE_STATUS = {
   // "Coming later" read as though validation were queued and nearly here —
   // which would imply the results are on their way to being proven. This tool
   // does not run validation at all, and saying so is the point.
-  later: 'Not done — needs a controlled test',
+  later: 'Not done, needs a controlled test',
 };
 
 export const STAGES = [
@@ -97,7 +97,7 @@ export function stageStatuses(result, { periodsWithData = 0 } = {}) {
       : `${model.maxLag}-lag window estimated; delayed-only relationship is signed.`;
   } else if (model?.available) {
     status.distributedLag = 'partial';
-    detail.distributedLag = 'Only a same-period model was estimated — no lag window, so no delayed effect has been looked for.';
+    detail.distributedLag = 'Only a same-period model was estimated. With no lag window, no delayed effect has been looked for.';
   } else {
     status.distributedLag = 'needs_data';
     detail.distributedLag = 'Needs the adjusted model first.';
@@ -120,7 +120,7 @@ export function stageStatuses(result, { periodsWithData = 0 } = {}) {
   // 6 — Validation. Out of scope by design, and the reason no output here may
   // be described as incremental.
   status.validation = 'later';
-  detail.validation = 'Geo or holdout testing. Not part of this tool yet — which is why nothing here is labelled incremental.';
+  detail.validation = 'Geo or holdout testing. Not part of this tool, which is why nothing here is labelled incremental.';
 
   return STAGES.map((s) => ({
     ...s,

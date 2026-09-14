@@ -173,7 +173,7 @@ export function fitDistributedLag(periods, { maxLag = MAX_SUPPORTED_LAG, control
       // twice. The headline is the claim; the message is only the arithmetic
       // behind it.
       headline: 'Not enough history for an adjusted halo estimate.',
-      message: `${cap.usable} usable period${cap.usable === 1 ? '' : 's'} cannot reliably estimate a ${L}-lag model with ${parameterCount} parameters — that needs about ${cap.required}. Signed correlations and lag relationships above need far less data and are still valid.`,
+      message: `${cap.usable} usable period${cap.usable === 1 ? '' : 's'} cannot reliably estimate a ${L}-lag model with ${parameterCount} parameters, which needs about ${cap.required}. Signed correlations and lag relationships above need far less data and are still valid.`,
     };
   }
 
@@ -183,7 +183,7 @@ export function fitDistributedLag(periods, { maxLag = MAX_SUPPORTED_LAG, control
 
   const fit = ols(design, y);
   if (!fit) {
-    return { ...base, reason: 'singular', message: 'The model could not be estimated — the selected inputs are collinear or degenerate over this period.' };
+    return { ...base, reason: 'singular', message: 'The model could not be estimated: the selected inputs are collinear or degenerate over this period.' };
   }
 
   const hac = hacCovariance(fit);
@@ -277,7 +277,7 @@ export function fitDistributedLag(periods, { maxLag = MAX_SUPPORTED_LAG, control
     });
   }
   if (interval.lower != null && interval.lower < 0 && interval.upper > 0) {
-    warnings.push({ code: 'interval_spans_zero', message: 'The 95% interval includes zero — the direction of this relationship is uncertain over this period.' });
+    warnings.push({ code: 'interval_spans_zero', message: 'The 95% interval includes zero, so the direction of this relationship is unresolved over this period.' });
   }
   // Said plainly rather than left for the reader to infer from two intervals:
   // if the DELAYED part cannot be distinguished from zero, the full cumulative

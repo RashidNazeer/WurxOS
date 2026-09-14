@@ -32,6 +32,9 @@ import {
 import { buildHaloV2Csv, haloV2CsvFilename } from '../src/lib/haloV2/exportCsv.js';
 import { HALO_FIELDS } from '../src/lib/haloFields.js';
 import { fillFromDaily } from '../src/lib/haloV2/dailyFill.js';
+import { buildSnapshot, NOT_CLAIM_LINE, SIGNAL_BY_CONFIDENCE } from '../src/lib/haloV2/snapshot.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // dataAdapter reaches V1's haloMath, whose imports are extensionless (Vite
 // resolves them). Resolve them the same way here so the adapter can be tested
@@ -857,7 +860,7 @@ const NO_CTL = { trend: false, seasonality: false };
   check('41. no modellable grain → guided mode', rec.guided === true);
   check('41b. …but a grain is still recommended for the charts', rec.grain === 'week');
   check('41c. …and correlations are acknowledged as still meaningful',
-    /correlations are still meaningful/.test(rec.reason), rec.reason);
+    /signed correlations.*are still meaningful/.test(rec.reason), rec.reason);
   check('41d. correlations ARE computable at n=6', assessments.week.canCorrelate === true,
     `obs=${assessments.week.correlationObs} need=${assessments.week.correlationRequired}`);
   check('41e. no grains at all → guided with a null grain',
@@ -1252,8 +1255,10 @@ function haloFinderTest(res) {
   check('BugB5. an indexed series shows 1 decimal and no currency',
     formatMetricValue(733.3333333333333, 'gmv', { indexed: true }) === '733.3',
     formatMetricValue(733.3333333333333, 'gmv', { indexed: true }));
-  check('BugB6. missing stays a dash, not NaN',
-    formatMetricValue(null, 'gmv') === '—' && formatMetricValue(undefined, 'gmv') === '—');
+  // The placeholder used to be an em dash. The client-ready copy rule bans
+  // those, so it is now "n/a": still not a number, and still not NaN.
+  check('BugB6. missing stays a placeholder, not NaN',
+    formatMetricValue(null, 'gmv') === 'n/a' && formatMetricValue(undefined, 'gmv') === 'n/a');
   check('BugB7. no formatted value anywhere contains NaN',
     !['gmv', 'ntb', 'keyword_search_rank', 'video_per_day'].some((k) => /NaN/.test(formatMetricValue(0, k))));
 }
@@ -1304,8 +1309,8 @@ function haloFinderTest(res) {
   check('KT2. it states a signed percentage', /[+-]\d+%/.test(t1.headline), t1.headline);
   check('KT3. it says whether it was the same period or later',
     /same day|days later|day later/.test(t1.headline), t1.headline);
-  check('KT4. the caveat is always present and says correlation',
-    /correlation, not proof/i.test(t1.caveat), t1.caveat);
+  check('KT4. the caveat is always present, says correlation and refuses cause',
+    /correlation/i.test(t1.caveat) && /not proof of cause/i.test(t1.caveat), t1.caveat);
   check('KT5. confidence and observation count are carried',
     t1.confidenceLabel != null && t1.observations > 0, `${t1.confidenceLabel} / ${t1.observations}`);
   check('KT6. the "so what" matches the planning gate',
@@ -1355,7 +1360,7 @@ function haloFinderTest(res) {
   check('CSV2. it has both a SUMMARY and a SERIES block', /SUMMARY/.test(csv) && /SERIES/.test(csv));
   check('CSV3. the summary carries n, the interval and the controls',
     /Usable periods,\d+/.test(csv) && /95% interval/.test(csv) && /Controls included/.test(csv));
-  check('CSV4. the same-period share is carried', /Same-period share of cumulative/.test(csv));
+  check('CSV4. the same-period share is carried', /Same-period share of the combined figure/.test(csv));
   check('CSV5. a brand name containing a comma is quoted',
     /"Acme, Inc\."/.test(csv), (csv.match(/.*Acme.*/) || [''])[0]);
   check('CSV6. the series has one row per period plus a header',
@@ -1522,7 +1527,7 @@ function haloFinderTest(res) {
   check('SMOKE. historyPhrase only claims a year when the span really is one',
     phrases.filter((s) => /about a year/.test(s)).every((s) => {
       const n = Number((s.match(/^(\d+)/) || [])[1]);
-      const u = (s.match(/usable (\w+?)s? /) || [])[1];
+      const u = (s.match(/usable (\w+?)s?[ ,.]/) || [])[1];
       const per = { day: 365, week: 52, month: 12 }[u];
       return per ? n / per >= 0.85 : false;
     }),
@@ -1630,6 +1635,196 @@ function haloFinderTest(res) {
   const fromDaily = buildPeriods({ ...base, rows: daily, sourceGran: 'day', dailyRows: daily });
   check('FILL 21. a view already rolled up from the daily sheet is not filled a second time',
     fromDaily.periods.find((p) => p.key === '2026-03-07')?.y === 700 && !fromDaily.filledFromDaily.length);
+}
+
+// ── CLIENT-READY REDESIGN ────────────────────────────────────────────
+// Snapshot, Assumptions-mode planning, the exports, and the two copy rules
+// the redesign brief states as hard requirements.
+{
+  const ANALYSE = { xKey: 'gmv', yKey: 'revenue_per_day', unit: 'week', controls: { trend: true, seasonality: false } };
+  const run = (rows, opts = {}) => analyseHalo(rows, { ...ANALYSE, ...opts });
+
+  // A clean delayed relationship on enough history: TikTok GMV last week
+  // drives Amazon revenue this week.
+  const nX = [];
+  for (let i = 0; i < 120; i++) nX.push(900 + 300 * Math.sin(i / 5) + 250 * rnd());
+  const nY = nX.map((_, i) => 2000 + 0.5 * (i >= 1 ? nX[i - 1] : nX[0]) + 25 * rnd());
+  const healthy = run(periods(nX, nY), { maxLag: 2 });
+  const snapHealthy = buildSnapshot(healthy, { unit: 'week', cur: '$' });
+
+  // Pure noise on the same amount of history: a fitted model whose interval
+  // cannot decide on a direction.
+  const noiseX = [], noiseY = [];
+  for (let i = 0; i < 120; i++) { noiseX.push(500 + 400 * rnd()); noiseY.push(1500 + 900 * rnd()); }
+  const noisy = run(periods(noiseX, noiseY), { maxLag: 2 });
+  const snapNoisy = buildSnapshot(noisy, { unit: 'week', cur: '$' });
+
+  // Too little history for any model at all.
+  const thin = run(periods(nX.slice(0, 8), nY.slice(0, 8)), { maxLag: 2 });
+  const snapThin = buildSnapshot(thin, { unit: 'week', cur: '$' });
+
+  // Same data, no lag window: a same-period association only.
+  const samePeriod = run(periods(nX, nY), { maxLag: 0 });
+  const snapSame = buildSnapshot(samePeriod, { unit: 'week', cur: '$' });
+
+  check('SNAP 1. the headline figure is the DELAYED basis when a lag window exists',
+    snapHealthy.effect.basis === 'lagged_only' && /per \$1$/.test(snapHealthy.effect.value),
+    `${snapHealthy.effect.basis} "${snapHealthy.effect.value}"`);
+  check('SNAP 2. with no lag window it is labelled same-period and flagged weak halo',
+    snapSame.effect.weakHalo === true && snapSame.effect.label === 'Same-period association',
+    `${snapSame.effect.label}`);
+  check('SNAP 3. the 95% range is given in words, not notation',
+    /^Likely between \$.+ and \$.+$/.test(snapHealthy.range.value), snapHealthy.range.value);
+  check('SNAP 4. signal strength is the confidence label re-expressed, never a second opinion',
+    snapHealthy.signal.level === SIGNAL_BY_CONFIDENCE[healthy.adjustedModel.confidenceLabel],
+    `${healthy.adjustedModel.confidenceLabel} -> ${snapHealthy.signal.level}`);
+  check('SNAP 5. signal strength carries the reason that actually decided it',
+    typeof snapHealthy.signal.why === 'string' && snapHealthy.signal.why.length > 10,
+    snapHealthy.signal.why);
+  check('SNAP 6. a clean positive model at Moderate or better says Scale',
+    snapHealthy.action.verdict === 'Scale',
+    `${snapHealthy.action.verdict} (${healthy.adjustedModel.confidenceLabel})`);
+  check('SNAP 7. Scale still names the missing confounders as a ceiling',
+    /Promotions/.test(snapHealthy.action.detail), snapHealthy.action.detail);
+  check('SNAP 8. an interval that crosses zero says Hold, never Scale',
+    snapNoisy.action.verdict === 'Hold' && snapNoisy.range.spansZero === true,
+    `${snapNoisy.action.verdict} spansZero=${snapNoisy.range.spansZero}`);
+  check('SNAP 9. no model at all says Need more data, with the shortfall',
+    snapThin.action.verdict === 'Need more data' && snapThin.effect.available === false,
+    snapThin.action.detail);
+  check('SNAP 10. every snapshot carries the claim ceiling verbatim',
+    [snapHealthy, snapNoisy, snapThin].every((s) => s.notClaim === NOT_CLAIM_LINE));
+
+  // ── Planning: model mode, assumptions mode, override ──────────
+  const withRevenue = (rows, opts, planning) => analyseHalo(rows, { ...ANALYSE, ...opts, planning });
+  const planModel = withRevenue(periods(nX, nY), { maxLag: 2 }, {
+    ttsRevenue: '100000', marketingSpend: '30000', assumptions: null, mode: null,
+  });
+  const planAssumed = withRevenue(periods(noiseX, noiseY), { maxLag: 2 }, {
+    ttsRevenue: '100000', marketingSpend: '30000', assumptions: null, mode: null,
+  });
+  const planOverride = withRevenue(periods(nX, nY), { maxLag: 2 }, {
+    ttsRevenue: '100000', marketingSpend: '30000', assumptions: { conservative: 5, base: 10, upside: 20 }, mode: 'override',
+  });
+
+  check('PLAN 1. an eligible model drives all three scenarios from its interval',
+    planModel.planning.mode === 'model'
+      && planModel.planning.conservative.haloPercent === planModel.planningDerived.assumptions.conservative
+      && planModel.planning.base.haloPercent === planModel.planningDerived.assumptions.base
+      && planModel.planning.upside.haloPercent === planModel.planningDerived.assumptions.upside,
+    JSON.stringify(planModel.planningDerived.assumptions));
+  check('PLAN 2. the spread IS the model interval, not a decorative plus or minus',
+    planModel.planning.conservative.haloPercent < planModel.planning.base.haloPercent
+      && planModel.planning.base.haloPercent < planModel.planning.upside.haloPercent);
+  check('PLAN 3. an ineligible model falls back to ASSUMPTIONS mode rather than locking the client out',
+    planAssumed.planning.mode === 'assumptions' && planAssumed.planning.base != null,
+    `mode=${planAssumed.planning.mode}`);
+  check('PLAN 4. assumptions mode says in its own disclaimer that nothing was measured',
+    /not measured results/i.test(planAssumed.planning.disclaimer), planAssumed.planning.disclaimer);
+  check('PLAN 5. assumptions mode still lists what would unlock the model',
+    (planAssumed.planningEligibility.blockers || []).length > 0
+      && planAssumed.planningEligibility.blockers.every((b) => b.message && b.fix));
+  check('PLAN 6. a manual edit is labelled an override, not the model',
+    planOverride.planning.mode === 'override' && planOverride.planning.modeLabel === 'Manual override'
+      && planOverride.planning.base.haloPercent === 10);
+  check('PLAN 7. scenario outputs are computed, not just the inputs echoed',
+    planModel.planning.base.offPlatformRevenue === 100000 * (planModel.planning.base.haloPercent / 100)
+      && planModel.planning.base.totalInfluencedRevenue === 100000 + planModel.planning.base.offPlatformRevenue
+      && near(planModel.planning.base.blendedMultiple, planModel.planning.base.totalInfluencedRevenue / 30000, 1e-9));
+
+  // ── Exports ───────────────────────────────────────────────────
+  const csvArgs = { periods: periods(nX, nY), gran: 'week', range: { start: '2026-01-01', end: '2026-06-30' }, xKey: 'gmv', yKey: 'revenue_per_day', brandName: 'Longevity Box', currency: '$' };
+  const csvModel = buildHaloV2Csv({
+    ...csvArgs, result: planModel, snapshot: buildSnapshot(planModel, { unit: 'week', cur: '$' }),
+    planning: { ttsRevenue: '100000', marketingSpend: '30000', periodLabel: 'Q4 2026', currency: '$' },
+  });
+  const csvAssumed = buildHaloV2Csv({
+    ...csvArgs, result: planAssumed, snapshot: buildSnapshot(planAssumed, { unit: 'week', cur: '$' }),
+    planning: { ttsRevenue: '100000', marketingSpend: '30000', periodLabel: 'Q4 2026', currency: '$' },
+  });
+  const csvNoPlan = buildHaloV2Csv({
+    ...csvArgs, result: healthy, snapshot: snapHealthy,
+    planning: { ttsRevenue: '', marketingSpend: '', periodLabel: '', currency: '$' },
+  });
+
+  check('CSV 1. the scenario block is tagged MODELLED when the model drove it',
+    csvModel.includes('SCENARIOS') && /Base,.*,MODELLED,/.test(csvModel));
+  check('CSV 2. the same block is tagged ASSUMED in assumptions mode',
+    csvAssumed.includes('SCENARIOS') && /Base,.*,ASSUMED,/.test(csvAssumed)
+      && !csvAssumed.includes(',MODELLED,'));
+  check('CSV 3. every scenario row carries n, grain, metric pair and a timestamp',
+    /Base,.*,week,TikTok Shop sales \(GMV\) against Amazon revenue,\d{4}-\d{2}-\d{2}T/.test(csvModel));
+  check('CSV 4. no scenario block at all until revenue has been entered',
+    !csvNoPlan.includes('SCENARIOS'));
+  check('CSV 5. the snapshot travels in the file, next action included',
+    csvModel.includes('SNAPSHOT') && csvModel.includes('Next action')
+      && csvModel.includes(NOT_CLAIM_LINE));
+  check('CSV 6. the not-incremental statement survives in every export',
+    [csvModel, csvAssumed, csvNoPlan].every((t) => /NOT incremental/i.test(t)
+      && /geo or holdout validation/i.test(t)));
+  check('CSV 7. the planning period label is recorded',
+    csvModel.includes('Q4 2026'));
+
+  // ── Copy rules ────────────────────────────────────────────────
+  // 1. No em dashes anywhere a user can read: strings, JSX text, exports.
+  //    Source comments are stripped first, so the rule polices copy rather
+  //    than the way the code is written about.
+  const V2_DIRS = ['src/components/haloV2', 'src/lib/haloV2'];
+  const V2_PAGES = ['src/pages/boss/HaloV2Page.jsx', 'src/pages/portal/HaloV2PortalPage.jsx'];
+  const repo = path.resolve(process.cwd());
+  const v2Files = [
+    ...V2_DIRS.flatMap((d) => fs.readdirSync(path.join(repo, d)).map((f) => path.join(d, f))),
+    ...V2_PAGES,
+  ].filter((f) => /\.(js|jsx)$/.test(f));
+
+  const stripComments = (text) => {
+    let inBlock = false;
+    return text.split(/\r?\n/).map((line) => {
+      let code = '';
+      let rest = line;
+      while (rest.length) {
+        if (inBlock) {
+          const end = rest.indexOf('*/');
+          if (end < 0) { rest = ''; break; }
+          rest = rest.slice(end + 2); inBlock = false;
+        } else {
+          const b = rest.indexOf('/*');
+          const l = rest.indexOf('//');
+          if (b >= 0 && (l < 0 || b < l)) { code += rest.slice(0, b); rest = rest.slice(b + 2); inBlock = true; }
+          else if (l >= 0) { code += rest.slice(0, l); rest = ''; }
+          else { code += rest; rest = ''; }
+        }
+      }
+      return code;
+    }).join('\n');
+  };
+
+  const emDashHits = v2Files.filter((f) => stripComments(fs.readFileSync(path.join(repo, f), 'utf8')).includes('—'));
+  check(`COPY 1. no em dashes in any user-facing string across ${v2Files.length} Halo V2 files`,
+    emDashHits.length === 0, emDashHits.join(', '));
+
+  // 2. The words a Meeting hero may never use. Checked against what the
+  //    snapshot and the takeaway actually emit, plus the Snapshot component's
+  //    own copy, because that block is what gets screenshotted.
+  const FORBIDDEN = [/\bproves\b/i, /\bcaused\b/i, /incremental lift/i, /true ROAS/i, /\bguaranteed\b/i];
+  const heroStrings = [
+    ...[snapHealthy, snapNoisy, snapThin, snapSame].flatMap((s) => [
+      s.effect.label, s.effect.value, s.effect.sub, s.range.label, s.range.value, s.range.sub,
+      s.signal.level, s.signal.why, s.action.verdict, s.action.detail, s.notClaim,
+    ]),
+    ...[healthy, noisy, thin].flatMap((r) => {
+      const t = keyTakeaway(r, { unit: 'week', xKey: 'gmv', yKey: 'revenue_per_day' });
+      return [t.headline, t.caveat, t.soWhat];
+    }),
+    stripComments(fs.readFileSync(path.join(repo, 'src/components/haloV2/Snapshot.jsx'), 'utf8')),
+  ].filter(Boolean);
+  const offenders = heroStrings.filter((s) => FORBIDDEN.some((re) => re.test(s)));
+  check('COPY 2. the Meeting hero never says proves, caused, incremental lift, true ROAS or guaranteed',
+    offenders.length === 0, offenders.slice(0, 2).join(' | '));
+
+  check('COPY 3. the claim ceiling names what it is not, in one line',
+    /Not a geo test/.test(NOT_CLAIM_LINE) && /Not platform ROAS/.test(NOT_CLAIM_LINE)
+      && !/incremental lift/i.test(NOT_CLAIM_LINE), NOT_CLAIM_LINE);
 }
 
 console.log('\nHalo V2 — brief §33 test suite\n');
