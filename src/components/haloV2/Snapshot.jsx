@@ -11,7 +11,7 @@
 // screenshotted into a deck and the caveat has to be inside the same crop.
 // ============================================================
 
-import { EvidenceTag, ModelledBadge, Chip } from './shared.jsx';
+import { ModelledBadge, Chip } from './shared.jsx';
 
 const VERDICT_TONE = {
   Scale: { fg: 'var(--success)', bg: 'var(--success-soft)', bd: 'var(--success)', icon: 'bi-graph-up-arrow' },
@@ -19,38 +19,29 @@ const VERDICT_TONE = {
   'Need more data': { fg: 'var(--text-secondary)', bg: 'var(--surface-3)', bd: 'var(--border-default)', icon: 'bi-hourglass-split' },
 };
 
-export default function Snapshot({ snapshot, headline, periodLabel, brandName, comparison, chart, chartCaption }) {
+export default function Snapshot({ snapshot, headline, chart, chartCaption }) {
   if (!snapshot) return null;
   const { effect, range, signal, action, notClaim } = snapshot;
   const verdict = VERDICT_TONE[action.verdict] || VERDICT_TONE['Need more data'];
 
   return (
-    <section className="wx-card" style={{ padding: '20px 22px' }}>
-      {/* Framing line: who, what and when, before any number. */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-          The TikTok Shop effect on Amazon
-        </div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-          {[brandName, periodLabel].filter(Boolean).join(' · ')}
-        </div>
+    <section className="wx-card" style={{ padding: '18px 20px' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+        The TikTok Shop effect on Amazon
       </div>
 
       {headline && (
         <h1 style={{
-          fontSize: 'clamp(1.1rem, 2.4vw, 1.5rem)', fontWeight: 800, margin: '8px 0 0',
+          fontSize: 'clamp(1.1rem, 2.4vw, 1.45rem)', fontWeight: 800, margin: '6px 0 0',
           lineHeight: 1.3, color: 'var(--text-primary)', maxWidth: 900,
         }}>
           {headline}
         </h1>
       )}
-      {comparison && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{comparison}</div>
-      )}
 
       <div style={{
-        display: 'grid', gap: 12, marginTop: 16,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(215px, 1fr))',
+        display: 'grid', gap: 10, marginTop: 14,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(205px, 1fr))',
       }}>
         {/* 1 - the effect. The only card with the accent border. */}
         <Card
@@ -81,12 +72,12 @@ export default function Snapshot({ snapshot, headline, periodLabel, brandName, c
           footer={signal.confidenceLabel ? <Chip>{signal.confidenceLabel}</Chip> : null}
         />
 
-        {/* 4 - the claim ceiling. */}
+        {/* 4 - the claim ceiling. The badge lives on the number above, not
+            here: one badge, next to the figure it qualifies. */}
         <Card
           label="What this is not"
           value={<span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>{notClaim}</span>}
           sub="Showing that sales would not have happened otherwise needs a controlled test, such as a geo holdout. This tool does not run one."
-          footer={<EvidenceTag />}
         />
 
         {/* 5 - the decision. */}

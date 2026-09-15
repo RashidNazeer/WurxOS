@@ -54,23 +54,25 @@ export default function HaloV2Page() {
           <h1 className="page-title" style={{ margin: 0 }}>Amazon Halo V2</h1>
           <p className="page-subtitle" style={{ margin: '4px 0 0' }}>
             How TikTok Shop activity moved with Amazon outcomes in this period, and how sure we are.
-            {' '}<Link to="/halo" style={{ color: 'var(--accent)' }}>The original Halo tool</Link> is unchanged.
           </p>
         </div>
+        {/* The brand dropdown is the ONLY place the brand is named. It used to
+            be a "BRAND" label plus the dropdown plus the brand again in the
+            explorer's top bar and again in the snapshot. */}
         {!loading && brands.length > 0 && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Brand</span>
             <select className="wx-input" style={{ maxWidth: 300, minWidth: 170 }} value={selectedBrandId || ''} onChange={(e) => setSelectedBrandId(e.target.value)}>
               {brands.map((x) => (
                 <option key={x.brand.id} value={x.brand.id}>{x.brand.brand_name}</option>
               ))}
             </select>
-            {/* V2's own links. Separate tokens from V1's, so handing a client
-                the V2 view never disturbs a V1 link they already have. */}
-            <button type="button" className="wx-btn wx-btn-ghost"
-              onClick={() => setShareOpen(true)}>
-              <i className="bi bi-link-45deg" style={{ marginRight: 6 }} />Client links
-            </button>
+            {/* Client links normally live inside the explorer's Share menu.
+                With no sheets there is no explorer, so keep one way in. */}
+            {!brandDatasets.length && (
+              <button type="button" className="wx-btn wx-btn-ghost" onClick={() => setShareOpen(true)}>
+                <i className="bi bi-link-45deg" style={{ marginRight: 6 }} />Client links
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -99,6 +101,10 @@ export default function HaloV2Page() {
           // Internal users move between both views all day, so this page
           // remembers the last one. A client link always opens in Meeting.
           rememberMode
+          // Sharing sits in the explorer's Share menu beside the exports,
+          // rather than as a separate button in the page header.
+          onManageLinks={() => setShareOpen(true)}
+          v1Href="/halo"
         />
       ) : (
         <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>

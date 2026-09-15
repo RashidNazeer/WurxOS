@@ -49,7 +49,9 @@ export default function ContributionChart({ contribution, unit, yLabel }) {
 
       <div style={{ height: 260 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 22, left: 8 }}>
+          {/* Legend at the top, for the same reason as the over-time chart: at
+              the bottom it overlapped the centered axis title. */}
+          <ComposedChart data={data} margin={{ top: 4, right: 12, bottom: 24, left: 8 }}>
             <CartesianGrid stroke={GRID} vertical={false} />
             <XAxis
               dataKey="label"
@@ -68,7 +70,10 @@ export default function ContributionChart({ contribution, unit, yLabel }) {
                 return [fmtValue(v, 'money'), name];
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Legend
+              verticalAlign="top" align="left" height={34} iconSize={9}
+              wrapperStyle={{ fontSize: 10.5, paddingLeft: 2, lineHeight: '15px' }}
+            />
             <ReferenceLine y={0} stroke={GRID} />
             {hasBand && (
               <Area

@@ -1,19 +1,16 @@
 // ============================================================
-// Halo V2 - exports and provenance.
+// Halo V2 - provenance (Lab).
 //
-// Two pieces that belong together:
+// Everything that must travel WITH a modelled figure: n, both intervals,
+// controls in and out, grain, range, the same-period share and the badge.
 //
-//   ExportButtons  the one-pager (PDF or PNG) and the CSV. They live in the
-//                  page header, because "send this to finance" is the last
-//                  thing said in the meeting and nobody should have to scroll
-//                  to the bottom of the page to do it.
-//   ProvenanceBlock  everything that must travel WITH a modelled figure: n,
-//                  both intervals, controls in and out, grain, range, the
-//                  same-period share and the badge.
+// It is on the page rather than only in a file, because the realistic way one
+// of these numbers leaves the tool is a screenshot, and a caveat that only
+// exists in a download does not survive that.
 //
-// The provenance block is on the page rather than only in a file, because the
-// realistic way one of these numbers leaves the tool is a screenshot, and a
-// caveat that only exists in a download does not survive that.
+// The three export buttons that used to live here moved into the single Share
+// menu in the scope bar (round 2): four peer CTAs in the first viewport was
+// the loudest piece of chrome on the page.
 // ============================================================
 
 import { useState } from 'react';
@@ -22,27 +19,6 @@ import { plainMetricLabel } from '../../lib/haloV2/plainLanguage.js';
 import { GRAIN_LABEL } from '../../lib/haloV2/grainRecommendation.js';
 import { NOT_CLAIM_LINE } from '../../lib/haloV2/snapshot.js';
 import { ModelledBadge } from './shared.jsx';
-
-export function ExportButtons({ onPdf, onPng, onCsv, busy = null, size = 'sm' }) {
-  const cls = `wx-btn wx-btn-ghost wx-btn-${size}`;
-  return (
-    <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      <button type="button" className={cls} onClick={onPdf} disabled={busy === 'pdf'}>
-        {busy === 'pdf'
-          ? <><span className="wx-spinner" style={{ marginRight: 6 }} />Building</>
-          : <><i className="bi bi-file-earmark-pdf" style={{ marginRight: 6 }} />One-pager (PDF)</>}
-      </button>
-      <button type="button" className={cls} onClick={onPng} disabled={busy === 'png'}>
-        {busy === 'png'
-          ? <><span className="wx-spinner" style={{ marginRight: 6 }} />Building</>
-          : <><i className="bi bi-image" style={{ marginRight: 6 }} />PNG</>}
-      </button>
-      <button type="button" className={cls} onClick={onCsv}>
-        <i className="bi bi-filetype-csv" style={{ marginRight: 6 }} />CSV for finance
-      </button>
-    </div>
-  );
-}
 
 export function ProvenanceBlock({ result, gran, range, unit, xKey, yKey, cur }) {
   const m = result.adjustedModel;

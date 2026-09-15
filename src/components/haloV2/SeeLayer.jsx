@@ -191,7 +191,10 @@ export function OverTimeChart({ periods, xKey, yKey, unit, normalize = false, he
     <div style={{ height, marginTop: compact ? 0 : 12 }}>
       {!compact && <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Over time</div>}
       <ResponsiveContainer width={width} height="100%">
-        <ComposedChart data={data} margin={{ top: 6, right: 10, bottom: compact ? 8 : 24, left: 6 }}>
+        {/* Recharts puts the legend at the BOTTOM by default, which landed it
+            on top of the centered "Period (day)" axis title. The legend moves
+            to the top left; the axis title keeps the bottom margin to itself. */}
+        <ComposedChart data={data} margin={{ top: 4, right: 10, bottom: compact ? 8 : 26, left: 6 }}>
           <CartesianGrid stroke={GRID} vertical={false} />
           <XAxis
             dataKey="label" tick={{ fontSize: 10 }} minTickGap={20}
@@ -211,7 +214,7 @@ export function OverTimeChart({ periods, xKey, yKey, unit, normalize = false, he
             contentStyle={TT_STYLE}
             formatter={(v, name) => [formatMetricValue(v, name === xName ? xKey : yKey, { indexed: normalize }), name]}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend verticalAlign="top" align="left" height={22} iconSize={9} wrapperStyle={{ fontSize: 11, paddingLeft: 2 }} />
           <Bar yAxisId="l" dataKey="x" name={xName} fill={SERIES_TIKTOK} opacity={0.65} />
           <Line yAxisId="r" dataKey="y" name={yName} stroke={SERIES_AMAZON} dot={false} strokeWidth={2} />
         </ComposedChart>

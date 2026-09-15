@@ -22,7 +22,7 @@ import { useMemo } from 'react';
 import { refitWithout } from '../../lib/haloV2/distributedLag.js';
 import { controlsChecklist } from '../../lib/haloV2/controls.js';
 import { plainMetricLabel } from '../../lib/haloV2/plainLanguage.js';
-import { Note, Stat, Row, ProgressMeter, ModelledBadge, Chip } from './shared.jsx';
+import { Note, Stat, Row, ProgressMeter, Chip } from './shared.jsx';
 import { Term } from './Glossary.jsx';
 
 export default function AdjustLayer({
@@ -96,12 +96,9 @@ export default function AdjustLayer({
 
       {/* ── 2. Same period vs delayed ────────────────────────── */}
       <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
-          <h3 style={{ fontSize: '.95rem', fontWeight: 800, margin: '0 0 2px' }}>
-            How much of this is a delay, and how much is the same {unit}?
-          </h3>
-          <ModelledBadge />
-        </div>
+        <h3 style={{ fontSize: '.95rem', fontWeight: 800, margin: '0 0 2px' }}>
+          How much of this is a delay, and how much is the same {unit}?
+        </h3>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px', maxWidth: 760 }}>
           Only the delayed part supports a halo reading. Movement inside a single {unit} is what a shared
           cause produces, so it is reported separately rather than folded into the headline.
@@ -124,7 +121,6 @@ export default function AdjustLayer({
               value={`${fullLabel} per ${cur}1`}
               sub="No lag window is selected, so no delayed effect has been looked for."
               tone="warn"
-              badge={<ModelledBadge compact weakHalo />}
               emphasis
             />
           )}
