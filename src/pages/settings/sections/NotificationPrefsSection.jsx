@@ -6,7 +6,7 @@ import SectionShell from './SectionShell';
 
 const CATEGORIES = [
   { key: 'task',        label: 'Tasks',       blurb: 'Assignments, reassignments, status changes, comments.' },
-  { key: 'dev_task',    label: 'Development', blurb: 'Review hand-offs, blockers, reported issues, and fixes going live.' },
+  { key: 'development', label: 'Development', blurb: 'Tasks assigned to you, status changes, blockers, comments, mentions and releases.' },
   { key: 'report',      label: 'Reports',     blurb: 'Submissions, verifications, approvals, rejections.' },
   { key: 'brand',       label: 'Brands',      blurb: 'Brand switch requests, approvals/rejections.' },
   { key: 'leave',       label: 'Leave',       blurb: 'New requests you need to decide on, and decisions on yours.' },
