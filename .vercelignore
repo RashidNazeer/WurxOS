@@ -17,3 +17,16 @@ backups
 # Supabase server-side code is deployed separately via `supabase functions deploy`;
 # it has no business in the Vite bundle.
 supabase
+
+# Deploy credentials and one-off local files. A prod deploy uploads everything
+# in the working copy that this file does not skip. On 2026-09-10 that
+# included the deploy token (.vercel-token) and a brand-assignment backup.
+.vercel-token
+.env.*
+!.env.demo
+*.local
+backup-*.json
+vercel.dev.json
+dist
+migration
+scripts/tts-ingest/failures.json
