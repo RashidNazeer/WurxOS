@@ -89,6 +89,18 @@ export async function getPaidCollabEntriesForWeek(brandIds, weekStart) {
   return m;
 }
 
+// Names of the people who last saved entries → { userId: display name }. Best
+// effort: a name the viewer may not read is simply left out, never an error.
+export async function getSaverNames(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (!ids.length) return {};
+  try {
+    const { data, error } = await supabase.from('profiles').select('id, display_name').in('id', ids);
+    if (error) return {};
+    return Object.fromEntries((data || []).map((p) => [p.id, p.display_name]));
+  } catch { return {}; }
+}
+
 // Upsert — update-then-insert so the row's id/created_at stay stable.
 export async function savePaidCollabEntry({ brandId, weekStart, data }) {
   const me = await uid();
