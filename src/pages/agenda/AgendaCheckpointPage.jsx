@@ -12,7 +12,7 @@
 // `useReportLeaveGuard` intercepts in-app navigation with a Save/Stay/Discard
 // modal.
 // ============================================================
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,9 +25,9 @@ import {
 import { carryForward, fillPrevInto } from '../../lib/checkpointCarry';
 import {
   listCheckpoints, getCheckpoint, findPreviousCheckpoint, saveCheckpoint, listReportWeeks, deleteCheckpoint,
-  submitCheckpoint, verifyCheckpoint, returnCheckpoint, reopenCheckpoint,
+  submitCheckpoint, verifyCheckpoint, returnCheckpoint, reopenCheckpoint, CheckpointAccountMismatchError,
 } from '../../lib/checkpointsApi';
-import { loadDraft, saveDraft, clearDraft, hydrate } from '../../lib/checkpointDraft';
+import { loadDraft, saveDraft, clearDraft, hydrate, purgeLegacyDrafts } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorDuplicates } from '../../lib/checkpointAutofill';
 import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
 import { listManagedBrandIds, getPaidCollabEntry, getLatestPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
@@ -83,7 +83,31 @@ function ApcCheckpointPage() {
   const [brandId, setBrandId] = useState('');
   const [weekStart, setWeekStart] = useState(defaultReviewWeekStart);
   const [mode, setMode] = useState('list');            // list | view | edit
-  const [data, setData] = useState(null);
+
+  // ── WHICH CHECKPOINT `data` BELONGS TO ─────────────────────────────────
+  // Prod incident, 15 Sept 2026. With a checkpoint open, switching brand or
+  // week re-ran the autosave with the OLD checkpoint and the NEW brand + week:
+  // the open checkpoint was copied into the new brand's local backup and, when
+  // that brand had no checkpoint for the week, saved to the database under
+  // whoever was signed in. A TL viewing an APC's Kenashii checkpoint created
+  // Bentgo and Pure Daily Care checkpoints carrying that APC's name.
+  // So the checkpoint on screen is stored WITH the brand + week it was loaded
+  // for and reads as null under any other brand or week; every async step
+  // re-checks the brand + week before it writes; local backups belong to one
+  // person; and a save is refused when the database login is not the person
+  // this page shows.
+  const currentKey = `${brandId}::${weekStart}`;
+  const currentKeyRef = useRef(currentKey);
+  currentKeyRef.current = currentKey;
+  const [loaded, setLoaded] = useState({ key: null, data: null });
+  const data = loaded.key === currentKey ? loaded.data : null;
+  // Edits (the form, currency, cover sync) change the loaded checkpoint only.
+  const setData = useCallback((next) => setLoaded((prev) => {
+    if (prev.key === null || prev.data == null) return prev;
+    return { key: prev.key, data: typeof next === 'function' ? next(prev.data) : next };
+  }), []);
+  const [accountError, setAccountError] = useState('');
+
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
@@ -132,6 +156,10 @@ function ApcCheckpointPage() {
   useEffect(() => { if (!brandId && brands.length) setBrandId(brands[0].id); }, [brands, brandId]);
   useEffect(() => { setMode('list'); }, [brandId]);      // brand change → back to list
   useEffect(() => { setPendingDelete(null); setViewDelete(false); }, [mode, brandId, weekStart]); // clear delete confirms
+
+  // Backups from the old brand + week scheme may hold another person's or
+  // another brand's checkpoint: they are deleted, never restored.
+  useEffect(() => { purgeLegacyDrafts(); }, []);
 
   const existing = useQuery({
     queryKey: ['checkpoint', 'one', brandId, weekStart],
@@ -217,68 +245,87 @@ function ApcCheckpointPage() {
   }, [pendingDeepView, existing.isSuccess, existing.data]);
 
   // reset the loaded checkpoint on key change
-  useEffect(() => { setData(null); setDirty(false); loadedRef.current = false; baselineRef.current = ''; setSaveState('idle'); }, [brandId, weekStart]);
+  useEffect(() => { setLoaded({ key: null, data: null }); setDirty(false); loadedRef.current = false; baselineRef.current = ''; setSaveState('idle'); }, [brandId, weekStart]);
 
-  // load once the query settles (DB row → local recovery → none)
+  // load once the query settles (DB row → this person's own unsynced copy → none)
   useEffect(() => {
     if (!brandId || !existing.isSuccess || loadedRef.current) return;
     loadedRef.current = true;
     if (existing.data) {
       const d = hydrate(existing.data.data);
       d.cover = { ...d.cover, brandName, weekLabel };
-      setData(d); baselineRef.current = JSON.stringify(d); setSaveState('saved');
+      setLoaded({ key: currentKey, data: d }); baselineRef.current = JSON.stringify(d); setSaveState('saved');
     } else {
-      const local = loadDraft(brandId, weekStart);
-      if (local) { local.cover = { ...local.cover, brandName, weekLabel }; setData(local); baselineRef.current = ''; setSaveState('local'); }
-      else setData(null);
+      const local = loadDraft(profile?.id, brandId, weekStart);
+      if (local) { local.cover = { ...local.cover, brandName, weekLabel }; setLoaded({ key: currentKey, data: local }); baselineRef.current = ''; setSaveState('local'); }
+      else setLoaded({ key: currentKey, data: null });
     }
-  }, [existing.isSuccess, existing.data, brandId, weekStart, brandName, weekLabel]);
+  }, [existing.isSuccess, existing.data, brandId, weekStart, brandName, weekLabel, currentKey, profile?.id]);
 
-  // keep cover brand/team in sync (self-correct stale "Team"); null-guard the updater
+  // keep cover brand/team in sync (self-correct stale "Team"); only ever touches
+  // the checkpoint loaded for the brand + week on screen
   useEffect(() => {
     if (!data || !selectedBrand) return;
     const nextTeam = teamLeadName ? `Team ${teamLeadName}` : data.cover.team;
     if (data.cover.brandName !== selectedBrand.brand_name || data.cover.weekLabel !== weekLabel || data.cover.team !== nextTeam) {
-      setData((d) => (d ? { ...d, cover: { ...d.cover, brandName: selectedBrand.brand_name, weekLabel, team: teamLeadName ? `Team ${teamLeadName}` : d.cover.team } } : d));
+      const key = currentKey;
+      setLoaded((prev) => (prev.key === key && prev.data
+        ? { key, data: { ...prev.data, cover: { ...prev.data.cover, brandName: selectedBrand.brand_name, weekLabel, team: teamLeadName ? `Team ${teamLeadName}` : prev.data.cover.team } } }
+        : prev));
     }
-  }, [selectedBrand, weekLabel, data, teamLeadName]);
+  }, [selectedBrand, weekLabel, data, teamLeadName, currentKey]);
+
+  // A save refused because the database login is not the person on this page
+  // stops autosave and says so; any other failure keeps the local copy and retries.
+  function handleSaveError(e) {
+    if (e instanceof CheckpointAccountMismatchError) { setAccountError(e.message); setSaveState('idle'); return; }
+    setSaveState('local');
+  }
 
   // autosave (DB) + instant local mirror + dirty tracking
   useEffect(() => {
-    if (!data || !brandId) return;
+    if (!data || !brandId || accountError) return;
     const snapshot = JSON.stringify(data);
     if (snapshot === baselineRef.current) { setDirty(false); return; }
     setDirty(true);
-    saveDraft(brandId, weekStart, data);
+    const key = currentKey;
+    const userId = profile?.id;
+    saveDraft(userId, brandId, weekStart, data);
     setSaveState('saving');
     const id = setTimeout(async () => {
+      if (currentKeyRef.current !== key) return;   // the page moved to another brand or week
       try {
-        await saveCheckpoint({ brandId, weekStart, weekLabel, data });
+        await saveCheckpoint({ brandId, weekStart, weekLabel, data, asUserId: userId });
+        clearDraft(userId, brandId, weekStart, snapshot);
+        if (currentKeyRef.current !== key) return;
         baselineRef.current = snapshot; setDirty(false); setSaveState('saved'); setSavedAt(Date.now());
         qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
-      } catch { setSaveState('local'); }
+      } catch (e) { handleSaveError(e); }
     }, 1200);
     return () => clearTimeout(id);
-  }, [data, brandId, weekStart, weekLabel, qc]);
+  }, [data, brandId, weekStart, weekLabel, qc, currentKey, profile?.id, accountError]);
 
   // ── unsaved-work protection (same plumbing as the report forms) ─────
   useUnsavedGuard(dirty);
   async function saveNow() {
     if (!data || !brandId) return true;
     const snapshot = JSON.stringify(data);
-    saveDraft(brandId, weekStart, data);
+    const userId = profile?.id;
+    saveDraft(userId, brandId, weekStart, data);
     try {
-      await saveCheckpoint({ brandId, weekStart, weekLabel, data });
+      await saveCheckpoint({ brandId, weekStart, weekLabel, data, asUserId: userId });
+      clearDraft(userId, brandId, weekStart, snapshot);
       baselineRef.current = snapshot; setDirty(false); setSaveState('saved'); setSavedAt(Date.now());
       qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
       qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, weekStart] });
       return true;
-    } catch { setSaveState('local'); return false; }
+    } catch (e) { handleSaveError(e); return false; }
   }
   const { guardModal, guardAction } = useReportLeaveGuard({ dirty, onSaveDraft: saveNow, noun: 'checkpoint' });
 
   // ── actions ─────────────────────────────────────────────────────────
   async function createNew(fromLast) {
+    const key = currentKey;
     setCreating(true); setWfErr(''); setAutofillMsg('');
     // Non-dismissable progress overlay so the APC sees work happening (Euka
     // brands can take several seconds) instead of just a greyed-out button.
@@ -298,14 +345,23 @@ function ApcCheckpointPage() {
         meta = patch.meta;
       } catch { /* best effort — a failed auto-fill still yields a usable blank/carried form */ }
       setCreateStage({ label: 'Saving…', pct: 96 });
-      loadedRef.current = true;
-      setData(d);
+      const userId = profile?.id;
+      let saved = true;
       try {
-        await saveCheckpoint({ brandId, weekStart, weekLabel, data: d });
-        baselineRef.current = JSON.stringify(d); setDirty(false); setSaveState('saved'); setSavedAt(Date.now());
-        qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
-        qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, weekStart] });
-      } catch { setSaveState('local'); }
+        await saveCheckpoint({ brandId, weekStart, weekLabel, data: d, asUserId: userId });
+      } catch (e) {
+        if (e instanceof CheckpointAccountMismatchError) { setAccountError(e.message); return; }
+        saved = false;   // couldn't reach the database: keep working locally, autosave retries
+      }
+      qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
+      qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, weekStart] });
+      // Saved to the brand + week it was created for; not shown if the page has
+      // since moved to another one.
+      if (currentKeyRef.current !== key) return;
+      loadedRef.current = true;
+      setLoaded({ key, data: d });
+      if (saved) { baselineRef.current = JSON.stringify(d); setDirty(false); setSaveState('saved'); setSavedAt(Date.now()); }
+      else { baselineRef.current = ''; setSaveState('local'); }
       setAutofillMsg(autofillSummary(meta, true));
       setMode('edit');
     } finally { setCreating(false); setCreateStage(null); }
@@ -313,6 +369,7 @@ function ApcCheckpointPage() {
 
   async function onAutofill() {
     if (!data || autofilling) return;
+    const key = currentKey;
     setAutofilling(true); setAutofillMsg('');
     try {
       const patch = await runCheckpointAutofill({ brandId, weekStart, brand: selectedBrand });
@@ -320,9 +377,13 @@ function ApcCheckpointPage() {
       // columns too (heals existing checkpoints that never ran carry-forward).
       let prevData = null;
       try { const prev = await findPreviousCheckpoint(brandId, weekStart); prevData = prev?.data ? hydrate(prev.data) : null; } catch { /* ignore */ }
-      setData((d) => fillPrevInto(mirrorDuplicates(applyAutofillPatch(d, patch)), prevData));
+      // Only onto the checkpoint it was fetched for, and only if it is still on screen.
+      if (currentKeyRef.current !== key) return;
+      setLoaded((prev) => (prev.key === key && prev.data
+        ? { key, data: fillPrevInto(mirrorDuplicates(applyAutofillPatch(prev.data, patch)), prevData) }
+        : prev));
       setAutofillMsg(autofillSummary(patch.meta, false));
-    } catch (e) { setAutofillMsg(`Auto-fill failed: ${e?.message || e}`); }
+    } catch (e) { if (currentKeyRef.current === key) setAutofillMsg(`Auto-fill failed: ${e?.message || e}`); }
     finally { setAutofilling(false); }
   }
 
@@ -418,8 +479,8 @@ function ApcCheckpointPage() {
     setDeleting(true);
     try {
       await deleteCheckpoint(id);
-      if (ws === weekStart) { setData(null); setDirty(false); loadedRef.current = false; baselineRef.current = ''; }
-      clearDraft(brandId, ws); // clear any local mirror for that week
+      if (ws === weekStart) { setLoaded({ key: null, data: null }); setDirty(false); loadedRef.current = false; baselineRef.current = ''; }
+      clearDraft(profile?.id, brandId, ws); // clear any local mirror for that week
       qc.invalidateQueries({ queryKey: ['checkpoint', 'weeks', brandId] });
       qc.invalidateQueries({ queryKey: ['checkpoint', 'one', brandId, ws] });
       after?.();
@@ -463,6 +524,7 @@ function ApcCheckpointPage() {
       </div>
 
       {err && <div className="wx-alert wx-alert-danger" style={{ marginBottom: 14 }}><AlertIcon width="16" height="16" /> <span>{err}</span></div>}
+      {accountError && <div className="wx-alert wx-alert-danger" role="alert" style={{ marginBottom: 14 }}><AlertIcon width="16" height="16" /> <span>{accountError}</span></div>}
 
       {/* ─────────────── LIST ─────────────── */}
       {mode === 'list' && (

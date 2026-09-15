@@ -53,8 +53,12 @@ export async function findPreviousCheckpoint(brandId, weekStart) {
 // silently reverted to 'draft'. `status` is written ONLY when explicitly
 // passed (e.g. the workflow functions below); new rows fall back to the DB
 // default 'draft' on insert.
-export async function saveCheckpoint({ brandId, weekStart, weekLabel, data, status }) {
+//
+// Pass `asUserId` (the person the page shows): the save is refused if the
+// database login is someone else.
+export async function saveCheckpoint({ brandId, weekStart, weekLabel, data, status, asUserId }) {
   const me = await uid();
+  if (asUserId && me !== asUserId) throw new CheckpointAccountMismatchError();
   const patch = {
     brand_id: brandId, week_start: weekStart, week_label: weekLabel,
     data, updated_by: me, updated_at: new Date().toISOString(),
@@ -72,6 +76,16 @@ export async function saveCheckpoint({ brandId, weekStart, weekLabel, data, stat
     .select().single();
   if (insErr) throw new Error(insErr.message);
   return ins;
+}
+
+// Thrown when the page and the database disagree about who is signed in (for
+// example another account signed in on a different tab of the same browser).
+// Saving then would record one person as the author and another on the cover.
+export class CheckpointAccountMismatchError extends Error {
+  constructor() {
+    super('You are signed in as a different account than this page shows. Reload the page before saving.');
+    this.name = 'CheckpointAccountMismatchError';
+  }
 }
 
 // Update a checkpoint by id and return the fresh row. maybeSingle() + re-fetch
