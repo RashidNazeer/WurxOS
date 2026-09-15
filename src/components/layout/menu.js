@@ -218,10 +218,7 @@ const AGENDA_GROUP_GUEST = {
 // items (notifications/settings).
 
 const ASSISTANT_ITEM = { label: 'Assistant', icon: MessageIcon, to: '/assistant' };
-// Developer task management (mig 328). Boss and OL see it to know what is
-// coming and what is blocked; the developer works from it. Nobody else --
-// TLs, PCTLs, APCs and IPCs have no business in the dev pipeline, and the
-// route's RoleGuard agrees.
+// Product roadmap and review queue, private to the Boss and developers.
 const DEV_TASKS_ITEM = { label: 'Development', icon: ChecklistIcon, to: '/dev-tasks' };
 
 export const MENUS = {
@@ -263,7 +260,6 @@ export const MENUS = {
     SETTINGS_ITEM,
   ],
   ol: [
-    DEV_TASKS_ITEM,
     DASHBOARD_ITEM,
     BRANDS_ITEM,
     CREATOR_LIBRARY_ITEM,

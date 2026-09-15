@@ -1,0 +1,1363 @@
+/* ============================================================
+   Development workspace — roadmap, task lists, drawers, forms.
+
+   ── TOKENS ──────────────────────────────────────────────────
+   Every colour here is a token from tokens.css. The first version used
+   --surface, --border and --primary, which WurxOS does not define. An
+   undefined custom property invalidates the whole declaration, so every
+   background painted with them was TRANSPARENT: the drawers, the tabs, the
+   main surface, feature cards and task rows. The page and top bar showed
+   straight through the panels.
+
+     --surface  ->  --surface-1      cards, panels, modals
+     --border   ->  --border-default
+     --primary  ->  --info           "In progress"; WurxOS has no blue brand
+                                     token, and --accent already means "Now"
+
+   ── LAYERS ──────────────────────────────────────────────────
+   drawer backdrop 1040 · drawer 1041 · dialogs opened from a drawer 1060.
+   The shared .wx-modal-backdrop is 1000, which put "Add task" and "Edit"
+   behind the drawer that opened them.
+   ============================================================ */
+
+/* ── page ──────────────────────────────────────────────────── */
+
+.dev-page {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 4px 2px 48px;
+  color: var(--text-primary);
+}
+
+.dev-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dev-page-head h1 {
+  margin: 2px 0 3px;
+  font-size: clamp(28px, 3vw, 38px);
+  letter-spacing: -.035em;
+}
+
+.dev-page-head p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.dev-eyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.dev-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dev-error {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.dev-error button {
+  border: 0;
+  background: none;
+  color: inherit;
+}
+
+.dev-loading {
+  min-height: 320px;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── avatar, status and priority ───────────────────────────── */
+
+.dev-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dev-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dev-avatar.is-alert {
+  border: 2px solid var(--danger);
+  color: var(--danger);
+}
+
+.dev-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.dev-pill.is-primary {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, var(--surface-1));
+}
+
+.dev-pill.is-danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
+}
+
+.dev-pill.is-warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-1));
+}
+
+.dev-pill.is-success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 13%, var(--surface-1));
+}
+
+.dev-pill.is-live {
+  color: var(--text-inverse);
+  background: var(--success);
+}
+
+.dev-pill.is-planned {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+}
+
+.dev-priority {
+  display: inline-flex;
+  padding: 2px 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.dev-priority.is-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-default));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.dev-priority.is-warning {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border-default));
+}
+
+/* ── waiting on you ────────────────────────────────────────── */
+
+.dev-waiting {
+  margin-bottom: 20px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--warning) 60%, var(--border-default));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--warning) 7%, var(--surface-1));
+}
+
+.dev-waiting-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 2px 9px;
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dev-waiting-title b {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--warning);
+  color: var(--text-inverse);
+  text-align: center;
+}
+
+.dev-waiting-list {
+  display: grid;
+  gap: 6px;
+}
+
+.dev-waiting-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.dev-waiting-row:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.dev-waiting-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.dev-waiting-copy strong,
+.dev-waiting-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-waiting-copy strong {
+  font-size: 13px;
+}
+
+.dev-waiting-copy small {
+  color: var(--text-muted);
+}
+
+.dev-age {
+  color: var(--warning);
+  font: 700 11px ui-monospace, monospace;
+}
+
+.dev-age.is-late {
+  color: var(--danger);
+}
+
+/* ── tabs and surface ──────────────────────────────────────── */
+
+.dev-tabs {
+  display: inline-flex;
+  gap: 3px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.dev-tabs button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.dev-tabs button.is-active {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.dev-surface {
+  min-height: 360px;
+  padding: 18px;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.dev-tabs button:focus-visible,
+.dev-feature:focus-visible,
+.dev-task-row:focus-visible,
+.dev-waiting-row:focus-visible,
+.dev-done-row:focus-visible,
+.dev-drawer-close:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+/* ── roadmap ───────────────────────────────────────────────── */
+
+.dev-roadmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.dev-roadmap {
+  min-width: 1020px;
+  display: grid;
+  grid-template-columns: 165px repeat(var(--dev-cols), minmax(170px, 1fr));
+  gap: 0 8px;
+}
+
+.dev-roadmap-head {
+  padding: 4px 8px 9px;
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.dev-roadmap-head b {
+  display: block;
+  color: inherit;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dev-roadmap-head small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.dev-roadmap-head.is-now {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.dev-roadmap-product-row {
+  display: contents;
+}
+
+.dev-product {
+  min-height: 112px;
+  display: grid;
+  grid-template-columns: 9px 1fr;
+  align-content: start;
+  gap: 2px 7px;
+  padding: 15px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dev-product strong {
+  font-size: 13px;
+}
+
+.dev-product small {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.dev-product-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.dev-product-dot.is-blue { background: var(--info); }
+.dev-product-dot.is-green { background: var(--success); }
+.dev-product-dot.is-amber { background: var(--warning); }
+.dev-product-dot.is-rose { background: var(--danger); }
+.dev-product-dot.is-violet { background: var(--accent); }
+.dev-product-dot.is-teal { background: color-mix(in srgb, var(--info) 55%, var(--success)); }
+
+.dev-roadmap-cell {
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 5px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background .15s ease;
+}
+
+.dev-roadmap-cell.is-now {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.dev-roadmap-cell.is-over {
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  outline: 1px dashed var(--info);
+  outline-offset: -2px;
+}
+
+.dev-feature {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 8px;
+  padding: 9px 9px 8px 11px;
+  border: 1px solid var(--border-default);
+  border-left: 4px solid var(--text-muted);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-align: left;
+  box-shadow: var(--shadow-sm);
+}
+
+.dev-feature[draggable=true] { cursor: grab; }
+.dev-feature[draggable=true]:active { cursor: grabbing; }
+
+.dev-feature:hover {
+  border-top-color: var(--border-strong);
+  border-right-color: var(--border-strong);
+  border-bottom-color: var(--border-strong);
+}
+
+.dev-feature.is-primary { border-left-color: var(--info); }
+.dev-feature.is-warning { border-left-color: var(--warning); }
+.dev-feature.is-danger { border-left-color: var(--danger); }
+.dev-feature.is-success { border-left-color: var(--success); }
+
+.dev-feature-main {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.dev-feature-main strong {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.dev-feature-main > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.dev-feature-main em {
+  color: var(--warning);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.dev-feature .dev-avatar {
+  width: 25px;
+  height: 25px;
+}
+
+.dev-feature-progress {
+  color: var(--text-muted);
+  font: 600 10.5px ui-monospace, monospace;
+}
+
+.dev-feature-blocked {
+  color: var(--danger);
+  font-size: 9.5px;
+  text-align: right;
+}
+
+.dev-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 13px 4px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.dev-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dev-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--text-muted);
+}
+
+.dev-legend i.is-primary { background: var(--info); }
+.dev-legend i.is-warning { background: var(--warning); }
+.dev-legend i.is-danger { background: var(--danger); }
+.dev-legend i.is-success { background: var(--success); }
+
+/* ── task lists ────────────────────────────────────────────── */
+
+.dev-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dev-list-toolbar select {
+  max-width: 190px;
+}
+
+.dev-task-list {
+  display: grid;
+  gap: 7px;
+}
+
+.dev-task-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 110px minmax(220px, 1fr) minmax(130px, .5fr) auto auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.dev-task-row:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+/* Inside a feature drawer the context column is hidden, leaving SIX visible
+   cells. This used to declare five, so the chevron wrapped onto its own line. */
+.dev-task-list.compact .dev-task-row {
+  grid-template-columns: auto minmax(180px, 1fr) auto auto auto auto;
+}
+
+.dev-task-list.compact .dev-task-context {
+  display: none;
+}
+
+.dev-task-copy,
+.dev-task-context {
+  display: grid;
+  min-width: 0;
+}
+
+.dev-task-copy strong {
+  font-size: 13px;
+}
+
+.dev-task-copy small {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-task-context {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.dev-task-context small {
+  color: var(--text-muted);
+}
+
+.dev-task-due {
+  color: var(--text-muted);
+  font: 500 10.5px ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.dev-task-row .dev-avatar {
+  width: 27px;
+  height: 27px;
+}
+
+/* ── empty and done ────────────────────────────────────────── */
+
+.dev-empty {
+  min-height: 200px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.dev-empty > i {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 19px;
+}
+
+.dev-empty strong {
+  color: var(--text-secondary);
+}
+
+.dev-empty span {
+  max-width: 340px;
+  margin-top: 3px;
+  font-size: 12px;
+}
+
+.dev-done-groups {
+  display: grid;
+  gap: 22px;
+}
+
+.dev-done-groups h3 {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dev-done-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.dev-done-row > i:first-child {
+  color: var(--success);
+}
+
+.dev-done-row span {
+  display: grid;
+}
+
+.dev-done-row small {
+  color: var(--text-muted);
+}
+
+/* ── my week ───────────────────────────────────────────────── */
+
+.dev-week-surface {
+  padding: 22px;
+}
+
+.dev-week-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.dev-week-heading span {
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dev-week-heading h2 {
+  margin: 2px 0 0;
+  font-size: 20px;
+}
+
+.dev-week-heading > strong {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dev-week-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+}
+
+.dev-week-work {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.dev-week-work h3 {
+  margin: 0 0 9px;
+  font-size: 13px;
+}
+
+.dev-review-queue {
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border-default));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--warning) 5%, var(--surface-1));
+}
+
+.dev-review-queue h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--warning);
+}
+
+.dev-review-queue h3 b {
+  margin-left: auto;
+}
+
+.dev-eod {
+  position: sticky;
+  top: 82px;
+  align-self: start;
+  padding: 15px;
+  border: 1px solid var(--border-default);
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+
+.dev-eod > span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.dev-eod h3 {
+  margin: 3px 0 10px;
+  font-size: 15px;
+}
+
+.dev-eod textarea {
+  resize: vertical;
+  background: var(--surface-1);
+}
+
+.dev-eod small {
+  display: block;
+  margin: 7px 0 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.dev-eod .wx-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.dev-eod-notice {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* ── forms and the report-an-issue dialog ──────────────────── */
+
+.dev-form {
+  display: grid;
+  gap: 13px;
+}
+
+.dev-form label,
+.dev-modal-note {
+  display: grid;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dev-form label span {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.dev-form-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dev-acceptance-input {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-default));
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface-1));
+}
+
+.dev-modal-note {
+  margin: 0;
+}
+
+.dev-issue-prefill {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dev-issue-prefill > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.dev-issue-prefill small {
+  color: var(--text-muted);
+  font-size: 9px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.dev-issue-prefill b {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font: 500 11px ui-monospace, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-dropzone {
+  position: relative;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-2);
+  text-align: center;
+  cursor: pointer;
+}
+
+.dev-dropzone:hover {
+  border-color: var(--info);
+}
+
+.dev-dropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dev-issue-sent {
+  min-height: 230px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.dev-issue-sent > i {
+  color: var(--success);
+  font-size: 38px;
+}
+
+.dev-issue-sent h3 {
+  margin: 10px 0 2px;
+}
+
+.dev-issue-sent p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ── drawer ────────────────────────────────────────────────── */
+
+.dev-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: rgba(0, 0, 0, .4);
+  backdrop-filter: blur(2px);
+}
+
+.dev-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 1041;
+  width: min(620px, 94vw);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-xl);
+  animation: dev-drawer-in .2s ease-out;
+}
+
+/* Focus is moved to the panel itself on open; it is not a control. */
+.dev-drawer:focus {
+  outline: none;
+}
+
+.dev-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 22px 17px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dev-drawer-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.dev-drawer-crumb {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.dev-drawer-title {
+  margin: 6px 0 11px;
+  font-size: 21px;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.dev-drawer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dev-drawer-meta em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.dev-drawer-close {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.dev-drawer-close:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.dev-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px 30px;
+}
+
+/* .wx-alert carries no margin of its own; without this the error sits flush
+   against the acceptance box below it. */
+.dev-drawer-body > .wx-alert {
+  margin-bottom: 14px;
+}
+
+.dev-drawer-foot {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.dev-drawer-foot span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.wx-modal-backdrop.dev-modal-layer {
+  z-index: 1060;
+}
+
+.dev-rollup {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dev-rollup.is-primary { color: var(--info); }
+.dev-rollup.is-warning { color: var(--warning); }
+.dev-rollup.is-danger { color: var(--danger); }
+.dev-rollup.is-success { color: var(--success); }
+
+/* ── feature drawer ────────────────────────────────────────── */
+
+.dev-feature-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dev-feature-summary > span {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+}
+
+.dev-feature-summary small,
+.dev-acceptance small,
+.dev-block-reason small,
+.dev-expected small {
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dev-feature-summary b {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.dev-feature-description {
+  margin: 15px 0;
+  color: var(--text-secondary);
+}
+
+.dev-drawer-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 9px;
+}
+
+.dev-drawer-section-head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ── task drawer ───────────────────────────────────────────── */
+
+.dev-acceptance,
+.dev-block-reason,
+.dev-expected {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 10px;
+}
+
+.dev-acceptance {
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-default));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface-1));
+}
+
+.dev-block-reason {
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border-default));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface-1));
+}
+
+.dev-expected {
+  background: var(--surface-2);
+}
+
+.dev-acceptance p,
+.dev-block-reason p,
+.dev-expected p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.dev-task-facts {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px 13px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dev-task-facts dt {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.dev-task-facts dd {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.dev-task-facts dd.break {
+  word-break: break-all;
+}
+
+.dev-task-facts .dev-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.dev-screenshot {
+  display: block;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: 9px;
+}
+
+.dev-screenshot img {
+  display: block;
+  width: 100%;
+  max-height: 230px;
+  object-fit: cover;
+}
+
+.dev-activity {
+  display: grid;
+  gap: 13px;
+}
+
+.dev-activity > div {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 10px;
+}
+
+.dev-activity time {
+  color: var(--text-muted);
+  font: 500 10px ui-monospace, monospace;
+}
+
+.dev-activity p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dev-activity .dev-pill {
+  display: inline-flex;
+  margin: 0 3px;
+  vertical-align: middle;
+}
+
+.dev-note-box,
+.dev-duplicate {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 7px;
+  margin-top: 17px;
+}
+
+.dev-duplicate {
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── product filter, carried-over work, activity, EOD notice ─ */
+
+/* The product name on the roadmap is a button: clicking it shows only that
+   product. The spec (§09) replaces the old Project dropdown with this. */
+.dev-product {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dev-product:hover strong {
+  color: var(--accent);
+}
+
+.dev-product.is-picked {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.dev-product:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: -2px;
+}
+
+.dev-filter-chip {
+  width: max-content;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+  padding: 5px 6px 5px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dev-filter-chip .dev-product-dot {
+  margin-top: 0;
+}
+
+.dev-filter-chip button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.dev-filter-chip button:hover {
+  background: var(--surface-3);
+}
+
+.dev-filter-chip button:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+/* "carried over from 1 – 14 Sept": unfinished work from a block that ended. */
+.dev-feature-note {
+  grid-column: 1 / -1;
+  color: var(--warning);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+/* Date above time, as on the spec's task card. */
+.dev-activity time span {
+  display: block;
+}
+
+.dev-activity p b {
+  color: var(--text-primary);
+}
+
+.dev-eod-notice {
+  display: grid;
+  gap: 4px;
+}
+
+.dev-eod-notice.is-error {
+  color: var(--danger);
+}
+
+.dev-eod-notice ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-muted);
+}
+
+@keyframes dev-drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: .7;
+  }
+}
+
+/* ── narrow screens ────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .dev-week-grid { grid-template-columns: 1fr; }
+  .dev-eod { position: static; }
+
+  .dev-task-row { grid-template-columns: auto minmax(160px, 1fr) auto auto; }
+  .dev-task-context,
+  .dev-task-due,
+  .dev-task-row > .dev-avatar { display: none; }
+
+  .dev-waiting-row { grid-template-columns: 1fr auto auto; }
+  .dev-waiting-row .dev-priority,
+  .dev-waiting-row > i { display: none; }
+}
+
+@media (max-width: 620px) {
+  .dev-page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dev-head-actions { width: 100%; }
+  .dev-head-actions .wx-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .dev-surface {
+    padding: 11px;
+    border-radius: 11px;
+  }
+
+  .dev-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .dev-tabs button {
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  .dev-waiting { padding: 9px; }
+  .dev-waiting-row { grid-template-columns: 1fr auto; }
+  .dev-waiting-row .dev-pill { display: none; }
+
+  .dev-form-pair,
+  .dev-feature-summary { grid-template-columns: 1fr; }
+
+  .dev-drawer { width: 100vw; }
+
+  .dev-drawer-head,
+  .dev-drawer-body,
+  .dev-drawer-foot {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dev-drawer { animation: none; }
+}

@@ -18,6 +18,7 @@ const TABS = [
 
 const CATEGORY_LABEL = {
   task:           'Tasks',
+  dev_task:       'Development',
   brand:          'Brands',
   report:         'Reports',
   paid_collab:    'Paid Collab',
@@ -36,6 +37,7 @@ const CATEGORY_LABEL = {
 
 const CATEGORY_META = {
   task:           { Icon: CheckIcon,     tone: 'task',   bi: 'bi-check2-square' },
+  dev_task:       { Icon: CheckIcon,     tone: 'task',   bi: 'bi-code-slash' },
   report:         { Icon: ReportIcon,    tone: 'report', bi: 'bi-file-earmark-text' },
   brand:          { Icon: StarIcon,      tone: 'brand',  bi: 'bi-shop' },
   paid_collab:    { Icon: MegaphoneIcon, tone: 'paid',   bi: 'bi-megaphone-fill' },

@@ -26,7 +26,7 @@
 // ============================================================
 
 import { PLANNING_MODES } from '../../lib/haloV2/planningScenarios.js';
-import { FieldLabel, Note, Chip, EvidenceTag, ModelledBadge, moneyWith as money } from './shared.jsx';
+import { FieldLabel, Note, Chip, EvidenceTag, moneyWith as money } from './shared.jsx';
 import { Term } from './Glossary.jsx';
 
 const COLUMN_HELP = {
@@ -95,7 +95,6 @@ export default function PlanningLayer({ result, planning, setPlanning, cur }) {
             Reset from model
           </button>
         )}
-        {eligibility?.weakHaloClaim && modelAvailable && <ModelledBadge weakHalo />}
       </div>
 
       {mode === 'model' && (
