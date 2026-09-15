@@ -22,6 +22,7 @@
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { setHaloCurrency, getHaloCurrency } from '../../lib/haloFields';
 import {
   sourceForGran, dailySourceFor, availableGrans, availableFields, dataSpan, buildPeriods, detectControls,
@@ -31,11 +32,12 @@ import { assessGrains, recommendGrain, grainSwitchSuggestion, GRAIN_LABEL, GRAIN
 import { PERIODS_PER_YEAR } from '../../lib/haloV2/controls.js';
 import { stageStatuses } from '../../lib/haloV2/stages.js';
 import { buildSnapshot } from '../../lib/haloV2/snapshot.js';
-import { plainMetricLabel, comparisonSentence, keyTakeaway } from '../../lib/haloV2/plainLanguage.js';
+import { plainMetricLabel, keyTakeaway } from '../../lib/haloV2/plainLanguage.js';
 import { buildHaloV2Csv, downloadHaloV2Csv, haloV2CsvFilename } from '../../lib/haloV2/exportCsv.js';
 import { exportNodeToPng } from '../../lib/haloV2/exportImage.js';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
 import Snapshot from './Snapshot.jsx';
+import ScopeBar from './ScopeBar.jsx';
 import SeeLayer, { OverTimeChart } from './SeeLayer.jsx';
 import AdjustLayer from './AdjustLayer.jsx';
 import EstimateLayer from './EstimateLayer.jsx';
@@ -46,10 +48,8 @@ import HaloFinder from './HaloFinder.jsx';
 import StatusPanel from './StatusPanel.jsx';
 import ClientSummarySheet, { summaryFilename } from './ClientSummarySheet.jsx';
 import { GlossaryPanel } from './Glossary.jsx';
-import { ExportButtons, ProvenanceBlock } from './Provenance.jsx';
-import {
-  FieldLabel, Picker, Check, Note, Section, ModeToggle, ModelledBadge, Chip,
-} from './shared.jsx';
+import { ProvenanceBlock } from './Provenance.jsx';
+import { Picker, Check, Note, Section } from './shared.jsx';
 
 const MODE_KEY = 'wx.haloV2.viewMode';
 
@@ -58,6 +58,12 @@ export default function HaloV2Explorer({
   // Share links open in Meeting and stay there until someone asks for Lab.
   // The internal page remembers what the operator last used.
   defaultMode = 'meeting', rememberMode = false,
+  // The internal page owns the client-links modal, so it hands the explorer a
+  // way to open it: sharing belongs in the Share menu with the exports, not as
+  // a fifth button somewhere else on the page.
+  onManageLinks = null,
+  // A quiet way back to V1, for Lab only. The portal has no route to it.
+  v1Href = null,
 }) {
   const [rowsById, setRowsById] = useState({});
   const [loading, setLoading] = useState(false);
@@ -83,6 +89,7 @@ export default function HaloV2Explorer({
   const [chartsOnly, setChartsOnly] = useState(false);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(null);
+  const [toast, setToast] = useState('');
   const [planning, setPlanning] = useState({
     ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null,
     periodLabel: '', currency: '',
@@ -146,8 +153,11 @@ export default function HaloV2Explorer({
 
   useEffect(() => { if (grans.length && !grans.includes(gran)) setGran(grans.includes('week') ? 'week' : grans[0]); }, [grans, gran]);
   useEffect(() => { setHaloCurrency(src?.dataset?.currency || '$'); }, [src]);
+  // Everything these sheets cover, which is both the default range and what the
+  // date picker offers as "All data".
+  const span = useMemo(() => dataSpan(srcRows, dailyRows), [srcRows, dailyRows]);
   useEffect(() => {
-    if (srcRows && srcRows.length) setRange(dataSpan(srcRows, dailyRows));
+    if (srcRows && srcRows.length) setRange(span);
     else setRange({ start: '', end: '' });
   }, [src?.dataset?.id, srcRows, dailyRows]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -243,12 +253,17 @@ export default function HaloV2Explorer({
   const snapshot = useMemo(() => buildSnapshot(result, { unit, cur }), [result, unit, cur]);
 
   // ── Exports ──────────────────────────────────────────────────────
+  // A download gives no feedback of its own in some browsers, and the Share
+  // menu closes on click, so say what happened.
+  const say = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2600); };
+
   const exportCsv = () => {
     const text = buildHaloV2Csv({
       result, periods, gran, range, xKey, yKey, currency: cur, brandName, snapshot,
       planning: { ...planning, currency: planning.currency || cur },
     });
     downloadHaloV2Csv(text, haloV2CsvFilename({ brandName, gran, range }));
+    say('CSV downloaded.');
   };
   const runExport = async (kind) => {
     if (!summaryRef.current || exportBusy) return;
@@ -257,18 +272,11 @@ export default function HaloV2Explorer({
     try {
       if (kind === 'pdf') await exportReportToPdf(summaryRef.current, { title });
       else await exportNodeToPng(summaryRef.current, { filename: title });
+      say(kind === 'pdf' ? 'One-pager downloaded.' : 'Image downloaded.');
     } finally {
       setExportBusy(null);
     }
   };
-  const exports = (
-    <ExportButtons
-      onPdf={() => runExport('pdf')}
-      onPng={() => runExport('png')}
-      onCsv={exportCsv}
-      busy={exportBusy}
-    />
-  );
 
   if (loading) return <div style={{ color: 'var(--text-muted)', fontSize: 13 }}><span className="wx-spinner" /> Loading data…</div>;
   if (error) return <div className="wx-alert wx-alert-danger"><span>{error}</span></div>;
@@ -285,85 +293,19 @@ export default function HaloV2Explorer({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {glossaryOpen && <GlossaryPanel onClose={() => setGlossaryOpen(false)} />}
 
-      {/* ══ Top bar: who, when, which view, and how to leave with it ══ */}
-      <div className="wx-card" style={{ padding: '12px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            {brandName && <strong style={{ fontSize: 14 }}>{brandName}</strong>}
-            <Chip icon="bi-calendar3">{GRAIN_LABEL[gran]}{rangeText(range) ? ` · ${rangeText(range)}` : ''}</Chip>
-            <ModelledBadge />
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <ModeToggle mode={mode} onChange={pickMode} />
-            {exports}
-          </div>
-        </div>
-
-        {/* Scope. A client needs the period and the view; the metric pickers
-            are apparatus and live in Lab. */}
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 12 }}>
-          <Picker
-            label="View"
-            value={gran}
-            onChange={pickGrain}
-            options={grans.map((g) => {
-              const a = assessments[g];
-              const tag = recommendation?.grain === g ? ' (recommended)'
-                : a && !a.canModel ? ' (charts only)'
-                : '';
-              return { value: g, label: `${GRAIN_LABEL[g]}${tag}` };
-            })}
-            width={190}
-            hint={assessment ? `${assessment.usable} usable ${assessment.unit}s here` : null}
-          />
-          <div>
-            <FieldLabel>Date range</FieldLabel>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input type="date" className="wx-input" style={{ width: 145 }} value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} />
-              <input type="date" className="wx-input" style={{ width: 145 }} value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} />
-            </div>
-          </div>
-
-          {lab ? (
-            <>
-              <Picker
-                label="TikTok activity"
-                value={xKey}
-                onChange={setXKey}
-                options={tiktokFields.map((f) => ({ value: f.key, label: plainMetricLabel(f.key) }))}
-                width={210}
-              />
-              <Picker
-                label="Amazon outcome"
-                value={yKey}
-                onChange={setYKey}
-                options={amazonFields.map((f) => ({ value: f.key, label: plainMetricLabel(f.key) }))}
-                width={210}
-              />
-              <div style={{ paddingBottom: 4 }}>
-                <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={resetDefaults}>
-                  <i className="bi bi-arrow-counterclockwise" style={{ marginRight: 6 }} />Reset to defaults
-                </button>
-              </div>
-            </>
-          ) : (
-            <div style={{ paddingBottom: 4, fontSize: 12, color: 'var(--text-secondary)' }}>
-              <FieldLabel>Comparing</FieldLabel>
-              {comparisonSentence(xKey, yKey)}
-              <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginLeft: 8 }}
-                onClick={() => pickMode('lab')}>
-                Change metrics
-              </button>
-            </div>
-          )}
-
-          <div style={{ paddingBottom: 4, marginLeft: 'auto' }}>
-            <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setGlossaryOpen(true)}>
-              <i className="bi bi-question-circle" style={{ marginRight: 6 }} />What do these terms mean?
-            </button>
-          </div>
-        </div>
-
+      {/* ══ Scope: one row, everything else behind it ═════════════ */}
+      <ScopeBar
+        mode={mode} onMode={pickMode} lab={lab}
+        grans={grans} gran={gran} onGran={pickGrain}
+        assessments={assessments} recommendation={recommendation}
+        range={range} setRange={setRange} span={span}
+        xKey={xKey} yKey={yKey} setXKey={setXKey} setYKey={setYKey}
+        tiktokFields={tiktokFields} amazonFields={amazonFields} onReset={resetDefaults}
+        onManageLinks={onManageLinks}
+        onPdf={() => runExport('pdf')} onPng={() => runExport('png')} onCsv={exportCsv}
+        exportBusy={exportBusy}
+        onGlossary={() => setGlossaryOpen(true)}
+      >
         {lab && (
           <>
             <button
@@ -403,15 +345,14 @@ export default function HaloV2Explorer({
             )}
           </>
         )}
-      </div>
+      </ScopeBar>
 
       {/* ══ 0 - SNAPSHOT ══════════════════════════════════════════ */}
+      {/* Brand, period and the metric pair are all in the scope bar directly
+          above, so the snapshot states the answer and nothing else. */}
       <Snapshot
         snapshot={snapshot}
         headline={takeaway.headline}
-        brandName={brandName}
-        periodLabel={`${GRAIN_LABEL[gran]}${rangeText(range) ? ` · ${rangeText(range)}` : ''}`}
-        comparison={comparisonSentence(xKey, yKey)}
         chart={contribution?.perPeriod?.length
           ? <ContributionChart contribution={contribution} unit={unit} yLabel={plainMetricLabel(yKey)} />
           : <OverTimeChart periods={periods} xKey={xKey} yKey={yKey} unit={unit} normalize={normalize} height={220} compact />}
@@ -453,7 +394,7 @@ export default function HaloV2Explorer({
       <Section
         step="Step 1 · See"
         title="Do TikTok and Amazon move together?"
-        question="How the two moved over this period. Moving together is evidence. It is never proof that one caused the other."
+        question="How the two moved over this period."
       >
         <SeeLayer
           result={result} unit={unit} xKey={xKey} yKey={yKey} periods={periods}
@@ -466,8 +407,7 @@ export default function HaloV2Explorer({
       <Section
         step="Step 2 · Adjust"
         title="What did we adjust for?"
-        question="What else could explain the movement, which of those we could account for, and what that does to the claim."
-        right={m.available ? <ModelledBadge /> : null}
+        question="What else could explain the movement, and which of those we could account for."
       >
         <AdjustLayer
           result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
@@ -482,8 +422,7 @@ export default function HaloV2Explorer({
       <Section
         step="Step 3 · Estimate"
         title="How much Amazon looks tied to TikTok in this window?"
-        question="An estimate of association after the adjustments above. Not proof of cause, and not incremental lift."
-        right={m.available ? <ModelledBadge /> : null}
+        question="An estimate of association after the adjustments above."
       >
         <EstimateLayer
           result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
@@ -499,7 +438,7 @@ export default function HaloV2Explorer({
       <Section
         step="Step 4 · Plan"
         title="If we plan TikTok at these assumptions, what Amazon effect should we discuss?"
-        question="Planning is a decision informed by the model, never a measurement of it. Every figure here is an assumption."
+        question="Every figure here is a planning assumption, not a measurement."
         tone="planning"
       >
         <PlanningLayer result={result} planning={planning} setPlanning={setPlanning} cur={cur} />
@@ -525,10 +464,36 @@ export default function HaloV2Explorer({
           result={result} gran={gran} range={range} unit={unit} xKey={xKey} yKey={yKey} cur={cur}
         />
       )}
-      {lab && !controlsFound.promo && !controlsFound.stockout && (
-        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-          This sheet carries no promotion or stock-out column. The model reads them automatically as soon
-          as one appears.
+      {lab && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-muted)' }}>
+          {!controlsFound.promo && !controlsFound.stockout && (
+            <span>
+              This sheet carries no promotion or stock-out column. The model reads them automatically as
+              soon as one appears.
+            </span>
+          )}
+          {v1Href && (
+            <Link to={v1Href} style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+              Open the original Halo tool
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Downloads are silent in some browsers and the Share menu closes on
+          click, so confirm what just happened, briefly. */}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
+            background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+            borderRadius: 999, boxShadow: 'var(--shadow-lg)', padding: '8px 16px',
+            fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+          }}
+        >
+          <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} />{toast}
         </div>
       )}
 

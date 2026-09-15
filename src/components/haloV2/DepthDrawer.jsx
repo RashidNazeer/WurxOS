@@ -52,30 +52,13 @@ export default function DepthDrawer({ statuses, model, unit, referenceLabel = nu
         <span style={{ fontSize: 11.5, color: 'var(--accent)', fontWeight: 700 }}>{open ? 'Hide' : 'Show'}</span>
       </button>
 
+      {/* Opening this used to dump a stage grid, a mapping table, four method
+          bullets and a validation notice at once, which is a wall by any
+          measure. Three nested sections, each closed, so the reader opens the
+          one thing they came for. */}
       {open && (
-        <div style={{ marginTop: 14 }}>
-          <StageStepper statuses={statuses} />
-
-          <div style={{ marginTop: 14 }}>
-            <Label>Where each stage appears on this page</Label>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 460 }}>
-                <tbody>
-                  {(statuses || []).map((s) => (
-                    <tr key={s.key} style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                      <td style={{ padding: '6px 8px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Stage {s.n}</td>
-                      <td style={{ padding: '6px 8px', fontWeight: 600 }}>{s.title}</td>
-                      <td style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{STAGE_TO_STEP[s.key]}</td>
-                      <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{s.statusLabel}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 14 }}>
-            <Label>Method</Label>
+        <div style={{ marginTop: 12 }}>
+          <Sub title="Method" hint="What the model actually does">
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               <li>
                 Amazon outcome is regressed on TikTok activity at several {unit} lags at once (a distributed
@@ -91,14 +74,6 @@ export default function DepthDrawer({ statuses, model, unit, referenceLabel = nu
                   with {model.parameterCount} parameters.
                 </li>
               )}
-              {model?.available && (
-                <li>
-                  Adjusted for {model.controls?.length ? model.controls.join(', ').toLowerCase() : 'nothing'}.
-                  {model.controlsUnavailable?.length
-                    ? ` No data in the sheet for ${model.controlsUnavailable.join(', ').toLowerCase()}.`
-                    : ''}
-                </li>
-              )}
               {referenceLabel && (
                 <li>
                   Contribution compares the model's prediction under what happened against the same
@@ -107,20 +82,76 @@ export default function DepthDrawer({ statuses, model, unit, referenceLabel = nu
                 </li>
               )}
             </ul>
-          </div>
+          </Sub>
 
-          <div style={{
-            marginTop: 14, padding: '10px 12px', borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)', border: '1px dashed var(--border-default)',
-            fontSize: 12.5, color: 'var(--text-secondary)',
-          }}>
-            <strong style={{ color: 'var(--text-primary)' }}>Stage 6, validation (geo or holdout): not done.</strong>
-            {' '}Proving that sales would not have happened otherwise needs a controlled test with a held out
-            region or audience. This tool does not run one, which is why every figure here is labelled
-            modelled association rather than incremental.
-          </div>
+          <Sub title="Stages" hint={`${done} of ${total} complete`}>
+            <StageStepper statuses={statuses} />
+            <div style={{ marginTop: 12, overflowX: 'auto' }}>
+              <Label>Where each stage appears on this page</Label>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 460 }}>
+                <tbody>
+                  {(statuses || []).map((s) => (
+                    <tr key={s.key} style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '6px 8px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Stage {s.n}</td>
+                      <td style={{ padding: '6px 8px', fontWeight: 600 }}>{s.title}</td>
+                      <td style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{STAGE_TO_STEP[s.key]}</td>
+                      <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{s.statusLabel}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Sub>
+
+          <Sub title="Provenance and limitations" hint="What was adjusted for, and what is not proven">
+            {model?.available && (
+              <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 10 }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Adjusted for: </span>
+                  {model.controls?.length ? model.controls.join(', ').toLowerCase() : 'nothing'}
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Not adjusted for: </span>
+                  {model.controlsUnavailable?.length ? model.controlsUnavailable.join('; ').toLowerCase() : 'nothing outstanding'}
+                </div>
+              </div>
+            )}
+            <div style={{
+              padding: '10px 12px', borderRadius: 'var(--radius-md)',
+              background: 'var(--surface-2)', border: '1px dashed var(--border-default)',
+              fontSize: 12.5, color: 'var(--text-secondary)',
+            }}>
+              <strong style={{ color: 'var(--text-primary)' }}>Stage 6, validation (geo or holdout): not done.</strong>
+              {' '}Showing that sales would not have happened otherwise needs a controlled test with a held
+              out region or audience. This tool does not run one, which is why every figure here is
+              labelled modelled association rather than incremental.
+            </div>
+          </Sub>
         </div>
       )}
+    </div>
+  );
+}
+
+// One nested, collapsed section inside the drawer.
+function Sub({ title, hint, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((s) => !s)}
+        aria-expanded={open}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left',
+          background: 'none', border: 'none', padding: '10px 2px', cursor: 'pointer', color: 'inherit',
+        }}
+      >
+        <i className={`bi bi-chevron-${open ? 'down' : 'right'}`} style={{ color: 'var(--text-muted)', fontSize: 11 }} />
+        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{title}</span>
+        {hint && <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{hint}</span>}
+      </button>
+      {open && <div style={{ padding: '0 2px 14px' }}>{children}</div>}
     </div>
   );
 }

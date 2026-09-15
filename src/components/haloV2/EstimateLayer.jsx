@@ -21,7 +21,7 @@ import { fmtValue } from '../../lib/haloFields';
 import { REFERENCE_METHOD_SPECS } from '../../lib/haloV2/counterfactual.js';
 import { plainMetricLabel } from '../../lib/haloV2/plainLanguage.js';
 import ContributionChart from './ContributionChart.jsx';
-import { FieldLabel, Picker, Note, Stat, ModelledBadge } from './shared.jsx';
+import { FieldLabel, Picker, Note, Stat } from './shared.jsx';
 import { Term } from './Glossary.jsx';
 
 export default function EstimateLayer({
@@ -54,7 +54,6 @@ export default function EstimateLayer({
               : `Measured against the ${contrib.referenceLabel.toLowerCase()}`)
             : 'The model could not produce one for this window.'}
           tone={contrib && contrib.amount < 0 ? 'neg' : 'pos'}
-          badge={<ModelledBadge compact />}
           emphasis
         />
         {contrib && (
