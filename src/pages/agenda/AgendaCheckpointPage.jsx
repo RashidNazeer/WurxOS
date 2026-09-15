@@ -418,11 +418,17 @@ function ApcCheckpointPage() {
   const isAuthor = !!cp?.author_id && cp.author_id === profile?.id;
   const isOwnerTL = !!selectedBrand?.owner_id && selectedBrand.owner_id === profile?.id;
   const isAdmin = ['ol', 'boss', 'developer'].includes(profile?.role);
+  // An APC assigned to the brand owns its weekly checkpoint, whoever created the
+  // row. 15 Sept 2026: a TL's login created Pure Daily Care's 6–12 Sept
+  // checkpoint, and Mohid, its APC, could neither edit nor submit it.
+  const isBrandApc = profile?.role === 'apc'
+    && !!selectedBrand?.assignedUsers?.some((person) => person.id === profile?.id);
   // Submit-only (mig 305): the checkpoint is the APC's own document — no TL verify
-  // or return. The author (and OL/Boss admin) can edit it any time, even after
-  // submitting; the TL only VIEWS it. RLS (checkpoint_can_write) still backs writes.
-  const canEditContent = isAdmin || isAuthor;
-  const canSubmit = status !== 'submitted' && (isAuthor || isAdmin);
+  // or return. The author, the brand's APC (and OL/Boss admin) can edit it any
+  // time, even after submitting; the TL only VIEWS it. RLS (checkpoint_can_write)
+  // still backs writes.
+  const canEditContent = isAdmin || isAuthor || isBrandApc;
+  const canSubmit = status !== 'submitted' && (isAuthor || isBrandApc || isAdmin);
   const canVerify = false;   // retired — TL no longer verifies checkpoints
   const canReturn = false;   // retired — no return step
   const canReopen = false;   // retired — nothing to reopen
