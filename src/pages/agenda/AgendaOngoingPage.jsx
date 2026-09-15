@@ -238,6 +238,29 @@ export default function AgendaOngoingPage() {
     catch (e) { alert(e.message || 'Failed to stop presenting'); }
     finally { setBusy(''); }
   }
+  // OL ends someone else's turn: presenting -> presented.
+  //
+  // The APC's own "Stop Presenting" was the ONLY way to release the floor, and
+  // the APC is the person least likely to click it — they are talking, or they
+  // dropped off the call, or they were marked absent mid-turn. Because the
+  // presenter lock is one-at-a-time (a partial unique index, mig 179), a turn
+  // nobody closed left the whole room stuck: every other APC's Start was
+  // refused with "another APC is currently presenting" and the only way out was
+  // to finish the entire meeting. The RPC has always allowed an OL to do this;
+  // there was simply no button.
+  //
+  // The APC stays selected in the evaluation panel afterwards, so the OL can
+  // finish their overall summary and weekly score while the next APC starts.
+  async function handleStopFor(apcId, name) {
+    if (!window.confirm(`Mark ${name || 'this APC'} as presented? This ends their turn and frees the floor for the next APC.`)) return;
+    setBusy(`stop-${apcId}`);
+    try {
+      await stopPresenting(meeting.id, apcId);
+      setReviewTargetId(apcId);
+      await refresh();
+    } catch (e) { alert(e.message || 'Failed to end the presentation'); }
+    finally { setBusy(''); }
+  }
   // OL reopens a done APC: they're marked NOT presented and can present again.
   async function handleReopen(apcId) {
     if (!window.confirm('Reopen this APC’s session? They will be marked as NOT presented and can present again.')) return;
@@ -568,11 +591,28 @@ export default function AgendaOngoingPage() {
           </div>
         </div>
         {activePresentation && (
-          <span className="ms-auto rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
-            style={{ background: 'color-mix(in srgb, var(--on-accent) 18%, transparent)', fontSize: '0.62rem', fontWeight: 800 }}>
-            <span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--on-accent)', display: 'inline-block' }} />
-            LIVE
-          </span>
+          <div className="ms-auto d-flex align-items-center gap-2">
+            <span className="rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
+              style={{ background: 'color-mix(in srgb, var(--on-accent) 18%, transparent)', fontSize: '0.62rem', fontWeight: 800 }}>
+              <span className="rounded-circle" style={{ width: 6, height: 6, background: 'var(--on-accent)', display: 'inline-block' }} />
+              LIVE
+            </span>
+            {/* The OL's way out of a turn nobody closed. Placed on the banner
+                because this is where the OL is already looking when an APC
+                finishes talking, and the same action on the progress chip below
+                is easy to miss mid-meeting. */}
+            {isOL && (
+              <button className="btn btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
+                title={`Mark ${activePresentation.apc?.display_name || 'this APC'} as presented and free the floor for the next APC`}
+                style={{ borderRadius: 8, fontSize: '0.74rem', fontWeight: 600, background: 'var(--surface-1)', color: 'var(--accent)', border: 'none' }}
+                disabled={busy === `stop-${activePresentation.apc_id}`}
+                onClick={() => handleStopFor(activePresentation.apc_id, activePresentation.apc?.display_name)}>
+                {busy === `stop-${activePresentation.apc_id}`
+                  ? <><span className="spinner-border spinner-border-sm" /> Ending…</>
+                  : <><i className="bi bi-check2-circle" /> Mark presented</>}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -589,6 +629,9 @@ export default function AgendaOngoingPage() {
           onReopen={isOL ? handleReopen : null}
           onRemarks={isOL ? setReviewTargetId : null}
           onStartFor={(isOL || isMyTeam) ? handleStartFor : null}
+          // OL only: agenda_stop_presenting accepts the presenting APC or an
+          // OL/Boss, so offering it to a TL would only produce a refusal.
+          onStopFor={isOL ? handleStopFor : null}
           someonePresenting={!!activePresentation}
           reviewTargetId={reviewTargetId}
           busy={busy} />
@@ -840,10 +883,12 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
 }
 
 // ── Presentation progress (OL) ──────────────────────────────────────────
-// For a Presented APC the OL gets two actions: "Remarks" (review their tasks
-// without changing status) and "Reopen" (mark not-presented so they can go
-// again). Handlers are null for non-OL observers, hiding the buttons.
-function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, someonePresenting, reviewTargetId, busy }) {
+// Per chip, by status:
+//   pending     — "Start" (on the APC's behalf, when they forgot to click)
+//   presenting  — "Mark presented" (OL ends the turn and frees the floor)
+//   done        — "Remarks" (review without changing status) and "Reopen"
+// Handlers are null for observers, which hides the buttons.
+function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, onStopFor, someonePresenting, reviewTargetId, busy }) {
   const META = {
     done:       { label: 'Presented',  color: 'var(--success)',        bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
     presenting: { label: 'Presenting', color: 'var(--accent)',         bg: 'var(--accent-soft)',  icon: 'bi-easel2-fill' },
@@ -894,6 +939,21 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, 
                     {busy === `startfor-${a.id}`
                       ? <span className="spinner-border spinner-border-sm" style={{ width: '0.6rem', height: '0.6rem' }} />
                       : <><i className="bi bi-play-fill" />Start</>}
+                  </button>
+                )}
+                {/* Presenting: the OL closes the turn. Without this the floor
+                    stayed locked until the APC clicked Stop themselves, which
+                    is exactly what they forget to do. */}
+                {st === 'presenting' && onStopFor && (
+                  <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1"
+                    title={`Mark ${a.display_name} as presented and free the floor for the next APC`}
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
+                      background: 'var(--surface-1)', color: 'var(--success)', border: '1px solid var(--success)' }}
+                    disabled={busy === `stop-${a.id}`}
+                    onClick={() => onStopFor(a.id, a.display_name)}>
+                    {busy === `stop-${a.id}`
+                      ? <span className="spinner-border spinner-border-sm" style={{ width: '0.6rem', height: '0.6rem' }} />
+                      : <><i className="bi bi-check2-circle" />Mark presented</>}
                   </button>
                 )}
                 {isDone && onRemarks && (
