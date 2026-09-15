@@ -218,12 +218,28 @@ const AGENDA_GROUP_GUEST = {
 // items (notifications/settings).
 
 const ASSISTANT_ITEM = { label: 'Assistant', icon: MessageIcon, to: '/assistant' };
-// Product roadmap and review queue, private to the Boss and developers.
-const DEV_TASKS_ITEM = { label: 'Development', icon: ChecklistIcon, to: '/dev-tasks' };
+// Development — the product roadmap, private to the Boss and developers.
+// `dot` shows this group's unread dot (groups have none by default), and
+// `prefix` keeps a child highlighted on deeper pages (/development/projects/wurxos).
+const DEVELOPMENT_GROUP = {
+  label: 'Development',
+  icon: DiagramIcon,
+  category: 'development',
+  dot: true,
+  children: [
+    { label: 'Roadmap',   to: '/development/roadmap',  prefix: true },
+    { label: 'Overview',  to: '/development/overview' },
+    { label: 'Projects',  to: '/development/projects', prefix: true },
+    { label: 'All tasks', to: '/development/tasks' },
+    { label: 'Bugs',      to: '/development/bugs' },
+    { label: 'Team',      to: '/development/team' },
+    { label: 'Activity',  to: '/development/activity' },
+  ],
+};
 
 export const MENUS = {
   boss: [
-    DEV_TASKS_ITEM,
+    DEVELOPMENT_GROUP,
     DASHBOARD_ITEM,
     EMPLOYEES_GROUP,
     BRANDS_ITEM,
@@ -404,10 +420,9 @@ export const MENUS = {
   // Their job is to triage bugs + suggestions; no brands, no tasks.
   // Attendance + My Compensation are HR surfaces — the developer still
   // clocks in and gets paid like anyone else. DashboardRouter in
-  // App.jsx redirects /dashboard to /bugs for this role so they land
-  // on triage by default.
+  // App.jsx sends this role to Development → Roadmap (owner, 2026-09-16).
   developer: [
-    DEV_TASKS_ITEM,
+    DEVELOPMENT_GROUP,
     { label: 'Bug Reports', icon: BugIcon, to: '/bugs', category: 'bug' },
     { label: 'Suggestions', icon: LightbulbIcon, to: '/suggestions', category: 'suggestion' },
     ATTENDANCE_ITEM,

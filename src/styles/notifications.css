@@ -258,7 +258,7 @@
   border: 2px solid var(--surface-1);
   font-size: 9px;
 }
-.notif-avatar-cat-task, .notif-avatar-cat-dev_task { background: var(--accent); color: #fff; }
+.notif-avatar-cat-task, .notif-avatar-cat-development { background: var(--accent); color: #fff; }
 .notif-avatar-cat-report { background: #818cf8;        color: #fff; }
 .notif-avatar-cat-brand  { background: #eab308;        color: #fff; }
 .notif-avatar-cat-paid_collab { background: #10b981;   color: #fff; }

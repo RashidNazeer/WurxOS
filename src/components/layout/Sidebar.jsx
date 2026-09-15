@@ -191,7 +191,10 @@ function NavGroup({ item, collapsed, forceOpen = false }) {
         onClick={() => setOpen((o) => !o)}
         title={collapsed ? item.label : undefined}
       >
-        <span className="icon">{Icon ? <Icon width="17" height="17" /> : null}</span>
+        <span className="icon" style={{ position: 'relative' }}>
+          {Icon ? <Icon width="17" height="17" /> : null}
+          {item.dot && item.category && <UnreadDot category={item.category} />}
+        </span>
         <span className="label">{item.label}</span>
         <span className="chev"><ChevronRightIcon width="14" height="14" /></span>
       </button>
@@ -201,7 +204,7 @@ function NavGroup({ item, collapsed, forceOpen = false }) {
             <NavLink
               key={i}
               to={c.to}
-              end
+              end={!c.prefix}
               className={({ isActive }) => `shell-nav-link ${isActive ? 'active' : ''}`}
             >
               <span className="label">{c.label}</span>

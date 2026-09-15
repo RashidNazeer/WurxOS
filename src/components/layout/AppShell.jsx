@@ -28,6 +28,7 @@ const SIDEBAR_COLLAPSED_KEY = 'wurxos.sidebar.collapsed';
 
 // Per-path page metadata: title + subtitle shown in the Topbar.
 // If a path isn't listed, the Topbar falls back to a safe default.
+const DEVELOPMENT_META = { title: 'Development', subtitle: 'Product roadmap, tasks and releases' };
 const PAGE_META = {
   '/dashboard':                { title: 'Dashboard',              subtitle: 'Overview of your workspace' },
   '/brands':                   { title: 'Brands',                 subtitle: 'Brand portfolio and assignments' },
@@ -92,7 +93,8 @@ export default function AppShell() {
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, [navigate]);
   const location = useLocation();
-  const meta = PAGE_META[location.pathname] || { title: 'WurxOS', subtitle: '' };
+  const meta = PAGE_META[location.pathname]
+    || (location.pathname.startsWith('/development/') ? DEVELOPMENT_META : { title: 'WurxOS', subtitle: '' });
 
   // Auto-close the mobile drawer on every route change.
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
