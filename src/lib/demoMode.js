@@ -24,31 +24,31 @@
 // Point 2 is the part that matters. A stray VITE_DEMO_MODE in the wrong
 // .env, or a Vercel env var set on the wrong project, would otherwise hand
 // every visitor a one-click "sign in as the Boss" control against the real
-// database. The ref is hardcoded rather than read from config on purpose:
-// a guard that can be switched off by the same config it is guarding
-// against is not a guard.
+// database. Demo mode refuses to enable unless the production ref is supplied
+// explicitly, so a missing guard fails closed.
 // ============================================================
 
-// The production project ref (see the README / supabase link). Demo mode is
-// refused against this host no matter what the environment says.
-const PRODUCTION_REF = 'xoaaidgvblondjpvxjqp';
+const PRODUCTION_REF = String(import.meta.env.VITE_PRODUCTION_SUPABASE_REF || '').trim();
 
 const rawUrl = String(import.meta.env.VITE_SUPABASE_URL || '');
 const flagOn = import.meta.env.VITE_DEMO_MODE === 'true';
-const pointedAtProduction = rawUrl.includes(PRODUCTION_REF);
+const guardConfigured = Boolean(PRODUCTION_REF);
+const pointedAtProduction = guardConfigured && rawUrl.includes(PRODUCTION_REF);
 
 // Evaluated once at module load: the answer cannot change at runtime, and
 // making it a constant means no call site can accidentally re-derive it
 // from something weaker.
-export const DEMO_MODE = flagOn && !pointedAtProduction;
+export const DEMO_MODE = flagOn && guardConfigured && !pointedAtProduction;
 
 // Shout if someone tries. Silence here would mean a demo build quietly
 // running against production and nobody finding out until the walkthrough.
-if (flagOn && pointedAtProduction) {
+if (flagOn && (!guardConfigured || pointedAtProduction)) {
   // eslint-disable-next-line no-console
   console.error(
-    '[demo] VITE_DEMO_MODE is set but VITE_SUPABASE_URL points at the PRODUCTION ' +
-    'project. Demo features are disabled. Point this build at the demo project.',
+    !guardConfigured
+      ? '[demo] VITE_DEMO_MODE is set but VITE_PRODUCTION_SUPABASE_REF is missing. Demo features are disabled.'
+      : '[demo] VITE_DEMO_MODE is set but VITE_SUPABASE_URL points at the PRODUCTION ' +
+        'project. Demo features are disabled. Point this build at the demo project.',
   );
 }
 
