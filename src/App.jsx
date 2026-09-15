@@ -118,7 +118,16 @@ const AmazonHaloPage        = lazy(() => import('./pages/boss/AmazonHaloPage'));
 const HaloV2Page            = lazy(() => import('./pages/boss/HaloV2Page'));
 const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
 const TikTokCallbackPage    = lazy(() => import('./pages/oauth/TikTokCallbackPage'));
-const DevTasksPage          = lazy(() => import('./pages/devTasks/DevTasksPage'));
+const DevelopmentLayout     = lazy(() => import('./pages/development/DevelopmentLayout'));
+const devPage = (name) => lazy(() => import('./pages/development/pages').then((m) => ({ default: m[name] })));
+const DevRoadmapPage   = devPage('RoadmapPage');
+const DevOverviewPage  = devPage('OverviewPage');
+const DevProjectsPage  = devPage('ProjectsPage');
+const DevProjectPage   = devPage('ProjectPage');
+const DevTaskListPage  = devPage('AllTasksPage');
+const DevBugsPage      = devPage('BugsPage');
+const DevTeamPage      = devPage('TeamPage');
+const DevActivityPage  = devPage('ActivityPage');
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -156,8 +165,7 @@ function PublicOnly({ children }) {
 
 // Dashboard is role-aware. For now only Boss has a real dashboard;
 // other roles see a placeholder until we build their features.
-// Developers land directly on the bug triage page — same pattern
-// as v1's /dev/dashboard = DevBugDashboard.
+// Developers land on Development → Roadmap (owner, 2026-09-16).
 function DashboardRouter() {
   const { profile, loading } = useAuth();
   // Render a real spinner while the profile is still loading instead
@@ -175,7 +183,7 @@ function DashboardRouter() {
       </div>
     );
   }
-  if (profile.role === 'developer') return <Navigate to="/bugs" replace />;
+  if (profile.role === 'developer') return <Navigate to="/development/roadmap" replace />;
   if (profile.role === 'boss')      return <BossDashboard />;
   return <RoleDashboard />;
 }
@@ -659,16 +667,30 @@ export default function App() {
                 element={<MyCompensationPage />}
               />
 
-              {/* Bugs — everyone authenticated (RLS filters rows per role) */}
-              {/* Development workspace — private to the Boss and developers. */}
+              {/* Development — the Boss and developers only (RLS is the boundary). */}
               <Route
-                path="/dev-tasks/:id?"
+                path="/development"
                 element={
                   <RoleGuard allow={['boss', 'developer']}>
-                    <DevTasksPage />
+                    <DevelopmentLayout />
                   </RoleGuard>
                 }
-              />
+              >
+                <Route index element={<Navigate to="roadmap" replace />} />
+                <Route path="roadmap" element={<DevRoadmapPage />} />
+                <Route path="overview" element={<DevOverviewPage />} />
+                <Route path="projects" element={<DevProjectsPage />} />
+                <Route path="projects/:key" element={<DevProjectPage />} />
+                <Route path="tasks" element={<DevTaskListPage />} />
+                <Route path="bugs" element={<DevBugsPage />} />
+                <Route path="team" element={<DevTeamPage />} />
+                <Route path="activity" element={<DevActivityPage />} />
+                <Route path="*" element={<Navigate to="roadmap" replace />} />
+              </Route>
+              {/* Links from the previous Development workspace. */}
+              <Route path="/dev-tasks/*" element={<Navigate to="/development/roadmap" replace />} />
+
+              {/* Bugs — everyone authenticated (RLS filters rows per role) */}
               <Route path="/bugs"        element={<BugsPage />} />
               <Route path="/suggestions" element={<SuggestionsPage />} />
 

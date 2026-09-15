@@ -14,6 +14,7 @@ import '../../styles/notifications.css';
 // dedicated color fall back to a sensible neighbour (see notifications.css).
 const CATEGORY_META = {
   task:        { label: 'Task',        icon: ChecklistIcon, cat: 'task' },
+  development: { label: 'Development', icon: ChecklistIcon, cat: 'task' },
   report:      { label: 'Report',      icon: ReportIcon,    cat: 'report' },
   brand:       { label: 'Brand',       icon: StoreIcon,     cat: 'brand' },
   paid_collab: { label: 'Paid Collab', icon: MegaphoneIcon, cat: 'paid_collab' },

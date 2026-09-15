@@ -7,16 +7,17 @@ import { roleLabel } from '../../lib/roles';
 import ThemeToggle from '../common/ThemeToggle';
 import NotificationBell from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
-import { ChevronDownIcon, LogoutIcon, UserIcon, SettingsIcon, InstallIcon, MenuIcon, BugIcon } from '../common/Icon';
+import { ChevronDownIcon, LogoutIcon, UserIcon, SettingsIcon, InstallIcon, MenuIcon } from '../common/Icon';
 import { canInstall, onInstallAvailable, promptInstall, isStandalone } from '../../lib/pwa';
-import ReportIssueModal from '../development/ReportIssueModal';
+// Dialogs on Settings, Chat, Incentives and Creator Library use .wx-modal from
+// this sheet without importing it; the top bar is on every page, so it loads it.
+import '../../styles/table.css';
 
 export default function Topbar({ title, subtitle, onMobileMenu }) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [installable, setInstallable] = useState(canInstall());
-  const [reportingIssue, setReportingIssue] = useState(false);
   const [pos, setPos] = useState(null);     // portal anchor {top, right}
   const ref = useRef(null);                  // the trigger button wrapper
   const menuRef = useRef(null);              // the portaled menu
@@ -122,13 +123,6 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
                 <SettingsIcon width="16" height="16" />
                 Account &amp; settings
               </button>
-              <button
-                className="shell-user-menu-item"
-                onClick={() => { setMenuOpen(false); setReportingIssue(true); }}
-              >
-                <BugIcon width="16" height="16" />
-                Report an issue
-              </button>
               {installable && !standalone && (
                 <>
                   <div className="shell-user-menu-divider" />
@@ -151,7 +145,6 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
           )}
         </div>
       </div>
-      {reportingIssue && <ReportIssueModal profile={profile} onClose={() => setReportingIssue(false)} />}
     </header>
   );
 }
