@@ -59,7 +59,7 @@ export function signedCorrelation(xs, ys, xKey, yKey) {
   const sufficiency = sufficiencyOf(n);
   if (!sufficiency.computable) {
     return { rawCorrelation: null, businessAdjustedCorrelation: null, inverted: false, n, sufficiency,
-      reason: `Only ${n} overlapping period${n === 1 ? '' : 's'} — at least ${MIN_CORRELATION_OBS} are needed.` };
+      reason: `Only ${n} overlapping period${n === 1 ? '' : 's'}, and at least ${MIN_CORRELATION_OBS} are needed.` };
   }
   const raw = pearson(xs, ys);
   if (raw == null) {

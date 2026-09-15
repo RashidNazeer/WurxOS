@@ -286,6 +286,22 @@ export async function switchBrandApc(brandId, newApcId, note = null, notify = fa
   if (error) throw new Error(error.message);
 }
 
+// --------------------------------------------------------------
+// Assign a brand to an APC WITHOUT swapping (Boss / OL only, mig 360).
+//
+// switchBrandApc is a bilateral swap: both APCs exchange their whole
+// portfolios. This moves ONE brand — the new APC keeps every brand they
+// already hold, the replaced APC loses only this one. IPCs and temporary
+// cover on the brand are left in place. See lib/brandSwitchRules.js for the
+// preview-side mirror of who gets replaced.
+// --------------------------------------------------------------
+export async function assignBrandApc(brandId, newApcId, note = null, notify = false) {
+  const { error } = await supabase.rpc('brand_assign_apc', {
+    p_brand: brandId, p_new_apc: newApcId, p_note: note, p_notify: notify,
+  });
+  if (error) throw new Error(error.message);
+}
+
 // Returns the current brand list for each of the two users — used
 // by the Switch APC preview so the caller can see exactly which
 // brands will move in each direction of the swap.

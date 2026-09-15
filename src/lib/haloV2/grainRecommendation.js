@@ -163,7 +163,7 @@ export function recommendGrain(assessments, { currentGrain = null } = {}) {
   if (month?.canModel) {
     return {
       grain: 'month', guided: false, assessment: month,
-      reason: `Only Monthly can carry a model over this range (${month.usable} usable months). Monthly is exploratory — few observations make the estimate move easily.`,
+      reason: `Only Monthly can carry a model over this range (${month.usable} usable months). Monthly is exploratory: few observations make the estimate move easily.`,
     };
   }
 
@@ -173,7 +173,7 @@ export function recommendGrain(assessments, { currentGrain = null } = {}) {
     grain: richest?.grain ?? null,
     guided: true,
     assessment: richest,
-    reason: 'No grain has enough history for an adjusted model over this date range yet. The descriptive charts and — where there is enough overlap — the signed correlations are still meaningful.',
+    reason: 'No grain has enough history for an adjusted model over this date range yet. The descriptive charts, and the signed correlations where there is enough overlap, are still meaningful.',
   };
 }
 
@@ -194,7 +194,7 @@ export function grainSwitchSuggestion(currentGrain, assessments, recommendation)
     // loaded, so switching costs nothing and needs no new data.
     cta: `Switch to ${target.label} (works with this date range)`,
     detail: target.canModel
-      ? `${target.usable} usable ${target.unit}s — enough for a ${target.feasibleLag === 0 ? `same-${target.unit}` : `${target.feasibleLag}-${target.unit}`} model.`
-      : `${target.usable} usable ${target.unit}s — more history than the current view.`,
+      ? `${target.usable} usable ${target.unit}s, enough for a ${target.feasibleLag === 0 ? `same-${target.unit}` : `${target.feasibleLag}-${target.unit}`} model.`
+      : `${target.usable} usable ${target.unit}s, more history than the current view.`,
   };
 }

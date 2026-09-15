@@ -60,13 +60,13 @@ export function historyPhrase(n, unit = 'period') {
   const perYear = PER_YEAR[unit];
   if (!perYear) return count;
   const years = n / perYear;
-  if (years >= 1.85) return `${count} — about ${years.toFixed(1)} years of history`;
-  if (years >= 0.85) return `${count} — about a year of history`;
+  if (years >= 1.85) return `${count}, about ${years.toFixed(1)} years of history`;
+  if (years >= 0.85) return `${count}, about a year of history`;
   // Below a year, describe it in the next unit UP where that reads better than
   // a bare count ("118 usable days — about 17 weeks"). Three weeks is the floor:
   // below it "about 1 weeks" is worse than the plain day count.
-  if (unit === 'day' && n >= 21) return `${count} — about ${Math.round(n / 7)} weeks`;
-  if (unit === 'month' && n >= 6) return `${count} — about ${(n / 12).toFixed(1)} of a year`;
+  if (unit === 'day' && n >= 21) return `${count}, about ${Math.round(n / 7)} weeks`;
+  if (unit === 'month' && n >= 6) return `${count}, about ${(n / 12).toFixed(1)} of a year`;
   return count;
 }
 
@@ -90,10 +90,10 @@ export function modelConfidence({
   // 1. Sample size. Thresholds unchanged; the wording now names the grain.
   const n = model.sampleSize;
   const span = historyPhrase(n, unit);
-  if (n >= 78) { score += 2; reasons.push(`${span} — plenty to estimate on.`); }
+  if (n >= 78) { score += 2; reasons.push(`${span}. Plenty to estimate on.`); }
   else if (n >= 52) { score += 1.5; reasons.push(`${span}.`); }
   else if (n >= 26) { score += 1; reasons.push(`${span}.`); }
-  else { score += 0.25; reasons.push(`${span} — few enough that the estimate moves easily.`); }
+  else { score += 0.25; reasons.push(`${span}. Few enough that the estimate moves easily.`); }
 
   // 2. Interval: does it agree on a direction, and how wide is it?
   const { lower, upper } = model.confidenceInterval || {};
@@ -124,12 +124,12 @@ export function modelConfidence({
   const realControls = controlsIncluded.filter((c) => c !== 'Trend');
   if (realControls.length >= 2) { score += 0.75; reasons.push(`Adjusted for ${realControls.join(', ').toLowerCase()}.`); }
   else if (realControls.length === 1) { score += 0.4; reasons.push(`Adjusted for ${realControls[0].toLowerCase()} only.`); }
-  else reasons.push('Only a time trend could be controlled for — other drivers are unmeasured.');
+  else reasons.push('Only a time trend could be controlled for. Other drivers are unmeasured.');
   if (controlsUnavailable.length) reasons.push(`Not controlled for: ${controlsUnavailable.length} variable${controlsUnavailable.length === 1 ? '' : 's'} with no data.`);
 
   // 5. Penalties for known fragility.
   if (model.warnings?.some((w) => w.code === 'influential_observation')) { score -= 0.5; reasons.push('One period heavily influences the estimate.'); }
-  if (model.warnings?.some((w) => w.code === 'multicollinearity')) reasons.push('Individual lag coefficients are collinear — read the cumulative figure, not the parts.');
+  if (model.warnings?.some((w) => w.code === 'multicollinearity')) reasons.push('Individual lag coefficients are collinear, so read the combined figure rather than the parts.');
   if (model.adjustedR2 != null && model.adjustedR2 < 0.1) { score -= 0.25; reasons.push('The model explains little of the variation in Amazon revenue.'); }
 
   const earned = score >= 4 ? 'Strong Evidence'

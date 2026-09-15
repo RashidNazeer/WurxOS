@@ -56,7 +56,7 @@ export const REFERENCE_METHOD_SPECS = [
     label: 'Low-activity baseline (recommended)',
     short: 'Low-activity baseline',
     recommended: true,
-    describe: 'Median of the quietest quarter of TikTok activity in this window — what Amazon looks like when TikTok is quiet.',
+    describe: 'Median of the quietest quarter of TikTok activity in this window, which is what Amazon looks like when TikTok is quiet.',
   },
   {
     name: 'period_median',
@@ -141,7 +141,7 @@ export function resolveReference(xs, method = 'low_activity', customValue = null
     return done(
       median(vals),
       'period_median',
-      `A low-activity baseline needs at least ${LOW_ACTIVITY_MIN_OBS} periods to have a meaningful quietest quarter — this window has ${vals.length}, so the window median was used instead.`,
+      `A low-activity baseline needs at least ${LOW_ACTIVITY_MIN_OBS} periods to have a meaningful quietest quarter. This window has ${vals.length}, so the window median was used instead.`,
       true,
     );
   }

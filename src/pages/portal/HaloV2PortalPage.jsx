@@ -107,10 +107,10 @@ export default function HaloV2PortalPage() {
               "we cannot confidently detect a halo", and a client who was not
               told that reads a missing figure as a broken page. */}
           <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '10px 0 0', maxWidth: 720 }}>
-            Here&apos;s how TikTok Shop activity moved with Amazon outcomes in this period — and how
-            sure we are. It reports movement in both directions, negative as readily as positive,
-            and where there is not enough history it says so rather than estimating. A missing
-            figure is a deliberate answer, not a fault.
+            How TikTok Shop activity moved with Amazon outcomes in this period, and how sure we are.
+            It reports movement in both directions, negative as readily as positive, and where there
+            is not enough history it says so rather than estimating. A missing figure is a deliberate
+            answer, not a fault.
           </p>
         </div>
 

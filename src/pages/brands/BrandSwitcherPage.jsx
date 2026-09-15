@@ -53,6 +53,18 @@ export default function BrandSwitcherPage() {
   }, [brands, q]);
 
   async function decide(row, approve) {
+    // Approving used to be one click with no confirmation, on a row that did
+    // not say what would happen. Now that a request is either an Assign (one
+    // brand) or a Swap (two whole portfolios), the Boss must see which before
+    // committing — they are very different amounts of change.
+    if (approve && row.to_apc_id) {
+      const brandName = row.brand?.brand_name || 'this brand';
+      const target = row.to_apc?.display_name || 'the new APC';
+      const msg = requestMode(row) === 'swap'
+        ? `Approve SWAP for "${brandName}"?\n\n${target} and whoever currently holds this brand will EXCHANGE THEIR WHOLE BRAND PORTFOLIOS.\n\nThis is applied to the assignments as they are now, not as they were when the request was made.`
+        : `Approve ASSIGN for "${brandName}"?\n\n${target} gets this brand and keeps every brand they already have. The current APC loses only this one.`;
+      if (!confirm(msg)) return;
+    }
     const note = approve ? '' : (prompt('Rejection note (optional):') || '');
     if (!approve && note === null) return;
     try {
@@ -238,7 +250,7 @@ function BrandRow({ brand, onSwitch }) {
       </div>
       <button className="wx-btn wx-btn-primary" onClick={onSwitch}
         style={{ padding: '7px 12px', fontSize: 12.5 }}>
-        <RefreshIcon width="13" height="13" /> Switch APC
+        <RefreshIcon width="13" height="13" /> Reassign APC
       </button>
     </div>
   );
@@ -271,6 +283,8 @@ function RequestRow({ row, isBoss, currentUserId, onDecide, onCancel }) {
   // The new shape carries target in `to_apc`; legacy rows may carry `to_owner`.
   const target = row.to_apc || row.to_owner;
   const targetRole = (row.to_apc ? 'APC' : 'TL').toUpperCase();
+  // Only APC requests have an action; a legacy TL row just changes the owner.
+  const action = row.to_apc_id ? requestMode(row) : null;
 
   return (
     <div className={`bsw-req ${pending ? 'is-pending' : ''}`}>
@@ -288,8 +302,9 @@ function RequestRow({ row, isBoss, currentUserId, onDecide, onCancel }) {
             <Avatar user={target} size={22} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 12.5 }}>{target.display_name}</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.05em', display: 'flex', gap: 6, alignItems: 'center' }}>
                 → {targetRole}
+                {action && <ActionChip action={action} />}
               </div>
             </div>
           </div>
@@ -337,6 +352,34 @@ function Avatar({ user, size = 28 }) {
   }
   const init = String(user?.display_name || '?').split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   return <div style={style}>{init}</div>;
+}
+
+// A request's action. Rows created before mig 360 have mode='swap' from the
+// column default — correct, since swap was then the only thing a request did.
+function requestMode(row) {
+  return row?.mode === 'assign' ? 'assign' : 'swap';
+}
+
+// Swap is visually louder on purpose: it moves two people's whole portfolios.
+function ActionChip({ action }) {
+  const swap = action === 'swap';
+  return (
+    <span
+      title={swap
+        ? 'Swap: both APCs exchange their whole brand portfolios.'
+        : 'Assign: only this brand moves; the new APC keeps their own.'}
+      style={{
+        padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+        letterSpacing: '0.04em', textTransform: 'uppercase',
+        background: swap
+          ? 'color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent)'
+          : 'color-mix(in srgb, var(--accent) 16%, transparent)',
+        color: swap ? 'var(--warning, #b45309)' : 'var(--accent)',
+      }}
+    >
+      {swap ? 'Swap' : 'Assign'}
+    </span>
+  );
 }
 
 function formatDate(iso) {

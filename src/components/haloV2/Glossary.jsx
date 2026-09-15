@@ -30,7 +30,7 @@ export function Term({ term, children }) {
       {children ?? g.term}
       <button
         type="button"
-        title={`${g.term} — ${g.def}`}
+        title={`${g.term}: ${g.def}`}
         aria-label={`What does ${g.term} mean?`}
         style={{
           background: 'none', border: 'none', padding: '0 0 0 3px', cursor: 'help',
@@ -68,7 +68,7 @@ export function GlossaryPanel({ onClose }) {
         <div className="wx-modal-body">
           <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
             Written for what each term means <em>on this page</em>, which is not always the
-            textbook definition — &ldquo;attributed&rdquo;, &ldquo;modelled&rdquo; and
+            textbook definition. &ldquo;Attributed&rdquo;, &ldquo;modelled&rdquo; and
             &ldquo;incremental&rdquo; are three different things here, and they are routinely
             treated as one.
           </p>

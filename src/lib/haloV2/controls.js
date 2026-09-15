@@ -110,8 +110,8 @@ export function buildControls(periods, options = {}) {
       columns.push({ name: spec.name, label: spec.label, values: periods.map((p) => Number(p?.controls?.[spec.name]) || 0), source: 'data' });
       included.push(spec.label);
     } else {
-      unavailable.push(`${spec.label} — data unavailable`);
-      if (spec.major) missingMajor.push({ name: spec.name, label: spec.label, reason: 'data unavailable' });
+      unavailable.push(`${spec.label} (no column in the sheet)`);
+      if (spec.major) missingMajor.push({ name: spec.name, label: spec.label, reason: 'no column in the sheet' });
     }
   }
 
@@ -122,7 +122,7 @@ export function buildControls(periods, options = {}) {
       columns.push({ name, values: periods.map((p) => Number(p?.controls?.[name]) || 0), source: 'data' });
       included.push(name);
     } else {
-      unavailable.push(`${name} — data unavailable`);
+      unavailable.push(`${name} (no column in the sheet)`);
     }
   }
 
@@ -155,7 +155,7 @@ export function buildControls(periods, options = {}) {
     }
   } else {
     seasonalityReason = `annual seasonality needs about ${perYear} ${unitWord} of history, this window has ${n}`;
-    unavailable.push(`Seasonality — limited history (needs ~${perYear} ${unitWord})`);
+    unavailable.push(`Seasonality (needs about ${perYear} ${unitWord} of history)`);
   }
 
   // A control that never varies explains nothing and only costs a degree of
@@ -173,7 +173,7 @@ export function buildControls(periods, options = {}) {
       const label = c.label || c.name;
       const i = included.indexOf(label);
       if (i >= 0) included.splice(i, 1);
-      unavailable.push(`${label} — no variation in this period`);
+      unavailable.push(`${label} (no variation in this period)`);
       const spec = CONTROL_SPEC_BY_NAME[c.name];
       if (spec?.major && !missingMajor.some((m) => m.name === spec.name)) {
         missingMajor.push({ name: spec.name, label: spec.label, reason: 'no variation in this period' });
@@ -193,5 +193,56 @@ export function buildControls(periods, options = {}) {
     seasonalityIncluded,
     seasonalityReason,
     trendIncluded: included.includes('Trend'),
+  };
+}
+
+/**
+ * The Adjust step's readiness checklist.
+ *
+ * "Controls included / Not controlled for" as two prose lists made a missing
+ * promotion column look like a footnote. The client question is "what about
+ * Prime Day, what about the stock-out in May", and the honest answer is a
+ * checklist where a missing major control is a visible blocker on the estimate.
+ *
+ * Reads the fitted model only, so it can never claim an adjustment the model
+ * did not make. `primary` is what a client should see: the three confounders
+ * that matter most, plus seasonality and trend. `others` are the rest of the
+ * register, which belong in the Lab view.
+ */
+export function controlsChecklist(model) {
+  const included = new Set(model?.controls || []);
+  const unavailable = model?.controlsUnavailable || [];
+  // buildControls writes its reasons as "Label (reason)", so the reason can be
+  // read back out without a second source of truth for the wording.
+  const noteFor = (label) => {
+    const hit = unavailable.find((u) => u.startsWith(label));
+    const m = hit ? hit.match(/\(([^)]+)\)/) : null;
+    return m ? m[1] : null;
+  };
+  const row = (label, major = false) => ({
+    label,
+    included: included.has(label),
+    major,
+    note: included.has(label) ? 'in the model' : (noteFor(label) || 'not in the model'),
+  });
+
+  return {
+    primary: [
+      ...MAJOR_CONTROL_SPECS.map((s) => row(s.label, true)),
+      {
+        label: 'Annual seasonality',
+        included: !!model?.seasonalityIncluded,
+        major: false,
+        note: model?.seasonalityIncluded ? 'in the model' : (model?.seasonalityReason || 'not in the model'),
+      },
+      {
+        label: 'Time trend',
+        included: !!model?.trendIncluded,
+        major: false,
+        note: model?.trendIncluded ? 'in the model' : 'not in the model',
+      },
+    ],
+    others: CONTROL_SPECS.filter((s) => !s.major).map((s) => row(s.label)),
+    missingMajor: model?.controlsMissingMajor || [],
   };
 }
