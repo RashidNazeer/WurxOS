@@ -1,5 +1,5 @@
 // Every task, filterable by status. The Bugs tab is this same list restricted
-// to reported issues.
+// to reported issues. Picking a product on the roadmap narrows both.
 import { useState } from 'react';
 import { STATUS_META, sortWorkTasks } from '../../lib/devTasksApi';
 import TaskRow from './TaskRow';
@@ -11,10 +11,13 @@ function matchesStatus(task, filter) {
   return task.status === filter;
 }
 
-export default function ListView({ tasks, features, onOpen, source = null }) {
+export default function ListView({ tasks, features, viewerId, productId = null, source = null, onOpen }) {
   const [status, setStatus] = useState('open');
   const featureById = Object.fromEntries(features.map((feature) => [feature.id, feature]));
-  const rows = sortWorkTasks(tasks.filter((task) => (!source || task.source === source) && matchesStatus(task, status)));
+  const rows = sortWorkTasks(tasks.filter((task) => (!source || task.source === source)
+    && (!productId || featureById[task.task_id]?.project_id === productId)
+    && matchesStatus(task, status)));
+  const isBugs = source === 'bug_report';
 
   return (
     <>
@@ -31,14 +34,21 @@ export default function ListView({ tasks, features, onOpen, source = null }) {
             <option value={value} key={value}>{meta.label}</option>
           ))}
         </select>
-        <span>{rows.length} task{rows.length === 1 ? '' : 's'}</span>
+        <span>{rows.length} {isBugs ? 'bug' : 'task'}{rows.length === 1 ? '' : 's'}</span>
       </div>
 
       <div className="dev-task-list">
         {rows.map((task) => (
-          <TaskRow key={task.id} task={task} feature={featureById[task.task_id]} onOpen={onOpen} />
+          <TaskRow key={task.id} task={task} feature={featureById[task.task_id]} viewerId={viewerId} onOpen={onOpen} />
         ))}
-        {!rows.length && <Empty title="Nothing here" body="Change the filter or add a task to a feature." />}
+        {!rows.length && (
+          <Empty
+            title={isBugs ? 'No bugs here' : 'Nothing here'}
+            body={isBugs
+              ? 'Issues reported from the user menu appear here.'
+              : 'Change the filter or add a task to a feature.'}
+          />
+        )}
       </div>
     </>
   );

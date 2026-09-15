@@ -48,7 +48,24 @@ function attachPeople(rows, people) {
   }));
 }
 
+// Roadmap rows in the order the spec draws them: the live product first, then
+// the pre-launch products as seeded by migration 361, then anything added
+// later by name. The query itself orders by name, which put GMV Max Intel first.
+const PRODUCT_ORDER = ['wurxos', 'creator-app', 'gmv-max-intel'];
+
+function sortProducts(rows) {
+  const rank = (row) => {
+    const index = PRODUCT_ORDER.indexOf(row.system_key);
+    return index < 0 ? PRODUCT_ORDER.length : index;
+  };
+  const liveFirst = (row) => (row.stage === 'live' ? 0 : 1);
+  return [...rows].sort((a, b) => liveFirst(a) - liveFirst(b)
+    || rank(a) - rank(b)
+    || String(a.name).localeCompare(String(b.name)));
+}
+
 export async function loadDevelopmentWorkspace() {
+  // Creates the running block and the next three if they do not exist yet.
   const ensured = await supabase.rpc('dev_ensure_blocks', {});
   throwIf(ensured.error);
   const results = await Promise.all([
@@ -59,15 +76,19 @@ export async function loadDevelopmentWorkspace() {
       .in('role', ['boss', 'developer']).eq('is_active', true).is('deleted_at', null)
       .order('created_at'),
     supabase.from('dev_team_members').select('*'),
+    // EVERY block, not only the four the RPC returns: unfinished work planned
+    // into a block that has ended, and the Done changelog, both point at past
+    // blocks.
+    supabase.from('dev_blocks').select('*').order('starts_on'),
   ]);
   results.forEach((result) => throwIf(result.error));
-  const [productResult, featureResult, taskResult, peopleResult, teamResult] = results;
+  const [productResult, featureResult, taskResult, peopleResult, teamResult, blockResult] = results;
   const people = peopleResult.data || [];
   const tasks = attachPeople(taskResult.data || [], people);
   const tasksByFeature = Object.fromEntries((featureResult.data || []).map((feature) => [feature.id, []]));
   tasks.forEach((task) => { (tasksByFeature[task.task_id] ||= []).push(task); });
   return {
-    products: productResult.data || [], blocks: ensured.data || [], people,
+    products: sortProducts(productResult.data || []), blocks: blockResult.data || [], people,
     team: teamResult.data || [], features: attachPeople(featureResult.data || [], people),
     tasks, tasksByFeature,
   };
@@ -159,23 +180,61 @@ function normalize(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+// The task an end-of-day line is about. The line names it loosely before its
+// first colon: the start of the title ("Landing page: footer links: done"),
+// or a distinctive run of words inside it ("OTP step: …" for "Creator signup:
+// email + OTP step"). A name that fits several tasks matches none, so a note
+// is never posted to the wrong task.
+function taskForLine(line, tasks) {
+  const colon = line.indexOf(':');
+  const whole = `${normalize(line)} `;
+  const head = normalize(colon >= 0 ? line.slice(0, colon) : line);
+  if (!head) return null;
+  const titled = tasks.map((task) => ({ task, title: normalize(task.title) })).filter((item) => item.title);
+  const only = (items) => (items.length === 1 ? items[0].task : null);
+  const fullTitle = [...titled]
+    .sort((a, b) => b.title.length - a.title.length)
+    .find(({ title }) => whole.startsWith(`${title} `));
+  return fullTitle?.task
+    || only(titled.filter(({ title }) => title === head))
+    || only(titled.filter(({ title }) => title.startsWith(head)))
+    || (head.length >= 4 ? only(titled.filter(({ title }) => ` ${title} `.includes(` ${head} `))) : null);
+}
+
+// The note itself: everything after the colon that ends the task's name. A
+// title containing its own colon ("Creator signup: email + OTP step") skips
+// that one as well.
+function noteForLine(line, task) {
+  const titleColons = normalize(line).startsWith(normalize(task.title)) ? (task.title.match(/:/g) || []).length : 0;
+  let index = -1;
+  for (let seen = 0; seen <= titleColons; seen += 1) {
+    index = line.indexOf(':', index + 1);
+    if (index < 0) return line;
+  }
+  return line.slice(index + 1).trim();
+}
+
+/** Splits an end-of-day update into one entry per task it names, plus the lines that named none. */
+export function matchEodLines(message, tasks) {
+  const entries = [];
+  const unmatched = [];
+  String(message || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((line) => {
+    // "Blocked: none" and similar are status lines for the team, not task notes.
+    if (/^blocked\s*:/i.test(line)) return;
+    const task = taskForLine(line, tasks);
+    const body = task ? noteForLine(line, task) : '';
+    if (task && body) entries.push({ task_id: task.id, body });
+    else unmatched.push(line);
+  });
+  return { entries, unmatched };
+}
+
 export function matchEodEntries(message, tasks) {
-  return String(message || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-    .map((line) => {
-      if (/^blocked\s*:\s*none\.?$/i.test(line)) return null;
-      const lineNorm = normalize(line);
-      const task = [...tasks].sort((a, b) => b.title.length - a.title.length).find((item) => {
-        const words = normalize(item.title).split(' ');
-        return lineNorm.startsWith(words.slice(0, Math.min(3, words.length)).join(' '));
-      });
-      if (!task) return null;
-      const colon = line.indexOf(':');
-      return { task_id: task.id, body: colon >= 0 ? line.slice(colon + 1).trim() : line };
-    }).filter((entry) => entry?.body);
+  return matchEodLines(message, tasks).entries;
 }
 
 export async function postEod(message, tasks) {
-  const entries = matchEodEntries(message, tasks);
+  const { entries } = matchEodLines(message, tasks);
   if (!entries.length) throw new Error('Start each line with a task name so I know where to post it.');
   const { data, error } = await supabase.rpc('dev_post_eod', {
     p_entries: entries, p_message: String(message || '').trim(),
@@ -231,11 +290,11 @@ export function allowedTaskActions(task, viewerId, team) {
   if (task.status === 'blocked' && viewerId === task.owner_id) return [{ to: 'in_progress', label: 'Unblock', primary: true }];
   if (task.status === 'dev_review' && viewerId === task.reviewer_id && viewerId !== task.owner_id) return [
     { to: 'your_review', label: 'Pass to Usman', primary: true },
-    { to: 'in_progress', label: 'Send back', note: 'required' },
+    { to: 'in_progress', label: 'Send back with note', note: 'required' },
   ];
   if (task.status === 'your_review' && viewerId === task.final_reviewer_id && viewerId !== task.owner_id) return [
     { to: 'tested', label: 'Tested & ready', primary: true },
-    { to: 'in_progress', label: 'Send back', note: 'required' },
+    { to: 'in_progress', label: 'Send back with note', note: 'required' },
   ];
   if (task.status === 'tested' && viewerId === task.owner_id) return [{ to: 'live', label: 'Mark live', primary: true }];
   return [];
@@ -247,4 +306,32 @@ export function waitingLabel(task) {
   if (task.status === 'tested') return task.owner?.display_name || 'developer';
   if (task.status === 'blocked') return 'a blocker';
   return task.owner?.display_name || 'developer';
+}
+
+/** Shown in place of buttons the viewer may not press: who the task waits on, and for what. */
+export function waitingLine(task) {
+  const owner = task.owner?.display_name || 'the owner';
+  const boss = task.finalReviewer?.display_name || 'Usman';
+  switch (task.status) {
+    case 'backlog':
+      return String(task.acceptance_check || '').trim()
+        ? `Waiting on ${boss} to schedule it at planning.`
+        : 'Needs an acceptance check before it can be scheduled.';
+    case 'planned':
+      return `Waiting on ${owner} to start.`;
+    case 'in_progress':
+      return `Waiting on ${owner} to submit it for review.`;
+    case 'blocked':
+      return `Blocked. Waiting on ${owner} to clear it.`;
+    case 'dev_review':
+      return `Waiting on ${task.reviewer?.display_name || 'the senior developer'} for Dev review.`;
+    case 'your_review':
+      return `Waiting on ${boss} for final review.`;
+    case 'tested':
+      return `Waiting on ${owner} to deploy it and mark it live.`;
+    case 'live':
+      return task.resolution === 'duplicate' ? 'Closed as a duplicate.' : 'Live.';
+    default:
+      return `Waiting on ${owner}.`;
+  }
 }

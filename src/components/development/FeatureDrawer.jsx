@@ -1,19 +1,27 @@
-// A feature: owner, progress, description and its tasks.
+// A feature: owner, progress, where it is planned, its description and tasks.
 import { useState } from 'react';
 import { ROLLUP_META, sortWorkTasks } from '../../lib/devTasksApi';
 import DevDrawer from './DevDrawer';
 import TaskRow from './TaskRow';
 import WorkTaskModal from './WorkTaskModal';
 import { Avatar, PriorityPill, Empty } from './Primitives';
+import { blockPhrase } from './devBlocks';
 
-export default function FeatureDrawer({ feature, tasks, developers, canEdit, onClose, onOpenTask, onRefresh }) {
+export default function FeatureDrawer({
+  feature, tasks, blocks = [], developers, viewerId, canEdit, onClose, onOpenTask, onRefresh,
+}) {
   const [adding, setAdding] = useState(false);
   const rollup = ROLLUP_META[feature.rollup_status];
+  const total = Number(feature.subtask_total || 0);
 
   const meta = (
     <>
       <PriorityPill priority={feature.priority} />
       {rollup && <span className={`dev-rollup is-${rollup.tone}`}>{rollup.label}</span>}
+      <em>
+        {blockPhrase(feature.block_id, blocks)}
+        {feature.scope_added > 0 ? ` · +${feature.scope_added} since planning` : ''}
+      </em>
     </>
   );
 
@@ -27,7 +35,7 @@ export default function FeatureDrawer({ feature, tasks, developers, canEdit, onC
           </span>
           <span>
             <small>Progress</small>
-            <b>{feature.subtask_done}/{feature.subtask_total} tested</b>
+            <b>{total ? `${feature.subtask_done}/${total} tested` : 'no tasks yet'}</b>
           </span>
         </div>
 
@@ -44,7 +52,7 @@ export default function FeatureDrawer({ feature, tasks, developers, canEdit, onC
 
         <div className="dev-task-list compact">
           {sortWorkTasks(tasks).map((task) => (
-            <TaskRow key={task.id} task={task} feature={feature} onOpen={onOpenTask} />
+            <TaskRow key={task.id} task={task} feature={feature} viewerId={viewerId} onOpen={onOpenTask} />
           ))}
           {!tasks.length && <Empty title="No tasks yet" body="Break this feature into testable pieces." />}
         </div>

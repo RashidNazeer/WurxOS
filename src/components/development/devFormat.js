@@ -4,9 +4,27 @@
 // calendar day. A stored YYYY-MM-DD is formatted as the day it names, never
 // shifted by the viewer's own timezone.
 
-export const isoToday = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }))
-  .toISOString()
-  .slice(0, 10);
+const TIME_ZONE = 'Asia/Karachi';
+
+const dayParts = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** The Karachi calendar day of a moment, as YYYY-MM-DD. */
+export function isoDay(value) {
+  const parts = Object.fromEntries(
+    dayParts.formatToParts(new Date(value)).map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+// The previous version parsed a Karachi wall-clock string as local time and
+// converted it back to UTC, which returned YESTERDAY between midnight and 5am
+// in Pakistan — so the page could not find the running block.
+export const isoToday = () => isoDay(new Date());
 
 export function shortDate(value) {
   if (!value) return '—';
@@ -16,6 +34,13 @@ export function shortDate(value) {
     day: 'numeric',
     month: 'short',
   });
+}
+
+/** "15 – 28 Sept", or "29 Sept – 12 Oct" across a month boundary. */
+export function dateRange(start, end) {
+  if (!start || !end) return '—';
+  if (start.slice(0, 7) === end.slice(0, 7)) return `${Number(start.slice(8, 10))} – ${shortDate(end)}`;
+  return `${shortDate(start)} – ${shortDate(end)}`;
 }
 
 /** How long something has been waiting: 45m, 5h, 2d 3h. */
@@ -36,10 +61,21 @@ export function initials(person) {
     .toUpperCase();
 }
 
-export const activityTime = (value) => new Date(value).toLocaleString('en-GB', {
-  timeZone: 'Asia/Karachi',
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+export function firstName(person) {
+  return String(person?.display_name || '').trim().split(/\s+/)[0] || '';
+}
+
+/** The day and clock time of an activity entry, in the team's timezone. */
+export function activityParts(value) {
+  const date = new Date(value);
+  return {
+    day: date.toLocaleDateString('en-GB', { timeZone: TIME_ZONE, day: 'numeric', month: 'short' }),
+    clock: date.toLocaleTimeString('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+/** "13 Sept 18:40" */
+export function activityTime(value) {
+  const { day, clock } = activityParts(value);
+  return `${day} ${clock}`;
+}

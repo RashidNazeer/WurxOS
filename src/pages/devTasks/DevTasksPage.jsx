@@ -1,5 +1,5 @@
 // Development — the product roadmap, review queue and daily update for the
-// Boss and the developers.
+// Boss and the developers (spec: "WurxOS Development section v2").
 //
 // ── WHY THIS FILE IS SMALL NOW ─────────────────────────────────────────────
 // It used to hold seventeen components, several written as single lines over
@@ -52,6 +52,7 @@ export default function DevTasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState(isBoss ? 'roadmap' : 'week');
+  const [productId, setProductId] = useState(null);
   const [feature, setFeature] = useState(null);
   const [task, setTask] = useState(null);
   const [showFeatureModal, setShowFeatureModal] = useState(false);
@@ -123,9 +124,13 @@ export default function DevTasksPage() {
 
   const openFeatures = data.features.filter((item) => !isShipped(item));
   const openBugs = data.tasks.filter((item) => item.source === 'bug_report' && item.status !== 'live').length;
+  const bugsTab = ['bugs', `Bugs · ${openBugs}`];
+  // The senior developer triages bugs first thing each morning, so developers
+  // get the Bugs tab too. Done is the Boss's changelog.
   const tabs = isBoss
-    ? [['roadmap', 'Roadmap'], ['list', 'List'], ['bugs', `Bugs · ${openBugs}`], ['done', 'Done']]
-    : [['week', 'My week'], ['roadmap', 'Roadmap'], ['list', 'All tasks']];
+    ? [['roadmap', 'Roadmap'], ['list', 'List'], bugsTab, ['done', 'Done']]
+    : [['week', 'My week'], ['roadmap', 'Roadmap'], ['list', 'All tasks'], bugsTab];
+  const pickedProduct = data.products.find((item) => item.id === productId);
 
   return (
     <div className="dev-page">
@@ -164,6 +169,14 @@ export default function DevTasksPage() {
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
+      {pickedProduct && tab !== 'week' && (
+        <div className="dev-filter-chip" role="status">
+          <span className={`dev-product-dot is-${pickedProduct.colour}`} aria-hidden="true" />
+          <span>Showing <b>{pickedProduct.name}</b> only</span>
+          <button type="button" onClick={() => setProductId(null)}>Show all products</button>
+        </div>
+      )}
+
       <main className={`dev-surface${tab === 'week' ? ' dev-week-surface' : ''}`}>
         {tab === 'week' && !isBoss && (
           <MyWeek data={data} me={profile} onOpen={openTask} onRefresh={load} />
@@ -174,18 +187,40 @@ export default function DevTasksPage() {
             blocks={data.blocks}
             features={openFeatures}
             canPlan={isBoss}
+            productId={productId}
+            onPickProduct={setProductId}
             onOpen={openFeature}
             onMove={isBoss ? plan : () => {}}
           />
         )}
         {tab === 'list' && (
-          <ListView tasks={data.tasks} features={data.features} onOpen={openTask} />
+          <ListView
+            tasks={data.tasks}
+            features={data.features}
+            viewerId={profile?.id}
+            productId={productId}
+            onOpen={openTask}
+          />
         )}
-        {tab === 'bugs' && isBoss && (
-          <ListView tasks={data.tasks} features={data.features} source="bug_report" onOpen={openTask} />
+        {tab === 'bugs' && (
+          <ListView
+            tasks={data.tasks}
+            features={data.features}
+            viewerId={profile?.id}
+            productId={productId}
+            source="bug_report"
+            onOpen={openTask}
+          />
         )}
         {tab === 'done' && isBoss && (
-          <DoneView features={data.features} products={data.products} blocks={data.blocks} onOpen={openFeature} />
+          <DoneView
+            features={data.features}
+            tasks={data.tasks}
+            products={data.products}
+            blocks={data.blocks}
+            productId={productId}
+            onOpen={openFeature}
+          />
         )}
       </main>
 
@@ -193,7 +228,9 @@ export default function DevTasksPage() {
         <FeatureDrawer
           feature={feature}
           tasks={data.tasksByFeature[feature.id] || []}
+          blocks={data.blocks}
           developers={developers}
+          viewerId={profile?.id}
           canEdit
           onClose={closeDrawer}
           onOpenTask={openTask}

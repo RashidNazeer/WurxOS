@@ -3,6 +3,7 @@
 // screenshot, and files it as a bug on the Development board.
 import { useState } from 'react';
 import { reportIssue } from '../../lib/devTasksApi';
+import { roleLabel } from '../../lib/roles';
 import DevModal from './DevModal';
 
 export default function ReportIssueModal({ profile, onClose }) {
@@ -50,7 +51,7 @@ export default function ReportIssueModal({ profile, onClose }) {
       <>
         <button type="button" className="wx-btn wx-btn-ghost" onClick={onClose}>Cancel</button>
         <button type="button" className="wx-btn wx-btn-primary" disabled={busy || !happened.trim()} onClick={send}>
-          {busy ? 'Sending…' : 'Send issue'}
+          {busy ? 'Sending…' : 'Send'}
         </button>
       </>
     );
@@ -74,7 +75,7 @@ export default function ReportIssueModal({ profile, onClose }) {
             </span>
             <span>
               <small>Reported by</small>
-              <b>{profile?.display_name} · {profile?.role?.toUpperCase()}</b>
+              <b>{profile?.display_name} · {roleLabel(profile?.role)}</b>
             </span>
           </div>
 

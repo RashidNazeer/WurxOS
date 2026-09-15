@@ -1192,6 +1192,105 @@
   border-top: 1px solid var(--border-subtle);
 }
 
+/* ── product filter, carried-over work, activity, EOD notice ─ */
+
+/* The product name on the roadmap is a button: clicking it shows only that
+   product. The spec (§09) replaces the old Project dropdown with this. */
+.dev-product {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dev-product:hover strong {
+  color: var(--accent);
+}
+
+.dev-product.is-picked {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.dev-product:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: -2px;
+}
+
+.dev-filter-chip {
+  width: max-content;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+  padding: 5px 6px 5px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dev-filter-chip .dev-product-dot {
+  margin-top: 0;
+}
+
+.dev-filter-chip button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.dev-filter-chip button:hover {
+  background: var(--surface-3);
+}
+
+.dev-filter-chip button:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+/* "carried over from 1 – 14 Sept": unfinished work from a block that ended. */
+.dev-feature-note {
+  grid-column: 1 / -1;
+  color: var(--warning);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+/* Date above time, as on the spec's task card. */
+.dev-activity time span {
+  display: block;
+}
+
+.dev-activity p b {
+  color: var(--text-primary);
+}
+
+.dev-eod-notice {
+  display: grid;
+  gap: 4px;
+}
+
+.dev-eod-notice.is-error {
+  color: var(--danger);
+}
+
+.dev-eod-notice ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-muted);
+}
+
 @keyframes dev-drawer-in {
   from {
     transform: translateX(24px);
