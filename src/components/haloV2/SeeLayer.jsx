@@ -46,11 +46,16 @@ export default function SeeLayer({
         <>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'stretch' }}>
             {o.lagCorrelations.map((r) => (
-              <LagChip key={r.lag} row={r} unit={unit} isBest={r.lag === o.bestObservedLag} />
+              <LagChip key={r.lag} row={r} unit={unit} isBest={r.lag === o.bestObservedLag} lab={lab} />
             ))}
           </div>
 
-          {waiting.length > 0 && (
+          {/* Everything below was on the Meeting face until round 3: the
+              per-lag observation counts, a sentence naming the strongest lag,
+              the coverage footer and a causation caveat that the badge on the
+              takeaway already carries. A CMO reads four percentages and the
+              chart. Analysts keep the lot in Lab. */}
+          {lab && waiting.length > 0 && (
             <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
               {waiting.length === 1 ? 'One lag is' : `${waiting.length} lags are`} still waiting on overlap:
               {' '}they need {MIN_CORRELATION_OBS} overlapping {unit}s and this window gives them
@@ -59,17 +64,22 @@ export default function SeeLayer({
             </div>
           )}
 
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '12px 0 0', maxWidth: 820 }}>
-            {best?.correlation != null ? (
-              <>
-                Strongest observed: <strong>{best.lag === 0 ? `same ${unit}` : `${best.lag} ${unit}${best.lag === 1 ? '' : 's'} later`}</strong>
-                {' '}at {fmtSignedPct(best.correlation)}, a {describeCorrelation(best.correlation).toLowerCase()} between {xName} and {yName}.
-                {' '}<strong>Moving together is not proof of cause.</strong> A third factor, such as a promotion
-                both channels ran, produces the same picture.
-              </>
-            ) : 'No correlation could be computed for this pair over this period.'}
-          </p>
+          {lab && (
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '12px 0 0', maxWidth: 820 }}>
+              {best?.correlation != null ? (
+                <>
+                  Strongest observed: <strong>{best.lag === 0 ? `same ${unit}` : `${best.lag} ${unit}${best.lag === 1 ? '' : 's'} later`}</strong>
+                  {' '}at {fmtSignedPct(best.correlation)}, a {describeCorrelation(best.correlation).toLowerCase()} between {xName} and {yName}.
+                  {' '}<strong>Moving together is not proof of cause.</strong> A confounder, such as a promotion
+                  both channels ran, produces the same picture.
+                </>
+              ) : 'No correlation could be computed for this pair over this period.'}
+            </p>
+          )}
 
+          {/* Kept in both views: with an inverse metric such as keyword rank,
+              a negative number is GOOD news, and a reader who is not told that
+              draws the opposite conclusion. */}
           {invNote && (
             <Note tone="info">
               {invNote} Raw correlation at the strongest lag: <strong>{fmtSignedPct(best?.rawCorrelation) ?? 'not available'}</strong>,
@@ -77,7 +87,7 @@ export default function SeeLayer({
             </Note>
           )}
 
-          {o.warnings.map((w) => <Note key={w.code} tone="warn">{w.message}</Note>)}
+          {lab && o.warnings.map((w) => <Note key={w.code} tone="warn">{w.message}</Note>)}
         </>
       )}
 
@@ -98,40 +108,50 @@ export default function SeeLayer({
         <ScatterPanel periods={periods} xKey={xKey} yKey={yKey} />
       )}
 
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
-        {coverageNote({
-          periodsSupplied: result.meta.periodsSupplied,
-          completeObservations: result.meta.completeObservations,
-          unit,
-        })}
-        {filledFromDaily.length > 0 && (
-          <>
-            {' '}{filledFromDaily.map(plainMetricLabel).join(' and ')} per {unit}{' '}
-            {filledFromDaily.length > 1 ? 'are' : 'is'} totalled from the daily sheet for every {unit} it covers.
-          </>
-        )}
-      </div>
+      {lab && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
+          {coverageNote({
+            periodsSupplied: result.meta.periodsSupplied,
+            completeObservations: result.meta.completeObservations,
+            unit,
+          })}
+          {filledFromDaily.length > 0 && (
+            <>
+              {' '}{filledFromDaily.map(plainMetricLabel).join(' and ')} per {unit}{' '}
+              {filledFromDaily.length > 1 ? 'are' : 'is'} totalled from the daily sheet for every {unit} it covers.
+            </>
+          )}
+        </div>
+      )}
     </>
   );
 }
 
 // ── One lag, as a chip ──────────────────────────────────────────────
-function LagChip({ row, unit, isBest }) {
+// Meeting shows the label and the percentage. Nothing else: the observation
+// count and the sufficiency wording were the "45 days · More stable
+// directional evidence" fine print the review cut. The strongest lag keeps its
+// accent border, which says the same thing as the chip that used to sit under
+// it. Both details stay available on hover, and in full in Lab.
+function LagChip({ row, unit, isBest, lab = false }) {
   const value = row.correlation;
   const pending = value == null;
   const arrow = pending ? null : value > 0.02 ? 'bi-arrow-up-right' : value < -0.02 ? 'bi-arrow-down-right' : 'bi-dash';
+  const detail = pending
+    ? `${row.numberOfObservations} of ${MIN_CORRELATION_OBS} ${unit}s`
+    : `${row.numberOfObservations} ${unit}s · ${row.sufficiency?.label}`;
   return (
     <div
-      title={row.reason || row.sufficiency?.label || undefined}
+      title={row.reason || detail}
       style={{
-        flex: '0 1 auto', minWidth: 132, padding: '9px 12px', borderRadius: 'var(--radius-md)',
+        flex: '0 1 auto', minWidth: 124, padding: '9px 12px', borderRadius: 'var(--radius-md)',
         background: 'var(--surface-2)',
         border: `1px solid ${isBest ? 'var(--accent)' : 'var(--border-subtle)'}`,
         opacity: pending ? 0.7 : 1,
       }}
     >
       <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700 }}>
-        {row.lag === 0 ? `Same ${unit}` : `${row.lag} ${unit}${row.lag === 1 ? '' : 's'} later`}
+        {row.lag === 0 ? `Same ${unit}` : `${row.lag} ${unit}${row.lag === 1 ? '' : 's'}`}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
         {arrow && <i className={`bi ${arrow}`} style={{ fontSize: 12, color: 'var(--text-muted)' }} />}
@@ -139,12 +159,8 @@ function LagChip({ row, unit, isBest }) {
           {pending ? 'Waiting' : fmtSignedPct(value)}
         </span>
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
-        {pending
-          ? `${row.numberOfObservations} of ${MIN_CORRELATION_OBS} ${unit}s`
-          : `${row.numberOfObservations} ${unit}s · ${row.sufficiency?.label}`}
-      </div>
-      {isBest && !pending && (
+      {lab && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{detail}</div>}
+      {lab && isBest && !pending && (
         <div style={{ marginTop: 5 }}><Chip tone="accent">Strongest observed</Chip></div>
       )}
     </div>

@@ -1,33 +1,38 @@
 // ============================================================
-// Halo V2 - Snapshot, the first viewport.
+// Halo V2 - the key takeaway.
 //
-// Inverted pyramid: the answer, the range around it, how much weight it
-// carries, what it is not, and what to do next. Five cards and one chart, with
-// no control to operate. If a reader has to scroll or ask a question before
-// they understand it, this section has failed.
+// TWO cards, one type scale:
+//   the modelled effect, with its range as a quieter second line
+//   signal strength, with the one reason that decided it
 //
-// The "what this is not" card is not a disclaimer in small print. It sits at
-// the same weight as the effect, because the effect is the figure that gets
-// screenshotted into a deck and the caveat has to be inside the same crop.
+// Round 2 had five cards here (effect, a standalone 95% range, signal, "what
+// this is not", and a next action), which forced the type down to fit a
+// five-up grid and turned the first viewport into a scoreboard. The range now
+// rides along under the number it belongs to, and the claim ceiling is carried
+// by the badge and the methodology rather than by a card of its own.
+//
+// The badge sits on this block and nowhere else on Meeting. It is the one
+// place the product truth needs stating: the figure beside it is a modelled
+// association, not incremental lift.
+//
+// buildSnapshot still computes the next action and the claim line. They are
+// not dead: both travel in the CSV and the one-pager, where a figure leaves
+// the page without the page around it.
 // ============================================================
 
 import { ModelledBadge, Chip } from './shared.jsx';
 
-const VERDICT_TONE = {
-  Scale: { fg: 'var(--success)', bg: 'var(--success-soft)', bd: 'var(--success)', icon: 'bi-graph-up-arrow' },
-  Hold: { fg: 'var(--warning)', bg: 'var(--warning-soft)', bd: 'var(--warning)', icon: 'bi-pause-circle' },
-  'Need more data': { fg: 'var(--text-secondary)', bg: 'var(--surface-3)', bd: 'var(--border-default)', icon: 'bi-hourglass-split' },
-};
-
 export default function Snapshot({ snapshot, headline, chart, chartCaption }) {
   if (!snapshot) return null;
-  const { effect, range, signal, action, notClaim } = snapshot;
-  const verdict = VERDICT_TONE[action.verdict] || VERDICT_TONE['Need more data'];
+  const { effect, range, signal } = snapshot;
 
   return (
     <section className="wx-card" style={{ padding: '18px 20px' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-        The TikTok Shop effect on Amazon
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+          The TikTok Shop effect on Amazon
+        </div>
+        <ModelledBadge />
       </div>
 
       {headline && (
@@ -39,65 +44,29 @@ export default function Snapshot({ snapshot, headline, chart, chartCaption }) {
         </h1>
       )}
 
+      {/* Two equal cards, stacked once there is no room for two. */}
       <div style={{
-        display: 'grid', gap: 10, marginTop: 14,
-        gridTemplateColumns: 'repeat(auto-fit, minmax(205px, 1fr))',
+        display: 'grid', gap: 12, marginTop: 14,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
       }}>
-        {/* 1 - the effect. The only card with the accent border. */}
         <Card
           label={effect.label}
           value={effect.value}
+          secondary={effect.available && range.available ? range.value : null}
           sub={effect.sub}
-          badge={effect.available ? <ModelledBadge compact weakHalo={effect.weakHalo} /> : null}
-          primary
+          accent
           muted={!effect.available}
         />
-
-        {/* 2 - the range, in words rather than notation. */}
-        <Card
-          label={range.label}
-          value={range.value}
-          sub={range.sub}
-          valueSize={16}
-          muted={!range.available}
-          tone={range.spansZero ? 'warn' : undefined}
-        />
-
-        {/* 3 - signal strength, with the reason that decided it. */}
         <Card
           label="Signal strength"
           value={signal.level}
+          secondary={signal.confidenceLabel ? <Chip>{signal.confidenceLabel}</Chip> : null}
           sub={signal.why}
-          tone={signal.level === 'High' ? 'pos' : signal.level === 'Moderate' ? undefined : 'muted'}
-          footer={signal.confidenceLabel ? <Chip>{signal.confidenceLabel}</Chip> : null}
         />
-
-        {/* 4 - the claim ceiling. The badge lives on the number above, not
-            here: one badge, next to the figure it qualifies. */}
-        <Card
-          label="What this is not"
-          value={<span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>{notClaim}</span>}
-          sub="Showing that sales would not have happened otherwise needs a controlled test, such as a geo holdout. This tool does not run one."
-        />
-
-        {/* 5 - the decision. */}
-        <div style={{
-          padding: '12px 14px', borderRadius: 'var(--radius-lg)',
-          background: verdict.bg, border: `1px solid ${verdict.bd}`,
-        }}>
-          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700 }}>
-            Next action
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
-            <i className={`bi ${verdict.icon}`} style={{ color: verdict.fg, fontSize: 16 }} />
-            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: verdict.fg, lineHeight: 1.2 }}>{action.verdict}</span>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.45 }}>{action.detail}</div>
-        </div>
       </div>
 
       {chart && (
-        <div style={{ marginTop: 18 }}>
+        <div style={{ marginTop: 16 }}>
           {chart}
           {chartCaption && (
             <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6 }}>{chartCaption}</div>
@@ -108,31 +77,29 @@ export default function Snapshot({ snapshot, headline, chart, chartCaption }) {
   );
 }
 
-function Card({ label, value, sub, badge = null, footer = null, primary = false, muted = false, tone, valueSize }) {
-  const color = tone === 'pos' ? 'var(--success)'
-    : tone === 'warn' ? 'var(--warning)'
-    : muted ? 'var(--text-muted)'
-    : 'var(--text-primary)';
+// One card shape for both, so neither can drift to its own type scale.
+function Card({ label, value, secondary, sub, accent = false, muted = false }) {
   return (
     <div style={{
-      padding: '12px 14px', borderRadius: 'var(--radius-lg)',
-      background: primary ? 'var(--accent-soft)' : 'var(--surface-2)',
-      border: `1px solid ${primary ? 'var(--accent)' : 'var(--border-subtle)'}`,
+      padding: '14px 16px', borderRadius: 'var(--radius-lg)',
+      background: accent ? 'var(--accent-soft)' : 'var(--surface-2)',
+      border: `1px solid ${accent ? 'var(--accent)' : 'var(--border-subtle)'}`,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700 }}>
-          {label}
-        </span>
-        {badge}
+      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 700 }}>
+        {label}
       </div>
       <div style={{
-        fontSize: valueSize ? valueSize : primary ? '1.5rem' : '1.25rem',
-        fontWeight: 800, color, lineHeight: 1.25, marginTop: 2,
+        fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.2, marginTop: 4,
+        color: muted ? 'var(--text-muted)' : 'var(--text-primary)',
       }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.45 }}>{sub}</div>}
-      {footer && <div style={{ marginTop: 8 }}>{footer}</div>}
+      {secondary && (
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, fontWeight: 600 }}>{secondary}</div>
+      )}
+      {sub && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>{sub}</div>
+      )}
     </div>
   );
 }
