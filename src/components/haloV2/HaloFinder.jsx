@@ -20,22 +20,21 @@ import { fmtSignedPct, signedCorrTextColor, MIN_CORRELATION_OBS } from '../../li
 import { haloFinder } from '../../lib/haloV2/lagAnalysis.js';
 import { buildPeriods } from '../../lib/haloV2/dataAdapter';
 import { plainMetricLabel } from '../../lib/haloV2/plainLanguage.js';
-import { Popover, Chip } from './shared.jsx';
+import { Popover, Chip, BarButton } from './shared.jsx';
 
 export default function HaloFinderMenu(props) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: 'relative' }}>
-      <button
-        type="button"
-        className="wx-btn wx-btn-ghost wx-btn-sm"
-        aria-expanded={open}
+      {/* Same primitive as every other control in the scope bar, so it cannot
+          drift to a different height or radius. */}
+      <BarButton
+        icon="bi-search" chevron open={open} ariaExpanded={open}
+        title="Rank every TikTok metric against this Amazon outcome"
         onClick={() => setOpen((s) => !s)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
       >
-        <i className="bi bi-search" />Halo Finder
-        <i className={`bi bi-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 10 }} />
-      </button>
+        Halo Finder
+      </BarButton>
       {/* Mounted only while open, which is what keeps the ranking lazy. */}
       {open && (
         <Popover open onClose={() => setOpen(false)} width={430}>
