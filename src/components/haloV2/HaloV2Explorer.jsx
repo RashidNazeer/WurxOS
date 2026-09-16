@@ -52,6 +52,11 @@ import { Picker, Check, Note, Section, UnderConstruction } from './shared.jsx';
 
 const MODE_KEY = 'wx.haloV2.viewMode';
 
+// The pair the page opens on, and the pair Reset returns to. Named so the
+// initial state and the reset cannot drift apart.
+const DEFAULT_X = 'gmv';
+const DEFAULT_Y = 'revenue_per_day';
+
 export default function HaloV2Explorer({
   datasets, loadRows, brandName = null,
   // Share links open in Meeting and stay there until someone asks for Lab.
@@ -71,8 +76,8 @@ export default function HaloV2Explorer({
   const [mode, setMode]   = useState(() => readMode(defaultMode, rememberMode));
   const [gran, setGran]   = useState('week');
   const [range, setRange] = useState({ start: '', end: '' });
-  const [xKey, setXKey]   = useState('gmv');
-  const [yKey, setYKey]   = useState('revenue_per_day');
+  const [xKey, setXKey]   = useState(DEFAULT_X);
+  const [yKey, setYKey]   = useState(DEFAULT_Y);
   const [maxLag, setMaxLag] = useState(3);
   const [useTrend, setUseTrend] = useState(true);
   const [useSeasonality, setUseSeasonality] = useState(true);
@@ -81,7 +86,6 @@ export default function HaloV2Explorer({
   const [scenarioPct, setScenarioPct] = useState(10);
   const [customChange, setCustomChange] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);      // model diagnostics
-  const [scopeAdvanced, setScopeAdvanced] = useState(false);    // analyst knobs
   const [showScatter, setShowScatter] = useState(false);
   const [excludeIndex, setExcludeIndex] = useState(null);
   const [normalize, setNormalize] = useState(false);
@@ -101,7 +105,23 @@ export default function HaloV2Explorer({
     if (rememberMode) { try { localStorage.setItem(MODE_KEY, m); } catch { /* private mode */ } }
   };
 
+  // Reset looked broken because it was: it put back the analyst knobs (lag
+  // window, trend, seasonality, the reference rule, the planning inputs) and
+  // every one of those lives behind a collapsed panel or further down the
+  // page. The metric pair, the view and the dates, which are the three things
+  // on screen when you press it, were left exactly where they were. It also
+  // never cleared the scatter toggle. So a click changed nothing you could
+  // see.
+  //
+  // It now restores the whole visible scope first, then the knobs, and says so.
   const resetDefaults = () => {
+    const tk = tiktokFields.find((f) => f.key === DEFAULT_X) || tiktokFields[0];
+    const am = amazonFields.find((f) => f.key === DEFAULT_Y) || amazonFields[0];
+    if (tk) setXKey(tk.key);
+    if (am) setYKey(am.key);
+    if (recommendation?.grain && grans.includes(recommendation.grain)) setGran(recommendation.grain);
+    if (srcRows?.length) setRange(dataSpan(srcRows, dailyRows));
+
     setMaxLag(3);
     setUseTrend(true);
     setUseSeasonality(true);
@@ -110,15 +130,17 @@ export default function HaloV2Explorer({
     setScenarioPct(10);
     setCustomChange('');
     setNormalize(false);
+    setShowScatter(false);
     setExcludeIndex(null);
     setChartsOnly(false);
     setPlanning({ ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null, periodLabel: '', currency: '' });
-    // srcRows / dailyRows / grainPinned / autoAppliedFor are declared below;
-    // this closure only ever runs from a click, long after the render that
-    // defines them.
-    if (srcRows?.length) setRange(dataSpan(srcRows, dailyRows));
+    // Let the recommendation apply itself again for this context.
     grainPinned.current = false;
     autoAppliedFor.current = null;
+    // Everything referenced above (tiktokFields, recommendation, srcRows, say,
+    // the refs) is declared further down this component. The closure only ever
+    // runs from a click, long after the render that defines them.
+    say('Reset to defaults.');
   };
 
   // Once the user picks a grain deliberately, stop moving it under them. The
@@ -319,6 +341,30 @@ export default function HaloV2Explorer({
         exportBusy={exportBusy}
         onGlossary={() => setGlossaryOpen(true)}
         onMethodology={() => setMethodOpen(true)}
+        // The bar owns the analyst row's layout and its open state; this is
+        // only the contents.
+        analystPanel={(
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <Picker
+              label="Halo window"
+              value={String(maxLag)}
+              onChange={(v) => setMaxLag(Number(v))}
+              options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
+              width={150}
+              hint={`Effects that may show up over several ${unit}s.`}
+            />
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
+              <Check label="Adjust for trend" checked={useTrend} onChange={setUseTrend}
+                title="Adjust for a steady rise or fall over time, so growth the brand had anyway is not credited to TikTok" />
+              <Check label="Adjust for seasonality" checked={useSeasonality} onChange={setUseSeasonality}
+                title={`Adjust for an annual cycle. Needs about ${PERIODS_PER_YEAR[gran]} ${unit}s of history`} />
+              <Check label="Index to 100" checked={normalize} onChange={setNormalize}
+                title="Index both series to 100 at the start so metrics on different scales can be compared for shape" />
+              <Check label="Show scatter" checked={showScatter} onChange={setShowScatter}
+                title="Show the scatter plot alongside the over-time chart" />
+            </div>
+          </div>
+        )}
         finder={(
           <HaloFinderMenu
             srcRows={srcRows} dailyRows={dailyRows} src={src} gran={gran} xKey={xKey} yKey={yKey}
@@ -326,47 +372,7 @@ export default function HaloV2Explorer({
             suggestion={suggestion} onSwitchGrain={pickGrain} onPickMetric={setXKey}
           />
         )}
-      >
-        {lab && (
-          <>
-            <button
-              type="button"
-              className="wx-btn wx-btn-ghost wx-btn-sm"
-              style={{ marginTop: 10 }}
-              aria-expanded={scopeAdvanced}
-              onClick={() => setScopeAdvanced((s) => !s)}
-            >
-              <i className={`bi bi-chevron-${scopeAdvanced ? 'up' : 'down'}`} style={{ marginRight: 6 }} />
-              Analyst options
-            </button>
-            {scopeAdvanced && (
-              <div style={{
-                marginTop: 10, paddingTop: 12, borderTop: '1px solid var(--border-subtle)',
-                display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end',
-              }}>
-                <Picker
-                  label="Halo window"
-                  value={String(maxLag)}
-                  onChange={(v) => setMaxLag(Number(v))}
-                  options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
-                  width={150}
-                  hint={`Effects that may show up over several ${unit}s.`}
-                />
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
-                  <Check label="Adjust for trend" checked={useTrend} onChange={setUseTrend}
-                    title="Adjust for a steady rise or fall over time, so growth the brand had anyway is not credited to TikTok" />
-                  <Check label="Adjust for seasonality" checked={useSeasonality} onChange={setUseSeasonality}
-                    title={`Adjust for an annual cycle. Needs about ${PERIODS_PER_YEAR[gran]} ${unit}s of history`} />
-                  <Check label="Index to 100" checked={normalize} onChange={setNormalize}
-                    title="Index both series to 100 at the start so metrics on different scales can be compared for shape" />
-                  <Check label="Show scatter" checked={showScatter} onChange={setShowScatter}
-                    title="Show the scatter plot alongside the over-time chart" />
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </ScopeBar>
+      />
 
       {/* ══ 0 - SNAPSHOT ══════════════════════════════════════════ */}
       {/* Brand, period and the metric pair are all in the scope bar directly

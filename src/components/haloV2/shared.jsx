@@ -143,6 +143,58 @@ export function Section({ step, title, question, tone, children, right = null, i
   );
 }
 
+// ── Scope-bar controls ──────────────────────────────────────────────
+// `wx-btn-sm` is referenced all over this app and defined in no stylesheet,
+// so every "small" button was rendering at full .wx-btn size: 14px text, 11px
+// padding, about 40px tall. Beside a 30px segmented pill that is what made the
+// Halo bar look like two different designs. These primitives give every
+// control in that bar one height, one radius and one type size.
+export const BAR_H = 34;
+export const BAR_FONT = 12.5;
+
+export const barBtnStyle = ({ accent = false, quiet = false, active = false } = {}) => ({
+  height: BAR_H,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  // 11px, not 13: seven controls at 13px padding plus 8px gaps came to about
+  // 1130px, which wraps at 1280 once the sidebar takes its share. That wrap is
+  // what made the row look ragged in the first place.
+  padding: '0 11px',
+  fontSize: BAR_FONT,
+  fontWeight: accent ? 700 : 600,
+  fontFamily: 'inherit',
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
+  borderRadius: 999,
+  boxSizing: 'border-box',
+  cursor: quiet ? 'default' : 'pointer',
+  background: accent ? 'var(--accent)' : active ? 'var(--surface-2)' : 'transparent',
+  color: accent ? 'var(--on-accent)' : 'var(--text-primary)',
+  border: `1px solid ${accent ? 'var(--accent)' : 'var(--border-default)'}`,
+  transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+});
+
+export function BarButton({
+  icon, children, chevron = false, open = false, accent = false, onClick, title, ariaExpanded,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-expanded={ariaExpanded}
+      style={barBtnStyle({ accent, active: open })}
+      onMouseEnter={(e) => { if (!accent) e.currentTarget.style.background = 'var(--surface-2)'; }}
+      onMouseLeave={(e) => { if (!accent) e.currentTarget.style.background = open ? 'var(--surface-2)' : 'transparent'; }}
+    >
+      {icon && <i className={`bi ${icon}`} style={{ fontSize: 13 }} />}
+      {children}
+      {chevron && <i className={`bi bi-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 9, opacity: 0.75 }} />}
+    </button>
+  );
+}
+
 // ── A dismissable panel anchored under its trigger ──────────────────
 // Click outside and Escape both close. One definition, because the date
 // range, the share menu and the Halo Finder all behave identically and three
