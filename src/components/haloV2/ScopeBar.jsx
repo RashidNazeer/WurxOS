@@ -16,41 +16,10 @@
 // point of having two views.
 // ============================================================
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { GRAIN_LABEL } from '../../lib/haloV2/grainRecommendation.js';
 import { plainMetricLabel, comparisonSentence } from '../../lib/haloV2/plainLanguage.js';
-import { Picker, ModeToggle } from './shared.jsx';
-
-// ── A dismissable panel anchored under its trigger ──────────────────
-// Click outside and Escape both close. Written once here because the date
-// range and the share menu behave identically and two hand-rolled versions
-// would drift.
-function Popover({ open, onClose, children, width = 260, align = 'left' }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open, onClose]);
-
-  if (!open) return null;
-  return (
-    <div
-      ref={ref}
-      role="dialog"
-      style={{
-        position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 30, width,
-        background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', padding: 10,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
+import { Picker, ModeToggle, Popover } from './shared.jsx';
 
 // ── View: Daily / Weekly / Monthly ──────────────────────────────────
 // The "(recommended)" suffix and the "32 usable days here" helper moved into
@@ -273,7 +242,7 @@ export default function ScopeBar({
   range, setRange, span,
   xKey, yKey, setXKey, setYKey, tiktokFields, amazonFields, onReset,
   onManageLinks, onPdf, onCsv, onPng, exportBusy,
-  onGlossary, children,
+  onGlossary, onMethodology, finder, children,
 }) {
   return (
     <div className="wx-card" style={{ padding: '10px 14px' }}>
@@ -283,6 +252,9 @@ export default function ScopeBar({
           assessments={assessments} recommendation={recommendation}
         />
         <DateRangeChip range={range} setRange={setRange} span={span} />
+        {/* Closed by default. It ranks every TikTok metric, which is a
+            question worth asking occasionally and never worth a panel. */}
+        {finder}
 
         {lab ? (
           <>
@@ -327,6 +299,17 @@ export default function ScopeBar({
         )}
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Methodology is a modal, not a band on the page. */}
+          {onMethodology && (
+            <button
+              type="button"
+              className="wx-btn wx-btn-ghost wx-btn-sm"
+              onClick={onMethodology}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              <i className="bi bi-journal-text" style={{ marginRight: 5 }} />Methodology
+            </button>
+          )}
           {/* Lab is a detour, so it needs a door back that is not a small pill.
               Change metrics drops a client straight in here. */}
           {lab && (

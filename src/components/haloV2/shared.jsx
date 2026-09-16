@@ -7,6 +7,8 @@
 // panel renders its own slightly different version.
 // ============================================================
 
+import { useEffect, useRef } from 'react';
+
 export const TT_STYLE = {
   background: 'var(--surface-1, #16161c)',
   border: '1px solid var(--border-default, #2b2b35)',
@@ -138,6 +140,82 @@ export function Section({ step, title, question, tone, children, right = null, i
       </div>
       {children}
     </section>
+  );
+}
+
+// ── A dismissable panel anchored under its trigger ──────────────────
+// Click outside and Escape both close. One definition, because the date
+// range, the share menu and the Halo Finder all behave identically and three
+// hand-rolled versions would drift apart.
+export function Popover({ open, onClose, children, width = 260, align = 'left' }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      style={{
+        position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 30, width,
+        maxWidth: 'calc(100vw - 32px)',
+        background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+        borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', padding: 10,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ── Under construction ──────────────────────────────────────────────
+// Steps 2, 3 and 4 need platform APIs (promotions, stock-outs, ad spend)
+// before a client can act on them. The computation pipelines stay in the
+// codebase and stay live in Lab; on Meeting the body is blurred, clipped and
+// inert, so the step reads as "coming" rather than as something to operate or
+// as something that was deleted.
+//
+// aria-hidden plus inert pointer events: a blurred control that a screen
+// reader still announces, or that a tab key can reach, is worse than hiding it.
+export function UnderConstruction({ children, subline = null, previewHeight = 190 }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        aria-hidden="true"
+        style={{
+          filter: 'blur(5px)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none',
+          maxHeight: previewHeight, overflow: 'hidden',
+          maskImage: 'linear-gradient(to bottom, var(--surface-1) 45%, transparent)',
+          WebkitMaskImage: 'linear-gradient(to bottom, var(--surface-1) 45%, transparent)',
+        }}
+      >
+        {children}
+      </div>
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 6, textAlign: 'center', padding: 12,
+      }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+          borderRadius: 999, padding: '6px 14px', boxShadow: 'var(--shadow-sm)',
+          fontSize: 12, fontWeight: 800, letterSpacing: '.04em', color: 'var(--text-secondary)',
+        }}>
+          <i className="bi bi-cone-striped" style={{ color: 'var(--warning)' }} />
+          Under construction
+        </span>
+        {subline && (
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted)', maxWidth: 460 }}>{subline}</span>
+        )}
+      </div>
+    </div>
   );
 }
 

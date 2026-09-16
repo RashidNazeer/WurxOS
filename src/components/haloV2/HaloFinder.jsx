@@ -1,25 +1,54 @@
 // ============================================================
-// Halo V2 - Halo Finder (Lab only).
+// Halo V2 - Halo Finder, as a dropdown.
 //
-// It ranks every TikTok metric against the chosen Amazon outcome. In the old
-// layout it sat under the client sections repeating what See had already said,
-// with no reason to read it. It is an operator tool, and it needs a decision
-// cue: the row worth acting on is the metric with the strongest DELAYED
-// relationship, because that is the one to drive the Estimate step with.
+// It ranks every TikTok metric against the chosen Amazon outcome. As an
+// always-open card it owned a screen for a question nobody had asked yet, so
+// it is now a closed control in the scope bar: open it, see the ranking, pick
+// a metric, and it is gone again.
 //
-// Negative rows are kept. They are findings, not omissions.
+// The ranking is computed INSIDE the popover, so opening it is what pays for
+// it. Closed, it costs nothing: it used to run a regression per TikTok metric
+// on every render of the page.
+//
+// The row worth acting on is the metric with the strongest DELAYED
+// relationship, because that is the halo question. Negative rows are kept:
+// they are findings, not omissions.
 // ============================================================
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { fmtSignedPct, signedCorrTextColor, MIN_CORRELATION_OBS } from '../../lib/haloV2/correlation.js';
 import { haloFinder } from '../../lib/haloV2/lagAnalysis.js';
 import { buildPeriods } from '../../lib/haloV2/dataAdapter';
 import { plainMetricLabel } from '../../lib/haloV2/plainLanguage.js';
-import { Note, Chip } from './shared.jsx';
+import { Popover, Chip } from './shared.jsx';
 
-export default function HaloFinder({
+export default function HaloFinderMenu(props) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        className="wx-btn wx-btn-ghost wx-btn-sm"
+        aria-expanded={open}
+        onClick={() => setOpen((s) => !s)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+      >
+        <i className="bi bi-search" />Halo Finder
+        <i className={`bi bi-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 10 }} />
+      </button>
+      {/* Mounted only while open, which is what keeps the ranking lazy. */}
+      {open && (
+        <Popover open onClose={() => setOpen(false)} width={430}>
+          <FinderList {...props} onClose={() => setOpen(false)} />
+        </Popover>
+      )}
+    </div>
+  );
+}
+
+function FinderList({
   srcRows, dailyRows, src, gran, xKey, yKey, range, tiktokFields, maxLag, unit,
-  suggestion, onSwitchGrain, onPickMetric,
+  suggestion, onSwitchGrain, onPickMetric, onClose,
 }) {
   const rows = useMemo(() => {
     if (!srcRows?.length || !src) return [];
@@ -30,29 +59,28 @@ export default function HaloFinder({
     return haloFinder(keys, yKey, seriesFor, maxLag);
   }, [srcRows, dailyRows, src, gran, yKey, range, tiktokFields, maxLag]);
 
-  if (!rows.length) return null;
   const usable = rows.filter((r) => r.correlation != null);
-  const sorted = [...rows].sort((a, b) => Math.abs(b.correlation ?? 0) - Math.abs(a.correlation ?? 0));
 
-  if (!usable.length) {
+  if (!rows.length || !usable.length) {
     return (
-      <div className="wx-card" style={{ padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>Halo Finder</div>
-        <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
-          No TikTok metric has {MIN_CORRELATION_OBS} or more overlapping {unit}s against{' '}
-          {plainMetricLabel(yKey)} over this range, so there is nothing to rank yet. A table of zeros would
-          say we had measured no relationship, rather than that we could not look.
-        </div>
+      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', padding: 4 }}>
+        No TikTok metric has {MIN_CORRELATION_OBS} or more overlapping {unit}s against{' '}
+        {plainMetricLabel(yKey)} over this range, so there is nothing to rank yet.
         {suggestion && (
-          <button type="button" className="wx-btn wx-btn-primary wx-btn-sm" style={{ marginTop: 10 }}
-            onClick={() => onSwitchGrain(suggestion.grain)}>{suggestion.cta}</button>
+          <button
+            type="button"
+            className="wx-btn wx-btn-primary wx-btn-sm"
+            style={{ marginTop: 10, width: '100%' }}
+            onClick={() => { onClose(); onSwitchGrain(suggestion.grain); }}
+          >
+            {suggestion.cta}
+          </button>
         )}
       </div>
     );
   }
 
-  // Strongest DELAYED relationship, which is a different question from
-  // strongest overall: same-period movement usually wins that one.
+  const sorted = [...rows].sort((a, b) => Math.abs(b.correlation ?? 0) - Math.abs(a.correlation ?? 0));
   const laggedBest = [...usable]
     .map((r) => {
       const best = (r.lags || []).filter((l) => l.lag >= 1 && l.correlation != null)
@@ -62,57 +90,59 @@ export default function HaloFinder({
     .filter(Boolean)
     .sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation))[0];
 
+  const pick = (metric) => { onClose(); if (onPickMetric) onPickMetric(metric); };
+
   return (
-    <div className="wx-card" style={{ padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 2 }}>Halo Finder</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-        Every TikTok metric ranked against {plainMetricLabel(yKey)}, at its own strongest lag.
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '2px 4px 8px' }}>
+        TikTok metrics against {plainMetricLabel(yKey)}
       </div>
 
       {laggedBest && (
-        <Note tone="info">
-          <strong>Best metric to drive the Estimate step:</strong> {plainMetricLabel(laggedBest.metric)}, at{' '}
-          {laggedBest.lag} {unit}{laggedBest.lag === 1 ? '' : 's'} later ({fmtSignedPct(laggedBest.correlation)}).
-          {' '}It has the strongest delayed relationship here, which is the halo question.
-          {onPickMetric && laggedBest.metric !== xKey && (
-            <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginLeft: 8 }}
-              onClick={() => onPickMetric(laggedBest.metric)}>
-              Use it
-            </button>
-          )}
-        </Note>
+        <div style={{
+          fontSize: 11.5, color: 'var(--text-secondary)', background: 'var(--surface-2)',
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+          padding: '7px 9px', marginBottom: 8, lineHeight: 1.45,
+        }}>
+          Strongest <strong>delayed</strong> relationship: {plainMetricLabel(laggedBest.metric)} at{' '}
+          {laggedBest.lag} {unit}{laggedBest.lag === 1 ? '' : 's'} ({fmtSignedPct(laggedBest.correlation)}).
+        </div>
       )}
 
-      <div style={{ overflowX: 'auto', marginTop: 10 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 560 }}>
-          <thead>
-            <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
-              <th style={{ padding: '6px 8px' }}>TikTok metric</th>
-              <th style={{ padding: '6px 8px' }}>Best observed lag</th>
-              <th style={{ padding: '6px 8px' }}>Correlation</th>
-              <th style={{ padding: '6px 8px' }}>Observations</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((r) => (
-              <tr key={r.metric} style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '6px 8px' }}>
-                  {plainMetricLabel(r.metric)}
-                  {r.metric === xKey && <span style={{ marginLeft: 6 }}><Chip tone="accent">In use</Chip></span>}
-                </td>
-                <td style={{ padding: '6px 8px' }}>
-                  {r.bestLag == null ? 'not available'
-                    : r.bestLag === 0 ? `Same ${unit}`
-                    : `${r.bestLag} ${unit}${r.bestLag === 1 ? '' : 's'} later`}
-                </td>
-                <td style={{ padding: '6px 8px', fontWeight: 700, color: signedCorrTextColor(r.correlation) }}>
-                  {fmtSignedPct(r.correlation) ?? 'not available'}
-                </td>
-                <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{r.numberOfObservations}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ maxHeight: 270, overflowY: 'auto' }}>
+        {sorted.map((r) => {
+          const inUse = r.metric === xKey;
+          return (
+            <button
+              key={r.metric}
+              type="button"
+              onClick={() => pick(r.metric)}
+              disabled={inUse}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                background: 'none', border: 'none', padding: '6px 8px', borderRadius: 'var(--radius-md)',
+                cursor: inUse ? 'default' : 'pointer', color: 'var(--text-primary)', font: 'inherit', fontSize: 12.5,
+              }}
+              onMouseEnter={(e) => { if (!inUse) e.currentTarget.style.background = 'var(--surface-2)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {plainMetricLabel(r.metric)}
+                {inUse && <span style={{ marginLeft: 6 }}><Chip tone="accent">In use</Chip></span>}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                {r.bestLag == null ? '' : r.bestLag === 0 ? `same ${unit}` : `+${r.bestLag} ${unit}${r.bestLag === 1 ? '' : 's'}`}
+              </span>
+              <span style={{ fontWeight: 700, color: signedCorrTextColor(r.correlation), whiteSpace: 'nowrap', minWidth: 44, textAlign: 'right' }}>
+                {fmtSignedPct(r.correlation) ?? 'n/a'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', padding: '8px 4px 2px', borderTop: '1px solid var(--border-subtle)', marginTop: 6 }}>
+        Pick one to compare it against {plainMetricLabel(yKey)}.
       </div>
     </div>
   );
