@@ -6,16 +6,23 @@ import HaloV2Explorer from '../../components/haloV2/HaloV2Explorer';
 import { useForceLightTheme } from './useForceLightTheme';
 import '../../styles/portal.css';
 
-// Anonymous client view of Amazon Halo V2 (mig 330).
+// Anonymous client view of Amazon Halo.
 //
-// Deliberately a SEPARATE page and route from HaloPortalPage. V1 links stay on
-// /portal/halo/:token and keep rendering V1; a V2 token only resolves here. A
-// single page switching model by a flag would mean one wrong flag shows a
-// client the other model, and the two say materially different things — V2 will
-// report a negative relationship, or refuse to give a money figure at all,
-// where V1 always produced an encouraging number.
-export default function HaloV2PortalPage() {
-  // External clients always see this in light mode, same as the V1 portal.
+// ONE VIEW, TWO KINDS OF LINK (2026-09-21). There used to be two Halo models and
+// two portals, kept deliberately apart: the original always produced an
+// encouraging number, this one reports negative relationships and refuses a
+// money figure on thin data, and a client must never be shown one while
+// believing it was the other. The original model has been retired, so that risk
+// is gone, and there is exactly one thing a Halo link can show.
+//
+// Links minted by the original tool live in a different table (halo_shares) and
+// resolve through different RPCs, so they cannot simply be pointed at this
+// page's fetchers. Instead this view takes its fetchers as props: the V2 route
+// passes the halo_v2_shares pair and /portal/halo/:token passes the original
+// pair. Both return the identical shape, so the explorer cannot tell them apart.
+// Old links keep working, and open this.
+export function AmazonHaloPortal({ fetchShared, fetchRows }) {
+  // External clients always see this in light mode.
   useForceLightTheme();
 
   const { token } = useParams();
@@ -26,16 +33,16 @@ export default function HaloV2PortalPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchSharedHaloV2(token)
+    fetchShared(token)
       .then((d) => { if (!cancelled) setData(d); })
       .catch((e) => { if (!cancelled) setErr(e.message || 'Could not load this page.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, fetchShared]);
 
   // Stable loader so the explorer's row-loading effect does not re-run on
-  // every render.
-  const loadRows = useCallback((id) => fetchSharedHaloV2Rows(token, id), [token]);
+  // every render. The fetchers are module-level functions, so they are stable.
+  const loadRows = useCallback((id) => fetchRows(token, id), [token, fetchRows]);
 
   const brands = useMemo(() => data?.brands || [], [data]);
   const datasets = useMemo(() => data?.datasets || [], [data]);
@@ -96,11 +103,8 @@ export default function HaloV2PortalPage() {
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
             Read-only explorer
           </div>
-          {/* The version goes in the title, not a pill beside it. A client who
-              cannot tell V1 from V2 cannot tell which set of claims they are
-              reading, and the two models say materially different things. */}
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-            Amazon Halo V2
+            Amazon Halo
           </h1>
           {label && <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 6 }}>{label}</div>}
           {/* Set expectations before the numbers appear. V2 is willing to say
@@ -140,4 +144,9 @@ export default function HaloV2PortalPage() {
       </div>
     </div>
   );
+}
+
+// The halo_v2_shares route: /portal/halo-v2/:token.
+export default function HaloV2PortalPage() {
+  return <AmazonHaloPortal fetchShared={fetchSharedHaloV2} fetchRows={fetchSharedHaloV2Rows} />;
 }

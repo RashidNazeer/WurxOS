@@ -22,7 +22,6 @@
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { setHaloCurrency, getHaloCurrency } from '../../lib/haloFields';
 import {
   sourceForGran, dailySourceFor, availableGrans, availableFields, dataSpan, buildPeriods, detectControls,
@@ -43,15 +42,19 @@ import AdjustLayer from './AdjustLayer.jsx';
 import EstimateLayer from './EstimateLayer.jsx';
 import PlanningLayer from './PlanningLayer.jsx';
 import ContributionChart from './ContributionChart.jsx';
-import DepthDrawer from './DepthDrawer.jsx';
-import HaloFinder from './HaloFinder.jsx';
+import HaloFinderMenu from './HaloFinder.jsx';
+import MethodologyModal from './MethodologyModal.jsx';
 import StatusPanel from './StatusPanel.jsx';
 import ClientSummarySheet, { summaryFilename } from './ClientSummarySheet.jsx';
 import { GlossaryPanel } from './Glossary.jsx';
-import { ProvenanceBlock } from './Provenance.jsx';
-import { Picker, Check, Note, Section } from './shared.jsx';
+import { Picker, Check, Note, Section, UnderConstruction } from './shared.jsx';
 
 const MODE_KEY = 'wx.haloV2.viewMode';
+
+// The pair the page opens on, and the pair Reset returns to. Named so the
+// initial state and the reset cannot drift apart.
+const DEFAULT_X = 'gmv';
+const DEFAULT_Y = 'revenue_per_day';
 
 export default function HaloV2Explorer({
   datasets, loadRows, brandName = null,
@@ -62,8 +65,6 @@ export default function HaloV2Explorer({
   // way to open it: sharing belongs in the Share menu with the exports, not as
   // a fifth button somewhere else on the page.
   onManageLinks = null,
-  // A quiet way back to V1, for Lab only. The portal has no route to it.
-  v1Href = null,
 }) {
   const [rowsById, setRowsById] = useState({});
   const [loading, setLoading] = useState(false);
@@ -72,8 +73,8 @@ export default function HaloV2Explorer({
   const [mode, setMode]   = useState(() => readMode(defaultMode, rememberMode));
   const [gran, setGran]   = useState('week');
   const [range, setRange] = useState({ start: '', end: '' });
-  const [xKey, setXKey]   = useState('gmv');
-  const [yKey, setYKey]   = useState('revenue_per_day');
+  const [xKey, setXKey]   = useState(DEFAULT_X);
+  const [yKey, setYKey]   = useState(DEFAULT_Y);
   const [maxLag, setMaxLag] = useState(3);
   const [useTrend, setUseTrend] = useState(true);
   const [useSeasonality, setUseSeasonality] = useState(true);
@@ -82,12 +83,12 @@ export default function HaloV2Explorer({
   const [scenarioPct, setScenarioPct] = useState(10);
   const [customChange, setCustomChange] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);      // model diagnostics
-  const [scopeAdvanced, setScopeAdvanced] = useState(false);    // analyst knobs
   const [showScatter, setShowScatter] = useState(false);
   const [excludeIndex, setExcludeIndex] = useState(null);
   const [normalize, setNormalize] = useState(false);
   const [chartsOnly, setChartsOnly] = useState(false);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [methodOpen, setMethodOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(null);
   const [toast, setToast] = useState('');
   const [planning, setPlanning] = useState({
@@ -101,7 +102,23 @@ export default function HaloV2Explorer({
     if (rememberMode) { try { localStorage.setItem(MODE_KEY, m); } catch { /* private mode */ } }
   };
 
+  // Reset looked broken because it was: it put back the analyst knobs (lag
+  // window, trend, seasonality, the reference rule, the planning inputs) and
+  // every one of those lives behind a collapsed panel or further down the
+  // page. The metric pair, the view and the dates, which are the three things
+  // on screen when you press it, were left exactly where they were. It also
+  // never cleared the scatter toggle. So a click changed nothing you could
+  // see.
+  //
+  // It now restores the whole visible scope first, then the knobs, and says so.
   const resetDefaults = () => {
+    const tk = tiktokFields.find((f) => f.key === DEFAULT_X) || tiktokFields[0];
+    const am = amazonFields.find((f) => f.key === DEFAULT_Y) || amazonFields[0];
+    if (tk) setXKey(tk.key);
+    if (am) setYKey(am.key);
+    if (recommendation?.grain && grans.includes(recommendation.grain)) setGran(recommendation.grain);
+    if (srcRows?.length) setRange(dataSpan(srcRows, dailyRows));
+
     setMaxLag(3);
     setUseTrend(true);
     setUseSeasonality(true);
@@ -110,15 +127,17 @@ export default function HaloV2Explorer({
     setScenarioPct(10);
     setCustomChange('');
     setNormalize(false);
+    setShowScatter(false);
     setExcludeIndex(null);
     setChartsOnly(false);
     setPlanning({ ttsRevenue: '', marketingSpend: '', assumptions: null, mode: null, periodLabel: '', currency: '' });
-    // srcRows / dailyRows / grainPinned / autoAppliedFor are declared below;
-    // this closure only ever runs from a click, long after the render that
-    // defines them.
-    if (srcRows?.length) setRange(dataSpan(srcRows, dailyRows));
+    // Let the recommendation apply itself again for this context.
     grainPinned.current = false;
     autoAppliedFor.current = null;
+    // Everything referenced above (tiktokFields, recommendation, srcRows, say,
+    // the refs) is declared further down this component. The closure only ever
+    // runs from a click, long after the render that defines them.
+    say('Reset to defaults.');
   };
 
   // Once the user picks a grain deliberately, stop moving it under them. The
@@ -251,6 +270,12 @@ export default function HaloV2Explorer({
   const unit = GRAIN_UNIT[gran];
   const takeaway = useMemo(() => keyTakeaway(result, { unit, xKey, yKey }), [result, unit, xKey, yKey]);
   const snapshot = useMemo(() => buildSnapshot(result, { unit, cur }), [result, unit, cur]);
+  // Real Amazon revenue per period, keyed the way the counterfactual keys its
+  // own rows, so the chart can draw the actual series beside the modelled one.
+  const actualByKey = useMemo(
+    () => new Map(periods.map((p) => [String(p.key), p.y])),
+    [periods],
+  );
 
   // ── Exports ──────────────────────────────────────────────────────
   // A download gives no feedback of its own in some browsers, and the Share
@@ -292,6 +317,13 @@ export default function HaloV2Explorer({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {glossaryOpen && <GlossaryPanel onClose={() => setGlossaryOpen(false)} />}
+      {methodOpen && (
+        <MethodologyModal
+          result={result} statuses={stages} gran={gran} range={range} unit={unit}
+          xKey={xKey} yKey={yKey} cur={cur} filledFromDaily={filledFromDaily}
+          onClose={() => setMethodOpen(false)}
+        />
+      )}
 
       {/* ══ Scope: one row, everything else behind it ═════════════ */}
       <ScopeBar
@@ -305,56 +337,56 @@ export default function HaloV2Explorer({
         onPdf={() => runExport('pdf')} onPng={() => runExport('png')} onCsv={exportCsv}
         exportBusy={exportBusy}
         onGlossary={() => setGlossaryOpen(true)}
-      >
-        {lab && (
-          <>
-            <button
-              type="button"
-              className="wx-btn wx-btn-ghost wx-btn-sm"
-              style={{ marginTop: 10 }}
-              aria-expanded={scopeAdvanced}
-              onClick={() => setScopeAdvanced((s) => !s)}
-            >
-              <i className={`bi bi-chevron-${scopeAdvanced ? 'up' : 'down'}`} style={{ marginRight: 6 }} />
-              Analyst options
-            </button>
-            {scopeAdvanced && (
-              <div style={{
-                marginTop: 10, paddingTop: 12, borderTop: '1px solid var(--border-subtle)',
-                display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end',
-              }}>
-                <Picker
-                  label="Halo window"
-                  value={String(maxLag)}
-                  onChange={(v) => setMaxLag(Number(v))}
-                  options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
-                  width={150}
-                  hint={`Effects that may show up over several ${unit}s.`}
-                />
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
-                  <Check label="Adjust for trend" checked={useTrend} onChange={setUseTrend}
-                    title="Adjust for a steady rise or fall over time, so growth the brand had anyway is not credited to TikTok" />
-                  <Check label="Adjust for seasonality" checked={useSeasonality} onChange={setUseSeasonality}
-                    title={`Adjust for an annual cycle. Needs about ${PERIODS_PER_YEAR[gran]} ${unit}s of history`} />
-                  <Check label="Index to 100" checked={normalize} onChange={setNormalize}
-                    title="Index both series to 100 at the start so metrics on different scales can be compared for shape" />
-                  <Check label="Show scatter" checked={showScatter} onChange={setShowScatter}
-                    title="Show the scatter plot alongside the over-time chart" />
-                </div>
-              </div>
-            )}
-          </>
+        onMethodology={() => setMethodOpen(true)}
+        // The bar owns the analyst row's layout and its open state; this is
+        // only the contents.
+        analystPanel={(
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <Picker
+              label="Halo window"
+              value={String(maxLag)}
+              onChange={(v) => setMaxLag(Number(v))}
+              options={[0, 1, 2, 3].map((l) => ({ value: String(l), label: l === 0 ? `Same ${unit} only` : `${l} ${unit}${l === 1 ? '' : 's'}` }))}
+              width={150}
+              hint={`Effects that may show up over several ${unit}s.`}
+            />
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', paddingBottom: 6, flexWrap: 'wrap' }}>
+              <Check label="Adjust for trend" checked={useTrend} onChange={setUseTrend}
+                title="Adjust for a steady rise or fall over time, so growth the brand had anyway is not credited to TikTok" />
+              <Check label="Adjust for seasonality" checked={useSeasonality} onChange={setUseSeasonality}
+                title={`Adjust for an annual cycle. Needs about ${PERIODS_PER_YEAR[gran]} ${unit}s of history`} />
+              <Check label="Index to 100" checked={normalize} onChange={setNormalize}
+                title="Index both series to 100 at the start so metrics on different scales can be compared for shape" />
+              <Check label="Show scatter" checked={showScatter} onChange={setShowScatter}
+                title="Show the scatter plot alongside the over-time chart" />
+            </div>
+          </div>
         )}
-      </ScopeBar>
+        finder={(
+          <HaloFinderMenu
+            srcRows={srcRows} dailyRows={dailyRows} src={src} gran={gran} xKey={xKey} yKey={yKey}
+            range={range} tiktokFields={tiktokFields} maxLag={effectiveMaxLag} unit={unit}
+            suggestion={suggestion} onSwitchGrain={pickGrain} onPickMetric={setXKey}
+          />
+        )}
+      />
 
       {/* ══ 0 - SNAPSHOT ══════════════════════════════════════════ */}
       {/* Brand, period and the metric pair are all in the scope bar directly
           above, so the snapshot states the answer and nothing else. */}
+      {/* The chart shows REAL Amazon revenue against the model's quieter-TikTok
+          counterfactual. Actual revenue is the one series here that is not an
+          estimate, so it gets the solid line. */}
       <Snapshot
         snapshot={snapshot}
         headline={takeaway.headline}
         chart={contribution?.perPeriod?.length
-          ? <ContributionChart contribution={contribution} unit={unit} yLabel={plainMetricLabel(yKey)} />
+          ? (
+            <ContributionChart
+              contribution={contribution} unit={unit} yLabel={plainMetricLabel(yKey)}
+              variant="meeting" actualByKey={actualByKey} height={250}
+            />
+          )
           : <OverTimeChart periods={periods} xKey={xKey} yKey={yKey} unit={unit} normalize={normalize} height={220} compact />}
         chartCaption={contribution?.perPeriod?.length
           ? null
@@ -374,14 +406,16 @@ export default function HaloV2Explorer({
           blockedModel={blockedModel}
         />
       )}
-      {!showStatusPanel && suggestion && (
+      {/* Advisory banners are Lab only now. They are useful to an operator and
+          they are exactly the helper prose a client meeting does not need. */}
+      {lab && !showStatusPanel && suggestion && (
         <Note tone="info">
           {recommendation.reason}{' '}
           <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" style={{ marginLeft: 6 }}
             onClick={() => pickGrain(suggestion.grain)}>{suggestion.cta}</button>
         </Note>
       )}
-      {lagWasReduced && (
+      {lab && lagWasReduced && (
         <Note tone="info">
           Reduced to <strong>{effectiveMaxLag} {unit}{effectiveMaxLag === 1 ? '' : 's'}</strong> because this
           view has {assessment.usable} usable {assessment.unit}s and a {maxLag}-{unit} window would need
@@ -394,7 +428,6 @@ export default function HaloV2Explorer({
       <Section
         step="Step 1 · See"
         title="Do TikTok and Amazon move together?"
-        question="How the two moved over this period."
       >
         <SeeLayer
           result={result} unit={unit} xKey={xKey} yKey={yKey} periods={periods}
@@ -403,67 +436,58 @@ export default function HaloV2Explorer({
         />
       </Section>
 
-      {/* ══ 2 - ADJUST ════════════════════════════════════════════ */}
+      {/* ══ 2, 3, 4 ═══════════════════════════════════════════════
+          Adjust, Estimate and Plan all depend on controls this tool cannot
+          reach yet: promotions, stock-outs and ad spend arrive with the
+          platform APIs. Every pipeline behind them still runs on every render
+          (the model, the counterfactual and the planning scenarios are all
+          computed above and exported), and all three are fully operable in
+          Lab. On Meeting the bodies are blurred, clipped and inert, so a
+          client sees what is coming without being able to act on half-fed
+          numbers. Un-blurring when the APIs land is deleting a wrapper. */}
       <Section
         step="Step 2 · Adjust"
         title="What did we adjust for?"
-        question="What else could explain the movement, and which of those we could account for."
+        question={lab ? 'What else could explain the movement, and which of those we could account for.' : null}
       >
-        <AdjustLayer
-          result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
-          periods={periods} maxLag={effectiveMaxLag} controlOpts={controlOpts}
-          excludeIndex={excludeIndex} setExcludeIndex={setExcludeIndex}
-          showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
-          assessment={assessment} lab={lab}
-        />
+        <MaybeUnderConstruction blurred={!lab}>
+          <AdjustLayer
+            result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
+            periods={periods} maxLag={effectiveMaxLag} controlOpts={controlOpts}
+            excludeIndex={excludeIndex} setExcludeIndex={setExcludeIndex}
+            showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
+            assessment={assessment} lab={lab}
+          />
+        </MaybeUnderConstruction>
       </Section>
 
-      {/* ══ 3 - ESTIMATE ══════════════════════════════════════════ */}
       <Section
         step="Step 3 · Estimate"
         title="How much Amazon looks tied to TikTok in this window?"
-        question="An estimate of association after the adjustments above."
+        question={lab ? 'An estimate of association after the adjustments above.' : null}
       >
-        <EstimateLayer
-          result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
-          refMethod={refMethod} setRefMethod={setRefMethod}
-          customRef={customRef} setCustomRef={setCustomRef}
-          scenarioPct={scenarioPct} setScenarioPct={setScenarioPct}
-          customChange={customChange} setCustomChange={setCustomChange}
-          lab={lab}
-        />
+        <MaybeUnderConstruction blurred={!lab}>
+          <EstimateLayer
+            result={result} unit={unit} cur={cur} xKey={xKey} yKey={yKey}
+            refMethod={refMethod} setRefMethod={setRefMethod}
+            customRef={customRef} setCustomRef={setCustomRef}
+            scenarioPct={scenarioPct} setScenarioPct={setScenarioPct}
+            customChange={customChange} setCustomChange={setCustomChange}
+            lab={lab} compact={!lab}
+          />
+        </MaybeUnderConstruction>
       </Section>
 
-      {/* ══ 4 - PLAN ══════════════════════════════════════════════ */}
       <Section
         step="Step 4 · Plan"
         title="If we plan TikTok at these assumptions, what Amazon effect should we discuss?"
-        question="Every figure here is a planning assumption, not a measurement."
+        question={lab ? 'Every figure here is a planning assumption, not a measurement.' : null}
         tone="planning"
       >
-        <PlanningLayer result={result} planning={planning} setPlanning={setPlanning} cur={cur} />
+        <MaybeUnderConstruction blurred={!lab}>
+          <PlanningLayer result={result} planning={planning} setPlanning={setPlanning} cur={cur} />
+        </MaybeUnderConstruction>
       </Section>
-
-      {/* ══ Depth, then the operator's tools ══════════════════════ */}
-      <DepthDrawer
-        statuses={stages}
-        model={m}
-        unit={unit}
-        referenceLabel={contribution?.referenceLabel || null}
-      />
-
-      {lab && (
-        <HaloFinder
-          srcRows={srcRows} dailyRows={dailyRows} src={src} gran={gran} xKey={xKey} yKey={yKey}
-          range={range} tiktokFields={tiktokFields} maxLag={effectiveMaxLag} unit={unit}
-          suggestion={suggestion} onSwitchGrain={pickGrain} onPickMetric={setXKey}
-        />
-      )}
-      {lab && (
-        <ProvenanceBlock
-          result={result} gran={gran} range={range} unit={unit} xKey={xKey} yKey={yKey} cur={cur}
-        />
-      )}
       {lab && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-muted)' }}>
           {!controlsFound.promo && !controlsFound.stockout && (
@@ -471,11 +495,6 @@ export default function HaloV2Explorer({
               This sheet carries no promotion or stock-out column. The model reads them automatically as
               soon as one appears.
             </span>
-          )}
-          {v1Href && (
-            <Link to={v1Href} style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              Open the original Halo tool
-            </Link>
           )}
         </div>
       )}
@@ -510,6 +529,15 @@ export default function HaloV2Explorer({
 }
 
 const rangeText = (range) => (range?.start && range?.end ? `${range.start} to ${range.end}` : null);
+
+// Blur a step's body on Meeting, render it untouched in Lab. One wrapper, so
+// the three steps waiting on platform APIs cannot drift apart, and so the
+// bodies below stay mounted exactly as they are for the day they un-blur.
+const MaybeUnderConstruction = ({ blurred, children }) => (blurred ? (
+  <UnderConstruction subline="Unlocks when platform APIs feed promos, stockouts, and related controls.">
+    {children}
+  </UnderConstruction>
+) : children);
 
 function readMode(defaultMode, remember) {
   if (!remember) return defaultMode;

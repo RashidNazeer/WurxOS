@@ -27,6 +27,10 @@ import { Term } from './Glossary.jsx';
 export default function EstimateLayer({
   result, unit, cur, xKey, yKey, refMethod, setRefMethod, customRef, setCustomRef,
   scenarioPct, setScenarioPct, customChange, setCustomChange, lab = false,
+  // `compact` drops the chart. Used for the blurred under-construction preview
+  // on Meeting, where mounting a second Recharts instance nobody can read is
+  // pure waste: the readable actual-vs-counterfactual chart is in the takeaway.
+  compact = false,
 }) {
   const m = result.adjustedModel;
   const contrib = result.historicalContribution;
@@ -128,7 +132,11 @@ export default function EstimateLayer({
 
       {contrib && (
         <>
-          <ContributionChart contribution={contrib} unit={unit} yLabel={plainMetricLabel(yKey)} />
+          {!compact && (
+            <ContributionChart
+              contribution={contrib} unit={unit} yLabel={plainMetricLabel(yKey)} variant="lab"
+            />
+          )}
           {contrib.spansZero && (
             <Note tone="warn">
               The interval on the contribution includes zero, so over this window the total cannot be told

@@ -1356,7 +1356,8 @@ function haloFinderTest(res) {
   const csv = buildHaloV2Csv({ result: res, periods: p, gran: 'day', range: { start: '2026-01-01', end: '2026-03-31' }, xKey: 'gmv', yKey: 'revenue_per_day', brandName: 'Acme, Inc.' });
 
   check('CSV1. it names the tool AND the not-incremental caveat up front',
-    /Amazon Halo V2/.test(csv) && /NOT incremental/.test(csv));
+    /Amazon Halo: modelled association/.test(csv) && /NOT incremental/.test(csv)
+      && !/Halo V2/.test(csv));
   check('CSV2. it has both a SUMMARY and a SERIES block', /SUMMARY/.test(csv) && /SERIES/.test(csv));
   check('CSV3. the summary carries n, the interval and the controls',
     /Usable periods,\d+/.test(csv) && /95% interval/.test(csv) && /Controls included/.test(csv));
@@ -1372,7 +1373,7 @@ function haloFinderTest(res) {
     !/NaN|undefined/.test(csv), (csv.match(/.*(NaN|undefined).*/) || [''])[0]);
   check('CSV9. the filename is safe and descriptive',
     haloV2CsvFilename({ brandName: 'Acme, Inc.', gran: 'day', range: { start: '2026-01-01', end: '2026-03-31' } })
-      === 'halo-v2_acme-inc_day_2026-01-01_2026-03-31.csv',
+      === 'amazon-halo_acme-inc_day_2026-01-01_2026-03-31.csv',
     haloV2CsvFilename({ brandName: 'Acme, Inc.', gran: 'day', range: { start: '2026-01-01', end: '2026-03-31' } }));
 
   // A refused model must still export the series, with the reason recorded.
@@ -1780,7 +1781,8 @@ function haloFinderTest(res) {
   //    Source comments are stripped first, so the rule polices copy rather
   //    than the way the code is written about.
   const V2_DIRS = ['src/components/haloV2', 'src/lib/haloV2'];
-  const V2_PAGES = ['src/pages/boss/HaloV2Page.jsx', 'src/pages/portal/HaloV2PortalPage.jsx'];
+  const V2_PAGES = ['src/pages/boss/HaloV2Page.jsx', 'src/pages/portal/HaloV2PortalPage.jsx',
+    'src/pages/portal/HaloPortalPage.jsx'];
   const repo = path.resolve(process.cwd());
   const v2Files = [
     ...V2_DIRS.flatMap((d) => fs.readdirSync(path.join(repo, d)).map((f) => path.join(d, f))),
@@ -1812,6 +1814,16 @@ function haloFinderTest(res) {
   const emDashHits = v2Files.filter((f) => stripComments(fs.readFileSync(path.join(repo, f), 'utf8')).includes('—'));
   check(`COPY 1. no em dashes in any user-facing string across ${v2Files.length} Halo V2 files`,
     emDashHits.length === 0, emDashHits.join(', '));
+
+  const versionHits = v2Files.flatMap((f) => {
+    const code = stripComments(fs.readFileSync(path.join(repo, f), 'utf8'));
+    return code.split(/\r?\n/)
+      .map((line, i) => ({ line, i }))
+      .filter(({ line }) => /\bV[12]\b|Halo V\d/.test(line))
+      .map(({ line, i }) => `${f}:${i + 1} ${line.trim().slice(0, 80)}`);
+  });
+  check(`COPY 1b. there is one Amazon Halo: no user-facing V1/V2 across ${v2Files.length} files`,
+    versionHits.length === 0, versionHits.join(' | '));
 
   // 2. The words a Meeting hero may never use. Checked against what the
   //    snapshot and the takeaway actually emit, plus the Snapshot component's

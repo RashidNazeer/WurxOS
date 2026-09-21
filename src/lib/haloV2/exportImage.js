@@ -10,7 +10,7 @@
 // clients who never export.
 // ============================================================
 
-export async function exportNodeToPng(node, { filename = 'Halo V2', pixelRatio = 2 } = {}) {
+export async function exportNodeToPng(node, { filename = 'Amazon Halo', pixelRatio = 2 } = {}) {
   if (!node) return;
   const { toPng } = await import('html-to-image');
   if (document.fonts?.ready) {
@@ -22,7 +22,7 @@ export async function exportNodeToPng(node, { filename = 'Halo V2', pixelRatio =
     backgroundColor: '#ffffff',
     filter: (el) => !(el.classList && el.classList.contains('no-print')),
   });
-  const safe = String(filename).replace(/[\\/:*?"<>|]/g, '_').slice(0, 120).trim() || 'Halo V2';
+  const safe = String(filename).replace(/[\\/:*?"<>|]/g, '_').slice(0, 120).trim() || 'Amazon Halo';
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = `${safe}.png`;
