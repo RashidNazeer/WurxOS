@@ -55,7 +55,7 @@ export default function ClientSummarySheet({
         {/* ── Header ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.01em' }}>Amazon Halo V2</div>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.01em' }}>Amazon Halo</div>
             {brandName && <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 2 }}>{brandName}</div>}
           </div>
           <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -251,7 +251,7 @@ function Figure({ label, value, sub, primary = false }) {
 /** Filename for the downloaded one-pager. */
 export function summaryFilename({ brandName, gran, range }) {
   const slug = (s) => String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
-  const parts = ['Amazon Halo V2', slug(brandName), GRAIN_LABEL[gran] || gran];
+  const parts = ['Amazon Halo', slug(brandName), GRAIN_LABEL[gran] || gran];
   if (range?.start && range?.end) parts.push(`${range.start} to ${range.end}`);
   return parts.filter(Boolean).join(' - ');
 }

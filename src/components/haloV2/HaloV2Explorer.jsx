@@ -22,7 +22,6 @@
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { setHaloCurrency, getHaloCurrency } from '../../lib/haloFields';
 import {
   sourceForGran, dailySourceFor, availableGrans, availableFields, dataSpan, buildPeriods, detectControls,
@@ -66,8 +65,6 @@ export default function HaloV2Explorer({
   // way to open it: sharing belongs in the Share menu with the exports, not as
   // a fifth button somewhere else on the page.
   onManageLinks = null,
-  // A quiet way back to V1, for Lab only. The portal has no route to it.
-  v1Href = null,
 }) {
   const [rowsById, setRowsById] = useState({});
   const [loading, setLoading] = useState(false);
@@ -498,11 +495,6 @@ export default function HaloV2Explorer({
               This sheet carries no promotion or stock-out column. The model reads them automatically as
               soon as one appears.
             </span>
-          )}
-          {v1Href && (
-            <Link to={v1Href} style={{ color: 'var(--text-muted)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              Open the original Halo tool
-            </Link>
           )}
         </div>
       )}

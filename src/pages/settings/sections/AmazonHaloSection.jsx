@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DiagramIcon, LinkIcon } from '../../../components/common/Icon';
 import SectionShell from './SectionShell';
-import HaloShareModal from '../../../components/halo/HaloShareModal';
+import HaloV2ShareModal from '../../../components/haloV2/HaloV2ShareModal';
 import {
   listAllBrandsForHaloSettings, listHaloEnabledBrandIds, enableHaloBrand, disableHaloBrand,
 } from '../../../lib/haloBrandsApi';
 
 // Boss/OL-only: curate which brands appear in the Amazon Halo brand dropdown,
 // and manage the read-only client access links (scoped to specific brands).
+//
+// The links are Amazon Halo links (halo_v2_shares). This section used to open
+// the retired original tool's modal, which would have kept minting links in the
+// old table for a tool nobody maintains any more.
 export default function AmazonHaloSection() {
   const [allBrands, setAllBrands] = useState([]);
   const [enabledIds, setEnabledIds] = useState([]);
@@ -100,7 +104,7 @@ export default function AmazonHaloSection() {
         </div>
       </SectionShell>
 
-      {linksOpen && <HaloShareModal brands={enabledBrandObjs} onClose={() => setLinksOpen(false)} />}
+      {linksOpen && <HaloV2ShareModal brands={enabledBrandObjs} onClose={() => setLinksOpen(false)} />}
     </>
   );
 }

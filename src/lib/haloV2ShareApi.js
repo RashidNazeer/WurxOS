@@ -97,8 +97,9 @@ function friendly(code) {
   }
 }
 
-// Note the /halo-v2/ path: a V2 token on the V1 route (or vice versa) resolves
-// to nothing, which is the intended outcome rather than a silent fallback.
+// New links use the /halo-v2/ path. Each portal route resolves only its own
+// table's tokens (this one halo_v2_shares, /portal/halo/ the retired original
+// tool's halo_shares), and both render the same Amazon Halo view.
 export function buildHaloV2ShareUrl(token) {
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   return `${base}/portal/halo-v2/${token}`;

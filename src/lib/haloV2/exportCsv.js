@@ -51,7 +51,7 @@ export function buildHaloV2Csv({
   const pct = (v) => (v == null ? '' : `${(Number(v) * 100).toFixed(1)}%`);
   const metricPair = `${plainMetricLabel(xKey)} against ${plainMetricLabel(yKey)}`;
 
-  lines.push(row(['Amazon Halo V2: modelled association, NOT incremental']));
+  lines.push(row(['Amazon Halo: modelled association, NOT incremental']));
   lines.push(row(['Generated', generatedAt]));
   if (brandName) lines.push(row(['Brand', brandName]));
   lines.push(row(['TikTok metric', plainMetricLabel(xKey)]));
@@ -195,6 +195,6 @@ export function downloadHaloV2Csv(text, filename) {
 
 export function haloV2CsvFilename({ brandName, gran, range }) {
   const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const parts = ['halo-v2', slug(brandName) || null, gran, range?.start || null, range?.end || null].filter(Boolean);
+  const parts = ['amazon-halo', slug(brandName) || null, gran, range?.start || null, range?.end || null].filter(Boolean);
   return `${parts.join('_')}.csv`;
 }

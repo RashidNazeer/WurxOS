@@ -1,118 +1,51 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// ============================================================
+// Amazon Halo: upload and replace a brand's sheets.
+//
+// MOVED HERE FROM THE ORIGINAL HALO PAGE when that page was retired and this
+// became the only Amazon Halo (2026-09-21). Until then this page had no upload
+// of its own; its empty state sent people to the old page to add a sheet. So
+// retiring the old page without moving this would have left nowhere to upload
+// a sheet at all.
+//
+// The logic is unchanged: the same parser (parseHaloGranularitySheet), the same
+// weekly build from a search-volume roll-up, the same REPLACE-by-granularity RPC
+// (createHaloDataset). Only the words changed, to drop em dashes, and client
+// links were left out: they already live in the explorer's Share menu and in
+// Settings, and a third way in is a third place for them to disagree.
+// ============================================================
+
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { parseHaloGranularitySheet } from '../../lib/haloParse';
 import { parseSearchVolumeSheet, buildWeeklyFromDaily } from '../../lib/haloWeeklyBuild';
-import { getHaloRows, createHaloDataset, deleteHaloDataset } from '../../lib/haloApi';
-import { listHaloEnabledBrands } from '../../lib/haloBrandsApi';
-import HaloExplorer from '../../components/halo/HaloExplorer';
-import HaloShareModal from '../../components/halo/HaloShareModal';
-import { LinkIcon } from '../../components/common/Icon';
+import { getHaloRows, createHaloDataset } from '../../lib/haloApi';
 
 const GRANS = [
-  { key: 'day', label: 'Daily sheet', hint: 'one row per day' },
-  { key: 'week', label: 'Weekly sheet', hint: 'one row per week (e.g. "1 June - 7 June")' },
-  { key: 'month', label: 'Monthly sheet', hint: 'one row per month (e.g. "June 2026")' },
+  { key: 'day', label: 'Daily sheet', hint: 'One row per day.' },
+  { key: 'week', label: 'Weekly sheet', hint: 'One row per week, for example "1 June - 7 June".' },
+  { key: 'month', label: 'Monthly sheet', hint: 'One row per month, for example "June 2026".' },
 ];
 
-export default function AmazonHaloPage() {
-  const [brands, setBrands] = useState([]); // [{ brand, datasets:{day?,week?,month?} }]
-  const [selectedBrandId, setSelectedBrandId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [shareOpen, setShareOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const refresh = useCallback(async () => {
-    setError('');
-    try {
-      const list = await listHaloEnabledBrands();
-      setBrands(list);
-      setSelectedBrandId((cur) => (cur && list.find((x) => x.brand.id === cur) ? cur : (list[0]?.brand?.id || null)));
-    } catch (e) { setError(e.message || String(e)); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { refresh(); }, [refresh]);
-
-  const selected = brands.find((x) => x.brand.id === selectedBrandId) || null;
-  const brandDatasets = useMemo(() => (selected ? Object.values(selected.datasets) : []), [selected]);
-  const loadRows = useCallback((id) => getHaloRows(id), []);
-
-  async function handleDelete(id, granLabel) {
-    if (!window.confirm(`Delete the ${granLabel} for this brand?`)) return;
-    try { await deleteHaloDataset(id); await refresh(); }
-    catch (e) { setError(e.message || String(e)); }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 40 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <h1 className="page-title" style={{ margin: 0 }}>Amazon Halo Effect</h1>
-          {!loading && brands.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 600 }}>Brand</span>
-              <select className="wx-input" style={{ maxWidth: 300, minWidth: 170 }} value={selectedBrandId || ''} onChange={(e) => setSelectedBrandId(e.target.value)}>
-                {brands.map((x) => (
-                  <option key={x.brand.id} value={x.brand.id}>
-                    {x.brand.brand_name}{['day', 'week', 'month'].filter((g) => x.datasets[g]).length ? '' : ' — no sheets yet'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-        {!loading && brands.length > 0 && (
-          <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={() => setSettingsOpen(true)} title="Upload sheets and manage client links">
-            <i className="bi bi-gear" /> Manage
-          </button>
-        )}
-      </div>
-
-      {error && <div className="wx-alert wx-alert-danger"><span>{error}</span></div>}
-
-      {loading ? (
-        <div style={{ color: 'var(--text-muted)', fontSize: 13 }}><span className="wx-spinner" /> Loading…</div>
-      ) : !brands.length ? (
-        <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-          No brands are enabled for Halo yet. Enable them in{' '}
-          <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }}>Settings → Amazon Halo</Link>.
-        </div>
-      ) : brandDatasets.length ? (
-        <HaloExplorer key={selectedBrandId} datasets={brandDatasets} loadRows={loadRows} />
-      ) : (
-        <div className="wx-card" style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
-          No sheets for <strong>{selected?.brand?.brand_name}</strong> yet. Click <strong>Manage</strong> (top right) to upload a daily, weekly or monthly sheet.
-        </div>
-      )}
-
-      {settingsOpen && selected && (
-        <HaloSettingsDrawer
-          selected={selected}
-          onClose={() => setSettingsOpen(false)}
-          onRefresh={refresh}
-          onDelete={handleDelete}
-          onOpenShare={() => setShareOpen(true)}
-        />
-      )}
-      {shareOpen && <HaloShareModal brands={brands.map((x) => x.brand)} onClose={() => setShareOpen(false)} />}
-    </div>
-  );
-}
-
-// ============================================================
-// Right-side drawer: per-brand sheet uploads + client-link management.
-// Keeps the main page to just the brand switcher + the explorer (gear opens this).
-// ============================================================
-function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShare }) {
+/**
+ * Right-side drawer holding a brand's three sheet slots.
+ *
+ * `selected` is one entry of listHaloEnabledBrands(): { brand, datasets:{day?,week?,month?} }.
+ */
+export default function HaloSheetsDrawer({ selected, onClose, onRefresh, onDelete }) {
   const brand = selected.brand;
   return createPortal(
+    // z-index 995 keeps the share modal (backdrop 1000) able to stack on top.
     <div style={{ position: 'fixed', inset: 0, zIndex: 995 }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} />
-      <div style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 'min(460px, 94vw)', background: 'var(--surface-1, #16161c)', borderLeft: '1px solid var(--border-default)', boxShadow: '-10px 0 40px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column' }}>
+      <div
+        role="dialog"
+        aria-label={`Sheets for ${brand.brand_name}`}
+        style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 'min(460px, 94vw)', background: 'var(--surface-1, #16161c)', borderLeft: '1px solid var(--border-default)', boxShadow: '-10px 0 40px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', flex: '0 0 auto' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Manage Halo</div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Manage sheets</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{brand.brand_name}</div>
           </div>
           <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onClose} aria-label="Close">✕</button>
@@ -120,9 +53,10 @@ function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShar
 
         <div style={{ overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Upload up to three sheets — a <strong>daily</strong>, a <strong>weekly</strong> and a <strong>monthly</strong> one (at least one).
-            Each granularity reads its own sheet, falling back to rolling up the daily sheet when a weekly/monthly one isn't uploaded.
-            Enable brands in <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }} onClick={onClose}>Settings → Amazon Halo</Link>.
+            Upload up to three sheets: a <strong>daily</strong>, a <strong>weekly</strong> and a <strong>monthly</strong> one.
+            At least one is needed. Each view reads its own sheet, and falls back to rolling up the daily sheet when a
+            weekly or monthly one is missing. Choose which brands appear here in{' '}
+            <Link to="/settings?section=amazonHalo" style={{ color: 'var(--accent)' }} onClick={onClose}>Settings, Amazon Halo</Link>.
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -139,16 +73,6 @@ function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShar
               />
             ))}
           </div>
-
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Client links</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-              Create read-only links to share a brand's Halo with clients — no login needed.
-            </div>
-            <button type="button" className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onOpenShare}>
-              <LinkIcon width="14" height="14" /> Manage client links
-            </button>
-          </div>
         </div>
       </div>
     </div>,
@@ -157,7 +81,7 @@ function HaloSettingsDrawer({ selected, onClose, onRefresh, onDelete, onOpenShar
 }
 
 // ============================================================
-// One upload slot for a brand's daily / weekly / monthly sheet.
+// One upload slot for a brand's daily, weekly or monthly sheet.
 // ============================================================
 function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, onDelete }) {
   const [file, setFile] = useState(null);
@@ -188,7 +112,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
       await createHaloDataset({
         brandId: brand.id,
         granularity,
-        name: `${brand.brand_name} — ${granularity} (${parsed.periodStart} → ${parsed.periodEnd})`,
+        name: `${brand.brand_name} · ${granularity} (${parsed.periodStart} → ${parsed.periodEnd})`,
         filename: file?.name,
         periodStart: parsed.periodStart,
         periodEnd: parsed.periodEnd,
@@ -223,6 +147,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
       )}
 
       <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input" style={{ fontSize: 11.5 }}
+        aria-label={`Upload ${meta.label.toLowerCase()}`}
         onChange={(e) => onFile(e.target.files?.[0] || null)} />
 
       {parseErr && <div style={{ fontSize: 11.5, color: 'var(--danger, #ef4444)' }}>{parseErr}</div>}
@@ -250,8 +175,9 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
         </div>
       )}
 
-      {/* Weekly-only: build the weekly sheet from the daily data + a search-volume
-          roll-up sheet, so the search volume never has to be reformatted by hand. */}
+      {/* Weekly only: build the weekly sheet from the daily data plus a
+          search-volume roll-up sheet, so search volume never has to be
+          reformatted by hand. */}
       {granularity === 'week' && (
         <WeeklySearchBuilder brand={brand} dailyDataset={dailyDataset} hasWeekly={!!dataset} onDone={onDone} />
       )}
@@ -260,10 +186,10 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
 }
 
 // ============================================================
-// Build the weekly dataset from the brand's daily sheet + a "Weekly Search
-// Volume — Brand Roll-Ups" sheet. The user uploads ONLY the search-volume sheet
-// and picks their column; we roll the daily data up to the same weeks and attach
-// it. No hand-merging, and the daily/weekly parser format is untouched.
+// Build the weekly dataset from the brand's daily sheet plus a "Weekly Search
+// Volume, Brand Roll-Ups" sheet. The user uploads ONLY the search-volume sheet;
+// the daily data is rolled up to the same weeks and attached. No hand-merging,
+// and the daily and weekly parser formats are untouched.
 // ============================================================
 function WeeklySearchBuilder({ brand, dailyDataset, hasWeekly, onDone }) {
   const [open, setOpen] = useState(false);
@@ -296,7 +222,7 @@ function WeeklySearchBuilder({ brand, dailyDataset, hasWeekly, onDone }) {
       await createHaloDataset({
         brandId: brand.id,
         granularity: 'week',
-        name: `${brand.brand_name} — week (built from daily + search volume)`,
+        name: `${brand.brand_name} · week (built from daily + search volume)`,
         filename: file?.name,
         periodStart: out.periodStart,
         periodEnd: out.periodEnd,
@@ -312,7 +238,7 @@ function WeeklySearchBuilder({ brand, dailyDataset, hasWeekly, onDone }) {
 
   return (
     <div style={{ marginTop: 4, borderTop: '1px dashed var(--border-subtle)', paddingTop: 8 }}>
-      <button type="button" onClick={() => setOpen((o) => !o)}
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
         style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, fontSize: 11.5, fontWeight: 600 }}>
         {open ? '▾' : '▸'} Or build from a search-volume sheet
       </button>
@@ -321,15 +247,16 @@ function WeeklySearchBuilder({ brand, dailyDataset, hasWeekly, onDone }) {
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 11.5, color: 'var(--text-muted)' }}>
           <div style={{ lineHeight: 1.5 }}>
             Upload the <strong>Weekly Search Volume roll-up</strong> sheet only. Every keyword column in it is summed into
-            this brand's branded search volume, and the daily data is rolled up to the same (Saturday-ending) weeks — no
-            picking, no manual grouping.
+            this brand's branded search volume, and the daily data is rolled up to the same Saturday-ending weeks. There is
+            nothing to pick and nothing to group by hand.
           </div>
 
           {!dailyDataset ? (
-            <div style={{ color: 'var(--warning, #f59e0b)' }}>⚠ Upload the daily sheet first — the weekly build rolls it up for the metrics.</div>
+            <div style={{ color: 'var(--warning, #f59e0b)' }}>⚠ Upload the daily sheet first. The weekly build rolls it up for the metrics.</div>
           ) : (
             <>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input" style={{ fontSize: 11.5 }}
+                aria-label="Upload a weekly search volume roll-up sheet"
                 onChange={(e) => onFile(e.target.files?.[0] || null)} />
 
               {err && <div style={{ color: 'var(--danger, #ef4444)' }}>{err}</div>}

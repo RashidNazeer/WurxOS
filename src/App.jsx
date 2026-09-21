@@ -114,7 +114,6 @@ const AgendaOngoingPage     = lazy(() => import('./pages/agenda/AgendaOngoingPag
 const AgendaPriorPage       = lazy(() => import('./pages/agenda/AgendaPriorPage'));
 const AgendaCheckpointPage  = lazy(() => import('./pages/agenda/AgendaCheckpointPage'));
 const EukaAnalyticsPage     = lazy(() => import('./pages/euka/EukaAnalyticsPage'));
-const AmazonHaloPage        = lazy(() => import('./pages/boss/AmazonHaloPage'));
 const HaloV2Page            = lazy(() => import('./pages/boss/HaloV2Page'));
 const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
 const TikTokCallbackPage    = lazy(() => import('./pages/oauth/TikTokCallbackPage'));
@@ -213,10 +212,12 @@ export default function App() {
               path="/portal/halo/:token"
               element={<Suspense fallback={<PageFallback />}><HaloPortalPage /></Suspense>}
             />
-            {/* Halo V2 links are a SEPARATE route with separate tokens
-                (mig 330). A V1 token here resolves to nothing, which is the
-                intended outcome -- the two models say different things and one
-                must never silently render as the other. */}
+            {/* Two link formats, one view. Links minted by the retired
+                original Halo tool (halo_shares) stay on /portal/halo/:token and
+                links from the current tool (halo_v2_shares, mig 330) on
+                /portal/halo-v2/:token. Each route resolves its own tokens
+                through its own RPCs, and both render Amazon Halo, so no client
+                holding an old link is sent to a dead page. */}
             <Route
               path="/portal/halo-v2/:token"
               element={<Suspense fallback={<PageFallback />}><HaloV2PortalPage /></Suspense>}
@@ -309,22 +310,19 @@ export default function App() {
                   </RoleGuard>
                 }
               />
+              {/* ONE Amazon Halo (2026-09-21). The original tool that lived
+                  here was retired; this is the model that used to be "V2".
+                  /halo-v2 redirects rather than 404s, so bookmarks and links
+                  pasted into chats keep working. */}
               <Route
-                path="/halo-v2"
+                path="/halo"
                 element={
                   <RoleGuard allow={['boss', 'ol', 'tl']}>
                     <HaloV2Page />
                   </RoleGuard>
                 }
               />
-              <Route
-                path="/halo"
-                element={
-                  <RoleGuard allow={['boss', 'ol', 'tl']}>
-                    <AmazonHaloPage />
-                  </RoleGuard>
-                }
-              />
+              <Route path="/halo-v2" element={<Navigate to="/halo" replace />} />
               <Route
                 path="/video-reviews"
                 element={

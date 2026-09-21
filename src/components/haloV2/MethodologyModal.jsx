@@ -27,7 +27,7 @@ import '../../styles/table.css';
 
 // The method this tool implements, named so a client can ask about it and an
 // operator can tell two vintages of a figure apart.
-export const METHOD_VERSION = 'Halo V2 distributed-lag model';
+export const METHOD_VERSION = 'Distributed-lag model';
 
 const STAGE_TO_STEP = {
   descriptive: 'Step 1, See',
