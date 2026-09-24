@@ -5,6 +5,7 @@ import {
   getUserForEditor, getIncentives, getMostRecentPriorPlan, savePlan,
   getIncentivesTemplate, setIncentivesTemplate, fetchBrandCommissionAllocations,
 } from '../../lib/incentivesApi';
+import { listBrandMetricsForMonth } from '../../lib/brandMetricsApi';
 import { currencySymbol } from '../../utils/currencies';
 
 function getCurrentMonth() {
@@ -81,13 +82,17 @@ function otherCommissionPct(commAlloc, brandId, targetId, itemId) {
     .reduce((sum, r) => sum + (Number(r.pct) || 0), 0);
 }
 
-function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersPct }) {
+function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersPct, gmvGoal = 0 }) {
   const source     = item.source || '';
   const isAtt      = source === 'attendance';
   const isOlBrands = source === 'ol_brands';
   const isGmvMax   = source === 'gmv_max';
   const isComm     = source === 'commission_tier';
   const isAuto     = !!source;
+  // A GMV-Max target is owned by the brand's monthly GMV goal (mig 365). Lock
+  // it only when a goal actually exists: otherwise a brand nobody has set a
+  // goal for could never be given a target, and the line could never complete.
+  const goalLocked = isGmvMax && Number(gmvGoal) > 0;
   // Brand rows only. Stamp the flag as soon as the line is recognisably a
   // GMV-Max one, so a new plan is auto-filled without anyone remembering to
   // set it. `source === undefined` means "never decided"; picking Manual
@@ -299,6 +304,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
             {isAtt   ? <>Target <span className="text-muted">(auto · attendance %)</span></>
              : isComm ? <>Target <span className="text-muted">(auto · the brand&apos;s GMV goal)</span></>
+             : goalLocked ? <>Target <span className="text-muted">(auto · the brand&apos;s monthly GMV goal)</span></>
              : <>Target value <span className="text-muted">(suffix optional — e.g. %, $, pts)</span></>}
           </label>
           <div className="input-group input-group-sm">
@@ -307,11 +313,11 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               className="form-control"
               placeholder={isComm ? 'From Brand Analytics' : 'e.g. 250'}
               min="0"
-              value={isAtt ? 100 : isComm ? '' : (item.targetValue ?? '')}
+              value={isAtt ? 100 : isComm ? '' : goalLocked ? gmvGoal : (item.targetValue ?? '')}
               onChange={e => onChange(item.id, 'targetValue', e.target.value)}
-              readOnly={isAtt || isComm}
-              disabled={isAtt || isComm}
-              style={lockStyle}
+              readOnly={isAtt || isComm || goalLocked}
+              disabled={isAtt || isComm || goalLocked}
+              style={isAtt || isComm || goalLocked ? lockStyle : undefined}
             />
             <input
               type="text"
@@ -326,6 +332,18 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               title="Optional unit (e.g. %, $, pts) — leave blank for plain numbers"
             />
           </div>
+          {/* The link is enforced in the database (mig 365), so say where the
+              number comes from rather than letting someone type one that is
+              silently replaced on save. When the brand has no goal yet the
+              field stays editable, otherwise a brand nobody has set a goal for
+              could never have a target at all. */}
+          {isGmvMax && (
+            <div className="form-text" style={{ fontSize: '0.62rem' }}>
+              {goalLocked
+                ? <>Set by this brand&apos;s GMV goal for the month in Brand Analytics. Everyone on the brand shares it.</>
+                : <>No GMV goal set for this brand this month. Setting one in Brand Analytics will take over this target.</>}
+            </div>
+          )}
         </div>
         <div style={{ width: 150 }}>
           <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
@@ -355,7 +373,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
 }
 
 // ── One brand's group of items inside a section ──────────────────────────────
-function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, commAlloc, targetId }) {
+function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, commAlloc, targetId, gmvGoal }) {
   const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const tier = brand.tier ? TIER_STYLE[String(brand.tier).toLowerCase()] : null;
   return (
@@ -375,6 +393,7 @@ function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, comm
         {items.length === 0
           ? <p className="text-muted mb-2 px-1" style={{ fontSize: '0.72rem' }}>No {noun} for this brand yet.</p>
           : items.map((item) => <LineRow key={item.id} item={item} onChange={onChange} onRemove={onRemove} hideToggles brandCurrency={brand.currency}
+              gmvGoal={gmvGoal}
               othersPct={otherCommissionPct(commAlloc, brand.id, targetId, item.id)} />)}
         <button type="button" className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
           style={{ fontSize: '0.72rem' }} onClick={() => onAdd(brand)}>
@@ -390,7 +409,7 @@ function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, comm
 // snapshot). Items are rendered grouped by their linked brand, driven by the
 // user's CURRENT brands — so a newly-assigned brand shows an empty group to fill
 // and an item linked to a brand the user no longer has surfaces as an orphan.
-function PlanSection({ title, color, icon, items, setItems, brands, noun, commAlloc, targetId }) {
+function PlanSection({ title, color, icon, items, setItems, brands, noun, commAlloc, targetId, gmvGoals }) {
   const change = (id, field, val) => setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: val } : it));
   const remove = (id) => setItems(prev => prev.filter(it => it.id !== id));
   const addBrand = (brand) => setItems(prev => [...prev, { id: uid4(), text: '', amount: '', suffix: '', brandId: brand.id, brandName: brand.name }]);
@@ -422,6 +441,7 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
             {brands.map((brand) => (
               <BrandGroup key={brand.id} brand={brand} color={color} noun={noun} commAlloc={commAlloc} targetId={targetId}
                 items={items.filter(i => i.brandId === brand.id)}
+                gmvGoal={Number(gmvGoals?.[brand.id]?.gmv_target) || 0}
                 onChange={change} onRemove={remove} onAdd={addBrand} />
             ))}
           </>
@@ -434,7 +454,8 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
             <div className="fw-semibold mb-2" style={{ fontSize: '0.7rem', color: '#b45309' }}>
               <i className="bi bi-exclamation-triangle me-1" />Linked to a brand no longer assigned{orphanItems[0]?.brandName ? ` (${orphanItems.map(o => o.brandName).filter((v, i, a) => v && a.indexOf(v) === i).join(', ')})` : ''} — remove, or it drops on the next carry-forward
             </div>
-            {orphanItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} hideToggles brandCurrency={item.brandCurrency} />)}
+            {orphanItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} hideToggles
+              brandCurrency={item.brandCurrency} gmvGoal={Number(gmvGoals?.[item.brandId]?.gmv_target) || 0} />)}
           </div>
         )}
 
@@ -546,6 +567,8 @@ export default function IncentiveForm() {
   // brandId -> [{ userId, userName, pct }] across EVERYONE this month, so a
   // commission line can show what is already promised on the same brand.
   const [commAlloc, setCommAlloc] = useState(new Map());
+  // brand_id -> the month's brand_monthly_metrics row, for the GMV-Max targets.
+  const [gmvGoals, setGmvGoals] = useState({});
 
   useEffect(() => {
     async function load() {
@@ -566,6 +589,13 @@ export default function IncentiveForm() {
       try {
         setCommAlloc(await fetchBrandCommissionAllocations(currentMonth));
       } catch { /* ignore — the hint just will not show */ }
+
+      // The month's brand GMV goals, which own every GMV-Max target (mig 365).
+      // Advisory in the same way: without it the target simply stays editable,
+      // and the database still applies the goal on save.
+      try {
+        setGmvGoals(await listBrandMetricsForMonth(currentMonth));
+      } catch { /* ignore — the field stays unlocked */ }
 
       // Existing record for this (user, month)?
       const existing = await getIncentives(targetId, currentMonth);
@@ -870,6 +900,7 @@ export default function IncentiveForm() {
           noun="incentive"
           commAlloc={commAlloc}
           targetId={targetId}
+          gmvGoals={gmvGoals}
         />
 
         {/* Bonuses — brand groups + Other */}
@@ -882,6 +913,7 @@ export default function IncentiveForm() {
           brands={brands}
           noun="bonus"
           commAlloc={commAlloc}
+          gmvGoals={gmvGoals}
           targetId={targetId}
         />
 
