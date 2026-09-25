@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { currencySymbol } from '../../utils/currencies';
 import {
   listActiveBrands, getBrandMonthlyMetrics, saveBrandMonthlyMetrics, listMonthsWithData,
-  listBrandMetricsForMonth,
+  listBrandMetricsForMonth, gmvMaxIncentiveLinks,
 } from '../../lib/brandMetricsApi';
 import { isManagedByUs } from '../../lib/roles';
 import { setBrandUnlimitedSampleGoal } from '../../lib/productsApi';
@@ -378,6 +378,9 @@ export default function BrandAnalyticsPage() {
                   </span>
                 </div>
               )}
+              {/* Who the GMV goal pays, and whether they are there yet. */}
+              <LinkedIncentives brandId={brandId} month={month} goal={data?.gmv_target} />
+
               {data?.updated_at && (
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 12 }}>
                   Last updated {new Date(data.updated_at).toLocaleString()}
@@ -400,6 +403,9 @@ export default function BrandAnalyticsPage() {
             qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'months', brandId] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'monthMap', month] });
+            // The goal we just saved is the incentive target too (mig 366), so
+            // the linked-incentive panel is stale the moment it lands.
+            qc.invalidateQueries({ queryKey: ['brandMetrics', 'gmvMaxLinks', brandId, month] });
             // The sample-goal mode lives on the brand row, so the brand list
             // (and the Products tab's copy of it) has to be refetched too.
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'brands'] });
@@ -554,6 +560,84 @@ function BrandDashCard({ brand, stat, onOpen, onSetGoals }) {
   );
 }
 
+// ── Who the GMV goal pays (mig 366) ─────────────────────────────────
+// The goal sets the target on every "Total Revenue in GMV Max" line for this
+// brand, so the people holding those lines all reach it at the same moment.
+// This is where that becomes visible: one row per line, with the same 90% rule
+// the incentive itself uses.
+//
+// It also shows the case the sync deliberately does NOT fix — a role with no
+// line at all. Creating one would mean inventing a compensation amount, so it
+// is surfaced for a human to decide instead.
+const ROLE_LABEL = {
+  apc: 'APC', tl: 'Team Lead', ol: 'Operations Lead', ipc: 'IPC',
+  ads_manager: 'Ads Manager', pctl: 'Paid Collab TL', boss: 'Boss', developer: 'Developer',
+};
+
+function LinkedIncentives({ brandId, month, goal }) {
+  const { data: links = [], isLoading } = useQuery({
+    queryKey: ['brandMetrics', 'gmvMaxLinks', brandId, month],
+    queryFn: () => gmvMaxIncentiveLinks(brandId, month),
+    enabled: !!brandId && !!month,
+  });
+
+  // Nothing to say when nobody is on the brand's GMV Max incentive.
+  if (isLoading || links.length === 0) return null;
+
+  const done = links.filter((l) => l.completed).length;
+  const hasGoal = Number(goal) > 0;
+
+  return (
+    <div className="ba-card" style={{ cursor: 'default', padding: 16, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+        <i className="bi bi-link-45deg" style={{ color: 'var(--accent)' }} />
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>
+          Linked GMV Max incentive
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
+          <strong style={{ color: done === links.length ? 'var(--ba-ontrack)' : 'var(--text-primary)' }}>
+            {done} of {links.length}
+          </strong> achieved
+        </span>
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 12 }}>
+        {hasGoal
+          ? <>This month&apos;s GMV goal sets the target on all of these lines, so they reach it together. A line counts as achieved at <strong>90%</strong> of the goal.</>
+          : <>Set a GMV goal above and it becomes the target on every line here.</>}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {links.map((l, i) => (
+          <div key={`${l.user_id}-${i}`} style={{
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            padding: '8px 12px', borderRadius: 10,
+            background: l.completed ? 'var(--ba-ontrack-soft)' : 'var(--surface-2)',
+            border: `1px solid ${l.completed ? 'var(--ba-ontrack-bd)' : 'var(--border-subtle)'}`,
+          }}>
+            <i className={`bi ${l.completed ? 'bi-check-circle-fill' : 'bi-circle'}`}
+              style={{ color: l.completed ? 'var(--ba-ontrack)' : 'var(--text-muted)', fontSize: 13 }} />
+            <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{l.display_name}</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+              color: 'var(--text-muted)', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
+              borderRadius: 6, padding: '2px 7px' }}>
+              {ROLE_LABEL[l.role] || l.role}
+            </span>
+            {l.paid && (
+              <span title="This payout is cleared, so its figures are frozen"
+                style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)' }}>
+                <i className="bi bi-lock-fill" style={{ marginRight: 3 }} />Paid
+              </span>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+              {fmt('$', l.achieved)} <span style={{ color: 'var(--text-muted)' }}>of</span> {fmt('$', l.target)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── One metric card with a progress bar (detail view) ───────────────
 // `unlimited` is the brand's sample-goal flag (mig 348). It suppresses the
 // target, the percentage and the bar — there is nothing to be a percentage OF —
@@ -682,6 +766,12 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
         <div style={{ padding: '16px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {metrics.map((m) => {
             const isSamples = m.key === 'samples';
+            // The monthly GMV goal is not only a goal: it is the target on every
+            // "Total Revenue in GMV Max" incentive line for this brand (mig 366).
+            // Whoever types it is moving the APC's, TL's and Ads Manager's bar,
+            // so say so here rather than letting them find out at payout.
+            const isGmv = m.key === 'gmv';
+            const gmvMoved = isGmv && Number(form[m.tCol] || 0) !== Number(data?.[m.tCol] || 0);
             return (
               <div key={m.key}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -721,6 +811,14 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
                     <i className="bi bi-info-circle me-1" />
                     Applies to <strong>{brand?.brand_name}</strong> in every month, not just {prettyMonth(month)} — it is the contract, not a target. Reports show no sample-goal progress while it is on.
+                  </div>
+                )}
+                {isGmv && (
+                  <div style={{ fontSize: 11, marginTop: 6, color: gmvMoved ? 'var(--ba-behind)' : 'var(--text-muted)' }}>
+                    <i className={`bi ${gmvMoved ? 'bi-exclamation-triangle-fill' : 'bi-info-circle'} me-1`} />
+                    {gmvMoved
+                      ? <>Saving this also moves the <strong>Total Revenue in GMV Max</strong> target for everyone on this brand — APC, Team Lead, Ads Manager — for {prettyMonth(month)}. Cleared payouts keep their frozen figures.</>
+                      : <>This goal is also the <strong>Total Revenue in GMV Max</strong> incentive target for everyone on this brand. A line counts as achieved at 90% of it.</>}
                   </div>
                 )}
               </div>
