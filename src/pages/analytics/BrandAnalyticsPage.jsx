@@ -403,7 +403,7 @@ export default function BrandAnalyticsPage() {
             qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'months', brandId] });
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'monthMap', month] });
-            // The goal we just saved is the incentive target too (mig 365), so
+            // The goal we just saved is the incentive target too (mig 366), so
             // the linked-incentive panel is stale the moment it lands.
             qc.invalidateQueries({ queryKey: ['brandMetrics', 'gmvMaxLinks', brandId, month] });
             // The sample-goal mode lives on the brand row, so the brand list
@@ -560,7 +560,7 @@ function BrandDashCard({ brand, stat, onOpen, onSetGoals }) {
   );
 }
 
-// ── Who the GMV goal pays (mig 365) ─────────────────────────────────
+// ── Who the GMV goal pays (mig 366) ─────────────────────────────────
 // The goal sets the target on every "Total Revenue in GMV Max" line for this
 // brand, so the people holding those lines all reach it at the same moment.
 // This is where that becomes visible: one row per line, with the same 90% rule
@@ -767,7 +767,7 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
           {metrics.map((m) => {
             const isSamples = m.key === 'samples';
             // The monthly GMV goal is not only a goal: it is the target on every
-            // "Total Revenue in GMV Max" incentive line for this brand (mig 365).
+            // "Total Revenue in GMV Max" incentive line for this brand (mig 366).
             // Whoever types it is moving the APC's, TL's and Ads Manager's bar,
             // so say so here rather than letting them find out at payout.
             const isGmv = m.key === 'gmv';

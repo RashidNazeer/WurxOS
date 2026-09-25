@@ -1,5 +1,5 @@
 -- ============================================================
--- WurxOS v2 — Migration 365: a brand's monthly GMV goal drives the target on
+-- WurxOS v2 — Migration 366: a brand's monthly GMV goal drives the target on
 -- every "Total Revenue in GMV Max" incentive line for that brand.
 --
 -- ── THE ASK ────────────────────────────────────────────────────────────────
@@ -323,9 +323,9 @@ begin
     v_rows  := v_rows + public.gmv_max_sync_targets(r.brand_id, r.month_key);
   end loop;
 
-  raise notice 'mig 365 backfill: % brand-months scanned, % incentive rows had a target corrected', v_pairs, v_rows;
+  raise notice 'mig 366 backfill: % brand-months scanned, % incentive rows had a target corrected', v_pairs, v_rows;
   if v_rows > 0 then
-    raise notice 'mig 365: review those changes in audit_log where entity_type = ''incentives'' and after->>''reason'' = ''gmv_max_target_sync''';
+    raise notice 'mig 366: review those changes in audit_log where entity_type = ''incentives'' and after->>''reason'' = ''gmv_max_target_sync''';
   end if;
 end;
 $backfill$;
@@ -346,34 +346,34 @@ begin
   select count(*) into v_n from pg_trigger
    where tgrelid = 'public.brand_monthly_metrics'::regclass
      and tgname = 'bmm_sync_gmv_max_trg' and not tgisinternal;
-  if v_n <> 1 then raise exception 'mig 365: the goal trigger did not attach'; end if;
+  if v_n <> 1 then raise exception 'mig 366: the goal trigger did not attach'; end if;
 
   select count(*) into v_n from pg_trigger
    where tgrelid = 'public.incentives'::regclass
      and tgname = 'inc_sync_gmv_max_trg' and not tgisinternal;
-  if v_n <> 1 then raise exception 'mig 365: the incentives trigger did not attach — a hand-typed target could still drift'; end if;
+  if v_n <> 1 then raise exception 'mig 366: the incentives trigger did not attach — a hand-typed target could still drift'; end if;
 
   -- Matching rules, stated as assertions so a later edit cannot quietly widen them.
   if public._inc_gmv_max_brand('{"brandId":"11111111-1111-1111-1111-111111111111","source":"gmv_max"}'::jsonb) is null then
-    raise exception 'mig 365: a flagged gmv_max line is not being matched';
+    raise exception 'mig 366: a flagged gmv_max line is not being matched';
   end if;
   if public._inc_gmv_max_brand('{"brandId":"11111111-1111-1111-1111-111111111111","text":"Total Revenue in GMV Max"}'::jsonb) is null then
-    raise exception 'mig 365: an unflagged GMV Max brand line is not being matched';
+    raise exception 'mig 366: an unflagged GMV Max brand line is not being matched';
   end if;
   if public._inc_gmv_max_brand('{"brandId":"11111111-1111-1111-1111-111111111111","source":null,"text":"Total Revenue in GMV Max"}'::jsonb) is not null then
-    raise exception 'mig 365: an explicitly Manual line must be left alone';
+    raise exception 'mig 366: an explicitly Manual line must be left alone';
   end if;
   if public._inc_gmv_max_brand('{"brandId":"not-a-uuid","source":"gmv_max"}'::jsonb) is not null then
-    raise exception 'mig 365: a malformed brandId must not be cast';
+    raise exception 'mig 366: a malformed brandId must not be cast';
   end if;
   if public._inc_gmv_max_brand('{"source":"attendance","text":"Attendance"}'::jsonb) is not null then
-    raise exception 'mig 365: a non-brand line must not be matched';
+    raise exception 'mig 366: a non-brand line must not be matched';
   end if;
 
   select id into v_brand from public.brands limit 1;
   select id into v_user  from public.profiles limit 1;
   if v_brand is null or v_user is null then
-    raise notice 'mig 365: no brand/profile to test against — triggers attached, behaviour unverified';
+    raise notice 'mig 366: no brand/profile to test against — triggers attached, behaviour unverified';
     return;
   end if;
 
@@ -394,7 +394,7 @@ begin
   select incentives into v_inc from public.incentives where user_id = v_user and month = v_month;
   v_tgt := (v_inc->0->>'targetValue')::numeric;
   if v_tgt <> 200000 then
-    raise exception 'mig 365: setting the goal did not reach the incentive line (target = %)', v_tgt;
+    raise exception 'mig 366: setting the goal did not reach the incentive line (target = %)', v_tgt;
   end if;
 
   -- 190000 / 200000 = 95%, so every holder of this line reads as achieved.
@@ -405,13 +405,13 @@ begin
   -- migration, which impersonates a real OL.
   select (v_tgt > 0 and 190000 >= v_tgt * 0.9) into v_done;
   if v_done is not true then
-    raise exception 'mig 365: 95%% of the goal did not satisfy the completion rule';
+    raise exception 'mig 366: 95%% of the goal did not satisfy the completion rule';
   end if;
   if not exists (
     select 1 from pg_proc p join pg_namespace s on s.oid = p.pronamespace
      where s.nspname = 'public' and p.proname = 'gmv_max_incentive_links'
   ) then
-    raise exception 'mig 365: the links RPC was not created';
+    raise exception 'mig 366: the links RPC was not created';
   end if;
 
   -- A hand-typed target must not survive a save.
@@ -421,7 +421,7 @@ begin
   select (incentives->0->>'targetValue')::numeric into v_tgt
     from public.incentives where user_id = v_user and month = v_month;
   if v_tgt <> 200000 then
-    raise exception 'mig 365: a hand-typed target drifted from the goal (target = %)', v_tgt;
+    raise exception 'mig 366: a hand-typed target drifted from the goal (target = %)', v_tgt;
   end if;
 
   -- A cleared row is frozen: the same edit sticks.
@@ -432,7 +432,7 @@ begin
   select (incentives->0->>'targetValue')::numeric into v_tgt
     from public.incentives where user_id = v_user and month = v_month;
   if v_tgt <> 555 then
-    raise exception 'mig 365: a paid row was rewritten by the sync — frozen history must stay frozen';
+    raise exception 'mig 366: a paid row was rewritten by the sync — frozen history must stay frozen';
   end if;
 
   delete from public.incentives            where user_id = v_user  and month = v_month;
@@ -443,6 +443,6 @@ begin
   delete from public.audit_log
    where entity_type = 'incentives' and after->>'month' = v_month;
 
-  raise notice 'mig 365: brand GMV goals now drive every GMV-Max incentive target; APC, TL, Ads Manager and the OL roll-up complete together';
+  raise notice 'mig 366: brand GMV goals now drive every GMV-Max incentive target; APC, TL, Ads Manager and the OL roll-up complete together';
 end;
 $verify$;

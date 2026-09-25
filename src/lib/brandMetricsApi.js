@@ -77,7 +77,7 @@ export async function saveBrandMonthlyMetrics(brandId, monthKey, values) {
 }
 
 // Who is on this brand's "Total Revenue in GMV Max" incentive for the month,
-// and whether the brand's figure has reached their target (mig 365).
+// and whether the brand's figure has reached their target (mig 366).
 //
 // The goal drives every one of those targets, so this is how the person setting
 // it sees the consequence: the APC, the Team Lead and the Ads Manager all read

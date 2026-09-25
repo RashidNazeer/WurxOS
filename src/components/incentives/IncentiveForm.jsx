@@ -89,7 +89,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
   const isGmvMax   = source === 'gmv_max';
   const isComm     = source === 'commission_tier';
   const isAuto     = !!source;
-  // A GMV-Max target is owned by the brand's monthly GMV goal (mig 365). Lock
+  // A GMV-Max target is owned by the brand's monthly GMV goal (mig 366). Lock
   // it only when a goal actually exists: otherwise a brand nobody has set a
   // goal for could never be given a target, and the line could never complete.
   const goalLocked = isGmvMax && Number(gmvGoal) > 0;
@@ -332,7 +332,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               title="Optional unit (e.g. %, $, pts) — leave blank for plain numbers"
             />
           </div>
-          {/* The link is enforced in the database (mig 365), so say where the
+          {/* The link is enforced in the database (mig 366), so say where the
               number comes from rather than letting someone type one that is
               silently replaced on save. When the brand has no goal yet the
               field stays editable, otherwise a brand nobody has set a goal for
@@ -590,7 +590,7 @@ export default function IncentiveForm() {
         setCommAlloc(await fetchBrandCommissionAllocations(currentMonth));
       } catch { /* ignore — the hint just will not show */ }
 
-      // The month's brand GMV goals, which own every GMV-Max target (mig 365).
+      // The month's brand GMV goals, which own every GMV-Max target (mig 366).
       // Advisory in the same way: without it the target simply stays editable,
       // and the database still applies the goal on save.
       try {
