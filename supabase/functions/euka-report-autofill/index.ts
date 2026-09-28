@@ -82,8 +82,24 @@ function errOut(stage: string, message: string, status = 500, detail?: unknown, 
 // So: every attempt is bounded, the whole request is bounded well inside the
 // edge wall clock, and running out of time is now a real error with a real
 // message instead of a dropped connection.
-const ATTEMPT_TIMEOUT_MS = 20_000;
-const TOTAL_BUDGET_MS = 90_000;
+//
+// WHY THESE NUMBERS, AND WHY THE TOTAL CANNOT SIMPLY BE RAISED
+// ------------------------------------------------------------
+// Supabase gives an edge function a 150s REQUEST IDLE TIMEOUT: if no response
+// has been sent by then the gateway returns its own 504 and our error never
+// reaches the browser. That 150s is a hard ceiling on every plan — the 400s
+// wall clock on paid plans does not move it. So the total budget must leave
+// room to build and send the response inside 150s, which is what 120s buys.
+//
+// The per-attempt cap is the part worth being generous with: Euka answering
+// slowly but correctly should SUCCEED, not be cut off. 45s is long enough for
+// a genuinely slow-but-working reply and still lets a dead connection fail
+// twice inside the budget.
+//
+// Needing more than this is a sign to ask Euka for less, not to wait longer —
+// which is why the MTD call now runs in parallel rather than after the others.
+const ATTEMPT_TIMEOUT_MS = 45_000;
+const TOTAL_BUDGET_MS = 120_000;
 
 function makeBudget(ms: number) {
   const endsAt = Date.now() + ms;
@@ -214,10 +230,24 @@ Deno.serve(async (req) => {
     const key = eukaKeyForSlug(String(brand.euka_slug));
     if (!key) return fail('config', `Euka key not configured for "${brand.brand_name}" — tell the developer.`, 500);
 
+    // ── Month-to-Date window ──────────────────────────────────────────
+    // The MTD month is decided by the WEEK'S END DATE: a week ending
+    // 2026-07-04 is July MTD (2026-07-01..04), even though it began in June.
+    // If the week already starts on the 1st, the weekly overview IS the MTD.
+    //
+    // This is the WIDEST window the function asks for — a week ending the 26th
+    // means 26 days, not 7 — so it is the likeliest slow call. It used to run
+    // sequentially AFTER the other three, which put the slowest request on the
+    // critical path behind everything else. It depends on nothing but the input
+    // dates, so it now goes in the same parallel batch: the whole function
+    // takes as long as its slowest call instead of the sum of two rounds.
+    const mtdStart = endDate.slice(0, 7) + '-01';
+    const needMtd = mtdStart !== startDate;
+
     // ── Fetch the exact-match stats (mirrors buildEukaAutofillData) ──
-    let overview: any, creatorsResp: any, prodResp: any;
+    let overview: any, creatorsResp: any, prodResp: any, mtdResp: any;
     try {
-      [overview, creatorsResp, prodResp] = await Promise.all([
+      [overview, creatorsResp, prodResp, mtdResp] = await Promise.all([
         eukaPost('/dashboard/performance-overview', { storeId, startDate, endDate }, key, budget, timings),
         eukaPost('/dashboard/top-creators-by-gmv', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 5 }, key, budget, timings).catch(() => null),
         // products-performance carries per-product affiliateGmv + orders itself.
@@ -226,13 +256,18 @@ Deno.serve(async (req) => {
         // filling. Ranked by total GMV; we re-rank by AFFILIATE GMV below, so
         // ask for more rows than the 5 we keep.)
         eukaPost('/dashboard/products-performance', { storeId, postedDateRange: { start: startDate, end: endDate }, pageSize: 25, sortField: 'gmv', sortOrder: 'DESC' }, key, budget, timings).catch(() => null),
+        // Best-effort: no MTD figure is a blank field, not a failed report.
+        needMtd
+          ? eukaPost('/dashboard/performance-overview', { storeId, startDate: mtdStart, endDate }, key,
+              budget, timings, 'performance-overview (MTD)').catch(() => null)
+          : Promise.resolve(null),
       ]);
     } catch (e) {
       // Out of time is its own failure and gets its own message: "Euka is slow
       // right now" is actionable, "Euka returned nothing" would be a lie.
       if ((e as any)?.timedOut) {
         return errOut('euka-timeout',
-          'Euka is not answering fast enough right now, so the auto-fill was stopped before it timed out. Try again in a few minutes, or fill this week in manually.',
+          'Euka did not answer within two minutes, so the auto-fill was stopped before the server cut it off. Euka is slow right now, not broken — try again in a few minutes, or fill this week in manually.',
           504, { ...(e as object), timings }, Date.now() - t0);
       }
       return errOut('euka-fetch', 'Euka did not return performance data for this period. It may be too recent (data not synced yet) or Euka may be temporarily unavailable. Try a slightly older week.', 502, { ...(e as object), timings }, Date.now() - t0);
@@ -241,23 +276,8 @@ Deno.serve(async (req) => {
       return fail('euka-empty', 'Euka returned no performance numbers for this period. Pick a week whose data has settled and try again.', 502, { overview, timings });
     }
 
-    // ── Month-to-Date GMV ─────────────────────────────────────────────
-    // The MTD month is decided by the WEEK'S END DATE: a week ending
-    // 2026-07-04 is July MTD (2026-07-01..04), even though it began in June.
-    // If the week already starts on the 1st, the weekly overview IS the MTD.
-    //
-    // This is the widest window the function asks for — a week ending the 26th
-    // means 26 days, not 7 — so it is the call most likely to be the slow one,
-    // and it runs AFTER the other three have already spent from the budget.
-    // It stays best-effort: no MTD figure is a blank field, not a failed report.
-    const mtdStart = endDate.slice(0, 7) + '-01';
-    let mtdOverview: any = overview;
-    if (mtdStart !== startDate) {
-      mtdOverview = await eukaPost(
-        '/dashboard/performance-overview', { storeId, startDate: mtdStart, endDate }, key,
-        budget, timings, 'performance-overview (MTD)',
-      ).catch(() => null);
-    }
+    // A week starting on the 1st IS its own MTD, so no second call was made.
+    const mtdOverview: any = needMtd ? mtdResp : overview;
     const mtdGmv = money(mtdOverview?.totalShopGMV);
 
     // Top creators — TOP 3 by GMV; exact fields only (units sold left blank).

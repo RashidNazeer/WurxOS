@@ -92,7 +92,11 @@ const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNa
 // until the platform kills the worker, and a killed worker returns no response
 // at all — the caller sees a dropped connection and blames the network. So cap
 // each attempt, and give the whole request a budget inside the edge wall clock.
-const ATTEMPT_TIMEOUT_MS = 20_000;
+// The total stays under Supabase's 150s request idle timeout — past that the
+// gateway sends its own 504 regardless of plan, so the ceiling is not ours to
+// raise. This one walks many creators, so its per-attempt cap stays tighter
+// than the autofills': one slow chunk must not eat the whole run.
+const ATTEMPT_TIMEOUT_MS = 30_000;
 const TOTAL_BUDGET_MS = 120_000;
 
 function makeBudget(ms: number) {

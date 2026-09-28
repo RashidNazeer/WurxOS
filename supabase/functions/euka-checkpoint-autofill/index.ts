@@ -59,8 +59,12 @@ const intOrNull = (v: unknown) => (v == null || Number.isNaN(Number(v)) ? null :
 // all — which surfaces as "TypeError: Failed to fetch" and gets blamed on the
 // user's internet. So every attempt is capped and the request as a whole has a
 // budget that stays inside the edge wall clock.
-const ATTEMPT_TIMEOUT_MS = 20_000;
-const TOTAL_BUDGET_MS = 90_000;
+// The total stays under Supabase's 150s request idle timeout — past that the
+// gateway sends its own 504 and our message never arrives, so the ceiling is
+// not ours to raise. The per-attempt cap is generous on purpose: Euka replying
+// slowly but correctly should succeed rather than be cut off.
+const ATTEMPT_TIMEOUT_MS = 45_000;
+const TOTAL_BUDGET_MS = 120_000;
 
 function makeBudget(ms: number) {
   const endsAt = Date.now() + ms;

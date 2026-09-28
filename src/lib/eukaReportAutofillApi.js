@@ -16,9 +16,10 @@ export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
   const accessToken = sess?.session?.access_token;
   if (!accessToken) throw new Error('Not signed in.');
 
-  // Longer than the function's own 90s budget, so its real error wins the race
-  // and we only abort when the server has genuinely stopped answering.
-  const CLIENT_TIMEOUT_MS = 120_000;
+  // Above the function's own 120s budget AND above Supabase's 150s request
+  // idle timeout, so a real server-side answer — ours or the gateway's 504 —
+  // always wins the race. We only abort when nothing at all came back.
+  const CLIENT_TIMEOUT_MS = 165_000;
 
   const t0 = Date.now();
   const ctl = new AbortController();
@@ -41,7 +42,7 @@ export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
     const elapsedMs = Date.now() - t0;
     const aborted = ctl.signal.aborted;
     const e = new Error(aborted
-      ? 'The server stopped responding after two minutes. Euka is most likely very slow right now — try again shortly, or fill this week in manually.'
+      ? 'The server stopped responding altogether. Euka is most likely very slow right now — try again shortly, or fill this week in manually.'
       : elapsedMs < 5000
         ? 'Could not reach the server. Check your internet and try again.'
         : `No response from the server after ${Math.round(elapsedMs / 1000)}s. The request was cut off rather than refused — this is usually Euka being slow, not your connection.`);
