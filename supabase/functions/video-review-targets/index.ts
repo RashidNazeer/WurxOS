@@ -87,12 +87,29 @@ const maxDate = (...ds: (string | null | undefined)[]) =>
 const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
 
 // ── Euka fetch with light retry (Pakistani ISPs + Euka throttling) ──
-async function eukaGet(path: string, key: string): Promise<any> {
+// The early rule-out above bounds how MANY calls this makes. It does not bound
+// how LONG one call can take: without a timeout a single hanging request runs
+// until the platform kills the worker, and a killed worker returns no response
+// at all — the caller sees a dropped connection and blames the network. So cap
+// each attempt, and give the whole request a budget inside the edge wall clock.
+const ATTEMPT_TIMEOUT_MS = 20_000;
+const TOTAL_BUDGET_MS = 120_000;
+
+function makeBudget(ms: number) {
+  const endsAt = Date.now() + ms;
+  return { left: () => endsAt - Date.now() };
+}
+type Budget = { left: () => number };
+
+async function eukaGet(path: string, key: string, budget: Budget): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 4; attempt++) {
+    const left = budget.left();
+    if (left <= 0) throw Object.assign(new Error(`Euka request ran out of time: ${path}`), { timedOut: true });
     try {
       const r = await fetch(EUKA_BASE + path, {
         headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(Math.min(ATTEMPT_TIMEOUT_MS, left)),
       });
       const text = await r.text();
       let data: any;
@@ -101,8 +118,14 @@ async function eukaGet(path: string, key: string): Promise<any> {
       lastErr = data?.error || `HTTP ${r.status}`;
       // 400s (bad params) won't fix on retry
       if (r.status === 400) return data;
-    } catch (e) { lastErr = e; }
-    await new Promise((res) => setTimeout(res, 400 * (attempt + 1)));
+    } catch (e) {
+      lastErr = e;
+      if (budget.left() <= 0) throw Object.assign(new Error(`Euka request ran out of time: ${path}`), { timedOut: true });
+    }
+    if (attempt === 3) break;
+    const backoff = 400 * (attempt + 1);
+    if (budget.left() <= backoff) break;
+    await new Promise((res) => setTimeout(res, backoff));
   }
   throw new Error(`Euka request failed: ${String(lastErr)}`);
 }
@@ -137,19 +160,23 @@ async function eukaGet(path: string, key: string): Promise<any> {
 // no-shortcuts ground truth (zero faults). It changes WHO IS SKIPPED, never who
 // gets a message.
 async function fullHistory(
-  handle: string, target: string, candStart: string, scope: string, key: string,
+  handle: string, target: string, candStart: string, scope: string, key: string, budget: Budget,
 ): Promise<{ skip: boolean; days: string[] }> {
   const vids = new Map<string, string>(); // video_id -> posted_date iso
   let end = target;
   let emptyStreak = 0;
   for (let i = 0; i < 13; i++) { // 13*70 ≈ 2.5 years — ample to find first 3
+    // Out of budget: stop walking back rather than keep asking for chunks we
+    // have no time to receive. An incomplete history can only fail to skip a
+    // creator, which errs toward sending a message rather than missing one.
+    if (budget.left() <= 0) break;
     const start = addDays(end, -69);
     let rows: any[] = [];
     try {
       const r = await eukaGet(
         `/data-export?type=creator_video_level&${scope}` +
         `&start_date=${start}&end_date=${end}&export_type=json&creator_handle=${encodeURIComponent(handle)}`,
-        key,
+        key, budget,
       );
       rows = Array.isArray(r?.data) ? r.data : [];
     } catch { rows = []; }
@@ -171,6 +198,8 @@ async function fullHistory(
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
+  const t0 = Date.now();
+  const budget = makeBudget(TOTAL_BUDGET_MS);
   try {
     // ── AuthN ────────────────────────────────────────────────────────
     const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
@@ -242,7 +271,7 @@ Deno.serve(async (req) => {
     const cv = await eukaGet(
       `/data-export?type=creator_videos&${scope}` +
       `&start_date=${candStart}&end_date=${candEnd}&export_type=json`,
-      key,
+      key, budget,
     );
     const windowVideos: any[] = Array.isArray(cv?.data) ? cv.data : [];
     const candidateHandles = [...new Set(
@@ -270,7 +299,7 @@ Deno.serve(async (req) => {
       while (idx < candidateHandles.length) {
         const handle = candidateHandles[idx++];
         let res: { skip: boolean; days: string[] };
-        try { res = await fullHistory(handle, target, candStart, scope, key); }
+        try { res = await fullHistory(handle, target, candStart, scope, key, budget); }
         catch { needsManual.push({ handle, note: 'history lookup failed — check manually' }); continue; }
         // Ruled out: 3+ videos predate the window, so all three messages fell due
         // days ago. Nothing due today — and NOT a manual case.
@@ -323,7 +352,10 @@ Deno.serve(async (req) => {
       },
     });
   } catch (err) {
-    console.error('video-review-targets failed:', err);
-    return json({ error: String(err) }, 500);
+    console.error('video-review-targets failed:', { err: String(err), elapsedMs: Date.now() - t0 });
+    if ((err as any)?.timedOut) {
+      return json({ error: 'Euka is not answering fast enough right now — try again in a few minutes.', elapsedMs: Date.now() - t0 }, 504);
+    }
+    return json({ error: String(err), elapsedMs: Date.now() - t0 }, 500);
   }
 });

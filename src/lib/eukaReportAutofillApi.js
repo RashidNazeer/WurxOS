@@ -16,25 +16,46 @@ export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
   const accessToken = sess?.session?.access_token;
   if (!accessToken) throw new Error('Not signed in.');
 
+  // Longer than the function's own 90s budget, so its real error wins the race
+  // and we only abort when the server has genuinely stopped answering.
+  const CLIENT_TIMEOUT_MS = 120_000;
+
+  const t0 = Date.now();
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), CLIENT_TIMEOUT_MS);
+
   let res, body;
   try {
     res = await fetch(`${base}/functions/v1/euka-report-autofill`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ brandId, startDate, endDate }),
+      signal: ctl.signal,
     });
   } catch (netErr) {
-    // Network-level failure (offline / DNS / CORS). Give a copyable shape.
-    const e = new Error('Could not reach the server. Check your internet and try again.');
-    e.detail = { stage: 'network', message: String(netErr) };
+    // No response at all. This used to say "check your internet", which was a
+    // guess: a dropped connection and an edge function killed mid-run raise the
+    // identical TypeError. So report what is actually known, and record how long
+    // it took — that is the number that separates the two causes. Fast means the
+    // request never left; slow means the server was working and got cut off.
+    const elapsedMs = Date.now() - t0;
+    const aborted = ctl.signal.aborted;
+    const e = new Error(aborted
+      ? 'The server stopped responding after two minutes. Euka is most likely very slow right now — try again shortly, or fill this week in manually.'
+      : elapsedMs < 5000
+        ? 'Could not reach the server. Check your internet and try again.'
+        : `No response from the server after ${Math.round(elapsedMs / 1000)}s. The request was cut off rather than refused — this is usually Euka being slow, not your connection.`);
+    e.detail = { stage: aborted ? 'client-timeout' : 'network', elapsedMs, message: String(netErr) };
     throw e;
+  } finally {
+    clearTimeout(timer);
   }
   try { body = await res.json(); } catch { body = null; }
 
   if (!res.ok || body?.error) {
     const err = body?.error || { stage: 'http', message: `Request failed (${res.status}).` };
     const e = new Error(typeof err === 'string' ? err : (err.message || 'Auto-fill failed.'));
-    e.detail = { httpStatus: res.status, ...(typeof err === 'object' ? err : {}) };
+    e.detail = { httpStatus: res.status, elapsedMs: Date.now() - t0, ...(typeof err === 'object' ? err : {}) };
     throw e;
   }
   return body;

@@ -54,46 +54,82 @@ function errOut(stage: string, message: string, status = 500, detail?: unknown) 
 const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
 const intOrNull = (v: unknown) => (v == null || Number.isNaN(Number(v)) ? null : Math.round(Number(v)));
 
-// POST /dashboard/* with light retry.
-async function eukaPost(path: string, body: unknown, key: string): Promise<any> {
+// An unbounded Euka call means this worker can be killed by the platform
+// instead of failing, and a killed worker answers the browser with nothing at
+// all — which surfaces as "TypeError: Failed to fetch" and gets blamed on the
+// user's internet. So every attempt is capped and the request as a whole has a
+// budget that stays inside the edge wall clock.
+const ATTEMPT_TIMEOUT_MS = 20_000;
+const TOTAL_BUDGET_MS = 90_000;
+
+function makeBudget(ms: number) {
+  const endsAt = Date.now() + ms;
+  return { left: () => endsAt - Date.now() };
+}
+type Budget = { left: () => number };
+
+// POST /dashboard/* with light retry, bounded per attempt and by the budget.
+async function eukaPost(path: string, body: unknown, key: string, budget: Budget): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
+    const left = budget.left();
+    if (left <= 0) throw { path, lastErr: lastErr ?? 'ran out of time before this call', timedOut: true };
     try {
       const r = await fetch(EUKA_BASE + path, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(Math.min(ATTEMPT_TIMEOUT_MS, left)),
       });
       const text = await r.text();
       let data: any; try { data = JSON.parse(text); } catch { data = text; }
       if (r.ok && !data?.error) return data;
       lastErr = { status: r.status, body: typeof data === 'string' ? data.slice(0, 300) : data };
       if (r.status === 400 || r.status === 401 || r.status === 403) break;
-    } catch (e) { lastErr = String(e); }
-    await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+    } catch (e) {
+      lastErr = String(e);
+      if (budget.left() <= 0) throw { path, lastErr, timedOut: true };
+    }
+    if (attempt === 2) break;
+    const backoff = 500 * (attempt + 1);
+    if (budget.left() <= backoff) break;
+    await new Promise((res) => setTimeout(res, backoff));
   }
-  throw { path, lastErr };
+  throw { path, lastErr, timedOut: budget.left() <= 0 };
 }
 
 // GET (for /data-export, which is a GET and never cached) with light retry.
-async function eukaGet(path: string, key: string): Promise<any> {
+async function eukaGet(path: string, key: string, budget: Budget): Promise<any> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 4; attempt++) {
+    const left = budget.left();
+    if (left <= 0) throw Object.assign(new Error(`Euka request ran out of time: ${path}`), { timedOut: true });
     try {
-      const r = await fetch(EUKA_BASE + path, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } });
+      const r = await fetch(EUKA_BASE + path, {
+        headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(Math.min(ATTEMPT_TIMEOUT_MS, left)),
+      });
       const text = await r.text();
       let data: any; try { data = JSON.parse(text); } catch { data = text; }
       if (r.ok && !data?.error) return data;
       lastErr = data?.error || `HTTP ${r.status}`;
       if (r.status === 400) return data;
-    } catch (e) { lastErr = e; }
-    await new Promise((res) => setTimeout(res, 400 * (attempt + 1)));
+    } catch (e) {
+      lastErr = e;
+      if (budget.left() <= 0) throw Object.assign(new Error(`Euka request ran out of time: ${path}`), { timedOut: true });
+    }
+    if (attempt === 3) break;
+    const backoff = 400 * (attempt + 1);
+    if (budget.left() <= backoff) break;
+    await new Promise((res) => setTimeout(res, backoff));
   }
   throw new Error(`Euka request failed: ${String(lastErr)}`);
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  const t0 = Date.now();
+  const budget = makeBudget(TOTAL_BUDGET_MS);
   try {
     // ── AuthN ──────────────────────────────────────────────────────
     const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
@@ -147,8 +183,8 @@ Deno.serve(async (req) => {
       + (eukaBrandId ? `&brand_id=${encodeURIComponent(eukaBrandId)}` : '')
       + `&start_date=${startDate}&end_date=${endDate}&export_type=json`;
     const [invitesResp, funnelResp] = await Promise.all([
-      eukaGet(`/data-export?${qs}`, key).catch((e) => ({ __err: String(e) })),
-      eukaPost('/dashboard/creator-outreach-funnel', { storeId, postedDateRange: { start: startDate, end: endDate } }, key).catch((e) => ({ __err: String(e) })),
+      eukaGet(`/data-export?${qs}`, key, budget).catch((e) => ({ __err: String(e) })),
+      eukaPost('/dashboard/creator-outreach-funnel', { storeId, postedDateRange: { start: startDate, end: endDate } }, key, budget).catch((e) => ({ __err: String(e) })),
     ]);
 
     const targetInvites = Array.isArray(invitesResp?.data) ? invitesResp.data.length : null;
@@ -175,6 +211,11 @@ Deno.serve(async (req) => {
       funnelError: funnelResp?.__err || null,
     });
   } catch (e) {
-    return errOut('unknown', 'Something went wrong pulling from Euka.', 500, String(e));
+    if ((e as any)?.timedOut) {
+      return errOut('euka-timeout',
+        'Euka is not answering fast enough right now, so the pull was stopped before it timed out. Try again in a few minutes.',
+        504, { err: String(e), elapsedMs: Date.now() - t0 });
+    }
+    return errOut('unknown', 'Something went wrong pulling from Euka.', 500, { err: String(e), elapsedMs: Date.now() - t0 });
   }
 });
