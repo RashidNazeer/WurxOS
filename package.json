@@ -12,7 +12,8 @@
     "dev:dev": "vite --mode dev",
     "build:dev": "vite build --mode dev",
     "test:halo-v2": "node scripts/halo-v2-tests.mjs",
-    "test:brand-switch": "node scripts/brand-switch-tests.mjs"
+    "test:brand-switch": "node scripts/brand-switch-tests.mjs",
+    "test:euka-timeouts": "npx --yes deno@latest run --no-lock --allow-read --allow-write --allow-net scripts/euka-timeout-tests.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
