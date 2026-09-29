@@ -11,7 +11,8 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { pickModel, respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { agentConfig, costUsd, type AgentConfig } from './config.ts';
+import { agentConfig, type AgentConfig } from './config.ts';
+import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
 import { buildInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
 import { ALL_TOOL_DEFS, CiteRegistry, runTool, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
@@ -24,7 +25,7 @@ export type TurnRequest = {
   displayName?: string | null;
   message: string;
   conversationId?: string | null;
-  surface?: 'quick' | 'full';          // quick panel → concise answers
+  surface?: 'quick' | 'full' | 'slack';  // quick panel → concise answers; slack = the internal relay
   pageContext?: PageContext | null;    // a hint only; never used for permissions
 };
 
@@ -75,6 +76,7 @@ export type CoreDeps = {
   apiKey: string;
   embed: (text: string) => Promise<number[] | null>;
   rerank?: Reranker;
+  meter?: UsageMeter;                // rerank + query-embedding usage of this question (→ ai_usage_log)
   now?: () => Date;
   llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam
   requestId?: string;
@@ -86,7 +88,7 @@ const ZERO: Usage = { input: 0, cached: 0, output: 0, reasoning: 0 };
 const add = (a: Usage, b: Usage): Usage => ({ input: a.input + b.input, cached: a.cached + b.cached, output: a.output + b.output, reasoning: a.reasoning + b.reasoning });
 
 async function loadConfig(admin: any) {
-  const { data } = await admin.from('ai_assistant_config').select('persona, model, enabled, retrieval').eq('id', 1).maybeSingle();
+  const { data } = await admin.from('ai_assistant_config').select('persona, model, enabled, retrieval, prices').eq('id', 1).maybeSingle();
   return data ?? {};
 }
 
@@ -120,6 +122,22 @@ export function trimHistory(rowsNewestFirst: { role: string; content: string }[]
 }
 
 class Stop extends Error {}
+
+// The spend of a question outside the chat model, as ai_usage_log rows.
+export function usageRows(meter: UsageMeter | undefined, prices: Prices, who: { user_id: string; request_id: string }) {
+  const rows: Record<string, unknown>[] = [];
+  if (meter?.rerank.calls) {
+    const r = meter.rerank;
+    rows.push({ ...who, kind: 'rerank', model: r.model, calls: r.calls, tokens_in: r.input, tokens_cached: r.cached, tokens_out: r.output,
+      est_cost_usd: Number(costUsd(prices, r.model, { input: r.input, cached: r.cached, output: r.output }).usd.toFixed(6)) });
+  }
+  if (meter?.embed.calls) {
+    const m = meter.embed;
+    rows.push({ ...who, kind: 'embed_query', model: m.model, calls: m.calls, tokens_in: m.input,
+      est_cost_usd: Number(costUsd(prices, m.model, { input: m.input }).usd.toFixed(6)) });
+  }
+  return rows;
+}
 
 export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Promise<TurnResult> {
   const t0 = Date.now();
@@ -190,7 +208,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const persona = effectivePersona(row.persona);
   const toolsCalled: string[] = [];
   let serious = isSeriousTopic(message);
-  const surface = cleanSurface(req.surface);
+  const surface = req.surface === 'slack' ? 'slack' : cleanSurface(req.surface);
   const notes = [
     ...(surface === 'quick' ? ['SURFACE: the quick-chat panel. Keep the answer short: at most ~120 words or 5 bullets, the key facts with their citations, and offer the full version ("Open in Buddy ↗" shows more).'] : []),
     ...[await pageContextNote(admin, req.userId, req.pageContext ?? null)].filter((x): x is string => !!x),
@@ -312,7 +330,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   if (serious) flags.serious = true;
   if (cancelled) flags.cancelled = true;
   const retrieved = reg.retrieved.map((r) => ({ ...r, cited: cited.has(r.cite) }));
-  const est = costUsd(agent, model, usage);
+  const prices = pricesFrom(row.prices);
+  const est = costUsd(prices, model, usage).usd;
 
   // Finish the reply row (the thing the UI trusts), then log. A failure here
   // must not lose the answer already streamed: the row is retried once.
@@ -338,7 +357,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     }
   }
   const logRow = {
-    conversation_id: conversationId, rounds, tools: toolLogs, retrieved,
+    conversation_id: conversationId, surface, rounds, tools: toolLogs, retrieved,
     tokens_in: usage.input, tokens_cached: usage.cached, tokens_out: usage.output, est_cost_usd: Number(est.toFixed(5)),
     latency_ms: Date.now() - t0, first_token_ms: firstTokenMs, error, flags,
   };
@@ -349,6 +368,15 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (e) throw e;
   } catch (e) {
     console.error('ai_request_log write failed', (e as Error)?.message ?? e);
+  }
+  const extra = usageRows(deps.meter, prices, { user_id: req.userId, request_id: requestId });
+  if (extra.length) {
+    try {
+      const { error: e } = await admin.from('ai_usage_log').insert(extra);
+      if (e) throw e;
+    } catch (e) {
+      console.error('ai_usage_log write failed', (e as Error)?.message ?? e);
+    }
   }
 
   emit({ done: true, conversationId, requestId, messageId, status, ...(cancelled ? { cancelled: true } : {}) });

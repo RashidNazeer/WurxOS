@@ -251,6 +251,20 @@ export async function ingestStats() {
   return data;
 }
 
+// Boss-only usage and cost estimate, PKT dates (YYYY-MM-DD, inclusive).
+export async function usageSummary(from, to) {
+  const { data, error } = await supabase.rpc('ai_usage_summary', { p_from: from, p_to: to });
+  if (error) throw new Error(/not allowed|boss/i.test(error.message) ? 'not allowed' : error.message);
+  return data;
+}
+
+// Report-only: Buddy is never blocked by it. null clears it.
+export async function setMonthlyBudget(usd) {
+  const { error } = await supabase.from('ai_assistant_config')
+    .update({ monthly_budget_usd: usd, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
+}
+
 export const INGEST_SOURCES = [
   ['kb_article', 'Knowledge Base SOPs'],
   ['ai_doc', 'Curated knowledge docs'],

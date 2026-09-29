@@ -20,15 +20,20 @@ export function cachedEmbedder(embed: (text: string) => Promise<number[]>, ttlMs
   };
 }
 
-export function openAiQueryEmbedder(apiKey: string, fetchImpl?: typeof fetch): (text: string) => Promise<number[]> {
-  return async (text) => (await embedTexts([text], { apiKey, fetchImpl, maxRetries: 1, timeoutMs: 10_000 })).vectors[0];
+// onUsage: the tokens billed (a cache hit in cachedEmbedder bills nothing).
+export function openAiQueryEmbedder(apiKey: string, fetchImpl?: typeof fetch, onUsage?: (tokens: number) => void): (text: string) => Promise<number[]> {
+  return async (text) => {
+    const r = await embedTexts([text], { apiKey, fetchImpl, maxRetries: 1, timeoutMs: 10_000 });
+    onUsage?.(r.usage.totalTokens);
+    return r.vectors[0];
+  };
 }
 
 // One call scores every candidate 0–10 for "answers the question". Output is
 // forced to JSON; a malformed reply throws and searchIndex keeps its order.
 export function openAiReranker(opts: {
   apiKey: string; model: string; fetchImpl?: typeof fetch; timeoutMs?: number;
-  onUsage?: (u: { input_tokens: number; output_tokens: number }) => void;
+  onUsage?: (u: { input_tokens: number; output_tokens: number; cached_tokens?: number }) => void;
 }): Reranker {
   const doFetch = opts.fetchImpl ?? fetch;
   return async (query, items) => {
@@ -52,7 +57,7 @@ export function openAiReranker(opts: {
       });
       if (!res.ok) throw new Error(`rerank HTTP ${res.status}`);
       const json = await res.json();
-      if (json.usage) opts.onUsage?.({ input_tokens: json.usage.input_tokens ?? 0, output_tokens: json.usage.output_tokens ?? 0 });
+      if (json.usage) opts.onUsage?.({ input_tokens: json.usage.input_tokens ?? 0, output_tokens: json.usage.output_tokens ?? 0, cached_tokens: json.usage.input_tokens_details?.cached_tokens ?? 0 });
       const text = json.output_text ?? json.output?.flatMap((o: any) => o.content ?? []).find((c: any) => c.type === 'output_text')?.text;
       const scores = JSON.parse(String(text)).scores;
       if (!Array.isArray(scores) || scores.length !== items.length) throw new Error('rerank: bad scores');

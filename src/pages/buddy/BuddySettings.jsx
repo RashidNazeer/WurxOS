@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyWithRetry as lazy } from '../../lib/lazyWithRetry';
 import {
   getAiConfig, updateAiConfig, listDocs, saveDoc, deleteDoc,
   getSlackConfig, setSlackEnabled, listSlackRelayLog,
@@ -13,6 +14,9 @@ import { BUDDY_GREETING, greetingIsDefault } from '../../lib/buddyLogic';
 // ai_run_ingestion RPC enforces it). Everything else: Boss only (RLS on the
 // config / docs / exclusion tables enforces it; this page only hides it).
 
+// Boss-only; its own chunk because it brings recharts.
+const BuddyUsage = lazy(() => import('./BuddyUsage'));
+
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 
 export default function BuddySettings({ role }) {
@@ -22,6 +26,9 @@ export default function BuddySettings({ role }) {
       <IngestionCard />
       {isBoss && (
         <>
+          <Suspense fallback={<div className="bd-card"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}>
+            <BuddyUsage />
+          </Suspense>
           <SourcesCard />
           <ExcludedCard />
           <BehaviourCard />

@@ -6,6 +6,7 @@ import { supabaseRpc } from '../ingest/db.ts';
 import { cachedEmbedder, openAiQueryEmbedder, openAiReranker } from '../retrieval/rerank.ts';
 import { RETRIEVAL_DEFAULTS } from '../retrieval/config.ts';
 import { DEFAULT_CONFIG } from '../config.ts';
+import { UsageMeter } from '../prices.ts';
 import { cleanPageContext, cleanSurface, requestCancel, type CoreDeps } from './core.ts';
 import { json, turnResponse, type TurnHttp } from './http.ts';
 
@@ -75,6 +76,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
   const userClient = caller.token
     ? env.createClient(env.url, env.anonKey, { global: { headers: { Authorization: `Bearer ${caller.token}` } }, auth: { persistSession: false, autoRefreshToken: false } })
     : null;
+  const meter = new UsageMeter();
   return {
     admin,
     searchRpc: supabaseRpc(userClient ?? admin),
@@ -84,8 +86,9 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     // local --as-user) there is none, and non-Boss people tools refuse.
     ...(userClient ? { userClient } : {}),
     apiKey: env.openAiKey,
-    embed: cachedEmbedder(openAiQueryEmbedder(env.openAiKey, env.fetchImpl), DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
-    rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl }),
+    embed: cachedEmbedder(openAiQueryEmbedder(env.openAiKey, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL)), DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
+    rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl, onUsage: meter.onRerank(RETRIEVAL_DEFAULTS.RERANK_MODEL) }),
+    meter,
   };
 }
 
@@ -102,7 +105,7 @@ export async function handleAsk(env: ServerEnv, admin: any, caller: Caller, body
   if (body?.conversationId && !conversationId) return { response: json({ error: 'conversation not found' }, 404), done: Promise.resolve() };
   return turnResponse({
     userId: caller.userId, role: caller.role, displayName: caller.displayName, message: String(body?.message ?? ''), conversationId,
-    surface: cleanSurface(body?.surface), pageContext: cleanPageContext(body?.page_context),
+    surface: caller.internal ? 'slack' : cleanSurface(body?.surface), pageContext: cleanPageContext(body?.page_context),
   }, deps, body?.stream === true);
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

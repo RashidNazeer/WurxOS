@@ -10,7 +10,7 @@ import {
   buddyReducer as R, initialBuddyState as S0, deriveMood, unreadCount, unreadTitle, serverUnread,
   parseSse, friendlyError, findReply, isFinal, isStuck, STUCK_MS, watchReply, questionBefore,
   groupConversations, pageContextFor, pageChips, citeHtml, orderSources, sourceLink, BUDDY_ROLES, greetingText,
-  buddyRoles, rowToMessage,
+  buddyRoles, rowToMessage, fmtUsd, fmtCount, fmtMs, fmtPct, pktDate, usageRange,
 } from '../src/lib/buddyLogic.js';
 
 let passed = 0, failed = 0;
@@ -22,6 +22,22 @@ function check(name, cond, detail) {
 const run = (state, ...actions) => actions.reduce(R, state);
 const T0 = '2026-09-30T10:00:00.000Z';
 const C1 = '11111111-1111-4111-8111-111111111111';
+
+// ── usage formatting (Boss usage panel) ─────────────────────────
+{
+  check('usd: 2 decimals from $1', fmtUsd(1234.5) === '$1,234.50' && fmtUsd(1) === '$1.00' && fmtUsd('859.95') === '$859.95', fmtUsd(1234.5));
+  check('usd: 4 decimals under $1', fmtUsd(0.01234) === '$0.0123' && fmtUsd(0.5) === '$0.5000', fmtUsd(0.01234));
+  check('usd: zero and missing', fmtUsd(0) === '$0.00' && fmtUsd(null) === '—' && fmtUsd('x') === '—');
+  check('count: thousands separators', fmtCount(1234567) === '1,234,567' && fmtCount(0) === '0' && fmtCount(undefined) === '—');
+  check('ms / pct', fmtMs(850) === '850 ms' && fmtMs(4321) === '4.3 s' && fmtPct(12.6) === '13%' && fmtPct(null) === '—');
+  // 2026-09-30 21:00 UTC is already Oct 1 in Pakistan (UTC+5).
+  const late = new Date('2026-09-30T21:00:00Z');
+  check('pktDate: Pakistan calendar day', pktDate(late) === '2026-10-01', pktDate(late));
+  const now = new Date('2026-03-05T06:00:00Z');
+  check('range: 7 days inclusive', JSON.stringify(usageRange('7d', now)) === '{"from":"2026-02-27","to":"2026-03-05"}', JSON.stringify(usageRange('7d', now)));
+  check('range: 30 days default', usageRange('30d', now).from === '2026-02-04' && usageRange('whatever', now).from === '2026-02-04');
+  check('range: this month', JSON.stringify(usageRange('month', late)) === '{"from":"2026-10-01","to":"2026-10-01"}');
+}
 
 // ── server-side Stop (mig 386) ──────────────────────────────────
 {

@@ -303,6 +303,26 @@
 .bd-modal-backdrop { position: fixed; inset: 0; z-index: 1080; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--surface-0) 55%, transparent); backdrop-filter: blur(4px); }
 .bd-modal { width: 600px; max-width: 100%; background: var(--surface-1); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-xl); }
 
+/* ---------- Usage (Boss) ---------- */
+.bd-usage-range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.bd-usage-dates { display: inline-flex; align-items: center; gap: 6px; }
+.bd-usage-dates input { width: 150px; }
+.bd-usage-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 12px; }
+.bd-usage-chart { margin: 0 0 10px; }
+.bd-usage-outcomes {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--text-secondary);
+  padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface-2); margin-bottom: 12px;
+}
+.bd-usage-outcomes b { color: var(--text-primary); }
+.bd-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.bd-usage-table { min-width: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 4px 6px 6px; }
+.bd-usage-table table, .bd-usage-prices table { --bs-table-bg: transparent; --bs-table-color: var(--text-primary); font-size: 12.5px; }
+.bd-usage-table th, .bd-usage-prices th { color: var(--text-muted); font-weight: 700; font-size: 11px; border-color: var(--border-subtle); white-space: nowrap; }
+.bd-usage-table td, .bd-usage-prices td { border-color: var(--border-subtle); max-width: 180px; font-variant-numeric: tabular-nums; }
+.bd-usage-budget { border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-bottom: 10px; }
+.bd-usage-prices summary { cursor: pointer; margin-bottom: 6px; }
+.bd-usage-prices a { color: var(--accent); }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1199px) {
   .bd-page { grid-template-columns: 240px minmax(0, 1fr) auto; }
@@ -325,6 +345,10 @@
   }
   .bd-exclude-form { grid-template-columns: 1fr; }
   .bd-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bd-usage-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 992px) and (max-width: 1399px) {
+  .bd-usage-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @keyframes bd-sheet { from { transform: translateY(40%); opacity: 0; } to { transform: none; opacity: 1; } }
 

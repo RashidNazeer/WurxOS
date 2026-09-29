@@ -430,6 +430,49 @@ export function firstName(profile) {
   return n ? n.split(/\s+/)[0] : '';
 }
 
+// ── usage (Boss) ───────────────────────────────────────────────────
+// USD: 2 decimals, 4 under $1 so a few cents of tokens still read.
+export function fmtUsd(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  const v = Number(n);
+  const d = v !== 0 && Math.abs(v) < 1 ? 4 : 2;
+  return `${v < 0 ? '-' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+}
+
+export const fmtCount = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : Math.round(Number(n)).toLocaleString('en-US'));
+
+export function fmtMs(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  return n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${Math.round(n)} ms`;
+}
+
+export const fmtPct = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : `${Math.round(Number(n))}%`);
+
+// Today in Pakistan time (the app's timezone), as YYYY-MM-DD.
+export const pktDate = (now = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+
+const addDays = (ymd, n) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+// Range presets → { from, to } (inclusive PKT dates) for ai_usage_summary.
+export function usageRange(preset, now = new Date()) {
+  const to = pktDate(now);
+  if (preset === '7d') return { from: addDays(to, -6), to };
+  if (preset === 'month') return { from: `${to.slice(0, 8)}01`, to };
+  return { from: addDays(to, -29), to };
+}
+
+export const USAGE_KIND_LABEL = {
+  chat: 'Chat (answers)',
+  rerank: 'Search rerank',
+  embeddings_query: 'Query embeddings',
+  embeddings_ingest: 'Ingestion embeddings',
+};
+
 // ── sources ────────────────────────────────────────────────────────
 const SOURCE_LABEL = {
   kb_article: 'SOP', ai_doc: 'Guide', app_guide: 'App guide', tts_article: 'TikTok Academy',
