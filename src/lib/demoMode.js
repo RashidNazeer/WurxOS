@@ -94,6 +94,7 @@ export const DEMO_DISABLED_HINT =
 // so on are the product, and they only ever touch the demo's own database.
 export const DEMO_BLOCKED_FUNCTIONS = new Set([
   'ai-chat',
+  'assistant',
   'euka-api',
   'euka-checkpoint-autofill',
   'euka-report-autofill',

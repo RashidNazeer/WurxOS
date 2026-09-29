@@ -1,0 +1,477 @@
+// Wurx Buddy: the pure parts (no React, no Supabase, no import.meta), so
+// scripts/buddy-tests.mjs can run them under plain Node.
+//   • buddyReducer: conversations, threads, in-flight replies, unread, panel
+//   • deriveMood: which clip the floating Buddy plays
+//   • parseSse / friendlyError: the transport contract
+//   • findReply / watchReply: picking up a reply after the stream dropped
+//   • history groups, page-aware chips, role starter cards
+
+// Who sees Buddy comes from ai_assistant_config.allowed_roles (the same list
+// the assistant function enforces). This is only the fallback when that read
+// fails, and it fails closed.
+export const BUDDY_ROLES = ['boss'];
+
+export function buddyRoles(allowedRoles) {
+  return Array.isArray(allowedRoles) ? allowedRoles.map((r) => String(r).toLowerCase()) : BUDDY_ROLES;
+}
+
+export const TMP_PREFIX = 'tmp:';
+export const isTmpKey = (k) => typeof k === 'string' && k.startsWith(TMP_PREFIX);
+
+// ── state ──────────────────────────────────────────────────────────
+export const initialBuddyState = {
+  convs: [],        // ai_conversations rows (own only), newest first
+  threads: {},      // key → { messages: [], loaded: bool }
+  inflight: {},     // key → { status, startedAt, recovering, text }
+  unread: {},       // conversation id → true
+  readAt: {},       // conversation id → ms the user last saw it here (beats a stale server read)
+  panel: 'closed',  // closed | open | minimised
+  quickKey: null,   // the quick panel's conversation
+  pageKey: null,    // the /buddy tab's conversation
+  bounce: 0,        // bumps once per reply that lands unseen (the FAB bounces on change)
+  denied: false,    // the backend refused this role (403)
+  stopped: {},      // key → true: the user pressed Stop; its late reply is not "unread"
+};
+
+const ms = (iso) => (iso ? new Date(iso).getTime() || 0 : 0);
+
+// A reply the user has not seen, per the server columns (§6): last_reply_at
+// after last_read_at, and after anything this client marked read.
+export function serverUnread(conv, readAtMs = 0) {
+  const reply = ms(conv?.last_reply_at);
+  if (!reply) return false;
+  return reply > Math.max(ms(conv.last_read_at), readAtMs || 0);
+}
+
+function renameKey(obj, from, to) {
+  if (!(from in obj)) return obj;
+  const { [from]: v, ...rest } = obj;
+  return { ...rest, [to]: v };
+}
+
+function patchLastAssistant(thread, fn) {
+  const messages = (thread?.messages || []).slice();
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') { messages[i] = fn(messages[i]); break; }
+  }
+  return { ...(thread || { loaded: true }), messages };
+}
+
+export function buddyReducer(state, a) {
+  switch (a.type) {
+    case 'CONVS_LOADED': {
+      const unread = { ...state.unread };
+      for (const c of a.convs) if (!state.stopped?.[c.id] && serverUnread(c, state.readAt[c.id])) unread[c.id] = true;
+      return { ...state, convs: a.convs, unread };
+    }
+    case 'THREAD_LOADED':
+      // Never clobber a thread that is streaming right now.
+      if (state.inflight[a.key] && !state.inflight[a.key].recovering) return state;
+      return { ...state, threads: { ...state.threads, [a.key]: { messages: a.messages, loaded: true } } };
+    case 'SEND_START': {
+      const t = state.threads[a.key] || { messages: [], loaded: true };
+      const messages = [
+        ...t.messages,
+        { role: 'user', content: a.text, created_at: a.at },
+        { role: 'assistant', content: '', pending: true, created_at: a.at, sources: [] },
+      ];
+      const { [a.key]: _s, ...stopped } = state.stopped || {};
+      return {
+        ...state,
+        stopped,
+        threads: { ...state.threads, [a.key]: { ...t, messages } },
+        inflight: { ...state.inflight, [a.key]: { status: 'On it…', startedAt: a.at, recovering: false, text: a.text } },
+      };
+    }
+    case 'STATUS':
+      // While stopping, keep saying so.
+      if (!state.inflight[a.key] || state.inflight[a.key].stopping) return state;
+      return { ...state, inflight: { ...state.inflight, [a.key]: { ...state.inflight[a.key], status: a.status } } };
+    case 'MSG_ID':
+      // The reply row's id ({started}, or found by recovery): what Stop cancels.
+      if (!state.inflight[a.key] || state.inflight[a.key].messageId === a.messageId) return state;
+      return { ...state, inflight: { ...state.inflight, [a.key]: { ...state.inflight[a.key], messageId: a.messageId } } };
+    case 'STOPPING': {
+      // Cancel sent; the stream (or the watcher) still runs to its done.
+      if (!state.inflight[a.key]) return state;
+      const { [a.key]: _u, ...unread } = state.unread;
+      return {
+        ...state, unread, stopped: { ...(state.stopped || {}), [a.key]: true },
+        inflight: { ...state.inflight, [a.key]: { ...state.inflight[a.key], stopping: true, status: 'Stopping…' } },
+      };
+    }
+    case 'DELTA':
+      if (!state.inflight[a.key]) return state;
+      return { ...state, threads: { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => ({ ...m, content: m.content + a.delta })) } };
+    case 'SOURCES':
+      return { ...state, threads: { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => ({ ...m, sources: a.sources })) } };
+    case 'CONV_ID': {
+      if (a.from === a.to) return state;
+      return {
+        ...state,
+        threads: renameKey(state.threads, a.from, a.to),
+        inflight: renameKey(state.inflight, a.from, a.to),
+        stopped: renameKey(state.stopped || {}, a.from, a.to),
+        quickKey: state.quickKey === a.from ? a.to : state.quickKey,
+        pageKey: state.pageKey === a.from ? a.to : state.pageKey,
+      };
+    }
+    case 'DONE':
+    case 'RECOVERED': {
+      if (!state.inflight[a.key]) return state;
+      const { [a.key]: _gone, ...inflight } = state.inflight;
+      const threads = a.type === 'RECOVERED' && a.messages
+        ? { ...state.threads, [a.key]: { messages: a.messages, loaded: true } }
+        : { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => ({
+            ...m, pending: false, requestId: a.requestId ?? m.requestId, id: a.messageId ?? m.id,
+            status: a.status ?? m.status ?? null,
+            // A cancelled reply is "Stopped", not an error.
+            stopped: !!a.cancelled || !!m.stopped,
+            error: a.cancelled ? null : a.error || m.error || (a.status === 'error' ? 'Buddy hit a problem with this answer.' : null),
+          })) };
+      const unseen = !a.viewed && !isTmpKey(a.key) && !a.cancelled && !state.stopped?.[a.key];
+      return {
+        ...state, threads, inflight,
+        unread: unseen ? { ...state.unread, [a.key]: true } : state.unread,
+        bounce: unseen ? state.bounce + 1 : state.bounce,
+      };
+    }
+    case 'RESUME':
+      // A reply still generating from before a reload.
+      if (state.inflight[a.key]) return state;
+      return { ...state, inflight: { ...state.inflight, [a.key]: { status: 'Buddy is still working on this…', startedAt: a.at, recovering: true, text: null, messageId: a.messageId ?? null } } };
+    case 'RESET':
+      return initialBuddyState;
+    case 'RECOVERING':
+      if (!state.inflight[a.key]) return state;
+      return { ...state, inflight: { ...state.inflight, [a.key]: { ...state.inflight[a.key], recovering: true, status: a.status || state.inflight[a.key].status } } };
+    case 'RECOVER_TICK':
+      if (!state.inflight[a.key]) return state;
+      return { ...state, threads: { ...state.threads, [a.key]: { messages: a.messages, loaded: true } } };
+    case 'FAILED': {
+      const { [a.key]: _gone, ...inflight } = state.inflight;
+      let t = state.threads[a.key] || { messages: [], loaded: true };
+      if (a.denied) {
+        // Drop the turn we optimistically added: the backend never took it.
+        t = { ...t, messages: t.messages.slice(0, -2) };
+      } else {
+        t = patchLastAssistant(t, (m) => ({ ...m, pending: false, error: a.error, content: m.content || '' }));
+      }
+      return { ...state, inflight, threads: { ...state.threads, [a.key]: t }, denied: state.denied || !!a.denied };
+    }
+    case 'STOPPED': {
+      if (!state.inflight[a.key]) return state;
+      const { [a.key]: _gone, ...inflight } = state.inflight;
+      const { [a.key]: _u, ...unread } = state.unread;
+      return {
+        ...state, inflight, unread, stopped: { ...(state.stopped || {}), [a.key]: true },
+        threads: { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => ({ ...m, pending: false, stopped: true })) },
+      };
+    }
+    case 'MARK_READ': {
+      if (!state.unread[a.id] && state.readAt[a.id] && a.at <= state.readAt[a.id]) return state;
+      const { [a.id]: _gone, ...unread } = state.unread;
+      return { ...state, unread, readAt: { ...state.readAt, [a.id]: a.at } };
+    }
+    case 'PANEL':
+      return { ...state, panel: a.panel, quickKey: a.quickKey !== undefined ? a.quickKey : state.quickKey };
+    case 'QUICK_KEY':
+      return { ...state, quickKey: a.key };
+    case 'PAGE_KEY':
+      return { ...state, pageKey: a.key };
+    case 'CONV_PATCH':
+      return { ...state, convs: state.convs.map((c) => (c.id === a.id ? { ...c, ...a.patch } : c)) };
+    case 'CONV_REMOVE': {
+      const { [a.id]: _t, ...threads } = state.threads;
+      const { [a.id]: _u, ...unread } = state.unread;
+      return {
+        ...state, threads, unread,
+        convs: state.convs.filter((c) => c.id !== a.id),
+        quickKey: state.quickKey === a.id ? null : state.quickKey,
+        pageKey: state.pageKey === a.id ? null : state.pageKey,
+      };
+    }
+    default:
+      return state;
+  }
+}
+
+export const unreadCount = (state) => Object.keys(state.unread).length;
+
+// idle → thinking (anything generating, panel open or not) → happy (a reply
+// landed unseen). Generating wins: the user should see Buddy is still busy.
+export function deriveMood(state) {
+  if (Object.keys(state.inflight).length) return 'thinking';
+  if (unreadCount(state)) return 'happy';
+  return 'idle';
+}
+
+export function unreadTitle(n) {
+  return n > 0 ? `(${n}) Buddy replied` : null;
+}
+
+// ── transport ──────────────────────────────────────────────────────
+// Feed raw SSE text; returns [events, rest]. Events are the JSON after `data:`.
+export function parseSse(buffer) {
+  const lines = buffer.split('\n');
+  const rest = lines.pop() ?? '';
+  const events = [];
+  for (const line of lines) {
+    const s = line.trim();
+    if (!s.startsWith('data:')) continue;
+    const payload = s.slice(5).trim();
+    if (!payload) continue;
+    try { events.push(JSON.parse(payload)); } catch { /* partial or junk line */ }
+  }
+  return [events, rest];
+}
+
+// A refusal (JSON + status) → what Buddy says, and whether it's the role gate.
+export function friendlyError(status, serverMsg = '') {
+  const msg = String(serverMsg || '');
+  switch (status) {
+    case 400:
+      if (/too long/i.test(msg)) return { text: "That's a bit long for me. Could you shorten it and ask again?" };
+      return { text: "I couldn't read that message. Please try again." };
+    case 401:
+      return { text: 'Your session has expired. Please sign in again.' };
+    case 403:
+      return { text: 'Buddy is coming to your role soon.', denied: true };
+    case 404:
+      return { text: "I couldn't find that conversation. Start a new chat and ask again." };
+    case 429:
+      return { text: 'Buddy needs a short break, try again in a minute 🐾' };
+    case 503:
+      return { text: 'Buddy is switched off by an admin right now. Please try again later.' };
+    default:
+      return { text: 'Something went wrong. Please try again.' };
+  }
+}
+
+// ── picking up a reply after the stream dropped ────────────────────
+// The assistant row that answers `userText`: the first assistant message after
+// the LAST user message with that text. Order-based, so client/server clock
+// skew doesn't matter.
+export function findReply(messages, userText) {
+  const want = String(userText || '').trim();
+  let u = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user' && String(messages[i].content || '').trim() === want) { u = i; break; }
+  }
+  if (u < 0) return null;
+  for (let i = u + 1; i < messages.length; i++) if (messages[i].role === 'assistant') return messages[i];
+  return null;
+}
+
+// No status column (older backend) means the row only exists once finished.
+export const isFinal = (m) => !!m && (m.status == null || m.status === 'done' || m.status === 'error');
+
+// An ai_messages row → a thread message. A reply the user stopped is saved as
+// status 'error' + meta.cancelled (mig 386): shown as "Stopped", not an error.
+// A timed-out or stale row (meta.stale) keeps its error.
+export const rowToMessage = (r) => ({
+  id: r.id, role: r.role, content: r.content || '', created_at: r.created_at,
+  status: r.status ?? null,
+  sources: r.meta?.sources || [],
+  requestId: r.meta?.requestId || null,
+  stopped: r.meta?.cancelled === true,
+  error: r.status === 'error' && r.meta?.cancelled !== true ? (r.meta?.error || 'Buddy hit a problem with this answer.') : null,
+});
+
+// A reply row still `generating` after this long is lost (Lead, 2026-09-30):
+// the UI offers Retry instead of waiting on it.
+export const STUCK_MS = 3 * 60000;
+export const isStuck = (m, now = Date.now()) =>
+  !!m && m.status === 'generating' && now - ms(m.created_at) > STUCK_MS;
+
+// The question an assistant message answered: the nearest user turn before it.
+export function questionBefore(messages, idx) {
+  for (let i = idx - 1; i >= 0; i--) if (messages[i].role === 'user') return messages[i].content;
+  return null;
+}
+
+// Poll + Realtime until pick(messages) is final. Resolves { messages, reply };
+// rejects on timeout or cancel. Deps are injected so tests can fake them.
+export function watchReply({ fetchMessages, subscribe, pick, onTick, pollMs = 4000, timeoutMs = 240000, addOnline }) {
+  let stopped = false;
+  let timer = null;
+  let unsub = () => {};
+  let offOnline = () => {};
+  let busy = false;
+  let again = false;
+  const cleanup = () => {
+    stopped = true;
+    clearInterval(timer);
+    clearTimeout(deadline);
+    try { unsub(); } catch { /* ignore */ }
+    try { offOnline(); } catch { /* ignore */ }
+  };
+  let deadline;
+  let rejectFn = () => {};
+  const promise = new Promise((resolve, reject) => {
+    rejectFn = reject;
+    const check = async () => {
+      if (stopped) return;
+      if (busy) { again = true; return; }
+      busy = true;
+      try {
+        const messages = await fetchMessages();
+        if (stopped) return;
+        const reply = pick(messages);
+        onTick?.(messages, reply);
+        if (reply && isFinal(reply)) { cleanup(); resolve({ messages, reply }); }
+      } catch { /* flaky network: the next tick retries */ }
+      finally {
+        busy = false;
+        if (again && !stopped) { again = false; check(); }
+      }
+    };
+    deadline = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
+    timer = setInterval(check, pollMs);
+    try { unsub = subscribe?.(check) || (() => {}); } catch { /* Realtime unavailable: polling covers it */ }
+    offOnline = addOnline?.(check) || (() => {});
+    check();
+  });
+  promise.cancel = () => { if (!stopped) { cleanup(); rejectFn(new Error('cancelled')); } };
+  return promise;
+}
+
+// ── history ────────────────────────────────────────────────────────
+export function groupConversations(convs, now = new Date()) {
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  const today = start.getTime();
+  const yesterday = today - 86400000;
+  const week = today - 6 * 86400000;
+  const groups = { Pinned: [], Today: [], Yesterday: [], 'Last 7 days': [], Older: [] };
+  for (const c of convs) {
+    const t = ms(c.last_reply_at) || ms(c.updated_at) || ms(c.created_at);
+    if (c.pinned) groups.Pinned.push(c);
+    else if (t >= today) groups.Today.push(c);
+    else if (t >= yesterday) groups.Yesterday.push(c);
+    else if (t >= week) groups['Last 7 days'].push(c);
+    else groups.Older.push(c);
+  }
+  return Object.entries(groups).filter(([, list]) => list.length).map(([label, items]) => ({ label, items }));
+}
+
+export function autoTitle(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  return t.length > 60 ? t.slice(0, 57) + '…' : t || 'New chat';
+}
+
+// ── page awareness ─────────────────────────────────────────────────
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Sent with each question as a hint for the prompt. Never trusted for access.
+export function pageContextFor(pathname, search = '') {
+  const ctx = { route: String(pathname).slice(0, 200) };
+  const brand = pathname.match(/^\/brands\/([^/]+)/);
+  if (brand && UUID.test(brand[1])) ctx.brand_id = brand[1];
+  const q = new URLSearchParams(search);
+  for (const [k, out] of [['report', 'report_id'], ['reportId', 'report_id'], ['kb', 'kb_id'], ['article', 'kb_id']]) {
+    const v = q.get(k);
+    if (v && UUID.test(v)) ctx[out] = v;
+  }
+  return ctx;
+}
+
+const PAGE_CHIPS = [
+  [/^\/leave/, ['How do I apply for leave?', 'How many leave days do I have left?']],
+  [/^\/attendance/, ['How does attendance work?', 'What happens if I clock in late?']],
+  [/^\/(weekly|biweekly|monthly)-reports/, ['How do I submit my weekly report?', 'What makes a great report?']],
+  [/^\/gmv-max/, ['How does GMV Max reporting work?']],
+  [/^\/incentives/, ['How are incentives calculated?', "What's my incentive this month?"]],
+  [/^\/performance/, ['How is my performance score calculated?']],
+  [/^\/me\/compensation/, ['How is my salary paid?']],
+  [/^\/kb/, ['Find the SOP for sample requests']],
+  [/^\/tasks/, ['How do I assign a task?']],
+  [/^\/agenda/, ['How do the weekly agenda meetings work?']],
+  [/^\/analytics\/brands/, ['Top brands by GMV this month']],
+  [/^\/brands\/?$/, ['Which brands need attention this week?']],
+  [/^\/creator-library/, ['How do I add a creator to the library?']],
+  [/^\/video-reviews/, ['How do video reviews work?']],
+];
+
+export function pageChips(pathname, brandName) {
+  if (/^\/brands\/[^/]+/.test(pathname)) {
+    const name = brandName || 'this brand';
+    return ["Summarise this brand's latest report", `How is ${name} doing this month?`];
+  }
+  for (const [re, chips] of PAGE_CHIPS) if (re.test(pathname)) return [...chips, 'How do I use this page?'];
+  return ['How do I use this page?', 'What can you help me with?'];
+}
+
+const STARTERS = {
+  boss: ['Top brands by GMV this month', 'Which reports are still awaiting approval?', 'Summarise last week across all brands', 'Which brands dropped vs last month?'],
+  ol: ['Which brands need attention this week?', "Which of my team's reports are pending?", 'Compare my brands month over month', 'How do I approve a report?'],
+  tl: ["Which of my team's reports are pending?", "How is my team's GMV this month?", 'How do I review an APC report?', 'Coaching tips for a low-GMV week'],
+  pctl: ['How do paid collabs work end to end?', 'How do I manage my IPCs?', 'Which campaigns are running now?', 'How do I apply for leave?'],
+  apc: ['How do I submit my weekly report?', 'How do I approve sample requests?', "How are my brands doing this month?", 'How is my incentive calculated?'],
+  ipc: ['How do I add a creator to the library?', 'How do I track my campaigns?', 'How is my incentive calculated?', 'How do I apply for leave?'],
+  ads_manager: ['How does GMV Max reporting work?', 'How are my brands doing this month?', 'Tips to improve ROAS on TikTok Shop', 'How do I apply for leave?'],
+  developer: ['How does the ingestion pipeline work?', 'How do I triage a bug report?', 'How do I apply for leave?', 'What can you help me with?'],
+};
+export const starterCards = (role) => STARTERS[role] || STARTERS.apc;
+
+// Buddy's own greeting, used when the Boss hasn't written one (or it is still
+// the v1 default, which calls itself the "WurxOS assistant").
+export const BUDDY_GREETING = "Hi {name}! I'm Wurx Buddy: here to help, explore and grow.";
+
+export const greetingIsDefault = (t) => !String(t || '').trim() || /wurxos assistant/i.test(String(t));
+
+export function greetingText(template, name) {
+  const use = greetingIsDefault(template) ? BUDDY_GREETING : String(template).trim();
+  // With no name, "Hi {name}!" → "Hi!".
+  return use.replace(/\{name\}/g, name || '').replace(/\s+([!,.?])/g, '$1').replace(/ {2,}/g, ' ').trim();
+}
+
+export function firstName(profile) {
+  const n = String(profile?.display_name || profile?.full_name || '').trim();
+  return n ? n.split(/\s+/)[0] : '';
+}
+
+// ── sources ────────────────────────────────────────────────────────
+const SOURCE_LABEL = {
+  kb_article: 'SOP', ai_doc: 'Guide', app_guide: 'App guide', tts_article: 'TikTok Academy',
+  report: 'Report', incentive: 'Incentive',
+};
+export const sourceLabel = (t) => SOURCE_LABEL[t] || 'Data';
+
+// In-app ('/…') → router; http(s) → new tab; anything else → not a link.
+export function sourceLink(s) {
+  const u = String(s?.url || '');
+  if (u.startsWith('/') && !u.startsWith('//')) return { kind: 'app', to: u };
+  if (/^https?:\/\//i.test(u)) return { kind: 'ext', href: u };
+  return null;
+}
+
+// Cited first, then the rest, each keeping the server's order. Numbered 1..n.
+export function orderSources(sources) {
+  const list = Array.isArray(sources) ? sources : [];
+  return [...list.filter((s) => s.cited !== false), ...list.filter((s) => s.cited === false)]
+    .map((s, i) => ({ ...s, n: i + 1 }));
+}
+
+const CITE_RE = /\[((?:[SD]\d{1,3})(?:\s*[,;]\s*[SD]\d{1,3})*)\]/g;
+// A tag, with quoted attribute values allowed to contain '>'.
+const TAG_RE = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g;
+
+// Replace [S1] / [D1, S2] markers in ALREADY-SANITISED html with numbered
+// buttons, in text only: a marker inside an attribute (a link URL) is left
+// alone. Only the ids the regex matched are emitted, so nothing unsafe gets in.
+export function citeHtml(html, sources) {
+  const num = new Map(orderSources(sources).map((s) => [s.id, s.n]));
+  const cite = (text) => text.replace(CITE_RE, (_m, group) => group.split(/[,;]/).map((raw) => {
+    const id = raw.trim();
+    const n = num.get(id);
+    return `<button type="button" class="bd-cite" data-cite="${id}" aria-label="Source ${n ?? id}">${n ?? id}</button>`;
+  }).join(''));
+  const s = String(html);
+  let out = '';
+  let last = 0;
+  for (const m of s.matchAll(TAG_RE)) {
+    out += cite(s.slice(last, m.index)) + m[0];
+    last = m.index + m[0].length;
+  }
+  return out + cite(s.slice(last));
+}

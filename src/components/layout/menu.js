@@ -4,6 +4,8 @@ import {
   BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon, PlayIcon,
   TrophyIcon,
 } from '../common/Icon';
+import BuddyIcon from '../buddy/BuddyIcon';
+import { BUDDY_ROLES } from '../../lib/buddyLogic';
 
 // Each role gets its own menu. Structure mirrors v1 layouts:
 //   * Boss   — components/boss/BossLayout.js
@@ -216,7 +218,7 @@ const AGENDA_GROUP_GUEST = {
 // groups (Paid Collab, Reporting, Requests), then footer-style
 // items (notifications/settings).
 
-const ASSISTANT_ITEM = { label: 'Assistant', icon: MessageIcon, to: '/assistant' };
+const BUDDY_ITEM = { label: 'Wurx Buddy', icon: BuddyIcon, to: '/buddy' };
 // Development — the product roadmap, private to the Boss and developers.
 // `dot` shows this group's unread dot (groups have none by default), and
 // `prefix` keeps a child highlighted on deeper pages (/development/projects/wurxos).
@@ -433,11 +435,12 @@ export const MENUS = {
 export function getMenuForRole(role, opts = {}) {
   const base = MENUS[role] || MENUS.apc;
   const out = [...base];
-  // AI Assistant is BOSS-ONLY during the test phase (server also enforces this
-  // in the ai-chat function). Widen this check when launching to more roles.
-  if (role === 'boss') {
-    const i = out.indexOf(NOTIFS_ITEM);
-    out.splice(i >= 0 ? i : out.length, 0, ASSISTANT_ITEM);
+  // Wurx Buddy: opts.buddy is BuddyProvider's gate (ai_assistant_config.allowed_roles,
+  // the list the assistant function enforces); BUDDY_ROLES (boss) when not given.
+  if (opts.buddy ?? BUDDY_ROLES.includes(role)) {
+    const i = out.indexOf(CHAT_ITEM);
+    const j = out.indexOf(NOTIFS_ITEM);
+    out.splice(i >= 0 ? i + 1 : j >= 0 ? j : out.length, 0, BUDDY_ITEM);
   }
   // Video Reviews is APC-only. It now has two modes: the Euka generator and a
   // file-based one (upload the TikTok export — no Euka needed), so every APC
@@ -462,8 +465,8 @@ export function menuKey(entry) {
  * role menu. Pure + SAFE: it can only reorder/pin entries the role ALREADY has.
  *   - keys in the layout that aren't in the role menu are ignored (removed items
  *     / a stale layout from a previous role),
- *   - role-menu entries missing from the saved order keep their natural position
- *     (appended after the saved ones), so newly-added items still appear,
+ *   - role-menu entries missing from the saved order are placed right after
+ *     their natural predecessor, so newly-added items still appear in place,
  *   - pinned entries float to the top (in their ordered order) and are tagged
  *     `_pinned` so the sidebar can group them.
  * Never adds an entry — so it can't surface anything the role isn't allowed.
@@ -476,10 +479,14 @@ export function applyMenuLayout(menu, layout) {
   const byKey = new Map(menu.map((it) => [menuKey(it), it]));
   const knownOrder = order.filter((k) => byKey.has(k));
   const knownSet = new Set(knownOrder);
-  const ordered = [
-    ...knownOrder.map((k) => byKey.get(k)),
-    ...menu.filter((it) => !knownSet.has(menuKey(it))),
-  ];
+  const ordered = knownOrder.map((k) => byKey.get(k));
+  // An entry the saved layout doesn't know yet goes right after the entry that
+  // precedes it in the role menu (e.g. Wurx Buddy after Chat), not at the bottom.
+  menu.forEach((it, idx) => {
+    if (knownSet.has(menuKey(it))) return;
+    const at = idx > 0 ? ordered.indexOf(menu[idx - 1]) : -1;
+    ordered.splice(at + 1, 0, it);
+  });
 
   const pinnedSet = new Set(pinned.filter((k) => byKey.has(k)));
   if (!pinnedSet.size) return ordered;
