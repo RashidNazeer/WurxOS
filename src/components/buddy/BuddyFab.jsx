@@ -63,24 +63,15 @@ export default function BuddyFab() {
   );
 }
 
-// Any dialog on screen hides the FAB. The app has several modal styles
-// (Bootstrap, .wx-modal-backdrop, and many inline fixed overlays), so besides
-// the known selectors we probe the centre of the viewport for a fixed
-// full-screen layer. Buddy's own panel (a full-screen sheet on phones) doesn't count.
-const MODAL_SELECTORS = '.modal.show, .wx-modal-backdrop, .modal-backdrop, [aria-modal="true"], .dv-drawer-backdrop';
+// A known dialog on screen hides the FAB. Only explicit modal selectors: a
+// "fixed full-screen layer at the centre" probe hid the FAB on normal pages
+// (app layouts use fixed full-screen layers). Any other overlay still covers
+// it, since the FAB sits below every modal's z-index.
+const MODAL_SELECTORS = '.modal.show, .wx-modal-backdrop, .modal-backdrop, [aria-modal="true"], .dv-drawer-backdrop, .dv-modal-backdrop, .ck-overlay, .wri-root, .cel-root';
 
 function modalOnScreen() {
   for (const el of document.querySelectorAll(MODAL_SELECTORS)) {
     if (!el.closest('[data-buddy-root]')) return true;
-  }
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  let n = document.elementFromPoint(vw / 2, vh / 2);
-  while (n && n !== document.body) {
-    if (n.hasAttribute?.('data-buddy-root')) return false;
-    const cs = getComputedStyle(n);
-    if (cs.position === 'fixed' && n.offsetWidth >= vw * 0.9 && n.offsetHeight >= vh * 0.9) return true;
-    n = n.parentElement;
   }
   return false;
 }
