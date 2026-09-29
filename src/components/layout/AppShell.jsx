@@ -8,6 +8,7 @@ import ClockInReminder from '../attendance/ClockInReminder';
 import AchievementCelebration from '../achievements/AchievementCelebration';
 import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
+import BuddyFab from '../buddy/BuddyFab';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import '../../styles/shell.css';
 
@@ -36,6 +37,7 @@ const PAGE_META = {
   '/reports':                  { title: 'Reports',                subtitle: 'Weekly and bi-weekly brand reports' },
   '/performance/simulator':    { title: 'Performance Simulator',  subtitle: 'A private what-if tool for your own score' },
   '/notifications':            { title: 'Notifications',          subtitle: 'Updates on your work' },
+  '/buddy':                    { title: 'Wurx Buddy',             subtitle: 'Here to help, explore and grow' },
   '/settings':                 { title: 'Settings',               subtitle: 'Your personal preferences' },
   '/boss/manage/tls':          { title: 'Team Leads',             subtitle: 'Affiliate TLs' },
   '/boss/manage/pctls':        { title: 'Paid Collab Team Leads', subtitle: 'PCTLs' },
@@ -160,6 +162,8 @@ export default function AppShell() {
           must be able to appear over any page, because the winner could be
           anywhere when the Boss hits Announce. */}
       <AchievementCelebration />
+      {/* Wurx Buddy, bottom-right on every page but its own tab. */}
+      <BuddyFab />
     </div>
   );
 }

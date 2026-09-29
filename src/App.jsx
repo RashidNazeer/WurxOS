@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorReporterProvider } from './contexts/ErrorReporterContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { BrandsProvider } from './contexts/BrandsContext';
+import { BuddyProvider } from './contexts/BuddyContext';
+import BuddyGate from './components/buddy/BuddyGate';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
 import AppShell from './components/layout/AppShell';
@@ -95,7 +97,7 @@ const TLTeamPage            = lazy(() => import('./pages/tl/TeamPage'));
 const AuditPage             = lazy(() => import('./pages/audit/AuditPage'));
 const SettingsPage          = lazy(() => import('./pages/settings/SettingsPage'));
 const NotificationsPage     = lazy(() => import('./pages/notifications/NotificationsPage'));
-const AiAssistantPage       = lazy(() => import('./pages/assistant/AiAssistantPage'));
+const BuddyPage             = lazy(() => import('./pages/buddy/BuddyPage'));
 const ReportsPage           = lazy(() => import('./pages/reports/ReportsPage'));
 const ReportPage            = lazy(() => import('./pages/reports/ReportPage'));
 const ResourcePlannerPage   = lazy(() => import('./pages/resourcePlanner/ResourcePlannerPage'));
@@ -242,21 +244,26 @@ export default function App() {
               <ProtectedRoute>
                 <BrandsProvider>
                   <NotificationsProvider>
-                    <AppShell />
+                    <BuddyProvider>
+                      <AppShell />
+                    </BuddyProvider>
                   </NotificationsProvider>
                 </BrandsProvider>
               </ProtectedRoute>
             }>
               <Route path="/"          element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardRouter />} />
+              {/* Wurx Buddy — the roles in ai_assistant_config.allowed_roles,
+                  the same list the assistant function enforces. */}
               <Route
-                path="/assistant"
+                path="/buddy"
                 element={
-                  <RoleGuard allow={['boss']}>
-                    <AiAssistantPage />
-                  </RoleGuard>
+                  <BuddyGate>
+                    <BuddyPage />
+                  </BuddyGate>
                 }
               />
+              <Route path="/assistant" element={<Navigate to="/buddy" replace />} />
 
               {/* Brands — Boss / OL / TL / APC / IPC / Developer (visibility enforced by RLS) */}
               <Route
