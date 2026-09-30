@@ -55,7 +55,7 @@ export async function loadWorkspace() {
     selectAll(() => supabase.from('dev_task_stats').select('*')),
     supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, role')
+      .select('id, display_name, avatar_url, role, reports_to, responsibilities')
       .in('role', ['boss', 'developer'])
       .eq('is_active', true)
       .is('deleted_at', null)

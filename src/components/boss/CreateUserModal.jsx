@@ -32,7 +32,7 @@ export default function CreateUserModal({ role, title, onClose, onCreated, locke
     if (!email.trim())       return setError('Email is required.');
     if (password.length < 8) return setError('Password must be at least 8 characters.');
     const effectiveReportsTo = lockedReportsTo || reportsTo;
-    if (extras.reportsToRole && !effectiveReportsTo) {
+    if (extras.reportsToRole && !extras.optional && !effectiveReportsTo) {
       return setError(`Please select a ${roleLabel(extras.reportsToRole)} to assign this user to.`);
     }
 

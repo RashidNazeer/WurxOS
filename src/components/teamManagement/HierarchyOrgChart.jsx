@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
-import { ROLE_COLORS, roleShortLabel, initialsOf } from './hierarchyTheme';
+import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf } from './hierarchyTheme';
 
 /**
  * Org chart view — Boss → OLs → TLs (with APC/IPC roster + brand chips).
@@ -236,8 +236,8 @@ function OLCard({ nodeRef, user, reportCount }) {
 }
 
 function TeamCard({ nodeRef, tl, onClickTl, onClickMember, onClickBrand }) {
-  const isPCTL = tl.role === 'pctl';
-  const c = isPCTL ? ROLE_COLORS.pctl : ROLE_COLORS.tl;
+  const kind = teamKindOf(tl.role);
+  const c = ROLE_COLORS[tl.role] || ROLE_COLORS.tl;
 
   return (
     <div ref={nodeRef} className="node-pop card border-0 shadow-sm h-100"
@@ -251,31 +251,35 @@ function TeamCard({ nodeRef, tl, onClickTl, onClickMember, onClickBrand }) {
         <div className="flex-grow-1 min-w-0">
           <div className="fw-semibold text-truncate" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{tl.displayName || tl.email}</div>
           <span className="rounded-pill px-2" style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: '#fff' }}>
-            {isPCTL ? 'PAID COLLAB TL' : 'TEAM LEAD'}
+            {kind.headerLabel}
           </span>
         </div>
         <i className="bi bi-chevron-right text-muted" style={{ fontSize: '0.7rem' }} />
       </button>
 
       <div className="card-body p-3">
-        {/* Brands owned */}
-        <SectionHeader icon="bi-shop" label="Brands" count={tl.brands.length} />
-        {tl.brands.length === 0 ? (
-          <EmptyHint text="No brands assigned" />
-        ) : (
-          <div className="d-flex flex-wrap gap-1 mb-3">
-            {tl.brands.map(b => (
-              <BrandChip key={b.id} name={b.brandName}
-                onClick={(e) => { e.stopPropagation(); onClickBrand(b); }} />
-            ))}
-          </div>
+        {/* Brands owned — TL/PCTL only */}
+        {kind.hasBrands && (
+          <>
+            <SectionHeader icon="bi-shop" label="Brands" count={tl.brands.length} />
+            {tl.brands.length === 0 ? (
+              <EmptyHint text="No brands assigned" />
+            ) : (
+              <div className="d-flex flex-wrap gap-1 mb-3">
+                {tl.brands.map(b => (
+                  <BrandChip key={b.id} name={b.brandName}
+                    onClick={(e) => { e.stopPropagation(); onClickBrand(b); }} />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Members + their brands */}
         <SectionHeader icon="bi-people"
-          label={isPCTL ? 'IPCs' : 'APCs'}
+          label={kind.memberLabel}
           count={tl.members.length}
-          className="mt-2" />
+          className={kind.hasBrands ? 'mt-2' : ''} />
         {tl.members.length === 0 ? (
           <EmptyHint text="No team members" />
         ) : (

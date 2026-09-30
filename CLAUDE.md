@@ -129,6 +129,16 @@ portals — everything an agency needs.
 - `.claude/memory/euka-integration.md` — TikTok Shop metrics sync via MCP
 - `.claude/memory/MEMORY.md` — index of all memories with one-line hooks
 
+### Wurx Buddy (the AI assistant, v2)
+- Design, decisions, runbook, tests, and the 57 app how-to guides live in
+  **`wurx-buddy/`** (start with `wurx-buddy/runbook-ingestion.md` and `wurx-buddy/ui-design.md`).
+  What ships is still this repo's `supabase/` (migrations 367–397, functions
+  `assistant`, `ai-ingest`, `tts-crawl`, shared `_shared/ai/`) and `src/`.
+- **Taking it to production:** follow `wurx-buddy/prompt.md` step by step.
+- `wurx-buddy/` scripts are dev-only and read `../.env.dev` (repo root, gitignored).
+- The Supabase CLI is **not** pre-linked on a fresh machine (the "already linked" note above
+  is stale). Link with `npx supabase link --project-ref <ref>` when needed.
+
 ---
 
 ## How users see broken things

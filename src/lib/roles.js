@@ -52,7 +52,13 @@ export const ROLE_EXTRAS = {
   // not a permission, it's the OL-curated list in Settings → Ads Manager Brands
   // (ads_manager_brands, mig 316), which also drives their incentive plan.
   ads_manager: { reportsToRole: null, permissions: [] },
-  developer: { reportsToRole: null,   permissions: [] },
+  // Developers are the one role where the parent is the SAME role: a Junior
+  // Developer reports to whichever developer is tagged Team Lead. `optional`
+  // means the picker shows but isn't required — a lead (or a lone developer
+  // before a team exists) reports to nobody. Mig 398 first set this by hand
+  // for Rashid Nazeer (lead) / Umar Ilyas (junior); this makes it a normal,
+  // Boss-editable field going forward instead of a one-off data fix.
+  developer: { reportsToRole: 'developer', optional: true, permissions: [] },
 };
 
 export const getRoleExtras = (role) => ROLE_EXTRAS[role] || { reportsToRole: null, permissions: [] };

@@ -54,21 +54,38 @@ export async function reactivateBrand(brandId) {
 
 /** Hierarchy fetch — shape mirrors v1's TeamHierarchyPage data so the
  *  ported components keep working without their own translations.
- *  Returns { boss, ols, users (tl+pctl), teamUsers (apc+ipc as v1 shape),
- *  brands (with assignedUsers + ownerName) }.
+ *  Returns { boss, ols, users (tl+pctl+developer leads), teamUsers
+ *  (apc+ipc+junior developers as v1 shape), brands (with assignedUsers +
+ *  ownerName) }.
  *
  *  v1 keyed each member's brands off teamUsers.assignedBrands; v2 stores
  *  the same relation in brand_assignments(user_id, brand_id). We rebuild
  *  the per-member brand list from that table so the org chart can render
  *  brand chips next to each APC/IPC.
+ *
+ *  Developers have no separate "lead" role (unlike tl/pctl vs apc/ipc) —
+ *  everyone is role='developer', distinguished only by who reports_to
+ *  whom (mig 398). So "lead" here is STRUCTURAL, not role-based: a
+ *  developer counts as a lead the moment another developer reports to
+ *  them, exactly mirroring how a TL card exists whether or not it has
+ *  APCs yet. A developer with neither a manager nor a report (a lone
+ *  developer, pre-team) simply doesn't appear on this chart — same as
+ *  how the chart has never had anything to show for a role with zero
+ *  members on either side.
  */
 export async function fetchHierarchy() {
   const { data: profiles, error: profErr } = await supabase
     .from('profiles')
-    .select('id, display_name, email, role, reports_to, is_active, deleted_at, avatar_url')
+    .select('id, display_name, email, role, reports_to, is_active, deleted_at, avatar_url, responsibilities')
     .is('deleted_at', null)
     .eq('is_active', true);
   if (profErr) throw new Error(profErr.message);
+
+  const devLeadIds = new Set(
+    (profiles || [])
+      .filter((p) => p.role === 'developer' && p.reports_to)
+      .map((p) => p.reports_to),
+  );
 
   const { data: brands, error: brErr } = await supabase
     .from('brands')
@@ -99,10 +116,13 @@ export async function fetchHierarchy() {
     };
   });
 
-  // teamUsers = APCs + IPCs, with assignedBrands derived from
-  // brand_assignments. v1 also kept ownerId here, so include it.
+  // teamUsers = APCs + IPCs + junior developers (reports_to another
+  // developer), with assignedBrands derived from brand_assignments — always
+  // empty for developers, who have none. v1 also kept ownerId here, so
+  // include it.
   const teamUsers = (profiles || [])
-    .filter((p) => p.role === 'apc' || p.role === 'ipc')
+    .filter((p) => p.role === 'apc' || p.role === 'ipc'
+      || (p.role === 'developer' && p.reports_to && devLeadIds.has(p.reports_to)))
     .map((p) => {
       const assignedBrands = v1Brands
         .filter((b) => b.assignedUsers.some((au) => au.id === p.id))
@@ -116,19 +136,22 @@ export async function fetchHierarchy() {
         avatar_url: p.avatar_url,
         ownerId: p.reports_to,
         ownerName: owner?.display_name || '',
+        responsibilities: p.responsibilities || [],
         assignedBrands,
       };
     });
 
-  // users = boss + ol + tl + pctl, mapped to v1's {id, displayName, email, role}.
+  // users = boss + ol + tl + pctl + developer LEADS (structural — see the
+  // fetchHierarchy doc comment), mapped to v1's {id, displayName, email, role}.
   const users = (profiles || [])
-    .filter((p) => ['boss', 'ol', 'tl', 'pctl'].includes(p.role))
+    .filter((p) => ['boss', 'ol', 'tl', 'pctl'].includes(p.role) || devLeadIds.has(p.id))
     .map((p) => ({
       id: p.id,
       displayName: p.display_name,
       email: p.email,
       role: p.role,
       avatar_url: p.avatar_url,
+      responsibilities: p.responsibilities || [],
     }));
 
   return { users, teamUsers, brands: v1Brands };

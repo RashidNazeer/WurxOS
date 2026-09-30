@@ -50,11 +50,15 @@ export default function TeamHierarchyPage() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  // Build derived org structure (Boss → OLs → TLs → APCs/IPCs)
+  // Build derived org structure (Boss → OLs → TLs/PCTLs/Dev Leads → members).
+  // Developer leads are folded into the same "tls" array as TL/PCTL — the
+  // enrichment below (members + brands lookup) is role-agnostic, and a
+  // developer lead's brands list is always empty, which every card already
+  // renders correctly ("No brands assigned").
   const org = useMemo(() => {
     const boss = users.find((u) => u.role === 'boss') || null;
     const ols = users.filter((u) => u.role === 'ol');
-    const tls = users.filter((u) => u.role === 'tl' || u.role === 'pctl');
+    const tls = users.filter((u) => u.role === 'tl' || u.role === 'pctl' || u.role === 'developer');
 
     const enrichedTls = tls.map((t) => {
       const members = teamUsers.filter((tu) => tu.ownerId === t.id);
@@ -80,6 +84,7 @@ export default function TeamHierarchyPage() {
     if (roleFilter) {
       if (roleFilter === 'tl') list = list.filter((t) => t.role === 'tl');
       else if (roleFilter === 'pctl') list = list.filter((t) => t.role === 'pctl');
+      else if (roleFilter === 'developer') list = list.filter((t) => t.role === 'developer');
       else if (roleFilter === 'apc' || roleFilter === 'ipc') {
         list = list.filter((t) => t.members.some((m) => (m.userType || 'apc') === roleFilter));
       }
@@ -100,9 +105,11 @@ export default function TeamHierarchyPage() {
   const stats = useMemo(() => {
     const tlCount = org.tls.filter((t) => t.role === 'tl').length;
     const pctlCount = org.tls.filter((t) => t.role === 'pctl').length;
+    const devLeadCount = org.tls.filter((t) => t.role === 'developer').length;
     const apcCount = teamUsers.filter((t) => (t.userType || 'apc') === 'apc').length;
     const ipcCount = teamUsers.filter((t) => t.userType === 'ipc').length;
-    const headcount = 1 + org.ols.length + org.tls.length + apcCount + ipcCount;
+    const devMemberCount = teamUsers.filter((t) => t.userType === 'developer').length;
+    const headcount = 1 + org.ols.length + org.tls.length + apcCount + ipcCount + devMemberCount;
     const activeBrands = brands.filter((b) => b.status !== 'inactive').length;
     const unassignedBrands = brands.filter((b) => !b.ownerId).length;
     const apcsWithBrands = teamUsers.filter((t) => (t.userType || 'apc') === 'apc');
@@ -111,8 +118,8 @@ export default function TeamHierarchyPage() {
     return {
       headcount,
       ols: org.ols,
-      tlCount, pctlCount,
-      apcCount, ipcCount,
+      tlCount, pctlCount, devLeadCount,
+      apcCount, ipcCount, devMemberCount,
       avgBrands,
       brandsTotal: brands.length,
       activeBrands,
@@ -156,6 +163,7 @@ export default function TeamHierarchyPage() {
             <Pill>{stats.apcCount} APCs</Pill>
             <Pill>{stats.ipcCount} IPCs</Pill>
             <Pill>{stats.brandsTotal} Brands</Pill>
+            {stats.devLeadCount > 0 && <Pill>{stats.devMemberCount + stats.devLeadCount} Developers</Pill>}
           </div>
         </div>
       </div>
@@ -167,7 +175,7 @@ export default function TeamHierarchyPage() {
           label="Headcount"
           value={stats.headcount}
           dot="#fb923c"
-          sub={`Across ${1 + stats.ols.length + stats.tlCount + stats.pctlCount} leadership · ${stats.apcCount + stats.ipcCount} on team`}
+          sub={`Across ${1 + stats.ols.length + stats.tlCount + stats.pctlCount + stats.devLeadCount} leadership · ${stats.apcCount + stats.ipcCount + stats.devMemberCount} on team`}
         />
         <StatCard
           label="Operations Leads"
@@ -193,6 +201,14 @@ export default function TeamHierarchyPage() {
           dot="#fb923c"
           sub={`${stats.unassignedBrands} unassigned · ${stats.activeBrands} active`}
         />
+        {stats.devLeadCount > 0 && (
+          <StatCard
+            label="Development"
+            value={stats.devLeadCount + stats.devMemberCount}
+            dot={ROLE_COLORS.developer.solid}
+            sub={`${stats.devLeadCount} lead${stats.devLeadCount === 1 ? '' : 's'} · ${stats.devMemberCount} junior${stats.devMemberCount === 1 ? '' : 's'}`}
+          />
+        )}
       </div>
 
       {/* ── Control bar ───────────────────────────────────────────────── */}
@@ -218,6 +234,7 @@ export default function TeamHierarchyPage() {
             <option value="pctl">PCTL</option>
             <option value="apc">APC</option>
             <option value="ipc">IPC</option>
+            {stats.devLeadCount > 0 && <option value="developer">Developer</option>}
           </select>
 
           <div className="d-flex align-items-center gap-2 ms-auto flex-wrap" style={{ fontSize: '0.7rem' }}>
@@ -227,6 +244,7 @@ export default function TeamHierarchyPage() {
             <Legend color={ROLE_COLORS.pctl.solid} label="PCTL" />
             <Legend color={ROLE_COLORS.apc.solid}  label="APC"  />
             <Legend color={ROLE_COLORS.ipc.solid}  label="IPC"  />
+            {stats.devLeadCount > 0 && <Legend color={ROLE_COLORS.developer.solid} label="Developer" />}
           </div>
         </div>
       </div>
