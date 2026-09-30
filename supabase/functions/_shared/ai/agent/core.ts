@@ -14,7 +14,7 @@ import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } 
 import { chooseTargets, omitFor, rememberOmit, unsupportedParam, type CatalogRow, type Keys } from './models.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
-import { providerAccountIssue, providerIssueMessage } from '../providerErrors.ts';
+import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ProviderIssue } from '../providerErrors.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
 import { buildInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
 import { ALL_TOOL_DEFS, CiteRegistry, runTool, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
@@ -297,22 +297,29 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   };
   let costSum = 0;
   let unpriced = false;
+  // Every account problem met on the way down the chain, for the final message.
+  const chainIssues: { issue: ProviderIssue; model: string; waitMs: number | null }[] = [];
+  // Each model call (success or not), for diagnosing a failed turn.
+  const attempts: { target: string; ms: number; error?: string }[] = [];
   // One model call on the current target. A field the model rejects is dropped
   // and remembered; an account error moves the SAME turn to the next target.
   const ask = async (o: Partial<LlmRequest>): Promise<LlmResult> => {
     for (let paramTries = 0; ;) {
       const omit = omitFor(catalog, target);
+      const ta = Date.now();
       try {
         const res = await llm({
           apiKey: target.keySlot === 'fallback' ? keys.fallback! : keys.primary, model: target.model, instructions, input,
           promptCacheKey: `wurx-buddy-${req.role}`, timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta,
           ...(omit.length ? { omit } : {}), ...o,
         });
+        attempts.push({ target: `${target.keySlot}:${target.model}`, ms: Date.now() - ta });
         const c = costUsd(prices, target.model, res.usage);
         costSum += c.usd;
         if (!c.priced) unpriced = true;
         return res;
       } catch (e) {
+        attempts.push({ target: `${target.keySlot}:${target.model}`, ms: Date.now() - ta, error: String((e as any)?.code ?? (e as any)?.status ?? (e as Error)?.name ?? 'error') });
         if (cancelCtrl.signal.aborted || (e as any)?.cancelled) throw e;
         const p = unsupportedParam(e);
         if (p && !omit.includes(p) && paramTries < 3) {
@@ -322,6 +329,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
           continue;
         }
         const issue = providerAccountIssue(e);
+        if (issue) chainIssues.push({ issue, model: target.model, waitMs: (e as any)?.retryAfterMs ?? null });
         if (issue && ti + 1 < targets.length) {
           const from = target;
           target = targets[++ti];
@@ -345,11 +353,14 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   let userError = '';
   const llmMs: number[] = [];         // per model call, for the latency picture
   flags.llm_ms = llmMs;
+  flags.model_attempts = attempts;
   const input: InputItem[] = [...history, { role: 'user', content: message }];
+  let step = 'start';
 
   emit({ status: 'On it…' });
   try {
     for (let round = 0; ; round++) {
+      step = `model round ${round}`;
       if (await checkCancel()) throw new Stop();
       const spent = usage.input + usage.output;
       // A tool round needs room for the tools and an answer after them.
@@ -376,6 +387,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       serious = serious || isSeriousTopic('', toolsCalled);
       emit({ status: TOOL_STATUS[calls[0].name] ?? 'Looking that up…' });
       // Tools may use what is left, minus room for the answer.
+      step = `tools round ${round}`;
       const toolBudget = Math.max(3000, left() - agent.ANSWER_RESERVE_MS);
       env.agent = { ...agent, SEARCH_TIMEOUT_MS: Math.min(agent.SEARCH_TIMEOUT_MS, toolBudget), DATA_TOOL_TIMEOUT_MS: Math.min(agent.DATA_TOOL_TIMEOUT_MS, toolBudget) };
       const outs = await Promise.all(calls.map((c) => runTool(env, reg, c.name, c.arguments)));
@@ -387,7 +399,9 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     const held = cstream.flush();
     if (held && !cancelled) { answer += held; emit({ delta: held }); }
     // Reasoning can eat the whole output budget: retry once, bigger, without tools.
+    step = 'answer';
     if (!answer.trim() && !cancelled && left() > agent.ANSWER_RESERVE_MS) {
+      step = 'empty-answer retry';
       flags.empty_retry = true;
       emit({ status: 'Composing a detailed answer…' });
       const res = await ask({ effort: agent.EFFORT_ANSWER as any, maxOutputTokens: agent.ANSWER_RETRY_MAX_OUTPUT_TOKENS });
@@ -406,16 +420,24 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       cancelled = true;
       emit({ cancelled: true });
     } else {
-      error = String((e as Error)?.message ?? e).slice(0, 500);
-      // No credits / a refused key: say who can fix it (QA 2026-10-01 F3).
+      error = scrubSecrets(String((e as Error)?.message ?? e)).slice(0, 500);
+      const status = Number((e as any)?.status) || null;
+      // No credits / a refused key / a used-up allowance: say who can fix it (QA 2026-10-01 F3).
       const account = providerAccountIssue(e);
       if (account) { flags.provider_quota = true; flags.provider_issue = account; }
       else if (/deadline|timed out/i.test(error)) flags.deadline_hit = true;
+      // The real exception, for whoever reads the log: never the key, never the prompt.
+      flags.error_detail = {
+        step, class: (e as Error)?.name ?? typeof e, status, code: (e as any)?.code ?? null, message: error.slice(0, 300),
+        target: `${target.keySlot}:${target.model}`, retry_after_s: (e as any)?.retryAfterMs != null ? Math.round((e as any).retryAfterMs / 1000) : null,
+      };
+      console.error(`assistant turn ${requestId} failed at ${step}:`, JSON.stringify(flags.error_detail));
       const tail = cstream.flush();
       if (tail) { answer += tail; emit({ delta: tail }); }
-      userError = account ? providerIssueMessage(account, req.role)
-        : /HTTP 429/.test(error) ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
+      userError = account ? providerIssueMessage(account, req.role, chainIssues)
+        : status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
         : flags.deadline_hit ? 'That took too long, so I stopped. Please try again, maybe a narrower question.' : 'Something went wrong while answering. Please try again.';
+      if (!account && status !== 429 && !flags.deadline_hit) flags.error_unclassified = true;
       emit({ error: userError });
     }
   } finally {
@@ -447,7 +469,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     requestId, model, key_slot: target.keySlot, ...(flags.fallback_used ? { fallback_used: flags.fallback_used } : {}), engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
     sources: sources.filter((s) => s.cited),
     tools: toolLogs.map((t) => ({ name: t.name, args: t.args, ms: t.ms, cites: t.cites })),
-    ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.provider_quota ? userError : flags.deadline_hit ? 'The reply took too long and was stopped.' : 'Something went wrong while answering.' } : {}),
+    ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.deadline_hit ? 'The reply took too long and was stopped.' : flags.error_unclassified ? 'Something went wrong while answering.' : userError } : {}),
   };
   const status = cancelled || error ? 'error' : 'done';     // a partial answer is kept, marked error
   const finishedAt = new Date().toISOString();

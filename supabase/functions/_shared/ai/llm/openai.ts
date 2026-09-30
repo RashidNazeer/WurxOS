@@ -5,7 +5,9 @@
 // rounds' output items go back as input, with the reasoning items' encrypted
 // content, so the model keeps its chain of thought across tool rounds.
 
-import { providerAccountIssue } from '../providerErrors.ts';
+import { providerAccountIssue, retryAfterMs } from '../providerErrors.ts';
+
+const MAX_RETRY_WAIT_MS = 5_000;
 
 export const ALLOWED_MODELS = ['gpt-5.4-mini', 'gpt-5.5', 'gpt-5.4-nano'] as const;
 export const DEFAULT_MODEL = 'gpt-5.4-mini';
@@ -68,9 +70,34 @@ export type LlmRequest = {
 
 export class LlmError extends Error {
   status?: number;
+  code?: string;                         // OpenAI's error code, e.g. rate_limit_exceeded
+  retryAfterMs?: number;                 // how long OpenAI says to wait
   cancelled?: boolean;
   constructor(message: string, status?: number) { super(message); this.name = 'LlmError'; this.status = status; }
 }
+
+// An HTTP error body or an in-stream error event → an LlmError with its code
+// and wait. A stream that starts with 200 and then sends `error` (a rate limit
+// did this live, 2026-10-01) gets the status the code implies, so it is
+// handled like the same error over plain HTTP.
+// HTTP errors keep the raw body in the message (unsupportedParam reads "param" from it).
+function providerError(prefix: string, status: number | undefined, err: any, raw: string, headerWaitMs?: number | null): LlmError {
+  const code = typeof err?.code === 'string' ? err.code : typeof err?.type === 'string' ? err.type : undefined;
+  const msg = typeof err?.message === 'string' ? err.message : raw;
+  const implied = status ?? (/rate_limit|quota|credit/i.test(`${code ?? ''} ${msg}`) ? 429 : undefined);
+  const e = new LlmError(status ? `${prefix} HTTP ${status}: ${raw}` : `${prefix}: ${code ? `[${code}] ` : ''}${msg}`.slice(0, 600), implied);
+  if (code) e.code = code;
+  const wait = headerWaitMs ?? retryAfterMs(msg);
+  if (wait != null) e.retryAfterMs = wait;
+  return e;
+}
+
+const headerWait = (h: Headers): number | null => {
+  const ms = Number(h.get('retry-after-ms'));
+  if (ms > 0) return ms;
+  const s = Number(h.get('retry-after'));
+  return s > 0 ? s * 1000 : null;
+};
 
 const ZERO: Usage = { input: 0, cached: 0, output: 0, reasoning: 0 };
 
@@ -147,7 +174,9 @@ export async function respond(r: LlmRequest): Promise<LlmResult> {
       }
       if (!res.ok) {
         const body = (await res.text().catch(() => '')).slice(0, 400);
-        throw new LlmError(`model HTTP ${res.status}: ${body}`, res.status);
+        let parsed: any = null;
+        try { parsed = JSON.parse(body)?.error; } catch { /* a truncated or non-JSON body */ }
+        throw providerError('model', res.status, parsed, body, headerWait(res.headers));
       }
       if (!r.onDelta) return resultOf(await res.json());
       let text = '';
@@ -160,9 +189,9 @@ export async function respond(r: LlmRequest): Promise<LlmResult> {
         } else if (ev.type === 'response.completed' || ev.type === 'response.incomplete') {
           final = ev.response;
         } else if (ev.type === 'response.failed') {
-          throw new LlmError(`model failed: ${ev.response?.error?.message ?? 'unknown error'}`);
+          throw providerError('model failed', undefined, ev.response?.error, 'unknown error');
         } else if (ev.type === 'error') {
-          throw new LlmError(`model error: ${ev.message ?? ev.error?.message ?? 'unknown'}`);
+          throw providerError('model error', undefined, ev.error ?? ev, 'unknown');
         }
       });
       if (!final) throw new LlmError('model stream ended without a response');
@@ -170,11 +199,14 @@ export async function respond(r: LlmRequest): Promise<LlmResult> {
     } catch (e) {
       if (r.signal?.aborted) throw cancelledErr();     // a stream read aborted by Stop
       const err = e instanceof LlmError ? e : new LlmError(String((e as Error)?.message ?? e));
-      const nearDeadline = r.deadline != null && r.deadline - Date.now() < 10_000;
-      // No credits / a refused key: another attempt cannot succeed.
-      const retryable = !streamed && !nearDeadline && !providerAccountIssue(err) && (err.status === undefined || err.status === 429 || err.status >= 500);
+      // No credits / a refused key / a long rate-limit wait: another attempt cannot
+      // succeed. A short wait is honoured when the turn has room for it.
+      const wait = Math.max(1500, err.retryAfterMs ?? 0);
+      const nearDeadline = r.deadline != null && r.deadline - Date.now() < 10_000 + wait;
+      const retryable = !streamed && !nearDeadline && wait <= MAX_RETRY_WAIT_MS && !providerAccountIssue(err)
+        && (err.status === undefined || err.status === 429 || err.status >= 500);
       if (!retryable || attempt >= 1) throw err;
-      await new Promise((ok) => setTimeout(ok, 1500));
+      await new Promise((ok) => setTimeout(ok, wait));
     } finally {
       clearTimeout(timer);
       r.signal?.removeEventListener('abort', onCancel);

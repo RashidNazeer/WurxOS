@@ -5,9 +5,10 @@ import assert from 'node:assert/strict';
 import { chatModels, chooseTargets, modelUsable, omitFor, refreshModels, unsupportedParam, type CatalogRow } from '../agent/models.ts';
 import { runTurn } from '../agent/core.ts';
 import { chainEmbedder, _resetEmbedDown } from '../agent/server.ts';
-import { LlmError, requestBody, type LlmRequest, type LlmResult } from '../llm/openai.ts';
+import { LlmError, requestBody, respond, type LlmRequest, type LlmResult } from '../llm/openai.ts';
 import { pricesFrom, UsageMeter } from '../prices.ts';
-import { providerIssueMessage } from '../providerErrors.ts';
+import { providerAccountIssue, providerIssueMessage, retryAfterMs, scrubSecrets } from '../providerErrors.ts';
+import { embedTexts } from '../embedder.ts';
 
 const QUOTA = JSON.stringify({ error: { message: 'Your credit balance is exhausted.', type: 'insufficient_quota', code: 'credit_balance_exhausted' } });
 const row = (slot: 'primary' | 'fallback', model: string, o: Partial<CatalogRow> = {}): CatalogRow =>
@@ -231,4 +232,92 @@ test('refreshModels: lists, probes, marks free while credits are exhausted, upse
   assert.deepEqual(up.params, { omit: ['text'] });
   assert.equal(r.probe_cost_usd_est, 0);
   assert.equal(r.probe_tokens.input, 52);
+});
+
+// ── a free model's used-up allowance (live bug 2026-10-01) ──────────────────
+// OpenAI answered gpt-6-luna with HTTP 200 and then an in-stream `error` event:
+// "Rate limit reached … Please try again in 36h54m25.92s". It had no status or
+// code, so it was retried, then shown as "Something went wrong".
+
+const LUNA_LIMIT_MSG = 'Rate limit reached for gpt-6-luna in organization org-x on tokens per min (TPM): Limit 100000, Used 99374, Requested 5752. Please try again in 36h54m25.92s. Visit https://platform.openai.com/account/rate-limits to learn more.';
+const sse = (ev: unknown) => new Response(`event: error\ndata: ${JSON.stringify(ev)}\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+
+test('an in-stream rate-limit error gets status 429, its code and its wait; a wait of hours is a "limit", not retried', async () => {
+  for (const ev of [{ type: 'error', code: 'rate_limit_exceeded', message: LUNA_LIMIT_MSG }, { type: 'error', error: { type: 'tokens', code: 'rate_limit_exceeded', message: LUNA_LIMIT_MSG } }]) {
+    let calls = 0;
+    const err: any = await respond({ apiKey: 'fk', model: 'gpt-6-luna', instructions: 'i', input: [], onDelta: () => {}, fetchImpl: (async () => { calls++; return sse(ev); }) as any })
+      .then(() => null, (e) => e);
+    assert.ok(err instanceof LlmError);
+    assert.deepEqual([err.status, err.code, err.retryAfterMs, calls], [429, 'rate_limit_exceeded', 132865920, 1]);
+    assert.equal(providerAccountIssue(err), 'limit');
+  }
+  assert.equal(retryAfterMs('Please try again in 1.2s.'), 1200);
+  assert.equal(retryAfterMs('try again in 850ms'), 850);
+  assert.equal(retryAfterMs('no wait here'), null);
+  // a short wait is still a passing rate limit: retried once, not an account issue
+  let calls = 0;
+  const short = { type: 'error', code: 'rate_limit_exceeded', message: 'Rate limit reached. Please try again in 20ms.' };
+  await assert.rejects(respond({ apiKey: 'fk', model: 'gpt-6-luna', instructions: 'i', input: [], onDelta: () => {}, fetchImpl: (async () => { calls++; return sse(short); }) as any }));
+  assert.equal(calls, 2);
+  assert.equal(providerAccountIssue(new LlmError('model error: [rate_limit_exceeded] Please try again in 20ms.', 429)), null);
+  // the new no-credit code
+  assert.equal(providerAccountIssue(new LlmError(`model HTTP 429: ${QUOTA}`, 429)), 'quota');
+  assert.equal(scrubSecrets('Incorrect API key provided: sk-proj-abc123****wxyz.'), 'Incorrect API key provided: sk-….');
+});
+
+test('whole chain out (primary no credits, luna limit): a specific message, and the real error in flags.error_detail', async () => {
+  const d = db();
+  const fetchImpl = async (_u: any, init: any) => String(init.headers.authorization).endsWith(' pk')
+    ? new Response(QUOTA, { status: 429 })
+    : sse({ type: 'error', code: 'rate_limit_exceeded', message: LUNA_LIMIT_MSG });
+  const llm = (r: LlmRequest) => respond({ ...r, fetchImpl: fetchImpl as any });
+  const events: any[] = [];
+  const t0 = Date.now();
+  await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm), (e) => events.push(e));
+  assert.ok(Date.now() - t0 < 1000, 'no retry waits');
+  const msg = events.find((e) => e.error).error;
+  assert.match(msg, /OpenAI credits are used up/);
+  assert.match(msg, /gpt-6-luna has used up its OpenAI token allowance \(OpenAI estimates about 37 h before a question fits again\)/);
+  assert.ok(events.some((e) => e.status === 'Switching to a backup model…'));
+  const log = d.inserts.ai_request_log[0];
+  assert.deepEqual(log.flags.error_detail, { step: 'model round 0', class: 'LlmError', status: 429, code: 'rate_limit_exceeded',
+    message: log.error.slice(0, 300), target: 'fallback:gpt-6-luna', retry_after_s: 132866 });
+  assert.deepEqual([log.flags.provider_issue, log.flags.model_attempts.map((a: any) => a.target)], ['limit', ['primary:gpt-5.4-mini', 'fallback:gpt-6-luna']]);
+  const reply = d.inserts.ai_messages.find((m: any) => m.role === 'assistant');
+  assert.equal(reply.meta.error, msg);                  // the saved reply says the same, not "Something went wrong"
+  // other roles: no technical detail
+  const d2 = db();
+  const ev2: any[] = [];
+  await runTurn({ userId: 'u2', role: 'apc', message: 'hi' }, deps(d2, llm), (e) => ev2.push(e));
+  assert.equal(ev2.find((e) => e.error).error, "Buddy can't reach its AI service right now: the AI account needs attention. Please tell the Boss.");
+});
+
+test('luna as the main model AND in the chain: tried once, not twice; alone out of allowance → the usage-limit message', async () => {
+  const cfg = { model: 'gpt-6-luna', model_key_slot: 'fallback', fallback_enabled: true, fallback_models: [{ key_slot: 'fallback', model: 'gpt-6-luna' }] };
+  assert.deepEqual(chooseTargets(cfg, [row('fallback', 'gpt-6-luna')], KEYS), [{ keySlot: 'fallback', model: 'gpt-6-luna' }]);
+  const d = db({ ai_assistant_config: [{ id: 1, persona: '', enabled: true, retrieval: {}, prices: {}, ...cfg }] });
+  let calls = 0;
+  const llm = (r: LlmRequest) => respond({ ...r, fetchImpl: (async () => { calls++; return sse({ type: 'error', code: 'rate_limit_exceeded', message: LUNA_LIMIT_MSG }); }) as any });
+  const events: any[] = [];
+  await runTurn({ userId: 'u1', role: 'apc', message: 'hi' }, deps(d, llm, { catalog: [row('fallback', 'gpt-6-luna')] }), (e) => events.push(e));
+  assert.equal(calls, 1);
+  assert.equal(events.find((e) => e.error).error, 'Buddy has reached its AI usage limit for now. Please try again later, or tell the Boss.');
+  assert.equal(d.inserts.ai_request_log[0].flags.error_detail.target, 'fallback:gpt-6-luna');
+});
+
+test('an unknown failure is still logged in full (flags.error_detail), the user sees the generic message', async () => {
+  const d = db();
+  const llm = async () => { throw new TypeError('Cannot read properties of undefined'); };
+  const events: any[] = [];
+  await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm as any), (e) => events.push(e));
+  assert.equal(events.find((e) => e.error).error, 'Something went wrong while answering. Please try again.');
+  const log = d.inserts.ai_request_log[0];
+  assert.deepEqual([log.flags.error_detail.class, log.flags.error_detail.step, log.flags.error_unclassified], ['TypeError', 'model round 0', true]);
+});
+
+test('embeddings: credit_balance_exhausted is not retried', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls++; return new Response(QUOTA, { status: 429 }); };
+  await assert.rejects(embedTexts(['a'], { apiKey: 'k', fetchImpl: fetchImpl as any, sleep: async () => {} }));
+  assert.equal(calls, 1);
 });

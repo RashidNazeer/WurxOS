@@ -60,7 +60,7 @@ export type RunStats = {
   by_type: Record<string, number>;
   errors: string[];
   deferred: number;                     // put back, attempt not spent: an OpenAI account problem
-  provider_issue: ProviderIssue | null; // 'quota' (no credits) | 'auth' (key refused): the run stops
+  provider_issue: ProviderIssue | null; // 'quota' (no credits) | 'auth' (key refused) | 'limit' (a wait of hours): the run stops
 };
 
 export const emptyStats = (): RunStats => ({
@@ -121,7 +121,7 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
     const issue = providerAccountIssue(e);
     if (issue) {
       stats.provider_issue = issue;
-      if (stats.errors.length < 10) stats.errors.push(`OpenAI account: ${issue === 'quota' ? 'no credits left' : 'API key refused'} (${errText(e).slice(0, 120)})`);
+      if (stats.errors.length < 10) stats.errors.push(`OpenAI account: ${issue === 'quota' ? 'no credits left' : issue === 'auth' ? 'API key refused' : 'usage limit reached'} (${errText(e).slice(0, 120)})`);
       const held = await rpc('ai_ingest_defer', { p_id: it.id, p_worker: workerId, p_error: errText(e), p_delay_seconds: PROVIDER_DEFER_SECONDS });
       if (held === false) stats.lost_lock++; else stats.deferred++;
       return;
