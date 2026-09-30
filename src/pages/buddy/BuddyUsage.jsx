@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usageSummary, setMonthlyBudget } from '../../lib/buddyApi';
+import { LoadError } from '../../components/buddy/BuddyThread';
 import { USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, pktDate, usageRange } from '../../lib/buddyLogic';
 
 // Buddy settings → Usage (Boss only; ai_usage_summary refuses anyone else).
@@ -19,10 +20,10 @@ export default function BuddyUsage() {
 
   const range = preset === 'custom' ? custom : usageRange(preset);
   const load = useCallback(async () => {
-    if (!range.from || !range.to || range.from > range.to) { setErr('Pick a start date on or before the end date.'); return; }
+    if (!range.from || !range.to || range.from > range.to) { setErr('range'); return; }
     setLoading(true); setErr('');
     try { setData(await usageSummary(range.from, range.to)); }
-    catch (e) { setErr(e.message === 'not allowed' ? 'Usage is visible to the Boss only.' : `Couldn't load usage: ${e.message}`); }
+    catch (e) { setErr(e.message === 'not allowed' ? 'boss' : 'load'); }
     finally { setLoading(false); }
   }, [range.from, range.to]);
   useEffect(() => { load(); }, [load]);
@@ -57,7 +58,12 @@ export default function BuddyUsage() {
         {loading && <span className="wx-spinner" style={{ color: 'var(--accent)' }} aria-label="Loading" />}
       </div>
 
-      {err && <div className="bd-error mb-2">{err}</div>}
+      {err && (err === 'range'
+        ? <div className="bd-error mb-2" role="alert">Pick a start date on or before the end date.</div>
+        : err === 'boss'
+          ? <div className="bd-card-sub mb-2">Usage is visible to the Boss only.</div>
+          : <LoadError what="usage" onRetry={load} compact />)}
+      {!data && !err && <UsageSkeleton />}
       {data && (
         <>
           <div className="bd-stats bd-usage-cards">
@@ -95,6 +101,17 @@ export default function BuddyUsage() {
         </>
       )}
     </section>
+  );
+}
+
+function UsageSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <div className="bd-stats bd-usage-cards">
+        {[0, 1, 2, 3, 4].map((i) => <div key={i} className="bd-stat"><div className="bd-skel is-label" /><div className="bd-skel is-value" /></div>)}
+      </div>
+      <div className="bd-skel is-chart" />
+    </div>
   );
 }
 

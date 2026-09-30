@@ -5,7 +5,7 @@ import { useBuddy } from '../../contexts/BuddyContext';
 import { groupConversations, isTmpKey, orderSources, starterCards } from '../../lib/buddyLogic';
 import { searchConversationIds } from '../../lib/buddyApi';
 import BuddyMascot from '../../components/buddy/BuddyMascot';
-import BuddyThread, { SourceChip } from '../../components/buddy/BuddyThread';
+import BuddyThread, { LoadError, SourceChip } from '../../components/buddy/BuddyThread';
 import { ComingSoon } from '../../components/buddy/BuddyPanel';
 import '../../styles/buddy.css';
 
@@ -47,6 +47,18 @@ export default function BuddyPage() {
     setParams(next, { replace: true });
   }, [key, params, setParams]);
   useEffect(() => { setSourceSel(null); }, [key]);
+
+  // Esc closes the phone drawer / sources sheet (the history drawer first).
+  useEffect(() => {
+    if (!historyOpen && !sourcesOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (historyOpen) setHistoryOpen(false);
+      else if (window.matchMedia?.('(max-width: 991px)').matches) setSourcesOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [historyOpen, sourcesOpen]);
 
   const messages = (key && state.threads[key]?.messages) || [];
   const conv = key ? state.convs.find((c) => c.id === key) : null;
@@ -145,8 +157,17 @@ export default function BuddyPage() {
   );
 }
 
+function HistorySkeleton() {
+  return (
+    <div className="bd-skeleton-list" aria-hidden="true">
+      <div className="bd-skel is-label" />
+      {[70, 85, 60, 90, 75, 55].map((w, i) => <div key={i} className="bd-skel is-row" style={{ width: `${w}%` }} />)}
+    </div>
+  );
+}
+
 function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSettings, settingsActive }) {
-  const { state, rename, pin, remove } = useBuddy();
+  const { state, rename, pin, remove, refreshConvs } = useBuddy();
   const [q, setQ] = useState('');
   const [hits, setHits] = useState(null);
   const [editing, setEditing] = useState(null); // { id, title }
@@ -184,9 +205,11 @@ function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSetti
         <i className="bi bi-search" aria-hidden="true" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats" aria-label="Search chats" />
       </div>
-      {err && <div className="bd-error mx-2">{err}</div>}
-      <nav className="bd-history-list">
-        {groups.length === 0 && <div className="bd-side-empty">{q ? 'No chats match.' : 'No chats yet. Ask Buddy something!'}</div>}
+      {err && <div className="bd-error mx-2" role="alert">{err}</div>}
+      <nav className="bd-history-list" aria-label="Chats" aria-busy={!state.convsLoaded}>
+        {!state.convsLoaded && !state.convsError && <HistorySkeleton />}
+        {state.convsError && !state.convs.length && <LoadError what="your chats" onRetry={refreshConvs} compact />}
+        {state.convsLoaded && groups.length === 0 && <div className="bd-side-empty">{q ? 'No chats match.' : 'No chats yet. Ask Buddy something!'}</div>}
         {groups.map((g) => (
           <div key={g.label} className="bd-group">
             <div className="bd-group-label">{g.label}</div>
@@ -203,18 +226,20 @@ function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSetti
                 : (
                   <div key={c.id} className={`bd-conv ${activeKey === c.id ? 'is-active' : ''}`}>
                     <button type="button" className="bd-conv-main" onClick={() => onPick(c.id)} aria-current={activeKey === c.id ? 'true' : undefined}>
-                      {state.unread[c.id] && <span className="bd-dot" aria-label="Unread reply" />}
-                      {state.inflight[c.id] && <span className="bd-spin" aria-label="Buddy is replying" />}
+                      {state.unread[c.id] && <span className="bd-dot" role="img" aria-label="Unread reply" />}
+                      {state.inflight[c.id] && <span className="bd-spin" role="img" aria-label="Buddy is replying" />}
                       <span className="text-truncate">{c.title || 'New chat'}</span>
                     </button>
                     <div className="bd-conv-acts">
-                      <button type="button" onClick={() => act(() => pin(c.id, !c.pinned))} aria-label={c.pinned ? 'Unpin' : 'Pin'} title={c.pinned ? 'Unpin' : 'Pin'}>
-                        <i className={`bi ${c.pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}`} />
+                      <button type="button" onClick={() => act(() => pin(c.id, !c.pinned))}
+                        aria-label={`${c.pinned ? 'Unpin' : 'Pin'} “${c.title || 'New chat'}”`} title={c.pinned ? 'Unpin' : 'Pin'}>
+                        <i className={`bi ${c.pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}`} aria-hidden="true" />
                       </button>
-                      <button type="button" onClick={() => setEditing({ id: c.id, title: c.title || '' })} aria-label="Rename" title="Rename"><i className="bi bi-pencil" /></button>
-                      <button type="button" className="is-danger" aria-label="Delete" title="Delete"
+                      <button type="button" onClick={() => setEditing({ id: c.id, title: c.title || '' })}
+                        aria-label={`Rename “${c.title || 'New chat'}”`} title="Rename"><i className="bi bi-pencil" aria-hidden="true" /></button>
+                      <button type="button" className="is-danger" aria-label={`Delete “${c.title || 'New chat'}”`} title="Delete"
                         onClick={() => { if (window.confirm('Delete this chat? This cannot be undone.')) act(() => remove(c.id)); }}>
-                        <i className="bi bi-trash3" />
+                        <i className="bi bi-trash3" aria-hidden="true" />
                       </button>
                     </div>
                   </div>

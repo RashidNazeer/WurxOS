@@ -22,6 +22,17 @@ export default function BuddyFab() {
   const firstBounce = useRef(bounce);
 
   useEffect(() => { if (panelOpen) setMounted(true); }, [panelOpen]);
+  // However the panel closes (Esc, —, ×, the FAB), focus comes back to the FAB
+  // unless the user has already moved it somewhere else on the page.
+  const fabRef = useRef(null);
+  const wasOpen = useRef(panelOpen);
+  useEffect(() => {
+    if (wasOpen.current && !panelOpen) {
+      const a = document.activeElement;
+      if (!a || a === document.body || a.closest?.('#buddy-panel')) fabRef.current?.focus();
+    }
+    wasOpen.current = panelOpen;
+  }, [panelOpen]);
   // The tab shows the same conversations; a panel over it would be a duplicate.
   useEffect(() => { if (onTab && panelOpen) buddy.minimise(); }, [onTab, panelOpen, buddy]);
   useEffect(() => {
@@ -47,6 +58,7 @@ export default function BuddyFab() {
       )}
       {!onTab && !modal && (
         <button
+          ref={fabRef}
           type="button"
           className={`bd-fab is-${mood} ${bouncing ? 'is-bounce' : ''} ${panelOpen ? 'is-open' : ''}`}
           onClick={togglePanel}

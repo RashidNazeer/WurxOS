@@ -106,6 +106,8 @@ export async function handleAsk(env: ServerEnv, admin: any, caller: Caller, body
   return turnResponse({
     userId: caller.userId, role: caller.role, displayName: caller.displayName, message: String(body?.message ?? ''), conversationId,
     surface: caller.internal ? 'slack' : cleanSurface(body?.surface), pageContext: cleanPageContext(body?.page_context),
+    // Regenerate: {regenerate: <assistant messageId>}; its question is reused, `message` is ignored.
+    ...(body?.regenerate !== undefined ? { regenerate: String(body.regenerate) } : {}),
   }, deps, body?.stream === true);
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

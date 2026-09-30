@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import {
   buddyRoles, TMP_PREFIX, isTmpKey, buddyReducer, initialBuddyState, deriveMood, unreadCount,
   unreadTitle, friendlyError, findReply, watchReply, isStuck, STUCK_MS, greetingText, firstName, serverUnread,
+  clockSkew, questionBefore, canRegenerateMsg,
 } from '../lib/buddyLogic';
 import {
   BuddyHttpError, streamAssistant, listConversations, getMessages, findGenerating, subscribeMessages,
@@ -48,6 +49,10 @@ export function BuddyProvider({ children }) {
   const ctrls = useRef({});     // key → AbortController of the live stream
   const watchers = useRef({});  // key → watchReply promise (has .cancel)
   const tmpSeq = useRef(0);
+  // Server clock minus ours ({started}.server_now): rows' created_at is server
+  // time, so "stuck" is judged on the server's clock. 0 until we hear otherwise.
+  const skew = useRef(0);
+  const serverNow = useCallback(() => Date.now() + skew.current, []);
 
   // Seen = on screen in a visible browser tab, in the panel or the Buddy tab.
   const isViewed = useCallback((key) => {
@@ -74,7 +79,10 @@ export function BuddyProvider({ children }) {
         if (s.stopped?.[c.id] && serverUnread(c, s.readAt[c.id])) markRead(c.id);
       }
       return convs;
-    } catch { return stateRef.current.convs; }
+    } catch (e) {
+      dispatch({ type: 'CONVS_ERROR', error: e?.message });
+      return stateRef.current.convs;
+    }
   }, [allowed, uid, markRead]);
 
   const resumeRef = useRef(null);  // resumeRow, defined below
@@ -87,7 +95,10 @@ export function BuddyProvider({ children }) {
       dispatch({ type: 'THREAD_LOADED', key, messages });
       const row = [...messages].reverse().find((m) => m.role === 'assistant');
       if (row?.status === 'generating') resumeRef.current?.(key, row);
-    } catch { /* retried on next open */ }
+    } catch (e) {
+      // Shown with Retry when nothing is on screen yet.
+      dispatch({ type: 'THREAD_ERROR', key, error: e?.message });
+    }
   }, []);
 
   // Follow a reply in the database until it is done or error. `messageId`
@@ -162,13 +173,19 @@ export function BuddyProvider({ children }) {
     startWatch(k, (msgs) => findReply(msgs, text));
   }, [findNewConversation, startWatch]);
 
-  const send = useCallback(async ({ key, text, surface = 'quick', pageContext }) => {
+  // `regenerate` (a reply's messageId, existing conversation only) replaces
+  // that answer in place instead of adding the question again.
+  const send = useCallback(async ({ key, text, surface = 'quick', pageContext, regenerate }) => {
     const msg = String(text || '').trim();
     if (!msg || !allowed) return null;
     let k = key || `${TMP_PREFIX}${++tmpSeq.current}`;
     if (stateRef.current.inflight[k]) return k;
     const startedAt = new Date().toISOString();
-    dispatch({ type: 'SEND_START', key: k, text: msg, at: startedAt });
+    const regen = regenerate && !isTmpKey(k)
+      && stateRef.current.threads[k]?.messages.some((m) => m.role === 'assistant' && m.id === regenerate) ? regenerate : null;
+    dispatch(regen
+      ? { type: 'REGEN_START', key: k, messageId: regen, text: msg, at: startedAt }
+      : { type: 'SEND_START', key: k, text: msg, at: startedAt });
     if (surface === 'quick') dispatch({ type: 'QUICK_KEY', key: k });
     else dispatch({ type: 'PAGE_KEY', key: k });
 
@@ -189,9 +206,10 @@ export function BuddyProvider({ children }) {
     };
     try {
       const r = await streamAssistant({
-        conversationId: isTmpKey(k) ? null : k, message: msg, surface, pageContext, signal: ctrl.signal,
+        conversationId: isTmpKey(k) ? null : k, message: msg, regenerate: regen, surface, pageContext, signal: ctrl.signal,
         onEvent: (ev) => {
-          // {started} carries the ids first; {done} repeats them.
+          // {started} carries the ids (and the server clock) first; {done} repeats them.
+          if (ev.started && ev.server_now) skew.current = clockSkew(ev.server_now);
           if (ev.conversationId) adopt(ev.conversationId);
           if (ev.requestId) requestId = ev.requestId;
           if (ev.messageId && ev.messageId !== messageId) {
@@ -217,8 +235,11 @@ export function BuddyProvider({ children }) {
       if (ctrl.signal.aborted && (ctrl.signal.reason === 'stop' || ctrl.signal.reason === 'reset')) return k;
       else if (e instanceof BuddyHttpError) {
         const f = friendlyError(e.status, e.message);
-        dispatch({ type: 'FAILED', key: k, error: f.text, denied: f.denied });
+        // Every refusal comes before the turn starts: a refused Regenerate changed nothing.
+        dispatch({ type: 'FAILED', key: k, error: f.text, denied: f.denied, refused: !!regen });
         settled = true;
+        // 409: the chat moved on (another tab, a reply still generating): show what's there now.
+        if (f.conflict) setTimeout(() => loadThread(k, true), 0);
       }
       // anything else is a dropped connection → recover below
     } finally {
@@ -227,17 +248,17 @@ export function BuddyProvider({ children }) {
     if (!settled) recover(k, msg, startedAt, messageId);
     else refreshConvs();
     return k;
-  }, [allowed, isViewed, markRead, recover, refreshConvs]);
+  }, [allowed, isViewed, markRead, recover, refreshConvs, loadThread]);
 
   // A reply row still generating that nobody here is streaming (a reload,
   // another tab): follow it to the end, or show it as lost once stuck.
   const resumeRow = useCallback((key, row) => {
-    if (stateRef.current.inflight[key] || row.status !== 'generating' || isStuck(row)) return;
+    if (stateRef.current.inflight[key] || row.status !== 'generating' || isStuck(row, serverNow())) return;
     dispatch({ type: 'RESUME', key, at: new Date().toISOString(), messageId: row.id });
-    const age = Date.now() - ms(row.created_at);
+    const age = serverNow() - ms(row.created_at);
     startWatch(key, (msgs) => msgs.find((m) => m.id === row.id) || null,
       { messageId: row.id, timeoutMs: Math.max(15000, STUCK_MS - age + 15000) });
-  }, [startWatch]);
+  }, [startWatch, serverNow]);
   resumeRef.current = resumeRow;
 
   // Retry a lost / failed reply: ask its question again.
@@ -251,6 +272,12 @@ export function BuddyProvider({ children }) {
     if (!text) return;
     const mine = gen.current;
     const convId = isTmpKey(key) ? await findNewConversation(text, startedAt) : key;
+    if (convId && convId !== key && gen.current === mine && stateRef.current.threads[key]) {
+      // The stopped chat now has a real id: move it there so history opens
+      // the same view (and the chat stays read).
+      dispatch({ type: 'CONV_ID', from: key, to: convId });
+      markRead(convId);
+    }
     for (let i = 0; i < 8 && convId && gen.current === mine; i++) {
       try {
         const reply = findReply(await getMessages(convId), text);
@@ -261,7 +288,7 @@ export function BuddyProvider({ children }) {
       } catch { /* flaky network: try again */ }
       await new Promise((r) => setTimeout(r, 2500));
     }
-  }, [findNewConversation]);
+  }, [findNewConversation, markRead]);
 
   // Server-side Stop (mig 386). With the reply row's id: send the cancel and
   // keep reading the stream (or the watcher) to its done, which arrives as
@@ -288,11 +315,14 @@ export function BuddyProvider({ children }) {
     cancelWhenFound(key, inf.text, inf.startedAt);
   }, [markRead, cancelWhenFound]);
 
-  // Regenerate = ask the last question again in the same conversation.
+  // Regenerate the last answer in place (server `regenerate`). Without the
+  // answer's row id (not saved yet), fall back to asking the question again.
   const regenerate = useCallback((key, surface) => {
     const msgs = stateRef.current.threads[key]?.messages || [];
-    const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
-    if (lastUser) send({ key, text: lastUser.content, surface });
+    const idx = msgs.map((m) => m.role).lastIndexOf('assistant');
+    const question = idx >= 0 ? questionBefore(msgs, idx) : [...msgs].reverse().find((m) => m.role === 'user')?.content;
+    if (!question) return;
+    send({ key, text: question, surface, regenerate: idx >= 0 && canRegenerateMsg(msgs[idx]) ? msgs[idx].id : null });
   }, [send]);
 
   // ── lifecycle ────────────────────────────────────────────────────
@@ -406,10 +436,10 @@ export function BuddyProvider({ children }) {
     unreadCount: nUnread,
     send, stop, regenerate, retry, loadThread, refreshConvs, markRead,
     openPanel, minimise, closePanel, togglePanel, newQuickChat, selectPage,
-    setPageActive, rename, pin, remove,
+    setPageActive, rename, pin, remove, serverNow,
     feedback: sendFeedback,
   }), [allowed, gateReady, role, profile, greeting, state, nUnread, send, stop, regenerate, retry, loadThread, refreshConvs, markRead,
-    openPanel, minimise, closePanel, togglePanel, newQuickChat, selectPage, rename, pin, remove]);
+    openPanel, minimise, closePanel, togglePanel, newQuickChat, selectPage, rename, pin, remove, serverNow]);
 
   return <BuddyCtx.Provider value={value}>{children}</BuddyCtx.Provider>;
 }

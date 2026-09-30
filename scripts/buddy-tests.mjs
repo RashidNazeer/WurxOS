@@ -11,6 +11,7 @@ import {
   parseSse, friendlyError, findReply, isFinal, isStuck, STUCK_MS, watchReply, questionBefore,
   groupConversations, pageContextFor, pageChips, citeHtml, orderSources, sourceLink, BUDDY_ROLES, greetingText,
   buddyRoles, rowToMessage, fmtUsd, fmtCount, fmtMs, fmtPct, pktDate, usageRange,
+  visibleMessages, canRegenerateMsg, clockSkew, nextAllowedRoles, ALL_ROLES,
 } from '../src/lib/buddyLogic.js';
 
 let passed = 0, failed = 0;
@@ -282,6 +283,90 @@ async function watchTests() {
   const inAttr = citeHtml('<div><a href="/kb?q=[S2]" class="ai-link">see [S2]</a> and <span title="a>[D1]">x</span> [D1]</div>', sources);
   check('cites: markers inside attributes untouched', inAttr.includes('href="/kb?q=[S2]"') && inAttr.includes('title="a>[D1]"'), inAttr);
   check('cites: text markers still rewritten', (inAttr.match(/class="bd-cite"/g) || []).length === 2, inAttr);
+}
+
+// ── completion pass: regenerate, skew, stop mood, load errors, roles ──
+{
+  const C3 = '33333333-3333-4333-8333-333333333333';
+  const base = run(S0, { type: 'THREAD_LOADED', key: C3, messages: [
+    { id: 'u1', role: 'user', content: 'How do I apply for leave?' },
+    { id: 'a1', role: 'assistant', content: 'Old answer', status: 'done', sources: [{ id: 'S1' }] },
+  ] });
+
+  // Regenerate replaces the answer in place; the question is not repeated.
+  let s = run(base, { type: 'REGEN_START', key: C3, messageId: 'a1', text: 'How do I apply for leave?', at: T0 });
+  let m = s.threads[C3].messages;
+  check('regen: no repeated question', m.length === 2 && m.filter((x) => x.role === 'user').length === 1);
+  check('regen: old text kept aside, status "Regenerating…"', m[1].regenerating && m[1].oldContent === 'Old answer' && m[1].content === '' && s.inflight[C3].status === 'Regenerating…');
+  check('regen: thinking while it runs', deriveMood(s) === 'thinking');
+  s = run(s, { type: 'MSG_ID', key: C3, messageId: 'a2' }, { type: 'DELTA', key: C3, delta: 'New answer' },
+    { type: 'DONE', key: C3, messageId: 'a2', status: 'done', viewed: true });
+  m = s.threads[C3].messages;
+  check('regen: new answer replaces the old, flags cleared', m.length === 2 && m[1].content === 'New answer' && m[1].id === 'a2'
+    && !m[1].regenerating && !m[1].oldContent && !m[1].previous, JSON.stringify(m[1]));
+
+  // Failed or stopped after starting: the old row is superseded on the server; keep it for "Show previous".
+  const failed = run(base, { type: 'REGEN_START', key: C3, messageId: 'a1', text: 'Q', at: T0 },
+    { type: 'DONE', key: C3, messageId: 'a3', status: 'error', error: 'That took too long…', viewed: true });
+  check('regen fails: new error stands, previous answer kept aside', failed.threads[C3].messages[1].error === 'That took too long…'
+    && failed.threads[C3].messages[1].previous?.content === 'Old answer');
+  const stopped = run(base, { type: 'REGEN_START', key: C3, messageId: 'a1', text: 'Q', at: T0 },
+    { type: 'MSG_ID', key: C3, messageId: 'a4' }, { type: 'STOPPING', key: C3 },
+    { type: 'DONE', key: C3, messageId: 'a4', status: 'error', cancelled: true, viewed: true });
+  check('regen stopped: "Stopped" + previous answer', stopped.threads[C3].messages[1].stopped && stopped.threads[C3].messages[1].previous?.content === 'Old answer');
+
+  // Refused before starting (409 etc.): nothing changed, the old answer is back as it was.
+  const refused = run(base, { type: 'REGEN_START', key: C3, messageId: 'a1', text: 'Q', at: T0 },
+    { type: 'FAILED', key: C3, error: 'Buddy is already working on this.', refused: true });
+  const r1 = refused.threads[C3].messages[1];
+  check('regen refused: old answer restored with a note', r1.content === 'Old answer' && r1.id === 'a1' && r1.status === 'done'
+    && !r1.error && !r1.regenerating && r1.notice === 'Buddy is already working on this.' && !refused.inflight[C3], JSON.stringify(r1));
+  const denied = run(base, { type: 'REGEN_START', key: C3, messageId: 'a1', text: 'Q', at: T0 },
+    { type: 'FAILED', key: C3, error: 'x', denied: true, refused: true });
+  check('regen 403: restores instead of dropping the turn', denied.threads[C3].messages.length === 2 && denied.threads[C3].messages[1].content === 'Old answer');
+  check('regen: unknown id is ignored', run(base, { type: 'REGEN_START', key: C3, messageId: 'nope', text: 'Q', at: T0 }) === base);
+  check('409 → "already working on this"', friendlyError(409).conflict && /already working/.test(friendlyError(409).text));
+
+  // Rows.
+  const sup = rowToMessage({ id: 'o', role: 'assistant', content: 'x', status: 'superseded', meta: { superseded_by: 'n' } });
+  const sup2 = rowToMessage({ id: 'o2', role: 'assistant', content: 'x', status: 'done', meta: { superseded_by: 'n' } });
+  const nu = rowToMessage({ id: 'n', role: 'assistant', content: 'y', status: 'error', meta: { supersedes: 'o', error: 'boom' } });
+  check('rows: superseded hidden (status or meta)', visibleMessages([sup, sup2, nu]).map((x) => x.id).join() === 'n');
+  check('rows: supersedes kept for "Show previous"', nu.supersedes === 'o');
+  check('canRegenerate: saved last reply, done or error only',
+    canRegenerateMsg({ role: 'assistant', id: 'a', status: 'done' }) && canRegenerateMsg({ role: 'assistant', id: 'a', status: 'error' })
+    && !canRegenerateMsg({ role: 'assistant', id: 'a', status: 'generating' }) && !canRegenerateMsg({ role: 'assistant', status: 'done' })
+    && !canRegenerateMsg({ role: 'assistant', id: 'a', status: 'done', pending: true }));
+
+  // Clock skew: rows' created_at is server time.
+  const local = Date.parse('2026-09-30T10:00:00Z');
+  check('skew: server 5 min ahead', clockSkew('2026-09-30T10:05:00Z', local) === 300000);
+  check('skew: small / missing / absurd → 0', clockSkew('2026-09-30T10:00:01Z', local) === 0 && clockSkew(null, local) === 0 && clockSkew('2020-01-01T00:00:00Z', local) === 0);
+  const row = { status: 'generating', created_at: '2026-09-30T10:03:00Z' };
+  check('isStuck: judged on the server clock', !isStuck(row, local + 300000) && isStuck(row, local + 300000 + 3 * 60000));
+
+  // Stop → idle at once.
+  const stopping = run(S0, { type: 'SEND_START', key: C3, text: 'Q', at: T0 }, { type: 'MSG_ID', key: C3, messageId: 'm' }, { type: 'STOPPING', key: C3 });
+  check('mood: idle as soon as Stop is pressed', deriveMood(stopping) === 'idle' && !!stopping.inflight[C3]);
+
+  // Stop before {started} in a new chat: the stopped view moves to the real id.
+  const moved = run(S0, { type: 'SEND_START', key: 'tmp:5', text: 'Q', at: T0 }, { type: 'PAGE_KEY', key: 'tmp:5' },
+    { type: 'DELTA', key: 'tmp:5', delta: 'Part' }, { type: 'STOPPED', key: 'tmp:5' }, { type: 'CONV_ID', from: 'tmp:5', to: C3 });
+  check('stop before started: thread, stopped flag and view move to the real id', moved.threads[C3]?.messages.at(-1).stopped
+    && moved.stopped[C3] && !moved.threads['tmp:5'] && moved.pageKey === C3);
+
+  // Load errors.
+  let e = run(S0, { type: 'CONVS_ERROR', error: 'net' });
+  check('history: error shown before the first load', e.convsError === 'net' && !e.convsLoaded);
+  e = run(e, { type: 'CONVS_LOADED', convs: [] });
+  check('history: a load clears the error', e.convsLoaded && e.convsError === null);
+  check('thread: error when nothing is shown yet', run(S0, { type: 'THREAD_ERROR', key: C3, error: 'x' }).threads[C3].error === 'x');
+  check('thread: a failed refetch keeps what is on screen', run(base, { type: 'THREAD_ERROR', key: C3, error: 'x' }) === base);
+
+  // Allowed roles: Boss always in, order stable.
+  check('roles: boss always included', nextAllowedRoles([], 'apc', true).join() === 'boss,apc' && nextAllowedRoles(['boss'], 'boss', false).join() === 'boss');
+  check('roles: toggle off, stable order', nextAllowedRoles(['developer', 'apc', 'boss', 'tl'], 'apc', false).join() === 'boss,tl,developer');
+  check('roles: 8 roles offered', ALL_ROLES.length === 8);
 }
 
 await watchTests();

@@ -25,6 +25,7 @@ export type TurnRequest = {
   displayName?: string | null;
   message: string;
   conversationId?: string | null;
+  regenerate?: string | null;         // an assistant messageId: answer its question again, in place
   surface?: 'quick' | 'full' | 'slack';  // quick panel → concise answers; slack = the internal relay
   pageContext?: PageContext | null;    // a hint only; never used for permissions
 };
@@ -145,7 +146,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const requestId = deps.requestId ?? crypto.randomUUID();
   const llm = deps.llm ?? respond;
   const admin = deps.admin;
-  const message = String(req.message ?? '').trim();
+  const regenerate = req.regenerate ?? null;
+  let message = String(req.message ?? '').trim();
 
   const [row] = await Promise.all([
     loadConfig(admin),
@@ -156,14 +158,24 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const retrieval = retrievalConfig(row.retrieval).config;
   const model = pickModel(row.model);
   const fail = (error: string, httpStatus: number): TurnResult => ({ requestId, conversationId: req.conversationId ?? null, answer: '', sources: [], error, httpStatus });
+  if (row.enabled === false) return fail('The assistant is currently turned off by an admin.', 503);
+
+  // Regenerate: the same question again, answered in place of the last reply.
+  let conversationId = req.conversationId ?? null;
+  let regen: { oldId: string; questionAt: string; oldStatus: string; oldMeta: Record<string, unknown> } | null = null;
+  if (regenerate) {
+    const r = await regenerateTarget(admin, req.userId, regenerate);
+    if ('error' in r) return fail(r.error, r.status);
+    ({ conversationId } = r);
+    message = r.question;
+    regen = { oldId: regenerate, questionAt: r.questionAt, oldStatus: r.oldStatus, oldMeta: r.oldMeta };
+  }
 
   if (!message) return fail('empty message', 400);
   if (message.length > agent.MESSAGE_MAX_CHARS) return fail('message too long', 400);
-  if (row.enabled === false) return fail('The assistant is currently turned off by an admin.', 503);
 
   // Own the conversation before anything is recorded.
-  let conversationId = req.conversationId ?? null;
-  if (conversationId) {
+  if (conversationId && !regen) {
     const { data: conv } = await admin.from('ai_conversations').select('id, user_id').eq('id', conversationId).maybeSingle();
     if (!conv || conv.user_id !== req.userId) return fail('conversation not found', 404);
   }
@@ -174,19 +186,43 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (error) return fail(error.message, 500);
     conversationId = created.id;
   }
-  const { data: hist } = await admin.from('ai_messages').select('role, content').eq('conversation_id', conversationId)
-    .eq('status', 'done').order('created_at', { ascending: false }).limit(agent.HISTORY_TURNS);
-  const history = trimHistory(hist ?? [], agent.HISTORY_TURNS, agent.HISTORY_CHAR_CAP);
 
   // The question and a 'generating' reply row go in before any work: the
   // reply is finished and saved even if the browser disconnects (ui-design §6).
-  const { data: made, error: mErr } = await admin.from('ai_messages').insert([
-    { conversation_id: conversationId, role: 'user', content: message, status: 'done', meta: { requestId }, created_at: new Date(t0).toISOString() },
-    { conversation_id: conversationId, role: 'assistant', content: '', status: 'generating', meta: { requestId }, created_at: new Date(t0 + 1).toISOString() },
-  ]).select('id, role');
-  if (mErr) return fail(mErr.message, 500);
-  const messageId: string = (made ?? []).find((m: any) => m.role === 'assistant')?.id;
-  emit({ started: true, conversationId, requestId, messageId });
+  // A regenerate reuses its question row, and supersedes the old reply only
+  // if nobody else did first (two clicks, two tabs).
+  let messageId: string;
+  if (regen) {
+    const { data: sup, error: sErr } = await admin.from('ai_messages').update({ status: 'superseded' })
+      .eq('id', regen.oldId).in('status', ['done', 'error']).select('id');
+    if (sErr) return fail(sErr.message, 500);
+    if (!sup?.length) return fail('that reply was already regenerated or is still being written', 409);
+    const { data: made, error: mErr } = await admin.from('ai_messages').insert(
+      { conversation_id: conversationId, role: 'assistant', content: '', status: 'generating', meta: { requestId, supersedes: regen.oldId }, created_at: new Date(t0).toISOString() },
+    ).select('id').single();
+    if (mErr) {
+      await admin.from('ai_messages').update({ status: regen.oldStatus }).eq('id', regen.oldId);
+      return fail(mErr.message, 500);
+    }
+    messageId = made.id;
+    await admin.from('ai_messages').update({ meta: { ...regen.oldMeta, superseded_by: messageId } }).eq('id', regen.oldId);
+  } else {
+    const { data: made, error: mErr } = await admin.from('ai_messages').insert([
+      { conversation_id: conversationId, role: 'user', content: message, status: 'done', meta: { requestId }, created_at: new Date(t0).toISOString() },
+      { conversation_id: conversationId, role: 'assistant', content: '', status: 'generating', meta: { requestId }, created_at: new Date(t0 + 1).toISOString() },
+    ]).select('id, role');
+    if (mErr) return fail(mErr.message, 500);
+    messageId = (made ?? []).find((m: any) => m.role === 'assistant')?.id;
+  }
+  // First event, before any model or retrieval work, so the UI can always Stop.
+  emit({ started: true, conversationId, requestId, messageId, server_now: new Date().toISOString(), ...(regen ? { regenerated: regen.oldId } : {}) });
+
+  // Context: finished turns only (superseded, error and generating rows never
+  // reach the model), and for a regenerate only what came before its question.
+  let hq = admin.from('ai_messages').select('role, content').eq('conversation_id', conversationId).eq('status', 'done');
+  hq = regen ? hq.lt('created_at', regen.questionAt) : hq.lt('created_at', new Date(t0).toISOString());
+  const { data: hist } = await hq.order('created_at', { ascending: false }).limit(agent.HISTORY_TURNS);
+  const history = trimHistory(hist ?? [], agent.HISTORY_TURNS, agent.HISTORY_CHAR_CAP);
 
   // Stop (QA M2): the owner's POST {cancel} sets cancel_requested_at; polled here.
   const cancelCtrl = new AbortController();
@@ -338,7 +374,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // A stopped reply is kept (partial) as 'error' + cancelled, and does not
   // move last_reply_at: no unread badge for an answer the user stopped.
   const meta = {
-    requestId, model, engine: 'v2', surface,
+    requestId, model, engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
     sources: sources.filter((s) => s.cited),
     tools: toolLogs.map((t) => ({ name: t.name, args: t.args, ms: t.ms, cites: t.cites })),
     ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.deadline_hit ? 'The reply took too long and was stopped.' : 'Something went wrong while answering.' } : {}),
@@ -393,4 +429,25 @@ export async function requestCancel(admin: any, userId: string, messageId: strin
   const { error } = await admin.from('ai_messages').update({ cancel_requested_at: new Date().toISOString() }).eq('id', messageId).eq('status', 'generating');
   if (error) return { status: 500, body: { error: 'could not cancel' } };
   return { status: 202, body: { cancelled: true, messageId, status: 'generating' } };
+}
+
+// Regenerate: only the owner's LAST reply of a conversation, only when nothing
+// in it is still generating, and only a finished (done / error) one. Returns
+// the question it answered (the user row just before it).
+export async function regenerateTarget(admin: any, userId: string, messageId: string):
+  Promise<{ conversationId: string; question: string; questionAt: string; oldStatus: string; oldMeta: Record<string, unknown> } | { error: string; status: number }> {
+  if (!UUID_RE.test(String(messageId ?? ''))) return { error: 'regenerate must be a message id', status: 400 };
+  const { data: m } = await admin.from('ai_messages').select('id, role, status, created_at, meta, conversation_id, ai_conversations(user_id)')
+    .eq('id', messageId).maybeSingle();
+  if (!m || m.role !== 'assistant' || m.ai_conversations?.user_id !== userId) return { error: 'message not found', status: 404 };
+  if (!['done', 'error'].includes(m.status)) return { error: `that reply cannot be regenerated (status ${m.status})`, status: 409 };
+  const { data: rows } = await admin.from('ai_messages').select('id, role, status, content, created_at')
+    .eq('conversation_id', m.conversation_id).neq('status', 'superseded').order('created_at', { ascending: false }).limit(50);
+  const live = (rows ?? []) as Array<{ id: string; role: string; status: string; content: string; created_at: string }>;
+  if (live.some((r) => r.status === 'generating')) return { error: 'a reply is still being written in this conversation', status: 409 };
+  const lastReply = live.find((r) => r.role === 'assistant');
+  if (lastReply?.id !== m.id) return { error: 'only the last reply of a conversation can be regenerated', status: 409 };
+  const question = live.find((r) => r.role === 'user' && r.created_at < m.created_at);
+  if (!question) return { error: 'the question for that reply was not found', status: 409 };
+  return { conversationId: m.conversation_id, question: question.content, questionAt: question.created_at, oldStatus: m.status, oldMeta: m.meta ?? {} };
 }
