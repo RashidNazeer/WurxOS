@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
-import { citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
+import { canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
+import { getMessageById } from '../../lib/buddyApi';
 import { useBuddy } from '../../contexts/BuddyContext';
 import BuddyMascot, { BUDDY_STILL } from './BuddyMascot';
 import '../../styles/assistant.css'; // .ai-md: the rendered-markdown rules
@@ -23,7 +24,7 @@ export function useOnline() {
 }
 
 export default function BuddyThread({ convKey, surface, pageContext, empty, onCite, activeSourceMsg }) {
-  const { state, send, stop, regenerate, retry } = useBuddy();
+  const { state, send, stop, regenerate, retry, loadThread } = useBuddy();
   const thread = convKey ? state.threads[convKey] : null;
   const messages = thread?.messages || [];
   const inflight = convKey ? state.inflight[convKey] : null;
@@ -43,13 +44,17 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
   const last = messages[messages.length - 1];
   const orphanStatus = inflight && (!last || last.role === 'user');
   const lastAssistantIdx = messages.map((m) => m.role).lastIndexOf('assistant');
+  const loadError = !!thread?.error && !inflight;
   const loading = convKey && !thread && !inflight;
 
   return (
     <div className="bd-thread">
       <div ref={scrollRef} className="bd-scroll" onScroll={onScroll}>
-        {loading && <div className="bd-center"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}
-        {!loading && messages.length === 0 && !inflight && empty}
+        {loading && <div className="bd-center" aria-busy="true"><span className="wx-spinner" style={{ color: 'var(--accent)' }} aria-label="Loading chat" /></div>}
+        {loadError && (
+          <LoadError what="this chat" onRetry={() => loadThread(convKey, true)} />
+        )}
+        {!loading && !loadError && messages.length === 0 && !inflight && empty}
         <div className="bd-col">
           {messages.map((m, i) => (
             <Message
@@ -57,10 +62,13 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
               m={m}
               status={inflight && i === messages.length - 1 ? inflight.status : null}
               surface={surface}
-              canRegenerate={surface === 'full' && i === lastAssistantIdx && !inflight}
+              canRegenerate={surface === 'full' && i === lastAssistantIdx && !inflight && canRegenerateMsg(m)}
               onRegenerate={() => regenerate(convKey, surface)}
               inflight={!!inflight && i === messages.length - 1}
-              onRetry={inflight ? null : () => retry(convKey, questionBefore(messages, i), surface)}
+              // The last reply is retried in place (Regenerate); an older one by asking again.
+              onRetry={inflight ? null : i === lastAssistantIdx && canRegenerateMsg(m)
+                ? () => regenerate(convKey, surface)
+                : () => retry(convKey, questionBefore(messages, i), surface)}
               onCite={onCite}
               active={activeSourceMsg === m}
             />
@@ -78,6 +86,19 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
   );
 }
 
+// A table read failed: say so kindly, offer Retry. Shared by the thread,
+// history, usage and settings.
+export function LoadError({ what, onRetry, compact }) {
+  const online = useOnline();
+  return (
+    <div className={`bd-load-error ${compact ? 'is-compact' : ''}`} role="alert">
+      <i className={`bi ${online ? 'bi-cloud-slash' : 'bi-wifi-off'}`} aria-hidden="true" />
+      <span>{online ? `Couldn't load ${what}.` : `You're offline, so ${what} can't load right now.`}</span>
+      {onRetry && <button type="button" className="bd-act is-primary" onClick={onRetry}><i className="bi bi-arrow-repeat" aria-hidden="true" /> Retry</button>}
+    </div>
+  );
+}
+
 export function StatusLine({ status }) {
   return (
     <div className="bd-row is-bot">
@@ -89,6 +110,7 @@ export function StatusLine({ status }) {
 
 function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inflight, onCite, active }) {
   const navigate = useNavigate();
+  const { serverNow } = useBuddy();
   if (m.role === 'user') {
     return (
       <div className="bd-row is-user">
@@ -96,11 +118,15 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
       </div>
     );
   }
-  // A generating row nobody is following any more (older than STUCK_MS) is lost.
-  const lost = !inflight && !m.pending && !m.stopped && isStuck(m);
+  // A generating row nobody is following any more (older than STUCK_MS on the
+  // server's clock) is lost.
+  const lost = !inflight && !m.pending && !m.stopped && isStuck(m, serverNow());
   const pending = !lost && (m.pending || m.status === 'generating');
   const error = m.error || (lost ? 'Buddy lost this reply.' : null);
-  const html = m.content ? citeHtml(renderAssistantHtml(m.content), m.sources) : '';
+  // Regenerating: the old answer stays, faded, until the new one starts.
+  const fading = pending && !m.content && m.regenerating && !!m.oldContent;
+  const shown = fading ? m.oldContent : m.content;
+  const html = shown ? citeHtml(renderAssistantHtml(shown), fading ? m.oldSources : m.sources) : '';
   const onClick = (e) => {
     const cite = e.target.closest?.('button.bd-cite');
     if (cite) { onCite?.(cite.getAttribute('data-cite'), m); return; }
@@ -112,33 +138,65 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
     <div className={`bd-row is-bot ${active ? 'is-active' : ''}`}>
       <img src={BUDDY_STILL} alt="" aria-hidden="true" className="bd-avatar" />
       <div className="bd-msg">
-        {pending && !m.content
+        {pending && !shown
           ? <div className="bd-status" role="status" aria-live="polite">
               <BuddyMascot clip="thinking" size={22} className="bd-inline-clip" />{status || 'On it…'}
             </div>
-          : m.content && (
-            <div className="bd-bubble is-bot" aria-live="polite" aria-busy={pending ? 'true' : 'false'}>
+          : shown && (
+            <div className={`bd-bubble is-bot ${fading ? 'is-fading' : ''}`} aria-live="polite" aria-busy={pending ? 'true' : 'false'}>
               <div className="ai-md" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
-              {pending && status && <div className="bd-status is-inline">{status}</div>}
+              {pending && status && <div className="bd-status is-inline" role="status">{status}</div>}
             </div>
           )}
         {error && (
           <div className="bd-error" role="alert">
-            <i className="bi bi-exclamation-circle" /> {error}
-            {onRetry && <button type="button" className="bd-act is-primary" onClick={onRetry}><i className="bi bi-arrow-repeat" /> Retry</button>}
+            <i className="bi bi-exclamation-circle" aria-hidden="true" /> {error}
+            {onRetry && <button type="button" className="bd-act is-primary" onClick={onRetry}><i className="bi bi-arrow-repeat" aria-hidden="true" /> Retry</button>}
           </div>
         )}
         {m.stopped && !pending && (
           <div className="bd-note">
             <i className="bi bi-stop-circle" aria-hidden="true" /> Stopped.
-            {onRetry && <button type="button" className="bd-act" onClick={onRetry}><i className="bi bi-arrow-repeat" /> Ask again</button>}
+            {onRetry && <button type="button" className="bd-act" onClick={onRetry}><i className="bi bi-arrow-repeat" aria-hidden="true" /> Ask again</button>}
           </div>
         )}
+        {m.notice && !pending && <div className="bd-note" role="status"><i className="bi bi-info-circle" aria-hidden="true" /> {m.notice}</div>}
+        {!pending && (error || m.stopped) && (m.previous || m.supersedes) && <PreviousAnswer m={m} />}
         {!pending && <SourceChips sources={m.sources} compact={surface === 'quick'} onCite={(id) => onCite?.(id, m)} />}
         {!pending && m.content && !error && (
           <Actions m={m} canRegenerate={canRegenerate} onRegenerate={onRegenerate} />
         )}
       </div>
+    </div>
+  );
+}
+
+// A Regenerate that failed or was stopped leaves the old answer superseded
+// (mig 389); this shows it on request. In-session it is kept locally
+// (m.previous); after a reload it is fetched by meta.supersedes.
+function PreviousAnswer({ m }) {
+  const [open, setOpen] = useState(false);
+  const [prev, setPrev] = useState(m.previous || null);
+  const [err, setErr] = useState(false);
+  const fetchPrev = async () => {
+    setErr(false);
+    try { setPrev(await getMessageById(m.supersedes)); } catch { setErr(true); }
+  };
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !prev && m.supersedes) fetchPrev();
+  };
+  return (
+    <div className="bd-previous">
+      <button type="button" className="bd-act" aria-expanded={open} onClick={toggle}>
+        <i className={`bi ${open ? 'bi-chevron-up' : 'bi-clock-history'}`} aria-hidden="true" /> {open ? 'Hide previous answer' : 'Show previous answer'}
+      </button>
+      {open && (err
+        ? <LoadError what="the previous answer" onRetry={fetchPrev} compact />
+        : prev
+          ? <div className="bd-bubble is-bot is-fading"><div className="ai-md" dangerouslySetInnerHTML={{ __html: citeHtml(renderAssistantHtml(prev.content), prev.sources) }} /></div>
+          : <span className="wx-spinner" style={{ color: 'var(--accent)' }} aria-label="Loading previous answer" />)}
     </div>
   );
 }

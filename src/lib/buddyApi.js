@@ -5,7 +5,7 @@
 // every call falls back to the v1 columns instead of failing.
 import { supabase } from './supabase';
 import { assertAllowedInDemo } from './demoMode';
-import { parseSse, rowToMessage } from './buddyLogic';
+import { parseSse, rowToMessage, visibleMessages } from './buddyLogic';
 
 export class BuddyHttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -26,7 +26,9 @@ const STALL_MS = 90000;
 
 // Resolves { done } once the stream ends. Throws BuddyHttpError for a refusal
 // (JSON + status), anything else (network, abort) as-is.
-export async function streamAssistant({ conversationId, message, surface, pageContext, signal, onEvent }) {
+// `regenerate` (the conversation's last reply id, mig 389) asks for a new
+// answer in place of that one: no message or conversationId is sent.
+export async function streamAssistant({ conversationId, message, regenerate, surface, pageContext, signal, onEvent }) {
   assertAllowedInDemo('assistant');
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
@@ -46,10 +48,9 @@ export async function streamAssistant({ conversationId, message, surface, pageCo
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        conversationId: conversationId || undefined, message, stream: true,
-        surface, page_context: pageContext,
-      }),
+      body: JSON.stringify(regenerate
+        ? { regenerate, stream: true, surface, page_context: pageContext }
+        : { conversationId: conversationId || undefined, message, stream: true, surface, page_context: pageContext }),
       signal: ctrl.signal,
     });
 
@@ -131,6 +132,13 @@ export async function searchConversationIds(convIds, q) {
 
 const toMessage = rowToMessage;
 
+// The answer a Regenerate replaced (for "Show previous answer"). Own rows only (RLS).
+export async function getMessageById(id) {
+  const { data, error } = await supabase.from('ai_messages').select('id, role, content, created_at, meta, status').eq('id', id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? toMessage(data) : null;
+}
+
 // Server-side Stop (mig 386): { cancelled:true } (202) or { cancelled:false,
 // status } (200, already finished). Throws BuddyHttpError otherwise.
 export async function cancelReply(messageId) {
@@ -151,14 +159,15 @@ export async function getMessages(conversationId) {
   const run = (cols) => supabase.from('ai_messages').select(cols)
     .eq('conversation_id', conversationId).order('created_at', { ascending: true });
   if (schema.msgStatus) {
-    const { data, error } = await run('id, role, content, created_at, meta, status');
-    if (!error) return (data || []).map(toMessage);
+    // Superseded answers (replaced by Regenerate) stay in the table but not in the chat.
+    const { data, error } = await run('id, role, content, created_at, meta, status').neq('status', 'superseded');
+    if (!error) return visibleMessages((data || []).map(toMessage));
     if (!missingColumn(error)) throw new Error(error.message);
     schema.msgStatus = false;
   }
   const { data, error } = await run('id, role, content, created_at, meta');
   if (error) throw new Error(error.message);
-  return (data || []).map(toMessage);
+  return visibleMessages((data || []).map(toMessage));
 }
 
 // Assistant rows still generating (a reload mid-reply). [] on an older backend.
@@ -249,6 +258,27 @@ export async function ingestStats() {
   const { data, error } = await supabase.rpc('ai_ingest_stats');
   if (error) throw new Error(/not allowed/i.test(error.message) ? 'not allowed' : error.message);
   return data;
+}
+
+// Boss-only usage and cost estimate, PKT dates (YYYY-MM-DD, inclusive).
+export async function usageSummary(from, to) {
+  const { data, error } = await supabase.rpc('ai_usage_summary', { p_from: from, p_to: to });
+  if (error) throw new Error(/not allowed|boss/i.test(error.message) ? 'not allowed' : error.message);
+  return data;
+}
+
+// Who may use Buddy (the assistant function and the UI gate both read it).
+export async function setAllowedRoles(roles) {
+  const { error } = await supabase.from('ai_assistant_config')
+    .update({ allowed_roles: roles, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
+}
+
+// Report-only: Buddy is never blocked by it. null clears it.
+export async function setMonthlyBudget(usd) {
+  const { error } = await supabase.from('ai_assistant_config')
+    .update({ monthly_budget_usd: usd, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
 }
 
 export const INGEST_SOURCES = [

@@ -27,10 +27,7 @@ export const AGENT_DEFAULTS = Object.freeze({
   CANCEL_POLL_MS: 1500,             // how often a running turn checks for Stop
   TOOL_RESULT_CHAR_CAP: 6000,
   LOG_RESULT_PREVIEW_CHARS: 2000,
-  // USD per 1M tokens: input, cached input, output. ASSUMED, not verified
-  // (phase5-design §10: verify on the day); only est_cost_usd depends on it.
-  PRICES: { 'gpt-5.4-mini': [0.75, 0.075, 4.5], 'gpt-5.5': [5, 0.5, 30] } as Record<string, number[]>,
-  EMBED_PRICE_PER_M: 0.02,
+  // Prices: ai_assistant_config.prices (mig 387), fallback ../prices.ts.
 });
 
 type Widen<T> = T extends number ? number : T extends string ? string : T;
@@ -39,19 +36,14 @@ export type AgentConfig = { -readonly [K in keyof typeof AGENT_DEFAULTS]: Widen<
 const EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high']);
 
 export function agentConfig(raw?: unknown): AgentConfig {
-  const cfg = { ...AGENT_DEFAULTS, RATE_LIMIT_EXEMPT_USERS: [] as string[], PRICES: { ...AGENT_DEFAULTS.PRICES } } as AgentConfig;
+  const cfg = { ...AGENT_DEFAULTS, RATE_LIMIT_EXEMPT_USERS: [] as string[] } as AgentConfig;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return cfg;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!(k in AGENT_DEFAULTS) || k === 'PRICES') continue;
+    if (!(k in AGENT_DEFAULTS)) continue;
     const def = (AGENT_DEFAULTS as Record<string, unknown>)[k];
     if (Array.isArray(def)) { if (Array.isArray(v) && v.every((x) => typeof x === 'string')) (cfg as any)[k] = [...v]; continue; }
     if (typeof def === 'number') { if (typeof v === 'number' && Number.isFinite(v) && v > 0) (cfg as any)[k] = v; continue; }
     if (k.startsWith('EFFORT_')) { if (EFFORTS.has(String(v))) (cfg as any)[k] = v; continue; }
   }
   return cfg;
-}
-
-export function costUsd(cfg: AgentConfig, model: string, u: { input: number; cached: number; output: number }): number {
-  const [pin, pcached, pout] = cfg.PRICES[model] ?? cfg.PRICES['gpt-5.4-mini'];
-  return ((u.input - u.cached) * pin + u.cached * pcached + u.output * pout) / 1e6;
 }

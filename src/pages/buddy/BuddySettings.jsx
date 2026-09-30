@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyWithRetry as lazy } from '../../lib/lazyWithRetry';
 import {
   getAiConfig, updateAiConfig, listDocs, saveDoc, deleteDoc,
   getSlackConfig, setSlackEnabled, listSlackRelayLog,
 } from '../../lib/aiAssistantApi';
 import {
   runIngestion, ingestStats, INGEST_SOURCES, getIngestSources, setIngestSources,
-  listExcluded, addExcluded, removeExcluded,
+  listExcluded, addExcluded, removeExcluded, getBuddyConfig, setAllowedRoles,
 } from '../../lib/buddyApi';
-import { BUDDY_GREETING, greetingIsDefault } from '../../lib/buddyLogic';
+import { ALL_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles } from '../../lib/buddyLogic';
+import { LoadError } from '../../components/buddy/BuddyThread';
 
 // Buddy settings (ui-design.md §4). Run ingestion: Boss + Developer (the
 // ai_run_ingestion RPC enforces it). Everything else: Boss only (RLS on the
 // config / docs / exclusion tables enforces it; this page only hides it).
+
+// Boss-only; its own chunk because it brings recharts.
+const BuddyUsage = lazy(() => import('./BuddyUsage'));
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 
@@ -22,12 +27,24 @@ export default function BuddySettings({ role }) {
       <IngestionCard />
       {isBoss && (
         <>
+          <Suspense fallback={<div className="bd-card"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}>
+            <BuddyUsage />
+          </Suspense>
+          <AllowedRolesCard />
           <SourcesCard />
           <ExcludedCard />
           <BehaviourCard />
           <KnowledgeCard />
         </>
       )}
+    </div>
+  );
+}
+
+function SkeletonLines({ n = 3 }) {
+  return (
+    <div className="bd-skeleton-list" aria-hidden="true">
+      {Array.from({ length: n }, (_, i) => <div key={i} className="bd-skel is-row" style={{ width: `${55 + ((i * 17) % 40)}%` }} />)}
     </div>
   );
 }
@@ -89,7 +106,7 @@ function IngestionCard() {
         {msg && <span className="small" role="status">{msg}</span>}
       </div>
       {statsErr === 'boss-only' && <div className="bd-card-sub">Run history and queue numbers are visible to the Boss only.</div>}
-      {statsErr && statsErr !== 'boss-only' && <div className="bd-error">Couldn't load ingestion stats: {statsErr}</div>}
+      {statsErr && statsErr !== 'boss-only' && <LoadError what="the ingestion stats" onRetry={load} compact />}
       {stats && (
         <div className="bd-stats">
           <Stat label="Last run" value={fmt(stats.last_sweep_at)} />
@@ -122,12 +139,71 @@ function Stat({ label, value, warn }) {
   );
 }
 
+// ── who may use Buddy ──────────────────────────────────────────────
+// ai_assistant_config.allowed_roles: the assistant function and the UI gate
+// both read it. Ticking a role changes nothing until Save.
+function AllowedRolesCard() {
+  const [saved, setSaved] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = () => {
+    setLoadErr(false);
+    getBuddyConfig().then((c) => {
+      if (!Array.isArray(c.allowedRoles)) { setLoadErr(true); return; }
+      const r = nextAllowedRoles(c.allowedRoles, 'boss', true);
+      setSaved(r); setDraft(r);
+    });
+  };
+  useEffect(load, []);
+
+  const dirty = saved && draft && saved.join() !== draft.join();
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try { await setAllowedRoles(draft); setSaved(draft); setMsg('Saved. People see the change the next time they load WurxOS.'); }
+    catch (e) { setMsg(`Couldn't save: ${e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Card icon="bi-people" title="Who can use Buddy" sub="The roles that see Buddy and can ask it questions. Boss is always included.">
+      {loadErr && <LoadError what="the allowed roles" onRetry={load} compact />}
+      {!draft && !loadErr && <SkeletonLines n={4} />}
+      {draft && (
+        <>
+          <fieldset className="bd-roles">
+            <legend className="visually-hidden">Roles allowed to use Buddy</legend>
+            {ALL_ROLES.map(([r, label]) => (
+              <div key={r} className="form-check">
+                <input className="form-check-input" type="checkbox" id={`bd-role-${r}`} checked={draft.includes(r)}
+                  disabled={r === 'boss' || saving} onChange={(e) => setDraft(nextAllowedRoles(draft, r, e.target.checked))} />
+                <label className="form-check-label small" htmlFor={`bd-role-${r}`}>{label}{r === 'boss' ? ' (always)' : ''}</label>
+              </div>
+            ))}
+          </fieldset>
+          <div className="d-flex align-items-center gap-2 flex-wrap mt-2">
+            <button type="button" className="btn btn-sm btn-primary" disabled={!dirty || saving} onClick={save}>
+              {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save roles'}
+            </button>
+            {dirty && <button type="button" className="btn btn-sm btn-link" onClick={() => setDraft(saved)}>Undo</button>}
+            {msg && <span className="small" role="status">{msg}</span>}
+          </div>
+          <div className="bd-card-sub mt-1">Each role's answers follow that person's own permissions: Buddy never shows someone data the app wouldn't.</div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 // ── sources ────────────────────────────────────────────────────────
 function SourcesCard() {
   const [on, setOn] = useState(null);
   const [err, setErr] = useState('');
+  const [loadErr, setLoadErr] = useState(false);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { getIngestSources().then(setOn).catch((e) => setErr(e.message)); }, []);
+  const load = () => { setLoadErr(false); getIngestSources().then(setOn).catch(() => setLoadErr(true)); };
+  useEffect(load, []);
 
   const toggle = async (type) => {
     const next = on.includes(type) ? on.filter((t) => t !== type) : [...on, type];
@@ -138,8 +214,9 @@ function SourcesCard() {
 
   return (
     <Card icon="bi-toggles" title="Sources" sub="What Buddy reads. A source switched off is removed from Buddy's memory at the next ingestion run.">
-      {err && <div className="bd-error">{err}</div>}
-      {!on ? <div className="bd-card-sub">Loading…</div> : INGEST_SOURCES.map(([type, label]) => (
+      {err && <div className="bd-error" role="alert">{err}</div>}
+      {loadErr && <LoadError what="the sources" onRetry={load} compact />}
+      {!on ? !loadErr && <SkeletonLines n={6} /> : INGEST_SOURCES.map(([type, label]) => (
         <div key={type} className="form-check form-switch">
           <input className="form-check-input" type="checkbox" role="switch" id={`src-${type}`}
             checked={on.includes(type)} disabled={saving} onChange={() => toggle(type)} />
@@ -155,7 +232,8 @@ function ExcludedCard() {
   const [rows, setRows] = useState(null);
   const [form, setForm] = useState({ type: 'kb_article', id: '', reason: '' });
   const [err, setErr] = useState('');
-  const load = () => listExcluded().then(setRows).catch((e) => setErr(e.message));
+  const [loadErr, setLoadErr] = useState(false);
+  const load = () => listExcluded().then((r) => { setRows(r); setLoadErr(false); }).catch(() => setLoadErr(true));
   useEffect(() => { load(); }, []);
 
   const add = async (e) => {
@@ -171,14 +249,16 @@ function ExcludedCard() {
 
   return (
     <Card icon="bi-eye-slash" title="Excluded documents" sub="Hidden from Buddy for everyone, the Boss included. Removed from its memory at the next ingestion run.">
-      {err && <div className="bd-error">{err}</div>}
+      {err && <div className="bd-error" role="alert">{err}</div>}
+      {loadErr && <LoadError what="the excluded documents" onRetry={load} compact />}
+      {!rows && !loadErr && <SkeletonLines n={2} />}
       {rows?.length === 0 && <div className="bd-card-sub mb-2">Nothing excluded.</div>}
       {rows?.map((r) => (
         <div key={`${r.source_type}:${r.source_id}`} className="bd-row-line">
           <code>{r.source_type}</code>
           <span className="text-truncate" title={r.source_id}>{r.source_id}</span>
           <span className="bd-card-sub text-truncate">{r.reason}</span>
-          <button type="button" className="bd-act" onClick={() => drop(r)} aria-label="Remove exclusion"><i className="bi bi-x-lg" /></button>
+          <button type="button" className="bd-act" onClick={() => drop(r)} aria-label={`Stop excluding ${r.source_type} ${r.source_id}`} title="Remove exclusion"><i className="bi bi-x-lg" aria-hidden="true" /></button>
         </div>
       ))}
       <form className="bd-exclude-form" onSubmit={add}>
@@ -207,11 +287,14 @@ function BehaviourCard() {
   const [cfg, setCfg] = useState(null);
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState('');
+  const [loadErr, setLoadErr] = useState(false);
   // An empty or v1-default greeting shows as Buddy's text, the one users see anyway.
-  useEffect(() => {
+  const load = () => {
+    setLoadErr(false);
     getAiConfig().then((c) => setCfg({ ...c, greeting: greetingIsDefault(c?.greeting) ? BUDDY_GREETING : c.greeting }))
-      .catch((e) => setFlash(e.message));
-  }, []);
+      .catch(() => setLoadErr(true));
+  };
+  useEffect(load, []);
 
   const save = async () => {
     setSaving(true); setFlash('');
@@ -222,19 +305,30 @@ function BehaviourCard() {
     finally { setSaving(false); setTimeout(() => setFlash(''), 2500); }
   };
 
-  if (!cfg) return <Card icon="bi-sliders" title="Persona and behaviour"><div className="bd-card-sub">{flash || 'Loading…'}</div></Card>;
+  if (!cfg) {
+    return (
+      <Card icon="bi-sliders" title="Persona and behaviour">
+        {loadErr ? <LoadError what="Buddy's settings" onRetry={load} compact /> : <SkeletonLines n={4} />}
+      </Card>
+    );
+  }
+  // What reads each field: the assistant function (Buddy) reads persona,
+  // model, enabled; the Slack relay (v1 ai-chat) reads the same three; the
+  // greeting is only Buddy's empty-chat line.
   return (
     <Card icon="bi-sliders" title="Persona and behaviour" sub="Buddy's personality and model. Accuracy rules always outrank the persona.">
       <label className="form-label small fw-semibold mb-1" htmlFor="bd-persona">Persona / instructions</label>
-      <textarea id="bd-persona" className="form-control form-control-sm mb-2" rows={6} value={cfg.persona || ''} onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} />
+      <textarea id="bd-persona" className="form-control form-control-sm mb-1" rows={6} value={cfg.persona || ''}
+        aria-describedby="bd-persona-help" onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} />
+      <div id="bd-persona-help" className="bd-card-sub mb-2">Used by Buddy and by the Slack relay. Leave it blank for Buddy's built-in personality.</div>
       <label className="form-label small fw-semibold mb-1" htmlFor="bd-greeting">Greeting</label>
       <textarea id="bd-greeting" className="form-control form-control-sm mb-1" rows={2} value={cfg.greeting || ''}
-        placeholder={BUDDY_GREETING} onChange={(e) => setCfg({ ...cfg, greeting: e.target.value })} />
-      <div className="bd-card-sub mb-2">Shown when a chat is empty. <code>{'{name}'}</code> becomes the person's first name; leave it blank for Buddy's default.</div>
-      <div className="d-flex align-items-end gap-3 flex-wrap mb-3">
-        <div>
+        aria-describedby="bd-greeting-help" placeholder={BUDDY_GREETING} onChange={(e) => setCfg({ ...cfg, greeting: e.target.value })} />
+      <div id="bd-greeting-help" className="bd-card-sub mb-2">Shown when a Buddy chat is empty. <code>{'{name}'}</code> becomes the person's first name; leave it blank for Buddy's default.</div>
+      <div className="d-flex align-items-end gap-3 flex-wrap mb-1">
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <label className="form-label small fw-semibold mb-1 d-block" htmlFor="bd-model">Model</label>
-          <select id="bd-model" className="form-select form-select-sm" style={{ minWidth: 260 }}
+          <select id="bd-model" className="form-select form-select-sm" style={{ width: 280, maxWidth: '100%' }}
             value={MODEL_OPTIONS.some((m) => m.id === cfg.model) ? cfg.model : MODEL_OPTIONS[0].id}
             onChange={(e) => setCfg({ ...cfg, model: e.target.value })}>
             {MODEL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -245,6 +339,7 @@ function BehaviourCard() {
           <label className="form-check-label small" htmlFor="bd-enabled">Buddy enabled</label>
         </div>
       </div>
+      <div className="bd-card-sub mb-3">The model and the on/off switch apply to Buddy and to the Slack relay. Switched off, both answer "turned off by an admin".</div>
       <button type="button" className="btn btn-sm btn-primary" disabled={saving} onClick={save}>
         {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save'}
       </button>
@@ -256,10 +351,11 @@ function BehaviourCard() {
 
 // ── curated knowledge docs (moved from the old Train tab) ───────────
 function KnowledgeCard() {
-  const [docs, setDocs] = useState([]);
+  const [docs, setDocs] = useState(null);
   const [editing, setEditing] = useState(null);
   const [err, setErr] = useState('');
-  const load = () => listDocs().then(setDocs).catch((e) => setErr(e.message));
+  const [loadErr, setLoadErr] = useState(false);
+  const load = () => listDocs().then((d) => { setDocs(d); setLoadErr(false); }).catch(() => setLoadErr(true));
   useEffect(() => { load(); }, []);
 
   const persist = async () => {
@@ -274,27 +370,33 @@ function KnowledgeCard() {
   };
 
   return (
-    <Card icon="bi-journal-text" title={`Knowledge docs (${docs.length})`} sub="Curated notes Buddy answers from, e.g. “Applying for leave”. Picked up at the next ingestion run.">
-      {err && <div className="bd-error">{err}</div>}
+    <Card icon="bi-journal-text" title={`Knowledge docs${docs ? ` (${docs.length})` : ''}`}
+      sub="Curated notes Buddy (and the Slack relay) answer from, e.g. “Applying for leave”. Buddy picks them up at the next ingestion run.">
+      {err && <div className="bd-error" role="alert">{err}</div>}
+      {loadErr && <LoadError what="the knowledge docs" onRetry={load} compact />}
       <button type="button" className="btn btn-sm btn-outline-secondary mb-2" onClick={() => setEditing({ title: '', content: '', is_active: true })}>
-        <i className="bi bi-plus-lg" /> Add knowledge
+        <i className="bi bi-plus-lg" aria-hidden="true" /> Add knowledge
       </button>
-      {docs.map((d) => (
+      {!docs && !loadErr && <SkeletonLines n={3} />}
+      {docs?.map((d) => (
         <div key={d.id} className="bd-row-line">
           <button type="button" className={`bd-link ${d.is_active ? '' : 'is-off'}`} onClick={() => setEditing(d)}>{d.title}</button>
           {!d.is_active && <span className="bd-tag">Off</span>}
-          <button type="button" className="bd-act" onClick={() => toggle(d)} aria-label={d.is_active ? 'Turn off' : 'Turn on'} title={d.is_active ? 'Active: click to turn off' : 'Off: click to turn on'}>
-            <i className={`bi ${d.is_active ? 'bi-toggle-on' : 'bi-toggle-off'}`} />
+          <button type="button" className="bd-act" onClick={() => toggle(d)} aria-pressed={!!d.is_active}
+            aria-label={`${d.is_active ? 'Turn off' : 'Turn on'} “${d.title}”`} title={d.is_active ? 'Active: click to turn off' : 'Off: click to turn on'}>
+            <i className={`bi ${d.is_active ? 'bi-toggle-on' : 'bi-toggle-off'}`} aria-hidden="true" />
           </button>
-          <button type="button" className="bd-act is-danger" onClick={() => remove(d.id)} aria-label="Delete"><i className="bi bi-trash3" /></button>
+          <button type="button" className="bd-act is-danger" onClick={() => remove(d.id)} aria-label={`Delete “${d.title}”`} title="Delete">
+            <i className="bi bi-trash3" aria-hidden="true" />
+          </button>
         </div>
       ))}
       {editing && (
-        <div className="wx-modal-backdrop bd-modal-backdrop" role="presentation">
+        <div className="wx-modal-backdrop bd-modal-backdrop" role="presentation" onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null); }}>
           <div className="bd-modal" role="dialog" aria-modal="true" aria-labelledby="bd-doc-title">
             <div id="bd-doc-title" className="fw-bold mb-3">{editing.id ? 'Edit knowledge' : 'Add knowledge'}</div>
             <label className="form-label small fw-semibold mb-1" htmlFor="bd-doc-t">Title</label>
-            <input id="bd-doc-t" className="form-control form-control-sm mb-2" placeholder="e.g. Applying for leave" value={editing.title}
+            <input id="bd-doc-t" autoFocus className="form-control form-control-sm mb-2" placeholder="e.g. Applying for leave" value={editing.title}
               onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
             <label className="form-label small fw-semibold mb-1" htmlFor="bd-doc-c">Content</label>
             <textarea id="bd-doc-c" className="form-control form-control-sm mb-3" rows={9} value={editing.content}

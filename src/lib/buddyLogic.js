@@ -31,7 +31,22 @@ export const initialBuddyState = {
   bounce: 0,        // bumps once per reply that lands unseen (the FAB bounces on change)
   denied: false,    // the backend refused this role (403)
   stopped: {},      // key → true: the user pressed Stop; its late reply is not "unread"
+  convsLoaded: false, // history has loaded at least once (skeleton until then)
+  convsError: null,   // the last history read failed (shown with Retry)
 };
+
+// Every role that can be offered Buddy (Settings → Allowed roles).
+export const ALL_ROLES = [
+  ['boss', 'Boss'], ['ol', 'Operation Leads'], ['tl', 'Team Leads'], ['pctl', 'Paid Collab TLs'],
+  ['apc', 'APCs'], ['ipc', 'IPCs'], ['ads_manager', 'Ads Managers'], ['developer', 'Developers'],
+];
+
+// The Boss is always included: ticking roles can only widen access.
+export function nextAllowedRoles(current, role, on) {
+  const set = new Set([...(Array.isArray(current) ? current : []), 'boss'].map((r) => String(r).toLowerCase()));
+  if (role !== 'boss') { if (on) set.add(role); else set.delete(role); }
+  return ALL_ROLES.map(([r]) => r).filter((r) => set.has(r));
+}
 
 const ms = (iso) => (iso ? new Date(iso).getTime() || 0 : 0);
 
@@ -57,17 +72,58 @@ function patchLastAssistant(thread, fn) {
   return { ...(thread || { loaded: true }), messages };
 }
 
+// End of a regenerate (mig 389). Refused before it started (409 etc.): nothing
+// changed on the server, so the old answer comes back as it was. Otherwise
+// the new reply stands (the old row is superseded); if it failed or was
+// stopped, the old text is kept aside for "Show previous answer".
+export function settleRegen(m, { restore = false } = {}) {
+  if (!m.regenerating) return m;
+  const { regenerating: _r, oldContent, oldSources, oldId, oldStatus, ...rest } = m;
+  if (restore) {
+    return { ...rest, id: oldId ?? rest.id, status: oldStatus ?? 'done', content: oldContent || '', sources: oldSources || [], error: null, stopped: false };
+  }
+  const keep = (rest.error || rest.stopped) && oldContent;
+  return keep ? { ...rest, previous: { content: oldContent, sources: oldSources || [] } } : rest;
+}
+
 export function buddyReducer(state, a) {
   switch (a.type) {
     case 'CONVS_LOADED': {
       const unread = { ...state.unread };
       for (const c of a.convs) if (!state.stopped?.[c.id] && serverUnread(c, state.readAt[c.id])) unread[c.id] = true;
-      return { ...state, convs: a.convs, unread };
+      return { ...state, convs: a.convs, unread, convsLoaded: true, convsError: null };
     }
+    case 'CONVS_ERROR':
+      return { ...state, convsError: a.error || 'error' };
     case 'THREAD_LOADED':
       // Never clobber a thread that is streaming right now.
       if (state.inflight[a.key] && !state.inflight[a.key].recovering) return state;
       return { ...state, threads: { ...state.threads, [a.key]: { messages: a.messages, loaded: true } } };
+    case 'THREAD_ERROR':
+      // Only when nothing is shown yet: a failed refetch keeps what is on screen.
+      if (state.threads[a.key]?.loaded || state.inflight[a.key]) return state;
+      return { ...state, threads: { ...state.threads, [a.key]: { messages: [], loaded: false, error: a.error || 'error' } } };
+    case 'REGEN_START': {
+      // Regenerate replaces the answer in place: the old text stays, faded,
+      // until the new one starts arriving (then it is dropped).
+      const t = state.threads[a.key];
+      if (!t || state.inflight[a.key]) return state;
+      const messages = t.messages.slice();
+      const i = messages.findIndex((m) => m.role === 'assistant' && m.id === a.messageId);
+      if (i < 0) return state;
+      const old = messages[i];
+      messages[i] = {
+        ...old, pending: true, regenerating: true,
+        oldContent: old.content, oldSources: old.sources, oldId: old.id, oldStatus: old.status,
+        content: '', sources: [], error: null, stopped: false, previous: null, status: 'generating', created_at: a.at,
+      };
+      const { [a.key]: _s, ...stopped } = state.stopped || {};
+      return {
+        ...state, stopped,
+        threads: { ...state.threads, [a.key]: { ...t, messages } },
+        inflight: { ...state.inflight, [a.key]: { status: 'Regenerating…', startedAt: a.at, recovering: false, text: a.text, regenerate: a.messageId } },
+      };
+    }
     case 'SEND_START': {
       const t = state.threads[a.key] || { messages: [], loaded: true };
       const messages = [
@@ -122,7 +178,7 @@ export function buddyReducer(state, a) {
       const { [a.key]: _gone, ...inflight } = state.inflight;
       const threads = a.type === 'RECOVERED' && a.messages
         ? { ...state.threads, [a.key]: { messages: a.messages, loaded: true } }
-        : { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => ({
+        : { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => settleRegen({
             ...m, pending: false, requestId: a.requestId ?? m.requestId, id: a.messageId ?? m.id,
             status: a.status ?? m.status ?? null,
             // A cancelled reply is "Stopped", not an error.
@@ -151,11 +207,15 @@ export function buddyReducer(state, a) {
     case 'FAILED': {
       const { [a.key]: _gone, ...inflight } = state.inflight;
       let t = state.threads[a.key] || { messages: [], loaded: true };
-      if (a.denied) {
+      const regen = [...t.messages].reverse().find((m) => m.role === 'assistant')?.regenerating;
+      if (regen && (a.refused || a.denied)) {
+        // A refused Regenerate changed nothing: put the old answer back, with a note.
+        t = patchLastAssistant(t, (m) => ({ ...settleRegen(m, { restore: true }), notice: a.error }));
+      } else if (a.denied) {
         // Drop the turn we optimistically added: the backend never took it.
         t = { ...t, messages: t.messages.slice(0, -2) };
       } else {
-        t = patchLastAssistant(t, (m) => ({ ...m, pending: false, error: a.error, content: m.content || '' }));
+        t = patchLastAssistant(t, (m) => settleRegen({ ...m, pending: false, error: a.error, content: m.content || '' }));
       }
       return { ...state, inflight, threads: { ...state.threads, [a.key]: t }, denied: state.denied || !!a.denied };
     }
@@ -165,7 +225,7 @@ export function buddyReducer(state, a) {
       const { [a.key]: _u, ...unread } = state.unread;
       return {
         ...state, inflight, unread, stopped: { ...(state.stopped || {}), [a.key]: true },
-        threads: { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => ({ ...m, pending: false, stopped: true })) },
+        threads: { ...state.threads, [a.key]: patchLastAssistant(state.threads[a.key], (m) => settleRegen({ ...m, pending: false, stopped: true })) },
       };
     }
     case 'MARK_READ': {
@@ -201,7 +261,8 @@ export const unreadCount = (state) => Object.keys(state.unread).length;
 // idle → thinking (anything generating, panel open or not) → happy (a reply
 // landed unseen). Generating wins: the user should see Buddy is still busy.
 export function deriveMood(state) {
-  if (Object.keys(state.inflight).length) return 'thinking';
+  // A reply being stopped no longer counts: Buddy goes idle at once.
+  if (Object.values(state.inflight).some((f) => !f.stopping)) return 'thinking';
   if (unreadCount(state)) return 'happy';
   return 'idle';
 }
@@ -239,6 +300,9 @@ export function friendlyError(status, serverMsg = '') {
       return { text: 'Buddy is coming to your role soon.', denied: true };
     case 404:
       return { text: "I couldn't find that conversation. Start a new chat and ask again." };
+    case 409:
+      // Regenerate refused: not the last reply, something still generating, or a race.
+      return { text: 'Buddy is already working on this.', conflict: true };
     case 429:
       return { text: 'Buddy needs a short break, try again in a minute 🐾' };
     case 503:
@@ -275,14 +339,35 @@ export const rowToMessage = (r) => ({
   sources: r.meta?.sources || [],
   requestId: r.meta?.requestId || null,
   stopped: r.meta?.cancelled === true,
+  // Replaced by a Regenerate: status 'superseded' or meta.superseded_by (both
+  // handled until the backend contract is final).
+  superseded: r.status === 'superseded' || !!r.meta?.superseded_by,
+  supersedes: r.meta?.supersedes || null,   // the answer this one replaced (mig 389)
   error: r.status === 'error' && r.meta?.cancelled !== true ? (r.meta?.error || 'Buddy hit a problem with this answer.') : null,
 });
 
+// The server regenerates only a saved last reply that is done or error (mig 389).
+export const canRegenerateMsg = (m) => !!m && m.role === 'assistant' && !!m.id && !m.pending
+  && (m.status == null || m.status === 'done' || m.status === 'error');
+
+// What the chat shows: superseded answers are hidden.
+export const visibleMessages = (messages) => messages.filter((m) => !m.superseded);
+
 // A reply row still `generating` after this long is lost (Lead, 2026-09-30):
-// the UI offers Retry instead of waiting on it.
+// the UI offers Retry instead of waiting on it. `now` should be the server's
+// clock (serverNow): created_at is server time.
 export const STUCK_MS = 3 * 60000;
 export const isStuck = (m, now = Date.now()) =>
   !!m && m.status === 'generating' && now - ms(m.created_at) > STUCK_MS;
+
+// Server clock minus ours, from {started}.server_now. 0 (trust our clock)
+// when it's missing or absurd; a round trip's worth is noise, so ignore < 2 s.
+export function clockSkew(serverNowIso, receivedAtMs = Date.now()) {
+  const s = ms(serverNowIso);
+  if (!s) return 0;
+  const d = s - receivedAtMs;
+  return Math.abs(d) < 2000 || Math.abs(d) > 7 * 86400000 ? 0 : d;
+}
 
 // The question an assistant message answered: the nearest user turn before it.
 export function questionBefore(messages, idx) {
@@ -429,6 +514,49 @@ export function firstName(profile) {
   const n = String(profile?.display_name || profile?.full_name || '').trim();
   return n ? n.split(/\s+/)[0] : '';
 }
+
+// ── usage (Boss) ───────────────────────────────────────────────────
+// USD: 2 decimals, 4 under $1 so a few cents of tokens still read.
+export function fmtUsd(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  const v = Number(n);
+  const d = v !== 0 && Math.abs(v) < 1 ? 4 : 2;
+  return `${v < 0 ? '-' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}`;
+}
+
+export const fmtCount = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : Math.round(Number(n)).toLocaleString('en-US'));
+
+export function fmtMs(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  return n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${Math.round(n)} ms`;
+}
+
+export const fmtPct = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : `${Math.round(Number(n))}%`);
+
+// Today in Pakistan time (the app's timezone), as YYYY-MM-DD.
+export const pktDate = (now = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+
+const addDays = (ymd, n) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+// Range presets → { from, to } (inclusive PKT dates) for ai_usage_summary.
+export function usageRange(preset, now = new Date()) {
+  const to = pktDate(now);
+  if (preset === '7d') return { from: addDays(to, -6), to };
+  if (preset === 'month') return { from: `${to.slice(0, 8)}01`, to };
+  return { from: addDays(to, -29), to };
+}
+
+export const USAGE_KIND_LABEL = {
+  chat: 'Chat (answers)',
+  rerank: 'Search rerank',
+  embeddings_query: 'Query embeddings',
+  embeddings_ingest: 'Ingestion embeddings',
+};
 
 // ── sources ────────────────────────────────────────────────────────
 const SOURCE_LABEL = {
