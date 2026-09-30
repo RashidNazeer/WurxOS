@@ -50,7 +50,7 @@ const raf = () => new Promise((r) => requestAnimationFrame(r));
 // status → { label, cls } for the card / topbar pills.
 const STATUS_PILL = {
   draft:     { label: 'Draft',      cls: 'draft' },
-  submitted: { label: 'Pending TL', cls: 'submitted' },
+  submitted: { label: 'Submitted',  cls: 'submitted' }, // submit-only since mig 305: no TL verify step
   verified:  { label: 'Verified',   cls: 'verified' },
   approved:  { label: 'Verified',   cls: 'verified' }, // legacy rows (mig 299 → verified)
 };
@@ -59,7 +59,7 @@ const pillFor = (s) => STATUS_PILL[s] || STATUS_PILL.draft;
 // Friendly one-liner after an auto-fill / create, pointing the APC at what's
 // filled vs. what they still need to complete by hand.
 function autofillSummary(meta, created) {
-  if (!meta) return created ? 'Blank checkpoint created — fill in each section below, then Done → Submit for verification.' : '';
+  if (!meta) return created ? 'Blank checkpoint created — fill in each section below, then Done → Submit.' : '';
   const bits = [meta.reportFound ? 'weekly report ✓' : 'no weekly report for this week'];
   if (meta.reportN2Found) bits.push('N-2 report ✓');
   if (meta.eukaTried) bits.push(meta.eukaOk ? 'Euka ✓' : 'Euka unavailable');
@@ -627,7 +627,7 @@ function ApcCheckpointPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {canSubmit && (
                 <button className="wx-btn wx-btn-primary" disabled={!!wfBusy || !data} onClick={doSubmit}>
-                  {wfBusy === 'submit' ? <><span className="wx-spinner" /> Submitting…</> : <><i className="bi bi-send me-1" /> Submit for verification</>}
+                  {wfBusy === 'submit' ? <><span className="wx-spinner" /> Submitting…</> : <><i className="bi bi-send me-1" /> Submit</>}
                 </button>
               )}
               {canVerify && (

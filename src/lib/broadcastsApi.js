@@ -85,7 +85,20 @@ export async function getMyResponse(broadcastId, userId) {
   return data;
 }
 
-// All responses for a broadcast (author / admins only per RLS).
+// Was the broadcast sent to this user? (broadcast_recipients, mig 391)
+export async function isRecipient(broadcastId, userId) {
+  if (!userId) return false;
+  const { data, error } = await supabase
+    .from('broadcast_recipients')
+    .select('user_id')
+    .eq('broadcast_id', broadcastId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return !!data;
+}
+
+// All responses for a broadcast (author / Boss only per RLS).
 export async function listResponses(broadcastId) {
   const { data, error } = await supabase
     .from('broadcast_responses')
@@ -101,6 +114,17 @@ export async function listResponses(broadcastId) {
 export async function listRecipients(broadcast) {
   if (!broadcast) return [];
   const base = 'id, display_name, role, avatar_url, email, reports_to';
+  // Once sent, the recipients are recorded (mig 391) — use them, not the
+  // target rule re-evaluated today (teams and brands change).
+  if (broadcast.sent_at) {
+    const { data, error } = await supabase
+      .from('broadcast_recipients')
+      .select(`user:user_id(${base})`)
+      .eq('broadcast_id', broadcast.id);
+    if (error) throw new Error(error.message);
+    return (data || []).map((r) => r.user).filter(Boolean)
+      .sort((a, b) => String(a.display_name).localeCompare(String(b.display_name)));
+  }
   const activeBase = supabase.from('profiles').select(base).eq('is_active', true);
   const { target, author_id } = broadcast;
 
