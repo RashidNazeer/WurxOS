@@ -7,13 +7,15 @@ import {
 import {
   runIngestion, ingestStats, INGEST_SOURCES, getIngestSources, setIngestSources,
   listExcluded, addExcluded, removeExcluded, getBuddyConfig, setAllowedRoles,
-  listModelCatalog, refreshModelList, getModelConfig, saveModelConfig, listKeySlots,
+  listModelCatalog, refreshModelList, getModelConfig, saveModelConfig, listKeySlots, usageSummary,
 } from '../../lib/buddyApi';
 import {
   ALL_ROLES, ALWAYS_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles,
   FALLBACK_MAX, DEFAULT_SLOT_META, keySlotMeta, chainAdd, chainMove, chainRemove, creditsExhausted, fmtUsd, lastChecked,
   modelLabel, modelOptions, optionKey, parseOptionKey, allOptions, filterOptions, slotLabel,
   chainEntryStatus, vectorsByModel, freeSourcesValue, toggleInList, fmtCount,
+  ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, setRoleEconomy,
+  budgetSaverState, validSaverPct, pktDate,
 } from '../../lib/buddyLogic';
 import { LoadError } from '../../components/buddy/BuddyThread';
 
@@ -37,6 +39,7 @@ export default function BuddySettings({ canEdit }) {
         <BuddyUsage readOnly={readOnly} />
       </Suspense>
       <ModelCard readOnly={readOnly} />
+      <RoleModelsCard readOnly={readOnly} />
       <AllowedRolesCard readOnly={readOnly} />
       <SourcesCard readOnly={readOnly} />
       <ExcludedCard readOnly={readOnly} />
@@ -568,6 +571,208 @@ function ModelCard({ readOnly }) {
             </div>
           )}
         </>
+      )}
+      {msg && <div className="small mt-2" role="status">{msg}</div>}
+    </Card>
+  );
+}
+
+// ── models by role (mig 404) ────────────────────────────────────────
+// A usable-model <select>: `empty` is the first option ("Default" / "None");
+// value null means that one. Unusable models are listed, greyed, with why.
+function ModelSelect({ id, value, onChange, shown, slots, meta, empty, label, disabled }) {
+  const cur = value ? optionKey(value.key_slot, value.model) : '';
+  const listed = !value || slots.some((s) => (shown[s] || []).some((o) => o.key_slot === value.key_slot && o.model === value.model));
+  return (
+    <select id={id} className="form-select form-select-sm" value={cur} aria-label={label} disabled={disabled}
+      onChange={(e) => onChange(e.target.value ? parseOptionKey(e.target.value) : null)}>
+      <option value="">{empty}</option>
+      {!listed && <option value={cur}>{value.model} (not in the list)</option>}
+      {slots.map((slot) => shown[slot]?.length > 0 && (
+        <optgroup key={slot} label={slotLabel(slot, meta)}>
+          {shown[slot].map((o) => (
+            <option key={o.model} value={optionKey(slot, o.model)} disabled={!o.usable}>
+              {o.label}{o.badges.includes('Free') ? ' · Free' : ''}{!o.usable && o.reason ? ` (${o.reason})` : ''}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+// A compact fallback-chain editor (the same rules as the global chain).
+function ChainEditor({ idPrefix, chain, onChange, shown, slots, meta, catalog, disabled }) {
+  const [add, setAdd] = useState('');
+  return (
+    <div>
+      <ol className="bd-chain my-1" aria-label="Backup order">
+        {chain.length === 0 && <li className="bd-card-sub">No backups.</li>}
+        {chain.map((f, i) => {
+          const st = chainEntryStatus(f, catalog);
+          return (
+            <li key={`${f.key_slot}|${f.model}`} className="bd-row-line">
+              <span className="bd-chain-n" aria-hidden="true">{i + 1}</span>
+              <span className="text-truncate">{modelLabel(f.model)}</span>
+              <span className="bd-badge-chip">{slotLabel(f.key_slot, meta)}</span>
+              {st === 'skipped' && <span className="bd-badge-chip is-warn" title="Not usable right now; it will be skipped">Skipped</span>}
+              {!disabled && (
+                <>
+                  <button type="button" className="bd-act" disabled={i === 0} onClick={() => onChange(chainMove(chain, i, -1))} aria-label={`Move ${f.model} up`}><i className="bi bi-arrow-up" aria-hidden="true" /></button>
+                  <button type="button" className="bd-act" disabled={i === chain.length - 1} onClick={() => onChange(chainMove(chain, i, 1))} aria-label={`Move ${f.model} down`}><i className="bi bi-arrow-down" aria-hidden="true" /></button>
+                  <button type="button" className="bd-act is-danger" onClick={() => onChange(chainRemove(chain, i))} aria-label={`Remove ${f.model}`}><i className="bi bi-x-lg" aria-hidden="true" /></button>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {!disabled && chain.length < FALLBACK_MAX && (
+        <div className="bd-chain-add">
+          <select id={`${idPrefix}-add`} className="form-select form-select-sm" value={add} onChange={(e) => setAdd(e.target.value)} aria-label="Model to add as a backup">
+            <option value="">Add a backup…</option>
+            {slots.map((slot) => {
+              const list = (shown[slot] || []).filter((o) => (o.usable || o.transient) && !chain.some((f) => f.key_slot === slot && f.model === o.model));
+              return list.length > 0 && (
+                <optgroup key={slot} label={slotLabel(slot, meta)}>
+                  {list.map((o) => <option key={o.model} value={optionKey(slot, o.model)}>{o.label}{o.badges.includes('Free') ? ' · Free' : ''}</option>)}
+                </optgroup>
+              );
+            })}
+          </select>
+          <button type="button" className="btn btn-sm btn-outline-secondary" disabled={!add}
+            onClick={() => { onChange(chainAdd(chain, parseOptionKey(add))); setAdd(''); }}>Add</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Per-role model, backup order and economy model, plus the budget saver.
+// Hidden until ai_assistant_config.role_models exists.
+function RoleModelsCard({ readOnly }) {
+  const [global, setGlobal] = useState(null);
+  const [saved, setSaved] = useState(null);   // { role_models, budget_saver_pct }
+  const [draft, setDraft] = useState(null);
+  const [catalog, setCatalog] = useState([]);
+  const [meta, setMeta] = useState(DEFAULT_SLOT_META);
+  const [mtd, setMtd] = useState(null);
+  const [query, setQuery] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    getAiConfig().then((c) => {
+      if (!c || !('role_models' in c)) { setHidden(true); return; }
+      const d = { role_models: normalizeRoleModels(c.role_models), budget_saver_pct: c.budget_saver_pct ?? null };
+      setGlobal({ model: c.model, model_key_slot: c.model_key_slot, fallback_models: c.fallback_models });
+      setSaved(d); setDraft(d);
+    }).catch(() => setHidden(true));
+    listModelCatalog().then(setCatalog).catch(() => {});
+    listKeySlots().then((rows) => setMeta(keySlotMeta(rows)));
+    const today = pktDate();
+    usageSummary(today, today).then((u) => setMtd(u?.month_to_date || null)).catch(() => {});
+  }, []);
+
+  if (hidden) return null;
+  if (!draft) return <Card icon="bi-people-fill" title="Models by role"><SkeletonLines n={4} /></Card>;
+
+  const options = modelOptions(catalog, meta);
+  const slots = Object.keys(options);
+  const shown = filterOptions(options, query, null);
+  const rm = draft.role_models;
+  const setRm = (role_models) => setDraft({ ...draft, role_models });
+  const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
+  const saver = budgetSaverState(draft.budget_saver_pct, mtd);
+  const pctOk = validSaverPct(draft.budget_saver_pct);
+
+  const save = async () => {
+    if (!pctOk) { setMsg('The budget saver needs a whole number from 1 to 100, or leave it empty to switch it off.'); return; }
+    setSaving(true); setMsg('');
+    try {
+      const patch = { role_models: draft.role_models, budget_saver_pct: draft.budget_saver_pct === '' || draft.budget_saver_pct == null ? null : Number(draft.budget_saver_pct) };
+      await updateAiConfig(patch);
+      setSaved({ ...draft, budget_saver_pct: patch.budget_saver_pct }); setDraft({ ...draft, budget_saver_pct: patch.budget_saver_pct });
+      setMsg('Saved. New questions use this from now on.');
+    } catch (e) { setMsg(`Not saved: ${e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  const globalName = global?.model ? modelLabel(global.model) : 'the main model';
+  return (
+    <Card icon="bi-people-fill" title="Models by role" sub="Give each role its own model, backup order and a cheaper economy model. Default follows the Model section.">
+      <div className="bd-search bd-model-search">
+        <i className="bi bi-search" aria-hidden="true" />
+        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter models" aria-label="Filter the model lists" />
+      </div>
+      <fieldset disabled={readOnly || saving} className="bd-fieldset">
+        <legend className="visually-hidden">Models by role</legend>
+        <div className="bd-role-models">
+          <div className="bd-role-head" aria-hidden="true">
+            <span>Role</span><span>Main model</span><span>Backup order</span><span>Economy model</span>
+          </div>
+          {ROLE_MODEL_ROLES.map((role) => {
+            const v = roleModelView(rm, role, global || {});
+            const id = `bd-rm-${role}`;
+            return (
+              <div key={role} className="bd-role-row" role="group" aria-labelledby={`${id}-name`}>
+                <div id={`${id}-name`} className="bd-role-name">{roleLabel(role)}</div>
+                <div>
+                  <label className="bd-role-label" htmlFor={`${id}-main`}>Main model</label>
+                  <ModelSelect id={`${id}-main`} value={v.main.inherit ? null : v.main} shown={shown} slots={slots} meta={meta}
+                    empty={`Default (${globalName})`} label={`${roleLabel(role)}: main model`}
+                    onChange={(t) => setRm(setRoleMain(rm, role, t))} />
+                </div>
+                <div>
+                  <label className="bd-role-label" htmlFor={`${id}-bk`}>Backup order</label>
+                  <select id={`${id}-bk`} className="form-select form-select-sm" value={v.backups.inherit ? 'default' : 'custom'}
+                    aria-label={`${roleLabel(role)}: backup order`}
+                    onChange={(e) => setRm(setRoleBackups(rm, role, e.target.value === 'custom' ? v.backups.chain : null))}>
+                    <option value="default">Default ({v.backups.chain.length} backup{v.backups.chain.length === 1 ? '' : 's'})</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                  {!v.backups.inherit && (
+                    <ChainEditor idPrefix={`${id}-chain`} chain={v.backups.chain} shown={shown} slots={slots} meta={meta} catalog={catalog}
+                      disabled={readOnly} onChange={(chain) => setRm(setRoleBackups(rm, role, chain))} />
+                  )}
+                </div>
+                <div>
+                  <label className="bd-role-label" htmlFor={`${id}-eco`}>Economy model</label>
+                  <ModelSelect id={`${id}-eco`} value={v.economy} shown={shown} slots={slots} meta={meta}
+                    empty="None" label={`${roleLabel(role)}: economy model`}
+                    onChange={(t) => setRm(setRoleEconomy(rm, role, t))} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <h4 className="bd-subhead">Budget saver</h4>
+        <div className="bd-saver">
+          <label htmlFor="bd-saver-pct" className="small">When this month's spend reaches</label>
+          <input id="bd-saver-pct" type="number" min="1" max="100" step="1" inputMode="numeric" className="form-control form-control-sm"
+            style={{ width: 80 }} placeholder="off" value={draft.budget_saver_pct ?? ''} aria-invalid={!pctOk}
+            disabled={!saver.hasBudget && draft.budget_saver_pct == null}
+            onChange={(e) => setDraft({ ...draft, budget_saver_pct: e.target.value === '' ? null : e.target.value })} />
+          <span className="small">% of the budget, roles with an economy model switch to it.</span>
+        </div>
+        <div className="bd-card-sub mt-1" role="status">
+          {!saver.hasBudget
+            ? 'Set a monthly budget in Usage to use this.'
+            : `This month so far: ${saver.usedPct == null ? '—' : `${saver.usedPct}%`} of the budget${saver.active ? ' · the saver is ON now' : ''}.`}
+        </div>
+      </fieldset>
+      <div className="bd-card-sub mt-2">
+        Tip: keep the Boss and OLs on the best model without an economy model, and give APCs a free Gemini model as their economy model.
+      </div>
+      {!readOnly && (
+        <div className="d-flex align-items-center gap-2 flex-wrap mt-3">
+          <button type="button" className="btn btn-sm btn-primary" disabled={!dirty || saving} onClick={save}>
+            {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save models by role'}
+          </button>
+          {dirty && <button type="button" className="btn btn-sm btn-link" onClick={() => setDraft(saved)}>Undo</button>}
+        </div>
       )}
       {msg && <div className="small mt-2" role="status">{msg}</div>}
     </Card>

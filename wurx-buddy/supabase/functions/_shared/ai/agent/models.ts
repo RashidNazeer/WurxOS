@@ -82,6 +82,42 @@ export function chooseTargets(cfg: { model?: unknown; model_key_slot?: unknown; 
 }
 export const MAX_FALLBACKS = 6;
 
+// Per-role models (mig 404): the caller's role entry over the globals; a
+// missing role or field inherits. With the budget saver on, a role that has an
+// `economy` model uses it. The result feeds chooseTargets.
+export type ModelSource = 'global' | `role:${string}` | 'economy';
+export function resolveRoleConfig<T extends Record<string, unknown>>(cfg: T, role: string, economyOn: boolean):
+  T & { model_source: ModelSource } {
+  const r = String(role || '').toLowerCase();
+  const rm = (cfg.role_models && typeof cfg.role_models === 'object' ? (cfg.role_models as Record<string, any>)[r] : null) ?? null;
+  const out: any = { ...cfg, model_source: 'global' };
+  if (!rm || typeof rm !== 'object') return out;
+  if (rm.model) { out.model = rm.model; out.model_key_slot = rm.key_slot ?? 'primary'; out.model_source = `role:${r}`; }
+  if (Array.isArray(rm.fallback_models)) { out.fallback_models = rm.fallback_models; out.model_source = `role:${r}`; }
+  if (economyOn && rm.economy?.model) { out.model = rm.economy.model; out.model_key_slot = rm.economy.key_slot ?? 'primary'; out.model_source = 'economy'; }
+  return out;
+}
+
+// Budget saver: spend has reached budget_saver_pct % of monthly_budget_usd.
+export function saverOn(cfg: { budget_saver_pct?: unknown; monthly_budget_usd?: unknown }, spendUsd: number | null): boolean {
+  const pct = Number(cfg.budget_saver_pct), budget = Number(cfg.monthly_budget_usd);
+  return pct > 0 && budget > 0 && spendUsd != null && spendUsd >= (budget * pct) / 100;
+}
+
+// Month-to-date spend (ai_month_spend_usd), cached per worker.
+export const SPEND_CACHE_MS = 5 * 60_000;
+let spendCache: { at: number; v: number } | null = null;
+export const _resetSpendCache = () => { spendCache = null; };
+export async function monthSpend(admin: any, now = Date.now()): Promise<number | null> {
+  if (spendCache && now - spendCache.at < SPEND_CACHE_MS) return spendCache.v;
+  try {
+    const { data, error } = await admin.rpc('ai_month_spend_usd');
+    if (error || data == null) return null;
+    spendCache = { at: now, v: Number(data) };
+    return spendCache.v;
+  } catch { return null; }
+}
+
 // The automatic safety net (auto_failover): every other usable catalog model
 // with a key, in this order: Gemini flash family, Groq, the OpenAI fallback
 // key, anything else.

@@ -237,7 +237,7 @@ export function BuddyProvider({ children }) {
           const doneKey = k;
           getMessageById(messageId)
             .then((row) => {
-              if (row) dispatch({ type: 'MSG_META', key: doneKey, id: messageId, meta: { model: row.model, keySlot: row.keySlot, fallbackUsed: row.fallbackUsed } });
+              if (row) dispatch({ type: 'MSG_META', key: doneKey, id: messageId, meta: { model: row.model, keySlot: row.keySlot, fallbackUsed: row.fallbackUsed, modelSource: row.modelSource } });
             })
             .catch(() => { /* only a label */ });
         }

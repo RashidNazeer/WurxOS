@@ -11,7 +11,7 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { chooseTargets, coolDown, coolingDown, endpointFor, keyFor, omitFor, rememberOmit, rememberParams, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chooseTargets, coolDown, coolingDown, endpointFor, keyFor, monthSpend, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, saverOn, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
 import { chatRespond } from '../llm/chat.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
@@ -88,6 +88,7 @@ export type CoreDeps = {
   embed: (text: string) => Promise<number[] | null>;
   rerank?: Reranker;
   model?: string;                    // local override (serve-assistant --model); still allow-listed
+  monthSpend?: () => Promise<number | null>;   // test seam: month-to-date spend (budget saver)
   modelKeySlot?: KeySlot;            // with `model`: that key, taken as given (serve-assistant --key-slot)
   meter?: UsageMeter;                // rerank + query-embedding usage of this question (→ ai_usage_log)
   now?: () => Date;
@@ -107,8 +108,8 @@ const add = (a: Usage, b: Usage): Usage => ({ input: a.input + b.input, cached: 
 
 async function loadConfig(admin: any) {
   const cols = 'persona, model, enabled, retrieval, prices, model_key_slot, fallback_models, fallback_enabled';
-  const { data, error } = await admin.from('ai_assistant_config').select(`${cols}, auto_failover`).eq('id', 1).maybeSingle();
-  // Before mig 401 there is no auto_failover column: read the rest.
+  const { data, error } = await admin.from('ai_assistant_config').select(`${cols}, auto_failover, role_models, budget_saver_pct, monthly_budget_usd`).eq('id', 1).maybeSingle();
+  // Before mig 401 / 404 there are no auto_failover / role_models columns: read the rest.
   if (error) return (await admin.from('ai_assistant_config').select(cols).eq('id', 1).maybeSingle()).data ?? {};
   return data ?? {};
 }
@@ -186,7 +187,11 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
   const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null };
   const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
-  const chain = chooseTargets(row, catalog, keys, override);
+  // Per-role models (mig 404); the budget saver switches roles with an economy model.
+  const hasEconomy = Object.values((row.role_models ?? {}) as Record<string, any>).some((v) => v?.economy?.model);
+  const economyOn = hasEconomy && Number(row.budget_saver_pct) > 0 && saverOn(row, await (deps.monthSpend ?? (() => monthSpend(admin)))());
+  const resolved = resolveRoleConfig(row, req.role, economyOn);
+  const chain = chooseTargets(resolved, catalog, keys, override);
   // Buddy must never go down (Owner 2026-10-01): after the Boss's chain, every
   // other usable model in the catalog, unless auto_failover is switched off.
   const targets = row.auto_failover === false ? chain : [...chain, ...safetyNet(catalog, keys, chain)];
@@ -419,6 +424,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const llmMs: number[] = [];         // per model call, for the latency picture
   flags.llm_ms = llmMs;
   flags.model_attempts = attempts;
+  flags.model_source = override ? 'override' : resolved.model_source;
   const input: InputItem[] = [...history, { role: 'user', content: message }];
   let step = 'start';
 
@@ -535,7 +541,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // A stopped reply is kept (partial) as 'error' + cancelled, and does not
   // move last_reply_at: no unread badge for an answer the user stopped.
   const meta = {
-    requestId, model, key_slot: target.keySlot, ...(flags.fallback_used ? { fallback_used: flags.fallback_used } : {}), engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
+    requestId, model, key_slot: target.keySlot, model_source: flags.model_source, ...(flags.fallback_used ? { fallback_used: flags.fallback_used } : {}), engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
     sources: sources.filter((s) => s.cited),
     tools: toolLogs.map((t) => ({ name: t.name, args: t.args, ms: t.ms, cites: t.cites })),
     ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.deadline_hit ? 'The reply took too long and was stopped.' : flags.error_unclassified ? 'Something went wrong while answering.' : userError } : {}),
