@@ -77,6 +77,7 @@ export type CoreDeps = {
   apiKey: string;
   embed: (text: string) => Promise<number[] | null>;
   rerank?: Reranker;
+  model?: string;                    // local override (serve-assistant --model); still allow-listed
   meter?: UsageMeter;                // rerank + query-embedding usage of this question (→ ai_usage_log)
   now?: () => Date;
   llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam
@@ -156,7 +157,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   ]);
   const agent = agentConfig(row.retrieval);
   const retrieval = retrievalConfig(row.retrieval).config;
-  const model = pickModel(row.model);
+  const model = pickModel(deps.model ?? row.model);
   const fail = (error: string, httpStatus: number): TurnResult => ({ requestId, conversationId: req.conversationId ?? null, answer: '', sources: [], error, httpStatus });
   if (row.enabled === false) return fail('The assistant is currently turned off by an admin.', 503);
 

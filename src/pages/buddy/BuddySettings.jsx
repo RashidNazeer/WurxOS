@@ -279,8 +279,9 @@ function ExcludedCard() {
 // Must match ALLOWED_MODELS in Assistant/supabase/functions/_shared/ai/llm/openai.ts:
 // the server falls back to the default for anything else.
 const MODEL_OPTIONS = [
-  { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini (fast, economical)' },
-  { id: 'gpt-5.5', label: 'gpt-5.5 (stronger reasoning, higher cost)' },
+  { id: 'gpt-5.4-nano', label: 'gpt-5.4-nano (cheapest, fastest; best for simple questions)' },
+  { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini (recommended: balanced)' },
+  { id: 'gpt-5.5', label: 'gpt-5.5 (strongest reasoning, highest cost)' },
 ];
 
 function BehaviourCard() {
