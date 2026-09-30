@@ -9,6 +9,8 @@ export type Prices = Record<string, Price>;
 export const DEFAULT_PRICES: Readonly<Prices> = Object.freeze({
   'gpt-5.4-mini': { in: 0.75, cached: 0.075, out: 4.5 },
   'gpt-5.5': { in: 5, cached: 0.5, out: 30 },
+  // ASSUMED, not a verified list price (2026-09-30): check OpenAI's price page.
+  'gpt-5.4-nano': { in: 0.2, cached: 0.02, out: 1.25 },
   'text-embedding-3-small': { in: 0.02, cached: 0.02, out: 0 },
 });
 

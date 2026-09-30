@@ -68,7 +68,7 @@ export async function checkProfile(admin: any, userId: string, token: string | n
   return { userId, role, displayName: p.display_name ?? null, token, internal };
 }
 
-export type ServerEnv = { url: string; serviceKey: string; anonKey: string; openAiKey: string; createClient: CreateClient; fetchImpl?: typeof fetch };
+export type ServerEnv = { url: string; serviceKey: string; anonKey: string; openAiKey: string; createClient: CreateClient; fetchImpl?: typeof fetch; modelOverride?: string };
 
 // Search runs with the caller's JWT so the database ACL applies; without one
 // (Slack relay, local --as-user) it runs as the service role with p_as_user.
@@ -86,6 +86,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     // local --as-user) there is none, and non-Boss people tools refuse.
     ...(userClient ? { userClient } : {}),
     apiKey: env.openAiKey,
+    ...(env.modelOverride ? { model: env.modelOverride } : {}),
     embed: cachedEmbedder(openAiQueryEmbedder(env.openAiKey, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL)), DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
     rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl, onUsage: meter.onRerank(RETRIEVAL_DEFAULTS.RERANK_MODEL) }),
     meter,

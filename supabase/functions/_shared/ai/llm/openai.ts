@@ -5,11 +5,23 @@
 // rounds' output items go back as input, with the reasoning items' encrypted
 // content, so the model keeps its chain of thought across tool rounds.
 
-export const ALLOWED_MODELS = ['gpt-5.4-mini', 'gpt-5.5'] as const;
+export const ALLOWED_MODELS = ['gpt-5.4-mini', 'gpt-5.5', 'gpt-5.4-nano'] as const;
 export const DEFAULT_MODEL = 'gpt-5.4-mini';
 export const pickModel = (m: unknown): string => ((ALLOWED_MODELS as readonly string[]).includes(String(m)) ? String(m) : DEFAULT_MODEL);
 
 export type Effort = 'none' | 'minimal' | 'low' | 'medium' | 'high';
+
+// What a model accepts, where it differs (live-checked 2026-09-30): gpt-5.4-nano
+// rejects reasoning.effort 'minimal' (400), so an unsupported effort becomes
+// 'low' for that model instead of failing the turn. Nano otherwise takes the
+// same request: streaming, parallel function tools, encrypted reasoning, cache.
+export const MODEL_EFFORTS: Readonly<Record<string, readonly Effort[]>> = Object.freeze({
+  'gpt-5.4-nano': ['none', 'low', 'medium', 'high'],
+});
+export function effortFor(model: string, effort: Effort): Effort {
+  const ok = MODEL_EFFORTS[model];
+  return !ok || ok.includes(effort) ? effort : 'low';
+}
 
 // Provider-neutral function tool (tools/types.ts ToolDef has the same shape).
 export type FunctionTool = { name: string; description: string; parameters: Record<string, unknown> };
@@ -88,7 +100,7 @@ export function requestBody(r: LlmRequest): Record<string, unknown> {
     instructions: r.instructions,
     input: r.input,
     ...(r.tools?.length ? { tools: r.tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.parameters, strict: false })), parallel_tool_calls: true } : {}),
-    ...(r.effort ? { reasoning: { effort: r.effort } } : {}),
+    ...(r.effort ? { reasoning: { effort: effortFor(r.model, r.effort) } } : {}),
     ...(r.maxOutputTokens ? { max_output_tokens: r.maxOutputTokens } : {}),
     ...(r.promptCacheKey ? { prompt_cache_key: r.promptCacheKey } : {}),
     store: false,
