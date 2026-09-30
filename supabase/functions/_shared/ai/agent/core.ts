@@ -13,6 +13,7 @@ import type { Reranker } from '../retrieval/search.ts';
 import { pickModel, respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
+import { providerAccountIssue, providerIssueMessage } from '../providerErrors.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
 import { buildInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
 import { ALL_TOOL_DEFS, CiteRegistry, runTool, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
@@ -135,7 +136,9 @@ export function usageRows(meter: UsageMeter | undefined, prices: Prices, who: { 
   }
   if (meter?.embed.calls) {
     const m = meter.embed;
-    rows.push({ ...who, kind: 'embed_query', model: m.model, calls: m.calls, tokens_in: m.input,
+    // Every column, in both rows: a bulk insert sends null for a key some rows
+    // lack, which a column default does not catch (QA 2026-10-01 F2).
+    rows.push({ ...who, kind: 'embed_query', model: m.model, calls: m.calls, tokens_in: m.input, tokens_cached: 0, tokens_out: 0,
       est_cost_usd: Number(costUsd(prices, m.model, { input: m.input }).usd.toFixed(6)) });
   }
   return rows;
@@ -280,6 +283,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   let usage = { ...ZERO };
   let rounds = 0;
   let error: string | null = null;
+  let userError = '';
   const llmMs: number[] = [];         // per model call, for the latency picture
   flags.llm_ms = llmMs;
   const input: InputItem[] = [...history, { role: 'user', content: message }];
@@ -344,11 +348,16 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       emit({ cancelled: true });
     } else {
       error = String((e as Error)?.message ?? e).slice(0, 500);
-      if (/deadline|timed out/i.test(error)) flags.deadline_hit = true;
+      // No credits / a refused key: say who can fix it (QA 2026-10-01 F3).
+      const account = providerAccountIssue(e);
+      if (account) { flags.provider_quota = true; flags.provider_issue = account; }
+      else if (/deadline|timed out/i.test(error)) flags.deadline_hit = true;
       const tail = cstream.flush();
       if (tail) { answer += tail; emit({ delta: tail }); }
-      emit({ error: /HTTP 429/.test(error) ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
-        : flags.deadline_hit ? 'That took too long, so I stopped. Please try again, maybe a narrower question.' : 'Something went wrong while answering. Please try again.' });
+      userError = account ? providerIssueMessage(account, req.role)
+        : /HTTP 429/.test(error) ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
+        : flags.deadline_hit ? 'That took too long, so I stopped. Please try again, maybe a narrower question.' : 'Something went wrong while answering. Please try again.';
+      emit({ error: userError });
     }
   } finally {
     clearInterval(poller);
@@ -378,7 +387,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     requestId, model, engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
     sources: sources.filter((s) => s.cited),
     tools: toolLogs.map((t) => ({ name: t.name, args: t.args, ms: t.ms, cites: t.cites })),
-    ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.deadline_hit ? 'The reply took too long and was stopped.' : 'Something went wrong while answering.' } : {}),
+    ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.provider_quota ? userError : flags.deadline_hit ? 'The reply took too long and was stopped.' : 'Something went wrong while answering.' } : {}),
   };
   const status = cancelled || error ? 'error' : 'done';     // a partial answer is kept, marked error
   const finishedAt = new Date().toISOString();

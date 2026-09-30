@@ -18,11 +18,15 @@
 
 import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../config.ts';
 import { embedTexts } from '../embedder.ts';
+import { providerAccountIssue, type ProviderIssue } from '../providerErrors.ts';
 import { SOURCE_TYPES } from '../extractors/index.ts';
 import type { SourceType } from '../extractors/index.ts';
 import type { ExistingDoc, QueueItem, Rpc, SourceRecord } from './db.ts';
 import { planDocument } from './plan.ts';
 import type { CustomSource, Plan, PlanOptions } from './plan.ts';
+
+// An OpenAI account problem defers items this long (they keep all 5 attempts).
+export const PROVIDER_DEFER_SECONDS = 1800;
 
 export const isSourceType = (t: string): t is SourceType => (SOURCE_TYPES as string[]).includes(t);
 
@@ -55,12 +59,14 @@ export type RunStats = {
   reused_chunks: number;
   by_type: Record<string, number>;
   errors: string[];
+  deferred: number;                     // put back, attempt not spent: an OpenAI account problem
+  provider_issue: ProviderIssue | null; // 'quota' (no credits) | 'auth' (key refused): the run stops
 };
 
 export const emptyStats = (): RunStats => ({
   claimed: 0, succeeded: 0, failed: 0, skipped_unchanged: 0, touched: 0, written: 0, deleted: 0, soft_deleted: 0,
   noop: 0, disabled: 0, lost_lock: 0, embedded_chunks: 0, embed_tokens: 0, embed_calls: 0, embed_requests: 0, reused_chunks: 0,
-  by_type: {}, errors: [],
+  by_type: {}, errors: [], deferred: 0, provider_issue: null,
 });
 
 export type WorkerOptions = {
@@ -110,6 +116,16 @@ const errText = (e: unknown) => String((e as Error)?.message ?? e).slice(0, 1000
 export async function processBatch(items: QueueItem[], o: BatchOptions, stats: RunStats): Promise<void> {
   const { rpc, workerId } = o;
   const fail = async (it: QueueItem, e: unknown) => {
+    // No credits / a refused key (QA 2026-10-01 F3): not the item's fault. It
+    // goes back to pending in 30 min without spending an attempt, and the run stops.
+    const issue = providerAccountIssue(e);
+    if (issue) {
+      stats.provider_issue = issue;
+      if (stats.errors.length < 10) stats.errors.push(`OpenAI account: ${issue === 'quota' ? 'no credits left' : 'API key refused'} (${errText(e).slice(0, 120)})`);
+      const held = await rpc('ai_ingest_defer', { p_id: it.id, p_worker: workerId, p_error: errText(e), p_delay_seconds: PROVIDER_DEFER_SECONDS });
+      if (held === false) stats.lost_lock++; else stats.deferred++;
+      return;
+    }
     stats.failed++;
     if (stats.errors.length < 10) stats.errors.push(`${it.source_type}/${it.source_id}: ${errText(e)}`);
     const held = await rpc('ai_ingest_fail', { p_id: it.id, p_worker: workerId, p_error: errText(e) });
@@ -251,6 +267,7 @@ export async function runWorker(opts: WorkerOptions): Promise<RunStats> {
       if (!items.length) break;
       stats.claimed += items.length;
       await processBatch(items, o, stats);
+      if (stats.provider_issue) { opts.log?.(`stopping: OpenAI account problem (${stats.provider_issue}); ${stats.deferred} item(s) deferred`); break; }
       opts.log?.(`batch of ${items.length}: ok ${stats.succeeded}, failed ${stats.failed}, embedded ${stats.embedded_chunks}`);
     }
   } catch (e) {
