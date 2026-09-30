@@ -896,7 +896,7 @@ export async function listBrands(admin: Db, ctx: ToolCtx): Promise<Out> {
   const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
   src.ids = brands.map((b: any) => b.id).slice(0, 50);
   return {
-    text: `Brands (${brands.length}):\n` + brands.map((b: any) =>
+    text: `${visible ? 'Brands you can see' : 'Brands'} (${brands.length}):\n` + brands.map((b: any) =>
       `- ${b.brand_name} (${b.status || 'n/a'})${b.owner_id ? ` — owner: ${nameOf.get(b.owner_id) || 'unknown'}` : ''}`).join('\n'),
     source: src,
   };

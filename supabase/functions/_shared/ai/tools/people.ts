@@ -45,14 +45,16 @@ const goalLine = (g: any) => {
   return `    • ${String(g?.text || 'goal').trim()}${prog} — ${money(g?.amount)}`;
 };
 
-function fmtIncentiveRow(name: string, row: any): string {
+// showPay: basic salary appears only on the Boss's view and the caller's own row
+// (others' pay is Boss-only in the app's salary pages; ui-design §8).
+function fmtIncentiveRow(name: string, row: any, showPay = true): string {
   const inc = Array.isArray(row.incentives) ? row.incentives : [];
   const bon = Array.isArray(row.bonuses) ? row.bonuses : [];
   const sum = (arr: any[]) => arr.reduce((s, g) => s + (g?.completed ? Number(g?.amount) || 0 : 0), 0);
   const earned = sum(inc) + sum(bon);
   const potential = [...inc, ...bon].reduce((s, g) => s + (Number(g?.amount) || 0), 0);
   const lines = [
-    `${name} — ${row.month} (basic salary ${money(row.basic_salary)}; verified: ${row.verified ? 'yes' : 'no'}, payout cleared: ${row.payout_cleared ? 'yes' : 'no'})`,
+    `${name} — ${row.month} (${showPay ? `basic salary ${money(row.basic_salary)}; ` : ''}verified: ${row.verified ? 'yes' : 'no'}, payout cleared: ${row.payout_cleared ? 'yes' : 'no'})`,
     `  Earned so far (completed goals): ${money(earned)} of ${money(potential)} potential.`,
   ];
   if (inc.length) { lines.push('  Incentives:'); inc.forEach((g: any) => lines.push(goalLine(g))); }
@@ -291,7 +293,7 @@ export async function getIncentives(s: Scope, args: any): Promise<Out> {
   const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
   const blocks = orows
     .sort((a: any, b: any) => String(nameOf.get(a.user_id)).localeCompare(String(nameOf.get(b.user_id))))
-    .map((r: any) => fmtIncentiveRow(String(nameOf.get(r.user_id) || 'Unknown'), r));
+    .map((r: any) => fmtIncentiveRow(String(nameOf.get(r.user_id) || 'Unknown'), r, s.boss || r.user_id === s.ctx.userId));
   return out(`Incentives for ${month} (${orows.length} record(s)):\n\n` + blocks.join('\n\n'),
     { ...src, ids: ids as string[], currency: 'PKR' });
 }
@@ -557,7 +559,7 @@ export async function getAttendance(s: Scope, args: any): Promise<Out> {
   };
 
   if (userIds && args?.detail) {
-    if (other && !rows.length && !bdOf.has(userIds[0])) return out(NOT_YOURS, { ...src, ids: userIds });
+    if (other && !rows.length && !bdOf.has(userIds[0])) return out(NOT_YOURS, src);
     const lines = rows.slice(0, 40).map((a: any) =>
       `  - ${a.date}: ${hms(a.total_work_ms)} worked (in ${pktTime(a.clock_in)}, out ${pktTime(a.clock_out)}${Number(a.total_break_ms) > 0 ? `, break ${hms(a.total_break_ms)}` : ''})`);
     const s = agg.get(userIds[0]) || { days: 0, work: 0, brk: 0 };
@@ -568,7 +570,7 @@ export async function getAttendance(s: Scope, args: any): Promise<Out> {
   if (userIds) {
     const s = agg.get(userIds[0]) || { days: 0, work: 0, brk: 0 };
     const pl = pctPhrase(userIds[0]);
-    if (!pl && !rows.length) return out(other ? NOT_YOURS : `No attendance data for ${single.display_name} in ${month || '(no data)'}.`, { ...src, ids: userIds });
+    if (!pl && !rows.length) return out(other ? NOT_YOURS : `No attendance data for ${single.display_name} in ${month || '(no data)'}.`, other ? src : { ...src, ids: userIds });
     return out(`Attendance for ${single.display_name} — ${month}${soFar}: ${pl || 'no coverage data'}. Hours: ${hms(s.work)} total worked (avg ${hms(Math.round(s.work / Math.max(1, s.days)))}/day), ${hms(s.brk)} on breaks.`, { ...src, ids: userIds });
   }
 
