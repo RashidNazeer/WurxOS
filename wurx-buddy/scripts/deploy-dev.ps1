@@ -26,12 +26,13 @@
 
  -DeployAssistant: deploy Wurx Buddy's `assistant` function instead (and nothing
  else): the same guards and dev ref; migrations 378, 383, 385, 386, 387, 389,
- 395, 396, 397 (already applied ones are skipped); the secrets step sets only
- OPEN_AI_API_KEY_FALLBACK from .env.dev when it is there (OPEN_AI_API_KEY is
+ 395, 396, 397, 401 (already applied ones are skipped); the secrets step sets only
+ the optional model keys from .env.dev when they are there: OPEN_AI_API_KEY_FALLBACK,
+ GROQ_API_KEY (from GROQ_Fallback), GEMINI_API_KEY (from Gemini_Fallback) (OPEN_AI_API_KEY is
  already set on dev; AI_INTERNAL_SECRET is optional, without it the Slack path
  is off); no app_config step. JWT verification stays ON for this function (callers are
  signed-in users), and it checks the caller's role itself
- (ai_assistant_config.allowed_roles, default {boss}).
+ (boss and developer always, plus ai_assistant_config.allowed_roles).
    powershell -ExecutionPolicy Bypass -File scripts\deploy-dev.ps1 -DeployAssistant -DryRun
 ============================================================
 #>
@@ -55,7 +56,7 @@ $Migrations = @('379', '380', '374', '375', '381')
 $NoVerifyJwt = $true
 if ($DeployAssistant) {
   $Functions = @('assistant')
-  $Migrations = @('378', '383', '385', '386', '387', '389', '395', '396', '397')
+  $Migrations = @('378', '383', '385', '386', '387', '389', '395', '396', '397', '401')
   $NoVerifyJwt = $false
   $SkipConfig = $true
 }
@@ -126,18 +127,23 @@ try {
   Step '(b) function secrets on DEV'
   if ($SkipSecrets) { Write-Host 'skipped (-SkipSecrets)' }
   elseif ($DeployAssistant) {
-    # Only the optional fallback key (mig 397); never echoed, through a temp file.
-    if (-not $envMap['OPEN_AI_API_KEY_FALLBACK']) { Write-Host 'OPEN_AI_API_KEY_FALLBACK not in .env.dev: nothing to set (fallback models stay off).' }
-    elseif ($DryRun) { Write-Host "would run: supabase secrets set --env-file <temp file> --project-ref $DevRef   (OPEN_AI_API_KEY_FALLBACK)" }
+    # Only the optional extra model keys (mig 397, 401): function secret <- .env.dev name.
+    # Never echoed; the values go through a temp file that is deleted straight after.
+    $extra = [ordered]@{ 'OPEN_AI_API_KEY_FALLBACK' = 'OPEN_AI_API_KEY_FALLBACK'; 'GROQ_API_KEY' = 'GROQ_Fallback'; 'GEMINI_API_KEY' = 'Gemini_Fallback' }
+    $set = @($extra.Keys | Where-Object { $envMap[$extra[$_]] })
+    foreach ($k in @($extra.Keys | Where-Object { -not $envMap[$extra[$_]] })) { Write-Host "$($extra[$k]) not in .env.dev: $k not set (that key's models stay off)." }
+    if (-not $set.Count) { Write-Host 'nothing to set.' }
+    elseif ($DryRun) { Write-Host "would run: supabase secrets set --env-file <temp file> --project-ref $DevRef   ($($set -join ', '))" }
     else {
       $tmpDir = Join-Path $env:TEMP 'claude'
       New-Item -ItemType Directory -Force $tmpDir | Out-Null
       $tmp = Join-Path $tmpDir ("deploy-dev-" + [guid]::NewGuid().ToString('N') + '.env')
       try {
-        [IO.File]::WriteAllText($tmp, "OPEN_AI_API_KEY_FALLBACK=$($envMap['OPEN_AI_API_KEY_FALLBACK'])`n", (New-Object Text.UTF8Encoding $false))
+        $lines = foreach ($k in $set) { "$k=$($envMap[$extra[$k]])" }
+        [IO.File]::WriteAllText($tmp, (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
         Invoke-Supabase @('secrets', 'set', '--env-file', $tmp)
       } finally { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
-      Write-Host 'ok: OPEN_AI_API_KEY_FALLBACK set on dev (not shown).'
+      Write-Host "ok: $($set -join ', ') set on dev (not shown)."
     }
   }
   else {
@@ -226,7 +232,7 @@ Verification checklist (dev, assistant):
   3. Signed in as the dev Boss: POST https://$DevRef.supabase.co/functions/v1/assistant
        {"message":"What does our SOP say about approving sample requests?","stream":true}
      -> SSE started, status..., delta..., sources, done{status:"done"}; the ai_messages row reaches status done.
-  4. A non-Boss user gets 403 until ai_assistant_config.allowed_roles is widened (after the role safeguards pass QA).
+  4. A user whose role is not boss / developer / in ai_assistant_config.allowed_roles gets 403.
 "@
     return
   }

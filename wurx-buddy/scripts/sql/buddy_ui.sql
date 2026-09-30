@@ -42,8 +42,8 @@ do $$ begin
     pg_temp.try($q$insert into ai_messages (conversation_id, role, content, status) values ('00000000-0000-4000-8000-00000000b001','user','x','weird')$q$) like 'error: 23514');
   perform pg_temp.ok('status default is done',
     (select column_default from information_schema.columns where table_name = 'ai_messages' and column_name = 'status') like '%done%');
-  perform pg_temp.ok('allowed_roles defaults to {boss}',
-    (select column_default from information_schema.columns where table_name = 'ai_assistant_config' and column_name = 'allowed_roles') like '%{boss}%');
+  perform pg_temp.ok('allowed_roles defaults to {boss,developer} (mig 401)',
+    (select column_default from information_schema.columns where table_name = 'ai_assistant_config' and column_name = 'allowed_roles') like '%{boss,developer}%');
   perform pg_temp.ok('realtime: both tables published',
     (select count(*) from pg_publication_tables where pubname = 'supabase_realtime' and tablename in ('ai_messages', 'ai_conversations')) = 2);
   perform pg_temp.ok('realtime admin can read both (RLS evaluation)',

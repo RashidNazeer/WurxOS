@@ -1,22 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { usageSummary, setMonthlyBudget } from '../../lib/buddyApi';
+import { usageSummary, setMonthlyBudget, listKeySlots } from '../../lib/buddyApi';
 import { LoadError } from '../../components/buddy/BuddyThread';
-import { KEY_SLOT_LABEL, USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, pktDate, usageRange } from '../../lib/buddyLogic';
+import {
+  DEFAULT_SLOT_META, USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, keySlotMeta, keySlotRows, pktDate, usageRange,
+} from '../../lib/buddyLogic';
 
-// Buddy settings → Usage (Boss only; ai_usage_summary refuses anyone else).
-// Estimates from our own request log × the configured prices; the OpenAI
-// dashboard is the exact bill. Lazy-loaded (it pulls in recharts).
+// Buddy settings → Usage (the Boss and developers; ai_usage_summary checks
+// ai_can_view_settings, mig 401). Estimates from our own request log × the
+// configured prices; the providers' dashboards are the exact bill.
+// Lazy-loaded (it pulls in recharts).
 
 const PRESETS = [['7d', '7 days'], ['30d', '30 days'], ['month', 'This month'], ['custom', 'Custom']];
 const SURFACE_LABEL = { full: 'Buddy tab', quick: 'Quick panel', slack: 'Slack relay', unknown: 'Unknown' };
 
-export default function BuddyUsage() {
+export default function BuddyUsage({ readOnly }) {
   const [preset, setPreset] = useState('30d');
   const [custom, setCustom] = useState(() => usageRange('30d'));
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [meta, setMeta] = useState(DEFAULT_SLOT_META);
+  useEffect(() => { listKeySlots().then((rows) => setMeta(keySlotMeta(rows))); }, []);
 
   const range = preset === 'custom' ? custom : usageRange(preset);
   const load = useCallback(async () => {
@@ -61,7 +66,7 @@ export default function BuddyUsage() {
       {err && (err === 'range'
         ? <div className="bd-error mb-2" role="alert">Pick a start date on or before the end date.</div>
         : err === 'boss'
-          ? <div className="bd-card-sub mb-2">Usage is visible to the Boss only.</div>
+          ? <div className="bd-card-sub mb-2">Usage isn't available to your role yet.</div>
           : <LoadError what="usage" onRetry={load} compact />)}
       {!data && !err && <UsageSkeleton />}
       {data && (
@@ -95,7 +100,7 @@ export default function BuddyUsage() {
             <UsageTable title="By kind" head={['Kind', 'Calls', 'Tokens in', 'Tokens out', 'Cost']}
               rows={Object.entries(data.by_kind || {}).map(([k, v]) => [USAGE_KIND_LABEL[k] || k, fmtCount(v.calls), fmtCount(v.tokens_in), fmtCount(v.tokens_out), fmtUsd(v.est_cost_usd)])} />
             <UsageTable title="By key" head={['Key', 'Questions', 'Fallback used', 'Cost']}
-              rows={Object.entries(data.by_key_slot || {}).map(([k, v]) => [KEY_SLOT_LABEL[k] || k, fmtCount(v.questions), fmtCount(v.fallback_used), fmtUsd(v.est_cost_usd)])} />
+              rows={keySlotRows(data.by_key_slot, meta).map((r) => [r.label, fmtCount(r.questions), fmtCount(r.fallback_used), fmtUsd(r.est_cost_usd)])} />
           </div>
 
           {Number(data.unpriced?.calls) > 0 && (
@@ -105,7 +110,7 @@ export default function BuddyUsage() {
             </div>
           )}
 
-          <Budget current={mtd.budget_usd} onSaved={load} />
+          <Budget current={mtd.budget_usd} onSaved={load} readOnly={readOnly} />
           <Prices prices={data.prices_per_1m || {}} />
         </>
       )}
@@ -178,7 +183,7 @@ function UsageTable({ title, head, rows }) {
   );
 }
 
-function Budget({ current, onSaved }) {
+function Budget({ current, onSaved, readOnly }) {
   const [value, setValue] = useState(current != null ? String(current) : '');
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState(false);
@@ -194,6 +199,15 @@ function Budget({ current, onSaved }) {
     finally { setSaving(false); }
   };
 
+  if (readOnly) {
+    return (
+      <div className="bd-usage-budget">
+        <div className="small fw-semibold mb-1">Monthly budget (USD)</div>
+        <div className="small">{current != null ? fmtUsd(current) : 'No budget set'}</div>
+        <div className="bd-card-sub mt-1">For reporting only. Buddy is never blocked by the budget.</div>
+      </div>
+    );
+  }
   return (
     <form className="bd-usage-budget" onSubmit={save}>
       <label className="form-label small fw-semibold mb-1" htmlFor="bd-budget">Monthly budget (USD)</label>

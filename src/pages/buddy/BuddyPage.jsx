@@ -2,7 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { lazyWithRetry as lazy } from '../../lib/lazyWithRetry';
 import { useBuddy } from '../../contexts/BuddyContext';
-import { groupConversations, isTmpKey, orderSources, starterCards } from '../../lib/buddyLogic';
+import { canEditSettings, groupConversations, isTmpKey, orderSources, starterCards } from '../../lib/buddyLogic';
 import { searchConversationIds } from '../../lib/buddyApi';
 import BuddyMascot from '../../components/buddy/BuddyMascot';
 import BuddyThread, { LoadError, SourceChip } from '../../components/buddy/BuddyThread';
@@ -12,13 +12,13 @@ import '../../styles/buddy.css';
 // The Wurx Buddy tab (ui-design.md §4): history · chat · sources.
 const BuddySettings = lazy(() => import('./BuddySettings'));
 
-const SETTINGS_ROLES = ['boss', 'developer'];
-
 export default function BuddyPage() {
   const buddy = useBuddy();
-  const { state, role, greeting, selectPage, setPageActive, send } = buddy;
+  const { state, role, profile, greeting, selectPage, setPageActive, send } = buddy;
   const [params, setParams] = useSearchParams();
-  const showSettings = params.get('view') === 'settings' && SETTINGS_ROLES.includes(role);
+  // Settings: the Boss and active developers, both with full edit (Owner, 2026-10-01).
+  const settingsOk = canEditSettings(profile);
+  const showSettings = params.get('view') === 'settings' && settingsOk;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(() => window.matchMedia?.('(min-width: 1200px)').matches ?? false);
   const [sourceSel, setSourceSel] = useState(null); // { msg, id }
@@ -105,7 +105,7 @@ export default function BuddyPage() {
         activeKey={key}
         onPick={pick}
         onNew={() => pick(null)}
-        canSettings={SETTINGS_ROLES.includes(role)}
+        canSettings={settingsOk}
         onSettings={() => { openSettings(true); setHistoryOpen(false); }}
         settingsActive={showSettings}
       />
@@ -128,7 +128,7 @@ export default function BuddyPage() {
             )}
         </header>
         {showSettings
-          ? <Suspense fallback={<div className="bd-center"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}><BuddySettings role={role} /></Suspense>
+          ? <Suspense fallback={<div className="bd-center"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}><BuddySettings canEdit={settingsOk} /></Suspense>
           : state.denied
             ? <ComingSoon />
             : <BuddyThread convKey={key} surface="full" pageContext={{ route: '/buddy' }} empty={empty} onCite={onCite} activeSourceMsg={sourceSel?.msg} />}

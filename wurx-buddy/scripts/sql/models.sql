@@ -56,7 +56,7 @@ begin
   perform pg_temp.ok('even the Boss cannot write it directly (the function does, with the service role)', r = 'denied', r);
 
   -- the config check, as the Boss through the API
-  r := pg_temp.try($q$update ai_assistant_config set model = 'gpt-5.5' where id = 1$q$);
+  r := pg_temp.try($q$update ai_assistant_config set model = 'gpt-5.5', model_key_slot = 'primary' where id = 1$q$);
   perform pg_temp.ok('a usable catalog model is accepted', r = 'rows=1', r);
   r := pg_temp.try($q$update ai_assistant_config set model = 'gpt-5.4-mini' where id = 1$q$);
   perform pg_temp.ok('a model the catalog marks unavailable is refused', r like 'error: model gpt-5.4-mini is not usable%', r);
@@ -68,8 +68,8 @@ begin
   perform pg_temp.ok('an unknown key slot is refused', r like 'error:%', r);
   r := pg_temp.try($q$update ai_assistant_config set fallback_models = '[{"key_slot":"fallback"}]' where id = 1$q$);
   perform pg_temp.ok('a fallback without a model is refused', r like 'error: each fallback%', r);
-  r := pg_temp.try($q$update ai_assistant_config set fallback_models = '[{"key_slot":"fallback","model":"a"},{"key_slot":"fallback","model":"b"},{"key_slot":"fallback","model":"c"},{"key_slot":"fallback","model":"d"},{"key_slot":"fallback","model":"e"},{"key_slot":"fallback","model":"f"}]' where id = 1$q$);
-  perform pg_temp.ok('more than 5 fallbacks are refused', r like 'error: fallback_models must be%', r);
+  r := pg_temp.try($q$update ai_assistant_config set fallback_models = '[{"key_slot":"fallback","model":"a"},{"key_slot":"fallback","model":"b"},{"key_slot":"fallback","model":"c"},{"key_slot":"fallback","model":"d"},{"key_slot":"fallback","model":"e"},{"key_slot":"fallback","model":"f"},{"key_slot":"fallback","model":"g"}]' where id = 1$q$);
+  perform pg_temp.ok('more than 6 fallbacks are refused (mig 401)', r like 'error: fallback_models must be%', r);
   r := pg_temp.try($q$update ai_assistant_config set fallback_models = '[{"key_slot":"fallback","model":"gpt-6-luna"},{"key_slot":"primary","model":"gpt-5.5"}]', fallback_enabled = false where id = 1$q$);
   perform pg_temp.ok('a valid chain and the switch are accepted', r = 'rows=1', r);
   execute 'reset role';
@@ -96,7 +96,7 @@ begin
   perform pg_temp.ok('empty catalog: a built-in model is accepted', r = 'rows=1', r);
   r := pg_temp.try($q$update ai_assistant_config set model = 'gpt-6-luna', model_key_slot = 'fallback' where id = 1$q$);
   perform pg_temp.ok('empty catalog: an uncatalogued model is refused', r like 'error:%', r);
-  perform pg_temp.ok('defaults: fallback chain is gpt-6-luna on the fallback key, enabled',
+  perform pg_temp.ok('defaults: the fallback chain ends with gpt-6-luna on the fallback key, enabled',
     (select column_default from information_schema.columns where table_name = 'ai_assistant_config' and column_name = 'fallback_models') like '%gpt-6-luna%'
     and (select column_default from information_schema.columns where table_name = 'ai_assistant_config' and column_name = 'fallback_enabled') = 'true');
   perform pg_temp.ok('gpt-6-luna is priced at 0', (select prices->'gpt-6-luna'->>'out' from ai_assistant_config where id = 1)::numeric = 0);
