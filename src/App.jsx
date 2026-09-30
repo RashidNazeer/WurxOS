@@ -653,10 +653,10 @@ export default function App() {
                 element={<RoleGuard allow="boss"><DevelopersPage /></RoleGuard>}
               />
 
-              {/* Resource Planner — Boss only (developer also allowed for debugging) */}
+              {/* Resource Planner — Boss only (developer removed, Owner decision; RLS mig 392) */}
               <Route
                 path="/boss/resource-planner"
-                element={<RoleGuard allow={['boss', 'developer']}><ResourcePlannerPage /></RoleGuard>}
+                element={<RoleGuard allow="boss"><ResourcePlannerPage /></RoleGuard>}
               />
 
               {/* Salary Management — Boss only (no developer access; per spec) */}
