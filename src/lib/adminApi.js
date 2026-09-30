@@ -69,14 +69,19 @@ export async function listProfilesByRole(role) {
 
 // Active users of a given role — used to populate the "Reports to" dropdown
 // in CreateUserModal / EditUserModal (e.g. pick a TL for a new APC).
-export async function listActiveParentsOfRole(parentRole) {
-  const { data, error } = await supabase
+//
+// `excludeId` matters for self-referencing roles (developer → developer):
+// without it, editing a developer would offer them as their own manager.
+export async function listActiveParentsOfRole(parentRole, excludeId = null) {
+  let q = supabase
     .from('profiles')
     .select('id, display_name, email')
     .eq('role', parentRole)
     .eq('is_active', true)
     .is('deleted_at', null)
     .order('display_name', { ascending: true });
+  if (excludeId) q = q.neq('id', excludeId);
+  const { data, error } = await q;
   if (error) throw new Error(error.message);
   return data || [];
 }

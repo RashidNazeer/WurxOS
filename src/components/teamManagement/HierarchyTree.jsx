@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ROLE_COLORS, roleShortLabel, initialsOf } from './hierarchyTheme';
+import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf } from './hierarchyTheme';
 
 /**
  * Tree view — indented, expandable hierarchy list.
@@ -165,22 +165,27 @@ function OLNode({ user, open, onToggle, reportCount, children }) {
 }
 
 function TLNode({ tl, open, onToggle, onSelect, isOpen, onMemberToggle }) {
+  const kind = teamKindOf(tl.role);
   return (
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
-        <Avatar name={tl.displayName || tl.email} size={28} role={tl.role === 'pctl' ? 'pctl' : 'tl'} src={tl.avatar_url} />
+        <Avatar name={tl.displayName || tl.email} size={28} role={tl.role === 'developer' ? 'developer' : (tl.role === 'pctl' ? 'pctl' : 'tl')} src={tl.avatar_url} />
         <button type="button"
           onClick={() => onSelect({ type: 'tl', tl })}
           className="border-0 bg-transparent p-0 fw-semibold text-start"
           style={{ fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer' }}>
           {tl.displayName || tl.email}
         </button>
-        <RoleBadge role={tl.role === 'pctl' ? 'pctl' : 'tl'} />
+        <RoleBadge role={tl.role === 'developer' ? 'developer' : (tl.role === 'pctl' ? 'pctl' : 'tl')} />
         <MetaRight>
-          <strong style={{ color: '#0f172a' }}>{tl.brands.length}</strong> brand{tl.brands.length === 1 ? '' : 's'}
-          {' · '}
-          <strong style={{ color: '#0f172a' }}>{tl.members.length}</strong> {tl.role === 'pctl' ? 'IPC' : 'APC'}{tl.members.length === 1 ? '' : 's'}
+          {kind.hasBrands && (
+            <>
+              <strong style={{ color: '#0f172a' }}>{tl.brands.length}</strong> brand{tl.brands.length === 1 ? '' : 's'}
+              {' · '}
+            </>
+          )}
+          <strong style={{ color: '#0f172a' }}>{tl.members.length}</strong> {kind.memberShortLabel}{tl.members.length === 1 ? '' : 's'}
         </MetaRight>
       </div>
       {open && (
@@ -215,6 +220,7 @@ function TLNode({ tl, open, onToggle, onSelect, isOpen, onMemberToggle }) {
 function MemberNode({ m, tl, open, onToggle, onSelect }) {
   const role = (m.userType || 'apc');
   const brandsCount = (m.brands || []).length;
+  const hasBrands = role !== 'developer';
   return (
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
@@ -227,11 +233,13 @@ function MemberNode({ m, tl, open, onToggle, onSelect }) {
           {m.userName || m.email}
         </button>
         <RoleBadge role={role} />
-        <MetaRight>
-          <strong style={{ color: '#0f172a' }}>{brandsCount}</strong> brand{brandsCount === 1 ? '' : 's'}
-        </MetaRight>
+        {hasBrands && (
+          <MetaRight>
+            <strong style={{ color: '#0f172a' }}>{brandsCount}</strong> brand{brandsCount === 1 ? '' : 's'}
+          </MetaRight>
+        )}
       </div>
-      {open && brandsCount > 0 && (
+      {open && hasBrands && brandsCount > 0 && (
         <div className="tree-children d-flex flex-wrap gap-1 my-1"
           style={{ marginLeft: 38 }}>
           {m.brands.map(b => (

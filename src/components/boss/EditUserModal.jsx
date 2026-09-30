@@ -37,7 +37,7 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
     e.preventDefault();
     setError('');
     if (!displayName.trim()) return setError('Name is required.');
-    if (!isTargetBoss && !isSelf && extras.reportsToRole && !reportsTo) {
+    if (!isTargetBoss && !isSelf && extras.reportsToRole && !extras.optional && !reportsTo) {
       return setError(`Please select a ${roleLabel(extras.reportsToRole)}.`);
     }
 
@@ -173,6 +173,7 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
                     permissions={permissions}
                     onPermissions={setPermissions}
                     disabled={saving}
+                    excludeUserId={user.id}
                   />
                 </div>
               </>
