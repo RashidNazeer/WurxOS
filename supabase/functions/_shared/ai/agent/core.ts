@@ -10,7 +10,8 @@
 import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
-import { pickModel, respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
+import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
+import { chooseTargets, omitFor, rememberOmit, unsupportedParam, type CatalogRow, type Keys } from './models.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
 import { providerAccountIssue, providerIssueMessage } from '../providerErrors.ts';
@@ -75,7 +76,11 @@ export type CoreDeps = {
   searchRpc: Rpc;                    // search RPCs as the caller (JWT) or service role + asUser
   asUser: string | null;
   userClient?: any;                  // supabase-js client with the caller's JWT (data tools, RLS); absent = none
-  apiKey: string;
+  apiKey: string;                    // OPEN_AI_API_KEY (the 'primary' slot)
+  fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot)
+  catalog?: CatalogRow[];            // tests; otherwise read from ai_model_catalog
+  rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
+  embedDown?: () => boolean;         // query embeddings known to be failing on every key
   embed: (text: string) => Promise<number[] | null>;
   rerank?: Reranker;
   model?: string;                    // local override (serve-assistant --model); still allow-listed
@@ -91,16 +96,16 @@ const ZERO: Usage = { input: 0, cached: 0, output: 0, reasoning: 0 };
 const add = (a: Usage, b: Usage): Usage => ({ input: a.input + b.input, cached: a.cached + b.cached, output: a.output + b.output, reasoning: a.reasoning + b.reasoning });
 
 async function loadConfig(admin: any) {
-  const { data } = await admin.from('ai_assistant_config').select('persona, model, enabled, retrieval, prices').eq('id', 1).maybeSingle();
+  const { data } = await admin.from('ai_assistant_config').select('persona, model, enabled, retrieval, prices, model_key_slot, fallback_models, fallback_enabled').eq('id', 1).maybeSingle();
   return data ?? {};
 }
 
 // Rate limit (QA m2): counted and recorded atomically when the turn STARTS
 // (ai_turn_begin, mig 386), so parallel sends can't slip past the cap. Without
 // that function (older DB) it falls back to counting finished turns.
-async function beginTurn(admin: any, cfg: AgentConfig, userId: string, requestId: string, question: string, model: string, now: Date):
+async function beginTurn(admin: any, cfg: AgentConfig, userId: string, requestId: string, question: string, model: string, now: Date, forceExempt = false):
   Promise<{ limited: boolean; logged: boolean }> {
-  const exempt = cfg.RATE_LIMIT_EXEMPT_USERS.includes(userId);
+  const exempt = forceExempt || cfg.RATE_LIMIT_EXEMPT_USERS.includes(userId);
   const { data, error } = await admin.rpc('ai_turn_begin', {
     p_request_id: requestId, p_user_id: userId, p_question: question, p_model: model, p_limit: exempt ? null : cfg.RATE_LIMIT_PER_USER_PER_HOUR,
   });
@@ -129,17 +134,19 @@ class Stop extends Error {}
 // The spend of a question outside the chat model, as ai_usage_log rows.
 export function usageRows(meter: UsageMeter | undefined, prices: Prices, who: { user_id: string; request_id: string }) {
   const rows: Record<string, unknown>[] = [];
+  // Every column, in every row: a bulk insert sends null for a key some rows
+  // lack, which a column default does not catch (QA 2026-10-01 F2).
   if (meter?.rerank.calls) {
     const r = meter.rerank;
-    rows.push({ ...who, kind: 'rerank', model: r.model, calls: r.calls, tokens_in: r.input, tokens_cached: r.cached, tokens_out: r.output,
-      est_cost_usd: Number(costUsd(prices, r.model, { input: r.input, cached: r.cached, output: r.output }).usd.toFixed(6)) });
+    const c = costUsd(prices, r.model, { input: r.input, cached: r.cached, output: r.output });
+    rows.push({ ...who, kind: 'rerank', model: r.model, key_slot: 'primary', calls: r.calls, tokens_in: r.input, tokens_cached: r.cached, tokens_out: r.output,
+      est_cost_usd: Number(c.usd.toFixed(6)), unpriced: !c.priced });
   }
   if (meter?.embed.calls) {
     const m = meter.embed;
-    // Every column, in both rows: a bulk insert sends null for a key some rows
-    // lack, which a column default does not catch (QA 2026-10-01 F2).
-    rows.push({ ...who, kind: 'embed_query', model: m.model, calls: m.calls, tokens_in: m.input, tokens_cached: 0, tokens_out: 0,
-      est_cost_usd: Number(costUsd(prices, m.model, { input: m.input }).usd.toFixed(6)) });
+    const c = costUsd(prices, m.model, { input: m.input });
+    rows.push({ ...who, kind: 'embed_query', model: m.model, key_slot: m.keySlot ?? 'primary', calls: m.calls, tokens_in: m.input, tokens_cached: 0, tokens_out: 0,
+      est_cost_usd: Number(c.usd.toFixed(6)), unpriced: !c.priced });
   }
   return rows;
 }
@@ -160,7 +167,16 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   ]);
   const agent = agentConfig(row.retrieval);
   const retrieval = retrievalConfig(row.retrieval).config;
-  const model = pickModel(deps.model ?? row.model);
+  // The model chain (mig 397): the configured model on its key, then the
+  // fallbacks. `target` moves down it on an account error (no credits, key refused).
+  let catalog: CatalogRow[] = deps.catalog ?? [];
+  if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
+  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null };
+  const targets = chooseTargets(row, catalog, keys, deps.model ?? null);
+  let ti = 0;
+  let target = targets[0];
+  let model = target.model;
+  const prices = pricesFrom(row.prices);
   const fail = (error: string, httpStatus: number): TurnResult => ({ requestId, conversationId: req.conversationId ?? null, answer: '', sources: [], error, httpStatus });
   if (row.enabled === false) return fail('The assistant is currently turned off by an admin.', 503);
 
@@ -183,7 +199,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     const { data: conv } = await admin.from('ai_conversations').select('id, user_id').eq('id', conversationId).maybeSingle();
     if (!conv || conv.user_id !== req.userId) return fail('conversation not found', 404);
   }
-  const begun = await beginTurn(admin, agent, req.userId, requestId, message, model, now);
+  const begun = await beginTurn(admin, agent, req.userId, requestId, message, model, now, deps.rateLimitExempt === true);
   if (begun.limited) return fail(`You've reached ${agent.RATE_LIMIT_PER_USER_PER_HOUR} questions this hour. Please try again a little later.`, 429);
   if (!conversationId) {
     const { data: created, error } = await admin.from('ai_conversations').insert({ user_id: req.userId, title: message.slice(0, 60) }).select('id').single();
@@ -252,12 +268,18 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const notes = [
     ...(surface === 'quick' ? ['SURFACE: the quick-chat panel. Keep the answer short: at most ~120 words or 5 bullets, the key facts with their citations, and offer the full version ("Open in Buddy ↗" shows more).'] : []),
     ...[await pageContextNote(admin, req.userId, req.pageContext ?? null)].filter((x): x is string => !!x),
+    ...(deps.embedDown?.() ? ['SEARCH is in keyword-only mode right now (no semantic search): search with the exact words a document would use, and if you cannot find something, say so plainly.'] : []),
   ];
   const { instructions } = buildInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now, notes });
 
+  // Search without embeddings (no credits on any key): the keyword arm only.
+  let embedFailed = false;
+  const embedWatched = async (text: string) => {
+    try { const v = await deps.embed(text); if (!v) embedFailed = true; return v; } catch (e) { embedFailed = true; throw e; }
+  };
   const reg = new CiteRegistry();
   const env: ToolEnv = {
-    admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: deps.embed, rerank: deps.rerank,
+    admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: embedWatched, rerank: deps.rerank,
     // userClient: the caller's own JWT client, so people & pay tools read under
     // that user's RLS (Engineer 2, ui-design §8). None on the internal (Boss) path.
     retrieval, agent, ctx: { userId: req.userId, role: req.role, ...(deps.userClient ? { userClient: deps.userClient } : {}) }, now,
@@ -273,10 +295,47 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     answer += safe;
     emit({ delta: safe });
   };
-  const ask = (o: Partial<LlmRequest>) => llm({
-    apiKey: deps.apiKey, model, instructions, input, promptCacheKey: `wurx-buddy-${req.role}`,
-    timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta, ...o,
-  });
+  let costSum = 0;
+  let unpriced = false;
+  // One model call on the current target. A field the model rejects is dropped
+  // and remembered; an account error moves the SAME turn to the next target.
+  const ask = async (o: Partial<LlmRequest>): Promise<LlmResult> => {
+    for (let paramTries = 0; ;) {
+      const omit = omitFor(catalog, target);
+      try {
+        const res = await llm({
+          apiKey: target.keySlot === 'fallback' ? keys.fallback! : keys.primary, model: target.model, instructions, input,
+          promptCacheKey: `wurx-buddy-${req.role}`, timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta,
+          ...(omit.length ? { omit } : {}), ...o,
+        });
+        const c = costUsd(prices, target.model, res.usage);
+        costSum += c.usd;
+        if (!c.priced) unpriced = true;
+        return res;
+      } catch (e) {
+        if (cancelCtrl.signal.aborted || (e as any)?.cancelled) throw e;
+        const p = unsupportedParam(e);
+        if (p && !omit.includes(p) && paramTries < 3) {
+          paramTries++;
+          ((flags.params_dropped ??= []) as string[]).push(`${target.keySlot}:${target.model}:${p}`);
+          await rememberOmit(admin, target, [...omit, p]);
+          continue;
+        }
+        const issue = providerAccountIssue(e);
+        if (issue && ti + 1 < targets.length) {
+          const from = target;
+          target = targets[++ti];
+          model = target.model;
+          flags.fallback_used = { from: `${from.keySlot}:${from.model}`, to: `${target.keySlot}:${target.model}`, reason: issue };
+          // Encrypted reasoning belongs to the model (and key) that made it.
+          for (let i = input.length - 1; i >= 0; i--) if ((input[i] as any)?.type === 'reasoning') input.splice(i, 1);
+          emit({ status: 'Switching to a backup model…' });
+          continue;
+        }
+        throw e;
+      }
+    }
+  };
 
   const toolLogs: ToolLog[] = [];
   const flags: Record<string, unknown> = { persona: persona.source };
@@ -376,15 +435,16 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   if (serious) flags.serious = true;
   if (cancelled) flags.cancelled = true;
   const retrieved = reg.retrieved.map((r) => ({ ...r, cited: cited.has(r.cite) }));
-  const prices = pricesFrom(row.prices);
-  const est = costUsd(prices, model, usage).usd;
+  const est = costSum;
+  if (unpriced) flags.unpriced = true;
+  if (embedFailed || deps.embedDown?.()) flags.search_mode = 'keyword_only';
 
   // Finish the reply row (the thing the UI trusts), then log. A failure here
   // must not lose the answer already streamed: the row is retried once.
   // A stopped reply is kept (partial) as 'error' + cancelled, and does not
   // move last_reply_at: no unread badge for an answer the user stopped.
   const meta = {
-    requestId, model, engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
+    requestId, model, key_slot: target.keySlot, ...(flags.fallback_used ? { fallback_used: flags.fallback_used } : {}), engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
     sources: sources.filter((s) => s.cited),
     tools: toolLogs.map((t) => ({ name: t.name, args: t.args, ms: t.ms, cites: t.cites })),
     ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.provider_quota ? userError : flags.deadline_hit ? 'The reply took too long and was stopped.' : 'Something went wrong while answering.' } : {}),
@@ -403,6 +463,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     }
   }
   const logRow = {
+    model, key_slot: target.keySlot,
     conversation_id: conversationId, surface, rounds, tools: toolLogs, retrieved,
     tokens_in: usage.input, tokens_cached: usage.cached, tokens_out: usage.output, est_cost_usd: Number(est.toFixed(5)),
     latency_ms: Date.now() - t0, first_token_ms: firstTokenMs, error, flags,
@@ -410,7 +471,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   try {
     const { error: e } = begun.logged
       ? await admin.from('ai_request_log').update(logRow).eq('id', requestId)
-      : await admin.from('ai_request_log').insert({ id: requestId, user_id: req.userId, engine: 'v2', provider: 'openai', model, question: message, ...logRow });
+      : await admin.from('ai_request_log').insert({ id: requestId, user_id: req.userId, engine: 'v2', provider: 'openai', question: message, ...logRow });
     if (e) throw e;
   } catch (e) {
     console.error('ai_request_log write failed', (e as Error)?.message ?? e);

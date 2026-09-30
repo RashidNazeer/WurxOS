@@ -15,7 +15,7 @@
 //           otherwise    → JSON { conversationId, requestId, reply, sources }
 //
 // Allowed roles: ai_assistant_config.allowed_roles (default {boss}).
-// Env (function secrets): OPEN_AI_API_KEY, AI_INTERNAL_SECRET,
+// Env (function secrets): OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK (optional), AI_INTERNAL_SECRET,
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (automatic).
 // Deploy: NOT YET — only with the Owner's go (TEAM.md rule 0/3), --project-ref dev.
 // ============================================================
@@ -29,6 +29,7 @@ const env: ServerEnv = {
   serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   anonKey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
   openAiKey: Deno.env.get('OPEN_AI_API_KEY') ?? Deno.env.get('OPENAI_API_KEY') ?? '',
+  openAiKeyFallback: Deno.env.get('OPEN_AI_API_KEY_FALLBACK') ?? null,
   createClient,
 };
 const AI_INTERNAL_SECRET = Deno.env.get('AI_INTERNAL_SECRET') ?? '';

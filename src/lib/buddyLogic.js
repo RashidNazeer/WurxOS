@@ -239,6 +239,12 @@ export function buddyReducer(state, a) {
       return { ...state, quickKey: a.key };
     case 'PAGE_KEY':
       return { ...state, pageKey: a.key };
+    case 'MSG_META': {
+      // Which model answered (read back from the saved row after {done}).
+      const t = state.threads[a.key];
+      if (!t || !t.messages.some((m) => m.id === a.id)) return state;
+      return { ...state, threads: { ...state.threads, [a.key]: { ...t, messages: t.messages.map((m) => (m.id === a.id ? { ...m, ...a.meta } : m)) } } };
+    }
     case 'CONV_PATCH':
       return { ...state, convs: state.convs.map((c) => (c.id === a.id ? { ...c, ...a.patch } : c)) };
     case 'CONV_REMOVE': {
@@ -343,8 +349,18 @@ export const rowToMessage = (r) => ({
   // handled until the backend contract is final).
   superseded: r.status === 'superseded' || !!r.meta?.superseded_by,
   supersedes: r.meta?.supersedes || null,   // the answer this one replaced (mig 389)
+  ...answeredBy(r.meta),
   error: r.status === 'error' && r.meta?.cancelled !== true ? (r.meta?.error || 'Buddy hit a problem with this answer.') : null,
 });
+
+// Which model and key wrote a reply (mig 397: meta.model, key_slot, fallback_used).
+export function answeredBy(meta) {
+  return {
+    model: meta?.model || null,
+    keySlot: meta?.key_slot || null,
+    fallbackUsed: meta?.fallback_used || null,
+  };
+}
 
 // The server regenerates only a saved last reply that is done or error (mig 389).
 export const canRegenerateMsg = (m) => !!m && m.role === 'assistant' && !!m.id && !m.pending
@@ -557,6 +573,108 @@ export const USAGE_KIND_LABEL = {
   embeddings_query: 'Query embeddings',
   embeddings_ingest: 'Ingestion embeddings',
 };
+
+// ── models (Boss, mig 397) ─────────────────────────────────────────
+export const KEY_SLOT_LABEL = { primary: 'Main key (paid)', fallback: 'Fallback key (free)' };
+export const KEY_SLOT_SHORT = { primary: 'main key', fallback: 'backup' };
+
+// The three built-ins keep their friendly labels, and are what the picker
+// offers when the catalog is empty (the database accepts only these then).
+export const BUILTIN_MODELS = [
+  ['gpt-5.4-nano', 'cheapest'],
+  ['gpt-5.4-mini', 'recommended'],
+  ['gpt-5.5', 'strongest'],
+];
+const BUILTIN = new Map(BUILTIN_MODELS);
+export const modelLabel = (model) => (BUILTIN.has(model) ? `${model} (${BUILTIN.get(model)})` : model);
+
+export const isQuotaError = (e) => /quota|credit/i.test(String(e || ''));
+
+// Mirrors public.ai_model_usable for one catalog row: works with tools and
+// streaming, or a built-in on the main key that failed only for lack of credits
+// (it works again the moment the account is topped up).
+export const catalogRowUsable = (r) => !!r && (
+  (r.available && r.supports_tools && r.supports_stream)
+  || (r.key_slot === 'primary' && BUILTIN.has(r.model) && isQuotaError(r.last_error)));
+
+function unusableReason(r) {
+  if (!r.available) return r.last_error || 'not available on this key';
+  if (!r.supports_tools) return 'no tool calling (Buddy needs it to look things up)';
+  if (!r.supports_stream) return 'no streaming';
+  return '';
+}
+
+export function modelBadges(r) {
+  const b = [];
+  if (r.free) b.push('Free');
+  if (r.supports_tools) b.push('Tools ✓');
+  if (r.supports_stream) b.push('Streaming ✓');
+  if (r.key_slot === 'primary' && isQuotaError(r.last_error)) b.push('Needs credits');
+  if (!catalogRowUsable(r)) b.push('Not usable');
+  return b;
+}
+
+// Picker options per key: { primary: [...], fallback: [...] }, each
+// { key_slot, model, label, usable, reason, badges }. Usable first, then the
+// built-ins, then A–Z. A key with no catalog rows offers nothing, except the
+// main key, which falls back to the three built-ins.
+export function modelOptions(catalog) {
+  const rows = Array.isArray(catalog) ? catalog : [];
+  const out = { primary: [], fallback: [] };
+  for (const slot of ['primary', 'fallback']) {
+    const mine = rows.filter((r) => r.key_slot === slot);
+    const list = mine.length || slot !== 'primary'
+      ? mine
+      : BUILTIN_MODELS.map(([model]) => ({ key_slot: 'primary', model, available: true, supports_tools: true, supports_stream: true, free: false, builtinOnly: true }));
+    out[slot] = list.map((r) => {
+      const usable = r.builtinOnly || catalogRowUsable(r);
+      return {
+        key_slot: slot, model: r.model, label: modelLabel(r.model), usable,
+        reason: usable ? '' : unusableReason(r),
+        badges: r.builtinOnly ? [] : modelBadges(r),
+      };
+    }).sort((a, b) => (b.usable - a.usable) || (BUILTIN.has(b.model) - BUILTIN.has(a.model)) || a.model.localeCompare(b.model));
+  }
+  return out;
+}
+
+export const optionKey = (slot, model) => `${slot}|${model}`;
+export const parseOptionKey = (k) => {
+  const i = String(k).indexOf('|');
+  return i < 0 ? null : { key_slot: String(k).slice(0, i), model: String(k).slice(i + 1) };
+};
+
+// The main key is out of credits: from the last refresh, or (after a reload)
+// from the catalog: main-key rows exist, none answer, and some failed on quota.
+export function creditsExhausted(catalog, refresh) {
+  const flag = refresh?.slots?.primary?.credits_exhausted;
+  if (typeof flag === 'boolean') return flag;
+  const rows = (catalog || []).filter((r) => r.key_slot === 'primary');
+  return rows.length > 0 && !rows.some((r) => r.available) && rows.some((r) => isQuotaError(r.last_error));
+}
+
+export function lastChecked(catalog) {
+  let best = 0;
+  for (const r of catalog || []) best = Math.max(best, ms(r.checked_at));
+  return best ? new Date(best).toISOString() : null;
+}
+
+// Fallback chain edits: ordered, no duplicates, at most 5.
+export const FALLBACK_MAX = 5;
+const sameTarget = (a, b) => a.key_slot === b.key_slot && a.model === b.model;
+export function chainAdd(chain, item) {
+  const c = Array.isArray(chain) ? chain : [];
+  if (!item?.model || c.length >= FALLBACK_MAX || c.some((x) => sameTarget(x, item))) return c;
+  return [...c, { key_slot: item.key_slot === 'primary' ? 'primary' : 'fallback', model: item.model }];
+}
+export const chainRemove = (chain, i) => chain.filter((_, j) => j !== i);
+export function chainMove(chain, i, dir) {
+  const j = i + dir;
+  if (i < 0 || i >= chain.length || j < 0 || j >= chain.length) return chain;
+  const c = chain.slice();
+  [c[i], c[j]] = [c[j], c[i]];
+  return c;
+}
 
 // ── sources ────────────────────────────────────────────────────────
 const SOURCE_LABEL = {

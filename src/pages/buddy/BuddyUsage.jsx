@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usageSummary, setMonthlyBudget } from '../../lib/buddyApi';
 import { LoadError } from '../../components/buddy/BuddyThread';
-import { USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, pktDate, usageRange } from '../../lib/buddyLogic';
+import { KEY_SLOT_LABEL, USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, pktDate, usageRange } from '../../lib/buddyLogic';
 
 // Buddy settings → Usage (Boss only; ai_usage_summary refuses anyone else).
 // Estimates from our own request log × the configured prices; the OpenAI
@@ -94,7 +94,16 @@ export default function BuddyUsage() {
               rows={(data.by_model || []).map((m) => [m.model, fmtCount(m.calls), fmtCount(m.tokens_in), fmtCount(m.tokens_cached), fmtCount(m.tokens_out), fmtUsd(m.est_cost_usd)])} />
             <UsageTable title="By kind" head={['Kind', 'Calls', 'Tokens in', 'Tokens out', 'Cost']}
               rows={Object.entries(data.by_kind || {}).map(([k, v]) => [USAGE_KIND_LABEL[k] || k, fmtCount(v.calls), fmtCount(v.tokens_in), fmtCount(v.tokens_out), fmtUsd(v.est_cost_usd)])} />
+            <UsageTable title="By key" head={['Key', 'Questions', 'Fallback used', 'Cost']}
+              rows={Object.entries(data.by_key_slot || {}).map(([k, v]) => [KEY_SLOT_LABEL[k] || k, fmtCount(v.questions), fmtCount(v.fallback_used), fmtUsd(v.est_cost_usd)])} />
           </div>
+
+          {Number(data.unpriced?.calls) > 0 && (
+            <div className="bd-usage-outcomes" role="note">
+              <span><b>{fmtCount(data.unpriced.calls)}</b> calls on models with no price set (counted as $0): {(data.unpriced.models || []).join(', ') || 'unknown'}</span>
+              <span>{fmtCount(data.unpriced.tokens_in)} tokens in · {fmtCount(data.unpriced.tokens_out)} out</span>
+            </div>
+          )}
 
           <Budget current={mtd.budget_usd} onSaved={load} />
           <Prices prices={data.prices_per_1m || {}} />

@@ -6,7 +6,9 @@ import { supabaseRpc } from '../ingest/db.ts';
 import { cachedEmbedder, openAiQueryEmbedder, openAiReranker } from '../retrieval/rerank.ts';
 import { RETRIEVAL_DEFAULTS } from '../retrieval/config.ts';
 import { DEFAULT_CONFIG } from '../config.ts';
-import { UsageMeter } from '../prices.ts';
+import { pricesFrom, UsageMeter } from '../prices.ts';
+import { providerAccountIssue } from '../providerErrors.ts';
+import { refreshModels } from './models.ts';
 import { cleanPageContext, cleanSurface, requestCancel, type CoreDeps } from './core.ts';
 import { json, turnResponse, type TurnHttp } from './http.ts';
 
@@ -68,7 +70,34 @@ export async function checkProfile(admin: any, userId: string, token: string | n
   return { userId, role, displayName: p.display_name ?? null, token, internal };
 }
 
-export type ServerEnv = { url: string; serviceKey: string; anonKey: string; openAiKey: string; createClient: CreateClient; fetchImpl?: typeof fetch; modelOverride?: string };
+export type ServerEnv = {
+  url: string; serviceKey: string; anonKey: string; createClient: CreateClient; fetchImpl?: typeof fetch; modelOverride?: string;
+  openAiKey: string;                     // OPEN_AI_API_KEY: the 'primary' key slot
+  openAiKeyFallback?: string | null;     // OPEN_AI_API_KEY_FALLBACK: the 'fallback' key slot (optional)
+  noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
+};
+
+// Query embeddings: the primary key, then the fallback key. When every key
+// refuses for an account reason (no credits, key refused), embeddings count as
+// down for 10 minutes in this worker (no more calls) and search runs on
+// keywords only.
+export const EMBED_DOWN_MS = 600_000;
+let embedDownUntil = 0;
+export const _resetEmbedDown = () => { embedDownUntil = 0; };   // tests
+export function chainEmbedder(env: ServerEnv, meter: UsageMeter): { embed: (t: string) => Promise<number[]>; down: () => boolean } {
+  const slots = ([['primary', env.openAiKey], ['fallback', env.openAiKeyFallback]] as const).filter(([, k]) => !!k);
+  const one = async (text: string): Promise<number[]> => {
+    if (Date.now() < embedDownUntil) throw new Error('query embeddings unavailable: no OpenAI key can embed right now');
+    let last: unknown = null;
+    for (const [slot, key] of slots) {
+      try { return await openAiQueryEmbedder(key as string, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL, slot))(text); }
+      catch (e) { last = e; if (!providerAccountIssue(e)) throw e; }
+    }
+    embedDownUntil = Date.now() + EMBED_DOWN_MS;
+    throw last;
+  };
+  return { embed: cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS), down: () => Date.now() < embedDownUntil };
+}
 
 // Search runs with the caller's JWT so the database ACL applies; without one
 // (Slack relay, local --as-user) it runs as the service role with p_as_user.
@@ -77,6 +106,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     ? env.createClient(env.url, env.anonKey, { global: { headers: { Authorization: `Bearer ${caller.token}` } }, auth: { persistSession: false, autoRefreshToken: false } })
     : null;
   const meter = new UsageMeter();
+  const emb = chainEmbedder(env, meter);
   return {
     admin,
     searchRpc: supabaseRpc(userClient ?? admin),
@@ -87,7 +117,10 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     ...(userClient ? { userClient } : {}),
     apiKey: env.openAiKey,
     ...(env.modelOverride ? { model: env.modelOverride } : {}),
-    embed: cachedEmbedder(openAiQueryEmbedder(env.openAiKey, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL)), DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
+    fallbackKey: env.openAiKeyFallback ?? null,
+    ...(env.noRateLimit ? { rateLimitExempt: true } : {}),
+    embed: emb.embed,
+    embedDown: emb.down,
     rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl, onUsage: meter.onRerank(RETRIEVAL_DEFAULTS.RERANK_MODEL) }),
     meter,
   };
@@ -100,6 +133,17 @@ export async function handleAsk(env: ServerEnv, admin: any, caller: Caller, body
   if (body?.cancel !== undefined) {
     const r = await requestCancel(admin, caller.userId, String(body.cancel));
     return { response: json(r.body, r.status), done: Promise.resolve() };
+  }
+  // The Boss's model list: probe what each key can use and store it (mig 397).
+  if (body?.refresh_models === true) {
+    if (caller.internal || caller.role !== 'boss') return { response: json({ error: 'only the Boss can refresh the model list' }, 403), done: Promise.resolve() };
+    const { data: cfg } = await admin.from('ai_assistant_config').select('prices').eq('id', 1).maybeSingle();
+    try {
+      const r = await refreshModels({ keys: { primary: env.openAiKey, fallback: env.openAiKeyFallback ?? null }, admin, prices: pricesFrom(cfg?.prices), fetchImpl: env.fetchImpl });
+      return { response: json(r), done: Promise.resolve() };
+    } catch (e) {
+      return { response: json({ error: String((e as Error)?.message ?? e).slice(0, 300) }, 500), done: Promise.resolve() };
+    }
   }
   const deps = makeDeps(env, admin, caller);
   const conversationId = typeof body?.conversationId === 'string' && UUID.test(body.conversationId) ? body.conversationId : null;

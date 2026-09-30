@@ -61,6 +61,7 @@ export type LlmRequest = {
   timeoutMs?: number;
   deadline?: number;                     // epoch ms: no attempt runs past it, no retry near it
   signal?: AbortSignal;                  // the caller's cancel (Stop)
+  omit?: string[];                       // top-level fields this model rejects (agent/models.ts)
   fetchImpl?: typeof fetch;
   endpoint?: string;
 };
@@ -97,10 +98,14 @@ export function resultOf(resp: any, streamedText?: string): LlmResult {
 }
 
 export function requestBody(r: LlmRequest): Record<string, unknown> {
-  return {
+  const omit = new Set(r.omit ?? []);
+  // Without `include`, reasoning items come back without their encrypted
+  // content, and sending them back would be refused: drop them from the input.
+  const input = omit.has('include') ? r.input.filter((i: any) => i?.type !== 'reasoning') : r.input;
+  const body: Record<string, unknown> = {
     model: r.model,
     instructions: r.instructions,
-    input: r.input,
+    input,
     ...(r.tools?.length ? { tools: r.tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.parameters, strict: false })), parallel_tool_calls: true } : {}),
     ...(r.effort ? { reasoning: { effort: effortFor(r.model, r.effort) } } : {}),
     ...(r.maxOutputTokens ? { max_output_tokens: r.maxOutputTokens } : {}),
@@ -109,6 +114,8 @@ export function requestBody(r: LlmRequest): Record<string, unknown> {
     include: ['reasoning.encrypted_content'],
     stream: !!r.onDelta,
   };
+  for (const k of omit) if (!['model', 'instructions', 'input', 'tools', 'stream'].includes(k)) delete body[k];
+  return body;
 }
 
 // One Responses call. Retries once on 429/5xx/network before any text was streamed.

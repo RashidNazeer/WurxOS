@@ -7,8 +7,13 @@ import {
 import {
   runIngestion, ingestStats, INGEST_SOURCES, getIngestSources, setIngestSources,
   listExcluded, addExcluded, removeExcluded, getBuddyConfig, setAllowedRoles,
+  listModelCatalog, refreshModelList, getModelConfig, saveModelConfig,
 } from '../../lib/buddyApi';
-import { ALL_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles } from '../../lib/buddyLogic';
+import {
+  ALL_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles,
+  FALLBACK_MAX, KEY_SLOT_LABEL, chainAdd, chainMove, chainRemove, creditsExhausted, fmtUsd, lastChecked,
+  modelLabel, modelOptions, optionKey, parseOptionKey,
+} from '../../lib/buddyLogic';
 import { LoadError } from '../../components/buddy/BuddyThread';
 
 // Buddy settings (ui-design.md §4). Run ingestion: Boss + Developer (the
@@ -30,6 +35,7 @@ export default function BuddySettings({ role }) {
           <Suspense fallback={<div className="bd-card"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}>
             <BuddyUsage />
           </Suspense>
+          <ModelCard />
           <AllowedRolesCard />
           <SourcesCard />
           <ExcludedCard />
@@ -275,14 +281,173 @@ function ExcludedCard() {
   );
 }
 
+// ── model and fallbacks (mig 397) ───────────────────────────────────
+// Any model the Boss's keys can use. ai_model_catalog lists what each key
+// (main = paid, fallback = free) can do, filled by "Refresh model list"; the
+// database refuses a model that can't run Buddy (no tools / streaming).
+function ModelCard() {
+  const [catalog, setCatalog] = useState(null);
+  const [saved, setSaved] = useState(null);   // { model, model_key_slot, fallback_models, fallback_enabled }
+  const [draft, setDraft] = useState(null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [refresh, setRefresh] = useState(null); // last refresh result
+  const [refreshing, setRefreshing] = useState(null); // { started, n }
+  const [elapsed, setElapsed] = useState(0);
+  const [msg, setMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [add, setAdd] = useState('');
+
+  const load = () => {
+    setLoadErr(false);
+    Promise.all([listModelCatalog(), getModelConfig()]).then(([cat, cfg]) => {
+      const c = {
+        model: cfg.model || 'gpt-5.4-mini', model_key_slot: cfg.model_key_slot || 'primary',
+        fallback_models: Array.isArray(cfg.fallback_models) ? cfg.fallback_models : [],
+        fallback_enabled: cfg.fallback_enabled !== false,
+      };
+      setCatalog(cat); setSaved(c); setDraft(c);
+    }).catch(() => setLoadErr(true));
+  };
+  useEffect(load, []);
+  useEffect(() => {
+    if (!refreshing) return undefined;
+    const t = setInterval(() => setElapsed(Math.round((Date.now() - refreshing.started) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [refreshing]);
+
+  const options = modelOptions(catalog || []);
+  const usable = [...options.primary, ...options.fallback].filter((o) => o.usable);
+  const current = draft && [...options.primary, ...options.fallback].find((o) => o.key_slot === draft.model_key_slot && o.model === draft.model);
+  const dirty = saved && draft && JSON.stringify(saved) !== JSON.stringify(draft);
+  const checkedAt = lastChecked(catalog);
+  const noCredits = creditsExhausted(catalog || [], refresh);
+
+  const doRefresh = async () => {
+    setMsg(''); setElapsed(0);
+    setRefreshing({ started: Date.now(), n: (catalog || []).length });
+    try {
+      const r = await refreshModelList();
+      setRefresh(r);
+      const s = r.slots || {};
+      const parts = Object.entries(s).map(([slot, v]) => (v.error
+        ? `${KEY_SLOT_LABEL[slot] || slot}: couldn't list models (${v.error})`
+        : `${KEY_SLOT_LABEL[slot] || slot}: ${v.usable} of ${v.probed} usable${v.free?.length ? `, ${v.free.length} free` : ''}`));
+      setMsg(`Checked. ${parts.join(' · ')}. The check cost about ${fmtUsd(r.probe_cost_usd_est || 0)}.`);
+      setCatalog(await listModelCatalog());
+    } catch (e) {
+      setMsg(e?.status === 403 ? 'Only the Boss can refresh the model list.' : `Couldn't refresh: ${e.message || 'network error'}`);
+    } finally { setRefreshing(null); }
+  };
+
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try {
+      await saveModelConfig(draft);
+      setSaved(draft); setMsg('Saved. New questions use this from now on.');
+    } catch (e) { setMsg(`Not saved: ${e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  const setChain = (fallback_models) => setDraft({ ...draft, fallback_models });
+
+  return (
+    <Card icon="bi-cpu" title="Model" sub="Which OpenAI model writes Buddy's answers, and what it falls back to.">
+      {noCredits && (
+        <div className="bd-banner" role="alert">
+          <i className="bi bi-exclamation-triangle" aria-hidden="true" />
+          <span>Main OpenAI key has no credits: Buddy is answering with the free fallback. Top up at platform.openai.com → Billing.</span>
+        </div>
+      )}
+      {loadErr && <LoadError what="the model settings" onRetry={load} compact />}
+      {!draft && !loadErr && <SkeletonLines n={4} />}
+      {draft && (
+        <>
+          <label className="form-label small fw-semibold mb-1" htmlFor="bd-model">Model</label>
+          <select id="bd-model" className="form-select form-select-sm bd-model-select" aria-describedby="bd-model-badges"
+            value={optionKey(draft.model_key_slot, draft.model)}
+            onChange={(e) => { const p = parseOptionKey(e.target.value); if (p) setDraft({ ...draft, model: p.model, model_key_slot: p.key_slot }); }}>
+            {!current && <option value={optionKey(draft.model_key_slot, draft.model)}>{draft.model} (not in the list)</option>}
+            {['primary', 'fallback'].map((slot) => options[slot].length > 0 && (
+              <optgroup key={slot} label={KEY_SLOT_LABEL[slot]}>
+                {options[slot].map((o) => (
+                  <option key={o.model} value={optionKey(slot, o.model)} disabled={!o.usable}>
+                    {o.label}{o.badges.length ? ` · ${o.badges.join(' · ')}` : ''}{!o.usable && o.reason ? ` (${o.reason})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <div id="bd-model-badges" className="bd-badges mt-1">
+            <span className="bd-badge-chip">{KEY_SLOT_LABEL[draft.model_key_slot]}</span>
+            {current?.badges.map((b) => <span key={b} className={`bd-badge-chip ${b === 'Not usable' || b === 'Needs credits' ? 'is-warn' : ''}`}>{b}</span>)}
+          </div>
+
+          <div className="d-flex align-items-center gap-2 flex-wrap mt-2">
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={doRefresh} disabled={!!refreshing}>
+              {refreshing ? <><span className="spinner-border spinner-border-sm" aria-hidden="true" /> Checking {refreshing.n ? `${refreshing.n} models` : 'the models'}… {elapsed}s</> : <><i className="bi bi-arrow-clockwise" aria-hidden="true" /> Refresh model list</>}
+            </button>
+            <span className="bd-card-sub">{refreshing ? 'This takes about a minute.' : `Last checked: ${checkedAt ? new Date(checkedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never'}`}</span>
+          </div>
+
+          <h4 className="bd-subhead">Fallbacks</h4>
+          <div className="form-check form-switch">
+            <input className="form-check-input" type="checkbox" role="switch" id="bd-fb-on" checked={draft.fallback_enabled}
+              onChange={(e) => setDraft({ ...draft, fallback_enabled: e.target.checked })} />
+            <label className="form-check-label small" htmlFor="bd-fb-on">Use fallback models</label>
+          </div>
+          <ol className="bd-chain" aria-label="Fallback order">
+            {draft.fallback_models.length === 0 && <li className="bd-card-sub">No fallbacks.</li>}
+            {draft.fallback_models.map((f, i) => {
+              const ok = usable.some((o) => o.key_slot === f.key_slot && o.model === f.model);
+              return (
+                <li key={`${f.key_slot}|${f.model}`} className={`bd-row-line ${draft.fallback_enabled ? '' : 'is-off'}`}>
+                  <span className="bd-chain-n" aria-hidden="true">{i + 1}</span>
+                  <span className="text-truncate">{modelLabel(f.model)}</span>
+                  <span className="bd-badge-chip">{f.key_slot === 'primary' ? 'Main' : 'Fallback'}</span>
+                  {!ok && catalog?.length > 0 && <span className="bd-badge-chip is-warn" title="Not usable right now; it will be skipped">Skipped</span>}
+                  <button type="button" className="bd-act" disabled={i === 0} onClick={() => setChain(chainMove(draft.fallback_models, i, -1))} aria-label={`Move ${f.model} up`}><i className="bi bi-arrow-up" aria-hidden="true" /></button>
+                  <button type="button" className="bd-act" disabled={i === draft.fallback_models.length - 1} onClick={() => setChain(chainMove(draft.fallback_models, i, 1))} aria-label={`Move ${f.model} down`}><i className="bi bi-arrow-down" aria-hidden="true" /></button>
+                  <button type="button" className="bd-act is-danger" onClick={() => setChain(chainRemove(draft.fallback_models, i))} aria-label={`Remove ${f.model} from the fallbacks`}><i className="bi bi-x-lg" aria-hidden="true" /></button>
+                </li>
+              );
+            })}
+          </ol>
+          {draft.fallback_models.length < FALLBACK_MAX && (
+            <div className="bd-chain-add">
+              <select className="form-select form-select-sm" value={add} onChange={(e) => setAdd(e.target.value)} aria-label="Model to add as a fallback">
+                <option value="">Add a fallback…</option>
+                {['primary', 'fallback'].map((slot) => {
+                  const list = usable.filter((o) => o.key_slot === slot && !draft.fallback_models.some((f) => f.key_slot === slot && f.model === o.model));
+                  return list.length > 0 && (
+                    <optgroup key={slot} label={KEY_SLOT_LABEL[slot]}>
+                      {list.map((o) => <option key={o.model} value={optionKey(slot, o.model)}>{o.label}{o.badges.includes('Free') ? ' · Free' : ''}</option>)}
+                    </optgroup>
+                  );
+                })}
+              </select>
+              <button type="button" className="btn btn-sm btn-outline-secondary" disabled={!add}
+                onClick={() => { setChain(chainAdd(draft.fallback_models, parseOptionKey(add))); setAdd(''); }}>Add</button>
+            </div>
+          )}
+          <div className="bd-card-sub mt-1">
+            Used automatically when the main model fails because of credits or the key. Free models may share data with OpenAI; check the fallback project's data-sharing setting.
+          </div>
+          <div className="bd-card-sub mt-1">The Slack relay still runs on the older engine: it uses the chosen model only if it is gpt-5.4-mini or gpt-5.5, otherwise mini, and it has no fallbacks.</div>
+
+          <div className="d-flex align-items-center gap-2 flex-wrap mt-3">
+            <button type="button" className="btn btn-sm btn-primary" disabled={!dirty || saving} onClick={save}>
+              {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save model settings'}
+            </button>
+            {dirty && <button type="button" className="btn btn-sm btn-link" onClick={() => setDraft(saved)}>Undo</button>}
+          </div>
+        </>
+      )}
+      {msg && <div className="small mt-2" role="status">{msg}</div>}
+    </Card>
+  );
+}
+
 // ── behaviour (moved from the old Train tab) ────────────────────────
-// Must match ALLOWED_MODELS in Assistant/supabase/functions/_shared/ai/llm/openai.ts:
-// the server falls back to the default for anything else.
-const MODEL_OPTIONS = [
-  { id: 'gpt-5.4-nano', label: 'gpt-5.4-nano (cheapest, fastest; best for simple questions)' },
-  { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini (recommended: balanced)' },
-  { id: 'gpt-5.5', label: 'gpt-5.5 (strongest reasoning, highest cost)' },
-];
 
 function BehaviourCard() {
   const [cfg, setCfg] = useState(null);
@@ -300,7 +465,7 @@ function BehaviourCard() {
   const save = async () => {
     setSaving(true); setFlash('');
     try {
-      await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled, model: cfg.model });
+      await updateAiConfig({ persona: cfg.persona, greeting: cfg.greeting, enabled: cfg.enabled });
       setFlash('Saved.');
     } catch (e) { setFlash(`Error: ${e.message}`); }
     finally { setSaving(false); setTimeout(() => setFlash(''), 2500); }
@@ -317,7 +482,7 @@ function BehaviourCard() {
   // model, enabled; the Slack relay (v1 ai-chat) reads the same three; the
   // greeting is only Buddy's empty-chat line.
   return (
-    <Card icon="bi-sliders" title="Persona and behaviour" sub="Buddy's personality and model. Accuracy rules always outrank the persona.">
+    <Card icon="bi-sliders" title="Persona and behaviour" sub="Buddy's personality and greeting. Accuracy rules always outrank the persona.">
       <label className="form-label small fw-semibold mb-1" htmlFor="bd-persona">Persona / instructions</label>
       <textarea id="bd-persona" className="form-control form-control-sm mb-1" rows={6} value={cfg.persona || ''}
         aria-describedby="bd-persona-help" onChange={(e) => setCfg({ ...cfg, persona: e.target.value })} />
@@ -326,21 +491,11 @@ function BehaviourCard() {
       <textarea id="bd-greeting" className="form-control form-control-sm mb-1" rows={2} value={cfg.greeting || ''}
         aria-describedby="bd-greeting-help" placeholder={BUDDY_GREETING} onChange={(e) => setCfg({ ...cfg, greeting: e.target.value })} />
       <div id="bd-greeting-help" className="bd-card-sub mb-2">Shown when a Buddy chat is empty. <code>{'{name}'}</code> becomes the person's first name; leave it blank for Buddy's default.</div>
-      <div className="d-flex align-items-end gap-3 flex-wrap mb-1">
-        <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          <label className="form-label small fw-semibold mb-1 d-block" htmlFor="bd-model">Model</label>
-          <select id="bd-model" className="form-select form-select-sm" style={{ width: 280, maxWidth: '100%' }}
-            value={MODEL_OPTIONS.some((m) => m.id === cfg.model) ? cfg.model : MODEL_OPTIONS[0].id}
-            onChange={(e) => setCfg({ ...cfg, model: e.target.value })}>
-            {MODEL_OPTIONS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
-        </div>
-        <div className="form-check form-switch mb-1">
-          <input className="form-check-input" type="checkbox" role="switch" id="bd-enabled" checked={!!cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />
-          <label className="form-check-label small" htmlFor="bd-enabled">Buddy enabled</label>
-        </div>
+      <div className="form-check form-switch mb-1">
+        <input className="form-check-input" type="checkbox" role="switch" id="bd-enabled" checked={!!cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />
+        <label className="form-check-label small" htmlFor="bd-enabled">Buddy enabled</label>
       </div>
-      <div className="bd-card-sub mb-3">The model and the on/off switch apply to Buddy and to the Slack relay. Switched off, both answer "turned off by an admin".</div>
+      <div className="bd-card-sub mb-3">Applies to Buddy and to the Slack relay. Switched off, both answer "turned off by an admin". The model is chosen in the Model section.</div>
       <button type="button" className="btn btn-sm btn-primary" disabled={saving} onClick={save}>
         {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save'}
       </button>

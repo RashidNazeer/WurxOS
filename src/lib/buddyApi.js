@@ -139,6 +139,42 @@ export async function getMessageById(id) {
   return data ? toMessage(data) : null;
 }
 
+// ── models (Boss, mig 397) ─────────────────────────────────────────
+export async function listModelCatalog() {
+  const { data, error } = await supabase.from('ai_model_catalog').select('*');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Probes every model on both keys (~60 s). Boss only (403 otherwise).
+export async function refreshModelList() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new BuddyHttpError(401, 'Not signed in.');
+  const res = await fetch(endpoint(), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_models: true }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new BuddyHttpError(res.status, body?.error || '');
+  return body;
+}
+
+export async function getModelConfig() {
+  const { data, error } = await supabase.from('ai_assistant_config')
+    .select('model, model_key_slot, fallback_models, fallback_enabled').eq('id', 1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data || {};
+}
+
+// A bad choice is refused by a trigger (mig 397) with a readable message: pass it on.
+export async function saveModelConfig(patch) {
+  const { error } = await supabase.from('ai_assistant_config')
+    .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
+}
+
 // Server-side Stop (mig 386): { cancelled:true } (202) or { cancelled:false,
 // status } (200, already finished). Throws BuddyHttpError otherwise.
 export async function cancelReply(messageId) {

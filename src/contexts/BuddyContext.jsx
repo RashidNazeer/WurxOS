@@ -6,7 +6,7 @@ import {
   clockSkew, questionBefore, canRegenerateMsg,
 } from '../lib/buddyLogic';
 import {
-  BuddyHttpError, streamAssistant, listConversations, getMessages, findGenerating, subscribeMessages,
+  BuddyHttpError, streamAssistant, listConversations, getMessages, getMessageById, findGenerating, subscribeMessages,
   subscribeConversations, markConversationRead, renameConversation, pinConversation, deleteConversation,
   sendFeedback, getBuddyConfig, cancelReply,
 } from '../lib/buddyApi';
@@ -229,6 +229,15 @@ export function BuddyProvider({ children }) {
         dispatch({ type: 'DONE', key: k, requestId, messageId, status: doneStatus, error: streamErr, cancelled, viewed });
         if (viewed && !isTmpKey(k)) markRead(k);
         settled = true;
+        // {done} doesn't say which model answered; the saved row does (mig 397).
+        if (messageId) {
+          const doneKey = k;
+          getMessageById(messageId)
+            .then((row) => {
+              if (row) dispatch({ type: 'MSG_META', key: doneKey, id: messageId, meta: { model: row.model, keySlot: row.keySlot, fallbackUsed: row.fallbackUsed } });
+            })
+            .catch(() => { /* only a label */ });
+        }
       }
     } catch (e) {
       // 'stop' = the user's Stop; 'reset' = signed out / provider unmounted.

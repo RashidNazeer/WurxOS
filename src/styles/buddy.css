@@ -351,6 +351,30 @@
   .bd-conv-acts { display: flex; }
 }
 
+/* ---------- Models (Boss) ---------- */
+.bd-banner {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; padding: 10px 12px;
+  border-radius: var(--radius-md); background: var(--danger-soft); color: var(--text-primary); font-size: 13px;
+}
+.bd-banner > i { color: var(--danger); margin-top: 2px; }
+.bd-model-select { width: 100%; max-width: 520px; }
+.bd-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.bd-badge-chip {
+  display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: var(--radius-pill);
+  background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.bd-badge-chip.is-warn { background: var(--warning-soft); color: var(--text-primary); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+.bd-subhead { font-size: 13px; font-weight: 800; margin: 16px 0 6px; }
+.bd-chain { list-style: none; padding: 0; margin: 6px 0; }
+.bd-row-line.is-off { opacity: 0.55; }
+.bd-chain-n {
+  width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 800;
+}
+.bd-chain-add { display: flex; gap: 6px; max-width: 520px; }
+.bd-chain-add select { min-width: 0; }
+.bd-model-line { font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1199px) {
   .bd-page { grid-template-columns: 240px minmax(0, 1fr) auto; }
