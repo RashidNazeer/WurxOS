@@ -4,11 +4,13 @@ import { getMenuForRole, applyMenuLayout } from './menu';
 import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
 import { useNotifications } from '../../contexts/NotificationsContext';
+import { useBuddy } from '../../contexts/BuddyContext';
 
 export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileOpen, onMobileClose }) {
   // Role menu + the user's saved order/pins (Settings → Menu Layout). Pinned
   // entries are tagged `_pinned` and floated to the top by applyMenuLayout.
-  const menu = useMemo(() => applyMenuLayout(getMenuForRole(role), menuLayout), [role, menuLayout]);
+  const buddy = !!useBuddy()?.allowed;
+  const menu = useMemo(() => applyMenuLayout(getMenuForRole(role, { buddy }), menuLayout), [role, buddy, menuLayout]);
   const [query, setQuery] = useState('');
 
   // v1-style menu filter — substring match against item labels +

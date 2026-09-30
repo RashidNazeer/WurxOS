@@ -175,7 +175,8 @@ export default function MonthlyReportsPage() {
     const prev = findPreviousMonthlyReport(reports, detailReport);
     const rStatus = getReportStatus(detailReport);
     const isOwner = detailReport.createdBy === currentUser.uid;
-    const canApcEdit = isApc && rStatus === 'draft';
+    // A PCTL author edits their own draft (returned ones included), as APC/IPC do.
+    const canApcEdit = rStatus === 'draft' && (isApc || (userRole === 'pctl' && isOwner));
     const canTlVerify = isTL && rStatus === 'submitted';
     // TL can only return to APC while the report is at the TL stage
     // (status: submitted). Once verified, ownership has passed to OL —

@@ -6,6 +6,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useBuddy } from '../../../contexts/BuddyContext';
 import { updateUserProfile } from '../../../lib/adminApi';
 import { getMenuForRole, menuKey, applyMenuLayout } from '../../../components/layout/menu';
 import { BookmarkIcon, AlertIcon, CheckIcon, StarIcon, ChevronDownIcon } from '../../../components/common/Icon';
@@ -18,7 +19,8 @@ export default function MenuLayoutSection() {
   const role = profile?.role;
 
   // The role menu (post-injection) + a key→entry map for rendering.
-  const base = useMemo(() => (role ? getMenuForRole(role) : []), [role]);
+  const buddy = !!useBuddy()?.allowed;
+  const base = useMemo(() => (role ? getMenuForRole(role, { buddy }) : []), [role, buddy]);
   const entryByKey = useMemo(() => new Map(base.map((e) => [menuKey(e), e])), [base]);
   const defaultKeys = useMemo(() => base.map(menuKey), [base]);
 

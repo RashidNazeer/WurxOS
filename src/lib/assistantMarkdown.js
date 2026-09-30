@@ -20,7 +20,8 @@ function inline(text) {
   // [label](url) — internal (/path) navigates in-app; http(s) opens external;
   // anything else keeps just the label (no link).
   t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => {
-    if (url.startsWith('/')) return `<a href="${url}" data-nav="${url}" class="ai-link">${label}</a>`;
+    // '//host' is protocol-relative, i.e. another site: not an in-app link.
+    if (url.startsWith('/') && !url.startsWith('//')) return `<a href="${url}" data-nav="${url}" class="ai-link">${label}</a>`;
     if (/^https?:\/\//i.test(url)) return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ai-link">${label}</a>`;
     return label;
   });

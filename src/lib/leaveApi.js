@@ -349,7 +349,9 @@ function mapStatusToV1(status, current_level, requester_role) {
       if (current_level === 1) return 'pending_ol';
       return 'pending_boss';
     }
-    if (r === 'ol') {
+    // OL and Ads Manager requests go straight to the Boss (Ads Manager: mig 390,
+    // Owner decision — the server routes them to the Boss too).
+    if (r === 'ol' || r === 'ads_manager') {
       return 'pending_boss';
     }
     // Unknown role — fall through to a safe label that the OL UI gate

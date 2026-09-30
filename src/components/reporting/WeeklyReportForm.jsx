@@ -998,6 +998,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         `Report week: ${selectedWeek?.label || '—'}`,
         `Stats period: ${eukaStart} → ${eukaEnd}`,
         `When: ${stamp}`,
+        // On its own line, because how long it ran is what tells the developer
+        // whether the request died on the way out or was cut off server-side.
+        `Took: ${err?.detail?.elapsedMs != null ? `${(err.detail.elapsedMs / 1000).toFixed(1)}s` : 'not recorded'}`,
         `Message: ${err?.message || 'unknown'}`,
         `Detail: ${JSON.stringify(err?.detail ?? null)}`,
       ].join('\n');

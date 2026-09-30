@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import {
   listBroadcasts, createBroadcast, allowedTargetsFor, canBroadcast,
   BROADCAST_TARGETS, listRecipientCandidates, previewRecipientCount,
-  submitResponse, getMyResponse, listResponses, listRecipients,
+  submitResponse, getMyResponse, isRecipient, listResponses, listRecipients,
   renotifyUser, renotifyPending,
 } from '../../lib/broadcastsApi';
 import { ROLES } from '../../lib/roles';
@@ -544,6 +544,13 @@ function BroadcastDetailModal({ broadcast, meId, onClose, onChanged }) {
     queryFn: () => getMyResponse(broadcast.id, meId),
     enabled: !!meId && hasPoll && !isAuthor,
   });
+  // Only recipients may answer (mig 391). The Boss sees every broadcast but
+  // answers only the ones sent to them.
+  const { data: amRecipient = false } = useQuery({
+    queryKey: ['broadcast', broadcast.id, 'recipient', meId],
+    queryFn: () => isRecipient(broadcast.id, meId),
+    enabled: !!meId && hasPoll && !isAuthor,
+  });
   const { data: allResponses = [] } = useQuery({
     queryKey: ['broadcast', broadcast.id, 'responses'],
     queryFn: () => listResponses(broadcast.id),
@@ -632,7 +639,7 @@ function BroadcastDetailModal({ broadcast, meId, onClose, onChanged }) {
           )}
 
           {/* ----- Recipient view ----- */}
-          {hasPoll && !isAuthor && (
+          {hasPoll && !isAuthor && amRecipient && (
             <div>
               <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
                 {myResponse ? 'Your response' : 'Tap to respond'}

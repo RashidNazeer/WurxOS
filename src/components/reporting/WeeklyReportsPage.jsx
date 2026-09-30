@@ -38,6 +38,14 @@ export default function WeeklyReportsPage() {
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
   const { brands } = useBrands();
+  // APC: drafts. TL: while it's at their stage (draft / submitted).
+  // PCTL / IPC authors: their own drafts only, returned ones included.
+  const canEditReport = (r) => {
+    const s = getReportStatus(r);
+    return (userRole === 'apc' && s === 'draft') ||
+           (userRole === 'tl' && (s === 'draft' || s === 'submitted')) ||
+           ((userRole === 'pctl' || userRole === 'ipc') && s === 'draft' && r.createdBy === user?.id);
+  };
 
   // Views: overview (all brands grid) | brand (single brand drill-down) | new | edit | detail
   const [view, setView] = useState('overview');
@@ -321,8 +329,9 @@ export default function WeeklyReportsPage() {
     //          the OL queue yet) AND 'submitted' (APC submitted, TL is
     //          reviewing). Once TL clicks Verify the report moves on
     //          to OL and TL no longer edits.
-    const canEdit = (userRole === 'apc' && rStatus === 'draft') ||
-                    (userRole === 'tl'  && (rStatus === 'draft' || rStatus === 'submitted'));
+    //   - PCTL / IPC: like an APC, but only their own drafts (a returned
+    //          report is a draft again). Owner decision, 2026-10.
+    const canEdit = canEditReport(detailReport);
     const canVerify = userRole === 'tl' && rStatus === 'submitted';
     // TL can only return to APC while the report is still at the TL stage
     // (status: submitted). Once they've verified it, the report has moved on
@@ -555,14 +564,9 @@ export default function WeeklyReportsPage() {
                           </button>
                           <ul className="dropdown-menu dropdown-menu-end" style={{ fontSize: '0.78rem' }}>
                             <li><button className="dropdown-item" onClick={() => handleViewReport(r)}><i className="bi bi-eye me-2" />View Report</button></li>
-                            {(() => {
-                              const s = getReportStatus(r);
-                              const can = (userRole === 'apc' && s === 'draft') ||
-                                          (userRole === 'tl'  && (s === 'draft' || s === 'submitted'));
-                              return can ? (
-                                <li><button className="dropdown-item" onClick={() => handleEdit(r.id)}><i className="bi bi-pencil me-2" />Edit</button></li>
-                              ) : null;
-                            })()}
+                            {canEditReport(r) && (
+                              <li><button className="dropdown-item" onClick={() => handleEdit(r.id)}><i className="bi bi-pencil me-2" />Edit</button></li>
+                            )}
                             {userRole === 'tl' && getReportStatus(r) === 'submitted' && (
                               <li><button className="dropdown-item" style={{ color: '#7c3aed' }} onClick={e => { e.stopPropagation(); handleVerify(r); }}><i className="bi bi-patch-check-fill me-2" />Verify</button></li>
                             )}
