@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
-import { canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
+import { KEY_SLOT_SHORT, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
 import { getMessageById } from '../../lib/buddyApi';
 import { useBuddy } from '../../contexts/BuddyContext';
 import BuddyMascot, { BUDDY_STILL } from './BuddyMascot';
@@ -110,7 +110,7 @@ export function StatusLine({ status }) {
 
 function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inflight, onCite, active }) {
   const navigate = useNavigate();
-  const { serverNow } = useBuddy();
+  const { serverNow, role } = useBuddy();
   if (m.role === 'user') {
     return (
       <div className="bd-row is-user">
@@ -166,7 +166,28 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
         {!pending && m.content && !error && (
           <Actions m={m} canRegenerate={canRegenerate} onRegenerate={onRegenerate} />
         )}
+        {!pending && <ModelLine m={m} showModel={role === 'boss' && surface === 'full'} />}
       </div>
+    </div>
+  );
+}
+
+// Which model wrote the answer (meta.model / key_slot / fallback_used, mig 397).
+// Everyone sees when a backup answered; the Boss sees the model on every answer
+// in the full tab.
+function ModelLine({ m, showModel }) {
+  if (!m.model) return null;
+  if (m.fallbackUsed) {
+    return (
+      <div className="bd-model-line" title={showModel && m.fallbackUsed.reason ? `Main model unavailable: ${m.fallbackUsed.reason}` : undefined}>
+        <i className="bi bi-arrow-left-right" aria-hidden="true" /> Answered by {m.model} (backup)
+      </div>
+    );
+  }
+  if (!showModel) return null;
+  return (
+    <div className="bd-model-line">
+      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {KEY_SLOT_SHORT[m.keySlot] || KEY_SLOT_SHORT.primary}
     </div>
   );
 }

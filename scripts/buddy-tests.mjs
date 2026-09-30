@@ -12,6 +12,8 @@ import {
   groupConversations, pageContextFor, pageChips, citeHtml, orderSources, sourceLink, BUDDY_ROLES, greetingText,
   buddyRoles, rowToMessage, fmtUsd, fmtCount, fmtMs, fmtPct, pktDate, usageRange,
   visibleMessages, canRegenerateMsg, clockSkew, nextAllowedRoles, ALL_ROLES,
+  catalogRowUsable, modelBadges, modelOptions, modelLabel, creditsExhausted, lastChecked,
+  chainAdd, chainRemove, chainMove, optionKey, parseOptionKey, FALLBACK_MAX,
 } from '../src/lib/buddyLogic.js';
 
 let passed = 0, failed = 0;
@@ -367,6 +369,74 @@ async function watchTests() {
   check('roles: boss always included', nextAllowedRoles([], 'apc', true).join() === 'boss,apc' && nextAllowedRoles(['boss'], 'boss', false).join() === 'boss');
   check('roles: toggle off, stable order', nextAllowedRoles(['developer', 'apc', 'boss', 'tl'], 'apc', false).join() === 'boss,tl,developer');
   check('roles: 8 roles offered', ALL_ROLES.length === 8);
+}
+
+// ── models (mig 397): usable filter, badges, picker groups, fallback chain ──
+{
+  const row = (o) => ({ key_slot: 'primary', available: true, supports_tools: true, supports_stream: true, free: false, last_error: null, ...o });
+  const cat = [
+    row({ model: 'gpt-5.4-mini' }),
+    row({ model: 'gpt-5.5', available: false, supports_tools: false, supports_stream: false, last_error: 'HTTP 429: insufficient_quota' }),
+    row({ model: 'gpt-4.1-weird', available: false, last_error: 'HTTP 404: model_not_found' }),
+    row({ model: 'gpt-x-notools', supports_tools: false }),
+    row({ model: 'gpt-x-nostream', supports_stream: false }),
+    row({ key_slot: 'fallback', model: 'gpt-6-luna', free: true }),
+    row({ key_slot: 'fallback', model: 'gpt-6-quota', available: false, last_error: 'HTTP 429: insufficient_quota' }),
+  ];
+  const by = (slot, m) => cat.find((r) => r.key_slot === slot && r.model === m);
+
+  // Usable = available with tools and streaming, or a built-in on the main key that failed only for credits.
+  check('usable: working model', catalogRowUsable(by('primary', 'gpt-5.4-mini')));
+  check('usable: built-in out of credits stays choosable', catalogRowUsable(by('primary', 'gpt-5.5')));
+  check('usable: not for other failures / no tools / no stream', !catalogRowUsable(by('primary', 'gpt-4.1-weird'))
+    && !catalogRowUsable(by('primary', 'gpt-x-notools')) && !catalogRowUsable(by('primary', 'gpt-x-nostream')));
+  check('usable: quota exemption is main-key built-ins only', !catalogRowUsable(by('fallback', 'gpt-6-quota')));
+
+  check('badges: free + tools + streaming', modelBadges(by('fallback', 'gpt-6-luna')).join() === 'Free,Tools ✓,Streaming ✓');
+  check('badges: needs credits, still usable', modelBadges(by('primary', 'gpt-5.5')).join() === 'Needs credits');
+  check('badges: not usable', modelBadges(by('primary', 'gpt-x-notools')).includes('Not usable'));
+
+  const opts = modelOptions(cat);
+  check('picker: grouped by key', opts.primary.length === 5 && opts.fallback.length === 2);
+  check('picker: usable first, built-ins first', opts.primary.slice(0, 2).map((o) => o.model).join() === 'gpt-5.4-mini,gpt-5.5' && opts.primary[2].usable === false,
+    opts.primary.map((o) => o.model).join());
+  const nt = opts.primary.find((o) => o.model === 'gpt-x-notools');
+  check('picker: unusable carries a reason', !nt.usable && /tool calling/.test(nt.reason));
+  check('picker: unusable reason from last_error', /model_not_found/.test(opts.primary.find((o) => o.model === 'gpt-4.1-weird').reason));
+  check('picker: friendly labels for the three built-ins', modelLabel('gpt-5.4-nano') === 'gpt-5.4-nano (cheapest)'
+    && modelLabel('gpt-5.4-mini') === 'gpt-5.4-mini (recommended)' && modelLabel('gpt-5.5') === 'gpt-5.5 (strongest)' && modelLabel('gpt-6-luna') === 'gpt-6-luna');
+  const empty = modelOptions([]);
+  check('picker: empty catalog → the three built-ins on the main key', empty.primary.map((o) => o.model).sort().join() === 'gpt-5.4-mini,gpt-5.4-nano,gpt-5.5'
+    && empty.primary.every((o) => o.usable) && empty.fallback.length === 0);
+  const k = optionKey('fallback', 'gpt-6-luna');
+  check('option keys round-trip (model names may contain dots)', JSON.stringify(parseOptionKey(k)) === '{"key_slot":"fallback","model":"gpt-6-luna"}');
+
+  // Credits banner.
+  check('credits: from the refresh result', creditsExhausted(cat, { slots: { primary: { credits_exhausted: true } } }) === true
+    && creditsExhausted(cat, { slots: { primary: { credits_exhausted: false } } }) === false);
+  const dry = [row({ model: 'gpt-5.4-mini', available: false, last_error: 'HTTP 429: insufficient_quota' }), row({ model: 'gpt-5.5', available: false, last_error: 'credit balance exhausted' })];
+  check('credits: from the catalog after a reload', creditsExhausted(dry, null) && !creditsExhausted(cat, null) && !creditsExhausted([], null));
+  check('last checked: newest checked_at', lastChecked([{ checked_at: '2026-10-01T10:00:00Z' }, { checked_at: '2026-10-01T11:00:00Z' }]) === '2026-10-01T11:00:00.000Z' && lastChecked([]) === null);
+
+  // Fallback chain.
+  const a = { key_slot: 'fallback', model: 'gpt-6-luna' };
+  let c = chainAdd([], a);
+  check('chain: add', c.length === 1 && c[0].model === 'gpt-6-luna');
+  check('chain: no duplicates', chainAdd(c, { ...a }).length === 1 && chainAdd(c, { key_slot: 'primary', model: 'gpt-6-luna' }).length === 2);
+  for (let i = 0; i < 10; i++) c = chainAdd(c, { key_slot: 'primary', model: `m${i}` });
+  check('chain: at most 5', c.length === FALLBACK_MAX);
+  const three = [{ key_slot: 'primary', model: 'a' }, { key_slot: 'primary', model: 'b' }, { key_slot: 'primary', model: 'c' }];
+  check('chain: move up / down', chainMove(three, 1, -1).map((x) => x.model).join() === 'b,a,c' && chainMove(three, 1, 1).map((x) => x.model).join() === 'a,c,b');
+  check('chain: moves past the ends do nothing', chainMove(three, 0, -1) === three && chainMove(three, 2, 1) === three);
+  check('chain: remove', chainRemove(three, 1).map((x) => x.model).join() === 'a,c');
+
+  // Which model answered.
+  const fb = rowToMessage({ id: 'x', role: 'assistant', content: 'hi', status: 'done', meta: { model: 'gpt-6-luna', key_slot: 'fallback', fallback_used: { from: 'primary:gpt-5.4-mini', to: 'fallback:gpt-6-luna', reason: 'quota' } } });
+  check('row: model, key and fallback', fb.model === 'gpt-6-luna' && fb.keySlot === 'fallback' && fb.fallbackUsed.reason === 'quota');
+  const s = run(S0, { type: 'THREAD_LOADED', key: C1, messages: [{ id: 'q', role: 'user', content: 'Q' }, { id: 'x', role: 'assistant', content: 'A' }] },
+    { type: 'MSG_META', key: C1, id: 'x', meta: { model: 'gpt-5.4-mini', keySlot: 'primary', fallbackUsed: null } });
+  check('MSG_META: labels the live reply', s.threads[C1].messages[1].model === 'gpt-5.4-mini');
+  check('MSG_META: unknown id ignored', run(s, { type: 'MSG_META', key: C1, id: 'nope', meta: { model: 'z' } }) === s);
 }
 
 await watchTests();
