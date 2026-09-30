@@ -4,7 +4,7 @@ import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chatBody, chatRespond, toMessages } from '../llm/chat.ts';
 import { LlmError, type LlmRequest, type LlmResult } from '../llm/openai.ts';
-import { _resetCooldowns, chooseTargets, coolDown, coolingDown, netRank, refreshModels, safetyNet, skipReason, unsupportedParam, type CatalogRow } from '../agent/models.ts';
+import { _resetCooldowns, chooseTargets, coolDown, coolingDown, netRank, refreshModels, resolveRoleConfig, safetyNet, saverOn, skipReason, unsupportedParam, type CatalogRow } from '../agent/models.ts';
 import { runTurn } from '../agent/core.ts';
 import { _resetBudgets, budgetFor, budgetFromError, estimate, fitRequest } from '../agent/compact.ts';
 import { compactInstructions } from '../agent/prompt.ts';
@@ -378,5 +378,44 @@ test('a Groq turn: round 2 is compacted to fit 8k instead of a 413; a 413 anyway
     assert.ok(estimate(last.messages[0].content, last.messages.slice(1), last.tools, last.max_tokens) <= 8000, `round 2 fits (reject=${r})`);
     assert.ok(log.flags.compact.some((c: any) => c.steps.includes('prompt_compact')));
     if (r) assert.equal(sent.length, 3);                                  // round 1, the 413, the compacted retry
+  }
+});
+// ── per-role models and the budget saver (mig 404) ──────────────────────────
+
+const ROLE_CFG = { model: 'gpt-6-luna', model_key_slot: 'fallback', fallback_models: CHAIN,
+  role_models: { boss: { model: 'gemini-3.6-flash', key_slot: 'gemini' },
+    apc: { fallback_models: [{ key_slot: 'groq', model: 'openai/gpt-oss-120b' }], economy: { model: 'gemini-3.1-flash-lite', key_slot: 'gemini' } } } };
+
+test('role models: a role overrides only what it sets; others inherit; economy only when the saver is on', () => {
+  const b = resolveRoleConfig(ROLE_CFG, 'Boss', true);
+  assert.deepEqual([b.model, b.model_key_slot, b.fallback_models, b.model_source], ['gemini-3.6-flash', 'gemini', CHAIN, 'role:boss']);   // no economy: stays
+  const a = resolveRoleConfig(ROLE_CFG, 'apc', false);
+  assert.deepEqual([a.model, a.model_key_slot, a.fallback_models, a.model_source], ['gpt-6-luna', 'fallback', [{ key_slot: 'groq', model: 'openai/gpt-oss-120b' }], 'role:apc']);
+  const e = resolveRoleConfig(ROLE_CFG, 'apc', true);
+  assert.deepEqual([e.model, e.model_key_slot, e.model_source], ['gemini-3.1-flash-lite', 'gemini', 'economy']);
+  const t = resolveRoleConfig(ROLE_CFG, 'tl', true);
+  assert.deepEqual([t.model, t.fallback_models, t.model_source], ['gpt-6-luna', CHAIN, 'global']);
+  assert.equal(resolveRoleConfig({ model: 'm' }, 'apc', true).model_source, 'global');   // no role_models at all
+  // the saver: pct % of the monthly budget
+  assert.equal(saverOn({ budget_saver_pct: 80, monthly_budget_usd: 10 }, 7.99), false);
+  assert.equal(saverOn({ budget_saver_pct: 80, monthly_budget_usd: 10 }, 8), true);
+  assert.equal(saverOn({ budget_saver_pct: null, monthly_budget_usd: 10 }, 100), false);
+  assert.equal(saverOn({ budget_saver_pct: 80, monthly_budget_usd: 0 }, 100), false);
+  assert.equal(saverOn({ budget_saver_pct: 80, monthly_budget_usd: 10 }, null), false);
+});
+
+test('a turn: the APC gets its economy model once spend passes the threshold; logged in flags and the reply meta', async () => {
+  const seen: string[] = [];
+  const fetchImpl = async (_u: string, init: any) => { const b = JSON.parse(init.body); seen.push(b.model); return sseOf([{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]); };
+  const cat = [...CAT, row('gemini', 'gemini-3.1-flash-lite'), row('gemini', 'gemini-3.6-flash')];
+  for (const [spend, want, source] of [[5, 'openai/gpt-oss-120b', 'role:apc'], [9, 'gemini-3.1-flash-lite', 'economy']] as const) {
+    _resetCooldowns(); seen.length = 0;
+    const d = db({ ...ROLE_CFG, budget_saver_pct: 80, monthly_budget_usd: 10 });
+    // spend 5: the APC's main model is the global luna (Responses fake: no credits) → its own chain → Groq
+    await runTurn({ userId: 'u1', role: 'apc', message: 'hi' }, deps(d, fetchImpl, { catalog: cat, monthSpend: async () => spend }), () => {});
+    const log = d.inserts.ai_request_log[0];
+    assert.equal(seen[0], want, `spend ${spend}`);
+    assert.equal(log.flags.model_source, source);
+    assert.equal(d.inserts.ai_messages.find((m: any) => m.role === 'assistant').meta.model_source, source);
   }
 });

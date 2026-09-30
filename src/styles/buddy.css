@@ -376,6 +376,20 @@
 .bd-model-line { font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; }
 .bd-model-search { margin: 0 0 8px; max-width: 520px; }
 
+/* Models by role: a 4-column grid on wide screens, one card per role on phones. */
+.bd-role-models { display: flex; flex-direction: column; gap: 6px; }
+.bd-role-head, .bd-role-row { display: grid; grid-template-columns: 120px repeat(3, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.bd-role-head { font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 0 8px; }
+.bd-role-row { padding: 8px; border-radius: var(--radius-md); background: var(--surface-2); }
+.bd-role-name { font-weight: 700; font-size: 13px; padding-top: 5px; }
+.bd-role-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.bd-saver { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 991px) {
+  .bd-role-head { display: none; }
+  .bd-role-row { grid-template-columns: 1fr; }
+  .bd-role-label { position: static; width: auto; height: auto; clip: auto; font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px; }
+}
+
 /* Settings sections are plain fieldsets (no browser border). */
 .bd-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .bd-fieldset:disabled .form-check-label, .bd-fieldset:disabled .form-label { opacity: 0.85; }

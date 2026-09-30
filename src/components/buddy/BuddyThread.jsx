@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
-import { slotLabel, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
+import { slotLabel, modelSourceLabel, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
 import { getMessageById } from '../../lib/buddyApi';
 import { useBuddy } from '../../contexts/BuddyContext';
 import BuddyMascot, { BUDDY_STILL } from './BuddyMascot';
@@ -166,28 +166,30 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
         {!pending && m.content && !error && (
           <Actions m={m} canRegenerate={canRegenerate} onRegenerate={onRegenerate} />
         )}
-        {!pending && <ModelLine m={m} showModel={role === 'boss' && surface === 'full'} />}
+        {!pending && <ModelLine m={m} showModel={(role === 'boss' || role === 'developer') && surface === 'full'} />}
       </div>
     </div>
   );
 }
 
 // Which model wrote the answer (meta.model / key_slot / fallback_used, mig 397).
-// Everyone sees when a backup answered; the Boss sees the model on every answer
-// in the full tab.
+// Everyone sees when a backup answered; the Boss and developers see the model
+// (and, when present, where the choice came from: role / global / economy) on
+// every answer in the full tab.
 function ModelLine({ m, showModel }) {
   if (!m.model) return null;
+  const source = showModel && modelSourceLabel(m.modelSource);
   if (m.fallbackUsed) {
     return (
       <div className="bd-model-line" title={showModel && m.fallbackUsed.reason ? `Main model unavailable: ${m.fallbackUsed.reason}` : undefined}>
-        <i className="bi bi-arrow-left-right" aria-hidden="true" /> Answered by {m.model} (backup)
+        <i className="bi bi-arrow-left-right" aria-hidden="true" /> Answered by {m.model} (backup){source ? ` · ${source}` : ''}
       </div>
     );
   }
   if (!showModel) return null;
   return (
     <div className="bd-model-line">
-      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {slotLabel(m.keySlot || 'primary')}
+      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {slotLabel(m.keySlot || 'primary')}{source ? ` · ${source}` : ''}
     </div>
   );
 }
