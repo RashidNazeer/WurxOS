@@ -1,6 +1,11 @@
 -- ============================================================
--- WurxOS v2 — Migration 397: give the Developers roster a lead — Rashid
+-- WurxOS v2 — Migration 398: give the Developers roster a lead — Rashid
 -- Nazeer as Team Lead, Umar Ilyas as Junior Developer reporting to him.
+--
+-- Originally written as 397; renumbered because feat/wurx-buddy landed
+-- 397_ai_model_catalog.sql on main while this branch was in review (same
+-- story as commit 6a34a67: "Renumber the GMV-Max goal sync to 366 (365 was
+-- already taken)"). 398 is free on both main and wurxosdev.
 --
 -- The `developer` role has always been flat (ROLE_EXTRAS.developer in
 -- src/lib/roles.js sets reportsToRole: null) because there was only ever one
@@ -35,7 +40,7 @@ begin
     from public.profiles
    where role = 'developer' and deleted_at is null;
   if v_dev_count < 2 then
-    raise exception '397: expected at least 2 active developers, found %', v_dev_count;
+    raise exception '398: expected at least 2 active developers, found %', v_dev_count;
   end if;
 
   select id into v_rashid
@@ -44,7 +49,7 @@ begin
      and display_name ilike '%rashid%nazeer%'
    limit 1;
   if v_rashid is null then
-    raise exception '397: no active developer profile matching "Rashid Nazeer" found';
+    raise exception '398: no active developer profile matching "Rashid Nazeer" found';
   end if;
 
   -- The other active developer, whichever exact spelling their name uses.
@@ -54,7 +59,7 @@ begin
    order by created_at
    limit 1;
   if v_umar is null then
-    raise exception '397: no second active developer found to make Junior Developer';
+    raise exception '398: no second active developer found to make Junior Developer';
   end if;
 
   -- Rashid: Team Lead. reports_to is untouched — he still reports to the Boss.
@@ -75,7 +80,7 @@ begin
   -- org-chart edge is never left stale.
   update public.profiles set reports_to = v_rashid where id = v_umar;
 
-  raise notice '397: developer % is Team Lead; developer % is Junior Developer reporting to them', v_rashid, v_umar;
+  raise notice '398: developer % is Team Lead; developer % is Junior Developer reporting to them', v_rashid, v_umar;
 end;
 $mig$;
 
@@ -90,7 +95,7 @@ begin
    where p.role = 'developer' and p.deleted_at is null and p.display_name ilike '%rashid%nazeer%'
    limit 1;
   if not ('Team Lead' = any(coalesce(r_resp, '{}'))) then
-    raise exception '397: Rashid Nazeer is missing the Team Lead tag';
+    raise exception '398: Rashid Nazeer is missing the Team Lead tag';
   end if;
 
   select p.responsibilities, p.reports_to into u_resp, u_manager
@@ -100,12 +105,12 @@ begin
    order by created_at
    limit 1;
   if not ('Junior Developer' = any(coalesce(u_resp, '{}'))) then
-    raise exception '397: the junior developer is missing the Junior Developer tag';
+    raise exception '398: the junior developer is missing the Junior Developer tag';
   end if;
   if u_manager is null then
-    raise exception '397: the junior developer has no reports_to set';
+    raise exception '398: the junior developer has no reports_to set';
   end if;
 
-  raise notice '397: verified — developer team lead/junior structure is in place';
+  raise notice '398: verified — developer team lead/junior structure is in place';
 end;
 $verify$;
