@@ -5,6 +5,8 @@
 // rounds' output items go back as input, with the reasoning items' encrypted
 // content, so the model keeps its chain of thought across tool rounds.
 
+import { providerAccountIssue } from '../providerErrors.ts';
+
 export const ALLOWED_MODELS = ['gpt-5.4-mini', 'gpt-5.5', 'gpt-5.4-nano'] as const;
 export const DEFAULT_MODEL = 'gpt-5.4-mini';
 export const pickModel = (m: unknown): string => ((ALLOWED_MODELS as readonly string[]).includes(String(m)) ? String(m) : DEFAULT_MODEL);
@@ -162,7 +164,8 @@ export async function respond(r: LlmRequest): Promise<LlmResult> {
       if (r.signal?.aborted) throw cancelledErr();     // a stream read aborted by Stop
       const err = e instanceof LlmError ? e : new LlmError(String((e as Error)?.message ?? e));
       const nearDeadline = r.deadline != null && r.deadline - Date.now() < 10_000;
-      const retryable = !streamed && !nearDeadline && (err.status === undefined || err.status === 429 || err.status >= 500);
+      // No credits / a refused key: another attempt cannot succeed.
+      const retryable = !streamed && !nearDeadline && !providerAccountIssue(err) && (err.status === undefined || err.status === 429 || err.status >= 500);
       if (!retryable || attempt >= 1) throw err;
       await new Promise((ok) => setTimeout(ok, 1500));
     } finally {

@@ -104,7 +104,9 @@ export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<E
       }
       if (!res.ok) {
         const body = (await res.text().catch(() => '')).slice(0, 300);
-        const err = new EmbedError(`embeddings HTTP ${res.status}: ${body}`, res.status === 429 || res.status >= 500, res.status);
+        // No credits (429 insufficient_quota) is not a rate limit: retrying cannot help.
+        const noCredit = /insufficient_quota|no credits remaining|exceeded your current quota/i.test(body);
+        const err = new EmbedError(`embeddings HTTP ${res.status}: ${body}`, !noCredit && (res.status === 429 || res.status >= 500), res.status);
         const ra = Number(res.headers.get('retry-after'));
         if (Number.isFinite(ra) && ra > 0) err.retryAfterMs = Math.min(ra * 1000, RETRY_AFTER_CAP_MS);
         throw err;
