@@ -1,8 +1,10 @@
 // Model catalog, fallback chain, parameter compatibility, keyword-only search
 // (mig 397). All faked: no API calls.
-import { test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chatModels, chooseTargets, modelUsable, omitFor, refreshModels, unsupportedParam, type CatalogRow } from '../agent/models.ts';
+import { _resetCooldowns, chatModels, chooseTargets, modelUsable, omitFor, refreshModels, unsupportedParam, type CatalogRow } from '../agent/models.ts';
+
+beforeEach(() => _resetCooldowns());
 import { runTurn } from '../agent/core.ts';
 import { chainEmbedder, _resetEmbedDown } from '../agent/server.ts';
 import { LlmError, requestBody, respond, type LlmRequest, type LlmResult } from '../llm/openai.ts';
@@ -223,8 +225,12 @@ test('refreshModels: lists, probes, marks free while credits are exhausted, upse
   };
   const d = db({ ai_model_catalog: [{ key_slot: 'fallback', model: 'gpt-6-luna', params: { omit: ['text'] } }] });
   const r = await refreshModels({ keys: KEYS, admin: d, prices: pricesFrom({}), fetchImpl: fetchImpl as any });
-  assert.deepEqual(r.slots.primary, { listed: 1, probed: 1, available: 0, usable: 0, free: [], credits_exhausted: true });
-  assert.deepEqual(r.slots.fallback, { listed: 2, probed: 2, available: 1, usable: 1, free: ['gpt-6-luna'], credits_exhausted: true });
+  // every listed model is stored; non-chat ones with a reason and no call
+  assert.deepEqual(r.slots.primary, { listed: 2, probed: 1, available: 0, usable: 0, free: [], credits_exhausted: true });
+  assert.deepEqual(r.slots.fallback, { listed: 3, probed: 2, available: 1, usable: 1, free: ['gpt-6-luna'], credits_exhausted: true });
+  assert.deepEqual(r.models.filter((m) => m.reason && !m.last_error).map((m) => [m.key_slot, m.model, m.reason]),
+    [['fallback', 'gpt-4o-mini-tts', 'audio model (not for chat)'], ['primary', 'gpt-image-1', 'image model (not for chat)']]);
+  assert.equal(r.models.find((m) => m.key_slot === 'primary' && m.model === 'gpt-5.4-mini')!.reason, 'no quota on this key');
   const luna = r.models.find((m) => m.model === 'gpt-6-luna')!;
   assert.deepEqual([luna.available, luna.supports_tools, luna.supports_stream, luna.free], [true, true, true, true]);
   assert.match(r.models.find((m) => m.key_slot === 'primary')!.last_error!, /429/);

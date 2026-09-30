@@ -14,8 +14,8 @@
 //                          {sources} {error} {done, conversationId, requestId, messageId, status}
 //           otherwise    → JSON { conversationId, requestId, reply, sources }
 //
-// Allowed roles: ai_assistant_config.allowed_roles (default {boss}).
-// Env (function secrets): OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK (optional), AI_INTERNAL_SECRET,
+// Allowed roles: boss and developer always, plus ai_assistant_config.allowed_roles.
+// Env (function secrets): OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_API_KEY, GEMINI_API_KEY (the last three optional), AI_INTERNAL_SECRET,
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (automatic).
 // Deploy: NOT YET — only with the Owner's go (TEAM.md rule 0/3), --project-ref dev.
 // ============================================================
@@ -30,6 +30,8 @@ const env: ServerEnv = {
   anonKey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
   openAiKey: Deno.env.get('OPEN_AI_API_KEY') ?? Deno.env.get('OPENAI_API_KEY') ?? '',
   openAiKeyFallback: Deno.env.get('OPEN_AI_API_KEY_FALLBACK') ?? null,
+  groqKey: Deno.env.get('GROQ_API_KEY') ?? null,
+  geminiKey: Deno.env.get('GEMINI_API_KEY') ?? null,
   createClient,
 };
 const AI_INTERNAL_SECRET = Deno.env.get('AI_INTERNAL_SECRET') ?? '';

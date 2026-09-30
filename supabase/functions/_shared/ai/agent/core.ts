@@ -11,12 +11,14 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { chooseTargets, omitFor, rememberOmit, unsupportedParam, type CatalogRow, type Keys } from './models.ts';
+import { chooseTargets, coolDown, coolingDown, endpointFor, keyFor, omitFor, rememberOmit, rememberParams, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chatRespond } from '../llm/chat.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
-import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ProviderIssue } from '../providerErrors.ts';
+import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIssue } from '../providerErrors.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
-import { buildInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
+import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
+import { budgetFor, budgetFromError, estimate, fitRequest, learnBudget } from './compact.ts';
 import { ALL_TOOL_DEFS, CiteRegistry, runTool, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
 
 export type Emit = (ev: Record<string, unknown>) => void;
@@ -78,25 +80,36 @@ export type CoreDeps = {
   userClient?: any;                  // supabase-js client with the caller's JWT (data tools, RLS); absent = none
   apiKey: string;                    // OPEN_AI_API_KEY (the 'primary' slot)
   fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot)
+  groqKey?: string | null;           // GROQ_API_KEY (the 'groq' slot, Chat Completions)
+  geminiKey?: string | null;         // GEMINI_API_KEY (the 'gemini' slot, Chat Completions)
   catalog?: CatalogRow[];            // tests; otherwise read from ai_model_catalog
   rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
   embedDown?: () => boolean;         // query embeddings known to be failing on every key
   embed: (text: string) => Promise<number[] | null>;
   rerank?: Reranker;
   model?: string;                    // local override (serve-assistant --model); still allow-listed
+  modelKeySlot?: KeySlot;            // with `model`: that key, taken as given (serve-assistant --key-slot)
   meter?: UsageMeter;                // rerank + query-embedding usage of this question (→ ai_usage_log)
   now?: () => Date;
-  llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam
+  llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam (also used for chat slots unless chatLlm is set)
+  chatLlm?: (r: LlmRequest) => Promise<LlmResult>;
   requestId?: string;
 };
 
 export type TurnResult = { requestId: string; conversationId: string | null; messageId?: string; answer: string; sources: unknown[]; error?: string; httpStatus?: number; cancelled?: boolean };
 
 const ZERO: Usage = { input: 0, cached: 0, output: 0, reasoning: 0 };
+// Failover bounds: at most this many model calls in a turn, and no
+// switch when less time than this is left (the answer needs room too).
+export const MAX_MODEL_ATTEMPTS = 8;
+export const SWITCH_MIN_LEFT_MS = 15_000;
 const add = (a: Usage, b: Usage): Usage => ({ input: a.input + b.input, cached: a.cached + b.cached, output: a.output + b.output, reasoning: a.reasoning + b.reasoning });
 
 async function loadConfig(admin: any) {
-  const { data } = await admin.from('ai_assistant_config').select('persona, model, enabled, retrieval, prices, model_key_slot, fallback_models, fallback_enabled').eq('id', 1).maybeSingle();
+  const cols = 'persona, model, enabled, retrieval, prices, model_key_slot, fallback_models, fallback_enabled';
+  const { data, error } = await admin.from('ai_assistant_config').select(`${cols}, auto_failover`).eq('id', 1).maybeSingle();
+  // Before mig 401 there is no auto_failover column: read the rest.
+  if (error) return (await admin.from('ai_assistant_config').select(cols).eq('id', 1).maybeSingle()).data ?? {};
   return data ?? {};
 }
 
@@ -171,8 +184,12 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // fallbacks. `target` moves down it on an account error (no credits, key refused).
   let catalog: CatalogRow[] = deps.catalog ?? [];
   if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
-  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null };
-  const targets = chooseTargets(row, catalog, keys, deps.model ?? null);
+  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null };
+  const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
+  const chain = chooseTargets(row, catalog, keys, override);
+  // Buddy must never go down (Owner 2026-10-01): after the Boss's chain, every
+  // other usable model in the catalog, unless auto_failover is switched off.
+  const targets = row.auto_failover === false ? chain : [...chain, ...safetyNet(catalog, keys, chain)];
   let ti = 0;
   let target = targets[0];
   let model = target.model;
@@ -271,6 +288,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     ...(deps.embedDown?.() ? ['SEARCH is in keyword-only mode right now (no semantic search): search with the exact words a document would use, and if you cannot find something, say so plainly.'] : []),
   ];
   const { instructions } = buildInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now, notes });
+  const compactBase = compactInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now });
+  const compactTried = new Set<string>();
 
   // Search without embeddings (no credits on any key): the keyword arm only.
   let embedFailed = false;
@@ -298,46 +317,92 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   let costSum = 0;
   let unpriced = false;
   // Every account problem met on the way down the chain, for the final message.
-  const chainIssues: { issue: ProviderIssue; model: string; waitMs: number | null }[] = [];
+  const chainIssues: ChainIssue[] = [];
   // Each model call (success or not), for diagnosing a failed turn.
   const attempts: { target: string; ms: number; error?: string }[] = [];
+  const chatLlm = deps.chatLlm ?? deps.llm ?? chatRespond;
+  const tag = (t: Target) => `${t.keySlot}:${t.model}`;
+  // The SAME turn moves to the next model. Encrypted reasoning belongs to the
+  // model (and key) that made it, so it is dropped.
+  let switchedNotice = false;
+  const moveOn = (reason: string) => {
+    target = targets[++ti];
+    model = target.model;
+    flags.fallback_used = { from: tag(targets[0]), to: tag(target), reason };
+    for (let i = input.length - 1; i >= 0; i--) if ((input[i] as any)?.type === 'reasoning') input.splice(i, 1);
+    if (!switchedNotice) { switchedNotice = true; emit({ status: 'Switching to a backup model…' }); }
+  };
   // One model call on the current target. A field the model rejects is dropped
-  // and remembered; an account error moves the SAME turn to the next target.
+  // and remembered. Any other failure before text reached the user hands the
+  // turn to the next model, within MAX_MODEL_ATTEMPTS and the deadline.
   const ask = async (o: Partial<LlmRequest>): Promise<LlmResult> => {
     for (let paramTries = 0; ;) {
+      // A model that just failed for quota / limit / a refused key is skipped
+      // (the last one left is always tried).
+      for (let c = coolingDown(target); c && ti + 1 < targets.length; c = coolingDown(target)) {
+        ((flags.skipped_cooling ??= []) as string[]).push(tag(target));
+        if (c.issue !== 'busy') chainIssues.push({ issue: c.issue, model: target.model, slot: target.keySlot, waitMs: c.waitMs });
+        moveOn(`cooling down (${c.issue})`);
+      }
       const omit = omitFor(catalog, target);
+      const chat = SLOTS[target.keySlot].api === 'openai-chat';
+      // Compact mode: a model with a small token budget gets a trimmed request
+      // (agent/compact.ts); the shared history is left as it is.
+      let call: Partial<LlmRequest> = { instructions, input, ...o };
+      const budget = budgetFor(catalog, target);
+      if (budget) {
+        const reqI = call.instructions ?? instructions;
+        const extra = reqI.startsWith(instructions) ? reqI.slice(instructions.length) : '';   // e.g. the SERIOUS note
+        const f = fitRequest({ instructions: reqI, compactInstructions: compactBase + extra, input, tools: call.tools, maxOutputTokens: call.maxOutputTokens }, budget);
+        if (f.steps.length) {
+          ((flags.compact ??= []) as unknown[]).push({ target: tag(target), budget, steps: f.steps, estimate: f.estimate });
+          call = { ...call, instructions: f.instructions, input: f.input, tools: f.tools, maxOutputTokens: f.maxOutputTokens };
+        }
+      }
       const ta = Date.now();
       try {
-        const res = await llm({
-          apiKey: target.keySlot === 'fallback' ? keys.fallback! : keys.primary, model: target.model, instructions, input,
+        const res = await (chat ? chatLlm : llm)({
+          apiKey: keyFor(keys, target.keySlot)!, model: target.model, instructions, input,
           promptCacheKey: `wurx-buddy-${req.role}`, timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta,
-          ...(omit.length ? { omit } : {}), ...o,
+          ...(chat ? { endpoint: endpointFor(target.keySlot) } : {}),
+          ...(omit.length ? { omit } : {}), ...call,
         });
-        attempts.push({ target: `${target.keySlot}:${target.model}`, ms: Date.now() - ta });
-        const c = costUsd(prices, target.model, res.usage);
+        attempts.push({ target: tag(target), ms: Date.now() - ta });
+        // Free tiers (Groq, Gemini) cost nothing, whatever the model's name.
+        const c = SLOTS[target.keySlot].free ? { usd: 0, priced: true } : costUsd(prices, target.model, res.usage);
+        if (SLOTS[target.keySlot].free) flags.free_tier = true;
         costSum += c.usd;
         if (!c.priced) unpriced = true;
         return res;
       } catch (e) {
-        attempts.push({ target: `${target.keySlot}:${target.model}`, ms: Date.now() - ta, error: String((e as any)?.code ?? (e as any)?.status ?? (e as Error)?.name ?? 'error') });
+        attempts.push({ target: tag(target), ms: Date.now() - ta, error: String((e as any)?.code ?? (e as any)?.status ?? (e as Error)?.name ?? 'error') });
         if (cancelCtrl.signal.aborted || (e as any)?.cancelled) throw e;
         const p = unsupportedParam(e);
         if (p && !omit.includes(p) && paramTries < 3) {
           paramTries++;
-          ((flags.params_dropped ??= []) as string[]).push(`${target.keySlot}:${target.model}:${p}`);
-          await rememberOmit(admin, target, [...omit, p]);
+          ((flags.params_dropped ??= []) as string[]).push(`${tag(target)}:${p}`);
+          await rememberOmit(admin, target, [...omit, p], catalog);
           continue;
         }
         const issue = providerAccountIssue(e);
-        if (issue) chainIssues.push({ issue, model: target.model, waitMs: (e as any)?.retryAfterMs ?? null });
-        if (issue && ti + 1 < targets.length) {
-          const from = target;
-          target = targets[++ti];
-          model = target.model;
-          flags.fallback_used = { from: `${from.keySlot}:${from.model}`, to: `${target.keySlot}:${target.model}`, reason: issue };
-          // Encrypted reasoning belongs to the model (and key) that made it.
-          for (let i = input.length - 1; i >= 0; i--) if ((input[i] as any)?.type === 'reasoning') input.splice(i, 1);
-          emit({ status: 'Switching to a backup model…' });
+        // Too large for this model: learn its budget and try it once more, compacted.
+        if (issue === 'too_large' && !compactTried.has(tag(target)) && left() > SWITCH_MIN_LEFT_MS) {
+          compactTried.add(tag(target));
+          // In our estimate's units: the provider's limit scaled by how it counted this request.
+          const sent = estimate(call.instructions ?? instructions, call.input ?? input, call.tools, call.maxOutputTokens);
+          const got = budgetFromError(String((e as Error)?.message ?? ''));
+          const b = got?.requested ? Math.floor(got.limit * sent / got.requested) : got ? got.limit : Math.floor(sent * 0.7);
+          learnBudget(target, b);
+          await rememberParams(admin, target, { token_budget: b }, catalog);
+          continue;
+        }
+        if (issue) chainIssues.push({ issue, model: target.model, slot: target.keySlot, waitMs: (e as any)?.retryAfterMs ?? null });
+        if (!(e as any)?.streamed) coolDown(target, e);
+        const status = Number((e as any)?.status);
+        const why = issue ?? (status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');
+        // Text already shown cannot be taken back: only a clean failure moves on.
+        if (!(e as any)?.streamed && ti + 1 < targets.length && attempts.length < MAX_MODEL_ATTEMPTS && left() > SWITCH_MIN_LEFT_MS) {
+          moveOn(why);
           continue;
         }
         throw e;
@@ -424,8 +489,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       const status = Number((e as any)?.status) || null;
       // No credits / a refused key / a used-up allowance: say who can fix it (QA 2026-10-01 F3).
       const account = providerAccountIssue(e);
-      if (account) { flags.provider_quota = true; flags.provider_issue = account; }
-      else if (/deadline|timed out/i.test(error)) flags.deadline_hit = true;
+      if (account || chainIssues.length) { flags.provider_quota = true; flags.provider_issue = account ?? chainIssues[chainIssues.length - 1].issue; }
+      if (!account && /deadline|timed out/i.test(error)) flags.deadline_hit = true;
       // The real exception, for whoever reads the log: never the key, never the prompt.
       flags.error_detail = {
         step, class: (e as Error)?.name ?? typeof e, status, code: (e as any)?.code ?? null, message: error.slice(0, 300),
@@ -434,10 +499,14 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       console.error(`assistant turn ${requestId} failed at ${step}:`, JSON.stringify(flags.error_detail));
       const tail = cstream.flush();
       if (tail) { answer += tail; emit({ delta: tail }); }
+      // Nothing worked. Account problems met anywhere in the chain are named;
+      // models that were only busy or silent get one line after them.
+      const busy = !account && !flags.deadline_hit && (status === 429 || (status ?? 0) >= 500 || (e as any)?.code === 'first_byte_timeout');
       userError = account ? providerIssueMessage(account, req.role, chainIssues)
-        : status === 429 ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
+        : chainIssues.length && busy ? `${providerIssueMessage(chainIssues[chainIssues.length - 1].issue, req.role, chainIssues)} The other models were busy or did not answer: please try again in a minute.`
+        : busy ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
         : flags.deadline_hit ? 'That took too long, so I stopped. Please try again, maybe a narrower question.' : 'Something went wrong while answering. Please try again.';
-      if (!account && status !== 429 && !flags.deadline_hit) flags.error_unclassified = true;
+      if (!account && !busy && !flags.deadline_hit) flags.error_unclassified = true;
       emit({ error: userError });
     }
   } finally {

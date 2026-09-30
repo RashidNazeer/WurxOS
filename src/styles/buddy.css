@@ -374,6 +374,11 @@
 .bd-chain-add { display: flex; gap: 6px; max-width: 520px; }
 .bd-chain-add select { min-width: 0; }
 .bd-model-line { font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; }
+.bd-model-search { margin: 0 0 8px; max-width: 520px; }
+
+/* Settings sections are plain fieldsets (no browser border). */
+.bd-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.bd-fieldset:disabled .form-check-label, .bd-fieldset:disabled .form-label { opacity: 0.85; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1199px) {

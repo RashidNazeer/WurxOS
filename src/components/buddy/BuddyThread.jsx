@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
-import { KEY_SLOT_SHORT, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
+import { slotLabel, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
 import { getMessageById } from '../../lib/buddyApi';
 import { useBuddy } from '../../contexts/BuddyContext';
 import BuddyMascot, { BUDDY_STILL } from './BuddyMascot';
@@ -187,7 +187,7 @@ function ModelLine({ m, showModel }) {
   if (!showModel) return null;
   return (
     <div className="bd-model-line">
-      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {KEY_SLOT_SHORT[m.keySlot] || KEY_SLOT_SHORT.primary}
+      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {slotLabel(m.keySlot || 'primary')}
     </div>
   );
 }

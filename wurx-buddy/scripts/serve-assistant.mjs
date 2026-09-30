@@ -1,8 +1,10 @@
 // ============================================================
 // Local Assistant v2 server for dev testing and the eval. DEV only.
 //
-//   node --experimental-strip-types scripts/serve-assistant.mjs [--port 8787] [--as-user <uuid>] [--model <allowed model>] [--no-rate-limit]
-//   --model overrides ai_assistant_config.model for this server only (e.g. to compare models).
+//   node --experimental-strip-types scripts/serve-assistant.mjs [--port 8787] [--as-user <uuid>] [--model <model>] [--key-slot primary|fallback|groq|gemini] [--no-rate-limit]
+//   --model overrides ai_assistant_config.model for this server only (e.g. to compare models);
+//   without --key-slot it must be a built-in OpenAI model, with it any model that key serves.
+//   Keys: OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_Fallback (or GROQ_API_KEY), Gemini_Fallback (or GEMINI_API_KEY).
 //
 //   POST http://127.0.0.1:<port>/assistant   (the same contract as the edge
 //   function supabase/functions/assistant; run-eval --engine v2 --base-url
@@ -24,13 +26,16 @@ import { devDbUrl, readEnv } from './dev-env.mjs';
 import { json } from '../supabase/functions/_shared/ai/agent/http.ts';
 import { checkProfile, handleAsk, identify } from '../supabase/functions/_shared/ai/agent/server.ts';
 import { ALLOWED_MODELS } from '../supabase/functions/_shared/ai/llm/openai.ts';
+import { KEY_SLOTS } from '../supabase/functions/_shared/ai/agent/models.ts';
 
 const argv = process.argv.slice(2);
 const opt = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : undefined; };
 const port = Number(opt('--port') ?? 8787);
 const asUser = opt('--as-user') ?? null;
 const modelOverride = opt('--model');
-if (modelOverride && !ALLOWED_MODELS.includes(modelOverride)) { console.error(`--model must be one of: ${ALLOWED_MODELS.join(', ')}`); process.exit(1); }
+const keySlot = opt('--key-slot');
+if (keySlot && (!modelOverride || !KEY_SLOTS.includes(keySlot))) { console.error(`--key-slot needs --model and one of: ${KEY_SLOTS.join(', ')}`); process.exit(1); }
+if (modelOverride && !keySlot && !ALLOWED_MODELS.includes(modelOverride)) { console.error(`--model must be one of: ${ALLOWED_MODELS.join(', ')} (or pass --key-slot)`); process.exit(1); }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 if (asUser && !UUID.test(asUser)) { console.error('--as-user must be a profile uuid'); process.exit(1); }
 
@@ -42,7 +47,7 @@ if (new URL(url).hostname !== `${devRef}.supabase.co`) { console.error('Refusing
 for (const k of ['WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY', 'VITE_SUPABASE_ANON_KEY', 'OPEN_AI_API_KEY']) {
   if (!env[k]) { console.error(`${k} missing in ../.env.dev`); process.exit(1); }
 }
-const serverEnv = { url, serviceKey: env.WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY, anonKey: env.VITE_SUPABASE_ANON_KEY, openAiKey: env.OPEN_AI_API_KEY, openAiKeyFallback: env.OPEN_AI_API_KEY_FALLBACK || null, noRateLimit: argv.includes('--no-rate-limit'), createClient, ...(modelOverride ? { modelOverride } : {}) };
+const serverEnv = { url, serviceKey: env.WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY, anonKey: env.VITE_SUPABASE_ANON_KEY, openAiKey: env.OPEN_AI_API_KEY, openAiKeyFallback: env.OPEN_AI_API_KEY_FALLBACK || null, groqKey: env.GROQ_API_KEY || env.GROQ_Fallback || null, geminiKey: env.GEMINI_API_KEY || env.Gemini_Fallback || null, noRateLimit: argv.includes('--no-rate-limit'), createClient, ...(modelOverride ? { modelOverride, ...(keySlot ? { modelKeySlot: keySlot } : {}) } : {}) };
 const admin = createClient(url, serverEnv.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
 // GET /__log/<requestId>: the request-log row in the shape run-eval reads
@@ -106,4 +111,4 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) send(res, json({ error: 'server error' }, 500)); else res.end();
   }
 });
-server.listen(port, '127.0.0.1', () => console.log(`Assistant v2 on http://127.0.0.1:${port}/assistant (dev ${devRef})${asUser ? `, answering as ${asUser}` : ''}${modelOverride ? `, model ${modelOverride}` : ''}`));
+server.listen(port, '127.0.0.1', () => console.log(`Assistant v2 on http://127.0.0.1:${port}/assistant (dev ${devRef})${asUser ? `, answering as ${asUser}` : ''}${modelOverride ? `, model ${keySlot ? `${keySlot}:` : ''}${modelOverride}` : ''}`));

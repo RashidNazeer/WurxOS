@@ -149,6 +149,20 @@ export function dynamicTail(p: PromptInput): string {
   ].join('\n');
 }
 
+// Compact mode (agent/compact.ts): the core rules only. No page list, role
+// angle, page context or notes; who and when stay.
+export function compactInstructions(p: PromptInput): string {
+  const r = String(p.role || '').toLowerCase();
+  return [
+    p.persona,
+    `THE PERSON'S ROLE: ${ROLE_LABEL[r] ?? r}. ${ROLE_CAPS[r] ?? ''}`,
+    AUTHORITY_POLICY,
+    TOOL_RULES,
+    STYLE_RULES,
+    `NOW: ${pktDateString(p.now)}. WHO YOU ARE HELPING: ${p.displayName || 'a team member'} (${ROLE_LABEL[r] ?? p.role}).`,
+  ].join('\n\n');
+}
+
 export function buildInstructions(p: PromptInput): { prefix: string; tail: string; instructions: string } {
   const prefix = stablePrefix(p.persona, p.role);
   const tail = dynamicTail(p);

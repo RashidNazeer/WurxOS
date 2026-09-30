@@ -6,13 +6,15 @@
 //   • findReply / watchReply: picking up a reply after the stream dropped
 //   • history groups, page-aware chips, role starter cards
 
-// Who sees Buddy comes from ai_assistant_config.allowed_roles (the same list
-// the assistant function enforces). This is only the fallback when that read
-// fails, and it fails closed.
-export const BUDDY_ROLES = ['boss'];
+// Who sees Buddy: the Boss and developers always (Owner rule; the backend
+// enforces the same, mig 399), plus the roles in ai_assistant_config.allowed_roles.
+// If that read fails, only the always-roles: it fails closed.
+export const ALWAYS_ROLES = ['boss', 'developer'];
+export const BUDDY_ROLES = ALWAYS_ROLES;
 
 export function buddyRoles(allowedRoles) {
-  return Array.isArray(allowedRoles) ? allowedRoles.map((r) => String(r).toLowerCase()) : BUDDY_ROLES;
+  const extra = Array.isArray(allowedRoles) ? allowedRoles.map((r) => String(r).toLowerCase()) : [];
+  return [...new Set([...ALWAYS_ROLES, ...extra])];
 }
 
 export const TMP_PREFIX = 'tmp:';
@@ -41,10 +43,10 @@ export const ALL_ROLES = [
   ['apc', 'APCs'], ['ipc', 'IPCs'], ['ads_manager', 'Ads Managers'], ['developer', 'Developers'],
 ];
 
-// The Boss is always included: ticking roles can only widen access.
+// The Boss and developers are always included: ticking roles can only widen access.
 export function nextAllowedRoles(current, role, on) {
-  const set = new Set([...(Array.isArray(current) ? current : []), 'boss'].map((r) => String(r).toLowerCase()));
-  if (role !== 'boss') { if (on) set.add(role); else set.delete(role); }
+  const set = new Set([...(Array.isArray(current) ? current : []), ...ALWAYS_ROLES].map((r) => String(r).toLowerCase()));
+  if (!ALWAYS_ROLES.includes(role)) { if (on) set.add(role); else set.delete(role); }
   return ALL_ROLES.map(([r]) => r).filter((r) => set.has(r));
 }
 
@@ -359,6 +361,7 @@ export function answeredBy(meta) {
     model: meta?.model || null,
     keySlot: meta?.key_slot || null,
     fallbackUsed: meta?.fallback_used || null,
+    modelSource: meta?.model_source || null,   // role / global / economy (models by role)
   };
 }
 
@@ -574,9 +577,42 @@ export const USAGE_KIND_LABEL = {
   embeddings_ingest: 'Ingestion embeddings',
 };
 
-// ── models (Boss, mig 397) ─────────────────────────────────────────
-export const KEY_SLOT_LABEL = { primary: 'Main key (paid)', fallback: 'Fallback key (free)' };
-export const KEY_SLOT_SHORT = { primary: 'main key', fallback: 'backup' };
+// ── models (Boss edits, developers view; mig 397+) ─────────────────
+// One key slot per provider key. Labels and order come from ai_key_slots
+// (mig 401) via keySlotMeta(); these defaults mirror that table and are only
+// used until it loads (or if it can't be read). Unknown slots from the
+// catalog are still shown, under their own name, after the known ones.
+export const KEY_SLOTS = ['primary', 'fallback', 'gemini', 'groq'];
+export const KEY_SLOT_LABEL = {
+  primary: 'OpenAI', fallback: 'OpenAI (fallback key)', gemini: 'Gemini (free)', groq: 'Groq (free)',
+};
+export const DEFAULT_SLOT_META = { order: KEY_SLOTS, labels: KEY_SLOT_LABEL };
+
+// ai_key_slots rows ({slot, label, sort, …}) → { order, labels }.
+export function keySlotMeta(rows) {
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r && r.slot);
+  if (!list.length) return DEFAULT_SLOT_META;
+  const sorted = [...list].sort((a, b) => (Number(a.sort) || 0) - (Number(b.sort) || 0) || String(a.slot).localeCompare(String(b.slot)));
+  return {
+    order: sorted.map((r) => r.slot),
+    labels: Object.fromEntries(sorted.map((r) => [r.slot, r.label || KEY_SLOT_LABEL[r.slot] || r.slot])),
+  };
+}
+
+// Buddy settings (Owner, 2026-10-01): the Boss and active developers open AND
+// change them; nobody else sees them. The database checks the same
+// (ai_can_view_settings / ai_can_edit_settings).
+export const SETTINGS_ROLES = ['boss', 'developer'];
+export const canEditSettings = (profile) => !!profile && profile.is_active !== false && !profile.deleted_at
+  && SETTINGS_ROLES.includes(profile.role);
+
+export const slotLabel = (s, meta = DEFAULT_SLOT_META) => meta.labels[s] || KEY_SLOT_LABEL[s] || s;
+
+// The slots to show, in order: the table's, then any other the catalog has.
+export function slotsOf(catalog, meta = DEFAULT_SLOT_META) {
+  const extra = [...new Set((catalog || []).map((r) => r.key_slot).filter((s) => s && !meta.order.includes(s)))].sort();
+  return [...meta.order, ...extra];
+}
 
 // The three built-ins keep their friendly labels, and are what the picker
 // offers when the catalog is empty (the database accepts only these then).
@@ -597,7 +633,14 @@ export const catalogRowUsable = (r) => !!r && (
   (r.available && r.supports_tools && r.supports_stream)
   || (r.key_slot === 'primary' && BUILTIN.has(r.model) && isQuotaError(r.last_error)));
 
+// A model whose check failed only for a passing provider error (5xx, timeout).
+// The backend keeps it in the Boss's chain (models.ts TRANSIENT_REASON).
+export const TRANSIENT_REASON = 'did not answer the check (provider error or timeout)';
+export const isTransientRow = (r) => !!r && r.reason === TRANSIENT_REASON;
+
 function unusableReason(r) {
+  // The backend's own explanation first (mig 401: "not a chat model", "no quota on this key", …).
+  if (r.reason) return r.reason;
   if (!r.available) return r.last_error || 'not available on this key';
   if (!r.supports_tools) return 'no tool calling (Buddy needs it to look things up)';
   if (!r.supports_stream) return 'no streaming';
@@ -614,14 +657,15 @@ export function modelBadges(r) {
   return b;
 }
 
-// Picker options per key: { primary: [...], fallback: [...] }, each
-// { key_slot, model, label, usable, reason, badges }. Usable first, then the
-// built-ins, then A–Z. A key with no catalog rows offers nothing, except the
+// Picker options per key slot: { primary: [...], fallback: [...], gemini, groq,
+// …any other }, each { key_slot, model, label, usable, reason, badges }. Every
+// catalogued model is listed (unusable ones carry their reason). Usable first,
+// then the built-ins, then A–Z. A slot with no rows offers nothing, except the
 // main key, which falls back to the three built-ins.
-export function modelOptions(catalog) {
+export function modelOptions(catalog, meta = DEFAULT_SLOT_META) {
   const rows = Array.isArray(catalog) ? catalog : [];
-  const out = { primary: [], fallback: [] };
-  for (const slot of ['primary', 'fallback']) {
+  const out = {};
+  for (const slot of slotsOf(rows, meta)) {
     const mine = rows.filter((r) => r.key_slot === slot);
     const list = mine.length || slot !== 'primary'
       ? mine
@@ -630,6 +674,7 @@ export function modelOptions(catalog) {
       const usable = r.builtinOnly || catalogRowUsable(r);
       return {
         key_slot: slot, model: r.model, label: modelLabel(r.model), usable,
+        transient: !usable && isTransientRow(r),
         reason: usable ? '' : unusableReason(r),
         badges: r.builtinOnly ? [] : modelBadges(r),
       };
@@ -659,13 +704,157 @@ export function lastChecked(catalog) {
   return best ? new Date(best).toISOString() : null;
 }
 
-// Fallback chain edits: ordered, no duplicates, at most 5.
-export const FALLBACK_MAX = 5;
+// All options of every slot, flat, in slot order.
+export const allOptions = (options) => Object.values(options || {}).flat();
+
+// The search box: case-insensitive match on the model name (and its label).
+// The currently chosen model is always kept, so the picker never loses it.
+export function filterOptions(options, query, keep) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return options;
+  const out = {};
+  for (const [slot, list] of Object.entries(options || {})) {
+    out[slot] = list.filter((o) => o.label.toLowerCase().includes(q)
+      || (keep && o.key_slot === keep.key_slot && o.model === keep.model));
+  }
+  return out;
+}
+
+// How a saved fallback will behave, mirroring chooseTargets (models.ts):
+// 'ok' usable; 'flaky' its check only hit a provider hiccup, still tried;
+// 'skipped' catalogued as unusable, so the backend skips it. A key slot with
+// no catalog rows is tried anyway ('ok').
+export function chainEntryStatus(entry, catalog) {
+  const rows = (catalog || []).filter((r) => r.key_slot === entry.key_slot);
+  if (!rows.length) return 'ok';
+  const r = rows.find((x) => x.model === entry.model);
+  if (r && catalogRowUsable(r)) return 'ok';
+  if (r && isTransientRow(r)) return 'flaky';
+  return 'skipped';
+}
+
+// Fallback chain edits: ordered, no duplicates, capped at the backend's
+// MAX_FALLBACKS (models.ts) and the config trigger (mig 401): 6.
+export const FALLBACK_MAX = 6;
 const sameTarget = (a, b) => a.key_slot === b.key_slot && a.model === b.model;
-export function chainAdd(chain, item) {
+export function chainAdd(chain, item, max = FALLBACK_MAX) {
   const c = Array.isArray(chain) ? chain : [];
-  if (!item?.model || c.length >= FALLBACK_MAX || c.some((x) => sameTarget(x, item))) return c;
-  return [...c, { key_slot: item.key_slot === 'primary' ? 'primary' : 'fallback', model: item.model }];
+  if (!item?.model || !item?.key_slot || c.length >= max || c.some((x) => sameTarget(x, item))) return c;
+  return [...c, { key_slot: String(item.key_slot), model: item.model }];
+}
+
+// ── models by role (Owner, 2026-10-01; contract provisional) ───────
+// ai_assistant_config.role_models: { role: { model, key_slot, fallback_models,
+// economy: { model, key_slot } } }. A missing field means "Default" (inherit
+// the global setting). budget_saver_pct: at this % of the monthly budget,
+// roles with an economy model switch to it (null = off).
+export const ROLE_MODEL_ROLES = ['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer', 'ads_manager'];
+const ROLE_LABEL = Object.fromEntries(ALL_ROLES);
+export const roleLabel = (r) => ROLE_LABEL[r] || r;
+
+const isTarget = (t) => !!t && typeof t === 'object' && !!t.model && !!t.key_slot;
+const pickTarget = (t) => (isTarget(t) ? { key_slot: String(t.key_slot), model: String(t.model) } : null);
+
+// Only the known shape survives (a stray key is dropped, never sent back).
+export function normalizeRoleModels(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [role, e] of Object.entries(raw)) {
+    if (!e || typeof e !== 'object') continue;
+    const x = {};
+    const main = pickTarget(e);
+    if (main) { x.model = main.model; x.key_slot = main.key_slot; }
+    if (Array.isArray(e.fallback_models)) x.fallback_models = e.fallback_models.map(pickTarget).filter(Boolean).slice(0, FALLBACK_MAX);
+    const eco = pickTarget(e.economy);
+    if (eco) x.economy = eco;
+    if (Object.keys(x).length) out[role] = x;
+  }
+  return out;
+}
+
+// What a role's row shows: each column either inherits ("Default") or overrides.
+export function roleModelView(roleModels, role, global = {}) {
+  const e = roleModels?.[role] || {};
+  const main = pickTarget(e);
+  return {
+    main: main ? { inherit: false, ...main } : { inherit: true, key_slot: global.model_key_slot || 'primary', model: global.model || null },
+    backups: Array.isArray(e.fallback_models)
+      ? { inherit: false, chain: e.fallback_models }
+      : { inherit: true, chain: Array.isArray(global.fallback_models) ? global.fallback_models : [] },
+    economy: pickTarget(e.economy),
+  };
+}
+
+// Edits return a new map; clearing the last override removes the role entry.
+function setRoleField(roleModels, role, apply) {
+  const all = { ...(roleModels || {}) };
+  const e = apply({ ...(all[role] || {}) });
+  if (Object.keys(e).length) all[role] = e; else delete all[role];
+  return all;
+}
+export const setRoleMain = (rm, role, target) => setRoleField(rm, role, (e) => {
+  delete e.model; delete e.key_slot;
+  const t = pickTarget(target);
+  return t ? { ...e, model: t.model, key_slot: t.key_slot } : e;
+});
+export const setRoleBackups = (rm, role, chain) => setRoleField(rm, role, (e) => {
+  delete e.fallback_models;
+  return Array.isArray(chain) ? { ...e, fallback_models: chain.slice(0, FALLBACK_MAX) } : e;
+});
+export const setRoleEconomy = (rm, role, target) => setRoleField(rm, role, (e) => {
+  delete e.economy;
+  const t = pickTarget(target);
+  return t ? { ...e, economy: t } : e;
+});
+
+// The budget saver line: is a budget set, how much is used, is it active now.
+export function budgetSaverState(pct, monthToDate) {
+  const budget = Number(monthToDate?.budget_usd) || 0;
+  const used = monthToDate?.budget_used_pct;
+  const threshold = pct == null || pct === '' ? null : Number(pct);
+  return {
+    hasBudget: budget > 0,
+    usedPct: used == null ? null : Number(used),
+    threshold,
+    active: budget > 0 && threshold != null && used != null && Number(used) >= threshold,
+  };
+}
+export const validSaverPct = (v) => v === '' || v == null || (Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 100);
+
+// meta.model_source on an answer (Boss/developer debug line).
+const MODEL_SOURCE_LABEL = { role: 'role setting', global: 'global setting', economy: 'budget saver (economy)' };
+export const modelSourceLabel = (s) => (s ? MODEL_SOURCE_LABEL[s] || s : null);
+
+// ── ingestion fallbacks (mig 402, Engineer 2; names provisional) ───
+// Vectors per embedding model, from ai_ingest_stats: an object {model: n} or
+// an array [{model, count|n|chunks}]. → [{model, count}], biggest first.
+export function vectorsByModel(stats) {
+  const v = stats?.vectors_by_model ?? stats?.embeddings_by_model ?? null;
+  if (!v) return [];
+  const rows = Array.isArray(v)
+    ? v.map((x) => ({ model: String(x.model ?? x.embed_model ?? 'unknown'), count: Number(x.count ?? x.n ?? x.chunks ?? 0) }))
+    : Object.entries(v).map(([model, n]) => ({ model, count: Number(typeof n === 'object' ? (n?.count ?? n?.chunks ?? 0) : n) }));
+  return rows.filter((r) => Number.isFinite(r.count)).sort((a, b) => b.count - a.count || a.model.localeCompare(b.model));
+}
+
+// Document types that may go to free AI providers. Incentive plans contain pay
+// amounts, so they are left out unless the Boss ticks them.
+export const FREE_SOURCES_DEFAULT_OFF = ['incentive'];
+export function freeSourcesValue(saved, allTypes) {
+  if (Array.isArray(saved)) return allTypes.filter((t) => saved.includes(t));
+  return allTypes.filter((t) => !FREE_SOURCES_DEFAULT_OFF.includes(t));
+}
+export function toggleInList(list, item, on, order) {
+  const set = new Set(list || []);
+  if (on) set.add(item); else set.delete(item);
+  return (order || [...set]).filter((x) => set.has(x));
+}
+
+// Usage "by key": the four known slots always (zeros if unused), then any other.
+export function keySlotRows(byKeySlot, meta = DEFAULT_SLOT_META) {
+  const d = byKeySlot || {};
+  const slots = [...meta.order, ...Object.keys(d).filter((s) => !meta.order.includes(s)).sort()];
+  return slots.map((s) => ({ slot: s, label: slotLabel(s, meta), questions: 0, fallback_used: 0, est_cost_usd: 0, ...(d[s] || {}) }));
 }
 export const chainRemove = (chain, i) => chain.filter((_, j) => j !== i);
 export function chainMove(chain, i, dir) {

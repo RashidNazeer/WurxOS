@@ -146,7 +146,14 @@ export async function listModelCatalog() {
   return data || [];
 }
 
-// Probes every model on both keys (~60 s). Boss only (403 otherwise).
+// The model keys, with their labels and order (mig 401). [] if it can't be
+// read: the UI then uses its built-in labels.
+export async function listKeySlots() {
+  const { data, error } = await supabase.from('ai_key_slots').select('*').order('sort');
+  return error ? [] : data || [];
+}
+
+// Probes every model on every key (~60 s). The Boss or a developer (403 otherwise).
 export async function refreshModelList() {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
@@ -161,17 +168,28 @@ export async function refreshModelList() {
   return body;
 }
 
+// auto_failover (the "automatic safety net") is newer than the other model
+// columns: until its migration lands, read and save without it.
+const MODEL_COLS = 'model, model_key_slot, fallback_models, fallback_enabled';
 export async function getModelConfig() {
-  const { data, error } = await supabase.from('ai_assistant_config')
-    .select('model, model_key_slot, fallback_models, fallback_enabled').eq('id', 1).maybeSingle();
+  if (schema.autoFailover !== false) {
+    const { data, error } = await supabase.from('ai_assistant_config')
+      .select(`${MODEL_COLS}, auto_failover`).eq('id', 1).maybeSingle();
+    if (!error) { schema.autoFailover = true; return data || {}; }
+    if (!missingColumn(error)) throw new Error(error.message);
+    schema.autoFailover = false;
+  }
+  const { data, error } = await supabase.from('ai_assistant_config').select(MODEL_COLS).eq('id', 1).maybeSingle();
   if (error) throw new Error(error.message);
   return data || {};
 }
 
 // A bad choice is refused by a trigger (mig 397) with a readable message: pass it on.
 export async function saveModelConfig(patch) {
+  const { auto_failover, ...rest } = patch;
+  const row = schema.autoFailover && auto_failover !== undefined ? { ...rest, auto_failover } : rest;
   const { error } = await supabase.from('ai_assistant_config')
-    .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1);
+    .update({ ...row, updated_at: new Date().toISOString() }).eq('id', 1);
   if (error) throw new Error(error.message);
 }
 
@@ -272,7 +290,7 @@ export async function sendFeedback(requestId, rating, note) {
 }
 
 // The Boss-edited greeting + who may use Buddy (mig 385). allowedRoles is null when the read
-// fails, so the caller falls back to BUDDY_ROLES (boss only).
+// fails, so the caller falls back to BUDDY_ROLES (the Boss and developers only).
 export async function getBuddyConfig() {
   try {
     const { data, error } = await supabase.from('ai_assistant_config').select('greeting, allowed_roles').eq('id', 1).maybeSingle();

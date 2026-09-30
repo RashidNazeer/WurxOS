@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import {
-  buddyRoles, TMP_PREFIX, isTmpKey, buddyReducer, initialBuddyState, deriveMood, unreadCount,
+  ALWAYS_ROLES, buddyRoles, TMP_PREFIX, isTmpKey, buddyReducer, initialBuddyState, deriveMood, unreadCount,
   unreadTitle, friendlyError, findReply, watchReply, isStuck, STUCK_MS, greetingText, firstName, serverUnread,
   clockSkew, questionBefore, canRegenerateMsg,
 } from '../lib/buddyLogic';
@@ -33,9 +33,12 @@ export function BuddyProvider({ children }) {
     getBuddyConfig().then((c) => { if (!cancelled) setCfg(c); });
     return () => { cancelled = true; };
   }, [uid]);
-  const gateReady = !!uid && cfg !== undefined;
-  // The UI gate mirrors the function's allowed_roles; BUDDY_ROLES (boss) if the read failed.
-  const allowed = gateReady && buddyRoles(cfg.allowedRoles).includes(role);
+  // The UI gate mirrors the function: the Boss and developers always (no need
+  // to wait for the config), everyone else by allowed_roles; if that read
+  // failed, only the always-roles.
+  const always = !!uid && ALWAYS_ROLES.includes(role);
+  const gateReady = always || (!!uid && cfg !== undefined);
+  const allowed = always || (gateReady && buddyRoles(cfg?.allowedRoles).includes(role));
 
   const [state, dispatch] = useReducer(buddyReducer, initialBuddyState);
   const stateRef = useRef(state);

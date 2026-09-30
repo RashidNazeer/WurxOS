@@ -435,8 +435,8 @@ export const MENUS = {
 export function getMenuForRole(role, opts = {}) {
   const base = MENUS[role] || MENUS.apc;
   const out = [...base];
-  // Wurx Buddy: opts.buddy is BuddyProvider's gate (ai_assistant_config.allowed_roles,
-  // the list the assistant function enforces); BUDDY_ROLES (boss) when not given.
+  // Wurx Buddy: opts.buddy is BuddyProvider's gate (the Boss and developers
+  // always, plus ai_assistant_config.allowed_roles); BUDDY_ROLES when not given.
   if (opts.buddy ?? BUDDY_ROLES.includes(role)) {
     const i = out.indexOf(CHAT_ITEM);
     const j = out.indexOf(NOTIFS_ITEM);
