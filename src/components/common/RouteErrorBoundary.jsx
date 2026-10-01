@@ -169,7 +169,7 @@ export default class RouteErrorBoundary extends React.Component {
                 padding: '10px 14px', borderRadius: 10,
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 8,
-                justifyContent: 'center', transition: 'background 0.15s',
+                justifyContent: 'center', transition: 'background-color var(--dur-fast) var(--ease-out)',
               }}>
               <i className={`bi ${copied ? 'bi-check-circle-fill' : 'bi-clipboard'}`} />
               {copied ? 'Copied!' : 'Copy details'}

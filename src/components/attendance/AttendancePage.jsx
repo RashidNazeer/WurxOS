@@ -1186,7 +1186,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
                 <span className="fw-semibold">{progress.done} / {progress.total}</span>
               </div>
               <div className="rounded-pill overflow-hidden" style={{ height: 6, background: 'var(--surface-2)' }}>
-                <div className="h-100" style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`, background: 'linear-gradient(90deg,var(--info),var(--accent))', transition: 'width 200ms ease' }} />
+                <div className="h-100" style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`, background: 'linear-gradient(90deg,var(--info),var(--accent))', transition: 'width var(--dur-base) var(--ease-out)' }} />
               </div>
             </div>
           )}
@@ -2109,7 +2109,7 @@ export default function AttendancePage() {
                         background: s.bg, minWidth: 78, cursor: 'pointer',
                         border: `1px solid color-mix(in srgb, ${s.color} ${active ? '33%' : '8%'}, transparent)`,
                         boxShadow: active ? `0 0 0 2px color-mix(in srgb, ${s.color} 33%, transparent)` : 'none',
-                        transition: 'box-shadow 0.15s, border-color 0.15s',
+                        transition: 'box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
                       }}
                     >
                       <div className="fw-bold" style={{ fontSize: '1.1rem', color: s.color }}>{s.value}</div>

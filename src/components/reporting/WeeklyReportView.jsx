@@ -437,7 +437,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
       style={{
         display: 'block', textDecoration: 'none', color: 'inherit',
         borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.line}`,
-        background: C.surface, transition: 'transform 120ms ease, box-shadow 120ms ease',
+        background: C.surface, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
       onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(15,23,42,0.10)'; } }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
@@ -588,14 +588,14 @@ function ComparisonRow({ label, current, previous, fmt }) {
       <div className="d-flex align-items-center gap-2 mt-1">
         <span style={{ width: 64, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>This wk</span>
         <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(num(current) / max) * 100}%`, background: C.amber, transition: 'width 320ms ease' }} />
+          <div style={{ height: '100%', width: `${(num(current) / max) * 100}%`, background: C.amber, transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
         <span style={{ minWidth: 78, textAlign: 'right', fontSize: '0.78rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt(current)}</span>
       </div>
       <div className="d-flex align-items-center gap-2">
         <span style={{ width: 64, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last wk</span>
         <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width 320ms ease' }} />
+          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
         <span style={{ minWidth: 78, textAlign: 'right', fontSize: '0.78rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmt(previous)}</span>
       </div>

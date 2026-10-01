@@ -47,7 +47,7 @@ export default function TeamManagementPage() {
                 padding: '8px 18px', fontSize: '0.82rem', fontWeight: 700,
                 letterSpacing: '-0.01em',
                 boxShadow: isActive ? '0 2px 8px rgba(15,23,42,0.08)' : 'none',
-                transition: 'all 150ms ease',
+                transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
               }}
               onClick={() => setTab(t.key)}>
               <i className={`bi ${t.icon}`} />{t.label}

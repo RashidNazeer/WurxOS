@@ -19,7 +19,7 @@
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -54,7 +54,7 @@
   padding: 12px 14px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-1);
-  transition: background var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out);
   position: relative; /* anchors the absolute .task-select checkbox */
 }
 .task-row:last-child { border-bottom: 0; }
@@ -108,7 +108,7 @@
   padding: 0;
   display: grid;
   place-items: center;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
   justify-self: center;
 }
 .task-status-btn:hover { border-color: var(--accent); }
@@ -192,7 +192,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .task-status-pill:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .task-status-pill[data-status='in_progress'] {
@@ -222,11 +222,7 @@
   box-shadow: var(--shadow-lg);
   padding: 4px;
   z-index: 1200;
-  animation: wx-pop 0.12s var(--ease-out);
-}
-@keyframes wx-pop {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  animation: wx-pop var(--dur-enter) var(--ease-out);
 }
 .task-status-option {
   display: flex;
@@ -294,7 +290,7 @@
   flex-direction: column;
   min-height: 200px;
   max-height: calc(100vh - 260px);
-  transition: background var(--dur-fast), border-color var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .task-kanban-col-over {
   background: var(--accent-soft);
@@ -345,12 +341,14 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 10px 30px 10px 12px;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
   cursor: grab;
 }
 .task-kanban-card[data-draggable='false'] { cursor: default; opacity: 0.9; }
-.task-kanban-card:hover { border-color: var(--border-strong); }
+.task-kanban-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
 .task-kanban-card:active { cursor: grabbing; }
+/* Source card while it's being dragged (class toggled in TaskKanban). */
+.task-kanban-card.is-dragging { opacity: 0.45; transform: scale(0.98); }
 .task-kanban-card-title {
   font-weight: 700;
   font-size: 13px;
@@ -407,7 +405,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 4px 8px 4px 10px;
-  transition: border-color var(--dur-fast), background var(--dur-fast);
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 .task-filter:hover { border-color: var(--border-default); }
 .task-filter.is-active {

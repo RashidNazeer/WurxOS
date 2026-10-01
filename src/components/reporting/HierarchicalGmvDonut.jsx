@@ -83,7 +83,7 @@ export default function HierarchicalGmvDonut({ parents, total, currencySym = '$'
                     className="bi bi-chevron-right"
                     style={{
                       fontSize: '0.6rem', color: DONUT_C.muted, width: 10, textAlign: 'center',
-                      transition: 'transform 160ms ease',
+                      transition: 'transform var(--dur-exit) var(--ease-out)',
                       transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
                     }}
                   />

@@ -325,7 +325,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                         background: category === cat.value ? cat.color : cat.bg,
                         color: category === cat.value ? cat.on : cat.color,
                         borderColor: category === cat.value ? cat.color : `color-mix(in srgb, ${cat.color} 35%, transparent)`,
-                        cursor: 'pointer', transition: 'all 0.12s',
+                        cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                       }}>
                       <i className={`bi ${cat.icon}`} style={{ fontSize: '0.72rem' }} />{cat.label}
                     </button>
@@ -348,7 +348,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                             background: leaveType === lt.value ? 'var(--accent)' : 'var(--surface-0)',
                             color: leaveType === lt.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                             borderColor: leaveType === lt.value ? 'var(--accent)' : 'var(--border-subtle)',
-                            cursor: 'pointer', transition: 'all 0.12s',
+                            cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                           }}>
                           <i className={`bi ${lt.icon}`} style={{ fontSize: '0.72rem' }} />
                           {lt.label}
@@ -520,7 +520,7 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
 
           <div
             className="d-flex align-items-center gap-2 rounded-2 p-2 mb-4"
-            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `1.5px solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'all 0.15s' }}
+            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `1.5px solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
             onClick={() => setForwardToBoss(v => !v)}
           >
             <input type="checkbox" className="form-check-input flex-shrink-0" checked={forwardToBoss}
@@ -1180,7 +1180,7 @@ export default function LeaveRequestPage() {
                 { label: 'Rejected', value: 'rejected', count: myStats.rejected, color: 'var(--danger)', activeText: 'var(--on-danger)', bg: 'var(--danger-soft)', border: 'color-mix(in srgb, var(--danger) 35%, transparent)' },
               ].map(s => (
                 <div key={s.label} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2"
-                  style={{ background: filterStatus === s.value ? s.color : s.bg, border: `1px solid ${filterStatus === s.value ? s.color : s.border}`, cursor: 'pointer', transition: 'all 0.15s' }}
+                  style={{ background: filterStatus === s.value ? s.color : s.bg, border: `1px solid ${filterStatus === s.value ? s.color : s.border}`, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
                   onClick={() => setFilterStatus(filterStatus === s.value ? '' : s.value)}>
                   <span className="fw-bold" style={{ color: filterStatus === s.value ? s.activeText : s.color, fontSize: '1.05rem', lineHeight: 1 }}>{s.count}</span>
                   <span style={{ fontSize: '0.7rem', color: filterStatus === s.value ? s.activeText : s.color, opacity: 0.75, fontWeight: 500 }}>{s.label}</span>

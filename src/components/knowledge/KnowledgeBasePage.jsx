@@ -406,7 +406,7 @@ export default function KnowledgeBasePage() {
             <button key={tab.value}
               className="d-inline-flex align-items-center gap-1 rounded-pill border px-3 py-1"
               style={{
-                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
+                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                 background: activeTab === tab.value ? 'var(--accent)' : 'var(--surface-2)',
                 color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                 borderColor: activeTab === tab.value ? 'var(--accent)' : 'var(--border-subtle)',
@@ -669,7 +669,7 @@ function ProposeModal({ onClose, onSave, saving }) {
                       background: tab === t.value ? 'var(--accent)' : 'var(--surface-2)',
                       color: tab === t.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                       borderColor: tab === t.value ? 'var(--accent)' : 'var(--border-subtle)',
-                      cursor: 'pointer', transition: 'all 0.12s',
+                      cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                     }}>
                     <i className={`bi ${t.icon}`} style={{ fontSize: '0.65rem' }} />{t.label}
                   </button>

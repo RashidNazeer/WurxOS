@@ -44,7 +44,7 @@ export default function GmvMaxReportingPage() {
       <div className="row g-3">
         {/* Brand picker */}
         <div className="col-lg-4">
-          <div className="card border-0 shadow-sm" style={{ borderRadius: 14, position: 'sticky', top: 16 }}>
+          <div className="card border-0 shadow-sm" style={{ borderRadius: 14, position: 'sticky', top: 'calc(var(--topbar-h, 0px) + 16px)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <h6 className="fw-bold mb-0" style={{ fontSize: '0.85rem' }}>

@@ -349,7 +349,7 @@ function StatusBar({ label, done, total, color }) {
         <span style={{ color: 'var(--text-muted)' }}>{done}/{total} ({pct}%)</span>
       </div>
       <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999, transition: 'width 0.6s ease' }} />
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );

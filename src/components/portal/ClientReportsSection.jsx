@@ -366,7 +366,7 @@ export default function ClientReportsSection({
                 return (
                   <div key={r.id} className="col-md-6 col-lg-4">
                     <div className="card border-0 shadow-sm h-100"
-                      style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s' }}
+                      style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                       onClick={() => setViewReport(r)}
                       onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'none'}>

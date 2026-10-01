@@ -18,6 +18,11 @@ export const TT_STYLE = {
 };
 export const GRID = 'var(--chart-grid, var(--border-subtle))';
 
+// Shared Recharts motion: short ease-out draw-in, off under reduced motion.
+const REDUCED_MOTION = typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+export const CHART_ANIM = { isAnimationActive: !REDUCED_MOTION, animationDuration: 400, animationEasing: 'ease-out' };
+
 // Chart series colours are literals that read correctly against both the light
 // portal and the dark app. (SVG presentation attributes DO resolve var() in
 // current browsers — GRID above relies on it — so these could move to the
@@ -173,7 +178,7 @@ export const barBtnStyle = ({ accent = false, quiet = false, active = false } = 
   background: accent ? 'var(--accent)' : active ? 'var(--surface-2)' : 'transparent',
   color: accent ? 'var(--on-accent)' : 'var(--text-primary)',
   border: `1px solid ${accent ? 'var(--accent)' : 'var(--border-default)'}`,
-  transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+  transition: 'background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
 });
 
 export function BarButton({
@@ -420,7 +425,7 @@ export function ProgressMeter({ usable, required, unit = 'period', almostThere =
         )}
       </div>
       <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: tone, transition: 'width .3s ease' }} />
+        <div style={{ width: `${pct}%`, height: '100%', background: tone, transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );

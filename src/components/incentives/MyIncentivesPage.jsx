@@ -356,7 +356,7 @@ export default function IncentivesPage() {
                     <span className="fw-semibold">{myCompleted.length}/{myItems.length} ({myCompletionPct}%)</span>
                   </div>
                   <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-                    <div className="h-100 rounded-pill" style={{ width: `${myCompletionPct}%`, background: myCompletionPct === 100 ? '#198754' : '#0d6efd', transition: 'width 0.4s' }} />
+                    <div className="h-100 rounded-pill" style={{ width: `${myCompletionPct}%`, background: myCompletionPct === 100 ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                   </div>
                 </div>
                 <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>

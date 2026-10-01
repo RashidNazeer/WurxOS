@@ -540,7 +540,7 @@ export default function WeeklyReportsPage() {
                 : changeDir > 0 ? 'var(--success)' : changeDir < 0 ? 'var(--danger)' : 'var(--text-secondary)';
               return (
                 <div key={r.id} className="col-12 col-md-6 col-lg-4">
-                  <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s' }}
+                  <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                     onClick={() => handleViewReport(r)}
                     onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                     onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -737,7 +737,7 @@ export default function WeeklyReportsPage() {
             const latestPerf = s.latest?.overallPerformance || {};
             return (
               <div key={b.id} className="col-12 col-md-6 col-lg-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', overflow: 'hidden', transition: 'transform 0.15s' }}
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', overflow: 'hidden', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                   onClick={() => openBrand(b.id)}
                   onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                   onMouseLeave={e => e.currentTarget.style.transform = 'none'}>

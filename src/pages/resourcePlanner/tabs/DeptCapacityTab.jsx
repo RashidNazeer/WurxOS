@@ -62,7 +62,7 @@ function UtilBar({ value, target, status }) {
 
   return (
     <div style={{ position: 'relative', background: '#f1f5f9', borderRadius: 4, height: 18, overflow: 'visible' }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width .2s' }} />
+      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width var(--dur-base) var(--ease-out)' }} />
       <div style={{ position: 'absolute', left: `${targetPct}%`, top: -2, bottom: -2, width: 2, background: '#475569' }} />
       <div style={{ position: 'absolute', right: 6, top: 0, height: 18, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, color: '#0f172a' }}>
         {value}%

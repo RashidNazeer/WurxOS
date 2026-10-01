@@ -157,11 +157,7 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
       )}
 
       <style>{`
-        @keyframes node-pop {
-          from { opacity: 0; transform: translateY(6px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0)   scale(1);    }
-        }
-        .node-pop { animation: node-pop 320ms cubic-bezier(.22,.61,.36,1); }
+        .node-pop { animation: wx-rise var(--dur-enter) var(--ease-out); }
       `}</style>
     </div>
   );
@@ -355,7 +351,7 @@ function BrandChip({ name, onClick, small }) {
         fontWeight: 600,
         padding: small ? '2px 8px' : '4px 10px',
         cursor: 'pointer',
-        transition: 'transform 120ms ease, box-shadow 120ms ease',
+        transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(154,52,18,0.18)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}

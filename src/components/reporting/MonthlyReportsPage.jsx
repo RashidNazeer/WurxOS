@@ -325,7 +325,7 @@ export default function MonthlyReportsPage() {
                   borderRadius: 14, cursor: 'pointer',
                   border: '1px solid var(--border-subtle)',
                   boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-                  transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
+                  transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
                 }}
                   onClick={() => setDetailReport(r)}
                   onMouseEnter={e => {

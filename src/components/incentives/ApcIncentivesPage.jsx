@@ -92,7 +92,7 @@ function DetailsModal({ record, items, onClose }) {
                 style={{
                   width: `${p}%`,
                   background: isCompleted ? '#198754' : p >= 60 ? '#fd7e14' : '#0d6efd',
-                  transition: 'width 0.3s',
+                  transition: 'width var(--dur-slow) var(--ease-out)',
                 }}
               />
             </div>
@@ -258,7 +258,7 @@ function EditItemRow({ item, category, onChange, month }) {
               style={{
                 width: `${p}%`,
                 background: isCompleted ? '#198754' : p >= 60 ? '#fd7e14' : '#0d6efd',
-                transition: 'width 0.3s',
+                transition: 'width var(--dur-slow) var(--ease-out)',
               }}
             />
           </div>
@@ -660,7 +660,7 @@ export default function ApcIncentivesPage() {
                   style={{
                     width: `${completionPct}%`,
                     background: completionPct === 100 ? '#198754' : '#0d6efd',
-                    transition: 'width 0.4s',
+                    transition: 'width var(--dur-slow) var(--ease-out)',
                   }}
                 />
               </div>

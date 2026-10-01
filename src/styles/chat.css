@@ -54,7 +54,7 @@
   background: var(--surface-1);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .chat-rail-head-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 
@@ -97,7 +97,7 @@
   cursor: pointer;
   text-align: left;
   color: var(--text-primary);
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .chat-channel-row:hover { background: var(--surface-2); }
 .chat-channel-row.is-active { background: var(--accent-soft); }
@@ -201,7 +201,7 @@
   color: var(--text-muted);
   cursor: pointer;
   display: grid; place-items: center;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .chat-thread-menu-btn:hover { background: var(--surface-2); color: var(--text-primary); }
 .chat-thread-menu {
@@ -211,9 +211,11 @@
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-lg);
   padding: 6px;
   z-index: 50;
+  transform-origin: top right;
+  animation: wx-rise var(--dur-enter) var(--ease-out);
   display: flex; flex-direction: column; gap: 2px;
 }
 .chat-thread-menu-item {
@@ -448,7 +450,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color var(--dur-fast), background var(--dur-fast);
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 .chat-person-row:hover { border-color: var(--border-subtle); background: var(--surface-1); }
 .chat-person-row.is-selected { background: var(--accent-soft); border-color: var(--accent); }

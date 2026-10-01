@@ -181,7 +181,7 @@ function AnalogClock({ now, accent = '#16a34a', size = 200 }) {
         strokeWidth="5"
         strokeLinecap="round"
         transform={`rotate(${hourDeg} ${cx} ${cy})`}
-        style={{ transition: 'transform 0.4s cubic-bezier(.4,2.2,.6,1)' }}
+        style={{ transition: 'transform var(--dur-slow) cubic-bezier(.4,2.2,.6,1)' }}
       />
       {/* Minute hand */}
       <line
@@ -191,7 +191,7 @@ function AnalogClock({ now, accent = '#16a34a', size = 200 }) {
         strokeWidth="3.5"
         strokeLinecap="round"
         transform={`rotate(${minuteDeg} ${cx} ${cy})`}
-        style={{ transition: 'transform 0.4s cubic-bezier(.4,2.2,.6,1)' }}
+        style={{ transition: 'transform var(--dur-slow) cubic-bezier(.4,2.2,.6,1)' }}
       />
       {/* Second hand */}
       <line
@@ -201,7 +201,7 @@ function AnalogClock({ now, accent = '#16a34a', size = 200 }) {
         strokeWidth="1.8"
         strokeLinecap="round"
         transform={`rotate(${secondDeg} ${cx} ${cy})`}
-        style={{ transition: 'transform 0.15s cubic-bezier(.4,2.5,.6,1)' }}
+        style={{ transition: 'transform var(--dur-fast) cubic-bezier(.4,2.5,.6,1)' }}
       />
 
       {/* Center cap */}
@@ -779,7 +779,7 @@ export default function ClockWidget() {
           width: 100%; padding: 18px 22px; border-radius: 16px; border: none;
           display: flex; align-items: center; justify-content: space-between;
           font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em;
-          transition: all 0.15s; cursor: pointer;
+          transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); cursor: pointer;
         }
         .att-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
         .att-primary-btn i { font-size: 1.3rem; }
@@ -793,7 +793,7 @@ export default function ClockWidget() {
           background: var(--surface-0); color: var(--text-secondary);
           font-size: 0.82rem; font-weight: 600;
           display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-          transition: all 0.15s; cursor: pointer;
+          transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); cursor: pointer;
         }
         .att-secondary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .att-secondary-btn:hover:not(:disabled) { background: var(--surface-2); }
@@ -809,7 +809,7 @@ export default function ClockWidget() {
         .att-today-card h4 { color: var(--att-spotlight-fg); font-weight: 700; margin-bottom: 18px; font-size: 1.35rem; }
         .att-today-card .att-digit { color: var(--att-spotlight-fg); }
         .att-today-progress { background: color-mix(in srgb, var(--att-spotlight-fg) 8%, transparent); border-radius: 999px; height: 6px; overflow: hidden; }
-        .att-today-progress-fill { height: 100%; background: linear-gradient(90deg, #f5d5a8, #d4a574); transition: width 0.4s; }
+        .att-today-progress-fill { height: 100%; background: linear-gradient(90deg, #f5d5a8, #d4a574); transition: width var(--dur-slow) var(--ease-out); }
         [data-theme='dark'] .att-today-progress-fill { background: color-mix(in srgb, var(--on-accent) 70%, transparent); }
         .att-today-stat-col {
           flex: 1; text-align: left;
@@ -892,7 +892,7 @@ export default function ClockWidget() {
                 {!loading && !isClockedOut && (
                   <div className="d-inline-flex align-items-center gap-2"
                     style={{ background: `${sc}15`, color: sc, padding: '4px 10px', borderRadius: 999, fontSize: '0.66rem', fontWeight: 700, border: `1px solid ${sc}30` }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc, display: 'inline-block', animation: 'attPulse 1.8s ease-in-out infinite' }} />
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc, display: 'inline-block', animation: 'attPulse 1.8s var(--ease-in-out) infinite' }} />
                     {statusLabel(effStatus)}
                   </div>
                 )}
@@ -969,7 +969,7 @@ export default function ClockWidget() {
                         {LOCATIONS.map(loc => (
                           <button key={loc.key}
                             className="btn d-flex align-items-center gap-2 px-3 py-2"
-                            style={{ border: `2px solid ${loc.color}25`, borderRadius: 12, background: 'var(--surface-1)', transition: 'all 0.15s' }}
+                            style={{ border: `2px solid ${loc.color}25`, borderRadius: 12, background: 'var(--surface-1)', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
                             onClick={() => handleClockIn(loc.key)}
                             disabled={action === 'clockin'}
                             onMouseEnter={e => { e.currentTarget.style.background = `${loc.color}08`; e.currentTarget.style.borderColor = loc.color; }}
@@ -1113,7 +1113,7 @@ export default function ClockWidget() {
 
                   {isTL && record?.status === 'clocked-in' && (
                     <div className="rounded-3 p-3 mt-3"
-                      style={{ background: autoClockOutEnabled ? 'var(--warning-soft)' : 'var(--surface-0)', border: `1px solid ${autoClockOutEnabled ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)'}`, transition: 'all 0.15s' }}>
+                      style={{ background: autoClockOutEnabled ? 'var(--warning-soft)' : 'var(--surface-0)', border: `1px solid ${autoClockOutEnabled ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)'}`, transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}>
                       <div className="d-flex align-items-center gap-2" style={{ cursor: 'pointer' }} onClick={handleToggleAutoClockOut}>
                         <input type="checkbox" className="form-check-input flex-shrink-0" checked={autoClockOutEnabled} readOnly style={{ cursor: 'pointer' }} />
                         <span className="small fw-semibold" style={{ color: autoClockOutEnabled ? 'var(--warning)' : 'var(--text-secondary)' }}>
@@ -1557,7 +1557,7 @@ function StatBlock({ label, value, color, icon, live }) {
               position: 'absolute', top: -1, right: -1,
               width: 6, height: 6, borderRadius: '50%',
               background: color, boxShadow: `0 0 0 2px var(--surface-1)`,
-              animation: 'attPulse 1.4s ease-in-out infinite',
+              animation: 'attPulse 1.4s var(--ease-in-out) infinite',
             }}
           />
         )}

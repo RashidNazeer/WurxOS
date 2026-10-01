@@ -96,7 +96,7 @@ function ModalShell({ onClose, title, subtitle, children }) {
               borderRadius: 8, border: '1px solid var(--border)',
               background: 'var(--surface-1)', color: 'var(--text-secondary)',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 0, transition: 'background 120ms ease, color 120ms ease',
+              cursor: 'pointer', padding: 0, transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>

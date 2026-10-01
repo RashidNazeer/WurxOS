@@ -63,7 +63,7 @@ export default function HierarchyTree({ boss, ols, tls, allReportsCount, allBran
           from { opacity: 0; transform: translateY(-6px); }
           to   { opacity: 1; transform: translateY(0);    }
         }
-        .tree-children { animation: slide-down 200ms ease-out; }
+        .tree-children { animation: slide-down var(--dur-enter) var(--ease-out); }
       `}</style>
     </div>
   );
@@ -75,7 +75,7 @@ function Chevron({ open, onClick }) {
       className="border-0 rounded-circle d-flex align-items-center justify-content-center"
       style={{
         width: 24, height: 24, background: '#f1f5f9', cursor: 'pointer',
-        transition: 'transform 200ms ease',
+        transition: 'transform var(--dur-base) var(--ease-out)',
         transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
         flexShrink: 0,
       }}>

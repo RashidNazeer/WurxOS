@@ -62,7 +62,7 @@ function OlBrandPanel({ status, olItem, paid }) {
       <div className="px-3 pt-3">
         {/* progress with a marker at the target% */}
         <div className="position-relative rounded-pill" style={{ height: 8, background: 'var(--surface-2)' }}>
-          <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: met ? 'var(--success)' : 'var(--accent)', transition: 'width .4s' }} />
+          <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: met ? 'var(--success)' : 'var(--accent)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
           <div style={{ position: 'absolute', top: -3, bottom: -3, left: `${target}%`, width: 2, background: 'var(--text-primary)', opacity: 0.55 }} title={`Target ${target}%`} />
         </div>
         <div className="d-flex justify-content-between mt-1" style={{ fontSize: '0.66rem', color: 'var(--text-muted)' }}>
@@ -540,7 +540,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
         {item.targetValue > 0 && (
           <div className="mt-2">
             <div className="rounded-pill overflow-hidden" style={{ height: 4, background: '#e9ecef' }}>
-              <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: item.completed ? '#198754' : '#0d6efd', transition: 'width 0.3s' }} />
+              <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: item.completed ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
             </div>
           </div>
         )}
@@ -1088,7 +1088,7 @@ export default function OLIncentivesPage() {
                     <span className="fw-semibold">{myCompleted.length}/{myAllItems.length} ({myCompletionPct}%)</span>
                   </div>
                   <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-                    <div className="h-100 rounded-pill" style={{ width: `${myCompletionPct}%`, background: myCompletionPct === 100 ? '#198754' : '#0d6efd', transition: 'width 0.4s' }} />
+                    <div className="h-100 rounded-pill" style={{ width: `${myCompletionPct}%`, background: myCompletionPct === 100 ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                   </div>
                 </div>
                 {!myRecord.payoutCleared && (
@@ -1355,9 +1355,9 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
           <span className="text-muted">{pkr(s.totalPayout)} total</span>
         </div>
         <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: '#64748b', transition: 'width .3s' }} />}
-          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: '#16a34a', transition: 'width .3s' }} />}
-          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: '#3b82f6', transition: 'width .3s' }} />}
+          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: '#64748b', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: '#3b82f6', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
           <Legend color="#64748b" label="Base" value={pkr(s.totalBase)} />
@@ -1373,9 +1373,9 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
           <span className="text-muted">{s.fullyAchieved + s.partial} of {s.fullyAchieved + s.partial + s.noneEarned} earned something</span>
         </div>
         <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: '#16a34a', transition: 'width .3s' }} />}
-          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: '#fbbf24', transition: 'width .3s' }} />}
-          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: '#cbd5e1', transition: 'width .3s' }} />}
+          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: '#fbbf24', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: '#cbd5e1', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
           <Legend color="#16a34a" label="Fully achieved" value={s.fullyAchieved} />

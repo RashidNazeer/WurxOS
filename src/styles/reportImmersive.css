@@ -94,7 +94,7 @@
   text-align: left;
   color: var(--text-primary);
   margin-bottom: 2px;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
   font-family: inherit;
 }
 .wri-navitem:hover { background: var(--surface-2); }
@@ -118,7 +118,7 @@
   place-items: center;
   background: color-mix(in srgb, var(--hue) 16%, transparent);
   color: var(--hue);
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .wri-navitem.active .wri-chip { background: var(--hue); color: #fff; }
 .wri-chip i { font-size: 0.95rem; }
@@ -177,7 +177,7 @@
   font-size: 0.76rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
 }
 .wri-btn:hover:not(:disabled) { background: var(--surface-2); }
 .wri-btn:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -320,7 +320,8 @@
 }
 
 /* ── Panels ────────────────────────────────────────────────── */
-.wri-panel { animation: wri-enter 0.34s var(--ease-out); }
+/* Kept module-local: a plain 8px rise without wx-rise's scale, which reads oddly on full-width panels. */
+.wri-panel { animation: wri-enter var(--dur-slow) var(--ease-out); }
 @keyframes wri-enter {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
@@ -386,10 +387,6 @@
   .wri-scroll { padding: 16px 16px 90px 14px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .wri-panel { animation: none; }
-  .wri-track > i, .wri-obar > i, .wri-meter .t > i { transition: none; }
-}
 
 /* ════════════════════════════════════════════════════════════════
    Redesign: collapsible nav submenus, group dividers, and the
@@ -436,7 +433,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .wri-subitem::before {
   content: "";
@@ -444,7 +441,7 @@
   border-radius: 50%;
   background: var(--border-default);
   flex: none;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .wri-subitem:hover { background: var(--surface-2); color: var(--text-primary); }
 .wri-subitem.active { color: var(--hue); font-weight: 700; }
@@ -612,7 +609,7 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .wri-addfield:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent); color: var(--text-primary); }
 .wri-addfield:disabled { opacity: 0.55; cursor: not-allowed; }

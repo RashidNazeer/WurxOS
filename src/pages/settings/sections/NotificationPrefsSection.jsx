@@ -107,14 +107,14 @@ export default function NotificationPrefsSection() {
           border: '1px solid',
           borderColor: soundOn ? 'var(--accent)' : 'var(--border-default)',
           position: 'relative', flex: '0 0 auto',
-          transition: 'background var(--dur-fast)',
+          transition: 'background-color var(--dur-fast) var(--ease-out)',
         }}>
           <span style={{
             position: 'absolute', top: 1, left: soundOn ? 17 : 1,
             width: 16, height: 16, borderRadius: '50%',
             background: '#fff',
             boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-            transition: 'left var(--dur-fast)',
+            transition: 'left var(--dur-fast) var(--ease-out)',
           }} />
         </span>
       </div>
@@ -149,7 +149,7 @@ export default function NotificationPrefsSection() {
                   border: '1px solid',
                   borderColor: on ? 'var(--accent)' : 'var(--border-default)',
                   position: 'relative', flex: '0 0 auto',
-                  transition: 'background var(--dur-fast)',
+                  transition: 'background-color var(--dur-fast) var(--ease-out)',
                 }}
               >
                 <span style={{
@@ -157,7 +157,7 @@ export default function NotificationPrefsSection() {
                   width: 16, height: 16, borderRadius: '50%',
                   background: '#fff',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                  transition: 'left var(--dur-fast)',
+                  transition: 'left var(--dur-fast) var(--ease-out)',
                 }} />
               </span>
             </div>

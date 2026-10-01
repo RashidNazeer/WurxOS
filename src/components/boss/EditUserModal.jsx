@@ -317,7 +317,7 @@ function Switch({ checked, onChange, disabled }) {
         borderColor: checked ? 'var(--accent)' : 'var(--border-default)',
         position: 'relative',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'all var(--dur-fast) var(--ease-out)',
+        transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
         padding: 0,
         flex: '0 0 auto',
       }}

@@ -602,7 +602,7 @@ function ChangeLogView() {
                 {filtered.length === 0 ? (
                   <tr><td colSpan={headers.length} className="text-center text-muted py-3">No matching entries.</td></tr>
                 ) : filtered.map((r, ri) => (
-                  <tr key={ri} style={{ transition: 'background 0.1s' }}>
+                  <tr key={ri} style={{ transition: 'background-color var(--dur-instant) var(--ease-out)' }}>
                     {r.map((c, ci) => (
                       <td key={ci} className="px-3 py-2" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c}>{c || '—'}</td>
                     ))}

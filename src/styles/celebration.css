@@ -74,7 +74,7 @@
   background:
     radial-gradient(120% 90% at 50% -10%, var(--cel-bg-1) 0%, var(--cel-bg-2) 55%, var(--cel-bg-3) 100%);
   box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.55);
-  animation: cel-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: cel-rise 0.5s var(--ease-emphasized) both;
   text-align: center;
   padding: 40px 28px 28px;
 }
@@ -104,7 +104,7 @@
   border: 1px solid color-mix(in srgb, var(--cel-gold) 42%, transparent);
   background: color-mix(in srgb, var(--cel-gold) 10%, transparent);
   box-shadow: 0 0 0 12px color-mix(in srgb, var(--cel-gold) 6%, transparent);
-  animation: cel-pulse 2.8s ease-in-out infinite;
+  animation: cel-pulse 2.8s var(--ease-in-out) infinite;
 }
 @keyframes cel-pulse {
   0%, 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--cel-gold) 6%, transparent); }
@@ -197,7 +197,7 @@
   color: #2a1b00;
   background: linear-gradient(135deg, var(--cel-gold), color-mix(in srgb, var(--cel-gold) 62%, white));
   box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--cel-gold) 70%, transparent);
-  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .cel-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .cel-btn:disabled { opacity: 0.65; cursor: progress; }

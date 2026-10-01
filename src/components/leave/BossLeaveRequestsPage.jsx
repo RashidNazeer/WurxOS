@@ -530,7 +530,7 @@ export default function BossLeaveRequestsPage() {
           { key: 'all',      label: 'All',      count: stats.all,      color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)' },
         ].map(tab => (
           <button key={tab.key} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2 border-0"
-            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? tab.on : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.15s' }}
+            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? tab.on : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
             onClick={() => setActiveTab(tab.key)}>
             {tab.label}
             <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? `color-mix(in srgb, ${tab.on} 18%, transparent)` : `color-mix(in srgb, ${tab.color} 20%, transparent)`, color: activeTab === tab.key ? tab.on : tab.color, fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>

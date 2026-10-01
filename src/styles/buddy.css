@@ -14,11 +14,11 @@
   background: var(--surface-1);
   box-shadow: 0 0 0 2px var(--accent-ring), var(--shadow-lg);
   display: grid; place-items: center; cursor: pointer;
-  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 .bd-fab:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow-xl); }
 .bd-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.bd-fab.is-thinking { animation: bd-ring 1.6s ease-in-out infinite; }
+.bd-fab.is-thinking { animation: bd-ring 1.6s var(--ease-in-out) infinite; }
 .bd-fab.is-open { box-shadow: 0 0 0 3px var(--accent), var(--shadow-lg); }
 .bd-fab.is-bounce { animation: bd-bounce 0.9s var(--ease-out) 1; }
 .bd-fab[data-tip]:hover::after {
@@ -325,7 +325,7 @@
 
 /* ---------- Regenerate, load errors, skeletons, roles ---------- */
 /* The old answer stays readable but clearly on its way out. */
-.bd-bubble.is-fading { opacity: 0.5; transition: opacity var(--dur-base); }
+.bd-bubble.is-fading { opacity: 0.5; transition: opacity var(--dur-base) var(--ease-out); }
 .bd-previous { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 100%; }
 .bd-load-error {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -338,7 +338,7 @@
 .bd-skel {
   border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
-  background-size: 200% 100%; animation: bd-shimmer 1.3s ease-in-out infinite;
+  background-size: 200% 100%; animation: bd-shimmer 1.3s var(--ease-in-out) infinite;
 }
 .bd-skel.is-row { height: 14px; }
 .bd-skel.is-label { height: 9px; width: 40%; margin-bottom: 6px; }

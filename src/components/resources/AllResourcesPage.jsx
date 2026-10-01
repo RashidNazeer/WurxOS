@@ -445,7 +445,7 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
   return (
     <div
       className="card border-0 shadow-sm h-100"
-      style={{ borderRadius: 14, transition: 'transform 0.12s, box-shadow 0.12s', position: 'relative' }}
+      style={{ borderRadius: 14, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)', position: 'relative' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.1)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
     >

@@ -51,7 +51,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
       borderRadius: 14, padding: '14px 16px',
       position: 'relative', overflow: 'hidden',
       backdropFilter: dark ? 'blur(10px) saturate(1.05)' : 'none',
-      transition: 'transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
+      transition: 'transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{
@@ -492,7 +492,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
                   border: 'none', borderRadius: 10,
                   padding: '8px 18px', fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em',
                   boxShadow: isActive ? `0 4px 14px rgba(0,0,0,0.25), 0 0 0 1px ${WURX.borderSoft}` : 'none',
-                  transition: 'all 150ms ease', cursor: 'pointer',
+                  transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)', cursor: 'pointer',
                 }}>
                 {t.label}
               </button>

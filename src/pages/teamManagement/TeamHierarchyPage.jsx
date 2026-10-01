@@ -294,7 +294,7 @@ export default function TeamHierarchyPage() {
           from { opacity: 0; transform: translateY(8px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .hierarchy-fade { animation: hierarchy-fade-in 280ms ease-out; }
+        .hierarchy-fade { animation: hierarchy-fade-in var(--dur-enter) var(--ease-out); }
       `}</style>
     </div>
   );
@@ -357,7 +357,7 @@ function ViewToggle({ value, onChange }) {
               border: 'none', borderRadius: 8,
               padding: '5px 12px', fontSize: '0.74rem', fontWeight: 700,
               boxShadow: active ? '0 2px 6px rgba(15,23,42,0.18)' : 'none',
-              transition: 'all 150ms ease',
+              transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
             }}>
             <i className={`bi ${it.icon}`} style={{ fontSize: '0.8rem' }} />{it.label}
           </button>

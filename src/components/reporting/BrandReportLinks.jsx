@@ -54,7 +54,7 @@ function LinkCard({ link, accent }) {
         borderRadius: 12,
         padding: '14px 16px',
         color: 'var(--text-primary)',
-        transition: 'transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease',
+        transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-1px)';

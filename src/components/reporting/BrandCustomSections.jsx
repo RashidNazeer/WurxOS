@@ -384,7 +384,7 @@ function ExtraFieldCell({ field, labelText, value, prevValue, comparisonLabel = 
             color: 'var(--text-muted)', cursor: 'pointer',
             fontSize: '0.7rem', lineHeight: 1,
             opacity: hover ? 1 : 0,
-            transition: 'opacity 120ms',
+            transition: 'opacity var(--dur-fast) var(--ease-out)',
           }}>
           <i className="bi bi-x-lg" />
         </button>

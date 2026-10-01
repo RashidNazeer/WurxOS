@@ -355,7 +355,7 @@ function BrandCard({ s, isIPC, onOpen, onRemind }) {
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ padding: 16, cursor: 'pointer', transition: 'box-shadow .15s, transform .15s', transform: hover ? 'translateY(-2px)' : 'none', boxShadow: hover ? '0 16px 34px -20px rgba(15,23,42,.55)' : undefined }}>
+      style={{ padding: 16, cursor: 'pointer', transition: 'box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out)', transform: hover ? 'translateY(-1px)' : 'none', boxShadow: hover ? 'var(--shadow-md)' : undefined }}>
       <div className="d-flex align-items-center gap-2 mb-3">
         <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
           {initials(brand.name)}

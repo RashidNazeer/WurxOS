@@ -179,7 +179,7 @@ function StatCard({ label, value, accent, to }) {
         display: 'block',
         textDecoration: 'none',
         color: 'inherit',
-        transition: 'transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast)',
+        transition: 'transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';

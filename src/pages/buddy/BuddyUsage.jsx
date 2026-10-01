@@ -150,7 +150,9 @@ function DailyChart({ days }) {
             labelFormatter={(_l, p) => p?.[0]?.payload?.date || ''}
             formatter={(v, _n, p) => [`${fmtUsd(v)} · ${fmtCount(p?.payload?.questions)} questions`, 'Cost']}
           />
-          <Bar dataKey="cost" fill="var(--accent)" radius={[3, 3, 0, 0]} maxBarSize={22} />
+          <Bar dataKey="cost" fill="var(--accent)" radius={[3, 3, 0, 0]} maxBarSize={22}
+            animationDuration={400} animationEasing="ease-out"
+            isAnimationActive={!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches} />
         </BarChart>
       </ResponsiveContainer>
       <figcaption className="bd-card-sub">Estimated cost per day</figcaption>

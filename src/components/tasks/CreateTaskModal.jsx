@@ -236,7 +236,7 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                   marginBottom: 14,
                   textAlign: 'left',
                   color: 'inherit',
-                  transition: 'all var(--dur-fast)',
+                  transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                 }}
               >
                 <span
@@ -250,7 +250,7 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                     display: 'grid',
                     placeItems: 'center',
                     border: `1px solid ${isPersonal ? 'var(--accent)' : 'var(--border-subtle)'}`,
-                    transition: 'all var(--dur-fast)',
+                    transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                   }}
                 >
                   <UserIcon width="18" height="18" />
@@ -586,7 +586,7 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                   borderRadius: 'var(--radius-md)',
                   background: notify ? 'var(--accent-soft)' : 'var(--surface-1)',
                   cursor: 'pointer',
-                  transition: 'background var(--dur-fast)',
+                  transition: 'background-color var(--dur-fast) var(--ease-out)',
                 }}>
                   <input type="checkbox" checked={notify}
                     onChange={(e) => setNotify(e.target.checked)}
@@ -653,7 +653,7 @@ function MiniToggle({ checked }) {
         background: checked ? 'var(--accent)' : 'var(--surface-3)',
         border: `1px solid ${checked ? 'var(--accent)' : 'var(--border-default)'}`,
         position: 'relative',
-        transition: 'all var(--dur-fast)',
+        transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
       }}
     >
       <span

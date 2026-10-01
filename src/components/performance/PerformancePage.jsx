@@ -79,7 +79,7 @@ function MetricInfoTip({ text }) {
           textAlign: 'left',
           boxShadow: '0 8px 24px rgba(15,23,42,0.25)',
           opacity: 0, visibility: 'hidden',
-          transition: 'opacity 0.12s ease',
+          transition: 'opacity var(--dur-fast) var(--ease-out)',
           pointerEvents: 'none', zIndex: 1080,
           whiteSpace: 'normal',
         }}>
@@ -832,7 +832,7 @@ function PillarBar({ pillar, score, weight, detail }) {
           </div>
         </div>
         <div className="rounded-pill overflow-hidden" style={{ height: 6, background: 'var(--surface-2)' }}>
-          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || 'var(--border-default)', transition: 'width 0.4s' }} />
+          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
       </button>
       {hasDetail && open && (
@@ -2046,7 +2046,7 @@ export default function PerformancePage() {
                                   <span className="fw-semibold" style={{ color: lv?.color || 'var(--text-muted)' }}>{s !== null ? s : '—'}</span>
                                 </div>
                                 <div className="rounded-pill overflow-hidden" style={{ height: 4, background: 'var(--surface-2)' }}>
-                                  <div className="h-100 rounded-pill" style={{ width: `${s || 0}%`, background: lv?.color || 'var(--surface-2)', transition: 'width 0.4s' }} />
+                                  <div className="h-100 rounded-pill" style={{ width: `${s || 0}%`, background: lv?.color || 'var(--surface-2)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                                 </div>
                               </div>
                             );

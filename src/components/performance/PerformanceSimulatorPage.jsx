@@ -662,7 +662,7 @@ export default function PerformanceSimulatorPage() {
                           {p.present ? <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{Math.round(p.score)}<span className="text-muted" style={{ fontWeight: 500 }}> × {Math.round(p.effWeight)}% = {Math.round(p.contribution)}</span></span> : <span className="text-muted" style={{ fontSize: '0.68rem' }}>Not counted</span>}
                         </div>
                         <div className="rounded-pill overflow-hidden mt-1" style={{ height: 6, background: 'var(--surface-2)' }}>
-                          <div className="h-100 rounded-pill" style={{ width: `${p.present ? p.score : 0}%`, background: p.present ? getLevelTokens(p.score).color : 'var(--border-default)', transition: 'width .35s' }} />
+                          <div className="h-100 rounded-pill" style={{ width: `${p.present ? p.score : 0}%`, background: p.present ? getLevelTokens(p.score).color : 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                         </div>
                       </div>
                     ))}

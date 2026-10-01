@@ -96,7 +96,7 @@ function DetailsModal({ rec, userName, onClose }) {
         {item.targetValue > 0 && (
           <div className="mt-1">
             <div className="rounded-pill overflow-hidden" style={{ height: 3, background: '#e9ecef' }}>
-              <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: item.completed ? '#198754' : '#0d6efd', transition: 'width 0.3s' }} />
+              <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: item.completed ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
             </div>
           </div>
         )}
@@ -611,7 +611,7 @@ export default function BossIncentivesPage() {
                             </div>
                             <div className="rounded-pill overflow-hidden" style={{ height: 5, background: '#e9ecef' }}>
                               <div className="h-100 rounded-pill"
-                                style={{ width: `${completionPct}%`, background: completionPct === 100 ? '#198754' : '#0d6efd', transition: 'width 0.4s' }} />
+                                style={{ width: `${completionPct}%`, background: completionPct === 100 ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                             </div>
                           </div>
                         </>
@@ -767,9 +767,9 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
           <span className="text-muted">{pkr(s.totalPayout)} total</span>
         </div>
         <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: '#64748b', transition: 'width .3s' }} />}
-          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: '#16a34a', transition: 'width .3s' }} />}
-          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: '#3b82f6', transition: 'width .3s' }} />}
+          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: '#64748b', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: '#3b82f6', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
           <Legend color="#64748b" label="Base" value={pkr(s.totalBase)} />
@@ -784,9 +784,9 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
           <span className="text-muted">{s.fullyAchieved + s.partial} of {s.fullyAchieved + s.partial + s.noneEarned} earned something</span>
         </div>
         <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: '#16a34a', transition: 'width .3s' }} />}
-          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: '#fbbf24', transition: 'width .3s' }} />}
-          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: '#cbd5e1', transition: 'width .3s' }} />}
+          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: '#fbbf24', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: '#cbd5e1', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
           <Legend color="#16a34a" label="Fully achieved" value={s.fullyAchieved} />

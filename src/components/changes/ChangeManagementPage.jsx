@@ -168,7 +168,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
                   const sel = form.affectedSopIds.includes(d.id);
                   return (
                     <div key={d.id} className="d-flex align-items-center gap-2 rounded-2 px-2 py-1 mb-1"
-                      style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', color: 'var(--text-primary)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'all 0.1s' }}
+                      style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', color: 'var(--text-primary)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out), border-color var(--dur-instant) var(--ease-out), box-shadow var(--dur-instant) var(--ease-out), transform var(--dur-instant) var(--ease-out), opacity var(--dur-instant) var(--ease-out)' }}
                       onClick={() => f('affectedSopIds', sel ? form.affectedSopIds.filter(x => x !== d.id) : [...form.affectedSopIds, d.id])}>
                       <input type="checkbox" className="form-check-input flex-shrink-0" checked={sel} readOnly style={{ cursor: 'pointer' }} />
                       <div className="flex-grow-1" style={{ minWidth: 0 }}>

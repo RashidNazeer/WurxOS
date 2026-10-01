@@ -99,7 +99,9 @@ function KanbanCard({ task, canEdit, isAssignee, onEdit, onView }) {
         if (!canDrag) { e.preventDefault(); return; }
         e.dataTransfer.setData('text/task-id', task.id);
         e.dataTransfer.effectAllowed = 'move';
+        e.currentTarget.classList.add('is-dragging');
       }}
+      onDragEnd={(e) => e.currentTarget.classList.remove('is-dragging')}
       data-draggable={canDrag}
       onClick={onView ? () => onView() : undefined}
       style={{ cursor: onView ? 'pointer' : undefined }}

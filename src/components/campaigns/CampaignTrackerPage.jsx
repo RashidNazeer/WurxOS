@@ -54,7 +54,7 @@ const STYLES = `
   .ct-modal-tab-btn {
     border: none; background: none; padding: 8px 16px;
     font-size: 0.83rem; font-weight: 500; color: var(--text-muted);
-    border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s;
+    border-bottom: 2px solid transparent; cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
   }
   .ct-modal-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
   .ct-modal-tab-btn:hover:not(.active) { color: var(--text-secondary); }
@@ -626,7 +626,7 @@ export default function CampaignTrackerPage() {
       {/* ── Bulk action bar ── */}
       {selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          style={{ position: 'sticky', top: 'var(--topbar-h, 0px)', zIndex: 'var(--z-sticky)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
           <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>
             <i className="bi bi-check2-square me-1" />{selected.size} selected
           </span>

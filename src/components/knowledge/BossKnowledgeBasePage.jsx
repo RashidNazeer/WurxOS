@@ -196,7 +196,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                       background: selectedTab === t.value ? 'var(--accent)' : 'var(--surface-2)',
                       color: selectedTab === t.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                       borderColor: selectedTab === t.value ? 'var(--accent)' : 'var(--border-subtle)',
-                      cursor: 'pointer', transition: 'all 0.12s',
+                      cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                     }}>
                     <i className={`bi ${t.icon}`} style={{ fontSize: '0.65rem' }} />{t.label}
                   </button>
@@ -229,7 +229,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                       background: visType === v.value ? 'var(--accent)' : 'var(--surface-2)',
                       color: visType === v.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                       borderColor: visType === v.value ? 'var(--accent)' : 'var(--border-subtle)',
-                      cursor: 'pointer', transition: 'all 0.12s',
+                      cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                     }}>
                     <i className={`bi ${v.icon}`} style={{ fontSize: '0.72rem' }} />{v.label}
                   </button>
@@ -373,7 +373,7 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
 
           <div className="d-flex align-items-center gap-2 mb-3">
             <div className="flex-grow-1 rounded-pill" style={{ height: 8, background: 'var(--surface-3)' }}>
-              <div className="rounded-pill" style={{ height: 8, width: `${totalUsers > 0 ? (readCount / totalUsers) * 100 : 0}%`, background: 'var(--success)', transition: 'width 0.3s' }} />
+              <div className="rounded-pill" style={{ height: 8, width: `${totalUsers > 0 ? (readCount / totalUsers) * 100 : 0}%`, background: 'var(--success)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
             </div>
             <span className="small fw-semibold" style={{ color: 'var(--success)', whiteSpace: 'nowrap' }}>{readCount}/{totalUsers}</span>
           </div>
@@ -733,7 +733,7 @@ export default function BossKnowledgeBasePage() {
             <button key={tab.value}
               className="d-inline-flex align-items-center gap-1 rounded-pill border px-3 py-1"
               style={{
-                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
+                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                 background: activeTab === tab.value ? 'var(--accent)' : 'var(--surface-2)',
                 color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                 borderColor: activeTab === tab.value ? 'var(--accent)' : 'var(--border-subtle)',
