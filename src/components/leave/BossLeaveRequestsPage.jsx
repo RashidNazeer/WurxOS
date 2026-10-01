@@ -9,6 +9,9 @@ import {
 import { supabase } from '../../lib/supabase';
 import MonthNavigator from './MonthNavigator';
 
+// Readable in both themes: amber tint + neutral text (bg-warning/text-dark flipped unreadable in dark).
+const UNPAID_CHIP = { background: 'var(--warning-soft)', color: 'var(--text-primary)', border: '1px solid color-mix(in srgb, var(--warning) 45%, transparent)' };
+
 const REQUEST_CATEGORIES = [
   { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger)', bg: 'var(--danger-soft)' },
   { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info)', bg: 'var(--info-soft)' },
@@ -131,14 +134,14 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
               <span className="fw-semibold small">{getRequestTitle(request)}</span>
               {request.bossOverrideToPaid ? (
                 <>
-                  <span className="badge bg-success" style={{ fontSize: '0.6rem' }}>Paid</span>
+                  <span className="badge" style={{ background: 'var(--success)', color: 'var(--on-success)', fontSize: '0.6rem' }}>Paid</span>
                   <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.6rem' }}>Boss Override</span>
                 </>
               ) : (
                 <>
-                  {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
-                  {request.unpaidDays > 0 && !request.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>Unpaid ({request.unpaidDays}d)</span>}
-                  {(!request.unpaidDays || request.unpaidDays === 0) && <span className="badge bg-success" style={{ fontSize: '0.6rem' }}>Paid</span>}
+                  {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
+                  {request.unpaidDays > 0 && !request.paidDays && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.6rem' }}>Unpaid ({request.unpaidDays}d)</span>}
+                  {(!request.unpaidDays || request.unpaidDays === 0) && <span className="badge" style={{ background: 'var(--success)', color: 'var(--on-success)', fontSize: '0.6rem' }}>Paid</span>}
                 </>
               )}
             </div>
@@ -195,7 +198,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onCancel} disabled={saving}>Cancel</button>
             {hasUnpaid ? (
               <>
-                <button className="btn btn-sm btn-warning px-3 d-inline-flex align-items-center gap-1 text-dark" onClick={() => onConfirm(false)} disabled={saving}>
+                <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1" style={UNPAID_CHIP} onClick={() => onConfirm(false)} disabled={saving}>
                   {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-x-circle" />} Approve as Unpaid
                 </button>
                 <button className="btn btn-sm btn-success px-3 d-inline-flex align-items-center gap-1" onClick={() => onConfirm(true)} disabled={saving}>
@@ -518,19 +521,19 @@ export default function BossLeaveRequestsPage() {
 
       <div className="d-flex gap-2 mb-4 flex-wrap align-items-center">
         {[
-          { key: 'pending',  label: 'Pending',  count: stats.pending,  color: 'var(--accent)', bg: 'var(--accent-soft)' },
-          { key: 'approved', label: 'Approved', count: stats.approved, color: 'var(--success)', bg: 'var(--success-soft)' },
-          { key: 'rejected', label: 'Rejected', count: stats.rejected, color: 'var(--danger)', bg: 'var(--danger-soft)' },
+          { key: 'pending',  label: 'Pending',  count: stats.pending,  color: 'var(--accent)', on: 'var(--on-accent)', bg: 'var(--accent-soft)' },
+          { key: 'approved', label: 'Approved', count: stats.approved, color: 'var(--success)', on: 'var(--on-success)', bg: 'var(--success-soft)' },
+          { key: 'rejected', label: 'Rejected', count: stats.rejected, color: 'var(--danger)', on: 'var(--on-danger)', bg: 'var(--danger-soft)' },
           // Unpaid tab is Boss-only — payroll-sensitive view that the
           // Developer support role shouldn't see.
-          ...(isBossOnly ? [{ key: 'unpaid',   label: 'Unpaid',   count: unpaidSummary.reduce((s, u) => s + u.days, 0), color: 'var(--warning)', bg: 'var(--warning-soft)' }] : []),
-          { key: 'all',      label: 'All',      count: stats.all,      color: 'var(--text-secondary)', bg: 'var(--surface-2)' },
+          ...(isBossOnly ? [{ key: 'unpaid',   label: 'Unpaid',   count: unpaidSummary.reduce((s, u) => s + u.days, 0), color: 'var(--warning)', on: 'var(--on-warning)', bg: 'var(--warning-soft)' }] : []),
+          { key: 'all',      label: 'All',      count: stats.all,      color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)' },
         ].map(tab => (
           <button key={tab.key} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2 border-0"
-            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? 'var(--on-accent)' : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.15s' }}
+            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? tab.on : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.15s' }}
             onClick={() => setActiveTab(tab.key)}>
             {tab.label}
-            <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? 'rgba(255,255,255,0.25)' : `color-mix(in srgb, ${tab.color} 20%, transparent)`, color: activeTab === tab.key ? 'var(--on-accent)' : tab.color, fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>
+            <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? `color-mix(in srgb, ${tab.on} 18%, transparent)` : `color-mix(in srgb, ${tab.color} 20%, transparent)`, color: activeTab === tab.key ? tab.on : tab.color, fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>
               {tab.key === 'unpaid' ? `${tab.count}d` : tab.count}
             </span>
           </button>
@@ -567,7 +570,7 @@ export default function BossLeaveRequestsPage() {
                     <tr key={i}>
                       <td><span className="fw-medium">{u.name}</span> <span className="text-muted">· {u.email}</span></td>
                       <td>{ROLE_LABELS[u.role] || u.role}</td>
-                      <td><span className="badge bg-warning text-dark">{u.days} day{u.days > 1 ? 's' : ''}</span></td>
+                      <td><span className="badge" style={UNPAID_CHIP}>{u.days} day{u.days > 1 ? 's' : ''}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -614,7 +617,7 @@ export default function BossLeaveRequestsPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">{activeTab === 'pending' ? 'No pending requests' : `No ${activeTab === 'all' ? '' : activeTab} requests for ${viewMonthLabel}`}</p>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{activeTab === 'pending' ? 'No pending requests' : `No ${activeTab === 'all' ? '' : activeTab} requests for ${viewMonthLabel}`}</p>
           <p className="text-muted small mb-0">{activeTab === 'pending' ? 'All caught up!' : 'Try another month from the navigator above.'}</p>
         </div>
       ) : (
@@ -629,8 +632,8 @@ export default function BossLeaveRequestsPage() {
                 <div className="card-body p-3">
                   <div className="d-flex align-items-start justify-content-between">
                     <div className="d-flex gap-3 flex-grow-1">
-                      <div className="rounded-circle d-flex align-items-center justify-content-center fw-semibold text-white flex-shrink-0"
-                        style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', fontSize: '0.65rem' }}>
+                      <div className="rounded-circle d-flex align-items-center justify-content-center fw-semibold flex-shrink-0"
+                        style={{ width: 38, height: 38, background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.65rem' }}>
                         {(r.requesterName || '?').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-grow-1">
@@ -648,8 +651,8 @@ export default function BossLeaveRequestsPage() {
                             <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>Paid</span>
                           ) : (
                             <>
-                              {r.unpaidDays > 0 && r.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>}
-                              {r.unpaidDays > 0 && !r.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>}
+                              {r.unpaidDays > 0 && r.paidDays > 0 && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>}
+                              {r.unpaidDays > 0 && !r.paidDays && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>}
                               {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>Paid</span>}
                             </>
                           )}

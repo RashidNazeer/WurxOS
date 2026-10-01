@@ -267,8 +267,8 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
     <div className="d-flex align-items-center gap-3 px-3 py-3" style={{ borderTop: `1px solid ${C.line}` }}>
       <div style={{
         width: 22, height: 22, borderRadius: 5,
-        background: rank === 1 ? '#fef3c7' : rank === 2 ? '#e2e8f0' : rank === 3 ? '#fde68a' : '#f1f5f9',
-        color: '#1f2937', fontSize: '0.72rem', fontWeight: 700,
+        background: rank === 1 ? 'color-mix(in srgb, var(--warning) 35%, var(--surface-1))' : rank === 2 ? 'var(--surface-3)' : rank === 3 ? 'color-mix(in srgb, var(--warning) 18%, var(--surface-1))' : 'var(--surface-2)',
+        color: C.ink, fontSize: '0.72rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{rank}</div>
       <div style={{
@@ -425,7 +425,7 @@ function DonutChart({ slices, total, currencySym = '$', size = 180, thickness = 
   return (
     <div className="d-flex align-items-center gap-3 flex-wrap" style={{ minHeight: size }}>
       <svg width={size} height={size} style={{ display: 'block', flexShrink: 0 }}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--chart-track)" strokeWidth={thickness} />
         {filtered.map((s, i) => {
           const v = Number(s.value);
           const pct = v / total;
@@ -562,16 +562,16 @@ function TrendTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
-      background: 'var(--surface-1)', border: `1px solid ${C.line}`, borderRadius: 10,
-      padding: '8px 12px', boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
+      background: 'var(--chart-tooltip-bg)', color: 'var(--chart-tooltip-fg)', border: `1px solid ${C.line}`, borderRadius: 10,
+      padding: '8px 12px', boxShadow: 'var(--shadow-md)',
       fontSize: '0.74rem',
     }}>
-      <div style={{ fontWeight: 700, color: C.ink, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
       {payload.map(p => (
-        <div key={p.dataKey} className="d-flex align-items-center gap-2" style={{ color: C.inkDim }}>
+        <div key={p.dataKey} className="d-flex align-items-center gap-2" style={{ color: 'color-mix(in srgb, var(--chart-tooltip-fg) 75%, transparent)' }}>
           <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: p.color }} />
           <span style={{ flex: 1 }}>{p.name}</span>
-          <strong style={{ color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{p.value}</strong>
+          <strong style={{ color: 'var(--chart-tooltip-fg)', fontVariantNumeric: 'tabular-nums' }}>{p.value}</strong>
         </div>
       ))}
     </div>
@@ -607,10 +607,10 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
                 <stop offset="100%" stopColor={C.amber} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="2 4" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
-            <YAxis yAxisId="gmv" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
-            <YAxis yAxisId="orders" orientation="right" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
+            <CartesianGrid strokeDasharray="2 4" stroke="var(--chart-grid)" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
+            <YAxis yAxisId="gmv" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
+            <YAxis yAxisId="orders" orientation="right" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} />
             <Tooltip content={<TrendTooltip />} cursor={{ stroke: C.amber, strokeOpacity: 0.25 }} />
             <Area yAxisId="gmv" type="monotone" dataKey="gmv" stroke={C.amber} strokeWidth={2}
               fill="url(#monthGmvFill)" name="GMV" isAnimationActive={false} dot={{ r: 2.5, fill: C.amber }} />
@@ -634,9 +634,9 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
                     <stop offset="100%" stopColor={C.green} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
                 <Tooltip content={<TrendTooltip />} cursor={{ stroke: C.green, strokeOpacity: 0.25 }} />
                 <Area type="monotone" dataKey="affiliateGmv" stroke={C.green} strokeWidth={2}
                   fill="url(#monthAffFill)" name="Affiliate GMV" isAnimationActive={false} dot={{ r: 2.5, fill: C.green }} />
@@ -652,10 +652,10 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
             </div>
             <ResponsiveContainer width="100%" height={150}>
               <BarChart data={trendData} margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="2 4" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
-                <Tooltip content={<TrendTooltip />} cursor={{ fill: '#f1f5f9' }} />
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<TrendTooltip />} cursor={{ fill: 'var(--chart-track)' }} />
                 <Bar dataKey="newVideos" fill="#f97316" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
@@ -1087,7 +1087,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           <div className="d-flex align-items-center gap-3">
             <div style={{
               width: 42, height: 42, borderRadius: 10, background: C.amber,
-              color: '#fff', fontSize: '1.05rem', fontWeight: 700,
+              color: 'var(--on-warning)', fontSize: '1.05rem', fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}>{(report.brandName || '?').charAt(0).toUpperCase()}</div>
             <div>

@@ -599,7 +599,7 @@ function SlackRelayPanel() {
       <div className="d-flex align-items-center gap-2 mb-2">
         <i className="bi bi-slack" style={{ color: 'var(--accent)' }} />
         <span className="fw-semibold small">Slack relay</span>
-        <span className={`badge ${cfg.enabled ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>{cfg.enabled ? 'ON' : 'OFF'}</span>
+        <span className="badge" style={{ background: cfg.enabled ? 'var(--success)' : 'var(--surface-3)', color: cfg.enabled ? 'var(--on-success)' : 'var(--text-secondary)', fontSize: '0.65rem' }}>{cfg.enabled ? 'ON' : 'OFF'}</span>
       </div>
       <div className="bd-card-sub mb-2">
         When someone tags a watched person in a watched channel, Buddy answers with real WurxOS data and posts it into

@@ -453,8 +453,8 @@ function ApprovalModal({ record, onClose, onDone }) {
 
           <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center gap-2 mb-2">
-              <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
-                style={{ width: 36, height: 36, background: '#3b82f6', fontSize: '0.65rem' }}>
+              <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                style={{ width: 36, height: 36, background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.65rem' }}>
                 {(record.userName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div>
@@ -528,8 +528,8 @@ function EditRequestModal({ record, onClose, onDone }) {
 
           <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center gap-2 mb-3">
-              <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
-                style={{ width: 36, height: 36, background: '#3b82f6', fontSize: '0.65rem' }}>
+              <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                style={{ width: 36, height: 36, background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.65rem' }}>
                 {(record.userName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div>
@@ -607,8 +607,8 @@ function BreaksEditModal({ record, onClose, onDone }) {
           <h6 className="fw-bold mb-3"><i className="bi bi-cup-hot-fill me-2 text-warning" />Break Edit Request</h6>
 
           <div className="d-flex align-items-center gap-2 mb-3">
-            <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
-              style={{ width: 36, height: 36, background: '#f59e0b', fontSize: '0.65rem' }}>
+            <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+              style={{ width: 36, height: 36, background: 'var(--warning)', color: 'var(--on-warning)', fontSize: '0.65rem' }}>
               {(record.userName || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <div>
@@ -675,19 +675,19 @@ function TodayTimeline({ record }) {
         title: 'Clocked in',
         subtitle: locLabel(record.location),
         icon: 'bi-box-arrow-in-right',
-        color: 'var(--success)',
+        color: 'var(--success)', fg: 'var(--on-success)',
       });
     }
     (record.breaks || []).forEach((b, i) => {
       if (b.start) out.push({
         t: b.start, type: 'break-start',
         title: `Break ${i + 1} started`, subtitle: '',
-        icon: 'bi-cup-hot-fill', color: 'var(--warning)',
+        icon: 'bi-cup-hot-fill', color: 'var(--warning)', fg: 'var(--on-warning)',
       });
       if (b.end) out.push({
         t: b.end, type: 'break-end',
         title: `Break ${i + 1} ended`, subtitle: '',
-        icon: 'bi-play-fill', color: 'var(--warning)',
+        icon: 'bi-play-fill', color: 'var(--warning)', fg: 'var(--on-warning)',
       });
     });
     if (record.clockOutRequestedAt) {
@@ -695,7 +695,7 @@ function TodayTimeline({ record }) {
         t: record.clockOutRequestedAt, type: 'request',
         title: 'Clock-out requested',
         subtitle: record.clockOutNote || 'Waiting for TL approval',
-        icon: 'bi-send-fill', color: 'var(--info)',
+        icon: 'bi-send-fill', color: 'var(--info)', fg: 'var(--on-info)',
       });
     }
     if (record.clockOut) {
@@ -703,7 +703,7 @@ function TodayTimeline({ record }) {
         t: record.clockOut, type: 'clock-out',
         title: 'Clocked out',
         subtitle: record.approvalStatus === 'rejected' ? 'Rejected — ' + (record.rejectionReason || '') : '',
-        icon: 'bi-box-arrow-right', color: 'var(--text-muted)',
+        icon: 'bi-box-arrow-right', color: 'var(--text-muted)', fg: 'var(--surface-1)',
       });
     }
     return out.sort((a, b) => {
@@ -761,7 +761,7 @@ function TodayTimeline({ record }) {
                     position: 'relative', zIndex: 1,
                   }}
                 >
-                  <i className={`bi ${ev.icon}`} style={{ fontSize: '0.6rem', color: '#fff' }} />
+                  <i className={`bi ${ev.icon}`} style={{ fontSize: '0.6rem', color: ev.fg }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -1041,8 +1041,8 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membe
                   <div className="card-body p-3">
                     <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
                       <div className="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                          style={{ width: 36, height: 36, background: '#3b82f6', fontSize: '0.7rem' }}>
+                        <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                          style={{ width: 36, height: 36, background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.7rem' }}>
                           {(r.user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
@@ -2008,7 +2008,7 @@ export default function AttendancePage() {
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <span className="rounded-circle" style={{ width: 8, height: 8, background: 'var(--danger)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--danger) 19%, transparent)' }} />
                     <span className="fw-bold" style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>Pending Approvals</span>
-                    <span className="badge bg-danger rounded-pill ms-auto">{pendingApprovals.length + pendingEditRequests.length + pendingEditOutRequests.length + pendingEditBreaksRequests.length}</span>
+                    <span className="badge rounded-pill ms-auto" style={{ background: 'var(--danger)', color: 'var(--on-danger)' }}>{pendingApprovals.length + pendingEditRequests.length + pendingEditOutRequests.length + pendingEditBreaksRequests.length}</span>
                   </div>
                   <div className="d-flex flex-column gap-2">
                     {pendingApprovals.map(r => (
@@ -2022,7 +2022,7 @@ export default function AttendancePage() {
                           </div>
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>Clock-out · {fmtTime(r.clockIn)} · {locLabel(r.location)}</div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: 'var(--info)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                     {pendingEditRequests.map(r => (
@@ -2038,7 +2038,7 @@ export default function AttendancePage() {
                             Edit clock-in · {fmtTime(r.clockIn)} → {fmtTime(r.editClockInRequest?.requestedClockIn)}
                           </div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: 'var(--info)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                     {pendingEditOutRequests.map(r => (
@@ -2054,7 +2054,7 @@ export default function AttendancePage() {
                             Adjust clock-out · {r.date} · was {fmtTime(r.clockOut)} → wants {fmtTime(r.editClockOutRequest?.requestedClockOut)}
                           </div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: 'var(--danger)', color: '#fff', fontSize: '0.6rem' }}>Review</span>
+                        <span className="badge rounded-pill" style={{ background: 'var(--danger)', color: 'var(--on-danger)', fontSize: '0.6rem' }}>Review</span>
                       </div>
                     ))}
                     {pendingEditBreaksRequests.map(r => (
@@ -2634,7 +2634,7 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
             {!rejecting ? (
               <>
                 <button className="btn btn-sm btn-outline-danger px-3" onClick={() => setRejecting(true)} disabled={saving}>Reject</button>
-                <button className="btn btn-sm px-4 text-white" style={{ background: 'var(--success)', border: 'none' }} onClick={handleApprove} disabled={saving}>
+                <button className="btn btn-sm px-4" style={{ background: 'var(--success)', color: 'var(--on-success)', border: 'none' }} onClick={handleApprove} disabled={saving}>
                   {saving ? <><span className="spinner-border spinner-border-sm me-1" />…</> : 'Approve'}
                 </button>
               </>

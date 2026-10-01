@@ -298,8 +298,8 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                           style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                           onClick={() => toggleUser(u.id)}>
                           <input type="checkbox" className="form-check-input flex-shrink-0" checked={sel} readOnly style={{ cursor: 'pointer' }} />
-                          <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                            style={{ width: 22, height: 22, background: sel ? 'var(--info)' : 'var(--text-muted)', fontSize: '0.5rem' }}>
+                          <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                            style={{ width: 22, height: 22, background: sel ? 'var(--info)' : 'var(--surface-3)', color: sel ? 'var(--on-info)' : 'var(--text-primary)', fontSize: '0.5rem' }}>
                             {name.slice(0, 2).toUpperCase()}
                           </span>
                           <div className="flex-grow-1" style={{ minWidth: 0 }}>
@@ -401,8 +401,8 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
                   <tr key={r.id}>
                     <td>
                       <div className="d-flex align-items-center gap-2">
-                        <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                          style={{ width: 24, height: 24, background: r.ack ? 'var(--success)' : 'var(--border-subtle)', fontSize: '0.5rem' }}>
+                        <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                          style={{ width: 24, height: 24, background: r.ack ? 'var(--success)' : 'var(--surface-3)', color: r.ack ? 'var(--on-success)' : 'var(--text-primary)', fontSize: '0.5rem' }}>
                           {r.name.slice(0, 2).toUpperCase()}
                         </span>
                         <div>

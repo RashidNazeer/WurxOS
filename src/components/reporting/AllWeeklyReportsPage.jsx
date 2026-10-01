@@ -659,7 +659,7 @@ export default function AllWeeklyReportsPage() {
             )}
             {canApprove && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--success)', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--success)', color: 'var(--on-success)', border: 'none' }}
                 onClick={() => handleApprove(viewReport)}>
                 <i className="bi bi-shield-check-fill" /> Approve
               </button>
@@ -1138,7 +1138,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             onClick={(e) => { e.stopPropagation(); onToggleSelect && onToggleSelect(); }}
             title={isSelected ? 'Unselect' : 'Select'}
           >
-            {isSelected && <i className="bi bi-check-lg text-white" style={{ fontSize: '0.95rem', lineHeight: 1 }} />}
+            {isSelected && <i className="bi bi-check-lg" style={{ fontSize: '0.95rem', lineHeight: 1, color: 'var(--on-danger)' }} />}
           </label>
         )}
         {/* Header row — avatar, brand, "by …", status pill, chevron */}

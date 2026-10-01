@@ -57,7 +57,7 @@ export default function AnniversaryBanner() {
     }}>
       <div style={{
         width: 48, height: 48, borderRadius: 'var(--radius-pill)',
-        background: 'var(--accent)', color: '#fff',
+        background: 'var(--accent)', color: 'var(--on-accent)',
         display: 'grid', placeItems: 'center', flex: '0 0 auto',
         boxShadow: '0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent)',
       }}>

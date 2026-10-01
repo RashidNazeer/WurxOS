@@ -779,13 +779,13 @@ export default function ClockWidget() {
           width: 100%; padding: 18px 22px; border-radius: 16px; border: none;
           display: flex; align-items: center; justify-content: space-between;
           font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em;
-          color: white; transition: all 0.15s; cursor: pointer;
+          transition: all 0.15s; cursor: pointer;
         }
         .att-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
         .att-primary-btn i { font-size: 1.3rem; }
-        .att-primary-in  { background: var(--success); }
+        .att-primary-in  { background: var(--success); color: var(--on-success); }
         .att-primary-in:hover:not(:disabled) { background: var(--success); transform: translateY(-1px); }
-        .att-primary-out { background: var(--danger); }
+        .att-primary-out { background: var(--danger); color: var(--on-danger); }
         .att-primary-out:hover:not(:disabled) { background: var(--danger); transform: translateY(-1px); }
 
         .att-secondary-btn {
@@ -843,7 +843,8 @@ export default function ClockWidget() {
             <button className="btn btn-sm btn-outline-secondary" onClick={() => setReminderDismissed(true)}>
               Dismiss
             </button>
-            <button className="btn btn-sm btn-warning text-white d-inline-flex align-items-center gap-1"
+            <button className="btn btn-sm btn-warning d-inline-flex align-items-center gap-1"
+              style={{ color: 'var(--on-warning)' }}
               onClick={handleStillWorking} disabled={savingStillWorking}>
               {savingStillWorking ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Yes, still working</>}
             </button>

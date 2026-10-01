@@ -99,10 +99,10 @@ const PILLARS = [
 const DEFAULT_WEIGHTS = { performance: 40, incentives: 25, attendance: 20, flags: 15 };
 
 const WEIGHTAGES = [
-  { key: 'low',      label: 'Low',      color: 'var(--text-secondary)', bg: 'var(--surface-2)', pts: 3 },
-  { key: 'medium',   label: 'Medium',   color: 'var(--warning)', bg: 'var(--warning-soft)', pts: 5 },
-  { key: 'high',     label: 'High',     color: 'var(--danger)', bg: 'var(--danger-soft)', pts: 8 },
-  { key: 'critical', label: 'Critical', color: 'var(--text-secondary)', bg: 'var(--surface-2)', pts: 12 },
+  { key: 'low',      label: 'Low',      color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)', pts: 3 },
+  { key: 'medium',   label: 'Medium',   color: 'var(--warning)', on: 'var(--on-warning)', bg: 'var(--warning-soft)', pts: 5 },
+  { key: 'high',     label: 'High',     color: 'var(--danger)', on: 'var(--on-danger)', bg: 'var(--danger-soft)', pts: 8 },
+  { key: 'critical', label: 'Critical', color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)', pts: 12 },
 ];
 
 function getLevel(score) {
@@ -302,6 +302,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const isGreen = flagType === 'green';
   const color = isGreen ? 'var(--success)' : 'var(--danger)';
+  const onColor = isGreen ? 'var(--on-success)' : 'var(--on-danger)';
 
   async function handleSave() {
     if (!description.trim()) return;
@@ -342,7 +343,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
             <div className="d-flex gap-2 flex-wrap">
               {WEIGHTAGES.map(w => (
                 <button key={w.key} type="button" className="btn btn-sm px-3"
-                  style={{ background: weightage === w.key ? w.color : w.bg, color: weightage === w.key ? '#fff' : w.color, border: `1.5px solid color-mix(in srgb, ${w.color} 25%, transparent)`, borderRadius: 8, fontSize: '0.75rem', fontWeight: 600 }}
+                  style={{ background: weightage === w.key ? w.color : w.bg, color: weightage === w.key ? w.on : w.color, border: `1.5px solid color-mix(in srgb, ${w.color} 25%, transparent)`, borderRadius: 8, fontSize: '0.75rem', fontWeight: 600 }}
                   onClick={() => setWeightage(w.key)}>{w.label}</button>
               ))}
             </div>
@@ -356,7 +357,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
             <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
-              style={{ background: color, color: '#fff', border: 'none', borderRadius: 8 }}
+              style={{ background: color, color: onColor, border: 'none', borderRadius: 8 }}
               onClick={handleSave} disabled={saving || !description.trim()}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-flag-fill" /> Add Flag</>}
             </button>
@@ -782,7 +783,7 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
           </div>
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm px-3" style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8 }}
+            <button className="btn btn-sm px-3" style={{ background: 'var(--danger)', color: 'var(--on-danger)', border: 'none', borderRadius: 8 }}
               onClick={handleWarn} disabled={saving || !reason.trim()}>
               {saving ? 'Issuing…' : 'Issue Warning'}
             </button>

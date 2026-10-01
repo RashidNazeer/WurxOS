@@ -224,7 +224,7 @@ function EukaMode() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))' }}>
-              <i className="bi bi-camera-video-fill" style={{ color: '#fff', fontSize: '1.05rem' }} />
+              <i className="bi bi-camera-video-fill" style={{ color: 'var(--on-accent)', fontSize: '1.05rem' }} />
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>Video Reviews</div>
@@ -323,7 +323,7 @@ function EukaMode() {
           {/* CTA */}
           <button className="vrx-cta" onClick={generate} disabled={running || !targetDate || !brandId}
             style={{ marginTop: 'auto', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              fontSize: 15, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 13, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 13, cursor: 'pointer',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
               boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent)' }}>
             <i className="bi bi-lightning-charge-fill" /> Generate review files

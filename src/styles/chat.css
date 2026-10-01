@@ -134,7 +134,7 @@
   padding: 0 6px;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 10.5px;
   font-weight: 800;
 }
@@ -469,7 +469,7 @@
 .chat-person-row.is-selected .chat-person-check {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* Compact width breakpoint */

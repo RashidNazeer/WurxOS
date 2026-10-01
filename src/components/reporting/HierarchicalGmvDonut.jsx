@@ -16,7 +16,7 @@ const DONUT_C = {
   ink:    'var(--text-primary)',
   inkDim: 'var(--text-secondary)',
   muted:  'var(--text-muted)',
-  track:  'var(--surface-2)',
+  track:  'var(--chart-track)',
 };
 
 export default function HierarchicalGmvDonut({ parents, total, currencySym = '$', size = 180, thickness = 28 }) {

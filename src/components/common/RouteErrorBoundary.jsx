@@ -164,8 +164,8 @@ export default class RouteErrorBoundary extends React.Component {
               onClick={this.handleCopy}
               style={{
                 flex: 1, minWidth: 140,
-                background: copied ? '#16a34a' : 'var(--accent, #2563eb)',
-                color: '#fff', border: 'none',
+                background: copied ? 'var(--success)' : 'var(--accent)',
+                color: copied ? 'var(--on-success)' : 'var(--on-accent)', border: 'none',
                 padding: '10px 14px', borderRadius: 10,
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 8,

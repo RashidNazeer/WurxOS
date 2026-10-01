@@ -10,17 +10,18 @@
 import { useEffect, useRef } from 'react';
 
 export const TT_STYLE = {
-  background: 'var(--surface-1, #16161c)',
+  background: 'var(--chart-tooltip-bg, var(--surface-1))',
   border: '1px solid var(--border-default, #2b2b35)',
   borderRadius: 8,
   fontSize: 12,
-  color: 'var(--text-primary, #e8e8ee)',
+  color: 'var(--chart-tooltip-fg, var(--text-primary))',
 };
-export const GRID = 'var(--border-subtle, #2b2b3522)';
+export const GRID = 'var(--chart-grid, var(--border-subtle))';
 
-// Chart series colours are literals rather than tokens on purpose: Recharts
-// paints SVG attributes, which cannot resolve a CSS custom property, and these
-// two hues read correctly against both the light portal and the dark app.
+// Chart series colours are literals that read correctly against both the light
+// portal and the dark app. (SVG presentation attributes DO resolve var() in
+// current browsers — GRID above relies on it — so these could move to the
+// --chart-* tokens.)
 export const SERIES_TIKTOK = '#6366f1';
 export const SERIES_AMAZON = '#22c55e';
 export const SERIES_BASELINE = '#94a3b8';

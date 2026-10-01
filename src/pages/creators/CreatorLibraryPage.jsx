@@ -613,7 +613,7 @@ function DecisionModal({ decision, busy, onClose, onSubmit }) {
         </div>
         <div className="wx-modal-footer">
           <button className="wx-btn wx-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="wx-btn" style={{ color: '#fff', background: isReject ? 'var(--danger)' : 'var(--success)', borderColor: 'transparent' }}
+          <button className="wx-btn" style={{ color: isReject ? 'var(--on-danger)' : 'var(--on-success)', background: isReject ? 'var(--danger)' : 'var(--success)', borderColor: 'transparent' }}
             onClick={() => onSubmit(note)} disabled={busy}>
             {busy ? <><span className="wx-spinner" /> Saving…</> : <><i className={`bi ${isReject ? 'bi-x-lg' : 'bi-check2'} me-1`} />{isReject ? 'Reject' : 'Approve'}</>}
           </button>

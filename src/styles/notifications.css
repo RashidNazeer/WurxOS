@@ -26,7 +26,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: var(--danger);
-  color: #fff;
+  color: var(--on-danger);
   font-size: 10.5px;
   font-weight: 700;
   display: grid;
@@ -84,7 +84,7 @@
 }
 .notif-panel-title-count {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 10.5px;
   font-weight: 800;
   padding: 1px 7px;
@@ -258,14 +258,14 @@
   border: 2px solid var(--surface-1);
   font-size: 9px;
 }
-.notif-avatar-cat-task, .notif-avatar-cat-development { background: var(--accent); color: #fff; }
-.notif-avatar-cat-report { background: #818cf8;        color: #fff; }
-.notif-avatar-cat-brand  { background: #eab308;        color: #fff; }
-.notif-avatar-cat-paid_collab { background: #10b981;   color: #fff; }
-.notif-avatar-cat-leave  { background: #06b6d4;        color: #fff; }
-.notif-avatar-cat-resource { background: #ec4899;      color: #fff; }
-.notif-avatar-cat-performance { background: #f59e0b;   color: #fff; }
-.notif-avatar-cat-agenda { background: #6366f1;        color: #fff; }
+.notif-avatar-cat-task, .notif-avatar-cat-development { background: var(--accent); color: var(--on-accent); }
+.notif-avatar-cat-report { background: var(--purple); color: var(--on-purple); }
+.notif-avatar-cat-brand  { background: var(--warning); color: var(--on-warning); }
+.notif-avatar-cat-paid_collab { background: var(--success); color: var(--on-success); }
+.notif-avatar-cat-leave  { background: var(--info); color: var(--on-info); }
+.notif-avatar-cat-resource { background: var(--text-secondary); color: var(--surface-1); }
+.notif-avatar-cat-performance { background: var(--warning); color: var(--on-warning); }
+.notif-avatar-cat-agenda { background: var(--purple); color: var(--on-purple); }
 .notif-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-item-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -403,12 +403,11 @@
   display: grid;
   place-items: center;
   border: 2px solid var(--surface-1);
-  color: #fff;
 }
-.notif-row-avatar-cat-task   { background: var(--accent); }
-.notif-row-avatar-cat-report { background: #818cf8; }
-.notif-row-avatar-cat-brand  { background: #eab308; }
-.notif-row-avatar-cat-paid   { background: #10b981; }
+.notif-row-avatar-cat-task   { background: var(--accent); color: var(--on-accent); }
+.notif-row-avatar-cat-report { background: var(--purple); color: var(--on-purple); }
+.notif-row-avatar-cat-brand  { background: var(--warning); color: var(--on-warning); }
+.notif-row-avatar-cat-paid   { background: var(--success); color: var(--on-success); }
 .notif-row-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-row-content { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -557,19 +556,19 @@
   place-items: center;
   flex-shrink: 0;
   overflow: hidden;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
 }
 .notif-toast-icon img { width: 100%; height: 100%; object-fit: cover; }
 .notif-toast-icon-task        { background: var(--accent); }
-.notif-toast-icon-report      { background: #818cf8; }
-.notif-toast-icon-brand       { background: #eab308; }
-.notif-toast-icon-paid_collab { background: #10b981; }
-.notif-toast-icon-leave       { background: #06b6d4; }
-.notif-toast-icon-resource    { background: #ec4899; }
-.notif-toast-icon-performance { background: #f59e0b; }
-.notif-toast-icon-agenda      { background: #6366f1; }
-.notif-toast-icon-system      { background: var(--text-muted); }
+.notif-toast-icon-report      { background: var(--purple); color: var(--on-purple); }
+.notif-toast-icon-brand       { background: var(--warning); color: var(--on-warning); }
+.notif-toast-icon-paid_collab { background: var(--success); color: var(--on-success); }
+.notif-toast-icon-leave       { background: var(--info); color: var(--on-info); }
+.notif-toast-icon-resource    { background: var(--text-secondary); color: var(--surface-1); }
+.notif-toast-icon-performance { background: var(--warning); color: var(--on-warning); }
+.notif-toast-icon-agenda      { background: var(--purple); color: var(--on-purple); }
+.notif-toast-icon-system      { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-toast-cat {
   font-size: 11px;

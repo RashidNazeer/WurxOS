@@ -297,11 +297,11 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: 8, borderRadius: 8,
-          background: '#f0f4ff', border: '1px solid #c5d5ff',
+          background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)',
         }}>
-          <LinkIcon width="13" height="13" style={{ color: '#3b82f6', flexShrink: 0 }} />
+          <LinkIcon width="13" height="13" style={{ color: 'var(--info)', flexShrink: 0 }} />
           <input readOnly value={url} onClick={e => e.target.select()}
-            style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 11.5, color: '#1e40af', outline: 'none' }} />
+            style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 11.5, color: 'var(--text-primary)', outline: 'none' }} />
           <button className="wx-btn wx-btn-ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={onCopy}>
             {copied ? <><CheckIcon width="11" height="11" /> Copied</> : <><CopyIcon width="11" height="11" /> Copy</>}
           </button>

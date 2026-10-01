@@ -273,7 +273,7 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
                   className="wx-btn"
                   style={{
                     background: 'var(--danger)',
-                    color: '#fff',
+                    color: 'var(--on-danger)',
                     border: 0,
                     fontWeight: 600,
                     width: '100%',
