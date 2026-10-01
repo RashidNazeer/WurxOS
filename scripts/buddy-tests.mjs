@@ -19,6 +19,7 @@ import {
   keySlotMeta, canEditSettings,
   normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, setRoleEconomy, budgetSaverState, modelSourceLabel,
 } from '../src/lib/buddyLogic.js';
+import { markdownToHtml } from '../src/lib/markdownCore.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -537,6 +538,34 @@ async function watchTests() {
   check('budget saver: active at/over the threshold', s.hasBudget && s.active && s.usedPct === 85);
   check('budget saver: no budget → never active', !budgetSaverState(80, { budget_usd: null, budget_used_pct: null }).hasBudget && !budgetSaverState(80, {}).active);
   check('model source labels', modelSourceLabel('economy') === 'budget saver (economy)' && modelSourceLabel(null) === null);
+}
+
+// ── Markdown (marked, GFM) ──────────────────────────────────────────
+{
+  const t = markdownToHtml('| Brand | GMV | Change |\n|---|---|---|\n| PDC | $191,707.10 | +12% [S1] |\n| Cutler | 9,800 | n/a |');
+  check('md: GFM table, wrapped to scroll', t.includes('<div class="ai-table"><table>') && t.includes('<th>Brand</th>') && t.includes('</table></div>'), t);
+  check('md: numeric cells right-aligned', t.includes('<td class="is-num">$191,707.10</td>') && t.includes('<td class="is-num">9,800</td>') && t.includes('<td>n/a</td>'), t);
+  const withCite = citeHtml(t, [{ id: 'S1', cited: true }]);
+  check('md: a citation inside a table cell becomes a button', /<td>\+12% <button type="button" class="bd-cite" data-cite="S1"/.test(withCite), withCite);
+  check('md: fullwidth 【S1】 citations too', citeHtml('<p>x 【S1】</p>', [{ id: 'S1' }]).includes('data-cite="S1"'));
+
+  const c = markdownToHtml('```js\nconst a = "<b>";\n```');
+  check('md: code fence → box with Copy, escaped', c.includes('<div class="ai-code"><button type="button" class="ai-code-copy"') && c.includes('class="language-js"') && c.includes('&lt;b&gt;') && !c.includes('<b>'), c);
+
+  const l = markdownToHtml('[Leave](/leave) [x](//evil.example) [Docs](https://example.com) [bad](javascript:alert(1)) https://auto.example');
+  check('md: in-app link → data-nav', l.includes('<a href="/leave" data-nav="/leave" class="ai-link">Leave</a>'), l);
+  check('md: //host is not in-app, external opens a new tab', !l.includes('data-nav="//evil') && !l.includes('href="//evil')
+    && l.includes('<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="ai-link">Docs</a>'), l);
+  check('md: unsafe scheme → plain text', !/href="javascript/i.test(l) && l.includes('bad'), l);
+  check('md: bare URLs autolink to a new tab', l.includes('href="https://auto.example" target="_blank"'), l);
+
+  const x = markdownToHtml('Hi <script>alert(1)</script> <img src=x onerror="alert(2)"> ![a](https://x/y.png)');
+  check('md: raw HTML escaped (no script / onerror / image tags)', !/<script|<img|onerror="/i.test(x) && x.includes('&lt;script&gt;'), x);
+  check('md: lists, quotes, rules, strike, task lists',
+    /<ul>[\s\S]*<ul>/.test(markdownToHtml('- a\n  - b')) && markdownToHtml('> q').includes('<blockquote>')
+    && markdownToHtml('a\n\n---\n\nb').includes('<hr>') && markdownToHtml('~~x~~').includes('<del>x</del>')
+    && markdownToHtml('- [x] done').includes('type="checkbox"'));
+  check('md: half-streamed table / fence never throws', typeof markdownToHtml('| a | b |\n|--') === 'string' && typeof markdownToHtml('```py\nprint(') === 'string');
 }
 
 await watchTests();

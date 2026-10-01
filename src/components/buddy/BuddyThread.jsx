@@ -9,7 +9,7 @@ import '../../styles/assistant.css'; // .ai-md: the rendered-markdown rules
 
 // The conversation view shared by the quick panel and the Buddy tab.
 
-const CITE_TEXT = /\s?\[(?:[SD]\d{1,3})(?:\s*[,;]\s*[SD]\d{1,3})*\]/g;
+const CITE_TEXT = /\s?[[【](?:[SD]\d{1,3})(?:\s*[,;，]\s*[SD]\d{1,3})*[\]】]/g;
 
 export function useOnline() {
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false));
@@ -151,6 +151,16 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
   const onClick = (e) => {
     const cite = e.target.closest?.('button.bd-cite');
     if (cite) { onCite?.(cite.getAttribute('data-cite'), m); return; }
+    // Copy on a code block (rendered by markdownCore).
+    const copyBtn = e.target.closest?.('button.ai-code-copy');
+    if (copyBtn) {
+      const code = copyBtn.parentElement?.querySelector('code')?.textContent ?? '';
+      navigator.clipboard?.writeText(code).then(() => {
+        copyBtn.textContent = 'Copied';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      }).catch(() => {});
+      return;
+    }
     const a = e.target.closest?.('a[data-nav]');
     const to = a?.getAttribute('data-nav');
     if (to && to.startsWith('/')) { e.preventDefault(); navigate(to); }
