@@ -164,10 +164,9 @@ export default function BuddyPage() {
     || [...messages].reverse().find((m) => m.role === 'assistant' && (m.sources || []).length);
   const panelSources = orderSources(panelMsg?.sources).filter((s) => s.cited !== false);
 
-  const onCite = (id, msg) => {
-    setSourceSel({ msg, id });
-    setSourcesOpen(true);
-  };
+  // Owner: the Sources panel opens only from its button. A citation just marks
+  // which source it is, so it's highlighted when the panel is opened.
+  const onCite = (id, msg) => setSourceSel({ msg, id });
   const pick = (id) => {
     selectPage(id);
     setHistoryOpen(false);
