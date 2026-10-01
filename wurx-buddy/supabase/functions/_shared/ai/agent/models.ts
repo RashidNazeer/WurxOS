@@ -19,23 +19,26 @@ import { ALLOWED_MODELS, DEFAULT_MODEL, LlmError } from '../llm/openai.ts';
 import { providerAccountIssue, retryAfterMs, type ProviderIssue } from '../providerErrors.ts';
 import type { Prices } from '../prices.ts';
 
-export type KeySlot = 'primary' | 'fallback' | 'groq' | 'gemini';
+export type KeySlot = 'primary' | 'fallback' | 'groq' | 'gemini' | 'nvidia' | 'nvidia2';
 export type Api = 'openai-responses' | 'openai-chat';
 export const SLOTS: Record<KeySlot, { api: Api; base: string; label: string; free: boolean }> = {
   primary: { api: 'openai-responses', base: 'https://api.openai.com/v1', label: 'OpenAI', free: false },
   fallback: { api: 'openai-responses', base: 'https://api.openai.com/v1', label: 'OpenAI (fallback key)', free: false },
   groq: { api: 'openai-chat', base: 'https://api.groq.com/openai/v1', label: 'Groq (free)', free: true },
   gemini: { api: 'openai-chat', base: 'https://generativelanguage.googleapis.com/v1beta/openai', label: 'Gemini (free)', free: true },
+  // NVIDIA API catalog: free keys for prototyping / testing only (NVIDIA's terms).
+  nvidia: { api: 'openai-chat', base: 'https://integrate.api.nvidia.com/v1', label: 'NVIDIA (dev/test only)', free: true },
+  nvidia2: { api: 'openai-chat', base: 'https://integrate.api.nvidia.com/v1', label: 'NVIDIA (key 2) (dev/test only)', free: true },
 };
 export const KEY_SLOTS = Object.keys(SLOTS) as KeySlot[];
 export const isSlot = (s: unknown): s is KeySlot => typeof s === 'string' && (KEY_SLOTS as string[]).includes(s);
 export const endpointFor = (slot: KeySlot) => `${SLOTS[slot].base}${SLOTS[slot].api === 'openai-chat' ? '/chat/completions' : '/responses'}`;
 
 export type Target = { keySlot: KeySlot; model: string };
-export type Keys = { primary: string; fallback?: string | null; groq?: string | null; gemini?: string | null };
+export type Keys = { primary: string; fallback?: string | null; groq?: string | null; gemini?: string | null; nvidia?: string | null; nvidia2?: string | null };
 export type CatalogRow = {
   key_slot: KeySlot; model: string; available: boolean; supports_tools: boolean; supports_stream: boolean;
-  free: boolean; params?: { omit?: string[]; token_budget?: number } | null; last_error?: string | null; reason?: string | null; checked_at?: string;
+  free: boolean; params?: { omit?: string[]; token_budget?: number; extra_body?: Record<string, unknown> } | null; last_error?: string | null; reason?: string | null; checked_at?: string;
 };
 export const keyFor = (keys: Keys, slot: KeySlot): string | null => (slot === 'primary' ? keys.primary : keys[slot] ?? null) || null;
 
@@ -133,6 +136,7 @@ export function netRank(t: Target): number {
     if (/flash/.test(t.model)) return 5;
     return 30;
   }
+  if (t.keySlot === 'nvidia' || t.keySlot === 'nvidia2') return (t.keySlot === 'nvidia' ? 50 : 60) + (/nemotron/.test(t.model) ? 0 : /gpt-oss/.test(t.model) ? 1 : 5);
   if (t.keySlot === 'groq') { const i = GROQ_ORDER.indexOf(t.model); return 100 + (i >= 0 ? i : 10); }
   if (t.keySlot === 'fallback') return 200;
   return 300;
@@ -170,6 +174,18 @@ export function coolDown(t: Target, e: unknown, now = Date.now()): void {
   cooling.set(ck(t), { until: now + ms, issue: issue ?? 'busy', waitMs: wait ?? null });
 }
 
+// Extra request fields per model (Chat Completions only): catalog params.extra_body
+// wins; NVIDIA Nemotron gets its thinking switch by default (NVIDIA's example).
+const NEMOTRON_EXTRA = { chat_template_kwargs: { enable_thinking: true }, temperature: 1, top_p: 0.95 };
+export function extraFor(catalog: CatalogRow[], t: Target): Record<string, unknown> | null {
+  const own = catalog.find((c) => c.key_slot === t.keySlot && c.model === t.model)?.params?.extra_body;
+  if (own && typeof own === 'object') return own;
+  return (t.keySlot === 'nvidia' || t.keySlot === 'nvidia2') && /^nvidia\/nemotron/i.test(t.model) ? NEMOTRON_EXTRA : null;
+}
+// A thinking model spends output tokens on reasoning first: it gets room for both.
+export const THINKING_MIN_OUTPUT = 8000;
+export const isThinking = (extra: Record<string, unknown> | null) => !!(extra?.chat_template_kwargs as any)?.enable_thinking;
+
 export const omitFor = (catalog: CatalogRow[], t: Target): string[] =>
   [...new Set([...(catalog.find((c) => c.key_slot === t.keySlot && c.model === t.model)?.params?.omit ?? []), ...learnedOmit(t)])];
 
@@ -197,24 +213,28 @@ export function unsupportedParam(e: unknown): string | null {
 
 // Why a listed model is not probed at all (no call spent); null = probe it.
 const REASONS: [RegExp, string][] = [
-  [/embed/i, 'embedding model (not for chat)'],
+  [/embed|retriever|rerank/i, 'embedding / rerank model (not for chat)'],
+  [/parse|ocr|deplot/i, 'document parser (not for chat)'],
+  [/asr|parakeet|canary|riva/i, 'speech-to-text model (not for chat)'],
+  [/translat/i, 'translation model (not for chat)'],
+  [/cosmos/i, 'world model (not for chat)'],
+  [/clip|vision|-vl\b|vila|neva|kosmos|fuyu|paligemma/i, 'vision model (not for chat)'],
   [/whisper|transcribe/i, 'speech-to-text model (not for chat)'],
   [/tts|orpheus|playai|lyria/i, 'audio model (not for chat)'],
-  [/guard|safeguard|moderation/i, 'safety classifier (not for chat)'],
+  [/guard|safeguard|safety|moderation/i, 'safety classifier (not for chat)'],
   [/imagen|dall-e|image|nano-banana/i, 'image model (not for chat)'],
-  [/veo|sora/i, 'video model (not for chat)'],
+  [/veo|sora|video/i, 'video model (not for chat)'],
   [/realtime|native-audio|\blive\b|-live|audio/i, 'live / audio model (not for chat)'],
   [/antigravity/i, 'Interactions API only'],
   [/deep-research/i, 'research agent (not for chat)'],
   [/omni/i, 'not a chat model (omni)'],
   [/allam|compound|distil|aqa|learnlm|robotics|computer-use|gemma-3n/i, 'not a general chat model'],
-  [/codex|search|instruct|computer/i, 'not a chat model'],
 ];
 const DATED = /-(\d{4}-\d{2}-\d{2}|\d{4})$/;
 export function skipReason(slot: KeySlot, id: string, all: Set<string>): string | null {
   for (const [re, why] of REASONS) if (re.test(id)) return why;
   if (SLOTS[slot].api === 'openai-responses') {
-    if (!/^(gpt|o\d)/i.test(id) || /chatgpt|dall/i.test(id)) return 'not a chat model';
+    if (!/^(gpt|o\d)/i.test(id) || /chatgpt|dall|codex|search|instruct|computer/i.test(id)) return 'not a chat model';
     if (/-pro\b|^o\d.*-pro/i.test(id)) return 'pro model (not for Buddy)';
   }
   if (DATED.test(id) && all.has(id.replace(DATED, ''))) return 'dated snapshot (its alias is listed)';

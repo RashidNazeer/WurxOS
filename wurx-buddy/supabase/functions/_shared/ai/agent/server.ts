@@ -79,6 +79,8 @@ export type ServerEnv = {
   openAiKeyFallback?: string | null;     // OPEN_AI_API_KEY_FALLBACK: the 'fallback' key slot (optional)
   groqKey?: string | null;               // GROQ_API_KEY: the 'groq' key slot (optional, free tier)
   geminiKey?: string | null;             // GEMINI_API_KEY: the 'gemini' key slot (optional, free tier)
+  nvidiaKey?: string | null;             // NVIDIA_API_KEY: the 'nvidia' key slot (optional; free, dev/test only)
+  nvidia2Key?: string | null;            // NVIDIA_API_KEY_2: the 'nvidia2' key slot
   modelKeySlot?: KeySlot;                // with modelOverride: that key (serve-assistant --key-slot)
   noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
 };
@@ -132,6 +134,8 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     fallbackKey: env.openAiKeyFallback ?? null,
     groqKey: env.groqKey ?? null,
     geminiKey: env.geminiKey ?? null,
+    nvidiaKey: env.nvidiaKey ?? null,
+    nvidia2Key: env.nvidia2Key ?? null,
     ...(env.noRateLimit ? { rateLimitExempt: true } : {}),
     embed: emb.embed,
     embedDown: emb.down,
@@ -156,7 +160,8 @@ export async function handleAsk(env: ServerEnv, admin: any, caller: Caller, body
     const slots = Array.isArray(body?.slots) ? body.slots.filter(isSlot) : undefined;
     const { data: cfg } = await admin.from('ai_assistant_config').select('prices').eq('id', 1).maybeSingle();
     try {
-      const r = await refreshModels({ keys: { primary: env.openAiKey, fallback: env.openAiKeyFallback ?? null, groq: env.groqKey ?? null, gemini: env.geminiKey ?? null },
+      const r = await refreshModels({ keys: { primary: env.openAiKey, fallback: env.openAiKeyFallback ?? null, groq: env.groqKey ?? null, gemini: env.geminiKey ?? null,
+        nvidia: env.nvidiaKey ?? null, nvidia2: env.nvidia2Key ?? null },
         admin, prices: pricesFrom(cfg?.prices), fetchImpl: env.fetchImpl, ...(slots?.length ? { slots } : {}) });
       return { response: json(r), done: Promise.resolve() };
     } catch (e) {

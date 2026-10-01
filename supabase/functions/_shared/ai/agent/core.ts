@@ -11,7 +11,7 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { chooseTargets, coolDown, coolingDown, endpointFor, keyFor, monthSpend, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, saverOn, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, monthSpend, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, saverOn, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
 import { chatRespond } from '../llm/chat.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
@@ -82,6 +82,8 @@ export type CoreDeps = {
   fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot)
   groqKey?: string | null;           // GROQ_API_KEY (the 'groq' slot, Chat Completions)
   geminiKey?: string | null;         // GEMINI_API_KEY (the 'gemini' slot, Chat Completions)
+  nvidiaKey?: string | null;         // NVIDIA_API_KEY (the 'nvidia' slot; free, dev/test only)
+  nvidia2Key?: string | null;        // NVIDIA_API_KEY_2 (the 'nvidia2' slot)
   catalog?: CatalogRow[];            // tests; otherwise read from ai_model_catalog
   rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
   embedDown?: () => boolean;         // query embeddings known to be failing on every key
@@ -185,7 +187,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // fallbacks. `target` moves down it on an account error (no credits, key refused).
   let catalog: CatalogRow[] = deps.catalog ?? [];
   if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
-  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null };
+  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
+    nvidia: deps.nvidiaKey ?? null, nvidia2: deps.nvidia2Key ?? null };
   const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
   // Per-role models (mig 404); the budget saver switches roles with an economy model.
   const hasEconomy = Object.values((row.role_models ?? {}) as Record<string, any>).some((v) => v?.economy?.model);
@@ -313,7 +316,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   let firstTokenMs: number | null = null;
   const onDelta = (d: string) => {
     if (cancelled) return;
-    const safe = cstream.push(d);
+    // Some models cite with fullwidth brackets (gpt-oss on NVIDIA, live 2026-10-01: 【S1】).
+    const safe = cstream.push(d.replace(/【/g, '[').replace(/】/g, ']'));
     if (!safe) return;
     if (firstTokenMs == null) firstTokenMs = Date.now() - t0;
     answer += safe;
@@ -354,6 +358,10 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       // Compact mode: a model with a small token budget gets a trimmed request
       // (agent/compact.ts); the shared history is left as it is.
       let call: Partial<LlmRequest> = { instructions, input, ...o };
+      // Model extras (NVIDIA Nemotron's thinking switch); a thinking model gets
+      // output room for its reasoning and the answer.
+      const extra = chat ? extraFor(catalog, target) : null;
+      if (extra) call = { ...call, extra, ...(isThinking(extra) ? { maxOutputTokens: Math.max(call.maxOutputTokens ?? 0, THINKING_MIN_OUTPUT) } : {}) };
       const budget = budgetFor(catalog, target);
       if (budget) {
         const reqI = call.instructions ?? instructions;

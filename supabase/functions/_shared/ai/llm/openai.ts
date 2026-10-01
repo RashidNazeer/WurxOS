@@ -67,6 +67,7 @@ export type LlmRequest = {
   signal?: AbortSignal;                  // the caller's cancel (Stop)
   omit?: string[];                       // top-level fields this model rejects (agent/models.ts)
   firstByteMs?: number;                  // give up if the response has not started by then (FIRST_BYTE_MS)
+  extra?: Record<string, unknown>;       // Chat Completions only: model-specific body fields (agent/models.ts extraFor)
   fetchImpl?: typeof fetch;
   endpoint?: string;
 };
@@ -88,7 +89,10 @@ export class LlmError extends Error {
 export function providerError(prefix: string, status: number | undefined, err: any, raw: string, headerWaitMs?: number | null): LlmError {
   const code = typeof err?.code === 'string' ? err.code : typeof err?.type === 'string' ? err.type : typeof err?.status === 'string' ? err.status : undefined;
   const msg = typeof err?.message === 'string' ? err.message : raw;
-  const implied = status ?? (/rate_limit|quota|credit|RESOURCE_EXHAUSTED/i.test(`${code ?? ''} ${msg}`) ? 429 : undefined);
+  const what = `${code ?? ''} ${msg}`;
+  // An in-stream error has no HTTP status: give it the one its code means
+  // (NVIDIA sent `service_unavailable` mid-stream, live 2026-10-01).
+  const implied = status ?? (/rate_limit|quota|credit|RESOURCE_EXHAUSTED/i.test(what) ? 429 : /unavailable|overloaded|server_error|internal/i.test(what) ? 503 : undefined);
   const e = new LlmError(status ? `${prefix} HTTP ${status}: ${raw}` : `${prefix}: ${code ? `[${code}] ` : ''}${msg}`.slice(0, 600), implied);
   if (code) e.code = code;
   const wait = headerWaitMs ?? retryAfterMs(msg) ?? retryAfterMs(raw);

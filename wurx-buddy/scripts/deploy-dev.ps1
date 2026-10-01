@@ -28,7 +28,8 @@
  else): the same guards and dev ref; migrations 378, 383, 385, 386, 387, 389,
  395, 396, 397, 401 (already applied ones are skipped); the secrets step sets only
  the optional model keys from .env.dev when they are there: OPEN_AI_API_KEY_FALLBACK,
- GROQ_API_KEY (from GROQ_Fallback), GEMINI_API_KEY (from Gemini_Fallback) (OPEN_AI_API_KEY is
+ GROQ_API_KEY (from GROQ_Fallback), GEMINI_API_KEY (from Gemini_Fallback), NVIDIA_API_KEY
+ (from OPEN_AI_NVA), NVIDIA_API_KEY_2 (from NEM_API) (OPEN_AI_API_KEY is
  already set on dev; AI_INTERNAL_SECRET is optional, without it the Slack path
  is off); no app_config step. JWT verification stays ON for this function (callers are
  signed-in users), and it checks the caller's role itself
@@ -56,7 +57,7 @@ $Migrations = @('379', '380', '374', '375', '381')
 $NoVerifyJwt = $true
 if ($DeployAssistant) {
   $Functions = @('assistant')
-  $Migrations = @('378', '383', '385', '386', '387', '389', '395', '396', '397', '401')
+  $Migrations = @('378', '383', '385', '386', '387', '389', '395', '396', '397', '401', '403', '404', '405')
   $NoVerifyJwt = $false
   $SkipConfig = $true
 }
@@ -129,7 +130,7 @@ try {
   elseif ($DeployAssistant) {
     # Only the optional extra model keys (mig 397, 401): function secret <- .env.dev name.
     # Never echoed; the values go through a temp file that is deleted straight after.
-    $extra = [ordered]@{ 'OPEN_AI_API_KEY_FALLBACK' = 'OPEN_AI_API_KEY_FALLBACK'; 'GROQ_API_KEY' = 'GROQ_Fallback'; 'GEMINI_API_KEY' = 'Gemini_Fallback' }
+    $extra = [ordered]@{ 'OPEN_AI_API_KEY_FALLBACK' = 'OPEN_AI_API_KEY_FALLBACK'; 'GROQ_API_KEY' = 'GROQ_Fallback'; 'GEMINI_API_KEY' = 'Gemini_Fallback'; 'NVIDIA_API_KEY' = 'OPEN_AI_NVA'; 'NVIDIA_API_KEY_2' = 'NEM_API' }
     $set = @($extra.Keys | Where-Object { $envMap[$extra[$_]] })
     foreach ($k in @($extra.Keys | Where-Object { -not $envMap[$extra[$_]] })) { Write-Host "$($extra[$k]) not in .env.dev: $k not set (that key's models stay off)." }
     if (-not $set.Count) { Write-Host 'nothing to set.' }

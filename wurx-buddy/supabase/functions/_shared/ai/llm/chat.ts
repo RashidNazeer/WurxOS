@@ -94,6 +94,8 @@ export function chatBody(r: LlmRequest): Record<string, unknown> {
     ...(r.effort ? { reasoning_effort: chatEffort(r.effort) } : {}),
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
+    // Model extras (e.g. NVIDIA Nemotron's chat_template_kwargs); never the core fields.
+    ...Object.fromEntries(Object.entries(r.extra ?? {}).filter(([k]) => !['model', 'messages', 'tools', 'stream'].includes(k))),
   };
   for (const k of r.omit ?? []) if (!['model', 'messages', 'tools', 'stream'].includes(k)) delete body[k];
   return body;
@@ -161,6 +163,8 @@ export function chatRespond(r: LlmRequest): Promise<LlmResult> {
       const ch = ev?.choices?.[0];
       if (!ch) return;
       if (ch.finish_reason) finish = ch.finish_reason;
+      // Only content is answer text: reasoning (NVIDIA's reasoning_content,
+      // Groq's reasoning) is never shown or stored.
       const d = ch.delta ?? {};
       if (typeof d.content === 'string' && d.content) {
         io.streamed();

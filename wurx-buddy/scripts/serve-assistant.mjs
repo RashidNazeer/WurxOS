@@ -4,7 +4,7 @@
 //   node --experimental-strip-types scripts/serve-assistant.mjs [--port 8787] [--as-user <uuid>] [--model <model>] [--key-slot primary|fallback|groq|gemini] [--no-rate-limit]
 //   --model overrides ai_assistant_config.model for this server only (e.g. to compare models);
 //   without --key-slot it must be a built-in OpenAI model, with it any model that key serves.
-//   Keys: OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_Fallback (or GROQ_API_KEY), Gemini_Fallback (or GEMINI_API_KEY).
+//   Keys: OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_Fallback (or GROQ_API_KEY), Gemini_Fallback (or GEMINI_API_KEY), OPEN_AI_NVA (or NVIDIA_API_KEY), NEM_API (or NVIDIA_API_KEY_2).
 //
 //   POST http://127.0.0.1:<port>/assistant   (the same contract as the edge
 //   function supabase/functions/assistant; run-eval --engine v2 --base-url
@@ -47,7 +47,7 @@ if (new URL(url).hostname !== `${devRef}.supabase.co`) { console.error('Refusing
 for (const k of ['WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY', 'VITE_SUPABASE_ANON_KEY', 'OPEN_AI_API_KEY']) {
   if (!env[k]) { console.error(`${k} missing in ../.env.dev`); process.exit(1); }
 }
-const serverEnv = { url, serviceKey: env.WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY, anonKey: env.VITE_SUPABASE_ANON_KEY, openAiKey: env.OPEN_AI_API_KEY, openAiKeyFallback: env.OPEN_AI_API_KEY_FALLBACK || null, groqKey: env.GROQ_API_KEY || env.GROQ_Fallback || null, geminiKey: env.GEMINI_API_KEY || env.Gemini_Fallback || null, noRateLimit: argv.includes('--no-rate-limit'), createClient, ...(modelOverride ? { modelOverride, ...(keySlot ? { modelKeySlot: keySlot } : {}) } : {}) };
+const serverEnv = { url, serviceKey: env.WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY, anonKey: env.VITE_SUPABASE_ANON_KEY, openAiKey: env.OPEN_AI_API_KEY, openAiKeyFallback: env.OPEN_AI_API_KEY_FALLBACK || null, groqKey: env.GROQ_API_KEY || env.GROQ_Fallback || null, geminiKey: env.GEMINI_API_KEY || env.Gemini_Fallback || null, nvidiaKey: env.NVIDIA_API_KEY || env.OPEN_AI_NVA || null, nvidia2Key: env.NVIDIA_API_KEY_2 || env.NEM_API || null, noRateLimit: argv.includes('--no-rate-limit'), createClient, ...(modelOverride ? { modelOverride, ...(keySlot ? { modelKeySlot: keySlot } : {}) } : {}) };
 const admin = createClient(url, serverEnv.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
 // GET /__log/<requestId>: the request-log row in the shape run-eval reads
