@@ -837,11 +837,38 @@ export const modelSourceLabel = (s) => (s ? MODEL_SOURCE_LABEL[s] || s : null);
 // an array [{model, count|n|chunks}]. → [{model, count}], biggest first.
 export function vectorsByModel(stats) {
   const v = stats?.vectors_by_model ?? stats?.embeddings_by_model ?? null;
-  if (!v) return [];
+  if (!v) {
+    // mig 402 shape: stats.vectors = { alt_filled, pending_with_alt, … }.
+    const alt = Number(stats?.vectors?.alt_filled);
+    const model = stats?.embed_model_alt;
+    return Number.isFinite(alt) && alt > 0 && model ? [{ model: String(model), count: alt }] : [];
+  }
   const rows = Array.isArray(v)
     ? v.map((x) => ({ model: String(x.model ?? x.embed_model ?? 'unknown'), count: Number(x.count ?? x.n ?? x.chunks ?? 0) }))
     : Object.entries(v).map(([model, n]) => ({ model, count: Number(typeof n === 'object' ? (n?.count ?? n?.chunks ?? 0) : n) }));
   return rows.filter((r) => Number.isFinite(r.count)).sort((a, b) => b.count - a.count || a.model.localeCompare(b.model));
+}
+
+// Progress for the ingestion card: the queue draining, and AI-vector coverage.
+// Chunks with no main-key vector are already keyword-searchable, and searchable
+// by meaning too when a fallback provider has given them one (pending_with_alt).
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+export function ingestProgress(stats) {
+  if (!stats) return null;
+  const q = stats.queue || {};
+  const left = num(q.pending) + num(q.processing);
+  const done = num(q.done);
+  const qTotal = left + done;
+  const queue = qTotal > 0 ? { done, left, total: qTotal, pct: Math.round((done / qTotal) * 100) } : null;
+
+  const pending = num(stats.vector_pending);
+  const withAlt = num(stats.vectors?.pending_with_alt);
+  const total = num(stats.chunks ?? stats.documents?.chunks ?? stats.vectors?.chunks)
+    || (num(stats.vectors?.alt_filled) + pending) || 0;
+  const vectors = total > 0
+    ? { ready: Math.max(0, total - pending), pending, withAlt, total, pct: Math.round(((total - pending) / total) * 100) }
+    : null;
+  return { queue, vectors };
 }
 
 // Document types that may go to free AI providers. Incentive plans contain pay
