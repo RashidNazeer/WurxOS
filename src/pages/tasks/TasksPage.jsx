@@ -11,6 +11,7 @@ import TaskDetailModal from '../../components/tasks/TaskDetailModal';
 import {
   PlusIcon, SearchIcon, AlertIcon, RefreshIcon, UsersIcon,
 } from '../../components/common/Icon';
+import { useDialogs } from '../../components/common/useDialogs';
 import '../../styles/table.css';
 import '../../styles/tasks.css';
 
@@ -30,6 +31,7 @@ const BASE_TABS = [
 const STATUS_FILTERS = ['all', 'todo', 'in_progress', 'done'];
 
 export default function TasksPage() {
+  const { ask, notify } = useDialogs();
   const { user, profile } = useAuth();
   const role = profile?.role;
   const isTL = role === 'tl';
@@ -177,7 +179,7 @@ export default function TasksPage() {
       setLocalError('All selected tasks belong to inactive brands and are frozen.');
       return;
     }
-    if (!confirm(`Delete ${active.length} task(s)? This cannot be undone.${frozen.length ? ` (${frozen.length} frozen task(s) will be skipped.)` : ''}`)) return;
+    if (!(await ask(`Delete ${active.length} task(s)? This cannot be undone.${frozen.length ? ` (${frozen.length} frozen task(s) will be skipped.)` : ''}`, { danger: true }))) return;
     setBulkBusy(true); setLocalError('');
     try {
       const { error } = await supabase.from('tasks').delete().in('id', active);

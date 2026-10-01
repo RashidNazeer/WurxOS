@@ -4,6 +4,7 @@ import {
   listAgendaResources, deleteAgendaResource, subscribeAgendaResources, listMyBrandIds,
 } from '../../lib/agendaApi';
 import AgendaResourceModal from '../../components/agenda/AgendaResourceModal';
+import { useDialogs } from '../../components/common/useDialogs';
 
 // Weekly Agenda Meetings — Resources foundation. A brand-scoped (or
 // general) library of links/files used in agenda meetings.
@@ -16,6 +17,7 @@ const TYPE_META = {
 };
 
 export default function AgendaResourcesPage() {
+  const { ask, notify } = useDialogs();
   const { user, profile } = useAuth();
   const role = profile?.role || '';
   const isAdmin = role === 'boss' || role === 'ol' || role === 'developer';
@@ -63,17 +65,17 @@ export default function AgendaResourcesPage() {
   }, [rows, search, typeFilter]);
 
   async function handleDelete(r) {
-    if (!window.confirm(`Delete "${r.name}"?`)) return;
+    if (!(await ask(`Delete "${r.name}"?`, { danger: true, confirmLabel: 'Delete' }))) return;
     try {
       await deleteAgendaResource(r.id);
       reload();
     } catch (e) {
-      alert('Failed to delete: ' + (e.message || 'unknown'));
+      notify.error('Failed to delete: ' + (e.message || 'unknown'));
     }
   }
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -82,7 +84,7 @@ export default function AgendaResourcesPage() {
           </h5>
           <p className="text-muted small mb-0">Shared links and files for the weekly agenda meeting.</p>
         </div>
-        <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }}
+        <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }}
           onClick={() => { setEditing(null); setModalOpen(true); }}>
           <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} /> Add resource
         </button>
@@ -110,7 +112,7 @@ export default function AgendaResourcesPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-folder2-open text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No resources yet</p>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No resources yet</p>
           <p className="text-muted small mb-0">Add the first agenda resource.</p>
         </div>
       ) : (

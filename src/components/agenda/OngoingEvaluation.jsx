@@ -58,7 +58,7 @@ function TaskReviewModal({ task, review, onClose, onSave }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg"
         style={{ position: 'relative', width: '100%', maxWidth: 540, maxHeight: '85vh', zIndex: 1, borderRadius: 14, display: 'flex', flexDirection: 'column' }}>
         {/* header */}
@@ -102,7 +102,7 @@ function TaskReviewModal({ task, review, onClose, onSave }) {
         {/* footer */}
         <div className="d-flex gap-2 justify-content-end px-4 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+          <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save review</>}
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                 style={{ width: 60, height: 60, background: 'var(--surface-2)' }}>
                 <i className="bi bi-easel text-muted" style={{ fontSize: '1.5rem', opacity: 0.4 }} />
               </div>
-              <p className="fw-semibold text-dark mb-1">Waiting for an APC to present</p>
+              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Waiting for an APC to present</p>
               <p className="text-muted small mb-0">The review panel opens as soon as someone starts presenting.</p>
             </div>
           ) : (
@@ -325,10 +325,10 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
 
             {/* Weekly performance rating — the 5 metrics scored per week for this APC */}
             {activePresentation && apcId && (
-              <div className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: '4px solid var(--info, #0d6efd)' }}>
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: '4px solid var(--info)' }}>
                 <div className="card-body p-3">
                   <div className="fw-semibold mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.84rem' }}>
-                    <i className="bi bi-bar-chart-fill" style={{ color: 'var(--info, #0d6efd)' }} />
+                    <i className="bi bi-bar-chart-fill" style={{ color: 'var(--info, var(--info-text))' }} />
                     Weekly performance rating
                   </div>
                   <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>

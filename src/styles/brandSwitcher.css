@@ -108,7 +108,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   margin-bottom: 6px;
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 .bsw-row:hover {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border-subtle));
@@ -178,6 +178,8 @@
   border-radius: var(--radius-md);
   margin-bottom: 6px;
 }
+/* New rows / requests fade in instead of popping into the list. */
+.bsw-row, .bsw-req { animation: wx-fade var(--dur-enter) var(--ease-out); }
 .bsw-req.is-pending {
   border-left: 3px solid var(--accent);
 }

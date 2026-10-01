@@ -361,7 +361,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             borderRadius: 'var(--radius-md)',
             background: notify ? 'var(--accent-soft)' : 'var(--surface-1)',
             cursor: 'pointer',
-            transition: 'background var(--dur-fast)',
+            transition: 'background-color var(--dur-fast) var(--ease-out)',
           }}>
             <input type="checkbox" checked={notify}
               onChange={(e) => setNotify(e.target.checked)}

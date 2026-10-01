@@ -187,7 +187,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
                 <i className="bi bi-check-circle-fill me-1" />Completed
               </span>
             ) : (
-              <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft, #fef3c7)', color: 'var(--warning, #b45309)', fontSize: '0.62rem', fontWeight: 800 }}>
+              <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning, var(--warning-text))', fontSize: '0.62rem', fontWeight: 800 }}>
                 <i className="bi bi-exclamation-triangle-fill me-1" />Missed — never started
               </span>
             )}

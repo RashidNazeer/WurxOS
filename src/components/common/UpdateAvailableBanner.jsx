@@ -33,7 +33,7 @@ export default function UpdateAvailableBanner() {
         borderRadius: 12,
         background: 'var(--surface-1)',
         border: '1px solid var(--border-default, var(--border-subtle))',
-        boxShadow: '0 12px 32px -8px rgba(0,0,0,0.35)',
+        boxShadow: 'var(--shadow-xl)',
         color: 'var(--text-primary)',
         fontSize: 13,
       }}

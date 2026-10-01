@@ -520,14 +520,14 @@ function OverviewPanel({
   if (gmv != null) {
     tiles.push({
       key: 'gmv', label: 'GMV · 30 day', value: formatMoney(gmv, brand.currency),
-      icon: 'bi-cash-stack', accent: '#0ea5e9',
+      icon: 'bi-cash-stack', accent: 'var(--info)',
       foot: gmv === 0 ? 'No attributed sales yet' : null,
     });
   }
   if (productsCount > 0) {
     tiles.push({
       key: 'products', label: 'Products live', value: productsCount,
-      icon: 'bi-box-seam', accent: '#10b981',
+      icon: 'bi-box-seam', accent: 'var(--success)',
     });
   }
   if (openTaskCount > 0 || overdueCount > 0 || dueTodayCount > 0) {
@@ -536,7 +536,7 @@ function OverviewPanel({
     if (dueTodayCount > 0) foot.push(`${dueTodayCount} due today`);
     tiles.push({
       key: 'tasks', label: 'Open tasks', value: openTaskCount,
-      icon: 'bi-check2-square', accent: '#f59e0b',
+      icon: 'bi-check2-square', accent: 'var(--warning)',
       foot: foot.join(' · ') || null,
       footTone: overdueCount > 0 ? 'danger' : null,
     });

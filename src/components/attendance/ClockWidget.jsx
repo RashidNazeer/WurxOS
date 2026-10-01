@@ -14,15 +14,14 @@ import {
   setAutoClockOutNote as apiSetAutoClockOutNote,
 } from '../../lib/attendanceApi';
 import { getNow, getNowDate } from '../../lib/serverTime';
-import ApcGmvGateModal from './ApcGmvGateModal';
-import { apcGmvStatus, submitApcGmv } from '../../lib/apcGmvApi';
+import { useClockActions } from './useClockActions';
 import { getMyAchievement, monthLabel } from '../../lib/achievementsApi';
 import '../../styles/celebration.css';
 
 const LOCATIONS = [
-  { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: '#2563eb' },
-  { key: 'lakecity', label: 'Lake City Office', icon: 'bi-buildings', color: '#7c3aed' },
-  { key: 'wfh',      label: 'Work From Home',   icon: 'bi-house-door', color: '#16a34a' },
+  { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: 'var(--info-text)' },
+  { key: 'lakecity', label: 'Lake City Office', icon: 'bi-buildings', color: 'var(--purple-text)' },
+  { key: 'wfh',      label: 'Work From Home',   icon: 'bi-house-door', color: 'var(--success-text)' },
 ];
 
 // All attendance display + editing is locked to Pakistan time
@@ -62,12 +61,13 @@ function fromPktLocalInput(str) {
 }
 
 function statusColor(s) {
-  if (s === 'clocked-in')       return '#16a34a';
-  if (s === 'on-break')         return '#f59e0b';
-  if (s === 'pending-approval') return '#3b82f6';
-  if (s === 'clocked-out')      return '#64748b';
-  if (s === 'auto-closed')      return '#dc2626';
-  return '#94a3b8';
+  // Text-safe tokens: the same colour is used for the chip text and its tint.
+  if (s === 'clocked-in')       return 'var(--success-text)';
+  if (s === 'on-break')         return 'var(--warning-text)';
+  if (s === 'pending-approval') return 'var(--info-text)';
+  if (s === 'clocked-out')      return 'var(--text-muted)';
+  if (s === 'auto-closed')      return 'var(--danger-text)';
+  return 'var(--text-muted)';
 }
 function statusLabel(s) {
   if (s === 'clocked-in')       return 'Working';
@@ -79,139 +79,6 @@ function statusLabel(s) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * Live analog clock — SVG, hands move every second based on `now`
- * ───────────────────────────────────────────────────────────────────────────── */
-function AnalogClock({ now, accent = '#16a34a', size = 200 }) {
-  // Hands point at Pakistan time so the analog dial agrees with the
-  // digital display and the attendance records.
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Karachi',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  }).formatToParts(now);
-  const pn = (k) => Number(parts.find((p) => p.type === k)?.value || '0');
-  let h24 = pn('hour'); if (h24 === 24) h24 = 0;
-  const h = h24 % 12;
-  const m = pn('minute');
-  const s = pn('second');
-
-  const hourDeg   = (h * 30) + (m * 0.5);
-  const minuteDeg = (m * 6)  + (s * 0.1);
-  const secondDeg = s * 6;
-
-  const cx = size / 2;
-  const cy = size / 2;
-  const r  = size / 2 - 4;
-
-  // Tick marks (12 hours)
-  const ticks = [];
-  for (let i = 0; i < 60; i++) {
-    const deg = i * 6;
-    const isHour = i % 5 === 0;
-    const inner = isHour ? r - 10 : r - 5;
-    const outer = r - 2;
-    const rad = (deg - 90) * (Math.PI / 180);
-    const x1 = cx + inner * Math.cos(rad);
-    const y1 = cy + inner * Math.sin(rad);
-    const x2 = cx + outer * Math.cos(rad);
-    const y2 = cy + outer * Math.sin(rad);
-    ticks.push(
-      <line
-        key={i}
-        x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={isHour ? '#1e293b' : '#cbd5e1'}
-        strokeWidth={isHour ? 2 : 1}
-        strokeLinecap="round"
-      />
-    );
-  }
-
-  // Hour numerals (12, 3, 6, 9)
-  const numerals = [];
-  const positions = [
-    { n: 12, a: 0 },
-    { n: 3,  a: 90 },
-    { n: 6,  a: 180 },
-    { n: 9,  a: 270 },
-  ];
-  positions.forEach(p => {
-    const rad = (p.a - 90) * (Math.PI / 180);
-    const x = cx + (r - 22) * Math.cos(rad);
-    const y = cy + (r - 22) * Math.sin(rad);
-    numerals.push(
-      <text
-        key={p.n}
-        x={x} y={y}
-        fontSize={14}
-        fontWeight={700}
-        fill="#475569"
-        textAnchor="middle"
-        dominantBaseline="central"
-      >
-        {p.n}
-      </text>
-    );
-  });
-
-  return (
-    <svg width={size} height={size} style={{ display: 'block' }}>
-      <defs>
-        <radialGradient id="clockFace" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"  stopColor="#ffffff" />
-          <stop offset="85%" stopColor="#f8fafc" />
-          <stop offset="100%" stopColor="#e2e8f0" />
-        </radialGradient>
-        <filter id="clockShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#0f172a" floodOpacity="0.15" />
-        </filter>
-      </defs>
-
-      {/* Outer bezel */}
-      <circle cx={cx} cy={cy} r={r + 2} fill="#1e293b" filter="url(#clockShadow)" />
-      {/* Face */}
-      <circle cx={cx} cy={cy} r={r} fill="url(#clockFace)" stroke="#cbd5e1" strokeWidth="1" />
-
-      {ticks}
-      {numerals}
-
-      {/* Hour hand */}
-      <line
-        x1={cx} y1={cy}
-        x2={cx} y2={cy - r * 0.5}
-        stroke="#1e293b"
-        strokeWidth="5"
-        strokeLinecap="round"
-        transform={`rotate(${hourDeg} ${cx} ${cy})`}
-        style={{ transition: 'transform 0.4s cubic-bezier(.4,2.2,.6,1)' }}
-      />
-      {/* Minute hand */}
-      <line
-        x1={cx} y1={cy}
-        x2={cx} y2={cy - r * 0.72}
-        stroke="#334155"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        transform={`rotate(${minuteDeg} ${cx} ${cy})`}
-        style={{ transition: 'transform 0.4s cubic-bezier(.4,2.2,.6,1)' }}
-      />
-      {/* Second hand */}
-      <line
-        x1={cx} y1={cy + 8}
-        x2={cx} y2={cy - r * 0.82}
-        stroke={accent}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        transform={`rotate(${secondDeg} ${cx} ${cy})`}
-        style={{ transition: 'transform 0.15s cubic-bezier(.4,2.5,.6,1)' }}
-      />
-
-      {/* Center cap */}
-      <circle cx={cx} cy={cy} r="5" fill="#1e293b" />
-      <circle cx={cx} cy={cy} r="2" fill={accent} />
-    </svg>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
  * Main Clock Widget
  * ───────────────────────────────────────────────────────────────────────────── */
 export default function ClockWidget() {
@@ -220,33 +87,16 @@ export default function ClockWidget() {
   // the ported markup keeps using the v1 names. apcProfile.ownerId
   // ↔ profile.reports_to. apcProfile.ownerName is fetched on demand
   // via the optional ownerName state below.
-  const { user, profile } = useAuth();
-  const currentUser = user ? {
-    uid: user.id,
-    email: user.email,
-    displayName: profile?.display_name || '',
-  } : null;
-  const userRole = profile?.role || '';
-  const apcProfile = profile ? {
-    userName:  profile.display_name || '',
-    ownerId:   profile.reports_to || null,
-    ownerName: profile.reports_to_name || '', // populated by the effect below
-    assignedBrands: profile.assigned_brands || [], // checkApcDailyTasks queries server-side
-  } : null;
+  const {
+    user, profile, record, setRecord, loading, setLoading, action, setAction, showClockIn, setShowClockIn, showClockOut, setShowClockOut, clockOutNote, setClockOutNote, taskError, setTaskError, showGmvGate, setShowGmvGate, gmvStatus, setGmvStatus, pendingLocation, setPendingLocation, clockedInToast, setClockedInToast, tlStatus, setTlStatus, tlAutoNote, setTlAutoNote, autoClockOutEnabled, setAutoClockOutEnabled, autoClockOutNote, setAutoClockOutNote, currentUser, userRole, apcProfile, _uid, isApcOrIpc, isTL, ownerId, ownerName, userName, refetchRecord, performClockIn, doClockIn, handleClockIn, handleGmvConfirm, handleBreak, handleClockOut, handleResumeShift, handleRequestClockOut, checkDailyTasks, handleToggleAutoClockOut, handleSaveAutoNote,
+    modals: clockModals,
+  } = useClockActions();
 
   // All hooks below assume currentUser exists. The page that mounts
   // this widget hides it for Boss/OL/Developer roles, so non-clocking
   // users won't even see it. The early-return at the END of the
   // component (just before the JSX) handles the auth-not-ready case
   // without breaking the rules-of-hooks.
-  const _uid = currentUser?.uid;
-  const [record, setRecord] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [action, setAction] = useState('');
-  const [showClockIn, setShowClockIn] = useState(false);
-  const [showClockOut, setShowClockOut] = useState(false);
-  const [clockOutNote, setClockOutNote] = useState('');
-  const [taskError, setTaskError] = useState('');
   const [now, setNow] = useState(() => getNowDate());
   const [showEditClockIn, setShowEditClockIn] = useState(false);
   const [editTime, setEditTime] = useState('');
@@ -259,11 +109,6 @@ export default function ClockWidget() {
   const [breakError, setBreakError]           = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
-  // APC GMV-on-clock-in gate (mig 311)
-  const [showGmvGate, setShowGmvGate] = useState(false);
-  const [gmvStatus, setGmvStatus] = useState(null);
-  const [pendingLocation, setPendingLocation] = useState(null);
-  const [clockedInToast, setClockedInToast] = useState(false);
 
   // "You were APC of the Month" — shown every day the winner comes here, from
   // the moment they acknowledge the award until the end of the month after the
@@ -277,22 +122,7 @@ export default function ClockWidget() {
     return () => { alive = false; };
   }, []);
 
-  // Auto-dismiss the "You're clocked in" confirmation toast.
-  useEffect(() => {
-    if (!clockedInToast) return undefined;
-    const t = setTimeout(() => setClockedInToast(false), 2800);
-    return () => clearTimeout(t);
-  }, [clockedInToast]);
 
-  const isApcOrIpc = userRole === 'apc' || userRole === 'ipc';
-  const isTL = userRole === 'tl';
-  const ownerId = apcProfile?.ownerId || null;
-  const ownerName = apcProfile?.ownerName || '';
-  const userName = currentUser?.displayName || apcProfile?.userName || currentUser?.email?.split('@')[0] || '';
-  const [tlStatus, setTlStatus] = useState(null);
-  const [tlAutoNote, setTlAutoNote] = useState('');
-  const [autoClockOutEnabled, setAutoClockOutEnabled] = useState(false);
-  const [autoClockOutNote, setAutoClockOutNote] = useState('');
 
   // Unacknowledged auto-closes (shown as banner with OK / Adjust)
   const [autoClosedItems, setAutoClosedItems] = useState([]);
@@ -363,53 +193,6 @@ export default function ClockWidget() {
     return () => { alive = false; };
   }, [currentUser.uid]);
 
-  // Real-time listener for active record (cross-midnight safe).
-  // Defense in depth: hard 5-second watchdog flips loading=false even
-  // if the subscription never delivers — never leave the user staring
-  // at a permanent spinner. Plus we expose refetch() so action handlers
-  // can force-refresh after clock-in/out/break without waiting for
-  // realtime (which is unreliable in v2 right now).
-  const recordSubRef = React.useRef(null);
-  useEffect(() => {
-    if (!_uid) return;
-    let alive = true;
-    const watchdog = setTimeout(() => {
-      if (alive) {
-        setLoading((wasLoading) => {
-          if (wasLoading) console.warn('[ClockWidget] watchdog: forcing loading=false after 5s');
-          return false;
-        });
-      }
-    }, 5000);
-    const unsub = onActiveRecord(_uid, r => {
-      if (!alive) return;
-      setRecord(r);
-      setLoading(false);
-      clearTimeout(watchdog);
-      if (isTL && r && r.autoClockOut !== undefined) {
-        setAutoClockOutEnabled(!!r.autoClockOut);
-        setAutoClockOutNote(r.autoClockOutNote || '');
-      }
-    });
-    recordSubRef.current = unsub;
-    return () => { alive = false; clearTimeout(watchdog); unsub(); };
-  }, [_uid, isTL]);
-  const refetchRecord = () => recordSubRef.current?.refetch?.();
-
-  // APC/IPC: check if TL is currently clocked in
-  useEffect(() => {
-    if (!isApcOrIpc || !ownerId) { setTlStatus('available'); return; }
-    const unsub = onActiveRecord(ownerId, (tlRecord) => {
-      if (!tlRecord || tlRecord.status === 'clocked-out') {
-        setTlStatus('not_clocked_in'); setTlAutoNote('');
-      } else if (tlRecord.autoClockOut) {
-        setTlStatus('auto_clockout'); setTlAutoNote(tlRecord.autoClockOutNote || '');
-      } else {
-        setTlStatus('available'); setTlAutoNote('');
-      }
-    });
-    return unsub;
-  }, [isApcOrIpc, ownerId]);
 
   // Tick every second for the live clock + work timer
   useEffect(() => {
@@ -493,99 +276,6 @@ export default function ClockWidget() {
 
   const locInfo = LOCATIONS.find(l => l.key === record?.location);
 
-  // Low-level clock-in: write + refresh + confirmation toast. THROWS on error.
-  async function performClockIn(location) {
-    await clockIn({
-      userId: currentUser.uid, userName, userRole,
-      userEmail: currentUser.email || '',
-      ownerId, location,
-    });
-    setShowClockIn(false);
-    setShowGmvGate(false);
-    setPendingLocation(null);
-    // Force-refresh — realtime can be flaky and we never want the user
-    // to see stale state after their own action.
-    refetchRecord();
-    setClockedInToast(true);
-  }
-
-  // Direct clock-in (non-gate path); swallows errors into the widget banner.
-  async function doClockIn(location) {
-    setAction('clockin');
-    try { await performClockIn(location); }
-    catch (err) { setTaskError(err.message); }
-    setAction('');
-  }
-
-  async function handleClockIn(location) {
-    // APC-only GMV gate BEFORE any attendance write. Fail-open if the check
-    // itself errors, so a glitch never locks an APC out of clocking in.
-    if (userRole === 'apc') {
-      setAction('clockin'); setTaskError('');
-      let st = null;
-      try { st = await apcGmvStatus(); } catch { st = null; }
-      setAction('');
-      if (st && st.needs_entry) {
-        setGmvStatus(st);
-        setPendingLocation(location);
-        setShowGmvGate(true);
-        return;
-      }
-    }
-    await doClockIn(location);
-  }
-
-  // The GMV modal's confirm handler: save GMV, then clock in. Errors propagate
-  // to the modal so it can show them and stay open for a retry.
-  async function handleGmvConfirm(payload) {
-    await submitApcGmv({
-      monthKey: gmvStatus.month_key,
-      rangeStart: payload.rangeStart,
-      rangeEnd: payload.rangeEnd,
-      entries: payload.entries,
-    });
-    await performClockIn(pendingLocation);
-  }
-
-  async function handleBreak() {
-    setAction('break');
-    try {
-      if (record.status === 'on-break') await endBreak(currentUser.uid);
-      else await startBreak(currentUser.uid);
-      refetchRecord();
-    } catch (err) { setTaskError(err.message); }
-    setAction('');
-  }
-
-  async function handleClockOut() {
-    if (isApcOrIpc) {
-      const tasksOk = await checkDailyTasks();
-      if (!tasksOk) return;
-      if (tlStatus === 'not_clocked_in' || tlStatus === 'auto_clockout') {
-        setAction('clockout');
-        try { await clockOut(currentUser.uid); refetchRecord(); } catch (err) { setTaskError(err.message); }
-        setAction('');
-        return;
-      }
-      setShowClockOut(true);
-      return;
-    }
-    setAction('clockout');
-    try { await clockOut(currentUser.uid); refetchRecord(); } catch (err) { setTaskError(err.message); }
-    setAction('');
-  }
-
-  async function handleResumeShift() {
-    setAction('resume');
-    setTaskError('');
-    try {
-      await resumeShift();
-      refetchRecord();
-    } catch (err) {
-      setTaskError(err.message || 'Could not resume the shift.');
-    }
-    setAction('');
-  }
 
   async function handleSubmitEditClockIn() {
     setEditError('');
@@ -703,47 +393,6 @@ export default function ClockWidget() {
     setBreakSaving(false);
   }
 
-  async function handleRequestClockOut() {
-    setAction('clockout');
-    try {
-      await requestClockOut({ userId: currentUser.uid, clockOutNote, ownerId, ownerName, userName });
-      setShowClockOut(false);
-      setClockOutNote('');
-      refetchRecord();
-    } catch (err) { setTaskError(err.message); }
-    setAction('');
-  }
-
-  async function checkDailyTasks() {
-    setTaskError('');
-    try {
-      const result = await checkApcDailyTasks(currentUser.uid);
-      if (!result.ok) {
-        setTaskError(`You have ${result.count} incomplete daily task${result.count > 1 ? 's' : ''} in ${result.brandName}. Complete all daily tasks before clocking out.`);
-        return false;
-      }
-      return true;
-    } catch {
-      // Non-fatal — let the user clock out if the check itself failed.
-      return true;
-    }
-  }
-
-  async function handleToggleAutoClockOut() {
-    if (!record) return;
-    const newVal = !autoClockOutEnabled;
-    setAutoClockOutEnabled(newVal);
-    try {
-      await apiSetAutoClockOut(currentUser.uid, newVal, autoClockOutNote);
-    } catch { /* ignore */ }
-  }
-
-  async function handleSaveAutoNote() {
-    if (!record) return;
-    try {
-      await apiSetAutoClockOutNote(currentUser.uid, autoClockOutNote);
-    } catch { /* ignore */ }
-  }
 
   const isClockedOut = !record || record.status === 'clocked-out';
 
@@ -779,13 +428,13 @@ export default function ClockWidget() {
           width: 100%; padding: 18px 22px; border-radius: 16px; border: none;
           display: flex; align-items: center; justify-content: space-between;
           font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em;
-          color: white; transition: all 0.15s; cursor: pointer;
+          transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); cursor: pointer;
         }
         .att-primary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
         .att-primary-btn i { font-size: 1.3rem; }
-        .att-primary-in  { background: var(--success); }
+        .att-primary-in  { background: var(--success); color: var(--on-success); }
         .att-primary-in:hover:not(:disabled) { background: var(--success); transform: translateY(-1px); }
-        .att-primary-out { background: var(--danger); }
+        .att-primary-out { background: var(--danger); color: var(--on-danger); }
         .att-primary-out:hover:not(:disabled) { background: var(--danger); transform: translateY(-1px); }
 
         .att-secondary-btn {
@@ -793,7 +442,7 @@ export default function ClockWidget() {
           background: var(--surface-0); color: var(--text-secondary);
           font-size: 0.82rem; font-weight: 600;
           display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-          transition: all 0.15s; cursor: pointer;
+          transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); cursor: pointer;
         }
         .att-secondary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .att-secondary-btn:hover:not(:disabled) { background: var(--surface-2); }
@@ -809,7 +458,7 @@ export default function ClockWidget() {
         .att-today-card h4 { color: var(--att-spotlight-fg); font-weight: 700; margin-bottom: 18px; font-size: 1.35rem; }
         .att-today-card .att-digit { color: var(--att-spotlight-fg); }
         .att-today-progress { background: color-mix(in srgb, var(--att-spotlight-fg) 8%, transparent); border-radius: 999px; height: 6px; overflow: hidden; }
-        .att-today-progress-fill { height: 100%; background: linear-gradient(90deg, #f5d5a8, #d4a574); transition: width 0.4s; }
+        .att-today-progress-fill { height: 100%; background: var(--accent); transition: width var(--dur-slow) var(--ease-out); }
         [data-theme='dark'] .att-today-progress-fill { background: color-mix(in srgb, var(--on-accent) 70%, transparent); }
         .att-today-stat-col {
           flex: 1; text-align: left;
@@ -822,6 +471,18 @@ export default function ClockWidget() {
           font-size: 1.1rem; font-weight: 700; color: var(--att-spotlight-fg); margin-top: 2px;
           font-variant-numeric: tabular-nums;
         }
+
+        /* Phones: the Clock in / out action comes first, the big clock and the
+           session stats after it. Order only; no element moves in the DOM. */
+        @media (max-width: 576px) {
+          .att-clock-body { display: flex; flex-direction: column; }
+          .att-clock-body > * { order: 10; }
+          .att-clock-body > .att-o-head { order: 0; }
+          .att-clock-body > .att-o-primary { order: 1; }
+          .att-clock-body > .att-o-clock { order: 20; }
+          .att-clock-body > .att-o-stats { order: 21; }
+          .att-greeting h2 { font-size: 1.5rem !important; }
+        }
       `}</style>
 
       {/* Still-working reminder — non-blocking nudge once a session is past
@@ -829,7 +490,7 @@ export default function ClockWidget() {
           how the user confirms they're still on the clock vs. forgot. */}
       {showReminderBanner && (
         <div className="mb-3 rounded-3 d-flex align-items-start gap-2 p-3"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', color: 'var(--warning-text)' }}>
           <i className="bi bi-clock-history flex-shrink-0 mt-1" style={{ fontSize: '1.1rem', color: 'var(--warning)' }} />
           <div className="flex-grow-1">
             <div className="fw-bold" style={{ fontSize: '0.88rem' }}>
@@ -843,7 +504,8 @@ export default function ClockWidget() {
             <button className="btn btn-sm btn-outline-secondary" onClick={() => setReminderDismissed(true)}>
               Dismiss
             </button>
-            <button className="btn btn-sm btn-warning text-white d-inline-flex align-items-center gap-1"
+            <button className="btn btn-sm btn-warning d-inline-flex align-items-center gap-1"
+              style={{ color: 'var(--on-warning)' }}
               onClick={handleStillWorking} disabled={savingStillWorking}>
               {savingStillWorking ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Yes, still working</>}
             </button>
@@ -871,7 +533,7 @@ export default function ClockWidget() {
       )}
 
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
-      <div className="mb-3">
+      <div className="mb-3 att-greeting">
         <h2 className="fw-bold mb-1" style={{ fontSize: '2.4rem', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
           {greetingPrefix()}, {firstName(userName)}.
         </h2>
@@ -883,15 +545,15 @@ export default function ClockWidget() {
         <div className="col-lg-8">
           <div className="card border-0 shadow-sm att-clock-card h-100" style={{ borderRadius: 22, overflow: 'hidden' }}>
             <div style={{ height: 4, background: sc }} />
-            <div className="p-4">
-              <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div className="p-4 att-clock-body">
+              <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2 att-o-head">
                 <div className="text-muted" style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
                   Current Time · {dateStr}
                 </div>
                 {!loading && !isClockedOut && (
                   <div className="d-inline-flex align-items-center gap-2"
-                    style={{ background: `${sc}15`, color: sc, padding: '4px 10px', borderRadius: 999, fontSize: '0.66rem', fontWeight: 700, border: `1px solid ${sc}30` }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc, display: 'inline-block', animation: 'attPulse 1.8s ease-in-out infinite' }} />
+                    style={{ background: `color-mix(in srgb, ${sc} 9%, transparent)`, color: sc, padding: '4px 10px', borderRadius: 999, fontSize: '0.66rem', fontWeight: 700, border: `1px solid color-mix(in srgb, ${sc} 20%, transparent)` }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc, display: 'inline-block', animation: 'attPulse 1.8s var(--ease-in-out) infinite' }} />
                     {statusLabel(effStatus)}
                   </div>
                 )}
@@ -909,7 +571,7 @@ export default function ClockWidget() {
               )}
 
               {/* Big digital clock — HH:MM black, SS lighter */}
-              <div className="att-digit fw-bold" style={{
+              <div className="att-digit fw-bold att-o-clock" style={{
                 fontSize: 'clamp(4rem, 10vw, 7rem)', lineHeight: 0.95,
                 letterSpacing: '-0.03em', color: 'var(--text-primary)',
               }}>
@@ -917,20 +579,20 @@ export default function ClockWidget() {
               </div>
 
               {locInfo && !isClockedOut && (
-                <div className="d-inline-flex align-items-center gap-1 mt-3"
-                  style={{ background: `${locInfo.color}10`, color: locInfo.color, padding: '4px 11px', borderRadius: 999, fontSize: '0.68rem', fontWeight: 600, border: `1px solid ${locInfo.color}25` }}>
+                <div className="d-inline-flex align-items-center gap-1 mt-3 att-o-clock"
+                  style={{ background: `color-mix(in srgb, ${locInfo.color} 7%, transparent)`, color: locInfo.color, padding: '4px 11px', borderRadius: 999, fontSize: '0.68rem', fontWeight: 600, border: `1px solid color-mix(in srgb, ${locInfo.color} 15%, transparent)` }}>
                   <i className={`bi ${locInfo.icon}`} style={{ fontSize: '0.62rem' }} />{locInfo.label}
                 </div>
               )}
 
-              <hr style={{ margin: '22px 0', borderColor: 'var(--border-subtle)' }} />
+              <hr className="att-o-clock" style={{ margin: '22px 0', borderColor: 'var(--border-subtle)' }} />
 
               {loading ? (
                 <div className="text-center py-4"><div className="spinner-border spinner-border-sm text-primary" /></div>
               ) : (
                 <>
                   {/* 3-column session stats */}
-                  <div className="row g-0 mb-3">
+                  <div className="row g-0 mb-3 att-o-stats">
                     <div className="col-4">
                       <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Last Clock-In</div>
                       <div className="att-digit fw-bold" style={{ fontSize: '1.5rem', color: 'var(--text-primary)', marginTop: 2 }}>
@@ -963,17 +625,17 @@ export default function ClockWidget() {
                   {/* ── Primary action ── */}
                   {isClockedOut ? (
                     showClockIn ? (
-                      <div className="d-flex flex-column gap-2">
+                      <div className="d-flex flex-column gap-2 att-o-primary">
                         <div className="text-muted small fw-semibold mb-1" style={{ fontSize: '0.72rem' }}>Where are you working from?</div>
                         {LOCATIONS.map(loc => (
                           <button key={loc.key}
                             className="btn d-flex align-items-center gap-2 px-3 py-2"
-                            style={{ border: `2px solid ${loc.color}25`, borderRadius: 12, background: 'var(--surface-1)', transition: 'all 0.15s' }}
+                            style={{ border: `2px solid color-mix(in srgb, ${loc.color} 15%, transparent)`, borderRadius: 12, background: 'var(--surface-1)', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
                             onClick={() => handleClockIn(loc.key)}
                             disabled={action === 'clockin'}
-                            onMouseEnter={e => { e.currentTarget.style.background = `${loc.color}08`; e.currentTarget.style.borderColor = loc.color; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.borderColor = `${loc.color}25`; }}>
-                            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 30, height: 30, background: `${loc.color}15` }}>
+                            onMouseEnter={e => { e.currentTarget.style.background = `color-mix(in srgb, ${loc.color} 5%, transparent)`; e.currentTarget.style.borderColor = loc.color; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.borderColor = `color-mix(in srgb, ${loc.color} 15%, transparent)`; }}>
+                            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 30, height: 30, background: `color-mix(in srgb, ${loc.color} 9%, transparent)` }}>
                               <i className={`bi ${loc.icon}`} style={{ color: loc.color, fontSize: '0.95rem' }} />
                             </div>
                             <span className="fw-semibold" style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>{loc.label}</span>
@@ -982,14 +644,14 @@ export default function ClockWidget() {
                         <button className="btn btn-sm btn-link text-muted mt-1" style={{ fontSize: '0.72rem', textDecoration: 'none' }} onClick={() => setShowClockIn(false)}>Cancel</button>
                       </div>
                     ) : (
-                      <button className="att-primary-btn att-primary-in" onClick={() => setShowClockIn(true)} disabled={!!action}>
+                      <button className="att-primary-btn att-primary-in att-o-primary" onClick={() => setShowClockIn(true)} disabled={!!action}>
                         <span>Clock in</span>
                         <i className="bi bi-arrow-right" />
                       </button>
                     )
                   ) : (
                     record.status !== 'pending-approval' && (
-                      <button className="att-primary-btn att-primary-out" onClick={handleClockOut} disabled={!!action || record.status === 'on-break'}>
+                      <button className="att-primary-btn att-primary-out att-o-primary" onClick={handleClockOut} disabled={!!action || record.status === 'on-break'}>
                         <span>Clock out</span>
                         <i className="bi bi-arrow-right" />
                       </button>
@@ -999,7 +661,7 @@ export default function ClockWidget() {
                   {/* Accidental clock-out recovery. Reopens today's
                       shift so no worked time is lost (mig 173). */}
                   {canResumeShift && (
-                    <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2"
+                    <div className="rounded-3 p-2 mt-2 d-flex align-items-center gap-2 att-o-primary"
                       style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
                       <i className="bi bi-arrow-counterclockwise" style={{ color: 'var(--success)', fontSize: '0.9rem' }} />
                       <span style={{ fontSize: '0.73rem', color: 'var(--success)', fontWeight: 600, flex: 1 }}>
@@ -1021,7 +683,7 @@ export default function ClockWidget() {
 
                   {/* ── Secondary action row (breaks / edit) ── */}
                   {!isClockedOut && record.status !== 'pending-approval' && (
-                    <div className="row g-2 mt-2">
+                    <div className="row g-2 mt-2 att-o-primary">
                       <div className="col-sm-4">
                         <button className="att-secondary-btn" onClick={handleBreak} disabled={!!action}
                           style={{ background: record.status === 'on-break' ? 'var(--warning-soft)' : 'var(--surface-0)', borderColor: record.status === 'on-break' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)', color: record.status === 'on-break' ? 'var(--warning)' : 'var(--text-secondary)' }}>
@@ -1069,11 +731,7 @@ export default function ClockWidget() {
                     </div>
                   )}
 
-                  {!loading && (
-                    <div className="text-center text-muted mt-3" style={{ fontSize: '0.68rem' }}>
-                      Press <kbd style={{ background: 'var(--surface-3)', padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem' }}>Space</kbd> to clock in/out · <kbd style={{ background: 'var(--surface-3)', padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem' }}>B</kbd> for break
-                    </div>
-                  )}
+                  
 
                   {/* ── Inline banners (edit request, TL auto-clockout, APC TL status, rejection) ── */}
                   {(() => {
@@ -1112,7 +770,7 @@ export default function ClockWidget() {
 
                   {isTL && record?.status === 'clocked-in' && (
                     <div className="rounded-3 p-3 mt-3"
-                      style={{ background: autoClockOutEnabled ? 'var(--warning-soft)' : 'var(--surface-0)', border: `1px solid ${autoClockOutEnabled ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)'}`, transition: 'all 0.15s' }}>
+                      style={{ background: autoClockOutEnabled ? 'var(--warning-soft)' : 'var(--surface-0)', border: `1px solid ${autoClockOutEnabled ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'var(--border-subtle)'}`, transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}>
                       <div className="d-flex align-items-center gap-2" style={{ cursor: 'pointer' }} onClick={handleToggleAutoClockOut}>
                         <input type="checkbox" className="form-check-input flex-shrink-0" checked={autoClockOutEnabled} readOnly style={{ cursor: 'pointer' }} />
                         <span className="small fw-semibold" style={{ color: autoClockOutEnabled ? 'var(--warning)' : 'var(--text-secondary)' }}>
@@ -1193,31 +851,11 @@ export default function ClockWidget() {
         </div>
       </div>
 
-      {/* APC GMV-on-clock-in gate */}
-      {showGmvGate && gmvStatus && (
-        <ApcGmvGateModal
-          status={gmvStatus}
-          onConfirm={handleGmvConfirm}
-          onClose={() => { setShowGmvGate(false); setShowClockIn(false); setPendingLocation(null); }}
-        />
-      )}
-
-      {/* "You're clocked in" confirmation toast */}
-      {clockedInToast && (
-        <div style={{
-          position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 1100,
-          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 12,
-          background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-          boxShadow: 'var(--shadow-lg)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
-        }}>
-          <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} /> You're clocked in
-        </div>
-      )}
 
       {/* Edit clock-in modal */}
       {showEditClockIn && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1071, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => !editSaving && setShowEditClockIn(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={() => !editSaving && setShowEditClockIn(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 16 }}>
             <div className="card-body p-4">
               <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
@@ -1292,7 +930,7 @@ export default function ClockWidget() {
           self-approval for everyone else). */}
       {showEditBreaks && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1071, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => !breakSaving && setShowEditBreaks(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={() => !breakSaving && setShowEditBreaks(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="card-body p-4">
               <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
@@ -1406,39 +1044,7 @@ export default function ClockWidget() {
         </div>
       )}
 
-      {/* Clock-out request modal */}
-      {showClockOut && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={() => setShowClockOut(false)} />
-          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 16 }}>
-            <div className="card-body p-4">
-              <h6 className="fw-bold mb-1">Clock Out</h6>
-              <p className="text-muted small mb-3">This ends your shift for today — you won't be able to clock back in until tomorrow.</p>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">What did you work on today?</label>
-                <textarea
-                  className="form-control form-control-sm"
-                  rows={3}
-                  value={clockOutNote}
-                  onChange={e => setClockOutNote(e.target.value)}
-                  placeholder="Brief summary of today's work..."
-                />
-              </div>
-              <div className="d-flex gap-2 justify-content-end">
-                <button className="btn btn-sm btn-outline-secondary px-3" onClick={() => setShowClockOut(false)}>Cancel</button>
-                <button
-                  className="btn btn-sm btn-dark px-4 d-inline-flex align-items-center gap-1"
-                  onClick={handleRequestClockOut}
-                  disabled={action === 'clockout'}
-                >
-                  {action === 'clockout' ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-box-arrow-right" />}
-                  Clock Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {clockModals}
     </>
   );
 }
@@ -1504,16 +1110,16 @@ function TodayStatsCard({ isClockedOut, loading, times, weekStats, dailyTargetMs
 
       <div className="mb-1">
         <span className="att-digit fw-bold" style={{ fontSize: '2.6rem', lineHeight: 1 }}>
-          {Math.floor(loggedMs / 3600000)}<span style={{ fontSize: '1.1rem', color: 'color-mix(in srgb, var(--on-accent) 50%, transparent)', fontWeight: 500 }}>h</span>{' '}
-          {String(Math.floor((loggedMs % 3600000) / 60000)).padStart(2, '0')}<span style={{ fontSize: '1.1rem', color: 'color-mix(in srgb, var(--on-accent) 50%, transparent)', fontWeight: 500 }}>m</span>
+          {Math.floor(loggedMs / 3600000)}<span style={{ fontSize: '1.1rem', color: 'color-mix(in srgb, var(--att-spotlight-fg) 50%, transparent)', fontWeight: 500 }}>h</span>{' '}
+          {String(Math.floor((loggedMs % 3600000) / 60000)).padStart(2, '0')}<span style={{ fontSize: '1.1rem', color: 'color-mix(in srgb, var(--att-spotlight-fg) 50%, transparent)', fontWeight: 500 }}>m</span>
         </span>
       </div>
-      <div style={{ fontSize: '0.74rem', color: 'color-mix(in srgb, var(--on-accent) 60%, transparent)' }}>
+      <div style={{ fontSize: '0.74rem', color: 'color-mix(in srgb, var(--att-spotlight-fg) 60%, transparent)' }}>
         logged of {fmtHm(dailyTargetMs)} target
       </div>
 
       <div className="mt-3 mb-4">
-        <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: '0.62rem', color: 'color-mix(in srgb, var(--on-accent) 50%, transparent)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: '0.62rem', color: 'color-mix(in srgb, var(--att-spotlight-fg) 50%, transparent)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           <span>Progress</span>
           <span>{pct}%</span>
         </div>
@@ -1533,42 +1139,10 @@ function TodayStatsCard({ isClockedOut, loading, times, weekStats, dailyTargetMs
         </div>
         <div className="att-today-stat-col">
           <div className="l">Overtime</div>
-          <div className="v" style={{ color: 'var(--on-accent)' }}>
+          <div className="v" style={{ color: 'var(--att-spotlight-fg)' }}>
             {weekStats.overtimeMs > 0 ? `+${fmtHmShort(weekStats.overtimeMs)}` : '0:00'}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function StatBlock({ label, value, color, icon, live }) {
-  return (
-    <div style={{ flex: 1, textAlign: 'center', padding: '12px 8px' }}>
-      <div
-        className="d-inline-flex align-items-center justify-content-center rounded-circle mb-1 position-relative"
-        style={{ width: 22, height: 22, background: `${color}15` }}
-      >
-        <i className={`bi ${icon}`} style={{ fontSize: '0.7rem', color }} />
-        {live && (
-          <span
-            style={{
-              position: 'absolute', top: -1, right: -1,
-              width: 6, height: 6, borderRadius: '50%',
-              background: color, boxShadow: `0 0 0 2px var(--surface-1)`,
-              animation: 'attPulse 1.4s ease-in-out infinite',
-            }}
-          />
-        )}
-      </div>
-      <div style={{ fontSize: '0.54rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        {label}
-      </div>
-      <div
-        className="att-digit fw-bold"
-        style={{ fontSize: live ? '1.1rem' : '1rem', color, marginTop: 1 }}
-      >
-        {value}
       </div>
     </div>
   );
@@ -1683,12 +1257,12 @@ function AdjustClockOutModal({ record, isApcOrIpc, onCancel, onSubmit }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: 'var(--danger)' }} />{titleText}</h6>
-            <button className="btn btn-sm btn-light rounded-circle" onClick={onCancel} disabled={saving}
+            <button className="btn btn-sm btn-outline-secondary rounded-circle" onClick={onCancel} disabled={saving}
               style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
@@ -1719,7 +1293,7 @@ function AdjustClockOutModal({ record, isApcOrIpc, onCancel, onSubmit }) {
           {error && <div className="alert alert-danger py-2 small mb-3" style={{ fontSize: '0.78rem' }}>{error}</div>}
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onCancel} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-4" onClick={handleSubmit} disabled={saving}>
+            <button className="btn btn-sm btn-primary px-4" onClick={handleSubmit} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm me-1" />Saving…</> : (isApcOrIpc ? 'Submit to TL' : 'Save')}
             </button>
           </div>

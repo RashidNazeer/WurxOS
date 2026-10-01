@@ -232,13 +232,9 @@ function normaliseHistory(row) {
   };
 }
 
-// Convenience: format a PKR amount the way the app does everywhere
-// (no decimals, thousands separators, "PKR" prefix). Mirror this in
-// any UI that displays salary so the format stays consistent.
-export function formatPKR(amount) {
-  if (amount == null || Number.isNaN(Number(amount))) return '—';
-  return 'PKR ' + Number(amount).toLocaleString('en-PK', { maximumFractionDigits: 0 });
-}
+// Money formatting lives in lib/format (2-decimal exact). Re-exported so any
+// old import path keeps working; nothing in src imports it from here now.
+export { formatPKR } from './format';
 
 // Date the Salary Management feature went live in production. Used
 // to gate the employee-side anniversary celebration banner: only

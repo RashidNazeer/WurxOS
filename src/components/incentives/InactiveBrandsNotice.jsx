@@ -18,10 +18,10 @@ export default function InactiveBrandsNotice({ userId, role }) {
   if (!brands.length) return null;
   const many = brands.length > 1;
   return (
-    <div className="rounded-3 p-2 px-3 mb-2" style={{ background: '#fff8e6', border: '1px solid #ffe2a8' }}>
+    <div className="rounded-3 p-2 px-3 mb-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)' }}>
       <div className="d-flex align-items-start gap-2">
-        <i className="bi bi-exclamation-triangle-fill flex-shrink-0" style={{ color: '#e08a00', fontSize: '0.8rem', marginTop: 2 }} />
-        <div style={{ fontSize: '0.7rem', color: '#8a5a00', lineHeight: 1.45 }}>
+        <i className="bi bi-exclamation-triangle-fill flex-shrink-0" style={{ color: 'var(--warning-text)', fontSize: '0.8rem', marginTop: 2 }} />
+        <div style={{ fontSize: '0.7rem', color: 'var(--warning-text)', lineHeight: 1.45 }}>
           <strong>Not included in incentives.</strong>{' '}
           {many ? 'These inactive brands are' : 'This inactive brand is'} excluded because {many ? 'they are' : 'it is'} inactive:{' '}
           <span className="fw-semibold">{brands.map((b) => b.name).join(', ')}</span>.

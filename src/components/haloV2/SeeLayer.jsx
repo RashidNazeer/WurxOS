@@ -23,7 +23,7 @@ import {
 import { fmtSignedPct, describeCorrelation, MIN_CORRELATION_OBS } from '../../lib/haloV2/correlation.js';
 import { inverseNote } from '../../lib/haloV2/metricMetadata.js';
 import { plainMetricLabel, formatMetricValue, coverageNote } from '../../lib/haloV2/plainLanguage.js';
-import { TT_STYLE, GRID, SERIES_TIKTOK, SERIES_AMAZON, Note, Chip, indexToHundred } from './shared.jsx';
+import { TT_STYLE, GRID, SERIES_TIKTOK, SERIES_AMAZON, Note, Chip, indexToHundred, CHART_ANIM } from './shared.jsx';
 
 export default function SeeLayer({
   result, unit, xKey, yKey, periods, normalize, assessment, showScatter = false,
@@ -231,8 +231,8 @@ export function OverTimeChart({ periods, xKey, yKey, unit, normalize = false, he
             formatter={(v, name) => [formatMetricValue(v, name === xName ? xKey : yKey, { indexed: normalize }), name]}
           />
           <Legend verticalAlign="top" align="left" height={22} iconSize={9} wrapperStyle={{ fontSize: 11, paddingLeft: 2 }} />
-          <Bar yAxisId="l" dataKey="x" name={xName} fill={SERIES_TIKTOK} opacity={0.65} />
-          <Line yAxisId="r" dataKey="y" name={yName} stroke={SERIES_AMAZON} dot={false} strokeWidth={2} />
+          <Bar yAxisId="l" dataKey="x" name={xName} fill={SERIES_TIKTOK} opacity={0.65} {...CHART_ANIM} />
+          <Line yAxisId="r" dataKey="y" name={yName} stroke={SERIES_AMAZON} dot={false} strokeWidth={2} {...CHART_ANIM} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
@@ -256,7 +256,7 @@ function ScatterPanel({ periods, xKey, yKey }) {
           <ZAxis range={[45, 45]} />
           <Tooltip contentStyle={TT_STYLE} cursor={{ strokeDasharray: '3 3' }}
             formatter={(v, name) => [formatMetricValue(v, name === xName ? xKey : yKey), name]} />
-          <Scatter data={points} fill={SERIES_TIKTOK} />
+          <Scatter data={points} fill={SERIES_TIKTOK} {...CHART_ANIM} />
         </ScatterChart>
       </ResponsiveContainer>
     </div>

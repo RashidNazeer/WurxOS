@@ -4,8 +4,10 @@ import {
   listTaskComments, addTaskComment, deleteTaskComment, subscribeToTaskComments,
 } from '../../lib/taskCommentsApi';
 import { AlertIcon, XIcon } from '../common/Icon';
+import { useDialogs } from '../common/useDialogs';
 
 export default function TaskCommentsPanel({ taskId }) {
+  const { ask, notify } = useDialogs();
   const { user, profile } = useAuth();
   const isBoss = profile?.role === 'boss';
 
@@ -58,7 +60,7 @@ export default function TaskCommentsPanel({ taskId }) {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Delete this comment?')) return;
+    if (!(await ask('Delete this comment?', { danger: true }))) return;
     try { await deleteTaskComment(id); setItems((cur) => cur.filter((c) => c.id !== id)); }
     catch (e) { setErr(e.message); }
   }

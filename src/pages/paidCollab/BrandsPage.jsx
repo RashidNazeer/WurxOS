@@ -271,7 +271,7 @@ function BrandCard({ brand, highlighted, onClick }) {
               <span style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
                 padding: '1px 6px', borderRadius: 999, textTransform: 'uppercase',
-                background: 'var(--accent)', color: '#fff',
+                background: 'var(--accent)', color: 'var(--on-accent)',
               }}>Managed</span>
             )}
           </div>

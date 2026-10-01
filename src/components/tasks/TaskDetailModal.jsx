@@ -17,9 +17,9 @@ const STATUS_META = {
   done:        { label: 'Done',        fg: 'var(--success)',         dot: 'var(--success)' },
 };
 const PRIORITY_META = {
-  low:    { label: 'Low',    fg: '#475569' },
-  medium: { label: 'Medium', fg: '#b45309' },
-  high:   { label: 'High',   fg: '#b91c1c' },
+  low:    { label: 'Low',    fg: 'var(--text-secondary)' },
+  medium: { label: 'Medium', fg: 'var(--warning-text)' },
+  high:   { label: 'High',   fg: 'var(--danger-text)' },
 };
 const CATEGORY_META = {
   general: { label: 'General' },
@@ -137,9 +137,9 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
           {brandInactive && (
             <div
               style={{
-                background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                color: '#374151',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-default)',
+                color: 'var(--text-primary)',
                 borderRadius: 8,
                 padding: '10px 12px',
                 marginBottom: 14,
@@ -149,7 +149,7 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
                 gap: 8,
               }}
             >
-              <i className="bi bi-snow" style={{ fontSize: 16, color: '#6b7280' }} />
+              <i className="bi bi-snow" style={{ fontSize: 16, color: 'var(--text-secondary)' }} />
               <span>
                 <strong>Frozen</strong> — this task's brand
                 {task.brand?.brand_name ? ` (${task.brand.brand_name})` : ''} is currently

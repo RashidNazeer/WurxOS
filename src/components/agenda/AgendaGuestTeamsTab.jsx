@@ -3,6 +3,7 @@ import {
   listAgendaGuestMembers, listAgendaPeople,
   addAgendaGuestMember, removeAgendaGuestMember,
 } from '../../lib/agendaApi';
+import { useDialogs } from '../common/useDialogs';
 
 // Guest teams settings — who is on Paid Collab / Paid Media.
 //
@@ -21,6 +22,7 @@ const ROLE_LABEL = {
 };
 
 export default function AgendaGuestTeamsTab() {
+  const { ask, notify } = useDialogs();
   const [teams, setTeams]     = useState([]);
   const [people, setPeople]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function AgendaGuestTeamsTab() {
   }
 
   async function handleRemove(slug, userId, name) {
-    if (!window.confirm(`Remove ${name} from this guest team? They will stop seeing and being notified about the meetings it is invited to.`)) return;
+    if (!(await ask(`Remove ${name} from this guest team? They will stop seeing and being notified about the meetings it is invited to.`, { danger: true, confirmLabel: 'Remove' }))) return;
     setBusy(`rm-${slug}-${userId}`);
     setError('');
     try {

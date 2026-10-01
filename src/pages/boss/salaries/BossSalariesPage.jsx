@@ -3,13 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../contexts/AuthContext';
 import { listProfilesByRole } from '../../../lib/adminApi';
 import {
-  listAllCompensation, listAllHistory, formatPKR,
+  listAllCompensation, listAllHistory,
   yearsCompletedSince, setUserHireDate, computePendingReviews,
 } from '../../../lib/salariesApi';
 import SalaryReviewModal from '../../../components/boss/SalaryReviewModal';
 import {
   AlertIcon, RefreshIcon, SearchIcon, StarIcon, PencilIcon, UsersIcon,
 } from '../../../components/common/Icon';
+import { formatPKR } from '../../../lib/format';
 import '../../../styles/table.css';
 import '../../../styles/tasks.css';
 
@@ -238,8 +239,8 @@ function ActiveSalariesTab({
       </div>
 
       <div className="wx-list">
-        <div className="wx-list-row wx-list-header"
-          style={{ gridTemplateColumns: '1.6fr 1fr 1fr 0.8fr 1fr 140px' }}>
+        <div className="wx-list-row wx-cols wx-list-header"
+          style={{ '--cols': '1.6fr 1fr 1fr 0.8fr 1fr 140px' }}>
           <div>Employee</div>
           <div>Hire date</div>
           <div>Current salary</div>
@@ -286,9 +287,9 @@ function SalaryRow({ r, onReview, onEditHireDate }) {
     : '—';
 
   return (
-    <div className="wx-list-row"
-      style={{ gridTemplateColumns: '1.6fr 1fr 1fr 0.8fr 1fr 140px' }}>
-      <div className="wx-user-cell">
+    <div className="wx-list-row wx-cols"
+      style={{ '--cols': '1.6fr 1fr 1fr 0.8fr 1fr 140px' }}>
+      <div className="wx-user-cell wx-col-lead">
         <div className="wx-user-avatar">
           {r.user.avatar_url
             ? <img src={r.user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover' }} />
@@ -302,7 +303,7 @@ function SalaryRow({ r, onReview, onEditHireDate }) {
               padding: '1px 7px',
               borderRadius: 'var(--radius-pill)',
               background: 'var(--accent-soft)',
-              color: 'var(--accent)',
+              color: 'var(--accent-text)',
               fontWeight: 700,
             }}>
               {(r.user.role || '').toUpperCase()}
@@ -326,7 +327,7 @@ function SalaryRow({ r, onReview, onEditHireDate }) {
         </button>
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 600, color: hasSalary ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+      <div className="wx-col-key" style={{ fontSize: 13, fontWeight: 600, color: hasSalary ? 'var(--text-primary)' : 'var(--text-muted)' }}>
         {hasSalary
           ? formatPKR(r.comp.basicSalary)
           : <span style={{ fontWeight: 500, fontStyle: 'italic' }}>Not set</span>}
@@ -431,8 +432,8 @@ function PendingReviewsTab({ rows, loading, onReview }) {
   return (
     <>
       <div className="wx-list">
-        <div className="wx-list-row wx-list-header"
-          style={{ gridTemplateColumns: '1.6fr 1fr 1fr 0.9fr 1fr 140px' }}>
+        <div className="wx-list-row wx-cols wx-list-header"
+          style={{ '--cols': '1.6fr 1fr 1fr 0.9fr 1fr 140px' }}>
           <div>Employee</div>
           <div>Hire date</div>
           <div>Years</div>
@@ -469,9 +470,9 @@ function PendingRow({ r, onReview }) {
   const initials = (r.user.display_name || r.user.email || '?')
     .split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   return (
-    <div className="wx-list-row"
-      style={{ gridTemplateColumns: '1.6fr 1fr 1fr 0.9fr 1fr 140px' }}>
-      <div className="wx-user-cell">
+    <div className="wx-list-row wx-cols"
+      style={{ '--cols': '1.6fr 1fr 1fr 0.9fr 1fr 140px' }}>
+      <div className="wx-user-cell wx-col-lead">
         <div className="wx-user-avatar">
           {r.user.avatar_url
             ? <img src={r.user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover' }} />
@@ -485,7 +486,7 @@ function PendingRow({ r, onReview }) {
               padding: '1px 7px',
               borderRadius: 'var(--radius-pill)',
               background: 'var(--accent-soft)',
-              color: 'var(--accent)',
+              color: 'var(--accent-text)',
               fontWeight: 700,
             }}>
               {(r.user.role || '').toUpperCase()}
@@ -499,12 +500,12 @@ function PendingRow({ r, onReview }) {
       <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
         {r.years} {r.years === 1 ? 'yr' : 'yrs'}
       </div>
-      <div>
+      <div className="wx-col-key">
         <span style={{
           fontSize: 11, fontWeight: 700,
           padding: '3px 9px', borderRadius: 'var(--radius-pill)',
-          background: r.overdueYears >= 2 ? 'var(--danger-soft)' : 'var(--warning-soft, #fff4e5)',
-          color:      r.overdueYears >= 2 ? 'var(--danger)'      : 'var(--warning, #c46b00)',
+          background: r.overdueYears >= 2 ? 'var(--danger-soft)' : 'var(--warning-soft)',
+          color:      r.overdueYears >= 2 ? 'var(--danger-text)' : 'var(--warning-text)',
         }}>
           {r.overdueYears} {r.overdueYears === 1 ? 'review due' : 'reviews due'}
         </span>
@@ -592,8 +593,8 @@ function SalaryHistoryTab() {
       )}
 
       <div className="wx-list">
-        <div className="wx-list-row wx-list-header"
-          style={{ gridTemplateColumns: '120px 1.4fr 0.9fr 1.4fr 1fr 1.2fr' }}>
+        <div className="wx-list-row wx-cols wx-list-header"
+          style={{ '--cols': '120px 1.4fr 0.9fr 1.4fr 1fr 1.2fr' }}>
           <div>When</div>
           <div>Employee</div>
           <div>Reason</div>
@@ -625,9 +626,9 @@ function SalaryHistoryTab() {
 
 const REASON_TONE = {
   initial_seed:     { bg: 'var(--surface-2)',  fg: 'var(--text-secondary)', label: 'Initial' },
-  annual_increment: { bg: 'var(--success-soft)', fg: 'var(--success)',      label: 'Annual' },
-  promotion:        { bg: 'var(--accent-soft)',  fg: 'var(--accent)',       label: 'Promotion' },
-  adjustment:       { bg: 'var(--warning-soft, #fff4e5)', fg: 'var(--warning, #c46b00)', label: 'Adjustment' },
+  annual_increment: { bg: 'var(--success-soft)', fg: 'var(--success-text)', label: 'Annual' },
+  promotion:        { bg: 'var(--accent-soft)',  fg: 'var(--accent-text)',  label: 'Promotion' },
+  adjustment:       { bg: 'var(--warning-soft)', fg: 'var(--warning-text)', label: 'Adjustment' },
   correction:       { bg: 'var(--surface-2)',  fg: 'var(--text-secondary)', label: 'Correction' },
 };
 
@@ -639,15 +640,15 @@ function HistoryFeedRow({ h }) {
     : created.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="wx-list-row"
-      style={{ gridTemplateColumns: '120px 1.4fr 0.9fr 1.4fr 1fr 1.2fr', alignItems: 'flex-start' }}>
+    <div className="wx-list-row wx-cols"
+      style={{ '--cols': '120px 1.4fr 0.9fr 1.4fr 1fr 1.2fr', alignItems: 'flex-start' }}>
       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
         {when}
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
           eff. {h.effectiveFrom}
         </div>
       </div>
-      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
+      <div className="wx-col-lead" style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
         {h.user?.displayName || '—'}
         <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 500, marginTop: 2 }}>
           {h.user?.role || ''}
@@ -662,13 +663,13 @@ function HistoryFeedRow({ h }) {
           {tone.label}
         </span>
       </div>
-      <div style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>
+      <div className="wx-col-key" style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>
         {h.previousAmount != null
           ? <>{formatPKR(h.previousAmount)} → {formatPKR(h.newAmount)}</>
           : <>{formatPKR(h.newAmount)}</>}
         {h.incrementPct != null && (
           <div style={{ fontSize: 11, fontWeight: 600, marginTop: 2,
-            color: h.incrementPct >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+            color: h.incrementPct >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
             {h.incrementPct >= 0 ? '+' : ''}{Number(h.incrementPct).toFixed(1)}%
           </div>
         )}

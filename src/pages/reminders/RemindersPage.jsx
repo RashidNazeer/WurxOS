@@ -147,7 +147,7 @@ function Section({ title, items, onDelete, past }) {
                   padding: '14px 18px',
                   borderTop: '1px solid var(--border-subtle)',
                   alignItems: 'center',
-                  transition: 'background var(--dur-fast)',
+                  transition: 'background-color var(--dur-fast) var(--ease-out)',
                 }}
               >
                 <div style={{
@@ -209,7 +209,7 @@ function Section({ title, items, onDelete, past }) {
                       cursor: 'pointer',
                       borderRadius: 8,
                       display: 'grid', placeItems: 'center',
-                      transition: 'background var(--dur-fast), color var(--dur-fast)',
+                      transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = 'var(--danger-soft)';

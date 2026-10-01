@@ -13,7 +13,7 @@ import {
   ALL_ROLES, ALWAYS_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles,
   FALLBACK_MAX, DEFAULT_SLOT_META, keySlotMeta, chainAdd, chainMove, chainRemove, creditsExhausted, fmtUsd, lastChecked,
   modelLabel, modelOptions, optionKey, parseOptionKey, allOptions, filterOptions, slotLabel,
-  chainEntryStatus, vectorsByModel, freeSourcesValue, toggleInList, fmtCount,
+  chainEntryStatus, vectorsByModel, ingestProgress, freeSourcesValue, toggleInList, fmtCount,
   ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups,
 } from '../../lib/buddyLogic';
 import { LoadError } from '../../components/buddy/BuddyThread';
@@ -117,6 +117,7 @@ function IngestionCard({ readOnly }) {
   const q = stats?.queue || {};
   const failed = Array.isArray(stats?.failed) ? stats.failed : [];
   const vectors = vectorsByModel(stats);
+  const prog = ingestProgress(stats);
   return (
     <Card icon="bi-arrow-repeat" title="Knowledge ingestion" sub="Buddy re-reads new and changed documents every 12 hours. Run it now after publishing something important.">
       <div className="d-flex align-items-center gap-2 flex-wrap mb-2">
@@ -133,9 +134,21 @@ function IngestionCard({ readOnly }) {
           <Stat label="Next due" value={fmt(stats.next_sweep_due_at)} />
           <Stat label="Queued" value={(q.pending || 0) + (q.processing || 0)} />
           <Stat label="Failed" value={q.failed || 0} warn={(q.failed || 0) > 0} />
-          {/* mig 402: documents saved but still waiting for their embeddings. */}
+          {/* mig 402: saved and keyword-searchable, still waiting for a main-key vector. */}
           {stats.vector_pending != null && <Stat label="Waiting for vectors" value={fmtCount(stats.vector_pending)} warn={Number(stats.vector_pending) > 0} />}
         </div>
+      )}
+      {prog?.queue && prog.queue.left > 0 && (
+        <Progress label="Reading documents" done={prog.queue.done} total={prog.queue.total} pct={prog.queue.pct}
+          note={`${fmtCount(prog.queue.left)} left in the queue`} />
+      )}
+      {prog?.vectors && (
+        <Progress label="AI search vectors" done={prog.vectors.ready} total={prog.vectors.total} pct={prog.vectors.pct}
+          note={prog.vectors.pending === 0
+            ? 'Every document is searchable by meaning.'
+            : `${fmtCount(prog.vectors.pending)} waiting for the main key${prog.vectors.withAlt > 0
+              ? ` — ${fmtCount(prog.vectors.withAlt)} of them already searchable through a fallback provider`
+              : ', searchable by keyword in the meantime'}.`} />
       )}
       {vectors.length > 0 && (
         <div className="mt-2">
@@ -241,6 +254,23 @@ function Stat({ label, value, warn }) {
     <div className={`bd-stat ${warn ? 'is-warn' : ''}`}>
       <div className="bd-stat-label">{label}</div>
       <div className="bd-stat-value">{value}</div>
+    </div>
+  );
+}
+
+// How far ingestion has got: the queue draining, and AI-vector coverage.
+function Progress({ label, done, total, pct, note }) {
+  return (
+    <div className="bd-progress mt-2">
+      <div className="bd-progress-top">
+        <span>{label}</span>
+        <span className="bd-card-sub">{fmtCount(done)} of {fmtCount(total)} · {pct}%</span>
+      </div>
+      <div className="bd-progress-track" role="progressbar" aria-label={label}
+        aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="bd-progress-fill" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+      </div>
+      {note && <div className="bd-card-sub mt-1">{note}</div>}
     </div>
   );
 }
@@ -933,7 +963,7 @@ function SlackRelayPanel({ readOnly }) {
       <div className="d-flex align-items-center gap-2 mb-2">
         <i className="bi bi-slack" style={{ color: 'var(--accent)' }} />
         <span className="fw-semibold small">Slack relay</span>
-        <span className={`badge ${cfg.enabled ? 'bg-success' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>{cfg.enabled ? 'ON' : 'OFF'}</span>
+        <span className="badge" style={{ background: cfg.enabled ? 'var(--success)' : 'var(--surface-3)', color: cfg.enabled ? 'var(--on-success)' : 'var(--text-secondary)', fontSize: '0.65rem' }}>{cfg.enabled ? 'ON' : 'OFF'}</span>
       </div>
       <div className="bd-card-sub mb-2">
         When someone tags a watched person in a watched channel, Buddy answers with real WurxOS data and posts it into

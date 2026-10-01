@@ -374,7 +374,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
 
       {/* ── Bulk delete confirm modal ── */}
       {bulkConfirm && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.55)', zIndex: 1060 }}>
+        <div className="modal show d-block" style={{ background: 'var(--backdrop)', zIndex: 1060 }}>
           <div className="modal-dialog" style={{ maxWidth: 380 }}>
             <div className="modal-content">
               <div className="modal-header border-0 pb-0">
@@ -398,7 +398,7 @@ export default function CampaignsTab({ brand: rawBrand }) {
 
       {/* ── Add / Edit modal ── */}
       {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.55)', zIndex: 1050 }}>
+        <div className="modal show d-block" style={{ background: 'var(--backdrop)', zIndex: 1050 }}>
           <div className="modal-dialog modal-dialog-scrollable" style={{ maxWidth: 560 }}>
             <div className="modal-content">
               <div className="modal-header border-0 pb-0">

@@ -32,14 +32,14 @@ const BA_CSS = `
   --ba-ontrack:#2dd4bf; --ba-ontrack-soft:rgba(45,212,191,.15); --ba-ontrack-bd:rgba(45,212,191,.35);
   --ba-behind:#fbbf24;  --ba-behind-soft:rgba(251,191,36,.15);  --ba-behind-bd:rgba(251,191,36,.35);
 }
-.ba-card{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:16px;transition:transform .18s ease, box-shadow .18s ease;cursor:pointer;text-align:left;width:100%;}
+.ba-card{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:16px;transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);cursor:pointer;text-align:left;width:100%;}
 .ba-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);}
 .ba-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-.ba-chip{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
-.ba-gauge-arc{transition:stroke-dashoffset 1s cubic-bezier(.22,1,.36,1);}
-.ba-bar-fill{transition:width 1s cubic-bezier(.22,1,.36,1);}
+.ba-chip{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
+.ba-gauge-arc{transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1);}
+.ba-bar-fill{transition: width 1s cubic-bezier(.22,1,.36,1);}
 @keyframes ba-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(1.6);}}
-.ba-pulse{animation:ba-pulse 2s cubic-bezier(.4,0,.6,1) infinite;}
+.ba-pulse{animation:ba-pulse 2s var(--ease-in-out) infinite;}
 @media (prefers-reduced-motion: reduce){.ba-gauge-arc,.ba-bar-fill{transition:none;}.ba-pulse{animation:none;}}
 `;
 
@@ -676,7 +676,7 @@ function MetricCard({ metric, target, achieved, unlimited = false }) {
 
       {!unlimited && (
         <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct == null ? 0 : Math.min(pct, 100)}%`, background: barColor, borderRadius: 999, transition: 'width .3s' }} />
+          <div style={{ height: '100%', width: `${pct == null ? 0 : Math.min(pct, 100)}%`, background: barColor, borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
       )}
 
@@ -750,7 +750,7 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
       <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
           {brand && <BrandAvatar brand={brand} size={34} radius={8} />}

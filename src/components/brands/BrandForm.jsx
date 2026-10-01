@@ -591,7 +591,7 @@ function ApcGroup({ label, hint, apcs, assignedIds, onToggle, disabled, tone }) 
                 background: on ? 'var(--accent)' : 'var(--surface-1)',
                 color: on ? 'var(--on-accent)' : 'var(--text-secondary)',
                 border: `1px solid ${on ? 'var(--accent)' : 'var(--border-default)'}`,
-                transition: 'all var(--dur-fast)',
+                transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}
             >

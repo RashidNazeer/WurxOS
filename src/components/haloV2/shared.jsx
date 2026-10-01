@@ -10,17 +10,23 @@
 import { useEffect, useRef } from 'react';
 
 export const TT_STYLE = {
-  background: 'var(--surface-1, #16161c)',
+  background: 'var(--chart-tooltip-bg, var(--surface-1))',
   border: '1px solid var(--border-default, #2b2b35)',
   borderRadius: 8,
   fontSize: 12,
-  color: 'var(--text-primary, #e8e8ee)',
+  color: 'var(--chart-tooltip-fg, var(--text-primary))',
 };
-export const GRID = 'var(--border-subtle, #2b2b3522)';
+export const GRID = 'var(--chart-grid, var(--border-subtle))';
 
-// Chart series colours are literals rather than tokens on purpose: Recharts
-// paints SVG attributes, which cannot resolve a CSS custom property, and these
-// two hues read correctly against both the light portal and the dark app.
+// Shared Recharts motion: short ease-out draw-in, off under reduced motion.
+const REDUCED_MOTION = typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+export const CHART_ANIM = { isAnimationActive: !REDUCED_MOTION, animationDuration: 400, animationEasing: 'ease-out' };
+
+// Chart series colours are literals that read correctly against both the light
+// portal and the dark app. (SVG presentation attributes DO resolve var() in
+// current browsers — GRID above relies on it — so these could move to the
+// --chart-* tokens.)
 export const SERIES_TIKTOK = '#6366f1';
 export const SERIES_AMAZON = '#22c55e';
 export const SERIES_BASELINE = '#94a3b8';
@@ -172,7 +178,7 @@ export const barBtnStyle = ({ accent = false, quiet = false, active = false } = 
   background: accent ? 'var(--accent)' : active ? 'var(--surface-2)' : 'transparent',
   color: accent ? 'var(--on-accent)' : 'var(--text-primary)',
   border: `1px solid ${accent ? 'var(--accent)' : 'var(--border-default)'}`,
-  transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+  transition: 'background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
 });
 
 export function BarButton({
@@ -419,7 +425,7 @@ export function ProgressMeter({ usable, required, unit = 'period', almostThere =
         )}
       </div>
       <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: tone, transition: 'width .3s ease' }} />
+        <div style={{ width: `${pct}%`, height: '100%', background: tone, transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );

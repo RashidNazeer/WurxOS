@@ -269,7 +269,7 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
           <div className="wx-modal-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{
               width: 32, height: 32, borderRadius: 'var(--radius-md)',
-              background: 'var(--danger-soft)', color: 'var(--danger)',
+              background: 'var(--danger-soft)', color: 'var(--danger-text)',
               display: 'grid', placeItems: 'center', flex: '0 0 auto',
             }}>
               <TrashIcon width="16" height="16" />
@@ -314,7 +314,7 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
             className="wx-btn"
             style={{
               background: canSubmit ? 'var(--danger)' : 'var(--surface-3)',
-              color: canSubmit ? '#fff' : 'var(--text-muted)',
+              color: canSubmit ? 'var(--on-danger)' : 'var(--text-muted)',
               border: 0,
               fontWeight: 600,
               cursor: canSubmit ? 'pointer' : 'not-allowed',

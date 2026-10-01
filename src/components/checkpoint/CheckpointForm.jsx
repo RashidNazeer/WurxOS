@@ -56,14 +56,14 @@ export default function CheckpointForm({
   return (
     <FieldCtx.Provider value={ctx}>
     <div className="ck-form">
-      <Section title="Cover" accent="#4f46e5">
+      <Section title="Cover" accent="var(--purple)">
         <Grid>
           <Txt label="APC name" path="cover.apcName" />
           <Txt label="Team" path="cover.team" />
         </Grid>
       </Section>
 
-      <Section n={1} title="Affiliate funnel" accent="#4f46e5">
+      <Section n={1} title="Affiliate funnel" accent="var(--purple)">
         <SubLabel>Recruit — this week</SubLabel>
         <Grid cols={4}>
           <MirrorNum label="Target invites" path="funnel.targetInvites" mirror={['outreach.reachInvites', 'effort.invitesSent']} />
@@ -85,7 +85,7 @@ export default function CheckpointForm({
         </Grid>
       </Section>
 
-      <Section n={2} title="APC effort log" accent="#0ea5e9">
+      <Section n={2} title="APC effort log" accent="var(--info)">
         <Grid cols={3}>
           <MirrorNum label="Invites sent" path="effort.invitesSent" mirror={['funnel.targetInvites', 'outreach.reachInvites']} />
           <MirrorNum label="Samples requested" path="effort.sampleRequested" mirror={['funnel.sampleRequests', 'samples.requestsReceived']} />
@@ -97,7 +97,7 @@ export default function CheckpointForm({
         <Area label="What took the most time · proud of · blocked" path="effort.narrative" />
       </Section>
 
-      <Section n={3} title="Outreach & sourcing" accent="#0d9488">
+      <Section n={3} title="Outreach & sourcing" accent="var(--success)">
         <SubLabel>How we reached out</SubLabel>
         <Grid cols={3}>
           <MirrorNum label="Target invites" path="outreach.reachInvites" mirror={['funnel.targetInvites', 'effort.invitesSent']} />
@@ -118,7 +118,7 @@ export default function CheckpointForm({
         <Area label="Read + next move" path="outreach.readNext" rows={2} />
       </Section>
 
-      <Section n={4} title="Performance snapshot" accent="#4f46e5">
+      <Section n={4} title="Performance snapshot" accent="var(--purple)">
         <label className="ck-field" style={{ maxWidth: 260 }}>
           <span className="wx-label">Overall status</span>
           <select className="wx-input" value={data.snapshot.status}
@@ -147,7 +147,7 @@ export default function CheckpointForm({
         <Area label="Why it moved" path="snapshot.whyMoved" />
       </Section>
 
-      <Section n={5} title="Samples" accent="#16a34a">
+      <Section n={5} title="Samples" accent="var(--success)">
         <Grid cols={4}>
           <MirrorNum label="Requests received" path="samples.requestsReceived" mirror={['funnel.sampleRequests', 'effort.sampleRequested']} />
           <Num label="Requests last week" path="samples.requestsPrev" />
@@ -178,7 +178,7 @@ export default function CheckpointForm({
         <Area label="Notes" path="samples.notes" rows={2} />
       </Section>
 
-      <Section n={6} title="Content & traffic" accent="#0ea5e9">
+      <Section n={6} title="Content & traffic" accent="var(--info)">
         <SubLabel>Traffic funnel — this week vs last</SubLabel>
         <Grid cols={3}>
           <Num label="Impressions" path="traffic.impressions" />
@@ -203,7 +203,7 @@ export default function CheckpointForm({
         <Area label="Why (on-page / creative)" path="traffic.why" rows={2} />
       </Section>
 
-      <Section n={7} title="Creative angles" accent="#7c3aed">
+      <Section n={7} title="Creative angles" accent="var(--purple)">
         {data.angles.rows.map((r, i) => (
           <RowEditor key={i} onRemove={() => removeRow('angles.rows', i)}>
             <input className="wx-input" placeholder="Angle / hook" value={r.angle}
@@ -224,7 +224,7 @@ export default function CheckpointForm({
         <Area label="The decision — one to scale, one to kill" path="angles.decision" rows={2} />
       </Section>
 
-      <Section n={8} title="GMV Max & paid" accent="#d97706">
+      <Section n={8} title="GMV Max & paid" accent="var(--warning)">
         <Grid cols={4}>
           <MirrorNum label="Spend" path="paid.spend" mirror={['snapshot.kpis.gmvMaxSpend.cur']} money />
           <Money label="Gross revenue" path="paid.grossRevenue" />
@@ -263,7 +263,7 @@ export default function CheckpointForm({
       </Section>
 
       {paidCollabMode !== 'hidden' && (
-        <Section n={9} title="Paid Collab" accent="#db2777">
+        <Section n={9} title="Paid Collab" accent="var(--danger)">
           {paidCollabMode === 'readonly' ? (
             <PaidCollabReadOnly entry={paidCollabEntry} sym={data.currency || '$'}
               onRemind={onRemindPaidCollab} reminding={remindingPaidCollab} remindMsg={paidCollabRemindMsg}
@@ -285,7 +285,7 @@ export default function CheckpointForm({
         </Section>
       )}
 
-      <Section n={10} title="Research & suggestions" accent="#0d9488">
+      <Section n={10} title="Research & suggestions" accent="var(--success)">
         <SubLabel>New research / findings</SubLabel>
         {data.research.findings.map((x, i) => (
           <RowEditor key={i} onRemove={() => removeRow('research.findings', i)}>
@@ -306,7 +306,7 @@ export default function CheckpointForm({
         <AddBtn onClick={() => addRow('research.suggestions', { suggestion: '', impact: '' })}>+ Add suggestion</AddBtn>
       </Section>
 
-      <Section n={11} title="Bottlenecks & actions" accent="#2563eb">
+      <Section n={11} title="Bottlenecks & actions" accent="var(--info)">
         <SubLabel>Bottlenecks</SubLabel>
         <div className="ck-chips-form">
           {COMMON_BOTTLENECKS.map((b) => {
@@ -393,7 +393,7 @@ function Derived({ label, value, sfx, hint }) {
       <span className="wx-label">{label}</span>
       <div style={{ position: 'relative' }}>
         <input className="wx-input" value={shown} readOnly placeholder="—"
-          style={{ background: 'var(--surface-2, #f1f5f9)', cursor: 'default', ...(sfx ? { paddingRight: 34 } : null) }} />
+          style={{ background: 'var(--surface-2)', cursor: 'default', ...(sfx ? { paddingRight: 34 } : null) }} />
         {sfx && <span className="ck-sfx">{sfx}</span>}
       </div>
       {hint && <span className="ck-hint">{hint}</span>}
