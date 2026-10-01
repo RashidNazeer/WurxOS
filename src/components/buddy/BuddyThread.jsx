@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { renderAssistantHtml } from '../../lib/assistantMarkdown';
-import { KEY_SLOT_SHORT, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
+import { slotLabel, modelSourceLabel, canRegenerateMsg, citeHtml, isStuck, orderSources, questionBefore, sourceLabel, sourceLink } from '../../lib/buddyLogic';
 import { getMessageById } from '../../lib/buddyApi';
 import { useBuddy } from '../../contexts/BuddyContext';
 import BuddyMascot, { BUDDY_STILL } from './BuddyMascot';
@@ -9,7 +9,7 @@ import '../../styles/assistant.css'; // .ai-md: the rendered-markdown rules
 
 // The conversation view shared by the quick panel and the Buddy tab.
 
-const CITE_TEXT = /\s?\[(?:[SD]\d{1,3})(?:\s*[,;]\s*[SD]\d{1,3})*\]/g;
+const CITE_TEXT = /\s?[[【](?:[SD]\d{1,3})(?:\s*[,;，]\s*[SD]\d{1,3})*[\]】]/g;
 
 export function useOnline() {
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false));
@@ -29,17 +29,32 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
   const messages = thread?.messages || [];
   const inflight = convKey ? state.inflight[convKey] : null;
   const scrollRef = useRef(null);
+  // Follow the reply while the reader is at the bottom; once they scroll up to
+  // read, stop following and offer "Jump to latest" instead.
   const stick = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
+  const toBottom = (smooth) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stick.current = true;
+    setAtBottom(true);
+    if (smooth && el.scrollTo) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    else el.scrollTop = el.scrollHeight;
+  };
 
   const onScroll = () => {
     const el = scrollRef.current;
-    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stick.current = bottom;
+    setAtBottom(bottom);
   };
+  // A chat opens at its latest message (runs before the follow effect below).
+  useLayoutEffect(() => { toBottom(false); }, [convKey]);
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, inflight?.status]);
-  useEffect(() => { stick.current = true; }, [convKey]);
 
   const last = messages[messages.length - 1];
   const orphanStatus = inflight && (!last || last.role === 'user');
@@ -76,9 +91,15 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
           {orphanStatus && <StatusLine status={inflight.status} />}
         </div>
       </div>
+      {!atBottom && messages.length > 0 && (
+        <button type="button" className="bd-jump" onClick={() => toBottom(true)}>
+          {inflight ? 'New reply below' : 'Jump to latest'} <i className="bi bi-arrow-down" aria-hidden="true" />
+        </button>
+      )}
       <Composer
         busy={!!inflight}
-        onSend={(text) => send({ key: convKey, text, surface, pageContext })}
+        // Sending is "I want to see this": follow again.
+        onSend={(text) => { toBottom(false); send({ key: convKey, text, surface, pageContext }); }}
         onStop={() => stop(convKey)}
         surface={surface}
       />
@@ -130,6 +151,16 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
   const onClick = (e) => {
     const cite = e.target.closest?.('button.bd-cite');
     if (cite) { onCite?.(cite.getAttribute('data-cite'), m); return; }
+    // Copy on a code block (rendered by markdownCore).
+    const copyBtn = e.target.closest?.('button.ai-code-copy');
+    if (copyBtn) {
+      const code = copyBtn.parentElement?.querySelector('code')?.textContent ?? '';
+      navigator.clipboard?.writeText(code).then(() => {
+        copyBtn.textContent = 'Copied';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      }).catch(() => {});
+      return;
+    }
     const a = e.target.closest?.('a[data-nav]');
     const to = a?.getAttribute('data-nav');
     if (to && to.startsWith('/')) { e.preventDefault(); navigate(to); }
@@ -166,28 +197,30 @@ function Message({ m, status, surface, canRegenerate, onRegenerate, onRetry, inf
         {!pending && m.content && !error && (
           <Actions m={m} canRegenerate={canRegenerate} onRegenerate={onRegenerate} />
         )}
-        {!pending && <ModelLine m={m} showModel={role === 'boss' && surface === 'full'} />}
+        {!pending && <ModelLine m={m} showModel={(role === 'boss' || role === 'developer') && surface === 'full'} />}
       </div>
     </div>
   );
 }
 
 // Which model wrote the answer (meta.model / key_slot / fallback_used, mig 397).
-// Everyone sees when a backup answered; the Boss sees the model on every answer
-// in the full tab.
+// Everyone sees when a backup answered; the Boss and developers see the model
+// (and, when present, where the choice came from: role / global / economy) on
+// every answer in the full tab.
 function ModelLine({ m, showModel }) {
   if (!m.model) return null;
+  const source = showModel && modelSourceLabel(m.modelSource);
   if (m.fallbackUsed) {
     return (
       <div className="bd-model-line" title={showModel && m.fallbackUsed.reason ? `Main model unavailable: ${m.fallbackUsed.reason}` : undefined}>
-        <i className="bi bi-arrow-left-right" aria-hidden="true" /> Answered by {m.model} (backup)
+        <i className="bi bi-arrow-left-right" aria-hidden="true" /> Answered by {m.model} (backup){source ? ` · ${source}` : ''}
       </div>
     );
   }
   if (!showModel) return null;
   return (
     <div className="bd-model-line">
-      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {KEY_SLOT_SHORT[m.keySlot] || KEY_SLOT_SHORT.primary}
+      <i className="bi bi-cpu" aria-hidden="true" /> {m.model} · {slotLabel(m.keySlot || 'primary')}{source ? ` · ${source}` : ''}
     </div>
   );
 }

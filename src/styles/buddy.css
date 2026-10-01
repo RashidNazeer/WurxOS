@@ -71,8 +71,79 @@
 .bd-send:focus-visible, .bd-cite:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Thread ---------- */
-.bd-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.bd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px 6px; }
+.bd-thread { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Only the message list scrolls; the composer below stays pinned. */
+.bd-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 16px 14px 6px; }
+/* Long code / tables / links scroll inside the bubble, never the page. */
+.bd-bubble.is-bot { min-width: 0; max-width: 100%; }
+.bd-bubble .ai-md { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+
+/* Markdown (markdownCore.js, GFM). Sized for chat. */
+.ai-md > :first-child { margin-top: 0; }
+.ai-md > :last-child { margin-bottom: 0; }
+.ai-md p { margin: 0 0 0.55rem; }
+.ai-md h1, .ai-md h2, .ai-md h3, .ai-md h4, .ai-md h5, .ai-md h6 { font-weight: 800; line-height: 1.3; margin: 0.8rem 0 0.35rem; color: var(--text-primary); }
+.ai-md h1 { font-size: 1.08rem; }
+.ai-md h2 { font-size: 1rem; }
+.ai-md h3, .ai-md h4, .ai-md h5, .ai-md h6 { font-size: 0.93rem; }
+.ai-md ul, .ai-md ol { margin: 0.25rem 0 0.6rem; padding-left: 1.3rem; }
+.ai-md li { margin: 0.15rem 0; }
+.ai-md li > ul, .ai-md li > ol { margin: 0.15rem 0 0.2rem; }
+.ai-md li > p { margin: 0 0 0.25rem; }
+.ai-md ul:has(> li > input[type='checkbox']) { list-style: none; padding-left: 0.3rem; }
+.ai-md li > input[type='checkbox'] { margin-right: 6px; vertical-align: -1px; accent-color: var(--accent); }
+.ai-md blockquote {
+  margin: 0.4rem 0 0.6rem; padding: 0.35rem 0.75rem; border-left: 3px solid var(--accent);
+  background: var(--accent-soft); color: var(--text-secondary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.ai-md blockquote > :last-child { margin-bottom: 0; }
+.ai-md hr { border: 0; border-top: 1px solid var(--border-default); margin: 0.75rem 0; opacity: 1; }
+.ai-md del { color: var(--text-muted); }
+.ai-md a:not([href]) { color: inherit; }
+.ai-md :not(pre) > code {
+  font-family: var(--font-mono); font-size: 0.82em; padding: 0.08rem 0.35rem; border-radius: 5px;
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary);
+}
+
+/* Code blocks: monospace box, scrolls sideways, a Copy button. */
+.ai-md .ai-code {
+  position: relative; margin: 0.4rem 0 0.7rem; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); background: var(--surface-0); max-width: 100%;
+}
+.ai-md .ai-code pre { margin: 0; padding: 0.75rem 0.85rem; overflow-x: auto; max-width: 100%; }
+.ai-md .ai-code code {
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; white-space: pre;
+  color: var(--text-primary); background: transparent; padding: 0; overflow-wrap: normal;
+}
+.ai-md .ai-code-copy {
+  position: absolute; top: 6px; right: 6px; z-index: 1; border: 1px solid var(--border-default);
+  background: var(--surface-1); color: var(--text-secondary); font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: var(--radius-sm); cursor: pointer; opacity: 0.85;
+}
+.ai-md .ai-code-copy:hover { opacity: 1; color: var(--accent); border-color: var(--accent); }
+.ai-md .ai-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
+
+/* Tables: scroll sideways inside the bubble, never wider than it. */
+.ai-md .ai-table {
+  max-width: 100%; overflow-x: auto; margin: 0.4rem 0 0.7rem;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.ai-md .ai-table table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 0.82rem; line-height: 1.4; }
+.ai-md .ai-table th, .ai-md .ai-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
+.ai-md .ai-table th + th, .ai-md .ai-table td + td { border-left: 1px solid var(--border-subtle); }
+.ai-md .ai-table thead th { background: var(--surface-3); color: var(--text-primary); font-weight: 800; white-space: nowrap; }
+.ai-md .ai-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--text-primary) 3.5%, transparent); }
+.ai-md .ai-table tbody tr:last-child td { border-bottom: 0; }
+.ai-md .ai-table td.is-num, .ai-md .ai-table [align='right'] { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ai-md .ai-table [align='center'] { text-align: center; }
+.bd-jump {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 2;
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-default);
+  background: var(--surface-1); color: var(--text-primary); box-shadow: var(--shadow-md);
+  font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer;
+}
+.bd-jump:hover { border-color: var(--accent); color: var(--accent); }
+.bd-jump:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bd-col { max-width: 760px; margin: 0 auto; }
 .bd-center { display: grid; place-items: center; min-height: 160px; }
 
@@ -191,10 +262,47 @@
 .bd-coming-sub { font-size: 0.85rem; color: var(--text-secondary); max-width: 340px; }
 
 /* ---------- Buddy tab ---------- */
+/* Fills the shell's content area (AppShell sets data-fill on /buddy, shell.css
+   makes that a flex column); no viewport calc, so it can never be taller than
+   the screen. Only the history list, the thread and the sources panel scroll. */
 .bd-page {
-  display: grid; grid-template-columns: 260px minmax(0, 1fr) auto; gap: 16px;
-  height: calc(100dvh - var(--topbar-h, 68px) - 72px); min-height: 480px;
+  position: relative;
+  display: grid; grid-template-columns: 260px minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); gap: 16px;
+  flex: 1 1 auto; min-height: 0; height: 100%; overflow: hidden;
 }
+/* Auto history (desktop, not pinned): the column is the 56 px rail; opened, the
+   panel overlays the chat (absolute) so the conversation never jumps. Explicit
+   columns keep the chat and sources in place while the history is absolute. */
+.bd-page.is-history-auto { grid-template-columns: 56px minmax(0, 1fr) auto; }
+.bd-page.is-history-auto > .bd-main { grid-column: 2; grid-row: 1; }
+.bd-page.is-history-auto > .bd-sources-panel { grid-column: 3; grid-row: 1; }
+.bd-history.is-overlay {
+  position: absolute; top: 0; bottom: 0; left: 0; z-index: 20; width: 260px;
+  box-shadow: var(--shadow-xl); animation: bd-unfold 220ms var(--ease-out);
+}
+@keyframes bd-unfold { from { width: 56px; opacity: 0.6; } to { width: 260px; opacity: 1; } }
+.bd-history.is-rail { align-items: center; gap: 8px; padding: 10px 6px; overflow: hidden; }
+.bd-rail-recent { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 6px; min-height: 0; overflow: hidden; }
+.bd-rail-chat {
+  position: relative; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; font-weight: 800; font-size: 13px;
+  border: 1px solid var(--border-subtle); background: var(--surface-2); color: var(--text-secondary);
+}
+.bd-rail-chat:hover { border-color: var(--accent); color: var(--text-primary); }
+.bd-rail-chat.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.bd-rail-chat:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bd-rail-chat .bd-dot { position: absolute; top: -1px; right: -1px; box-shadow: 0 0 0 2px var(--surface-1); }
+.bd-rail-foot { margin-top: auto; }
+.bd-icon-btn.is-on { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .bd-history.is-overlay { animation: none; }
+}
+.bd-rail-new {
+  width: 36px; height: 36px; border: 0; border-radius: var(--radius-md); display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.bd-rail-new:hover { background: var(--accent-hover); }
+.bd-rail-new:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bd-history, .bd-main, .bd-sources-panel {
   min-height: 0; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
 }
@@ -245,8 +353,9 @@
   border: 1px solid var(--accent); background: var(--input-bg); color: var(--input-text);
 }
 .bd-settings-btn {
-  margin-top: 6px; border: 0; border-top: 1px solid var(--border-subtle); background: transparent;
-  color: var(--text-secondary); font-size: 13px; font-weight: 600; padding: 10px; text-align: left; border-radius: 0 0 var(--radius-md) var(--radius-md);
+  display: block; margin-top: 6px; border: 0; border-top: 1px solid var(--border-subtle); background: transparent;
+  color: var(--text-secondary); font-size: 12.5px; font-weight: 600; padding: 10px; text-align: left; text-decoration: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 .bd-settings-btn:hover, .bd-settings-btn.is-active { color: var(--accent); background: var(--surface-2); }
 
@@ -280,7 +389,12 @@
 .bd-starter:hover { border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---------- Settings ---------- */
-.bd-settings { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+/* Settings › Wurx Buddy: category pills, only on phones (the Settings nav has
+   the sub-tabs on wider screens; it becomes a plain list at 900 px). */
+.bd-subtabs { display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+@media (max-width: 900px) { .bd-subtabs { display: flex; } }
+/* Inside Settings › Wurx Buddy: flows with the Settings page, no inner scroll box. */
+.bd-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .bd-card { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; background: var(--surface-1); }
 .bd-card-head { display: flex; gap: 10px; margin-bottom: 12px; }
 .bd-card-head > i { color: var(--accent); font-size: 1.05rem; margin-top: 1px; }
@@ -374,6 +488,25 @@
 .bd-chain-add { display: flex; gap: 6px; max-width: 520px; }
 .bd-chain-add select { min-width: 0; }
 .bd-model-line { font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; }
+.bd-model-search { margin: 0 0 8px; max-width: 520px; }
+
+/* Models by role: a 4-column grid on wide screens, one card per role on phones. */
+.bd-role-models { display: flex; flex-direction: column; gap: 6px; }
+.bd-role-head, .bd-role-row { display: grid; grid-template-columns: 120px repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.bd-role-head { font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 0 8px; }
+.bd-role-row { padding: 8px; border-radius: var(--radius-md); background: var(--surface-2); }
+.bd-role-name { font-weight: 700; font-size: 13px; padding-top: 5px; }
+.bd-role-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.bd-saver { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 991px) {
+  .bd-role-head { display: none; }
+  .bd-role-row { grid-template-columns: 1fr; }
+  .bd-role-label { position: static; width: auto; height: auto; clip: auto; font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px; }
+}
+
+/* Settings sections are plain fieldsets (no browser border). */
+.bd-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.bd-fieldset:disabled .form-check-label, .bd-fieldset:disabled .form-label { opacity: 0.85; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1199px) {
@@ -381,7 +514,8 @@
   .bd-sources-panel { width: 260px; }
 }
 @media (max-width: 991px) {
-  .bd-page { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - var(--topbar-h, 60px) - 60px); }
+  .bd-page, .bd-page.is-history-auto { grid-template-columns: minmax(0, 1fr); }
+  .bd-page.is-history-auto > .bd-main { grid-column: 1; }
   .bd-history {
     position: fixed; top: 0; bottom: 0; left: 0; z-index: 1047; width: min(300px, 86vw);
     border-radius: 0; transform: translateX(-100%); box-shadow: var(--shadow-xl);

@@ -16,8 +16,16 @@
 // 'processing' only if the function itself is killed, and are reclaimed after
 // the 10-minute lock timeout (counted as an attempt).
 
+//
+// OpenAI has no credits (mig 402): ingestion still goes on. New chunks are
+// written with `embedding` NULL (vector_pending) so the keyword arm finds them
+// at once; when the free provider may see their source type they also get a
+// NVIDIA vector (embedding_alt). After the queue, backfillVectors() fills
+// pending vectors in small batches whenever a provider works again, and defers
+// a space for 30 min on an account problem (ai_vector_defer).
+
 import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../config.ts';
-import { embedTexts } from '../embedder.ts';
+import { embedWithKeys, nvidiaEmbedOptions, ALT_EMBED_MODEL } from '../embedder.ts';
 import { providerAccountIssue, type ProviderIssue } from '../providerErrors.ts';
 import { SOURCE_TYPES } from '../extractors/index.ts';
 import type { SourceType } from '../extractors/index.ts';
@@ -33,12 +41,28 @@ export const isSourceType = (t: string): t is SourceType => (SOURCE_TYPES as str
 // requests = HTTP calls made (retries included), for ai_ingest_runs.stats.embed_requests.
 export type Embedder = (texts: string[]) => Promise<{ vectors: number[][]; tokens: number; requests?: number }>;
 
-export function openAiEmbedder(apiKey: string, model: string = DEFAULT_CONFIG.EMBED_MODEL, fetchImpl?: typeof fetch): Embedder {
+// One key, or [primary, fallback]: the fallback key is tried on an account problem.
+export function openAiEmbedder(keys: string | Array<string | null | undefined>, model: string = DEFAULT_CONFIG.EMBED_MODEL, fetchImpl?: typeof fetch): Embedder {
   return async (texts) => {
-    const r = await embedTexts(texts, { apiKey, model, fetchImpl });
+    const r = await embedWithKeys(texts, Array.isArray(keys) ? keys : [keys], { model, fetchImpl });
     return { vectors: r.vectors, tokens: r.usage.totalTokens, requests: r.requests };
   };
 }
+
+// The second vector space: NVIDIA (key nvidia, then nvidia2), into embedding_alt only.
+export function nvidiaEmbedder(keys: Array<string | null | undefined>, fetchImpl?: typeof fetch, sleep?: (ms: number) => Promise<void>): Embedder {
+  return async (texts) => {
+    const r = await embedWithKeys(texts, keys, nvidiaEmbedOptions('passage', { fetchImpl, sleep }));
+    return { vectors: r.vectors, tokens: r.usage.totalTokens, requests: r.requests };
+  };
+}
+
+export type EmbedSettings = { alt_always: boolean; free_sources: string[] };
+
+// Per run: which spaces answered, so a dead provider is asked once, not per batch.
+type EmbedState = { settings: EmbedSettings; primaryDown: boolean; altDown: boolean };
+
+export const BACKFILL = { primaryBatch: 64, primaryBatches: 4, altBatch: 32, altBatches: 2 };
 
 export type RunStats = {
   claimed: number;
@@ -59,19 +83,27 @@ export type RunStats = {
   reused_chunks: number;
   by_type: Record<string, number>;
   errors: string[];
-  deferred: number;                     // put back, attempt not spent: an OpenAI account problem
-  provider_issue: ProviderIssue | null; // 'quota' (no credits) | 'auth' (key refused): the run stops
+  deferred: number;                     // put back, attempt not spent: an account problem outside embedding
+  provider_issue: ProviderIssue | null; // OpenAI: 'quota' (no credits) | 'auth' (key refused) | 'limit' (a wait of hours)
+  alt_issue: ProviderIssue | null;      // the same for NVIDIA
+  vector_pending: number;               // chunks written without an OpenAI vector
+  alt_embedded: number;                 // chunks given an NVIDIA vector while ingesting
+  backfilled_primary: number;           // pending chunks given their OpenAI vector
+  backfilled_alt: number;               // chunks given an NVIDIA vector by the backfill
 };
 
 export const emptyStats = (): RunStats => ({
   claimed: 0, succeeded: 0, failed: 0, skipped_unchanged: 0, touched: 0, written: 0, deleted: 0, soft_deleted: 0,
   noop: 0, disabled: 0, lost_lock: 0, embedded_chunks: 0, embed_tokens: 0, embed_calls: 0, embed_requests: 0, reused_chunks: 0,
-  by_type: {}, errors: [], deferred: 0, provider_issue: null,
+  by_type: {}, errors: [], deferred: 0, provider_issue: null, alt_issue: null,
+  vector_pending: 0, alt_embedded: 0, backfilled_primary: 0, backfilled_alt: 0,
 });
 
 export type WorkerOptions = {
   rpc: Rpc;
-  embed: Embedder;
+  embed: Embedder;                // OpenAI → ai_chunks.embedding
+  embedAlt?: Embedder;            // NVIDIA → ai_chunks.embedding_alt (optional)
+  backfill?: boolean;             // default true: fill pending vectors after the queue
   workerId?: string;
   pipelineVersion?: string;       // tests override; production uses PIPELINE_VERSION
   model?: string;
@@ -85,7 +117,45 @@ export type WorkerOptions = {
   log?: (msg: string) => void;
 };
 
-type BatchOptions = PlanOptions & { rpc: Rpc; embed: Embedder; workerId: string; sources?: Record<string, CustomSource> };
+type BatchOptions = PlanOptions & {
+  rpc: Rpc; embed: Embedder; embedAlt?: Embedder; workerId: string; sources?: Record<string, CustomSource>;
+  state?: EmbedState;   // absent (older callers, tests): read from the database on first use
+};
+
+async function embedState(o: BatchOptions): Promise<EmbedState> {
+  if (!o.state) {
+    const s = (await o.rpc('ai_embed_settings').catch(() => null)) ?? {};
+    const ready = async (space: string) => (await o.rpc('ai_vector_ready', { p_space: space }).catch(() => true)) !== false;
+    o.state = {
+      settings: { alt_always: s.alt_always === true, free_sources: Array.isArray(s.free_sources) ? s.free_sources : [] },
+      primaryDown: !(await ready('primary')),
+      altDown: !o.embedAlt || !(await ready('alt')),
+    };
+  }
+  return o.state;
+}
+
+// Embeds with one provider; on an account problem marks the space down for this
+// run and defers it (ai_vector_defer), so neither the queue nor the tick keeps
+// asking a provider that has no credits.
+async function tryEmbed(o: BatchOptions, space: 'primary' | 'alt', embed: Embedder, texts: string[], stats: RunStats):
+  Promise<{ vectors: number[][]; tokens: number; requests?: number } | null> {
+  const st = await embedState(o);
+  try {
+    const r = await embed(texts);
+    if (r.vectors.length !== texts.length) throw new Error(`embedder returned ${r.vectors.length} vectors for ${texts.length} texts`);
+    return r;
+  } catch (e) {
+    const issue = providerAccountIssue(e);
+    const who = space === 'primary' ? 'OpenAI' : 'NVIDIA';
+    if (stats.errors.length < 10) stats.errors.push(`${who} embeddings: ${issue ?? 'error'} (${errText(e).slice(0, 160)})`);
+    if (issue) {
+      if (space === 'primary') { st.primaryDown = true; stats.provider_issue = issue; } else { st.altDown = true; stats.alt_issue = issue; }
+      await o.rpc('ai_vector_defer', { p_space: space, p_seconds: PROVIDER_DEFER_SECONDS, p_error: errText(e).slice(0, 500) }).catch(() => {});
+    }
+    return null;
+  }
+}
 
 // Backfill/reconcile compare fingerprints in SQL against ai_pipeline_version()
 // and ai_embed_model(); a worker built with other constants would re-enqueue
@@ -121,7 +191,7 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
     const issue = providerAccountIssue(e);
     if (issue) {
       stats.provider_issue = issue;
-      if (stats.errors.length < 10) stats.errors.push(`OpenAI account: ${issue === 'quota' ? 'no credits left' : 'API key refused'} (${errText(e).slice(0, 120)})`);
+      if (stats.errors.length < 10) stats.errors.push(`OpenAI account: ${issue === 'quota' ? 'no credits left' : issue === 'auth' ? 'API key refused' : 'usage limit reached'} (${errText(e).slice(0, 120)})`);
       const held = await rpc('ai_ingest_defer', { p_id: it.id, p_worker: workerId, p_error: errText(e), p_delay_seconds: PROVIDER_DEFER_SECONDS });
       if (held === false) stats.lost_lock++; else stats.deferred++;
       return;
@@ -186,23 +256,33 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
     }
   }
 
-  // 3. One embedding pass for every new text in the batch.
+  // 3. One embedding pass per space for every new text in the batch. A failed
+  // space never blocks the write: those chunks go in without that vector.
   const vectors = new Map<string, number[]>();
-  const texts = new Map<string, string>();
-  for (const { plan } of plans) if (plan.action === 'write') for (const c of plan.toEmbed) texts.set(c.content_hash, c.embed_text);
-  let embedError: unknown = null;
+  const altVectors = new Map<string, number[]>();
+  const texts = new Map<string, { text: string; type: string }>();
+  for (const { it, plan } of plans) {
+    if (plan.action === 'write') for (const c of plan.toEmbed) texts.set(c.content_hash, { text: c.embed_text, type: it.source_type });
+  }
   if (texts.size) {
-    try {
-      const hashes = [...texts.keys()];
+    const st = await embedState(o);
+    const hashes = [...texts.keys()];
+    if (!st.primaryDown) {
       stats.embed_calls++;
-      const r = await o.embed(hashes.map((h) => texts.get(h)!));
-      if (r.vectors.length !== hashes.length) throw new Error(`embedder returned ${r.vectors.length} vectors for ${hashes.length} texts`);
-      hashes.forEach((h, i) => vectors.set(h, r.vectors[i]));
-      stats.embedded_chunks += hashes.length;
-      stats.embed_tokens += r.tokens;
-      stats.embed_requests += r.requests ?? 1;
-    } catch (e) {
-      embedError = e;
+      const r = await tryEmbed(o, 'primary', o.embed, hashes.map((h) => texts.get(h)!.text), stats);
+      if (r) {
+        hashes.forEach((h, i) => vectors.set(h, r.vectors[i]));
+        stats.embedded_chunks += hashes.length;
+        stats.embed_tokens += r.tokens;
+        stats.embed_requests += r.requests ?? 1;
+      }
+    }
+    // Only source types the Owner allows to be sent to a free provider.
+    const free = new Set(st.settings.free_sources);
+    const altWanted = hashes.filter((h) => free.has(texts.get(h)!.type) && (st.settings.alt_always || !vectors.has(h)));
+    if (altWanted.length && o.embedAlt && !st.altDown) {
+      const r = await tryEmbed(o, 'alt', o.embedAlt, altWanted.map((h) => texts.get(h)!.text), stats);
+      if (r) { altWanted.forEach((h, i) => altVectors.set(h, r.vectors[i])); stats.alt_embedded += altWanted.length; }
     }
   }
 
@@ -222,10 +302,18 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
         ok = (await rpc('ai_ingest_delete', { p_type: it.source_type, p_id: it.source_id, p_soft: plan.soft, ...lock }))?.ok === true;
         if (ok) plan.soft ? stats.soft_deleted++ : stats.deleted++;
       } else {
-        if (plan.toEmbed.length && embedError) throw embedError;
-        const chunks = plan.chunks.map((c) => ({ ...c, embedding: vectors.get(c.content_hash) ?? null }));
-        ok = (await rpc('ai_ingest_write', { p_doc: plan.docRow, p_chunks: chunks, ...lock }))?.ok === true;
-        if (ok) { stats.written++; stats.reused_chunks += plan.stats.reusedMoved + plan.stats.reusedSameIndex; }
+        const chunks = plan.chunks.map((c) => ({
+          ...c,
+          embedding: vectors.get(c.content_hash) ?? null,
+          ...(altVectors.has(c.content_hash) ? { embedding_alt: altVectors.get(c.content_hash), embed_model_alt: ALT_EMBED_MODEL } : {}),
+        }));
+        const w = await rpc('ai_ingest_write', { p_doc: plan.docRow, p_chunks: chunks, ...lock });
+        ok = w?.ok === true;
+        if (ok) {
+          stats.written++;
+          stats.reused_chunks += plan.stats.reusedMoved + plan.stats.reusedSameIndex;
+          stats.vector_pending += Number(w.vector_pending ?? 0);
+        }
       }
       if (ok) {
         stats.succeeded++;
@@ -239,12 +327,47 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
   }
 }
 
+// Pending vectors, a few small batches per run and per space (free limits):
+// OpenAI fills `embedding` (vector_pending), NVIDIA fills `embedding_alt` for the
+// free-provider source types. Stops a space on its first account problem.
+export async function backfillVectors(o: BatchOptions, stats: RunStats, more: () => boolean, log?: (m: string) => void): Promise<void> {
+  const st = await embedState(o);
+  const spaces = [
+    { space: 'primary' as const, embed: o.embed, down: () => st.primaryDown, batch: BACKFILL.primaryBatch, n: BACKFILL.primaryBatches, model: o.model },
+    { space: 'alt' as const, embed: o.embedAlt, down: () => st.altDown, batch: BACKFILL.altBatch, n: BACKFILL.altBatches, model: ALT_EMBED_MODEL },
+  ];
+  for (const s of spaces) {
+    if (!s.embed) continue;
+    for (let i = 0; i < s.n && more() && !s.down(); i++) {
+      let rows: Array<{ id: string; content_hash: string; embed_text: string }>;
+      try { rows = (await o.rpc('ai_vector_pending', { p_space: s.space, p_limit: s.batch })) ?? []; } catch { return; }   // a database before mig 402
+      if (!rows.length) break;
+      const r = await tryEmbed(o, s.space, s.embed, rows.map((x) => x.embed_text), stats);
+      if (!r) break;
+      const filled = Number(await o.rpc('ai_vector_fill', {
+        p_space: s.space, p_model: s.model,
+        p_rows: rows.map((x, j) => ({ id: x.id, content_hash: x.content_hash, embedding: r.vectors[j] })),
+      }) ?? 0);
+      if (s.space === 'primary') {
+        stats.backfilled_primary += filled;
+        stats.embed_tokens += r.tokens;
+        stats.embed_requests += r.requests ?? 1;
+      } else {
+        stats.backfilled_alt += filled;
+      }
+      log?.(`backfill ${s.space}: ${filled} vector(s)`);
+      if (rows.length < s.batch) break;
+    }
+  }
+}
+
 export async function runWorker(opts: WorkerOptions): Promise<RunStats> {
   const now = opts.now ?? (() => Date.now());
   const t0 = now();
   const o: BatchOptions = {
     rpc: opts.rpc,
     embed: opts.embed,
+    embedAlt: opts.embedAlt,
     workerId: opts.workerId ?? `ingest-${crypto.randomUUID()}`,
     pipelineVersion: opts.pipelineVersion ?? PIPELINE_VERSION,
     model: opts.model ?? DEFAULT_CONFIG.EMBED_MODEL,
@@ -267,9 +390,9 @@ export async function runWorker(opts: WorkerOptions): Promise<RunStats> {
       if (!items.length) break;
       stats.claimed += items.length;
       await processBatch(items, o, stats);
-      if (stats.provider_issue) { opts.log?.(`stopping: OpenAI account problem (${stats.provider_issue}); ${stats.deferred} item(s) deferred`); break; }
-      opts.log?.(`batch of ${items.length}: ok ${stats.succeeded}, failed ${stats.failed}, embedded ${stats.embedded_chunks}`);
+      opts.log?.(`batch of ${items.length}: ok ${stats.succeeded}, failed ${stats.failed}, embedded ${stats.embedded_chunks}, pending vectors ${stats.vector_pending}`);
     }
+    if (opts.backfill !== false && now() - t0 < budget) await backfillVectors(o, stats, () => now() - t0 < budget, opts.log);
   } catch (e) {
     error = errText(e);
     throw e;

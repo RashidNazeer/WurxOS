@@ -26,6 +26,9 @@ import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBr
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import MenuLayoutSection     from './sections/MenuLayoutSection';
+import BuddySection          from './sections/BuddySection';
+import BuddyIcon             from '../../components/buddy/BuddyIcon';
+import { BUDDY_TABS, buddyTab, buddyTabLabel, canEditSettings } from '../../lib/buddyLogic';
 import '../../styles/settings.css';
 
 // Grouped registry — each group has its own icon (shown on the
@@ -75,6 +78,12 @@ const GROUPS = [
     label: 'Administration',
     icon: ShieldIcon,
     sections: [
+      // Deep link: /settings?section=buddy. `allow` = the Boss or an ACTIVE developer.
+      { id: 'buddy', label: 'Wurx Buddy', sub: 'Models, usage, knowledge and who can use Buddy',
+        icon: BuddyIcon, component: BuddySection,
+        allow: canEditSettings,
+        // Sub-tabs: ?section=buddy&tab=models|access|knowledge|personality|usage (Models by default).
+        subtabs: BUDDY_TABS, tabOf: buddyTab, tabLabel: buddyTabLabel },
       { id: 'leaveDefaults', label: 'Leave Defaults', sub: 'Starting quota for new hires',
         icon: ClockIcon, component: LeaveDefaultsSection,
         roles: ['boss'] },
@@ -128,8 +137,15 @@ const GROUPS = [
 export default function SettingsPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const role = profile?.role;
+  // Sub-tabs of a section (Wurx Buddy): ?section=buddy&tab=<id>.
+  const [subTab, setSubTab] = useState(() => searchParams.get('tab'));
+  const pickSubTab = (sectionId, tab) => {
+    setActiveId(sectionId);
+    setSubTab(tab);
+    setSearchParams({ section: sectionId, tab }, { replace: true });
+  };
 
   const [query, setQuery] = useState('');
 
@@ -139,10 +155,11 @@ export default function SettingsPage() {
     return GROUPS.map((g) => {
       const sections = g.sections
         .filter((s) => !s.roles || s.roles.includes(role))
+        .filter((s) => !s.allow || s.allow(profile))
         .filter((s) => !q || s.label.toLowerCase().includes(q) || (s.sub || '').toLowerCase().includes(q));
       return { ...g, sections };
     }).filter((g) => g.sections.length > 0);
-  }, [role, query]);
+  }, [role, profile, query]);
 
   const flatSections = useMemo(
     () => visibleGroups.flatMap((g) => g.sections),
@@ -211,22 +228,41 @@ export default function SettingsPage() {
             <div className="settings-nav-group-label">{g.label}</div>
             {g.sections.map((s) => {
               const Icon = s.icon;
+              const isActive = effectiveActiveId === s.id;
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  className="settings-nav-btn"
-                  data-active={effectiveActiveId === s.id}
-                  disabled={s.disabled}
-                  onClick={() => !s.disabled && setActiveId(s.id)}
-                  title={s.disabled ? 'Coming soon' : s.label}
-                >
-                  <span className="settings-nav-btn-icon">
-                    <Icon width="16" height="16" />
-                  </span>
-                  <span className="settings-nav-label">{s.label}</span>
-                  {s.disabled && <span className="settings-soon-badge">Soon</span>}
-                </button>
+                <div key={s.id}>
+                  <button
+                    type="button"
+                    className="settings-nav-btn"
+                    data-active={isActive && !s.subtabs}
+                    aria-expanded={s.subtabs ? isActive : undefined}
+                    disabled={s.disabled}
+                    onClick={() => {
+                      if (s.disabled) return;
+                      if (s.subtabs) pickSubTab(s.id, s.tabOf(isActive ? subTab : null));
+                      else setActiveId(s.id);
+                    }}
+                    title={s.disabled ? 'Coming soon' : s.label}
+                  >
+                    <span className="settings-nav-btn-icon">
+                      <Icon width="16" height="16" />
+                    </span>
+                    <span className="settings-nav-label">{s.label}</span>
+                    {s.disabled && <span className="settings-soon-badge">Soon</span>}
+                  </button>
+                  {/* Sub-tabs, shown while their section is open. */}
+                  {s.subtabs && isActive && (
+                    <div className="settings-subnav" role="group" aria-label={`${s.label} categories`}>
+                      {s.subtabs.map(([id, label]) => (
+                        <button key={id} type="button" className="settings-nav-btn settings-subnav-btn"
+                          data-active={s.tabOf(subTab) === id} aria-current={s.tabOf(subTab) === id ? 'page' : undefined}
+                          onClick={() => pickSubTab(s.id, id)}>
+                          <span className="settings-nav-label">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -242,11 +278,14 @@ export default function SettingsPage() {
       <div className="settings-content">
         {active && (
           <div className="settings-content-header">
-            <div className="settings-content-title">{active.label}</div>
+            <div className="settings-content-title">
+              {active.label}{active.subtabs ? ` · ${active.tabLabel(subTab)}` : ''}
+            </div>
             {active.sub && <div className="settings-content-subtitle">{active.sub}</div>}
           </div>
         )}
-        <ActiveComponent section={active} />
+        <ActiveComponent section={active}
+          {...(active?.subtabs ? { tab: active.tabOf(subTab), onTab: (t) => pickSubTab(active.id, t) } : {})} />
       </div>
     </div>
   );

@@ -14,7 +14,12 @@ import {
   visibleMessages, canRegenerateMsg, clockSkew, nextAllowedRoles, ALL_ROLES,
   catalogRowUsable, modelBadges, modelOptions, modelLabel, creditsExhausted, lastChecked,
   chainAdd, chainRemove, chainMove, optionKey, parseOptionKey, FALLBACK_MAX,
+  slotsOf, slotLabel, allOptions, filterOptions, keySlotRows, KEY_SLOTS,
+  TRANSIENT_REASON, chainEntryStatus, vectorsByModel, freeSourcesValue, toggleInList,
+  keySlotMeta, canEditSettings,
+  normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, setRoleEconomy, budgetSaverState, modelSourceLabel,
 } from '../src/lib/buddyLogic.js';
+import { markdownToHtml } from '../src/lib/markdownCore.js';
 
 let passed = 0, failed = 0;
 const results = [];
@@ -280,8 +285,9 @@ async function watchTests() {
   check('greeting: v1 default → Buddy text', greetingText("Hi! I'm your WurxOS assistant. Ask me anything.", 'Umar').startsWith("Hi Umar! I'm Wurx Buddy"));
   check('greeting: Boss text with {name}', greetingText('Salaam {name}, what are we fixing today?', 'Ali') === 'Salaam Ali, what are we fixing today?');
   check('greeting: no name → "Hi!"', greetingText('', '').startsWith("Hi! I'm Wurx Buddy"), greetingText('', ''));
-  check('roles: fallback fails closed (boss only)', BUDDY_ROLES.join() === 'boss' && buddyRoles(null).join() === 'boss');
-  check('roles: allowed_roles is used when read', buddyRoles(['Boss', 'apc']).join() === 'boss,apc' && buddyRoles([]).length === 0);
+  check('roles: fallback fails closed (Boss + developers only)', BUDDY_ROLES.join() === 'boss,developer' && buddyRoles(null).join() === 'boss,developer');
+  check('roles: allowed_roles adds to the always-roles', buddyRoles(['Boss', 'apc']).join() === 'boss,developer,apc' && buddyRoles([]).join() === 'boss,developer');
+  check('roles: Boss and developers can never be removed', ['boss', 'developer'].every((r) => buddyRoles([]).includes(r) && buddyRoles(['apc']).includes(r)));
   const inAttr = citeHtml('<div><a href="/kb?q=[S2]" class="ai-link">see [S2]</a> and <span title="a>[D1]">x</span> [D1]</div>', sources);
   check('cites: markers inside attributes untouched', inAttr.includes('href="/kb?q=[S2]"') && inAttr.includes('title="a>[D1]"'), inAttr);
   check('cites: text markers still rewritten', (inAttr.match(/class="bd-cite"/g) || []).length === 2, inAttr);
@@ -365,8 +371,9 @@ async function watchTests() {
   check('thread: error when nothing is shown yet', run(S0, { type: 'THREAD_ERROR', key: C3, error: 'x' }).threads[C3].error === 'x');
   check('thread: a failed refetch keeps what is on screen', run(base, { type: 'THREAD_ERROR', key: C3, error: 'x' }) === base);
 
-  // Allowed roles: Boss always in, order stable.
-  check('roles: boss always included', nextAllowedRoles([], 'apc', true).join() === 'boss,apc' && nextAllowedRoles(['boss'], 'boss', false).join() === 'boss');
+  // Allowed roles: Boss and developers always in, order stable.
+  check('roles: Boss + developers always included', nextAllowedRoles([], 'apc', true).join() === 'boss,apc,developer'
+    && nextAllowedRoles(['boss'], 'boss', false).join() === 'boss,developer' && nextAllowedRoles(['boss', 'developer'], 'developer', false).join() === 'boss,developer');
   check('roles: toggle off, stable order', nextAllowedRoles(['developer', 'apc', 'boss', 'tl'], 'apc', false).join() === 'boss,tl,developer');
   check('roles: 8 roles offered', ALL_ROLES.length === 8);
 }
@@ -423,8 +430,11 @@ async function watchTests() {
   let c = chainAdd([], a);
   check('chain: add', c.length === 1 && c[0].model === 'gpt-6-luna');
   check('chain: no duplicates', chainAdd(c, { ...a }).length === 1 && chainAdd(c, { key_slot: 'primary', model: 'gpt-6-luna' }).length === 2);
-  for (let i = 0; i < 10; i++) c = chainAdd(c, { key_slot: 'primary', model: `m${i}` });
-  check('chain: at most 5', c.length === FALLBACK_MAX);
+  for (let i = 0; i < 20; i++) c = chainAdd(c, { key_slot: 'primary', model: `m${i}` });
+  check('chain: capped at 6 (MAX_FALLBACKS / the mig 401 trigger)', c.length === FALLBACK_MAX && FALLBACK_MAX === 6);
+  check('chain: a smaller cap from the backend is honoured', chainAdd([a, { key_slot: 'gemini', model: 'g' }], { key_slot: 'groq', model: 'q' }, 2).length === 2);
+  check('chain: any key slot is kept as is', chainAdd([], { key_slot: 'gemini', model: 'gemini-3.5-flash' })[0].key_slot === 'gemini'
+    && chainAdd([], { model: 'x' }).length === 0);
   const three = [{ key_slot: 'primary', model: 'a' }, { key_slot: 'primary', model: 'b' }, { key_slot: 'primary', model: 'c' }];
   check('chain: move up / down', chainMove(three, 1, -1).map((x) => x.model).join() === 'b,a,c' && chainMove(three, 1, 1).map((x) => x.model).join() === 'a,c,b');
   check('chain: moves past the ends do nothing', chainMove(three, 0, -1) === three && chainMove(three, 2, 1) === three);
@@ -437,6 +447,125 @@ async function watchTests() {
     { type: 'MSG_META', key: C1, id: 'x', meta: { model: 'gpt-5.4-mini', keySlot: 'primary', fallbackUsed: null } });
   check('MSG_META: labels the live reply', s.threads[C1].messages[1].model === 'gpt-5.4-mini');
   check('MSG_META: unknown id ignored', run(s, { type: 'MSG_META', key: C1, id: 'nope', meta: { model: 'z' } }) === s);
+}
+
+// ── every model, four providers, search, safety net ────────────────
+{
+  const row = (o) => ({ available: true, supports_tools: true, supports_stream: true, free: false, last_error: null, ...o });
+  const cat = [
+    row({ key_slot: 'primary', model: 'gpt-5.4-mini' }),
+    row({ key_slot: 'gemini', model: 'gemini-3.5-flash', free: true }),
+    row({ key_slot: 'gemini', model: 'gemini-embedding-001', supports_tools: false, supports_stream: false }),
+    row({ key_slot: 'groq', model: 'llama-4-scout', free: true }),
+    row({ key_slot: 'mistral', model: 'mistral-small' }),
+  ];
+  check('slots: the four known, in order, then extras', slotsOf(cat).join() === 'primary,fallback,gemini,groq,mistral');
+  check('slots: built-in labels mirror ai_key_slots', slotLabel('gemini') === 'Gemini (free)' && slotLabel('groq') === 'Groq (free)'
+    && slotLabel('primary') === 'OpenAI' && slotLabel('fallback') === 'OpenAI (fallback key)' && slotLabel('mistral') === 'mistral');
+  const meta = keySlotMeta([
+    { slot: 'groq', label: 'Groq (free)', sort: 4 }, { slot: 'primary', label: 'OpenAI', sort: 1 },
+    { slot: 'gemini', label: 'Google Gemini', sort: 3 }, { slot: 'fallback', label: 'OpenAI (fallback key)', sort: 2 },
+  ]);
+  check('key slots: order and labels come from the table', meta.order.join() === 'primary,fallback,gemini,groq'
+    && slotLabel('gemini', meta) === 'Google Gemini' && slotsOf(cat, meta).at(-1) === 'mistral');
+  check('key slots: empty / unreadable table → built-in labels', keySlotMeta([]).order.join() === 'primary,fallback,gemini,groq' && keySlotMeta(null).labels.primary === 'OpenAI');
+  check('key slots: usage rows follow the table', keySlotRows({}, meta)[2].label === 'Google Gemini');
+  check('settings: the Boss and active developers edit; nobody else',
+    canEditSettings({ role: 'boss', is_active: true }) && canEditSettings({ role: 'developer', is_active: true })
+    && !canEditSettings({ role: 'developer', is_active: false }) && !canEditSettings({ role: 'developer', deleted_at: '2026-01-01' })
+    && !canEditSettings({ role: 'ol', is_active: true }) && !canEditSettings(null));
+  const opts = modelOptions(cat);
+  check('picker: every catalogued model is listed, unusable ones too', allOptions(opts).length === 5
+    && opts.gemini.find((o) => o.model === 'gemini-embedding-001')?.usable === false && /tool calling/.test(opts.gemini[1].reason));
+  check('picker: groups for all providers', opts.groq.length === 1 && opts.fallback.length === 0 && opts.mistral.length === 1);
+  const f = filterOptions(opts, 'GEMINI', { key_slot: 'primary', model: 'gpt-5.4-mini' });
+  check('search: case-insensitive, across groups', f.gemini.length === 2 && f.groq.length === 0);
+  check('search: the chosen model is always kept', f.primary.length === 1 && f.primary[0].model === 'gpt-5.4-mini');
+  check('search: empty query → everything', filterOptions(opts, '  ', null) === opts);
+
+  const rows = keySlotRows({ primary: { questions: 3, fallback_used: 0, est_cost_usd: 0.01 }, gemini: { questions: 2, fallback_used: 2, est_cost_usd: 0 } });
+  check('usage by key: the four slots, labelled, zeros when unused', rows.map((r) => r.slot).join() === KEY_SLOTS.join()
+    && rows[0].questions === 3 && rows[1].questions === 0 && rows[2].label === 'Gemini (free)' && rows[3].est_cost_usd === 0);
+  check('usage by key: extra slots appended', keySlotRows({ mistral: { questions: 1 } }).at(-1).slot === 'mistral');
+
+  const fbRow = rowToMessage({ id: 'g', role: 'assistant', content: 'x', status: 'done', meta: { model: 'gemini-3.5-flash', key_slot: 'gemini', fallback_used: { from: 'primary:gpt-5.4-mini', to: 'gemini:gemini-3.5-flash', reason: 'quota' } } });
+  check('answer label: any provider', fbRow.model === 'gemini-3.5-flash' && fbRow.keySlot === 'gemini' && !!fbRow.fallbackUsed);
+}
+
+// ── mig 401 alignment, mig 402 ingestion helpers ───────────────────
+{
+  const row = (o) => ({ available: true, supports_tools: true, supports_stream: true, free: true, last_error: null, reason: null, ...o });
+  const cat = [
+    row({ key_slot: 'gemini', model: 'gemini-3.5-flash', available: false, supports_tools: false, supports_stream: false, reason: TRANSIENT_REASON }),
+    row({ key_slot: 'gemini', model: 'text-embedding-004', available: false, supports_tools: false, supports_stream: false, reason: 'embedding model (not for chat)', last_error: 'x' }),
+    row({ key_slot: 'groq', model: 'openai/gpt-oss-120b' }),
+  ];
+  const o = modelOptions(cat);
+  check('reason: the backend reason wins over last_error', o.gemini.find((x) => x.model === 'text-embedding-004').reason === 'embedding model (not for chat)');
+  check('transient: marked, not usable', o.gemini.find((x) => x.model === 'gemini-3.5-flash').transient === true && !o.gemini.find((x) => x.model === 'gemini-3.5-flash').usable);
+  check('chain status: ok / flaky / skipped / uncatalogued', chainEntryStatus({ key_slot: 'groq', model: 'openai/gpt-oss-120b' }, cat) === 'ok'
+    && chainEntryStatus({ key_slot: 'gemini', model: 'gemini-3.5-flash' }, cat) === 'flaky'
+    && chainEntryStatus({ key_slot: 'gemini', model: 'text-embedding-004' }, cat) === 'skipped'
+    && chainEntryStatus({ key_slot: 'gemini', model: 'not-listed' }, cat) === 'skipped'
+    && chainEntryStatus({ key_slot: 'fallback', model: 'gpt-6-luna' }, cat) === 'ok');
+
+  check('vectors: object form', JSON.stringify(vectorsByModel({ vectors_by_model: { 'text-embedding-3-small': 11556, 'gemini-embedding-001': 200 } }))
+    === '[{"model":"text-embedding-3-small","count":11556},{"model":"gemini-embedding-001","count":200}]');
+  check('vectors: array form, any count field', vectorsByModel({ vectors_by_model: [{ model: 'a', n: 2 }, { embed_model: 'b', chunks: 5 }] }).map((x) => `${x.model}:${x.count}`).join() === 'b:5,a:2');
+  check('vectors: missing → nothing', vectorsByModel({}).length === 0 && vectorsByModel(null).length === 0);
+
+  const types = ['kb_article', 'ai_doc', 'app_guide', 'tts_article', 'report', 'incentive'];
+  check('free sources: default leaves incentive plans out', freeSourcesValue(null, types).join() === 'kb_article,ai_doc,app_guide,tts_article,report');
+  check('free sources: the saved list, in type order', freeSourcesValue(['report', 'kb_article', 'bogus'], types).join() === 'kb_article,report');
+  check('toggle: add / remove keeps the order', toggleInList(['report'], 'kb_article', true, types).join() === 'kb_article,report'
+    && toggleInList(['kb_article', 'report'], 'report', false, types).join() === 'kb_article');
+}
+
+// ── models by role: helpers only (the card ships once role_models exists) ──
+{
+  const global = { model: 'gpt-5.4-mini', model_key_slot: 'primary', fallback_models: [{ key_slot: 'gemini', model: 'gemini-3.5-flash' }] };
+  let rm = normalizeRoleModels({ apc: { model: 'x', key_slot: 'groq', junk: 1, economy: { model: 'g', key_slot: 'gemini' } }, ol: { junk: true } });
+  check('role models: only the known shape survives', JSON.stringify(rm) === '{"apc":{"model":"x","key_slot":"groq","economy":{"key_slot":"gemini","model":"g"}}}', JSON.stringify(rm));
+  const tl = roleModelView(rm, 'tl', global);
+  check('role models: inherit shows the global model and chain', tl.main.inherit && tl.main.model === 'gpt-5.4-mini' && tl.backups.inherit && tl.backups.chain.length === 1 && tl.economy === null);
+  const apc = roleModelView(rm, 'apc', global);
+  check('role models: override + economy', !apc.main.inherit && apc.main.model === 'x' && apc.economy.model === 'g' && apc.backups.inherit);
+  rm = setRoleBackups(rm, 'apc', [{ key_slot: 'groq', model: 'a' }]);
+  check('role models: custom backups', !roleModelView(rm, 'apc', global).backups.inherit);
+  rm = setRoleMain(setRoleEconomy(setRoleBackups(rm, 'apc', null), 'apc', null), 'apc', null);
+  check('role models: clearing every override removes the role', !('apc' in rm));
+  const s = budgetSaverState(80, { budget_usd: 50, budget_used_pct: 85 });
+  check('budget saver: active at/over the threshold', s.hasBudget && s.active && s.usedPct === 85);
+  check('budget saver: no budget → never active', !budgetSaverState(80, { budget_usd: null, budget_used_pct: null }).hasBudget && !budgetSaverState(80, {}).active);
+  check('model source labels', modelSourceLabel('economy') === 'budget saver (economy)' && modelSourceLabel(null) === null);
+}
+
+// ── Markdown (marked, GFM) ──────────────────────────────────────────
+{
+  const t = markdownToHtml('| Brand | GMV | Change |\n|---|---|---|\n| PDC | $191,707.10 | +12% [S1] |\n| Cutler | 9,800 | n/a |');
+  check('md: GFM table, wrapped to scroll', t.includes('<div class="ai-table"><table>') && t.includes('<th>Brand</th>') && t.includes('</table></div>'), t);
+  check('md: numeric cells right-aligned', t.includes('<td class="is-num">$191,707.10</td>') && t.includes('<td class="is-num">9,800</td>') && t.includes('<td>n/a</td>'), t);
+  const withCite = citeHtml(t, [{ id: 'S1', cited: true }]);
+  check('md: a citation inside a table cell becomes a button', /<td>\+12% <button type="button" class="bd-cite" data-cite="S1"/.test(withCite), withCite);
+  check('md: fullwidth 【S1】 citations too', citeHtml('<p>x 【S1】</p>', [{ id: 'S1' }]).includes('data-cite="S1"'));
+
+  const c = markdownToHtml('```js\nconst a = "<b>";\n```');
+  check('md: code fence → box with Copy, escaped', c.includes('<div class="ai-code"><button type="button" class="ai-code-copy"') && c.includes('class="language-js"') && c.includes('&lt;b&gt;') && !c.includes('<b>'), c);
+
+  const l = markdownToHtml('[Leave](/leave) [x](//evil.example) [Docs](https://example.com) [bad](javascript:alert(1)) https://auto.example');
+  check('md: in-app link → data-nav', l.includes('<a href="/leave" data-nav="/leave" class="ai-link">Leave</a>'), l);
+  check('md: //host is not in-app, external opens a new tab', !l.includes('data-nav="//evil') && !l.includes('href="//evil')
+    && l.includes('<a href="https://example.com" target="_blank" rel="noopener noreferrer" class="ai-link">Docs</a>'), l);
+  check('md: unsafe scheme → plain text', !/href="javascript/i.test(l) && l.includes('bad'), l);
+  check('md: bare URLs autolink to a new tab', l.includes('href="https://auto.example" target="_blank"'), l);
+
+  const x = markdownToHtml('Hi <script>alert(1)</script> <img src=x onerror="alert(2)"> ![a](https://x/y.png)');
+  check('md: raw HTML escaped (no script / onerror / image tags)', !/<script|<img|onerror="/i.test(x) && x.includes('&lt;script&gt;'), x);
+  check('md: lists, quotes, rules, strike, task lists',
+    /<ul>[\s\S]*<ul>/.test(markdownToHtml('- a\n  - b')) && markdownToHtml('> q').includes('<blockquote>')
+    && markdownToHtml('a\n\n---\n\nb').includes('<hr>') && markdownToHtml('~~x~~').includes('<del>x</del>')
+    && markdownToHtml('- [x] done').includes('type="checkbox"'));
+  check('md: half-streamed table / fence never throws', typeof markdownToHtml('| a | b |\n|--') === 'string' && typeof markdownToHtml('```py\nprint(') === 'string');
 }
 
 await watchTests();

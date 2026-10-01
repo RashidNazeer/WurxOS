@@ -196,11 +196,17 @@ export default function AppShell() {
     }
   }, [mobileOpen]);
 
+  // Full-height pages (the Buddy tab): the shell is exactly the viewport and
+  // only the page's own panels scroll, so the sidebar and topbar never move.
+  // Every other page keeps normal document scrolling.
+  const fill = location.pathname === '/buddy';
+
   return (
     <div
       className="shell"
       data-collapsed={collapsed ? 'true' : 'false'}
       data-mobile-open={mobileOpen ? 'true' : 'false'}
+      data-fill={fill ? 'true' : undefined}
     >
       <Sidebar
         role={profile?.role}

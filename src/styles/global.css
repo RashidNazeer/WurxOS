@@ -62,10 +62,12 @@ body {
    viewport. The sidebar/topbar use the natural font-size since
    they're a fixed chrome and shouldn't shrink with the user's
    content scale preference. */
-html[data-font-size='compact']     .shell-content { zoom: 0.925; }
-html[data-font-size='default']     .shell-content { zoom: 1.0;   }
-html[data-font-size='comfortable'] .shell-content { zoom: 1.075; }
-html[data-font-size='large']       .shell-content { zoom: 1.15;  }
+html[data-font-size='compact']     .shell-content { zoom: 0.925; --shell-zoom: 0.925; }
+html[data-font-size='default']     .shell-content { zoom: 1.0;   --shell-zoom: 1; }
+html[data-font-size='comfortable'] .shell-content { zoom: 1.075; --shell-zoom: 1.075; }
+html[data-font-size='large']       .shell-content { zoom: 1.15;  --shell-zoom: 1.15; }
+/* --shell-zoom lets viewport-sized things inside the content (the Settings
+   nav's sticky height) undo the zoom so they still fit the screen. */
 
 a {
   color: var(--accent-text);
