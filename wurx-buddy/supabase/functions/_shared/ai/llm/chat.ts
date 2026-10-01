@@ -9,6 +9,7 @@
 // instructions are the first `system` message, unchanged, so a provider that
 // caches prompt prefixes still sees the same prefix every call.
 
+import { looksLikeToolMarkup, parseTextToolCalls } from './textTools.ts';
 import { httpError, LlmError, providerError, readSse, withRetries, type Effort, type InputItem, type LlmRequest, type LlmResult, type ToolCall, type Usage } from './openai.ts';
 
 type ChatToolCall = { id: string; type: 'function'; function: { name: string; arguments: string }; extra_content?: unknown };
@@ -128,6 +129,16 @@ function result(text: string, calls: ChatToolCall[], usage: Usage, finish: strin
 let seq = 0;
 const newId = () => `call_${Date.now().toString(36)}${(seq++).toString(36)}`;
 
+// No native tool_calls, but the text is tool-call markup (llm/textTools.ts):
+// real calls for the offered tools, or a failure the turn moves on from.
+// The markup itself is never answer text.
+function settle(text: string, calls: ChatToolCall[], r: LlmRequest): { text: string; calls: ChatToolCall[]; textTools: boolean } {
+  if (calls.length || !looksLikeToolMarkup(text)) return { text, calls, textTools: false };
+  const parsed = parseTextToolCalls(text, r.tools);
+  if (!parsed) throw Object.assign(new LlmError('model wrote a tool call as text that could not be read'), { code: 'bad_tool_format' });
+  return { text: '', calls: parsed.map((c) => ({ id: c.call_id, type: 'function' as const, function: { name: c.name, arguments: c.arguments } })), textTools: true };
+}
+
 // One Chat Completions call. `r.endpoint` is the provider's .../chat/completions.
 export function chatRespond(r: LlmRequest): Promise<LlmResult> {
   const doFetch = r.fetchImpl ?? fetch;
@@ -149,10 +160,16 @@ export function chatRespond(r: LlmRequest): Promise<LlmResult> {
     if (!r.onDelta) {
       const j = await res.json();
       const m = j?.choices?.[0]?.message ?? {};
-      const calls: ChatToolCall[] = (m.tool_calls ?? []).map((c: any) => ({ id: c.id || newId(), type: 'function', function: { name: c.function?.name ?? '', arguments: c.function?.arguments ?? '{}' }, ...(c.extra_content ? { extra_content: c.extra_content } : {}) }));
-      return result(typeof m.content === 'string' ? m.content : '', calls, usageOfChat(j?.usage ?? j?.x_groq?.usage), j?.choices?.[0]?.finish_reason ?? null);
+      const native: ChatToolCall[] = (m.tool_calls ?? []).map((c: any) => ({ id: c.id || newId(), type: 'function', function: { name: c.function?.name ?? '', arguments: c.function?.arguments ?? '{}' }, ...(c.extra_content ? { extra_content: c.extra_content } : {}) }));
+      const s = settle(typeof m.content === 'string' ? m.content : '', native, r);
+      return { ...result(s.text, s.calls, usageOfChat(j?.usage ?? j?.x_groq?.usage), j?.choices?.[0]?.finish_reason ?? null), ...(s.textTools ? { textToolCalls: true } : {}) };
     }
     let text = '';
+    // The start of a message is held back until it is clearly not tool-call
+    // markup (text starting with '<', '{' or '['; at most ~40 characters).
+    let mode: 'undecided' | 'pass' | 'hold' = 'undecided';
+    let held = '';
+    const emit = (s: string) => { if (!s) return; io.streamed(); r.onDelta!(s); };
     let usage: Usage = usageOfChat(null);
     let finish: string | null = null;
     const calls: ChatToolCall[] = [];
@@ -167,9 +184,14 @@ export function chatRespond(r: LlmRequest): Promise<LlmResult> {
       // Groq's reasoning) is never shown or stored.
       const d = ch.delta ?? {};
       if (typeof d.content === 'string' && d.content) {
-        io.streamed();
         text += d.content;
-        r.onDelta!(d.content);
+        if (mode === 'pass') emit(d.content);
+        else if (mode === 'undecided') {
+          held += d.content;
+          const head = held.trimStart();
+          if (looksLikeToolMarkup(head)) mode = 'hold';
+          else if (head && (!/^[<{\[]/.test(head) || head.length >= 40)) { mode = 'pass'; emit(held); held = ''; }
+        }
       }
       // Tool calls arrive in pieces, keyed by index (the id and name first, then
       // argument fragments). A provider without indexes sends each call whole.
@@ -186,6 +208,8 @@ export function chatRespond(r: LlmRequest): Promise<LlmResult> {
     });
     const done = calls.filter(Boolean).map((c) => ({ ...c, id: c.id || newId() }));
     if (!text && !done.length && !finish) throw new LlmError('model stream ended without a response');
-    return result(text, done, usage, finish);
+    if (mode === 'undecided' && !looksLikeToolMarkup(held.trimStart())) emit(held);
+    const s = settle(text, done, r);
+    return { ...result(s.text, s.calls, usage, finish), ...(s.textTools ? { textToolCalls: true } : {}) };
   });
 }
