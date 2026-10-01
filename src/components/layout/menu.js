@@ -24,12 +24,12 @@ import { BUDDY_ROLES } from '../../lib/buddyLogic';
 
 // --- Reusable single items -----------------------------------------
 const TASKS_ITEM        = { label: 'Tasks',         icon: ChecklistIcon, to: '/tasks',         category: 'task' };
-const BRAND_ANALYTICS   = { label: 'Brand analytics', icon: ReportIcon, to: '/analytics/brands' };
+const BRAND_ANALYTICS   = { label: 'Brand Analytics', icon: ReportIcon, to: '/analytics/brands' };
 const EUKA_ANALYTICS_ITEM = { label: 'Euka Analytics', icon: StoreIcon,  to: '/euka' };
 const HALO_ITEM           = { label: 'Amazon Halo',    icon: DiagramIcon, to: '/halo' };
 const VIDEO_REVIEWS_ITEM  = { label: 'Video Reviews', icon: PlayIcon, to: '/video-reviews' };
 const BRAND_SWITCHES    = { label: 'Brand Switcher',  icon: RefreshIcon,  to: '/brand-switcher', category: 'brand' };
-const AUDIT_LOG         = { label: 'Audit log',       icon: ShieldIcon, to: '/audit' };
+const AUDIT_LOG         = { label: 'Audit Log',       icon: ShieldIcon, to: '/audit' };
 const BRANDS_ITEM       = { label: 'Brands',        icon: StoreIcon,     to: '/brands',        category: 'brand' };
 const PRODUCT_CAMPAIGNS = { label: 'Product Campaigns', icon: MegaphoneIcon, to: '/product-campaigns', category: 'product_campaign' };
 const CAMPAIGNS         = { label: 'Campaigns', icon: MegaphoneIcon, to: '/campaigns', category: 'campaign' };
@@ -85,7 +85,7 @@ const REQUESTS_GROUP_BOSS = {
   label: 'Requests',
   icon: MessageIcon,
   children: [
-    { label: 'Leave Requests', to: '/leave' },
+    { label: 'Leave', to: '/leave' },
     { label: 'Bug Reports',    to: '/bugs' },
     { label: 'Suggestions',    to: '/suggestions' },
   ],
@@ -150,8 +150,8 @@ const EMPLOYEES_GROUP = {
   label: 'Employees',
   icon: UsersIcon,
   children: [
-    { label: 'Affiliate TLs',   to: '/boss/manage/tls' },
-    { label: 'Paid Collab TLs', to: '/boss/manage/pctls' },
+    { label: 'Team Leads',   to: '/boss/manage/tls' },
+    { label: 'Paid Collab Team Leads', to: '/boss/manage/pctls' },
     { label: 'Operation Leads', to: '/boss/manage/ols' },
     { label: 'APCs',            to: '/boss/manage/apcs' },
     { label: 'IPCs',            to: '/boss/manage/ipcs' },
@@ -231,7 +231,7 @@ const DEVELOPMENT_GROUP = {
     { label: 'Roadmap',   to: '/development/roadmap',  prefix: true },
     { label: 'Overview',  to: '/development/overview' },
     { label: 'Projects',  to: '/development/projects', prefix: true },
-    { label: 'All tasks', to: '/development/tasks' },
+    { label: 'All Tasks', to: '/development/tasks' },
     { label: 'Bugs',      to: '/development/bugs' },
     { label: 'Team',      to: '/development/team' },
     { label: 'Activity',  to: '/development/activity' },
@@ -313,7 +313,7 @@ export const MENUS = {
     BRAND_ANALYTICS,
     CREATOR_LIBRARY_ITEM,
     HALO_ITEM,
-    { label: 'My team', icon: UsersIcon, to: '/tl/team' },
+    { label: 'My Team', icon: UsersIcon, to: '/tl/team' },
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,
