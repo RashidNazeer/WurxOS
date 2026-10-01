@@ -16,20 +16,37 @@
 
 /* ---------- Left panel ---------- */
 .settings-panel-nav {
-  /* Sticky inside the shell-content scroll context. The parent has
-     overflow-x: hidden which creates a scroll parent, so top: 0
-     pins the panel to the top of that context as you scroll. */
+  /* Sticky against the WINDOW (the document scrolls; .shell-content's
+     overflow-x: clip is not a scroll container), so it must sit below the
+     sticky topbar, not at 0 (it slid under the topbar and its search box
+     was clipped). Its height fits the space under the topbar, so the last
+     items stay reachable and only one scrollbar appears when the list is
+     long. Divided by the font-size zoom on .shell-content (global.css), so
+     a larger font can't push it past the screen. */
   position: sticky;
-  top: 0;
+  top: calc((var(--topbar-h, 68px) + 8px) / var(--shell-zoom, 1));
   align-self: start;
-  max-height: calc(100vh - 68px);
+  max-height: calc((100vh - var(--topbar-h, 68px) - 16px) / var(--shell-zoom, 1));
+  max-height: calc((100dvh - var(--topbar-h, 68px) - 16px) / var(--shell-zoom, 1));
   overflow-y: auto;
-  padding: 16px 0 24px;
+  overscroll-behavior: contain;
+  padding: 16px 4px 32px 0;
+  /* Themed, thin scrollbar. Chrome 121+ uses these standard properties and
+     then ignores ::-webkit-scrollbar, so without scrollbar-color it drew the
+     default (white) one in dark mode. */
   scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
 }
 .settings-panel-nav::-webkit-scrollbar       { width: 6px; }
-.settings-panel-nav::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
-.settings-panel-nav:hover::-webkit-scrollbar-thumb { background: var(--border-default); }
+.settings-panel-nav::-webkit-scrollbar-track { background: transparent; }
+.settings-panel-nav::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 999px; }
+.settings-panel-nav::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* Sub-tabs of a section (Settings › Wurx Buddy › Models …). */
+.settings-subnav { padding: 2px 0 6px 30px; }
+/* Two classes so it beats the later .settings-nav-btn grid (20px icon column),
+   which squeezed the label into the icon slot ("M…", "A…"). */
+.settings-nav-btn.settings-subnav-btn { grid-template-columns: minmax(0, 1fr); padding: 7px 12px; font-size: 12.5px; font-weight: 600; }
 
 /* Panel header — back arrow + label, echoes the ss */
 .settings-panel-header {
@@ -346,6 +363,8 @@
     max-height: none;
     padding: 8px 0;
   }
+  /* Phones: the sub-tabs show as pills at the top of the section instead. */
+  .settings-subnav { display: none; }
   .settings-content { padding-top: 0; }
   .settings-section-header { padding: 14px 16px; }
   .settings-section-body   { padding: 18px; }

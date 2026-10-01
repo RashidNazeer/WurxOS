@@ -50,6 +50,7 @@ export type LlmResult = {
   usage: Usage;
   status: string;                        // completed | incomplete | failed
   incompleteReason?: string;             // e.g. max_output_tokens
+  textToolCalls?: boolean;               // the model wrote its tool calls as text (llm/textTools.ts)
 };
 
 export type LlmRequest = {
@@ -200,7 +201,7 @@ export async function withRetries(r: LlmRequest, once: (io: CallIo) => Promise<L
       // A short wait is honoured when the turn has room for it.
       const wait = Math.max(1500, err.retryAfterMs ?? 0);
       const nearDeadline = r.deadline != null && r.deadline - Date.now() < 10_000 + wait;
-      const retryable = !streamed && !nearDeadline && wait <= MAX_RETRY_WAIT_MS && !providerAccountIssue(err) && !why
+      const retryable = !streamed && !nearDeadline && wait <= MAX_RETRY_WAIT_MS && !providerAccountIssue(err) && !why && err.code !== 'bad_tool_format'
         && (err.status === undefined || err.status === 429 || err.status >= 500);
       if (!retryable || attempt >= 1) throw err;
       await new Promise((ok) => setTimeout(ok, wait));

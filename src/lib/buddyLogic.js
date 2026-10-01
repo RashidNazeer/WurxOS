@@ -606,6 +606,13 @@ export const SETTINGS_ROLES = ['boss', 'developer'];
 export const canEditSettings = (profile) => !!profile && profile.is_active !== false && !profile.deleted_at
   && SETTINGS_ROLES.includes(profile.role);
 
+// Settings › Wurx Buddy › <tab> (/settings?section=buddy&tab=<id>). Models first.
+export const BUDDY_TABS = [
+  ['models', 'Models'], ['access', 'Access'], ['knowledge', 'Knowledge'], ['personality', 'Personality'], ['usage', 'Usage'],
+];
+export const buddyTab = (t) => (BUDDY_TABS.some(([id]) => id === t) ? t : 'models');
+export const buddyTabLabel = (t) => BUDDY_TABS.find(([id]) => id === buddyTab(t))[1];
+
 export const slotLabel = (s, meta = DEFAULT_SLOT_META) => meta.labels[s] || KEY_SLOT_LABEL[s] || s;
 
 // The slots to show, in order: the table's, then any other the catalog has.

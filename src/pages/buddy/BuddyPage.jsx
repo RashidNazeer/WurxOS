@@ -9,8 +9,8 @@ import { ComingSoon } from '../../components/buddy/BuddyPanel';
 import '../../styles/buddy.css';
 
 // The Wurx Buddy tab (ui-design.md §4): history · chat · sources. Buddy's
-// settings live in Settings › Wurx Buddy (/settings?section=buddy).
-export const BUDDY_SETTINGS_PATH = '/settings?section=buddy';
+// settings live in Settings › Wurx Buddy (/settings?section=buddy&tab=…).
+export const BUDDY_SETTINGS_PATH = '/settings?section=buddy&tab=models';
 const HISTORY_PINNED_KEY = 'wurxos.buddy.history.pinned';
 const OLD_COLLAPSED_KEY = 'wurxos.buddy.history.collapsed';   // the old manual toggle, retired
 const IDLE_MS = 1000;      // collapse this long after the pointer leaves (Owner: 1 s)
@@ -23,7 +23,7 @@ function useAutoHistory(active) {
   const [pinned, setPinned] = useState(() => {
     try { localStorage.removeItem(OLD_COLLAPSED_KEY); return localStorage.getItem(HISTORY_PINNED_KEY) === '1'; } catch { return false; }
   });
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);   // Owner: closed by default (pinned keeps it open)
   const ref = useRef(null);
   const hover = useRef(false);
   const busy = useRef(false);
@@ -40,7 +40,7 @@ function useAutoHistory(active) {
   }, []);
   useEffect(() => {
     if (!active || pinned) { clear(); setOpen(true); return undefined; }
-    scheduleClose();   // first load: open, then the same idle rule
+    setOpen(false);    // first load (and after unpinning): start folded; hover or click opens it
     return clear;
   }, [active, pinned, scheduleClose]);
 
