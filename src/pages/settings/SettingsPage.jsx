@@ -26,6 +26,9 @@ import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBr
 import DangerZoneSection     from './sections/DangerZoneSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import MenuLayoutSection     from './sections/MenuLayoutSection';
+import BuddySection          from './sections/BuddySection';
+import BuddyIcon             from '../../components/buddy/BuddyIcon';
+import { canEditSettings }   from '../../lib/buddyLogic';
 import '../../styles/settings.css';
 
 // Grouped registry — each group has its own icon (shown on the
@@ -75,6 +78,10 @@ const GROUPS = [
     label: 'Administration',
     icon: ShieldIcon,
     sections: [
+      // Deep link: /settings?section=buddy. `allow` = the Boss or an ACTIVE developer.
+      { id: 'buddy', label: 'Wurx Buddy', sub: 'Models, usage, knowledge and who can use Buddy',
+        icon: BuddyIcon, component: BuddySection,
+        allow: canEditSettings },
       { id: 'leaveDefaults', label: 'Leave Defaults', sub: 'Starting quota for new hires',
         icon: ClockIcon, component: LeaveDefaultsSection,
         roles: ['boss'] },
@@ -139,10 +146,11 @@ export default function SettingsPage() {
     return GROUPS.map((g) => {
       const sections = g.sections
         .filter((s) => !s.roles || s.roles.includes(role))
+        .filter((s) => !s.allow || s.allow(profile))
         .filter((s) => !q || s.label.toLowerCase().includes(q) || (s.sub || '').toLowerCase().includes(q));
       return { ...g, sections };
     }).filter((g) => g.sections.length > 0);
-  }, [role, query]);
+  }, [role, profile, query]);
 
   const flatSections = useMemo(
     () => visibleGroups.flatMap((g) => g.sections),
