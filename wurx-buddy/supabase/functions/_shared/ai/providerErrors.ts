@@ -53,6 +53,8 @@ const SLOT_INFO: Record<string, { provider: string; secret: string; openai: bool
   fallback: { provider: 'OpenAI', secret: 'OPEN_AI_API_KEY_FALLBACK', openai: true },
   groq: { provider: 'Groq', secret: 'GROQ_API_KEY', openai: false },
   gemini: { provider: 'Gemini', secret: 'GEMINI_API_KEY', openai: false },
+  nvidia: { provider: 'NVIDIA', secret: 'NVIDIA_API_KEY', openai: false },
+  nvidia2: { provider: 'NVIDIA', secret: 'NVIDIA_API_KEY_2', openai: false },
 };
 
 export type ChainIssue = { issue: ProviderIssue; model?: string; slot?: string; waitMs?: number | null };

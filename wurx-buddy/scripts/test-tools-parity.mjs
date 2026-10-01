@@ -121,6 +121,12 @@ async function check(tool, args) {
   if (tool !== 'get_reports') {
     const want = v2.bound(await v1.runTool(admin, tool, args)).text;
     if (got.text === want) return { ok: true, detail: `len ${want.length}` };
+    // Intended (brand-assignment fix): list_brands appends each brand's assigned
+    // APCs/IPCs after v1's "owner: X". Without that suffix it must equal v1.
+    if (tool === 'list_brands') {
+      const bare = got.text.replace(/; (?:APCs|IPCs|TLs|PCTLs|OLs|Ads Managers|Developers|Boss): [^\n]*/g, '');
+      if (bare === want) return { ok: true, kind: 'ASSIGNMENTS', detail: `v1 + assigned APCs/IPCs per brand` };
+    }
     if (tool === 'get_performance') {
       // v2 loads composites 4 at a time with a retry and SAYS when one fails;
       // v1 fires them all and silently falls back. So a difference is v1

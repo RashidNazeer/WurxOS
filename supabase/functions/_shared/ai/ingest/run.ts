@@ -31,6 +31,7 @@ export function parseMode(body: unknown): IngestMode | null {
 export async function runIngest(mode: IngestMode, o: {
   rpc: Rpc;
   embed: Embedder;
+  embedAlt?: Embedder;      // NVIDIA → embedding_alt (mig 406)
   timeBudgetMs?: number;
   now?: () => number;
   log?: (msg: string) => void;
@@ -45,6 +46,6 @@ export async function runIngest(mode: IngestMode, o: {
     out.skipped_drain = true;
     return out;
   }
-  out.stats = await runWorker({ rpc: o.rpc, embed: o.embed, timeBudgetMs: left, now, log: o.log });
+  out.stats = await runWorker({ rpc: o.rpc, embed: o.embed, embedAlt: o.embedAlt, timeBudgetMs: left, now, log: o.log });
   return out;
 }

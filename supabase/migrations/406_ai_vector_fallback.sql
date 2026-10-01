@@ -1,18 +1,18 @@
 -- ============================================================
--- 402 — Assistant v2: ingestion keeps working when OpenAI has no credits
--- (Owner, 2026-10-01).
+-- 406 — Assistant v2: ingestion keeps working when OpenAI has no credits
+-- (Owner, 2026-10-01). Was the parked wip-402; the alt space is NVIDIA now.
 --
 --   ai_chunks.vector_pending   true while the chunk has no OpenAI vector
 --                              (`embedding` NULL). Kept by a trigger. The
 --                              keyword arm finds such chunks at once; the
 --                              semantic arms skip them; the worker backfills them.
---   ai_chunks.embedding_alt    a SECOND vector space (Gemini gemini-embedding-001,
---              embed_model_alt  1536 dims, L2-normalised), never mixed with
+--   ai_chunks.embedding_alt    a SECOND vector space (NVIDIA llama-nemotron-embed-vl-1b-v2,
+--              embed_model_alt  1536 dims), never mixed with
 --                              `embedding`. Partial HNSW per corpus as mig 382.
 --   ai_assistant_config
 --     embed_alt_always         fill the alt space even when OpenAI works (default off)
 --     free_provider_sources    source types that MAY be sent to a free provider
---                              (Gemini). Default: all but 'incentive'. Anything else
+--                              (NVIDIA). Default: all but 'incentive'. Anything else
 --                              stays keyword-only / pending until OpenAI works.
 --   ai_vector_state            per space: when the worker may try again after an
 --                              account problem (no credits, key refused, a long limit).
@@ -78,7 +78,7 @@ alter table public.ai_assistant_config add column if not exists free_provider_so
   default array['kb_article', 'ai_doc', 'app_guide', 'report', 'tts_article'];
 
 create or replace function public.ai_embed_model_alt() returns text
-language sql immutable set search_path = public as $$ select 'gemini-embedding-001'::text $$;
+language sql immutable set search_path = public as $$ select 'nvidia:llama-nemotron-embed-vl-1b-v2'::text $$;
 revoke execute on function public.ai_embed_model_alt() from public, anon;
 grant  execute on function public.ai_embed_model_alt() to authenticated, service_role;
 
@@ -436,7 +436,7 @@ begin
     perform set_config('enable_sort', v_sort, true);
   end if;
 
-  -- ── semantic arm (alt space, Gemini): same shape on embedding_alt ──
+  -- ── semantic arm (alt space, NVIDIA): same shape on embedding_alt ──
   if p_query_embedding_alt is not null and v_n <= EXACT_MAX then
     select coalesce(array_agg(x.id order by x.dist), '{}') into v_alt
       from (select c.id, c.embedding_alt <=> p_query_embedding_alt as dist
@@ -561,7 +561,7 @@ begin
                                            or d.embed_model is distinct from public.ai_embed_model()) as other
                   from public.ai_documents d group by d.source_type) x), '{}'::jsonb),
     -- Chunks with no OpenAI vector yet: found by keywords (and by the alt space
-    -- if they have a Gemini vector) until the backfill fills them.
+    -- if they have an NVIDIA vector) until the backfill fills them.
     'vector_pending', (select count(*) from public.ai_chunks c where c.vector_pending),
     'vectors', jsonb_build_object(
        'pending_by_type', coalesce((select jsonb_object_agg(source_type, n) from (

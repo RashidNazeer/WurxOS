@@ -31,6 +31,9 @@ export type Reranker = (query: string, items: Array<{ id: string; title: string;
 export type SearchDeps = {
   rpc: Rpc;
   embed: (text: string) => Promise<number[] | null>;
+  // The second vector space (mig 406, NVIDIA): asked only when `embed` gives no
+  // vector, and searched as its own arm (p_query_embedding_alt).
+  embedAlt?: (text: string) => Promise<number[] | null>;
   asUser?: string | null;       // service role only (Slack relay, eval); else the JWT decides
   config?: RetrievalConfig;
   now?: Date;
@@ -246,7 +249,11 @@ export async function searchIndex(index: IndexName, query: string, filters: Sear
 
   let embedding: number[] | null = null;
   try { embedding = await deps.embed(q); } catch { embedding = null; }
-  if (!embedding) notes.push('embedding unavailable: keyword search only');
+  let embeddingAlt: number[] | null = null;
+  if (!embedding && deps.embedAlt) {
+    try { embeddingAlt = await deps.embedAlt(q); } catch { embeddingAlt = null; }
+  }
+  if (!embedding && !embeddingAlt) notes.push('embedding unavailable: keyword search only');
 
   const hasPeriod = !!(filters.periodFrom || filters.periodTo);
   const crossBrand = isReports && !filters.brandIds?.length;
@@ -260,6 +267,7 @@ export async function searchIndex(index: IndexName, query: string, filters: Sear
     p_match_count: from ? 10 : crossBrand ? cfg.REPORTS_CROSS_BRAND_POOL : cfg.RETRIEVAL_POOL,
     p_as_user: deps.asUser ?? undefined,
     p_sections: sections ?? undefined,
+    ...(embeddingAlt ? { p_query_embedding_alt: vecLiteral(embeddingAlt) } : {}),
   });
   // "How is Obagi doing?" is about the latest reports, which a generic query
   // may not rank into the pool at all: for a brand without a period, the best

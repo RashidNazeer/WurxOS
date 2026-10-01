@@ -334,16 +334,18 @@ test('pgRpc: named arguments, text[] vs jsonb, set-returning claim, savepoints',
   assert.deepEqual(seen, ['savepoint ai_rpc', 'select public.ai_x() as v', 'rollback to savepoint ai_rpc']);
 });
 
-test('worker: a write refused for a lost lock is dropped, not counted as success; embed failure fails only items that needed it', async () => {
+test('worker: a write refused for a lost lock is dropped, not counted as success; an embed failure writes the chunks pending (mig 406)', async () => {
   const s = src(F.weeklyLegacy(), 'fp1', brandCtx);
   const rpcCalls: string[] = [];
+  const writes: any[] = [];
   const rpc = async (fn: string, args: any = {}) => {
     rpcCalls.push(fn);
     if (fn === 'ai_source_types') return ['report'];
     if (fn === 'ai_ingest_source') return args.p_ids.map((id: string) => ({ ...s, source_id: id }));
     if (fn === 'ai_ingest_existing') return [];
-    if (fn === 'ai_ingest_write') return { ok: false, reason: 'lost_lock' };
+    if (fn === 'ai_ingest_write') { writes.push(args); return { ok: false, reason: 'lost_lock' }; }
     if (fn === 'ai_ingest_fail') return true;
+    if (['ai_embed_settings', 'ai_vector_ready', 'ai_vector_defer'].includes(fn)) return null;
     throw new Error(`unexpected ${fn}`);
   };
   const stats = emptyStats();
@@ -356,8 +358,9 @@ test('worker: a write refused for a lost lock is dropped, not counted as success
   const s2 = emptyStats();
   await processBatch([{ id: 2, source_type: 'report', source_id: 'r2', op: 'upsert', attempts: 1 }],
     { rpc, workerId: 'w', ...O, embed: async () => { throw new Error('OpenAI down'); } }, s2);
-  assert.equal(s2.failed, 1);
-  assert.ok(rpcCalls.includes('ai_ingest_fail'));
+  assert.equal(s2.failed, 0, 'never blocked by embeddings');
+  assert.ok(writes.at(-1).p_chunks.length > 0 && writes.at(-1).p_chunks.every((c: any) => c.embedding === null), 'written pending');
+  assert.ok(!rpcCalls.includes('ai_ingest_fail'));
   assert.ok(SOURCE_TYPES.includes('incentive'));
 });
 

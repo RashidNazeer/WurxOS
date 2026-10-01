@@ -4,7 +4,7 @@ import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chatBody, chatRespond, toMessages } from '../llm/chat.ts';
 import { LlmError, type LlmRequest, type LlmResult } from '../llm/openai.ts';
-import { _resetCooldowns, chooseTargets, coolDown, coolingDown, netRank, refreshModels, resolveRoleConfig, safetyNet, saverOn, skipReason, unsupportedParam, type CatalogRow } from '../agent/models.ts';
+import { _resetCooldowns, chooseTargets, coolDown, coolingDown, netRank, refreshModels, extraFor, KEY_SLOTS, resolveRoleConfig, safetyNet, saverOn, skipReason, SLOTS, unsupportedParam, type CatalogRow } from '../agent/models.ts';
 import { runTurn } from '../agent/core.ts';
 import { _resetBudgets, budgetFor, budgetFromError, estimate, fitRequest } from '../agent/compact.ts';
 import { compactInstructions } from '../agent/prompt.ts';
@@ -143,7 +143,7 @@ test('the chain across providers, then the safety net in its order; keys missing
   // skip reasons: no call spent on these
   const all = new Set(['gemini-embedding-001', 'whisper-large-v3', 'gemini-2.5-flash-preview-tts', 'antigravity-1', 'gemini-deep-research', 'veo-3', 'openai/gpt-oss-safeguard-20b', 'gemini-3.5-flash']);
   assert.deepEqual([...all].map((id) => skipReason(id.startsWith('whisper') || id.includes('/') ? 'groq' : 'gemini', id, all)), [
-    'embedding model (not for chat)', 'speech-to-text model (not for chat)', 'audio model (not for chat)', 'Interactions API only',
+    'embedding / rerank model (not for chat)', 'speech-to-text model (not for chat)', 'audio model (not for chat)', 'Interactions API only',
     'research agent (not for chat)', 'video model (not for chat)', 'safety classifier (not for chat)', null]);
 });
 
@@ -418,4 +418,54 @@ test('a turn: the APC gets its economy model once spend passes the threshold; lo
     assert.equal(log.flags.model_source, source);
     assert.equal(d.inserts.ai_messages.find((m: any) => m.role === 'assistant').meta.model_source, source);
   }
+});
+// ── NVIDIA (mig 405) ────────────────────────────────────────────────────────
+
+test('NVIDIA: two chat slots (dev/test only), non-chat models skipped without a call, -instruct chat models kept', () => {
+  assert.deepEqual(KEY_SLOTS.filter((s) => s.startsWith('nvidia')), ['nvidia', 'nvidia2']);
+  assert.deepEqual([SLOTS.nvidia.api, SLOTS.nvidia.base, SLOTS.nvidia2.label], ['openai-chat', 'https://integrate.api.nvidia.com/v1', 'NVIDIA (key 2) (dev/test only)']);
+  const ids = ['nvidia/nemotron-3-ultra-550b-a55b', 'openai/gpt-oss-20b', 'meta/llama-3.3-70b-instruct', 'nvidia/nv-embedqa-e5-v5', 'nvidia/llama-3.2-nv-rerankqa-1b-v2',
+    'nvidia/nemoretriever-parse', 'nvidia/llama-3.1-nemoguard-8b-content-safety', 'nvidia/parakeet-ctc-1.1b-asr', 'nvidia/riva-translate-4b-instruct', 'nvidia/cosmos-reason1-7b',
+    'nvidia/nemoretriever-ocr-v1', 'nvidia/nvclip', 'meta/llama-3.2-11b-vision-instruct'];
+  const all = new Set(ids);
+  assert.deepEqual(ids.filter((id) => !skipReason('nvidia', id, all)), ['nvidia/nemotron-3-ultra-550b-a55b', 'openai/gpt-oss-20b', 'meta/llama-3.3-70b-instruct']);
+});
+
+test('NVIDIA extras: Nemotron gets its thinking switch (catalog params win); reasoning_content never becomes answer text', async () => {
+  const nemo = { keySlot: 'nvidia' as const, model: 'nvidia/nemotron-3-ultra-550b-a55b' };
+  assert.deepEqual(extraFor([], nemo), { chat_template_kwargs: { enable_thinking: true }, temperature: 1, top_p: 0.95 });
+  assert.equal(extraFor([], { keySlot: 'nvidia', model: 'openai/gpt-oss-20b' }), null);
+  assert.deepEqual(extraFor([row('nvidia', nemo.model, { params: { extra_body: { chat_template_kwargs: { enable_thinking: false } } } })], nemo), { chat_template_kwargs: { enable_thinking: false } });
+  const b = chatBody({ apiKey: 'k', model: nemo.model, instructions: 'I', input: [], extra: { chat_template_kwargs: { enable_thinking: true }, top_p: 0.95, model: 'x' } }) as any;
+  assert.deepEqual([b.chat_template_kwargs, b.top_p, b.model], [{ enable_thinking: true }, 0.95, nemo.model]);   // a core field is never overridden
+  const deltas: string[] = [];
+  const res = await chatRespond({ apiKey: 'k', model: nemo.model, instructions: 'I', input: [], onDelta: (d) => deltas.push(d), endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+    fetchImpl: (async () => sseOf([{ choices: [{ delta: { reasoning_content: 'let me think…' } }] }, { choices: [{ delta: { content: 'Answer.' }, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 10, completion_tokens: 30, completion_tokens_details: { reasoning_tokens: 25 } } }])) as any });
+  assert.deepEqual([res.text, deltas, res.usage.reasoning], ['Answer.', ['Answer.'], 25]);
+});
+
+test('a turn on Nemotron: the NVIDIA key and endpoint, the thinking switch, and room for reasoning (max_tokens ≥ 8000)', async () => {
+  const sent: any[] = [];
+  const fetchImpl = async (url: string, init: any) => { sent.push({ url, auth: init.headers.authorization, body: JSON.parse(init.body) }); return sseOf([{ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] }]); };
+  const d = db({ model: 'nvidia/nemotron-3-ultra-550b-a55b', model_key_slot: 'nvidia' });
+  await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, fetchImpl, { nvidiaKey: 'nk', catalog: [...CAT, row('nvidia', 'nvidia/nemotron-3-ultra-550b-a55b')] }), () => {});
+  assert.deepEqual([sent[0].url, sent[0].auth, sent[0].body.chat_template_kwargs, sent[0].body.max_tokens >= 8000],
+    ['https://integrate.api.nvidia.com/v1/chat/completions', 'Bearer nk', { enable_thinking: true }, true]);
+  assert.deepEqual([d.inserts.ai_request_log[0].key_slot, d.inserts.ai_request_log[0].est_cost_usd], ['nvidia', 0]);
+});
+test('fullwidth citation brackets (【S1】) are read as [S1]; an in-stream "service_unavailable" counts as a 503', async () => {
+  let n = 0;
+  const fetchImpl = async () => (++n === 1
+    ? sseOf([{ choices: [{ delta: { tool_calls: [{ index: 0, id: 't1', type: 'function', function: { name: 'search_company_knowledge', arguments: '{"query":"samples"}' } }] }, finish_reason: 'tool_calls' }] }])
+    : sseOf([{ choices: [{ delta: { content: 'Shortlist first 【S' } }] }, { choices: [{ delta: { content: '1】.' }, finish_reason: 'stop' }] }]));
+  const searchRpc = async () => [{ chunk_id: 'c1', document_id: 'd1', chunk_index: 0, source_type: 'kb_article', source_id: 'k1', title: 'Sample SOP', url: null, section: null,
+    content: 'Shortlist creators first.', brand_id: null, period_start: null, period_end: null, metadata: {}, score: 1 }];
+  const d = db({ model: 'openai/gpt-oss-20b', model_key_slot: 'nvidia' });
+  const res = await runTurn({ userId: 'u1', role: 'boss', message: 'samples?' }, deps(d, fetchImpl, { nvidiaKey: 'nk', searchRpc, catalog: [...CAT, row('nvidia', 'openai/gpt-oss-20b')] }), () => {});
+  assert.equal(res.answer, 'Shortlist first [S1].');
+  assert.ok((res.sources as any[]).some((s) => s.cited));
+  const e: any = await chatRespond({ apiKey: 'k', model: 'm', instructions: 'I', input: [], onDelta: () => {}, endpoint: 'https://x/chat/completions',
+    fetchImpl: (async () => sseOf([{ error: { message: 'busy', code: 'service_unavailable' } }])) as any }).then(() => null, (x) => x);
+  assert.equal(e.status, 503);
 });
