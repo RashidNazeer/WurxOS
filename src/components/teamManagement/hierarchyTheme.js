@@ -1,18 +1,29 @@
 // Shared color theme + helpers for the Team Hierarchy page.
-// Mirrors v1's src/components/teamManagement/hierarchyTheme.js verbatim.
+// Ported from v1's hierarchyTheme.js; colours moved onto theme tokens.
 
+// Role palette on the shared chart slots (they theme for light/dark).
+// solid = fill, on = text on that fill, light = tinted panel, text = readable
+// role-coloured text on surfaces. --chart-3 (amber) is avoided for fills.
+const tone = (n) => ({
+  solid: `var(--chart-${n})`,
+  on: 'var(--text-inverse)',
+  light: `color-mix(in srgb, var(--chart-${n}) 10%, var(--surface-1))`,
+  text: `color-mix(in srgb, var(--chart-${n}) 80%, var(--text-primary))`,
+});
 export const ROLE_COLORS = {
-  boss: { solid: '#0f172a', light: '#f1f5f9', text: '#0f172a' },
-  ol:   { solid: '#7c3aed', light: '#f5f3ff', text: '#5b21b6' },
-  tl:   { solid: '#16a34a', light: '#f0fdf4', text: '#166534' },
-  pctl: { solid: '#0891b2', light: '#ecfeff', text: '#155e75' },
-  apc:  { solid: '#3b82f6', light: '#eff6ff', text: '#1d4ed8' },
-  ipc:  { solid: '#ec4899', light: '#fdf2f8', text: '#9d174d' },
+  boss: tone(8),
+  ol:   tone(4),
+  tl:   tone(7),
+  pctl: tone(2),
+  apc:  tone(6),
+  ipc:  tone(5),
   // Engineering — a separate branch from the TL/PCTL brand pods, so it gets
-  // its own color (amber) rather than borrowing one that implies it's a
-  // brand-owning team.
-  developer: { solid: '#d97706', light: '#fffbeb', text: '#92400e' },
+  // its own colour rather than borrowing one that implies a brand-owning team.
+  developer: tone(1),
 };
+
+// Translucent version of any colour token (replaces hex-alpha suffixes).
+export const alpha = (color, pct) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
 export function roleLabel(role) {
   return {

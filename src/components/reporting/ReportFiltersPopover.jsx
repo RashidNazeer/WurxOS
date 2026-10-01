@@ -46,7 +46,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
         <i className="bi bi-sliders" />
         <span>Filters</span>
         {activeCount > 0 && (
-          <span className="badge rounded-pill" style={{ background: '#3b82f6', color: 'white', fontSize: '0.6rem' }}>
+          <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>
             {activeCount}
           </span>
         )}
@@ -57,7 +57,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
           {/* Backdrop that dims the page behind the popover */}
           <div style={{
             position: 'fixed', inset: 0, zIndex: 999,
-            background: 'rgba(15, 23, 42, 0.25)', backdropFilter: 'blur(2px)',
+            background: 'color-mix(in srgb, var(--backdrop) 50%, transparent)', backdropFilter: 'blur(2px)',
           }} onClick={() => setOpen(false)} />
 
           <div ref={popRef}
@@ -71,7 +71,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
               border: '1px solid var(--border-default)',
               borderRadius: 14,
               padding: 0,
-              boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.35), 0 8px 16px -6px rgba(15, 23, 42, 0.15)',
+              boxShadow: 'var(--shadow-xl)',
               overflow: 'hidden',
             }}>
             <div className="d-flex align-items-center justify-content-between"
@@ -110,7 +110,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
                 ))}
               </div>
               <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <button type="button" className="btn btn-sm btn-dark px-3"
+                <button type="button" className="btn btn-sm btn-primary px-3"
                   style={{ borderRadius: 8, fontSize: '0.76rem' }}
                   onClick={() => setOpen(false)}>
                   Done

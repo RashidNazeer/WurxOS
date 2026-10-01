@@ -81,7 +81,7 @@ export default function HighlighterPicker({
                 background: c.swatch,
                 cursor: 'pointer', padding: 0,
                 transform: selected ? 'scale(1.08)' : 'none',
-                transition: 'transform 80ms ease',
+                transition: 'transform var(--dur-instant) var(--ease-out)',
               }} />
           );
         })}

@@ -119,7 +119,7 @@ function ApcCard({ apc }) {
       background: 'var(--surface-1)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-lg)',
-      transition: 'border-color var(--dur-fast), box-shadow var(--dur-fast)',
+      transition: 'border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
     }}>
       <Avatar user={apc} />
       <div style={{ minWidth: 0 }}>

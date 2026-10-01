@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { useDialogs } from '../../components/common/useDialogs';
 import {
   PlusIcon, AlertIcon, SearchIcon, XIcon, CheckIcon, CopyIcon,
   UsersIcon, MessageIcon, MoreIcon, TrashIcon, LogoutIcon,
@@ -17,6 +18,9 @@ export default function ChatPage() {
   const isBoss = profile?.role === 'boss';
 
   const [activeId, setActiveId] = useState(null);
+  // Phones show the conversation list and the open thread as separate views.
+  const [phoneThread, setPhoneThread] = useState(false);
+  const openChannel = (id) => { setActiveId(id); setPhoneThread(true); };
   const [showPeople, setShowPeople] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [err, setErr] = useState('');
@@ -130,7 +134,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div className="chat-shell">
+      <div className={`chat-shell ${phoneThread && activeChannel ? 'is-thread' : 'is-list'}`}>
         <aside className="chat-rail">
           <div className="chat-rail-header">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
@@ -171,13 +175,13 @@ export default function ChatPage() {
                 {dms.map((c) => (
                   <ChannelRow key={c.channel_id} channel={c} uid={uid}
                     active={c.channel_id === activeId}
-                    onClick={() => setActiveId(c.channel_id)} />
+                    onClick={() => openChannel(c.channel_id)} />
                 ))}
                 {groups.length > 0 && <div className="chat-section-header">Groups</div>}
                 {groups.map((c) => (
                   <ChannelRow key={c.channel_id} channel={c} uid={uid}
                     active={c.channel_id === activeId}
-                    onClick={() => setActiveId(c.channel_id)} />
+                    onClick={() => openChannel(c.channel_id)} />
                 ))}
               </>
             )}
@@ -192,7 +196,8 @@ export default function ChatPage() {
               onError={setErr}
               onAfterAction={() => { refetchMessages(); refetchChannels(); }}
               onLeave={() => leaveChannel(activeChannel.channel_id)}
-              onDestroy={() => destroyChannel(activeChannel.channel_id)} />
+              onDestroy={() => destroyChannel(activeChannel.channel_id)}
+              onBack={() => setPhoneThread(false)} />
           ) : (
             <div className="chat-empty">
               <div>
@@ -213,7 +218,7 @@ export default function ChatPage() {
           onDone={(id) => {
             setShowPeople(false);
             qc.invalidateQueries({ queryKey: ['chat', 'channels'] });
-            setActiveId(id);
+            openChannel(id);
           }} />
       )}
     </>
@@ -259,7 +264,7 @@ function ChannelAvatar({ channel, others }) {
   if (others.length === 0) {
     // Orphan DM — render a neutral muted avatar instead of "?" initials.
     return (
-      <div className="chat-avatar" style={{ background: '#e2e8f0', color: '#94a3b8' }}>
+      <div className="chat-avatar" style={{ background: 'var(--surface-3)', color: 'var(--text-muted)' }}>
         <LogoutIcon width="14" height="14" />
       </div>
     );
@@ -286,7 +291,8 @@ function Avatar({ user, size = null }) {
 // ============================================================
 // Thread
 // ============================================================
-function Thread({ channel, messages, uid, isBoss, endRef, onError, onAfterAction, onLeave, onDestroy }) {
+function Thread({ channel, messages, uid, isBoss, endRef, onError, onAfterAction, onLeave, onDestroy, onBack }) {
+  const { ask } = useDialogs();
   const [body, setBody]         = useState('');
   const [sending, setSending]   = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -317,23 +323,23 @@ function Thread({ channel, messages, uid, isBoss, endRef, onError, onAfterAction
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [menuOpen]);
 
-  function confirmLeave() {
+  async function confirmLeave() {
     setMenuOpen(false);
-    if (!confirm(`Leave this group? You won't receive new messages here. Other members will still see the group.`)) return;
+    if (!(await ask(`Leave this group? You won't receive new messages here. Other members will still see the group.`, { danger: true, confirmLabel: 'Leave group' }))) return;
     onLeave();
   }
-  function confirmDestroy() {
+  async function confirmDestroy() {
     setMenuOpen(false);
     const label = channel.kind === 'group' ? `the group "${title}"` : `this conversation`;
-    if (!confirm(`Delete ${label} for everyone? All messages will be permanently removed. This cannot be undone.`)) return;
+    if (!(await ask(`Delete ${label} for everyone? All messages will be permanently removed. This cannot be undone.`, { danger: true }))) return;
     onDestroy();
   }
   // DMs collapse to a single "Delete chat" action. Under the hood it
   // just removes your chat_members row; the auto-delete trigger then
   // tears down the channel since it drops below 2 members.
-  function confirmDeleteDM() {
+  async function confirmDeleteDM() {
     setMenuOpen(false);
-    if (!confirm(`Delete this chat? All messages will be permanently removed for both of you. This cannot be undone.`)) return;
+    if (!(await ask(`Delete this chat? All messages will be permanently removed for both of you. This cannot be undone.`, { danger: true }))) return;
     onLeave();
   }
 
@@ -368,7 +374,7 @@ function Thread({ channel, messages, uid, isBoss, endRef, onError, onAfterAction
   }
 
   async function deleteMsg(id) {
-    if (!confirm('Delete this message?')) return;
+    if (!(await ask('Delete this message?', { danger: true }))) return;
     try {
       const { error } = await supabase.from('chat_messages').delete().eq('id', id);
       if (error) throw error;
@@ -385,6 +391,9 @@ function Thread({ channel, messages, uid, isBoss, endRef, onError, onAfterAction
   return (
     <>
       <div className="chat-thread-header">
+        <button type="button" className="chat-back-btn" onClick={onBack} aria-label="Back to conversations">
+          <i className="bi bi-chevron-left" aria-hidden="true" />
+        </button>
         <ChannelAvatar channel={channel} others={others} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="chat-thread-title">{title}</div>

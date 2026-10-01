@@ -11,9 +11,9 @@ export default function BrandChip({ name }) {
       className="badge rounded-pill d-inline-flex align-items-center"
       style={{
         maxWidth: '100%',
-        background: '#eef2ff',
-        color: '#4338ca',
-        border: '1px solid #e0e7ff',
+        background: 'var(--purple-soft)',
+        color: 'var(--purple-text)',
+        border: '1px solid var(--purple-soft)',
         fontSize: '0.58rem',
         fontWeight: 600,
         letterSpacing: '0.01em',

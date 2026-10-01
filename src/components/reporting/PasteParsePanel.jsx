@@ -45,7 +45,7 @@ export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, ac
         className="btn btn-sm d-inline-flex align-items-center gap-1"
         style={{
           borderRadius: 8, fontSize: '0.72rem', fontWeight: 600,
-          color: open ? '#fff' : accent,
+          color: open ? 'var(--text-inverse)' : accent,
           background: open ? accent : 'transparent',
           border: `1px solid ${accent}`,
         }}>
@@ -75,7 +75,7 @@ export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, ac
           <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
             <button type="button" onClick={handleParse} disabled={!text.trim()}
               className="btn btn-sm d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8, fontSize: '0.74rem', fontWeight: 600, color: '#fff', background: accent, border: 'none', opacity: text.trim() ? 1 : 0.5 }}>
+              style={{ borderRadius: 8, fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-inverse)', background: accent, border: 'none', opacity: text.trim() ? 1 : 0.5 }}>
               <i className="bi bi-magic" /> Parse &amp; Fill
             </button>
             <button type="button" onClick={reset} disabled={!text && !status}

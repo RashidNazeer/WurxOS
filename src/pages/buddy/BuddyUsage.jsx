@@ -146,16 +146,18 @@ function DailyChart({ days }) {
     <figure className="bd-usage-chart" aria-label="Daily cost">
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="var(--border-subtle)" />
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={{ stroke: 'var(--border-subtle)' }} minTickGap={12} />
           <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => fmtUsd(v)} />
           <Tooltip
             cursor={{ fill: 'var(--accent-soft)' }}
-            contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 8, fontSize: 12, color: 'var(--text-primary)' }}
+            contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--border-default)', borderRadius: 8, fontSize: 12, color: 'var(--chart-tooltip-fg)' }}
             labelFormatter={(_l, p) => p?.[0]?.payload?.date || ''}
             formatter={(v, _n, p) => [`${fmtUsd(v)} · ${fmtCount(p?.payload?.questions)} questions`, 'Cost']}
           />
-          <Bar dataKey="cost" fill="var(--accent)" radius={[3, 3, 0, 0]} maxBarSize={22} />
+          <Bar dataKey="cost" fill="var(--accent)" radius={[3, 3, 0, 0]} maxBarSize={22}
+            animationDuration={400} animationEasing="ease-out"
+            isAnimationActive={!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches} />
         </BarChart>
       </ResponsiveContainer>
       <figcaption className="bd-card-sub">Estimated cost per day</figcaption>

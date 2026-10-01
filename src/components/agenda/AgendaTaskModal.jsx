@@ -89,7 +89,7 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <p className="fw-semibold mb-3">
@@ -166,7 +166,7 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> {isApcSelf ? 'Add task' : 'Assign task'}</>}
             </button>
           </div>

@@ -2,6 +2,9 @@ import { useTheme, FONT_FAMILIES, FONT_SIZES } from '../../../contexts/ThemeCont
 import { PaletteIcon, CheckIcon } from '../../../components/common/Icon';
 import SectionShell from './SectionShell';
 
+// Foundation applies these to --font-content only (reading surfaces), not the UI chrome.
+const READING_FONTS = new Set(['lora', 'mono']);
+
 export default function AppearanceSection() {
   const {
     theme, setTheme,
@@ -28,47 +31,15 @@ export default function AppearanceSection() {
           active={theme === 'light'}
           onClick={() => setTheme('light')}
           label="Light"
-          sub="Warm cream background, terracotta accents"
-          preview={(
-            <div style={{
-              height: '100%',
-              background: 'linear-gradient(160deg, #faf7f2 0%, #fdf0e6 100%)',
-              padding: 10,
-              display: 'flex', flexDirection: 'column', gap: 4,
-            }}>
-              <div style={{ background: '#c2704e', width: 48, height: 6, borderRadius: 3 }} />
-              <div style={{ background: '#e2e8f0', width: '70%', height: 5, borderRadius: 3 }} />
-              <div style={{ background: '#e2e8f0', width: '55%', height: 5, borderRadius: 3 }} />
-              <div style={{ flex: 1 }} />
-              <div style={{ display: 'flex', gap: 4 }}>
-                <div style={{ background: '#c2704e', width: 28, height: 12, borderRadius: 3 }} />
-                <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', width: 36, height: 12, borderRadius: 3 }} />
-              </div>
-            </div>
-          )}
+          sub="Warm cream background, chocolate text, terracotta accents"
+          preview={<ThemePreview theme="light" />}
         />
         <ThemeCard
           active={theme === 'dark'}
           onClick={() => setTheme('dark')}
           label="Dark"
-          sub="WurxOS signature peach on black"
-          preview={(
-            <div style={{
-              height: '100%',
-              background: 'linear-gradient(160deg, #0f0f0f 0%, #000 100%)',
-              padding: 10,
-              display: 'flex', flexDirection: 'column', gap: 4,
-            }}>
-              <div style={{ background: '#f5d5a8', width: 48, height: 6, borderRadius: 3 }} />
-              <div style={{ background: 'rgba(245,213,168,0.25)', width: '70%', height: 5, borderRadius: 3 }} />
-              <div style={{ background: 'rgba(245,213,168,0.2)', width: '55%', height: 5, borderRadius: 3 }} />
-              <div style={{ flex: 1 }} />
-              <div style={{ display: 'flex', gap: 4 }}>
-                <div style={{ background: '#f5d5a8', width: 28, height: 12, borderRadius: 3 }} />
-                <div style={{ background: '#1a1a1a', border: '1px solid rgba(245,213,168,0.22)', width: 36, height: 12, borderRadius: 3 }} />
-              </div>
-            </div>
-          )}
+          sub="WurxOS signature peach on near-black"
+          preview={<ThemePreview theme="dark" />}
         />
       </div>
 
@@ -77,7 +48,7 @@ export default function AppearanceSection() {
         <div>
           <div className="settings-row-label-title">Font family</div>
           <div className="settings-row-label-sub">
-            System stacks only — no external fonts are loaded.
+            Sans fonts set the whole interface; Lora and JetBrains Mono apply to report and rich-text content only. Loaded from Google Fonts; your system font shows until it arrives.
           </div>
         </div>
         <div />
@@ -89,7 +60,7 @@ export default function AppearanceSection() {
             active={fontFamily === f.key}
             onClick={() => setFontFamily(f.key)}
             label={f.label}
-            sub={f.note}
+            sub={READING_FONTS.has(f.key) ? `Reading font — applies to report and rich-text content. ${f.note}` : f.note}
             stack={f.stack}
           />
         ))}
@@ -131,6 +102,29 @@ export default function AppearanceSection() {
         })}
       </div>
     </SectionShell>
+  );
+}
+
+// Mini mock-up rendered with the real theme tokens: nesting data-theme
+// re-scopes every token inside, so the preview always matches the theme.
+function ThemePreview({ theme }) {
+  const bar = (bg, width, height = 5) => <div style={{ background: bg, width, height, borderRadius: 3 }} />;
+  return (
+    <div data-theme={theme} data-bs-theme={theme} style={{
+      height: '100%',
+      background: 'linear-gradient(160deg, var(--surface-1) 0%, var(--surface-0) 100%)',
+      padding: 10,
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      {bar('var(--accent)', 48, 6)}
+      {bar('var(--surface-3)', '70%')}
+      {bar('var(--surface-3)', '55%')}
+      <div style={{ flex: 1 }} />
+      <div style={{ display: 'flex', gap: 4 }}>
+        {bar('var(--accent)', 28, 12)}
+        <div style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', width: 36, height: 12, borderRadius: 3 }} />
+      </div>
+    </div>
   );
 }
 

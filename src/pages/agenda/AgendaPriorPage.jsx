@@ -79,7 +79,7 @@ export default function AgendaPriorPage() {
 
   if (selected) {
     return (
-      <div style={{ padding: '32px 32px 48px' }}>
+      <div style={{ paddingBottom: 48 }}>
         <AgendaPriorDetail
           meeting={selected.meeting}
           weekIndex={selected.weekIndex}
@@ -90,7 +90,7 @@ export default function AgendaPriorPage() {
   }
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -122,7 +122,7 @@ export default function AgendaPriorPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-clock-history text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No completed or missed meetings in {viewMonthLabel}</p>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No completed or missed meetings in {viewMonthLabel}</p>
           <p className="text-muted small mb-0">Finished meetings appear here automatically.</p>
         </div>
       ) : (
@@ -148,7 +148,7 @@ export default function AgendaPriorPage() {
                             {m.tl?.display_name || 'Team'}
                           </span>
                           {isMissed(m) ? (
-                            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft, #fef3c7)', color: 'var(--warning, #b45309)', fontSize: '0.6rem', fontWeight: 800 }}>
+                            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning, var(--warning-text))', fontSize: '0.6rem', fontWeight: 800 }}>
                               <i className="bi bi-exclamation-triangle-fill me-1" />Missed
                             </span>
                           ) : (

@@ -53,7 +53,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <p className="fw-semibold mb-1">Agenda task reset schedule</p>
@@ -72,7 +72,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                 <div className="d-flex gap-2">
                   {CADENCES.map(([v, l]) => (
                     <button key={v} type="button"
-                      className={`btn btn-sm ${cadence === v ? 'btn-dark' : 'btn-outline-secondary'}`}
+                      className={`btn btn-sm ${cadence === v ? 'btn-primary' : 'btn-outline-secondary'}`}
                       style={{ borderRadius: 8, fontSize: '0.78rem' }}
                       onClick={() => patch({ cadence: v })}>
                       {l}
@@ -138,7 +138,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving || loading}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving || loading}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save</>}
             </button>
           </div>

@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { formatRelTime } from '../../lib/notificationsApi';
+import { resolveNotificationLink } from '../../lib/notificationLinks';
 import {
   BellIcon, CheckIcon, ChecklistIcon, ReportIcon, StoreIcon,
   MegaphoneIcon, HomeIcon, BookmarkIcon, StarIcon, MessageIcon,
@@ -75,7 +76,8 @@ export default function NotificationBell() {
   function handleItemClick(n) {
     markRead(n.id);
     setOpen(false);
-    if (n.link) { const go = () => navigate(n.link); if (!maybeGuardLeave(go)) go(); }
+    const to = resolveNotificationLink(n);
+    if (to) { const go = () => navigate(to); if (!maybeGuardLeave(go)) go(); }
   }
 
   const unread = counts.total || 0;

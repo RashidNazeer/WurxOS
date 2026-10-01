@@ -10,6 +10,7 @@ import {
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 import { useNow } from '../../hooks/useNow';
+import { useDialogs } from '../../components/common/useDialogs';
 
 // Weekly Agenda Meetings — Ongoing (the live meeting room).
 // Realtime: attendance, presenter state and meeting status all sync
@@ -37,6 +38,7 @@ function fmtTime(t) {
 }
 
 export default function AgendaOngoingPage() {
+  const { ask, notify } = useDialogs();
   const { user, profile } = useAuth();
   const role = profile?.role || '';
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
@@ -214,13 +216,13 @@ export default function AgendaOngoingPage() {
   async function handleMark(apcId, status) {
     setBusy(`att-${apcId}`);
     try { await markAttendance(meeting.id, apcId, status); await refresh(); }
-    catch (e) { alert('Failed: ' + (e.message || 'unknown')); }
+    catch (e) { notify.error('Failed: ' + (e.message || 'unknown')); }
     finally { setBusy(''); }
   }
   async function handleStart() {
     setBusy('present');
     try { await startPresenting(meeting.id); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to start presenting'); }
+    catch (e) { notify.error(e.message || 'Failed to start presenting'); }
     finally { setBusy(''); }
   }
   // TL/OL starts a presentation FOR an APC who forgot to click (mig 324).
@@ -229,13 +231,13 @@ export default function AgendaOngoingPage() {
   async function handleStartFor(apcId) {
     setBusy(`startfor-${apcId}`);
     try { await startPresenting(meeting.id, apcId); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to start presenting for that APC'); }
+    catch (e) { notify.error(e.message || 'Failed to start presenting for that APC'); }
     finally { setBusy(''); }
   }
   async function handleStop(apcId) {
     setBusy('present');
     try { await stopPresenting(meeting.id, apcId); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to stop presenting'); }
+    catch (e) { notify.error(e.message || 'Failed to stop presenting'); }
     finally { setBusy(''); }
   }
   // OL ends someone else's turn: presenting -> presented.
@@ -252,55 +254,55 @@ export default function AgendaOngoingPage() {
   // The APC stays selected in the evaluation panel afterwards, so the OL can
   // finish their overall summary and weekly score while the next APC starts.
   async function handleStopFor(apcId, name) {
-    if (!window.confirm(`Mark ${name || 'this APC'} as presented? This ends their turn and frees the floor for the next APC.`)) return;
+    if (!(await ask(`Mark ${name || 'this APC'} as presented? This ends their turn and frees the floor for the next APC.`))) return;
     setBusy(`stop-${apcId}`);
     try {
       await stopPresenting(meeting.id, apcId);
       setReviewTargetId(apcId);
       await refresh();
-    } catch (e) { alert(e.message || 'Failed to end the presentation'); }
+    } catch (e) { notify.error(e.message || 'Failed to end the presentation'); }
     finally { setBusy(''); }
   }
   // OL reopens a done APC: they're marked NOT presented and can present again.
   async function handleReopen(apcId) {
-    if (!window.confirm('Reopen this APC’s session? They will be marked as NOT presented and can present again.')) return;
+    if (!(await ask('Reopen this APC’s session? They will be marked as NOT presented and can present again.'))) return;
     setBusy(`reopen-${apcId}`);
     try {
       await reopenPresentation(meeting.id, apcId);
       if (reviewTargetId === apcId) setReviewTargetId(null);
       await refresh();
-    } catch (e) { alert(e.message || 'Failed to reopen the session'); }
+    } catch (e) { notify.error(e.message || 'Failed to reopen the session'); }
     finally { setBusy(''); }
   }
-  function handleFinishClick() {
+  async function handleFinishClick() {
     // If any present APC never presented, confirm via the modal first.
     if (pendingPresent.length > 0) { setFinishModalOpen(true); return; }
-    if (!window.confirm('Finish this meeting? This ends the session for everyone.')) return;
+    if (!(await ask('Finish this meeting? This ends the session for everyone.'))) return;
     doFinish();
   }
   async function doFinish() {
     setFinishModalOpen(false);
     setBusy('finish');
     try { await finishMeeting(meeting.id); setJustFinished(true); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to finish meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to finish meeting'); }
     finally { setBusy(''); }
   }
   async function handleStartMeeting(meetingId) {
     setBusy(`start-${meetingId}`);
     try { setJustFinished(false); selectedRef.current = meetingId; setSelectedMeetingId(meetingId); await startMeeting(meetingId); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to start meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to start meeting'); }
     finally { setBusy(''); }
   }
   async function handlePause() {
     setBusy('pause');
     try { await pauseMeeting(meeting.id); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to pause meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to pause meeting'); }
     finally { setBusy(''); }
   }
   async function handleResume() {
     setBusy('resume');
     try { await startMeeting(meeting.id); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to resume meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to resume meeting'); }
     finally { setBusy(''); }
   }
 
@@ -325,7 +327,7 @@ export default function AgendaOngoingPage() {
       ? weekUpcoming.filter((m) => isGuestOf(m.guest_teams, myGuestSlugs))
       : [];
     return (
-      <div style={{ padding: '32px 32px 48px' }}>
+      <div style={{ paddingBottom: 48 }}>
         <div className="mb-4">
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-broadcast" style={{ fontSize: '1.15rem' }} />
@@ -366,7 +368,7 @@ export default function AgendaOngoingPage() {
             <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
               <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
             </div>
-            <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
+            <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No meeting in progress</p>
             {isGuest && !isOL ? (
               myGuestUpcoming.length > 0 ? (
                 <>
@@ -423,7 +425,7 @@ export default function AgendaOngoingPage() {
     .map((s) => guestTeamLabels[s] || s);
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       {/* Back to the rooms list — anyone who picks from one (OL or guest) */}
       {canSeeRooms && (
         <button type="button" onClick={() => openRoom(null)}
@@ -705,7 +707,7 @@ export default function AgendaOngoingPage() {
       {/* Finish-meeting guard — present APCs who never presented */}
       {finishModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">
@@ -782,7 +784,7 @@ function ActiveRoomsList({ meetings, teamsById, onOpen }) {
                     {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)} PKT
                   </div>
                   <div style={{ flexGrow: 1 }} />
-                  <button className="btn btn-sm btn-dark w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
+                  <button className="btn btn-sm btn-primary w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
                     style={{ borderRadius: 8, fontSize: '0.74rem' }}
                     onClick={() => onOpen(m.id)}>
                     <i className="bi bi-box-arrow-in-right" /> {isPaused ? 'Open / Resume' : 'Open room'}
@@ -1015,7 +1017,7 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, paused,
               <i className="bi bi-check2-circle" /> Presented
             </button>
           ) : (
-            <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
+            <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
               style={{ borderRadius: 8 }} disabled={busy || someoneElse || paused} onClick={onStart}>
               {paused ? <><i className="bi bi-pause-fill" /> Paused</>
                 : someoneElse ? <><i className="bi bi-lock-fill" /> Locked</>

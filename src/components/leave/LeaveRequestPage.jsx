@@ -11,14 +11,18 @@ import {
 } from '../../lib/leaveApi';
 import { listHolidaysInRange, analyzeLeaveRange } from '../../lib/holidaysApi';
 import MonthNavigator, { currentMonthStr, monthLabel, stepMonthStr } from './MonthNavigator';
+import { Button, StatCard, StatGrid, useConfirm, useToast } from '../ui';
+
+// Readable in both themes: amber tint + neutral text (bg-warning/text-dark flipped unreadable in dark).
+const UNPAID_CHIP = { background: 'var(--warning-soft)', color: 'var(--text-primary)', border: '1px solid color-mix(in srgb, var(--warning) 45%, transparent)' };
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const REQUEST_CATEGORIES = [
-  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger)',  bg: 'var(--danger-soft)' },
-  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info)',    bg: 'var(--info-soft)' },
-  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: 'var(--warning)', bg: 'var(--warning-soft)' },
-  { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: 'var(--purple)', bg: 'var(--purple-soft)' },
+  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger)',  on: 'var(--on-danger)',  bg: 'var(--danger-soft)' },
+  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info)',    on: 'var(--on-info)',    bg: 'var(--info-soft)' },
+  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: 'var(--warning)', on: 'var(--on-warning)', bg: 'var(--warning-soft)' },
+  { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: 'var(--purple)',  on: 'var(--on-purple)',  bg: 'var(--purple-soft)' },
 ];
 
 const LEAVE_TYPES = [
@@ -27,11 +31,11 @@ const LEAVE_TYPES = [
 ];
 
 const STATUS_CFG = {
-  pending_tl:   { label: 'Pending TL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
-  pending_pctl: { label: 'Pending PCTL', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
-  pending_ol:   { label: 'Pending OL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
-  pending_boss: { label: 'Pending Boss', color: 'var(--purple)', bg: 'var(--purple-soft)', icon: 'bi-hourglass-split' },
-  approved:     { label: 'Approved',     color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
+  pending_tl:   { label: 'Pending TL',   color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_pctl: { label: 'Pending PCTL', color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_ol:   { label: 'Pending OL',   color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_boss: { label: 'Pending Boss', color: 'var(--purple-text)', bg: 'var(--purple-soft)', icon: 'bi-hourglass-split' },
+  approved:     { label: 'Approved',     color: 'var(--success-text)', bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
   rejected:     { label: 'Rejected',     color: 'var(--danger)',  bg: 'var(--danger-soft)',  icon: 'bi-x-circle-fill' },
   withdrawn:    { label: 'Withdrawn',    color: 'var(--text-secondary)', bg: 'var(--surface-2)', icon: 'bi-arrow-counterclockwise' },
 };
@@ -74,6 +78,14 @@ function countDays(start, end) {
   return count;
 }
 
+// Day total for a stored request: the server's holiday-aware count
+// (paid_days + unpaid_days, set at submit by _leave_working_days, mig 167).
+// Falls back to the weekday count only for rows that carry neither (both null).
+function requestDays(r) {
+  if (r?.paidDays == null && r?.unpaidDays == null) return countDays(r?.startDate, r?.endDate);
+  return Number(r?.paidDays || 0) + Number(r?.unpaidDays || 0);
+}
+
 function getRequestTitle(r) {
   if (r.category === 'leave') { const lt = LEAVE_TYPES.find(l => l.value === r.leaveType); return lt ? lt.label : 'Leave Request'; }
   if (r.category === 'other') return r.otherTitle || 'Other Request';
@@ -99,7 +111,7 @@ function computeRemainingQuota(leaveQuota, requests) {
   requests.forEach(r => {
     if (r.status === 'rejected' || r.status === 'withdrawn') return;
     if (!isInCurrentMonth(r)) return;
-    const days = countDays(r.startDate, r.endDate);
+    const days = requestDays(r);
     if (r.category === 'leave' && r.leaveType) {
       if (r.leaveType === 'emergency') used.emergency += days;
       else if (r.leaveType === 'medical' || r.leaveType === 'medical_emergency') used.medical += days;
@@ -114,15 +126,12 @@ function computeRemainingQuota(leaveQuota, requests) {
   };
 }
 
-// ── Confirm Submit Modal — always shown before submission ─────────────────────
-
-function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOverrideCount }) {
-  const catCfg = getCatCfg(data.category);
-  const days = countDays(data.startDate, data.endDate);
-  const title = data.category === 'leave'
-    ? (LEAVE_TYPES.find(l => l.value === data.leaveType)?.label || 'Leave Request')
-    : data.category === 'other' ? (data.otherTitle || 'Other') : catCfg.label;
-
+// Paid / unpaid split for a new request. `actualDays` is the holiday-aware
+// count from analyzeLeaveRange (the same number as "Charged to your quota",
+// and what the server's _leave_working_days charges); the weekday count is
+// only a fallback before the range is known.
+function computePaidSplit(data, remainingQuota, actualDays) {
+  const days = actualDays ?? countDays(data.startDate, data.endDate);
   let quotaKey = null;
   let remaining = null;
   let paidDays = days;
@@ -149,12 +158,25 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
   }
   if (data.category === 'other') { paidDays = 0; unpaidDays = days; }
 
-  const allPaid = unpaidDays === 0;
-  const allUnpaid = paidDays === 0;
+  return {
+    days, quotaKey, remaining, paidDays, unpaidDays, effectiveDays,
+    allPaid: unpaidDays === 0,
+    allUnpaid: paidDays === 0,
+  };
+}
+
+// ── Confirm Submit Modal — shown only when part of the request is unpaid ─────
+
+function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCancel, paidOverrideCount }) {
+  const catCfg = getCatCfg(data.category);
+  const title = data.category === 'leave'
+    ? (LEAVE_TYPES.find(l => l.value === data.leaveType)?.label || 'Leave Request')
+    : data.category === 'other' ? (data.otherTitle || 'Other') : catCfg.label;
+  const { paidDays, unpaidDays, effectiveDays, allPaid, allUnpaid } = computePaidSplit(data, remainingQuota, actualDays);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -219,7 +241,7 @@ function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOve
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onCancel}>Cancel</button>
             <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
-              style={{ background: allPaid ? catCfg.color : 'var(--warning)', color: '#fff', border: 'none' }}
+              style={{ background: allPaid ? catCfg.color : 'var(--warning)', color: allPaid ? catCfg.on : 'var(--on-warning)', border: 'none' }}
               onClick={() => onConfirm({ paidDays, unpaidDays })}>
               <i className="bi bi-send" /> {allPaid ? 'Submit Request' : allUnpaid ? 'Submit as Unpaid' : 'Submit Request'}
             </button>
@@ -277,12 +299,25 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
     const err = validate();
     if (err) { setError(err); return; }
     setError('');
-    setPendingData({
+    const data = {
       category, leaveType: category === 'leave' ? leaveType : null,
       otherTitle: category === 'other' ? otherTitle.trim() : null,
       startDate, endDate, reason: reason.trim(),
-    });
+    };
+    // One step when it's all paid: submit the same payload the confirm would
+    // have sent. Any unpaid day still asks for an explicit confirmation.
+    const split = computePaidSplit(data, remainingQuota, rangeBreakdown?.actualDays);
+    if (split.allPaid) {
+      onSubmit({ ...data, paidDays: split.paidDays, unpaidDays: split.unpaidDays, isPaidTimeOff: true });
+      return;
+    }
+    setPendingData(data);
   }
+
+  // Live preview of the split the submit will use.
+  const liveSplit = (startDate && endDate && endDate >= startDate)
+    ? computePaidSplit({ category, leaveType: category === 'leave' ? leaveType : null, startDate, endDate }, remainingQuota, rangeBreakdown?.actualDays)
+    : null;
 
   function handleConfirm({ paidDays, unpaidDays }) {
     setPendingData(null);
@@ -291,10 +326,25 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
 
   const catCfg = getCatCfg(category);
 
+  // The confirm replaces the form instead of stacking on it; the form's state
+  // lives in this component, so Cancel returns to it untouched.
+  if (pendingData) {
+    return (
+      <ConfirmSubmitModal
+        data={pendingData}
+        actualDays={rangeBreakdown?.actualDays}
+        remainingQuota={remainingQuota}
+        onConfirm={handleConfirm}
+        onCancel={() => setPendingData(null)}
+        paidOverrideCount={paidOverrideCount}
+      />
+    );
+  }
+
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
         <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflowY: 'auto' }}>
           <div className="card-body p-4">
             <div className="d-flex align-items-center justify-content-between mb-4">
@@ -302,10 +352,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                 <h6 className="fw-bold mb-0">New Request</h6>
                 <p className="text-muted small mb-0">Submit a request for approval</p>
               </div>
-              <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-                style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-              </button>
+              <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -320,9 +367,9 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                       style={{
                         fontSize: '0.78rem', fontWeight: 600, padding: '5px 12px',
                         background: category === cat.value ? cat.color : cat.bg,
-                        color: category === cat.value ? '#fff' : cat.color,
+                        color: category === cat.value ? cat.on : cat.color,
                         borderColor: category === cat.value ? cat.color : `color-mix(in srgb, ${cat.color} 35%, transparent)`,
-                        cursor: 'pointer', transition: 'all 0.12s',
+                        cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                       }}>
                       <i className={`bi ${cat.icon}`} style={{ fontSize: '0.72rem' }} />{cat.label}
                     </button>
@@ -345,7 +392,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                             background: leaveType === lt.value ? 'var(--accent)' : 'var(--surface-0)',
                             color: leaveType === lt.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                             borderColor: leaveType === lt.value ? 'var(--accent)' : 'var(--border-subtle)',
-                            cursor: 'pointer', transition: 'all 0.12s',
+                            cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                           }}>
                           <i className={`bi ${lt.icon}`} style={{ fontSize: '0.72rem' }} />
                           {lt.label}
@@ -446,6 +493,19 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                 </div>
               )}
 
+              {liveSplit && remainingQuota && category !== 'other' && (
+                <div className="mb-3 rounded-3 px-3 py-2 d-flex flex-wrap gap-3 align-items-center" style={{
+                  fontSize: '0.75rem',
+                  background: liveSplit.allPaid ? 'var(--success-soft)' : 'var(--warning-soft)',
+                  color: 'var(--text-primary)',
+                }}>
+                  <span><i className={`bi ${liveSplit.allPaid ? 'bi-check-circle-fill' : 'bi-info-circle'} me-1`} style={{ color: liveSplit.allPaid ? 'var(--success-text)' : 'var(--warning-text)' }} />
+                    Paid from quota: <strong>{liveSplit.paidDays}</strong></span>
+                  {liveSplit.unpaidDays > 0 && <span>Unpaid: <strong>{liveSplit.unpaidDays}</strong></span>}
+                  <span className="text-muted">{liveSplit.allPaid ? 'Submits straight away.' : 'You will confirm the unpaid days next.'}</span>
+                </div>
+              )}
+
               <div className="mb-4">
                 <label className="form-label small fw-semibold">Reason <span className="text-danger">*</span></label>
                 <textarea className="form-control" rows={3} placeholder="Provide a reason…" value={reason} onChange={e => setReason(e.target.value)} />
@@ -453,7 +513,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
 
               <div className="d-flex gap-2 justify-content-end">
                 <button type="button" className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Cancel</button>
-                <button type="submit" className="btn btn-sm px-3 d-inline-flex align-items-center gap-1" style={{ background: catCfg.color, color: '#fff', border: 'none' }} disabled={saving}>
+                <button type="submit" className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" disabled={saving}>
                   {saving ? <><span className="spinner-border spinner-border-sm" />Submitting…</> : <><i className="bi bi-send" />Submit Request</>}
                 </button>
               </div>
@@ -462,15 +522,6 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
         </div>
       </div>
 
-      {pendingData && (
-        <ConfirmSubmitModal
-          data={pendingData}
-          remainingQuota={remainingQuota}
-          onConfirm={handleConfirm}
-          onCancel={() => setPendingData(null)}
-          paidOverrideCount={paidOverrideCount}
-        />
-      )}
     </>
   );
 }
@@ -481,11 +532,11 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
   const [forwardToBoss, setForwardToBoss] = useState(false);
   if (!request) return null;
   const catCfg = getCatCfg(request.category);
-  const days = countDays(request.startDate, request.endDate);
+  const days = requestDays(request);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -503,11 +554,11 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
               <i className={`bi ${catCfg.icon}`} style={{ color: catCfg.color }} />
               <span className="fw-semibold small">{getRequestTitle(request)}</span>
               {request.bossOverrideToPaid ? (
-                <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.6rem' }}>Paid · Boss Override</span>
+                <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: '0.6rem' }}>Paid · Boss Override</span>
               ) : (
                 <>
-                  {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
-                  {request.unpaidDays > 0 && !request.paidDays && <span className="badge bg-warning text-dark" style={{ fontSize: '0.6rem' }}>Unpaid ({request.unpaidDays}d)</span>}
+                  {request.unpaidDays > 0 && request.paidDays > 0 && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.6rem' }}>{request.paidDays}d paid · {request.unpaidDays}d unpaid</span>}
+                  {request.unpaidDays > 0 && !request.paidDays && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.6rem' }}>Unpaid ({request.unpaidDays}d)</span>}
                 </>
               )}
             </div>
@@ -517,7 +568,7 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
 
           <div
             className="d-flex align-items-center gap-2 rounded-2 p-2 mb-4"
-            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `1.5px solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'all 0.15s' }}
+            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `1.5px solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
             onClick={() => setForwardToBoss(v => !v)}
           >
             <input type="checkbox" className="form-check-input flex-shrink-0" checked={forwardToBoss}
@@ -546,7 +597,7 @@ function RejectTeamModal({ request, onConfirm, onCancel, saving }) {
   if (!request) return null;
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -579,6 +630,8 @@ function RejectTeamModal({ request, onConfirm, onCancel, saving }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function LeaveRequestPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -744,16 +797,17 @@ export default function LeaveRequestPage() {
       await submitLeaveV1(data);
       setShowModal(false);
     } catch (e) {
-      alert(e.message || 'Failed to submit');
+      toast.error(e.message || 'Failed to submit');
     } finally { setSaving(false); }
   }
 
   async function handleWithdraw(req) {
-    const ok = window.confirm(
-      `Withdraw this ${getRequestTitle(req)}?\n\n` +
-      `${req.startDate} → ${req.endDate}\n\n` +
-      `Your quota will be restored. This cannot be undone.`
-    );
+    const ok = await confirm({
+      title: `Withdraw this ${getRequestTitle(req)}?`,
+      message: `${req.startDate} → ${req.endDate}. Your quota will be restored. This cannot be undone.`,
+      confirmLabel: 'Withdraw',
+      tone: 'danger',
+    });
     if (!ok) return;
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -764,7 +818,7 @@ export default function LeaveRequestPage() {
       if (isAlreadyResolvedError(e.message)) {
         // Already withdrawn / decided — quietly succeed.
       } else {
-        alert('Failed to withdraw: ' + (e.message || 'unknown error'));
+        toast.error('Failed to withdraw: ' + (e.message || 'unknown error'));
       }
     } finally {
       submittingRef.current = false;
@@ -800,7 +854,7 @@ export default function LeaveRequestPage() {
         // list. Close the modal silently instead of scaring the user.
         setApproveTarget(null);
       } else {
-        alert('Failed to approve: ' + (e.message || 'unknown'));
+        toast.error('Failed to approve: ' + (e.message || 'unknown'));
       }
     } finally {
       submittingRef.current = false;
@@ -820,7 +874,7 @@ export default function LeaveRequestPage() {
       if (isAlreadyResolvedError(e.message)) {
         setRejectTarget(null);
       } else {
-        alert('Failed to reject: ' + (e.message || 'unknown'));
+        toast.error('Failed to reject: ' + (e.message || 'unknown'));
       }
     } finally {
       submittingRef.current = false;
@@ -908,7 +962,7 @@ export default function LeaveRequestPage() {
     const catCfg = getCatCfg(r.category);
     const stCfg = getStCfg(r.status);
     const title = getRequestTitle(r);
-    const days = countDays(r.startDate, r.endDate);
+    const days = requestDays(r);
     // Same breakdown the new-request form preview shows. Tells the
     // approver at a glance how many of the calendar days are weekend /
     // holiday vs. actual leave being granted.
@@ -925,8 +979,8 @@ export default function LeaveRequestPage() {
           <div className="d-flex align-items-start justify-content-between">
             <div className="d-flex gap-3 flex-grow-1">
               {showActions && (
-                <div className="rounded-circle d-flex align-items-center justify-content-center fw-semibold text-white flex-shrink-0"
-                  style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', fontSize: '0.6rem' }}>
+                <div className="rounded-circle d-flex align-items-center justify-content-center fw-semibold flex-shrink-0"
+                  style={{ width: 36, height: 36, background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>
                   {(r.requesterName || '?').slice(0, 2).toUpperCase()}
                 </div>
               )}
@@ -943,14 +997,14 @@ export default function LeaveRequestPage() {
                     // Boss-overridden = effectively paid. Suppress
                     // the Unpaid badge to avoid contradicting the
                     // "Boss Override to Paid" pill rendered elsewhere.
-                    <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.58rem' }}>Paid · Boss Override</span>
+                    <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: '0.58rem' }}>Paid · Boss Override</span>
                   ) : (
                     <>
                       {r.unpaidDays > 0 && r.paidDays > 0 && (
-                        <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>
+                        <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>
                       )}
                       {r.unpaidDays > 0 && (!r.paidDays || r.paidDays === 0) && (
-                        <span className="badge bg-warning text-dark" style={{ fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>
+                        <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>
                       )}
                     </>
                   )}
@@ -1111,7 +1165,7 @@ export default function LeaveRequestPage() {
   }
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -1128,7 +1182,7 @@ export default function LeaveRequestPage() {
             onNext={() => setViewMonth(m => stepMonthStr(m, 1))}
             onReset={() => setViewMonth(currentMonthStr())}
           />
-          <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setShowModal(true)}>
+          <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setShowModal(true)}>
             <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} /> New Request
           </button>
         </div>
@@ -1136,14 +1190,14 @@ export default function LeaveRequestPage() {
 
       {canReviewTeam && (
         <div className="d-flex gap-2 mb-4">
-          <button className={`btn btn-sm ${activeTab === 'my' ? 'btn-dark' : 'btn-outline-secondary'}`}
+          <button className={`btn btn-sm ${activeTab === 'my' ? 'btn-primary' : 'btn-outline-secondary'}`}
             style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setActiveTab('my')}>
             My Requests
           </button>
-          <button className={`btn btn-sm ${activeTab === 'team' ? 'btn-dark' : 'btn-outline-secondary'} d-inline-flex align-items-center gap-1`}
+          <button className={`btn btn-sm ${activeTab === 'team' ? 'btn-primary' : 'btn-outline-secondary'} d-inline-flex align-items-center gap-1`}
             style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setActiveTab('team')}>
             {isOL ? 'All Requests' : 'Team Requests'}
-            {teamPendingCount > 0 && <span className="badge bg-warning text-dark rounded-pill" style={{ fontSize: '0.62rem' }}>{teamPendingCount}</span>}
+            {teamPendingCount > 0 && <span className="badge rounded-pill" style={{ background: 'var(--warning)', color: 'var(--on-warning)', fontSize: '0.62rem' }}>{teamPendingCount}</span>}
           </button>
         </div>
       )}
@@ -1151,37 +1205,33 @@ export default function LeaveRequestPage() {
       {activeTab === 'my' && (
         <>
           {remainingQuota && (
-            <div className="d-flex flex-wrap gap-2 mb-4">
+            /* Equal-width quota tiles: what's left this month, at a glance. */
+            <StatGrid min={140} className="mb-4">
               {[
-                { label: 'Medical',   value: remainingQuota.medical,   total: leaveQuota?.medical   ?? 1, color: 'var(--danger)' },
-                { label: 'Emergency', value: remainingQuota.emergency, total: leaveQuota?.emergency ?? 1, color: 'var(--warning)' },
-                { label: 'WFH',       value: remainingQuota.wfh,       total: leaveQuota?.wfh       ?? 2, color: 'var(--info)' },
+                { label: 'Medical',   value: remainingQuota.medical,   total: leaveQuota?.medical   ?? 1 },
+                { label: 'Emergency', value: remainingQuota.emergency, total: leaveQuota?.emergency ?? 1 },
+                { label: 'WFH',       value: remainingQuota.wfh,       total: leaveQuota?.wfh       ?? 2 },
               ].map(q => (
-                <div key={q.label} className="rounded-2 px-3 py-2" style={{ background: `color-mix(in srgb, ${q.color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${q.color} 22%, transparent)` }}>
-                  <div style={{ fontSize: '0.62rem', color: q.color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{q.label}</div>
-                  <div className="d-flex align-items-baseline gap-1">
-                    <span className="fw-bold" style={{ fontSize: '1.05rem', color: q.color }}>{q.value}</span>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>/ {q.total} mo.</span>
-                  </div>
-                </div>
+                <StatCard key={q.label} label={`${q.label} left`} value={q.value} hint={`of ${q.total} this month`} />
               ))}
-            </div>
+            </StatGrid>
           )}
 
           {!loading && (
             <div className="d-flex flex-wrap gap-2 mb-3">
               {[
-                { label: 'All',      value: '',         count: myStats.total,    color: 'var(--accent)', activeText: 'var(--on-accent)', bg: 'var(--surface-2)', border: 'var(--border-subtle)' },
-                { label: 'Pending',  value: 'pending',  count: myStats.pending,  color: 'var(--warning)', activeText: '#fff', bg: 'var(--warning-soft)', border: 'color-mix(in srgb, var(--warning) 35%, transparent)' },
-                { label: 'Approved', value: 'approved', count: myStats.approved, color: 'var(--success)', activeText: '#fff', bg: 'var(--success-soft)', border: 'color-mix(in srgb, var(--success) 35%, transparent)' },
-                { label: 'Rejected', value: 'rejected', count: myStats.rejected, color: 'var(--danger)', activeText: '#fff', bg: 'var(--danger-soft)', border: 'color-mix(in srgb, var(--danger) 35%, transparent)' },
+                { label: 'All',      value: '',         count: myStats.total,    color: 'var(--accent)', text: 'var(--accent-text)', activeText: 'var(--on-accent)', bg: 'var(--surface-2)', border: 'var(--border-subtle)' },
+                { label: 'Pending',  value: 'pending',  count: myStats.pending,  color: 'var(--warning)', text: 'var(--warning-text)', activeText: 'var(--on-warning)', bg: 'var(--warning-soft)', border: 'color-mix(in srgb, var(--warning) 35%, transparent)' },
+                { label: 'Approved', value: 'approved', count: myStats.approved, color: 'var(--success)', text: 'var(--success-text)', activeText: 'var(--on-success)', bg: 'var(--success-soft)', border: 'color-mix(in srgb, var(--success) 35%, transparent)' },
+                { label: 'Rejected', value: 'rejected', count: myStats.rejected, color: 'var(--danger)', text: 'var(--danger-text)', activeText: 'var(--on-danger)', bg: 'var(--danger-soft)', border: 'color-mix(in srgb, var(--danger) 35%, transparent)' },
               ].map(s => (
-                <div key={s.label} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2"
-                  style={{ background: filterStatus === s.value ? s.color : s.bg, border: `1px solid ${filterStatus === s.value ? s.color : s.border}`, cursor: 'pointer', transition: 'all 0.15s' }}
+                <button type="button" key={s.label} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2"
+                  aria-pressed={filterStatus === s.value}
+                  style={{ background: filterStatus === s.value ? s.color : s.bg, border: `1px solid ${filterStatus === s.value ? s.color : s.border}`, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
                   onClick={() => setFilterStatus(filterStatus === s.value ? '' : s.value)}>
-                  <span className="fw-bold" style={{ color: filterStatus === s.value ? s.activeText : s.color, fontSize: '1.05rem', lineHeight: 1 }}>{s.count}</span>
-                  <span style={{ fontSize: '0.7rem', color: filterStatus === s.value ? s.activeText : s.color, opacity: 0.75, fontWeight: 500 }}>{s.label}</span>
-                </div>
+                  <span className="fw-bold" style={{ color: filterStatus === s.value ? s.activeText : s.text, fontSize: '1.05rem', lineHeight: 1 }}>{s.count}</span>
+                  <span style={{ fontSize: '0.75rem', color: filterStatus === s.value ? s.activeText : s.text, fontWeight: 600 }}>{s.label}</span>
+                </button>
               ))}
             </div>
           )}
@@ -1242,7 +1292,7 @@ export default function LeaveRequestPage() {
         <>
           <div className="d-flex gap-2 mb-3">
             {['pending', 'approved', 'rejected'].map(t => (
-              <button key={t} className={`btn btn-sm ${teamFilter === t ? 'btn-dark' : 'btn-outline-secondary'}`}
+              <button key={t} className={`btn btn-sm ${teamFilter === t ? 'btn-primary' : 'btn-outline-secondary'}`}
                 style={{ borderRadius: 8, fontSize: '0.78rem', textTransform: 'capitalize' }} onClick={() => setTeamFilter(t)}>
                 {t}
               </button>
@@ -1253,7 +1303,7 @@ export default function LeaveRequestPage() {
               request reviewed in June) are never hidden by the month navigator. */}
           {teamFilter === 'pending' && (
             <div className="d-flex align-items-center gap-2 mb-3 rounded-2 px-3 py-2"
-              style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)', fontSize: '0.74rem', color: 'var(--info)' }}>
+              style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)', fontSize: '0.74rem', color: 'var(--info-text)' }}>
               <i className="bi bi-info-circle" />
               <span>Showing all pending requests across every month — including future-dated ones — so nothing waiting on you is hidden.</span>
             </div>
@@ -1323,7 +1373,7 @@ export default function LeaveRequestPage() {
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
               </div>
-              <p className="fw-semibold text-dark mb-1">
+              <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
                 {teamFilter === 'pending' ? 'No pending team requests' : `No ${teamFilter} team requests for ${viewMonthLabel}`}
               </p>
               <p className="text-muted small mb-0">{(teamSearch || teamFilterCategory || teamDateFrom || teamDateTo) ? 'Try adjusting your filters.' : teamFilter === 'pending' ? "You're all caught up." : 'Try another month from the navigator above.'}</p>

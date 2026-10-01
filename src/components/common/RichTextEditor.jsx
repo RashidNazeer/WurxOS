@@ -216,7 +216,7 @@ export default function RichTextEditor({
           border: 1px solid var(--border-default);
           border-radius: var(--radius-md);
           background: var(--surface-1);
-          transition: border-color 130ms ease, box-shadow 130ms ease;
+          transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
         }
         .rte-container:focus-within {
           border-color: var(--accent);
@@ -226,8 +226,9 @@ export default function RichTextEditor({
         .rte-toolbar {
           /* Sticky offset is configurable so the toolbar can pin BELOW any
              sticky page chrome above it (e.g. the report header) instead of
-             colliding with it. Defaults to 0 — unchanged everywhere else. */
-          position: sticky; top: var(--rte-toolbar-top, 0); z-index: 3;
+             colliding with it. Defaults to the app topbar height (0 outside the
+             shell, e.g. portals); scroll containers like drawers reset it to 0. */
+          position: sticky; top: var(--rte-toolbar-top, var(--topbar-h, 0px)); z-index: 3;
           display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
           padding: 8px 10px;
           background: color-mix(in srgb, var(--surface-2) 88%, transparent);
@@ -244,7 +245,7 @@ export default function RichTextEditor({
           display: inline-flex; align-items: center; justify-content: center;
           cursor: pointer; color: var(--text-secondary);
           font-size: 15px; line-height: 1; font-family: inherit;
-          transition: background 110ms ease, color 110ms ease, border-color 110ms ease, transform 60ms ease;
+          transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-instant) var(--ease-out);
         }
         .rte-btn i { font-size: 15px; line-height: 1; }
         .rte-btn:hover { background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary); }
@@ -262,7 +263,7 @@ export default function RichTextEditor({
           height: 32px; padding: 0 26px 0 10px; width: 100%;
           font-size: 12.5px; font-weight: 600; color: var(--text-primary);
           cursor: pointer; font-family: inherit;
-          transition: border-color 110ms ease, background 110ms ease;
+          transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
         }
         .rte-select:hover { border-color: var(--border-strong); background: var(--surface-2); }
         .rte-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }

@@ -22,6 +22,7 @@ import ToolbarSelect from './ToolbarSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 import { remindReports } from '../../lib/reportsApi';
+import { useDialogs } from '../common/useDialogs';
 
 function StatusBadge({ status }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -42,6 +43,7 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export default function AllMonthlyReportsPage() {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -231,7 +233,7 @@ export default function AllMonthlyReportsPage() {
     if (!targets.length) return;
     const who  = kind === 'draft' ? 'APC' : 'Team Lead';
     const verb = kind === 'draft' ? 'submit' : 'verify';
-    if (!window.confirm(`Send a reminder to the ${who}s to ${verb} ${targets.length} ${kind} report${targets.length === 1 ? '' : 's'}?`)) return;
+    if (!(await ask(`Send a reminder to the ${who}s to ${verb} ${targets.length} ${kind} report${targets.length === 1 ? '' : 's'}?`))) return;
     setNotifyBusy(kind);
     try {
       const res = await remindReports(targets.map(r => r.id));
@@ -261,7 +263,7 @@ export default function AllMonthlyReportsPage() {
 
   /* ── OL acting as APC: submit a draft report ──────────────────────────── */
   const handleSubmitAsApc = async (report) => {
-    if (!window.confirm(`Submit this draft (${report.monthLabel}) on the APC's behalf? It will move to "submitted" for TL verification.`)) return;
+    if (!(await ask(`Submit this draft (${report.monthLabel}) on the APC's behalf? It will move to "submitted" for TL verification.`))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'submitted', {
@@ -272,12 +274,12 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: null } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: null } : r);
       notifyReportSubmitted({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly' });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   /* ── OL acting as TL: verify a submitted report ───────────────────────── */
   const handleVerifyAsTl = async (report) => {
-    if (!window.confirm(`Verify this report (${report.monthLabel}) on the TL's behalf? It will move to "verified" for OL approval.`)) return;
+    if (!(await ask(`Verify this report (${report.monthLabel}) on the TL's behalf? It will move to "verified" for OL approval.`))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'verified', {
@@ -287,12 +289,12 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'verified' } : r));
       setViewReport(r => r ? { ...r, status: 'verified' } : r);
       notifyReportVerified({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly' });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   /* ── Approve / Reject (OL only) ───────────────────────────────────────── */
   const handleApprove = async (report) => {
-    if (!window.confirm(`Approve this monthly report (${report.monthLabel})? This is the final approval.`)) return;
+    if (!(await ask(`Approve this monthly report (${report.monthLabel})? This is the final approval.`))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'approved', {
@@ -301,11 +303,11 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'approved' } : r));
       setViewReport(r => r ? { ...r, status: 'approved' } : r);
       notifyReportApproved({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly' });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   const handleRejectToTL = async (report) => {
-    const note = window.prompt('Reason for returning to Team Lead (required):');
+    const note = await askText('Reason for returning to Team Lead (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -317,11 +319,11 @@ export default function AllMonthlyReportsPage() {
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'tl', note: note.trim() });
       try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   const handleRejectToAPC = async (report) => {
-    const note = window.prompt('Reason for returning to APC (required):');
+    const note = await askText('Reason for returning to APC (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -332,12 +334,12 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'draft', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'apc', note: note.trim() });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   /* ── Reopen approved reports (OL only) ─────────────────────────────────── */
   const handleReopenForEdit = async (report) => {
-    if (!window.confirm('Reopen this approved report for your own edits? It will move back to "verified" so you can edit and re-approve.')) return;
+    if (!(await ask('Reopen this approved report for your own edits? It will move back to "verified" so you can edit and re-approve.'))) return;
     try {
       await updateReportStatus(report.id, 'verified', {
         reopenedBy: currentUser.uid,
@@ -346,11 +348,11 @@ export default function AllMonthlyReportsPage() {
       });
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'verified' } : r));
       setViewReport(r => r ? { ...r, status: 'verified' } : r);
-    } catch (err) { alert('Failed to reopen: ' + err.message); }
+    } catch (err) { notify.error('Failed to reopen: ' + err.message); }
   };
 
   const handleReopenToTL = async (report) => {
-    const note = window.prompt('Reason for sending this approved report back to Team Lead (required):');
+    const note = await askText('Reason for sending this approved report back to Team Lead (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -362,11 +364,11 @@ export default function AllMonthlyReportsPage() {
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'tl', note: note.trim(), isReopen: true });
       try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
-    } catch (err) { alert('Failed to reopen: ' + err.message); }
+    } catch (err) { notify.error('Failed to reopen: ' + err.message); }
   };
 
   const handleReopenToAPC = async (report) => {
-    const note = window.prompt('Reason for sending this approved report back to APC (required):');
+    const note = await askText('Reason for sending this approved report back to APC (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -377,22 +379,22 @@ export default function AllMonthlyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'draft', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'apc', note: note.trim(), isReopen: true });
-    } catch (err) { alert('Failed to reopen: ' + err.message); }
+    } catch (err) { notify.error('Failed to reopen: ' + err.message); }
   };
 
   const handleDeleteReport = async (report) => {
-    if (!window.confirm(`Delete this monthly report for ${report.brandName} (${report.monthLabel})? This cannot be undone.`)) return;
+    if (!(await ask(`Delete this monthly report for ${report.brandName} (${report.monthLabel})? This cannot be undone.`, { danger: true }))) return;
     try {
       await deleteMonthlyReport(report.id);
       setRawReports(prev => prev.filter(r => r.id !== report.id));
       setViewReport(null);
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   const handleBulkDelete = async () => {
     const ids = [...selected];
     if (ids.length === 0) return;
-    if (!window.confirm(`Delete ${ids.length} monthly report${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    if (!(await ask(`Delete ${ids.length} monthly report${ids.length === 1 ? '' : 's'}? This cannot be undone.`, { danger: true }))) return;
     setBulkBusy(true);
     try {
       const failures = [];
@@ -400,7 +402,7 @@ export default function AllMonthlyReportsPage() {
       const removedIds = new Set(ids.filter((id) => !failures.some((f) => f.id === id)));
       setRawReports((prev) => prev.filter((r) => !removedIds.has(r.id)));
       clearSelected();
-      if (failures.length) alert(`${failures.length} of ${ids.length} could not be deleted:\n` + failures.map((f) => f.msg).join('\n'));
+      if (failures.length) notify.error(`${failures.length} of ${ids.length} could not be deleted:\n` + failures.map((f) => f.msg).join('\n'));
     } finally { setBulkBusy(false); }
   };
 
@@ -471,7 +473,7 @@ export default function AllMonthlyReportsPage() {
             )}
             {canVerifyAsTl && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#7c3aed', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerifyAsTl(viewReport)}
                 title="Verify this submitted report (acting on behalf of the TL)">
                 <i className="bi bi-patch-check-fill" /> Verify as TL
@@ -479,7 +481,7 @@ export default function AllMonthlyReportsPage() {
             )}
             {canApprove && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#16a34a', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--success)', color: 'var(--on-success)', border: 'none' }}
                 onClick={() => handleApprove(viewReport)}>
                 <i className="bi bi-shield-check-fill" /> Approve
               </button>
@@ -541,7 +543,7 @@ export default function AllMonthlyReportsPage() {
             {/* Less-used / destructive actions tucked into the menu. */}
             <ReportActionsMenu actions={reportActions} hidePrimaryExports
               extraItems={[
-                canSubmitAsApc && { key: 'submit', label: 'Submit as APC', icon: 'bi-send-fill', iconColor: '#0ea5e9', onClick: () => handleSubmitAsApc(viewReport) },
+                canSubmitAsApc && { key: 'submit', label: 'Submit as APC', icon: 'bi-send-fill', iconColor: 'var(--info)', onClick: () => handleSubmitAsApc(viewReport) },
                 canDelete && { key: 'delete', label: 'Delete report', icon: 'bi-trash3', iconColor: 'var(--danger)', danger: true, onClick: () => handleDeleteReport(viewReport) },
               ]} />
           </div>
@@ -709,13 +711,13 @@ export default function AllMonthlyReportsPage() {
 
         {/* Pending Approval — verified, awaiting OL approval (click to filter) */}
         <div className="col-6 col-md-4 col-xl">
-          <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12, cursor: 'pointer', border: filterStatus === 'verified' ? '1.5px solid #7c3aed' : undefined }}
+          <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12, cursor: 'pointer', border: filterStatus === 'verified' ? '1.5px solid var(--purple)' : undefined }}
             onClick={() => setFilterStatus(f => f === 'verified' ? '' : 'verified')}
             title="Click to show reports awaiting approval">
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
-                <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
+                style={{ width: 36, height: 36, background: 'color-mix(in srgb, var(--purple) 18%, transparent)' }}>
+                <i className="bi bi-hourglass-split" style={{ color: 'var(--purple-text)' }} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{statusStats.verified}</div>
@@ -749,14 +751,14 @@ export default function AllMonthlyReportsPage() {
         <div className="card-body p-3">
           <div className="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-2">
             <div className="d-flex align-items-center gap-2">
-              <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={prevYear}
+              <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={prevYear}
                 style={{ width: 32, height: 32, padding: 0 }}>
                 <i className="bi bi-chevron-left" style={{ fontSize: '0.8rem' }} />
               </button>
               <div className="fw-bold" style={{ fontSize: '0.92rem', minWidth: 80, textAlign: 'center' }}>
                 {calYear}
               </div>
-              <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={nextYear}
+              <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={nextYear}
                 style={{ width: 32, height: 32, padding: 0 }}>
                 <i className="bi bi-chevron-right" style={{ fontSize: '0.8rem' }} />
               </button>
@@ -799,7 +801,7 @@ export default function AllMonthlyReportsPage() {
       {/* Bulk action bar */}
       {canBulkDelete && selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          style={{ position: 'sticky', top: 'var(--topbar-h, 0px)', zIndex: 'var(--z-sticky)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
           <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>
             <i className="bi bi-check2-square me-1" />
             {selected.size} selected
@@ -837,19 +839,19 @@ export default function AllMonthlyReportsPage() {
               <div key={r.id} className="col-12 col-md-6 col-lg-4">
                 <div className="card h-100 position-relative" style={{
                     borderRadius: 14, cursor: 'pointer',
-                    border: isSel ? '2px solid #ef4444' : '1px solid var(--border-subtle)',
-                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-                    transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
+                    border: isSel ? '2px solid var(--danger)' : '1px solid var(--border-subtle)',
+                    boxShadow: 'var(--shadow-sm)',
+                    transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
                   }}
                   onClick={() => setViewReport(r)}
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.08)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
                     if (!isSel) e.currentTarget.style.borderColor = 'var(--border-default)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
                     if (!isSel) e.currentTarget.style.borderColor = 'var(--border-subtle)';
                   }}>
                   {canBulkDelete && (
@@ -857,21 +859,21 @@ export default function AllMonthlyReportsPage() {
                       className="position-absolute d-flex align-items-center justify-content-center"
                       style={{
                         top: 8, left: 8, width: 24, height: 24,
-                        background: isSel ? '#ef4444' : 'var(--surface-1)',
-                        border: `1.5px solid ${isSel ? '#ef4444' : 'var(--border-default)'}`,
+                        background: isSel ? 'var(--danger)' : 'var(--surface-1)',
+                        border: `1.5px solid ${isSel ? 'var(--danger)' : 'var(--border-default)'}`,
                         borderRadius: 6, cursor: 'pointer', zIndex: 2,
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        boxShadow: 'var(--shadow-sm)',
                       }}
                       onClick={(e) => { e.stopPropagation(); toggleSelected(r.id); }}
                       title={isSel ? 'Unselect' : 'Select'}
                     >
-                      {isSel && <i className="bi bi-check-lg text-white" style={{ fontSize: '0.95rem', lineHeight: 1 }} />}
+                      {isSel && <i className="bi bi-check-lg" style={{ fontSize: '0.95rem', lineHeight: 1, color: 'var(--on-danger)' }} />}
                     </label>
                   )}
                   <div className="card-body p-3">
                     <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-subtle)', paddingLeft: canBulkDelete ? 28 : 0 }}>
-                      <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                        style={{ width: 26, height: 26, fontSize: '0.58rem', background: '#3b82f6' }}>
+                      <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                        style={{ width: 26, height: 26, fontSize: '0.58rem', background: 'var(--info)', color: 'var(--on-info)' }}>
                         {brandName.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="fw-bold text-truncate" style={{ fontSize: '0.85rem', minWidth: 0 }}>{brandName}</div>

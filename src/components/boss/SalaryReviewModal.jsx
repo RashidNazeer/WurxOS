@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  setUserSalary, getHistoryFor, formatPKR, yearsCompletedSince,
+  setUserSalary, getHistoryFor, yearsCompletedSince,
 } from '../../lib/salariesApi';
 import { XIcon, AlertIcon, CheckIcon, StarIcon } from '../common/Icon';
+import { formatPKR } from '../../lib/format';
 
 // Boss-only modal. Two modes implied by `currentSalary`:
 //   • Set initial salary  — currentSalary is null/undefined

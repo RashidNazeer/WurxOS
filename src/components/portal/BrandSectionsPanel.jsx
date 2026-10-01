@@ -5,6 +5,7 @@ import {
   clientSectionAdd, clientSectionRename, clientSectionRemove, clientSectionSetValue,
 } from '../../lib/clientReportSectionsApi';
 import { supabase } from '../../lib/supabase';
+import { useDialogs } from '../common/useDialogs';
 
 /**
  * Persistent client-added sections for a brand.
@@ -47,6 +48,7 @@ export default function BrandSectionsPanel({
   // get_client_access RPC payload.
   selfFetch = false,
 }) {
+  const { ask, askText, notify } = useDialogs();
   const [fetchedSections, setFetchedSections] = useState([]);
   const [fetchedValues, setFetchedValues]     = useState([]);
   // brand_report_sections.sections is a single array shared with the
@@ -133,7 +135,7 @@ export default function BrandSectionsPanel({
   }
 
   async function handleRename(section) {
-    const next = window.prompt('Rename section:', section.name);
+    const next = await askText('Rename section:', section.name);
     if (next == null) return;
     const trimmed = next.trim();
     if (!trimmed || trimmed === section.name) return;
@@ -146,9 +148,10 @@ export default function BrandSectionsPanel({
   }
 
   async function handleRemove(section) {
-    const ok = window.confirm(
+    const ok = await ask(
       `Remove section "${section.name}" from ${brandName || 'this brand'}? ` +
       `Past report values will stay but the section will no longer appear here.`,
+      { danger: true, confirmLabel: 'Remove' },
     );
     if (!ok) return;
     setBusy('remove:' + section.id); setError('');
@@ -168,7 +171,7 @@ export default function BrandSectionsPanel({
         <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
           <div>
             <h6 className="fw-bold mb-0 d-flex align-items-center gap-2" style={{ fontSize: '0.95rem' }}>
-              <i className="bi bi-pin-angle-fill" style={{ color: '#8b5cf6' }} />
+              <i className="bi bi-pin-angle-fill" style={{ color: 'var(--purple-text)' }} />
               {brandName ? `${brandName} — Client Sections` : 'Client Sections'}
             </h6>
             <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>
@@ -195,7 +198,7 @@ export default function BrandSectionsPanel({
         )}
 
         {!readOnly && adding && (
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <label className="form-label small fw-semibold">Section name</label>
             <input type="text" className="form-control form-control-sm" autoFocus
               value={newName} onChange={(e) => setNewName(e.target.value)}
@@ -207,7 +210,7 @@ export default function BrandSectionsPanel({
                 onClick={() => { setAdding(false); setNewName(''); }} disabled={busy === 'add'}>
                 Cancel
               </button>
-              <button className="btn btn-sm btn-dark"
+              <button className="btn btn-sm btn-primary"
                 onClick={handleAdd} disabled={!newName.trim() || busy === 'add'}>
                 {busy === 'add' ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-plus-lg me-1" />}
                 Add
@@ -233,28 +236,28 @@ export default function BrandSectionsPanel({
               const saving = busy === 'save:' + section.id;
               return (
                 <div key={section.id} className="rounded-3 p-3"
-                  style={{ background: '#fafaff', border: '1px solid #e2e8f0' }}>
+                  style={{ background: '#fafaff', border: '1px solid var(--border-subtle)' }}>
                   <div className="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-                    <div className="fw-semibold" style={{ fontSize: '0.85rem', color: '#1e293b' }}>
-                      <i className="bi bi-bookmark-star me-1" style={{ color: '#8b5cf6' }} />
+                    <div className="fw-semibold" style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      <i className="bi bi-bookmark-star me-1" style={{ color: 'var(--purple-text)' }} />
                       {section.name}
                     </div>
                     {!readOnly && !isEditing && (
                       <div className="d-flex gap-1">
-                        <button className="btn btn-sm btn-light border-0"
+                        <button className="btn btn-sm btn-outline-secondary border-0"
                           style={{ padding: '2px 8px', fontSize: '0.7rem' }}
                           onClick={() => startEdit(section)}
                           title="Edit value for this report">
                           <i className="bi bi-pencil" /> {hasValue ? 'Edit' : 'Add value'}
                         </button>
-                        <button className="btn btn-sm btn-light border-0"
+                        <button className="btn btn-sm btn-outline-secondary border-0"
                           style={{ padding: '2px 8px', fontSize: '0.7rem' }}
                           onClick={() => handleRename(section)}
                           disabled={renaming}
                           title="Rename section">
                           {renaming ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-input-cursor-text" />}
                         </button>
-                        <button className="btn btn-sm btn-light border-0 text-danger"
+                        <button className="btn btn-sm btn-outline-secondary border-0 text-danger"
                           style={{ padding: '2px 8px', fontSize: '0.7rem' }}
                           onClick={() => handleRemove(section)}
                           disabled={removing}
@@ -275,7 +278,7 @@ export default function BrandSectionsPanel({
                       <div className="d-flex justify-content-end gap-2 mt-2">
                         <button className="btn btn-sm btn-outline-secondary"
                           onClick={cancelEdit} disabled={saving}>Cancel</button>
-                        <button className="btn btn-sm btn-dark"
+                        <button className="btn btn-sm btn-primary"
                           onClick={() => handleSaveValue(section)} disabled={saving}>
                           {saving ? <><span className="spinner-border spinner-border-sm me-1" /> Saving…</> : <><i className="bi bi-check-lg me-1" /> Save</>}
                         </button>
@@ -283,7 +286,7 @@ export default function BrandSectionsPanel({
                     </div>
                   ) : hasValue ? (
                     <div className="rich-content"
-                      style={{ fontSize: '0.85rem', color: '#1e293b', lineHeight: 1.55 }}
+                      style={{ fontSize: '0.85rem', color: 'var(--text-primary)', lineHeight: 1.55 }}
                       dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(value) }} />
                   ) : (
                     <div className="text-muted" style={{ fontSize: '0.76rem', fontStyle: 'italic' }}>

@@ -395,7 +395,7 @@ function AppliesChips({ applies = [], onToggle }) {
               background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
               color: on ? 'var(--accent)' : 'var(--text-muted)',
               cursor: 'pointer',
-              transition: 'all 120ms ease',
+              transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
             }}
             title={on ? `Showing in ${REPORT_TYPE_LABEL[t]} reports — click to hide` : `Click to show in ${REPORT_TYPE_LABEL[t]} reports`}
           >

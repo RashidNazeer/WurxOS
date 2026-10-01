@@ -15,13 +15,15 @@ import WeeklyReportView from './WeeklyReportView';
 import ReportPeriodStrip from './ReportPeriodStrip';
 import ReportRatingBar from './ReportRatingBar';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
+import { useDialogs } from '../common/useDialogs';
+import { pktToday, currentReportableWeek as currentReportableWeekFor } from '../../lib/reportDue';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function monthKey(y, m) { return `${y}-${String(m + 1).padStart(2, '0')}`; }
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
-const BRAND_COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#6366f1','#14b8a6','#f97316'];
+const BRAND_COLORS = ['var(--chart-6)','var(--chart-4)','var(--chart-7)','var(--chart-1)','var(--chart-5)','var(--chart-2)','var(--chart-8)']; // chart slots: theme-aware, text-inverse readable
 
 function StatusBadge({ status, style }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -34,6 +36,7 @@ function StatusBadge({ status, style }) {
 }
 
 export default function WeeklyReportsPage() {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -136,10 +139,11 @@ export default function WeeklyReportsPage() {
 
   // For each brand: latest report + workflow status for current week
   const brandSummaries = useMemo(() => {
-    const today = todayStr();
-    const allWeekOptions = getFirstTimeWeekOptions();
-    const currentReportableWeek = [...allWeekOptions].reverse().find(w => w.endDate < today)
-      || allWeekOptions.find(w => w.startDate <= today && w.endDate >= today);
+    // Pakistan-time 'today' and the uncapped week chain shared with Today (lib/reportDue).
+    // getFirstTimeWeekOptions() stops after 20 weeks (mid-Aug 2026), which froze
+    // the current week there.
+    const today = pktToday();
+    const currentReportableWeek = currentReportableWeekFor(today);
 
     return myBrands.map((b, i) => {
       const reports = allReports.filter(r => r.brandId === b.id);
@@ -221,7 +225,7 @@ export default function WeeklyReportsPage() {
   /* ── Handlers ──────────────────────────────────────────────────────────── */
 
   const handleDelete = async (reportId) => {
-    if (!window.confirm('Delete this report? This cannot be undone.')) return;
+    if (!(await ask('Delete this report? This cannot be undone.', { danger: true, confirmLabel: 'Delete' }))) return;
     await deleteReport(reportId);
     setBrandReports(prev => prev.filter(r => r.id !== reportId));
     setAllReports(prev => prev.filter(r => r.id !== reportId));
@@ -263,7 +267,7 @@ export default function WeeklyReportsPage() {
   };
 
   const handleVerify = async (report) => {
-    if (!window.confirm(`Verify this report (${report.weekLabel})? It will be sent to the Operation Lead for approval.`)) return;
+    if (!(await ask(`Verify this report (${report.weekLabel})? It will be sent to the Operation Lead for approval.`))) return;
     try {
       const senderName = currentUser.displayName || 'TL';
       await updateReportStatus(report.id, 'verified', {
@@ -277,11 +281,11 @@ export default function WeeklyReportsPage() {
       if (selectedBrandId) getReportsForBrand(selectedBrandId).then(setBrandReports);
       setDetailReport(r => r ? { ...r, status: 'verified' } : r);
       notifyReportVerified({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly' });
-    } catch (err) { alert('Failed to verify: ' + err.message); }
+    } catch (err) { notify.error('Failed to verify: ' + err.message); }
   };
 
   const handleRejectToAPC = async (report) => {
-    const note = window.prompt('Reason for returning to APC (required):');
+    const note = await askText('Reason for returning to APC (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'TL';
@@ -297,7 +301,7 @@ export default function WeeklyReportsPage() {
       setDetailReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'apc', note: note.trim() });
       try { await deductPromptApcReport(report.id); } catch { /* deduction is best-effort; the return already happened */ }
-    } catch (err) { alert('Failed to reject: ' + err.message); }
+    } catch (err) { notify.error('Failed to reject: ' + err.message); }
   };
 
   const openBrand = (brandId) => {
@@ -360,7 +364,7 @@ export default function WeeklyReportsPage() {
             )}
             {canVerify && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#7c3aed', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerify(detailReport)}>
                 <i className="bi bi-patch-check-fill" /> Verify
               </button>
@@ -415,7 +419,7 @@ export default function WeeklyReportsPage() {
   /* ── Brand Detail View (single brand drill-down) ───────────────────────── */
   if (view === 'brand' && selectedBrandId) {
     const brandObj = myBrands.find(b => b.id === selectedBrandId);
-    const brandColor = brandSummaries.find(s => s.brand.id === selectedBrandId)?.color || '#3b82f6';
+    const brandColor = brandSummaries.find(s => s.brand.id === selectedBrandId)?.color || 'var(--chart-6)';
     return (
       <div>
         <button className="btn btn-sm btn-link text-muted p-0 mb-3" onClick={() => { setView('overview'); setSelectedBrandId(''); setBrandReports([]); }}>
@@ -424,8 +428,8 @@ export default function WeeklyReportsPage() {
 
         <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
           <div className="d-flex align-items-center gap-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-              style={{ width: 48, height: 48, fontSize: '0.85rem', background: brandColor }}>
+            <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+              style={{ width: 48, height: 48, fontSize: '0.85rem', background: brandColor, color: 'var(--text-inverse)' }}>
               {(brandObj?.brandName || brandObj?.name || '??').slice(0, 2).toUpperCase()}
             </div>
             <div>
@@ -433,7 +437,7 @@ export default function WeeklyReportsPage() {
               <p className="text-muted small mb-0">{brandReports.length} total reports</p>
             </div>
           </div>
-          <button className="btn btn-dark btn-sm px-4 d-inline-flex align-items-center gap-1"
+          <button className="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 10 }} onClick={() => setView('new')}>
             <i className="bi bi-plus-circle" /> New Report
           </button>
@@ -443,13 +447,13 @@ export default function WeeklyReportsPage() {
         <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
           <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-2">
-              <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={prevMonth} style={{ width: 32, height: 32, padding: 0 }}>
+              <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={prevMonth} style={{ width: 32, height: 32, padding: 0 }}>
                 <i className="bi bi-chevron-left" style={{ fontSize: '0.8rem' }} />
               </button>
               <div className="fw-bold" style={{ fontSize: '0.92rem', minWidth: 140, textAlign: 'center' }}>
                 {MONTH_NAMES[calMonth]} {calYear}
               </div>
-              <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={nextMonth} style={{ width: 32, height: 32, padding: 0 }}>
+              <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={nextMonth} style={{ width: 32, height: 32, padding: 0 }}>
                 <i className="bi bi-chevron-right" style={{ fontSize: '0.8rem' }} />
               </button>
               <button className="btn btn-sm btn-outline-secondary ms-1" style={{ borderRadius: 8, fontSize: '0.72rem' }}
@@ -540,7 +544,7 @@ export default function WeeklyReportsPage() {
                 : changeDir > 0 ? 'var(--success)' : changeDir < 0 ? 'var(--danger)' : 'var(--text-secondary)';
               return (
                 <div key={r.id} className="col-12 col-md-6 col-lg-4">
-                  <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s' }}
+                  <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                     onClick={() => handleViewReport(r)}
                     onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                     onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -559,7 +563,7 @@ export default function WeeklyReportsPage() {
                           </div>
                         </div>
                         <div className="dropdown" onClick={e => e.stopPropagation()}>
-                          <button className="btn btn-sm btn-light border-0 rounded-circle" data-bs-toggle="dropdown" style={{ width: 28, height: 28, padding: 0 }}>
+                          <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" data-bs-toggle="dropdown" style={{ width: 28, height: 28, padding: 0 }}>
                             <i className="bi bi-three-dots" style={{ fontSize: '0.8rem' }} />
                           </button>
                           <ul className="dropdown-menu dropdown-menu-end" style={{ fontSize: '0.78rem' }}>
@@ -568,7 +572,7 @@ export default function WeeklyReportsPage() {
                               <li><button className="dropdown-item" onClick={() => handleEdit(r.id)}><i className="bi bi-pencil me-2" />Edit</button></li>
                             )}
                             {userRole === 'tl' && getReportStatus(r) === 'submitted' && (
-                              <li><button className="dropdown-item" style={{ color: '#7c3aed' }} onClick={e => { e.stopPropagation(); handleVerify(r); }}><i className="bi bi-patch-check-fill me-2" />Verify</button></li>
+                              <li><button className="dropdown-item" style={{ color: 'var(--purple-text)' }} onClick={e => { e.stopPropagation(); handleVerify(r); }}><i className="bi bi-patch-check-fill me-2" />Verify</button></li>
                             )}
                             <li><hr className="dropdown-divider" /></li>
                             <li><button className="dropdown-item text-danger" onClick={() => handleDelete(r.id)}><i className="bi bi-trash3 me-2" />Delete</button></li>
@@ -615,7 +619,7 @@ export default function WeeklyReportsPage() {
           <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Weekly Reports</h5>
           <p className="text-muted small mb-0">Overview of your brands and report submission status</p>
         </div>
-        <button className="btn btn-dark btn-sm px-4 d-inline-flex align-items-center gap-1"
+        <button className="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1"
           style={{ borderRadius: 10 }} onClick={() => setView('new')}>
           <i className="bi bi-plus-circle" /> New Report
         </button>
@@ -667,8 +671,8 @@ export default function WeeklyReportsPage() {
             <div className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer' }}
               onClick={() => setOverviewFilter(f => f === 'needs_review' ? '' : 'needs_review')}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
-                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}>
-                  <i className="bi bi-hourglass-split" style={{ color: '#7c3aed' }} />
+                <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'color-mix(in srgb, var(--purple) 18%, transparent)' }}>
+                  <i className="bi bi-hourglass-split" style={{ color: 'var(--purple-text)' }} />
                 </div>
                 <div>
                   <div className="fw-bold" style={{ fontSize: '1.2rem' }}>{stats.needsReview}</div>
@@ -737,7 +741,7 @@ export default function WeeklyReportsPage() {
             const latestPerf = s.latest?.overallPerformance || {};
             return (
               <div key={b.id} className="col-12 col-md-6 col-lg-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', overflow: 'hidden', transition: 'transform 0.15s' }}
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', overflow: 'hidden', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                   onClick={() => openBrand(b.id)}
                   onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                   onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -745,8 +749,8 @@ export default function WeeklyReportsPage() {
                   <div className="card-body p-3">
                     <div className="d-flex align-items-start justify-content-between mb-2">
                       <div className="d-flex align-items-center gap-2">
-                        <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                          style={{ width: 38, height: 38, fontSize: '0.7rem', background: s.color }}>
+                        <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                          style={{ width: 38, height: 38, fontSize: '0.7rem', background: s.color, color: 'var(--text-inverse)' }}>
                           {(name || '??').slice(0, 2).toUpperCase()}
                         </div>
                         <div>

@@ -70,11 +70,11 @@ const SHELL_CSS = `
     border: 1px solid var(--border-subtle); border-radius: 18px; overflow: hidden; background: var(--surface-1); }
   .vrx-rail { border-right: 1px solid var(--border-subtle); padding: 30px 28px; display: flex; flex-direction: column; gap: 26px; }
   .vrx-output { padding: 40px 44px; background: radial-gradient(130% 90% at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent); }
-  .vrx-cta { transition: filter .15s, transform .1s; }
+  .vrx-cta { transition: filter var(--dur-fast) var(--ease-out), transform var(--dur-instant) var(--ease-out); }
   .vrx-cta:hover:not(:disabled) { filter: brightness(1.08); }
   .vrx-cta:active:not(:disabled) { transform: translateY(1px); }
   .vrx-cta:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
-  .vrx-filerow { transition: border-color .15s; }
+  .vrx-filerow { transition: border-color var(--dur-fast) var(--ease-out); }
   .vrx-filerow:hover { border-color: var(--border-default); }
   @media (max-width: 900px) {
     .vrx-shell { grid-template-columns: 1fr; min-height: 0; }
@@ -224,7 +224,7 @@ function EukaMode() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))' }}>
-              <i className="bi bi-camera-video-fill" style={{ color: '#fff', fontSize: '1.05rem' }} />
+              <i className="bi bi-camera-video-fill" style={{ color: 'var(--on-accent)', fontSize: '1.05rem' }} />
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>Video Reviews</div>
@@ -323,7 +323,7 @@ function EukaMode() {
           {/* CTA */}
           <button className="vrx-cta" onClick={generate} disabled={running || !targetDate || !brandId}
             style={{ marginTop: 'auto', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              fontSize: 15, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 13, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 13, cursor: 'pointer',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
               boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent)' }}>
             <i className="bi bi-lightning-charge-fill" /> Generate review files
@@ -493,7 +493,7 @@ export default function VideoReviewsPage() {
                   padding: '7px 16px', borderRadius: 9, border: 'none',
                   background: active ? 'var(--surface-1)' : 'transparent',
                   color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'background .12s, color .12s' }}>
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)' }}>
                 <i className={`bi ${m.icon}`} /> {m.label}
               </button>
             );

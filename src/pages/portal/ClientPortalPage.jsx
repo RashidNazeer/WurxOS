@@ -122,7 +122,7 @@ export default function ClientPortalPage() {
 
       {/* Tabs */}
       {showTabs && (
-        <div style={{ background: '#fff', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
           <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px' }}>
             <div style={{ display: 'flex', gap: 4 }}>
               {perms.reports && (

@@ -17,6 +17,7 @@
 import React, { useState } from 'react';
 import { cleanNumericInput } from '../../lib/reportsApi';
 import RichTextEditor from '../shared/RichTextEditor';
+import { useDialogs } from '../common/useDialogs';
 
 // `onDelete`, when provided, renders a trash button — used ONLY for
 // APC-created custom sections. Built-in/default sections never pass it, so
@@ -58,7 +59,7 @@ export function SectionHeader({ icon, title, color, required, enabled = true, on
           {deletable && (
             <button
               type="button"
-              className="btn btn-sm btn-light border-0 text-danger"
+              className="btn btn-sm btn-outline-secondary border-0 text-danger"
               style={{ padding: '2px 8px', fontSize: '0.72rem' }}
               onClick={onDelete}
               title="Delete this custom section">
@@ -102,7 +103,7 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
           <SectionHeader
             icon={section.kind === 'table' ? 'bi-table' : 'bi-card-text'}
             title={section.name}
-            color="#0ea5e9"
+            color="var(--info-text)"
             enabled={enabled}
             onToggle={toggleSection(section.id)}
             onDelete={() => onDelete(section)}
@@ -212,7 +213,7 @@ function BrandTableSection({ section, data, setData, renderPreset }) {
                         </td>
                       ))}
                       <td style={{ padding: 4, textAlign: 'center' }}>
-                        <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+                        <button type="button" className="btn btn-sm btn-outline-secondary border-0 text-danger"
                           onClick={() => removeRow(ri)} title="Remove row" style={{ padding: '2px 6px' }}>
                           <i className="bi bi-trash3" />
                         </button>
@@ -275,6 +276,7 @@ export function BuiltinExtras({
   sectionKey, sectionTitle, fields, data, setData, previousReport,
   disabled, onAddField, onRemoveField, curSym, comparisonLabel = 'Previous',
 }) {
+  const { ask, askText, notify } = useDialogs();
   const [adding, setAdding] = useState(false);
 
   function setValue(fieldId, fieldLabel, fieldType, v) {
@@ -308,12 +310,12 @@ export function BuiltinExtras({
   }
 
   async function handleRemove(field) {
-    const ok = window.confirm(
+    const ok = await ask(
       `Remove "${field.label}" from ${sectionTitle}?\n\nIt'll disappear from this report and from future reports for this brand. Existing reports keep their saved values.`
     );
     if (!ok) return;
     try { await onRemoveField(field.id); }
-    catch (err) { alert(err?.message || 'Could not remove the field.'); }
+    catch (err) { notify.error(err?.message || 'Could not remove the field.'); }
   }
 
   const hasFields = fields.length > 0;
@@ -346,7 +348,7 @@ export function BuiltinExtras({
           onCancel={() => setAdding(false)}
           onSave={async (def) => {
             try { await onAddField(def); setAdding(false); }
-            catch (err) { alert(err?.message || 'Could not save the field.'); }
+            catch (err) { notify.error(err?.message || 'Could not save the field.'); }
           }} />
       ) : (
         <button type="button"
@@ -384,7 +386,7 @@ function ExtraFieldCell({ field, labelText, value, prevValue, comparisonLabel = 
             color: 'var(--text-muted)', cursor: 'pointer',
             fontSize: '0.7rem', lineHeight: 1,
             opacity: hover ? 1 : 0,
-            transition: 'opacity 120ms',
+            transition: 'opacity var(--dur-fast) var(--ease-out)',
           }}>
           <i className="bi bi-x-lg" />
         </button>
@@ -448,8 +450,8 @@ function AddFieldInline({ onCancel, onSave }) {
         ) : <span />}
       </div>
       <div className="d-flex justify-content-end gap-2 mt-2">
-        <button type="button" className="btn btn-sm btn-light" onClick={onCancel}>Cancel</button>
-        <button type="button" className="btn btn-sm btn-dark"
+        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-primary"
           disabled={!canSave}
           onClick={() => onSave({
             label: label.trim(), type,
@@ -587,7 +589,7 @@ export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
                   value={f.options}
                   onChange={(e) => setFields((cur) => cur.map((x, idx) => idx === i ? { ...x, options: e.target.value } : x))} />
               ) : <span />}
-              <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+              <button type="button" className="btn btn-sm btn-outline-secondary border-0 text-danger"
                 disabled={fields.length === 1}
                 onClick={() => setFields((cur) => cur.filter((_, idx) => idx !== i))}
                 style={{ padding: '2px 8px' }}>
@@ -602,8 +604,8 @@ export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
         </div>
       )}
       <div className="d-flex justify-content-end gap-2">
-        <button type="button" className="btn btn-sm btn-light" onClick={reset}>Cancel</button>
-        <button type="button" className="btn btn-sm btn-dark" disabled={!canSave} onClick={submit}>
+        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={reset}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-primary" disabled={!canSave} onClick={submit}>
           Add section
         </button>
       </div>

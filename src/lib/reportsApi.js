@@ -1110,13 +1110,13 @@ export function emptyMonthlyReport() {
 }
 
 // ---------------------------------------------------------------------
-// REPORT_STATUSES — v1's color/icon palette for badges.
+// REPORT_STATUSES — badge palette; tones match ui/StatusBadge STATUS_TONES.report.
 // ---------------------------------------------------------------------
 export const REPORT_STATUSES = {
-  draft:     { label: 'Draft',     color: '#64748b', bg: '#f1f5f9', icon: 'bi-file-earmark-text' },
-  submitted: { label: 'Submitted', color: '#2563eb', bg: '#dbeafe', icon: 'bi-send-fill' },
-  verified:  { label: 'Verified',  color: '#7c3aed', bg: '#ede9fe', icon: 'bi-patch-check-fill' },
-  approved:  { label: 'Approved',  color: '#16a34a', bg: '#dcfce7', icon: 'bi-shield-check-fill' },
+  draft:     { label: 'Draft',     color: 'var(--text-secondary)', bg: 'var(--surface-2)', icon: 'bi-file-earmark-text' },
+  submitted: { label: 'Submitted', color: 'var(--info-text)', bg: 'var(--info-soft)', icon: 'bi-send-fill' },
+  verified:  { label: 'Verified',  color: 'var(--purple-text)', bg: 'var(--purple-soft)', icon: 'bi-patch-check-fill' },
+  approved:  { label: 'Approved',  color: 'var(--success-text)', bg: 'var(--success-soft)', icon: 'bi-shield-check-fill' },
 };
 
 // ---------------------------------------------------------------------
@@ -1437,6 +1437,34 @@ async function _listByType(type, { brandId = null, brandIds = null, limit = null
   return (data || []).map(_normReport);
 }
 
+// Slim, RLS-scoped status list for Today / Approvals (no jsonb payload, no
+// brand-id filter — can_view_brand already scopes the rows, so this needs no
+// BrandsContext round-trip first). Rows come back camelCased.
+export async function listReportStatuses({ since = null, types = null } = {}) {
+  let q = supabase
+    .from('reports')
+    .select('id, brand_id, type, status, period_start, period_end, period_label, rejection_note, author_id, submitted_at, updated_at, brand:brand_id(brand_name), author:author_id(display_name)')
+    .order('period_start', { ascending: false });
+  if (since) q = q.gte('period_start', since);
+  if (Array.isArray(types) && types.length) q = q.in('type', types);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => ({
+    id: r.id,
+    brandId: r.brand_id,
+    brandName: r.brand?.brand_name || '',
+    type: r.type,
+    status: r.status || 'draft',
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    periodLabel: r.period_label || '',
+    rejectionNote: r.rejection_note || '',
+    authorId: r.author_id,
+    authorName: r.author?.display_name || '',
+    submittedAt: r.submitted_at,
+    updatedAt: r.updated_at,
+  }));
+}
 // Single read by id, normalized.
 export async function getReportV1(id) {
   const { data, error } = await supabase

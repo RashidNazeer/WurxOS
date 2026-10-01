@@ -75,7 +75,7 @@ export default function EukaReportPreview({ storeId, store }) {
   const preview = autofill ? toFullReport(week, store?.name, autofill) : null;
 
   return (
-    <Section span={12} title="Weekly report — Euka preview" icon="bi-magic" color="#7c3aed"
+    <Section span={12} title="Weekly report — Euka preview" icon="bi-magic" color="var(--purple-text)"
       eyebrow="Boss-only preview. Pick a week to pull the exact stats Euka provides into the weekly-report layout. Nothing is saved — this is a live view, not a real report.">
       <div className="d-flex align-items-center flex-wrap gap-3 mb-2">
         <div className="d-inline-flex align-items-center gap-2">

@@ -97,7 +97,7 @@ export default function DangerZoneSection() {
           type="button"
           className="wx-btn"
           style={{
-            background: 'var(--danger)', color: '#fff', border: 0,
+            background: 'var(--danger)', color: 'var(--on-danger)', border: 0,
             fontWeight: 600, marginTop: 12,
           }}
           onClick={open}

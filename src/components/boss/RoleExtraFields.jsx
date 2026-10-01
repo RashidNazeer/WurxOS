@@ -141,7 +141,7 @@ export default function RoleExtraFields({
                     borderTop: i === 0 ? 'none' : '1px solid var(--border-subtle)',
                     cursor: disabled ? 'not-allowed' : 'pointer',
                     background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
-                    transition: 'background var(--dur-fast) var(--ease-out)',
+                    transition: 'background-color var(--dur-fast) var(--ease-out)',
                   }}
                 >
                   <div style={{ minWidth: 0, marginRight: 12 }}>
@@ -227,7 +227,7 @@ function MiniSwitch({ checked, disabled }) {
         position: 'relative',
         flex: '0 0 auto',
         opacity: disabled ? 0.5 : 1,
-        transition: 'background var(--dur-fast)',
+        transition: 'background-color var(--dur-fast) var(--ease-out)',
       }}
     >
       <span
@@ -240,8 +240,8 @@ function MiniSwitch({ checked, disabled }) {
           width: 16,
           height: 16,
           borderRadius: '50%',
-          background: '#fff',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+          background: 'var(--switch-knob)',
+          boxShadow: 'var(--shadow-sm)',
           transition: 'left var(--dur-fast) var(--ease-out)',
         }}
       />

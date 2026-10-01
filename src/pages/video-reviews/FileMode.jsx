@@ -248,7 +248,7 @@ export default function FileMode() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))' }}>
-              <i className="bi bi-filetype-xlsx" style={{ color: '#fff', fontSize: '1.05rem' }} />
+              <i className="bi bi-filetype-xlsx" style={{ color: 'var(--on-accent)', fontSize: '1.05rem' }} />
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>From TikTok file</div>
@@ -344,7 +344,7 @@ export default function FileMode() {
 
           <button className="vrx-cta" onClick={generate} disabled={generating || !brandId || !parsed}
             style={{ marginTop: 'auto', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              fontSize: 15, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 13, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 13, cursor: 'pointer',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
               boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent)' }}>
             {generating ? <><span className="wx-spinner" style={{ width: 16, height: 16 }} /> Working…</> : <><i className="bi bi-lightning-charge-fill" /> Generate review lists</>}
