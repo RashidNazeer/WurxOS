@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   ClockIcon, PaletteIcon, UserIcon, MegaphoneIcon, BoxIcon, StarIcon,
   BookmarkIcon, BellIcon, ReportIcon, HomeIcon, ShieldIcon, SearchIcon,
-  ChevronLeftIcon, TrashIcon, DiagramIcon, TiktokIcon,
+  ChevronLeftIcon, TrashIcon, DiagramIcon, TiktokIcon, RefreshIcon,
 } from '../../components/common/Icon';
 import TimeShiftSection      from './sections/TimeShiftSection';
 import ReportFieldsSection   from './sections/ReportFieldsSection';
@@ -24,6 +24,7 @@ import AdsManagerBrandsSection from './sections/AdsManagerBrandsSection';
 import TikTokAdsSection       from './sections/TikTokAdsSection';
 import PaidCollabCheckpointBrandsSection from './sections/PaidCollabCheckpointBrandsSection';
 import DangerZoneSection     from './sections/DangerZoneSection';
+import MaintenanceSection    from './sections/MaintenanceSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import MenuLayoutSection     from './sections/MenuLayoutSection';
 import BuddySection          from './sections/BuddySection';
@@ -108,6 +109,9 @@ const GROUPS = [
       { id: 'tiktokAds', label: 'TikTok Ads', sub: 'Connect ad accounts for GMV Max reporting',
         icon: TiktokIcon, component: TikTokAdsSection,
         roles: ['boss', 'ol', 'ads_manager'] },
+      { id: 'maintenance', label: 'Maintenance', sub: 'Repair week labels and other data fixes',
+        icon: RefreshIcon, component: MaintenanceSection,
+        roles: ['boss'] },
       { id: 'dangerZone', label: 'Danger Zone', sub: 'Wipe all operational data',
         icon: TrashIcon, component: DangerZoneSection,
         roles: ['boss'] },

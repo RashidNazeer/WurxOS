@@ -19,12 +19,14 @@ export function useForceLightTheme() {
     const root = document.documentElement;
     const prev = root.getAttribute('data-theme');
     root.setAttribute('data-theme', 'light');
+    root.setAttribute('data-bs-theme', 'light');
     return () => {
       // On unmount, restore whatever theme was active before this
       // portal page mounted. If nothing was set, default back to
       // the app's preferred dark.
-      if (prev) root.setAttribute('data-theme', prev);
-      else      root.setAttribute('data-theme', 'dark');
+      const next = prev || 'dark';
+      root.setAttribute('data-theme', next);
+      root.setAttribute('data-bs-theme', next);
     };
   }, []);
 }

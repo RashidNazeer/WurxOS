@@ -17,7 +17,7 @@ export default function AgendaSettingsPage() {
   const [tab, setTab] = useState('general');
 
   return (
-    <div style={{ padding: '32px 32px 48px', maxWidth: 760 }}>
+    <div style={{ paddingBottom: 48, maxWidth: 760 }}>
       <div className="mb-4">
         <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <i className="bi bi-calendar-week" style={{ fontSize: '1.15rem' }} />
@@ -111,7 +111,7 @@ function GeneralTab() {
           </div>
 
           <div className="d-flex align-items-center gap-2">
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
               onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save settings</>}
             </button>

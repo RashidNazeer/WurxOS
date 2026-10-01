@@ -11,6 +11,8 @@
 // font set on each of the 12 captures, which is what made it feel slow.
 // ============================================================
 
+import { withLightTheme } from './exportReportPdf';
+
 export const SLIDE_W = 1280;
 export const SLIDE_H = 720;
 
@@ -29,29 +31,31 @@ export async function exportCheckpointToPdf(container, { title = 'Weekly Checkpo
     try { await document.fonts.ready; } catch { /* ignore */ }
   }
 
-  // Embed all @font-face CSS once, then hand it to every capture so the fonts
-  // aren't re-fetched per slide (the main cost with 12 slides).
-  let fontEmbedCSS;
-  try { fontEmbedCSS = await htmlToImage.getFontEmbedCSS(slides[0]); } catch { fontEmbedCSS = undefined; }
-
   const pdf = new JsPDF({ unit: 'px', format: [SLIDE_W, SLIDE_H], orientation: 'landscape' });
+  // Slides are always captured in the light theme (see withLightTheme).
+  await withLightTheme(async () => {
+    // Embed all @font-face CSS once, then hand it to every capture so the fonts
+    // aren't re-fetched per slide (the main cost with 12 slides).
+    let fontEmbedCSS;
+    try { fontEmbedCSS = await htmlToImage.getFontEmbedCSS(slides[0]); } catch { fontEmbedCSS = undefined; }
 
-  for (let i = 0; i < slides.length; i++) {
-    if (onProgress) onProgress(i + 1, slides.length);
-    const canvas = await htmlToImage.toCanvas(slides[i], {
-      pixelRatio: 1.8,
-      cacheBust: false,
-      backgroundColor: '#ffffff',
-      width: SLIDE_W,
-      height: SLIDE_H,
-      fontEmbedCSS,
-      filter: (el) => !(el.classList && el.classList.contains('no-print')),
-    });
-    if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'landscape');
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, SLIDE_W, SLIDE_H);
-    // yield to the event loop so the progress label can paint between slides
-    await new Promise((r) => setTimeout(r, 0));
-  }
+    for (let i = 0; i < slides.length; i++) {
+      if (onProgress) onProgress(i + 1, slides.length);
+      const canvas = await htmlToImage.toCanvas(slides[i], {
+        pixelRatio: 1.8,
+        cacheBust: false,
+        backgroundColor: '#ffffff',
+        width: SLIDE_W,
+        height: SLIDE_H,
+        fontEmbedCSS,
+        filter: (el) => !(el.classList && el.classList.contains('no-print')),
+      });
+      if (i > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'landscape');
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, SLIDE_W, SLIDE_H);
+      // yield to the event loop so the progress label can paint between slides
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  });
 
   const safe = String(title).replace(/[\\/:*?"<>|]/g, '_').slice(0, 120).trim();
   pdf.save(`${safe || 'Weekly Checkpoint'}.pdf`);

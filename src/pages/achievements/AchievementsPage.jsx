@@ -6,6 +6,7 @@ import {
   monthLabel,
 } from '../../lib/achievementsApi';
 import { AlertIcon, CheckIcon, StarIcon } from '../../components/common/Icon';
+import { formatPKR } from '../../lib/format';
 import { CelebrationView } from '../../components/achievements/AchievementCelebration';
 
 const MAX_MSG = 100;
@@ -191,7 +192,7 @@ function AchievementCard({ type, month, record, onChanged }) {
         <FieldLabel>Reward (PKR)</FieldLabel>
         {locked ? (
           <div style={{ fontWeight: 700, fontSize: 14 }}>
-            {Number(record?.reward_amount || 0).toLocaleString()}
+            {formatPKR(record?.reward_amount || 0)}
             {record?.incentive_month && (
               <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--text-muted)', marginLeft: 8 }}>
                 added to {monthLabel(record.incentive_month)} incentives

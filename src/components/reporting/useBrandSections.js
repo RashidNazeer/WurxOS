@@ -18,6 +18,7 @@ import {
 import {
   countSectionPresetsForSection, deleteSectionPresetsForSection,
 } from '../../lib/reportSectionPresetsApi';
+import { useDialogs } from '../common/useDialogs';
 
 // `reportType` ('weekly' | 'biweekly' | 'monthly') scopes which sections this
 // form sees: only sections whose appliesTo includes this type (a section with
@@ -25,6 +26,7 @@ import {
 // this form default to appearing in THIS report type only. Omit reportType to
 // see/create for all types (back-compat).
 export function useBrandSections({ brandId, setData, reportType }) {
+  const { ask, askText, notify } = useDialogs();
   const [brandSectionDefs, setBrandSectionDefs] = useState([]);
   const [brandSectionExtras, setBrandSectionExtras] = useState({});
 
@@ -107,7 +109,7 @@ export function useBrandSections({ brandId, setData, reportType }) {
       ? `\n\nThis will ALSO permanently delete ${presetCount} saved preset${presetCount === 1 ? '' : 's'} for this section. `
         + 'Recreating a section with the same name will NOT bring them back.'
       : '';
-    const ok = window.confirm(
+    const ok = await ask(
       `Delete the custom section "${section.name}"?\n\n`
       + "It will be removed from this brand and won't appear on future "
       + 'reports. Reports already saved keep whatever they had.'
@@ -118,7 +120,7 @@ export function useBrandSections({ brandId, setData, reportType }) {
       await removeBrandSection(brandId, section.id);
       if (presetCount > 0) await deleteSectionPresetsForSection(brandId, section.id);
     } catch (err) {
-      alert('Failed to delete the section: ' + (err?.message || 'unknown error'));
+      notify.error('Failed to delete the section: ' + (err?.message || 'unknown error'));
       return;
     }
     setBrandSectionDefs((prev) => prev.filter((s) => s.id !== section.id));

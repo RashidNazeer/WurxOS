@@ -14,7 +14,7 @@
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .notif-bell:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .notif-bell-badge {
@@ -26,7 +26,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: var(--danger);
-  color: #fff;
+  color: var(--on-danger);
   font-size: 10.5px;
   font-weight: 700;
   display: grid;
@@ -43,7 +43,7 @@
   border-radius: inherit;
   border: 2px solid var(--danger);
   opacity: 0;
-  animation: notif-pulse 1.8s ease-out infinite;
+  animation: notif-pulse 1.8s var(--ease-out) infinite;
 }
 @keyframes notif-pulse {
   0%   { transform: scale(0.7); opacity: 0.55; }
@@ -65,7 +65,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: wx-pop 0.16s var(--ease-out);
+  animation: wx-rise var(--dur-enter) var(--ease-out);
 }
 .notif-panel-header {
   display: flex;
@@ -84,7 +84,7 @@
 }
 .notif-panel-title-count {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 10.5px;
   font-weight: 800;
   padding: 1px 7px;
@@ -106,7 +106,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .notif-panel-action:hover {
   color: var(--accent);
@@ -136,7 +136,7 @@
   border-radius: var(--radius-pill);
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -213,7 +213,7 @@
   text-align: left;
   color: inherit;
   position: relative;
-  transition: background var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .notif-item:hover { background: var(--surface-2); }
 .notif-item-unread::before {
@@ -258,14 +258,14 @@
   border: 2px solid var(--surface-1);
   font-size: 9px;
 }
-.notif-avatar-cat-task, .notif-avatar-cat-development { background: var(--accent); color: #fff; }
-.notif-avatar-cat-report { background: #818cf8;        color: #fff; }
-.notif-avatar-cat-brand  { background: #eab308;        color: #fff; }
-.notif-avatar-cat-paid_collab { background: #10b981;   color: #fff; }
-.notif-avatar-cat-leave  { background: #06b6d4;        color: #fff; }
-.notif-avatar-cat-resource { background: #ec4899;      color: #fff; }
-.notif-avatar-cat-performance { background: #f59e0b;   color: #fff; }
-.notif-avatar-cat-agenda { background: #6366f1;        color: #fff; }
+.notif-avatar-cat-task, .notif-avatar-cat-development { background: var(--accent); color: var(--on-accent); }
+.notif-avatar-cat-report { background: var(--purple); color: var(--on-purple); }
+.notif-avatar-cat-brand  { background: var(--warning); color: var(--on-warning); }
+.notif-avatar-cat-paid_collab { background: var(--success); color: var(--on-success); }
+.notif-avatar-cat-leave  { background: var(--info); color: var(--on-info); }
+.notif-avatar-cat-resource { background: var(--text-secondary); color: var(--surface-1); }
+.notif-avatar-cat-performance { background: var(--warning); color: var(--on-warning); }
+.notif-avatar-cat-agenda { background: var(--purple); color: var(--on-purple); }
 .notif-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-item-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -347,7 +347,7 @@
   cursor: pointer;
   text-align: left;
   position: relative;
-  transition: background var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .notif-row:last-child { border-bottom: 0; }
 .notif-row:hover { background: var(--surface-2); }
@@ -403,12 +403,11 @@
   display: grid;
   place-items: center;
   border: 2px solid var(--surface-1);
-  color: #fff;
 }
-.notif-row-avatar-cat-task   { background: var(--accent); }
-.notif-row-avatar-cat-report { background: #818cf8; }
-.notif-row-avatar-cat-brand  { background: #eab308; }
-.notif-row-avatar-cat-paid   { background: #10b981; }
+.notif-row-avatar-cat-task   { background: var(--accent); color: var(--on-accent); }
+.notif-row-avatar-cat-report { background: var(--purple); color: var(--on-purple); }
+.notif-row-avatar-cat-brand  { background: var(--warning); color: var(--on-warning); }
+.notif-row-avatar-cat-paid   { background: var(--success); color: var(--on-success); }
 .notif-row-avatar-cat-system { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-row-content { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -509,11 +508,11 @@
   box-shadow: var(--shadow-xl);
   padding: 13px 14px 11px 18px;
   overflow: hidden;
-  animation: notif-toast-in 0.42s var(--ease-out) both;
+  animation: notif-toast-in var(--dur-slow) var(--ease-out) both;
   will-change: transform, opacity;
 }
 .notif-toast.is-leaving {
-  animation: notif-toast-out 0.24s ease-in forwards;
+  animation: notif-toast-out var(--dur-exit) var(--ease-in) forwards;
   pointer-events: none;
 }
 @keyframes notif-toast-in {
@@ -557,19 +556,19 @@
   place-items: center;
   flex-shrink: 0;
   overflow: hidden;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
 }
 .notif-toast-icon img { width: 100%; height: 100%; object-fit: cover; }
 .notif-toast-icon-task        { background: var(--accent); }
-.notif-toast-icon-report      { background: #818cf8; }
-.notif-toast-icon-brand       { background: #eab308; }
-.notif-toast-icon-paid_collab { background: #10b981; }
-.notif-toast-icon-leave       { background: #06b6d4; }
-.notif-toast-icon-resource    { background: #ec4899; }
-.notif-toast-icon-performance { background: #f59e0b; }
-.notif-toast-icon-agenda      { background: #6366f1; }
-.notif-toast-icon-system      { background: var(--text-muted); }
+.notif-toast-icon-report      { background: var(--purple); color: var(--on-purple); }
+.notif-toast-icon-brand       { background: var(--warning); color: var(--on-warning); }
+.notif-toast-icon-paid_collab { background: var(--success); color: var(--on-success); }
+.notif-toast-icon-leave       { background: var(--info); color: var(--on-info); }
+.notif-toast-icon-resource    { background: var(--text-secondary); color: var(--surface-1); }
+.notif-toast-icon-performance { background: var(--warning); color: var(--on-warning); }
+.notif-toast-icon-agenda      { background: var(--purple); color: var(--on-purple); }
+.notif-toast-icon-system      { background: var(--text-muted); color: var(--surface-1); }
 
 .notif-toast-cat {
   font-size: 11px;
@@ -603,7 +602,7 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .notif-toast-x:hover { color: var(--text-primary); background: var(--surface-2); }
 
@@ -623,7 +622,7 @@
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.35;
-  transition: color var(--dur-fast);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 .notif-toast-body:hover .notif-toast-title { color: var(--accent); }
 .notif-toast-text {
@@ -669,7 +668,7 @@
   gap: 5px;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .notif-toast-markall:hover { color: var(--accent); background: var(--surface-2); }
 
@@ -681,10 +680,6 @@
     width: auto;
     max-width: none;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  .notif-toast { animation-duration: 0.01ms; }
-  .notif-toast.is-leaving { animation-duration: 0.01ms; }
 }
 
 /* Sidebar unread dot — tiny pulsing peach dot on nav items */
@@ -705,5 +700,5 @@
   border-radius: 50%;
   border: 2px solid var(--accent);
   opacity: 0;
-  animation: notif-pulse 1.8s ease-out infinite;
+  animation: notif-pulse 1.8s var(--ease-out) infinite;
 }

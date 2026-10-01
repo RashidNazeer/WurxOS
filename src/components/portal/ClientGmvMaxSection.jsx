@@ -51,7 +51,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
       borderRadius: 14, padding: '14px 16px',
       position: 'relative', overflow: 'hidden',
       backdropFilter: dark ? 'blur(10px) saturate(1.05)' : 'none',
-      transition: 'transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
+      transition: 'transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{
@@ -88,7 +88,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
           display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8,
           padding: '3px 10px', borderRadius: 999,
           background: delta.up ? (dark ? 'rgba(34, 197, 94, 0.22)' : '#dcfce7') : (dark ? 'rgba(239, 68, 68, 0.22)' : '#fef2f2'),
-          color: delta.up ? (dark ? '#86efac' : '#15803d') : (dark ? '#fca5a5' : '#991b1b'),
+          color: delta.up ? (dark ? '#86efac' : 'var(--success-text)') : (dark ? '#fca5a5' : 'var(--danger-text)'),
           fontSize: 10.5, fontWeight: 700,
           backdropFilter: dark ? 'blur(8px)' : 'none',
         }}>
@@ -114,7 +114,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
         ? `0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px ${WURX.border}, inset 0 1px 0 rgba(245, 213, 168, 0.08)`
         : `0 6px 18px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)`,
       border: isPrimary ? 'none' : `1px solid ${WURX.lightTintBorder}`,
-      minHeight: 280, color: isPrimary ? WURX.cream : '#0f172a',
+      minHeight: 280, color: isPrimary ? WURX.cream : 'var(--text-primary)',
     }}>
       {isPrimary && (
         <>
@@ -125,15 +125,15 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 14, position: 'relative' }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: isPrimary ? WURX.peach : '#94a3b8', marginBottom: 4 }}>{label}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: isPrimary ? WURX.cream : '#0f172a', letterSpacing: '-0.025em', lineHeight: 1.15 }}>{sublabel}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: isPrimary ? WURX.peach : 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: isPrimary ? WURX.cream : 'var(--text-primary)', letterSpacing: '-0.025em', lineHeight: 1.15 }}>{sublabel}</div>
           {report && <div style={{ fontSize: 11.5, color: isPrimary ? 'rgba(250, 247, 242, 0.55)' : '#64748b', marginTop: 4 }}>{report.period_start} → {report.period_end}</div>}
         </div>
         {prevReport && report && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 999, padding: '4px 10px',
             background: isPrimary ? 'rgba(245, 213, 168, 0.15)' : '#fef3e2',
-            color: isPrimary ? WURX.peach : '#92400e',
+            color: isPrimary ? WURX.peach : 'var(--warning-text)',
             fontSize: 10, fontWeight: 700,
             backdropFilter: 'blur(8px)',
             border: isPrimary ? `1px solid ${WURX.borderSoft}` : 'none',
@@ -152,7 +152,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
             display: 'grid', placeItems: 'center', fontSize: 22,
             border: isPrimary ? `1px solid ${WURX.borderSoft}` : 'none',
           }}>📊</div>
-          <div style={{ marginTop: 12, fontWeight: 700, fontSize: 14, color: isPrimary ? WURX.cream : '#475569' }}>No data yet</div>
+          <div style={{ marginTop: 12, fontWeight: 700, fontSize: 14, color: isPrimary ? WURX.cream : 'var(--text-secondary)' }}>No data yet</div>
           <div style={{ fontSize: 12, color: isPrimary ? 'rgba(250, 247, 242, 0.6)' : '#94a3b8', marginTop: 4 }}>GMV Max metrics for this period haven't been added yet.</div>
         </div>
       ) : (
@@ -176,7 +176,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: isPrimary ? WURX.peach : WURX.peachDeep }}>Notes</span>
           </div>
-          <div style={{ fontSize: 13, color: isPrimary ? WURX.cream : '#334155', lineHeight: 1.5 }}>{report.notes}</div>
+          <div style={{ fontSize: 13, color: isPrimary ? WURX.cream : 'var(--text-primary)', lineHeight: 1.5 }}>{report.notes}</div>
         </div>
       )}
     </div>
@@ -217,7 +217,7 @@ function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
         ? `0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px ${WURX.border}, inset 0 1px 0 rgba(245, 213, 168, 0.08)`
         : `0 6px 18px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)`,
       border: isActive ? 'none' : `1px solid ${WURX.lightTintBorder}`,
-      marginBottom: 16, color: isActive ? WURX.cream : '#0f172a',
+      marginBottom: 16, color: isActive ? WURX.cream : 'var(--text-primary)',
     }}>
       {isActive && (
         <>
@@ -229,10 +229,10 @@ function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
       <div style={{ marginBottom: 14, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
           <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: dark ? WURX.peach : '#94a3b8', marginBottom: 4 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: dark ? WURX.peach : 'var(--text-muted)', marginBottom: 4 }}>
               📣 Campaign
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: dark ? WURX.cream : '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2, wordBreak: 'break-word' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: dark ? WURX.cream : 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2, wordBreak: 'break-word' }}>
               {campaign.campaignName || 'Untitled Campaign'}
             </div>
           </div>
@@ -274,7 +274,7 @@ function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
           border: dark ? `1px solid ${WURX.borderSoft}` : `1px solid ${WURX.lightTintBorder}`,
         }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: dark ? WURX.peach : WURX.peachDeep, marginBottom: 4 }}>Notes</div>
-          <div style={{ fontSize: 13, color: dark ? WURX.cream : '#334155', lineHeight: 1.5 }}>{campaign.notes}</div>
+          <div style={{ fontSize: 13, color: dark ? WURX.cream : 'var(--text-primary)', lineHeight: 1.5 }}>{campaign.notes}</div>
         </div>
       )}
     </div>
@@ -353,10 +353,10 @@ function BrandBlock({ brand, allReports, year, monthIdx, view }) {
           <div style={{ textAlign: 'center', padding: '36px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '2px dashed var(--border)' }}>
             <div style={{
               width: 56, height: 56, borderRadius: '50%',
-              background: '#f1f5f9', color: '#94a3b8',
+              background: 'var(--surface-2)', color: 'var(--text-muted)',
               display: 'inline-grid', placeItems: 'center', marginBottom: 10, fontSize: 22,
             }}>📣</div>
-            <div style={{ fontWeight: 700, color: '#475569', fontSize: 14 }}>
+            <div style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: 14 }}>
               No campaigns for {MONTH_NAMES[monthIdx]} {year}
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
@@ -452,11 +452,11 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
             <NavBtn onClick={prevMonthClick}>‹</NavBtn>
             <select value={monthIdx} onChange={e => setMonthIdx(Number(e.target.value))}
               style={navSelect}>
-              {MONTH_NAMES.map((m, i) => <option key={m} value={i} style={{ color: '#0f172a', background: '#fff' }}>{m}</option>)}
+              {MONTH_NAMES.map((m, i) => <option key={m} value={i} style={{ color: 'var(--text-primary)', background: 'var(--surface-1)' }}>{m}</option>)}
             </select>
             <select value={year} onChange={e => setYear(Number(e.target.value))} style={navSelect}>
               {[today.getFullYear() - 2, today.getFullYear() - 1, today.getFullYear(), today.getFullYear() + 1].map(y => (
-                <option key={y} value={y} style={{ color: '#0f172a', background: '#fff' }}>{y}</option>
+                <option key={y} value={y} style={{ color: 'var(--text-primary)', background: 'var(--surface-1)' }}>{y}</option>
               ))}
             </select>
             <NavBtn onClick={nextMonthClick}>›</NavBtn>
@@ -492,7 +492,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
                   border: 'none', borderRadius: 10,
                   padding: '8px 18px', fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em',
                   boxShadow: isActive ? `0 4px 14px rgba(0,0,0,0.25), 0 0 0 1px ${WURX.borderSoft}` : 'none',
-                  transition: 'all 150ms ease', cursor: 'pointer',
+                  transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)', cursor: 'pointer',
                 }}>
                 {t.label}
               </button>

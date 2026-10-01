@@ -3,18 +3,19 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { countProfilesByRole } from '../../lib/adminApi';
 import { repairWeekLabels } from '../../lib/reportsApi';
+import { useConfirm } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   UsersIcon, ShieldIcon, AlertIcon, PlusIcon, ArrowRightIcon, RefreshIcon,
 } from '../../components/common/Icon';
 
 const CARDS = [
-  { role: 'ol',        label: 'Operation Leads',        to: '/boss/manage/ols',        accent: '#6366f1' },
-  { role: 'tl',        label: 'Team Leads',             to: '/boss/manage/tls',        accent: '#10b981' },
-  { role: 'pctl',      label: 'Paid Collab TLs',        to: '/boss/manage/pctls',      accent: '#f59e0b' },
-  { role: 'apc',       label: 'APCs',                   to: '/boss/manage/apcs',       accent: '#06b6d4' },
-  { role: 'ipc',       label: 'IPCs',                   to: '/boss/manage/ipcs',       accent: '#ec4899' },
-  { role: 'developer', label: 'Developers',             to: '/boss/manage/developers', accent: '#8b5cf6' },
+  { role: 'ol',        label: 'Operation Leads',        to: '/boss/manage/ols',        accent: 'var(--chart-4)' },
+  { role: 'tl',        label: 'Team Leads',             to: '/boss/manage/tls',        accent: 'var(--chart-2)' },
+  { role: 'pctl',      label: 'Paid Collab TLs',        to: '/boss/manage/pctls',      accent: 'var(--chart-3)' },
+  { role: 'apc',       label: 'APCs',                   to: '/boss/manage/apcs',       accent: 'var(--chart-6)' },
+  { role: 'ipc',       label: 'IPCs',                   to: '/boss/manage/ipcs',       accent: 'var(--chart-5)' },
+  { role: 'developer', label: 'Developers',             to: '/boss/manage/developers', accent: 'var(--purple-text)' },
 ];
 
 export default function BossDashboard() {
@@ -110,12 +111,13 @@ export default function BossDashboard() {
 //     numbering inconsistent.
 // --------------------------------------------------------------
 function MaintenanceSection() {
+  const confirm = useConfirm();
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [err, setErr] = useState('');
 
   async function runRepair() {
-    if (!confirm('Recompute Week labels for every weekly report on every brand? Safe — only updates labels.')) return;
+    if (!(await confirm({ title: 'Repair week labels?', message: 'Recompute Week labels for every weekly report on every brand? Safe — only updates labels.', confirmLabel: 'Repair labels' }))) return;
     setRunning(true); setErr(''); setResult(null);
     try {
       const r = await repairWeekLabels();
@@ -179,7 +181,7 @@ function StatCard({ label, value, accent, to }) {
         display: 'block',
         textDecoration: 'none',
         color: 'inherit',
-        transition: 'transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast)',
+        transition: 'transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-2px)';
@@ -196,7 +198,7 @@ function StatCard({ label, value, accent, to }) {
             width: 36,
             height: 36,
             borderRadius: 'var(--radius-md)',
-            background: `${accent}1e`,
+            background: `color-mix(in srgb, ${accent} 12%, transparent)`,
             color: accent,
             display: 'grid',
             placeItems: 'center',

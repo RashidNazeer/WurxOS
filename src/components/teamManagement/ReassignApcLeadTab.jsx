@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadTeamMembers, reassignApcLead } from '../../utils/teamManagementService';
+import { Button } from '../ui';
 
 export default function ReassignApcLeadTab() {
   const { user, profile } = useAuth();
@@ -90,7 +91,7 @@ export default function ReassignApcLeadTab() {
     <div>
       <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <div className="rounded-2 d-flex align-items-center justify-content-center"
-          style={{ width: 32, height: 32, background: '#fef3c7', color: '#d97706' }}>
+          style={{ width: 32, height: 32, background: 'var(--warning-soft)', color: 'var(--warning-text)' }}>
           <i className="bi bi-arrow-left-right" style={{ fontSize: '0.9rem' }} />
         </div>
         <div>
@@ -137,9 +138,9 @@ export default function ReassignApcLeadTab() {
                       <button key={a.id} type="button"
                         className="btn text-start"
                         style={{
-                          background: isSel ? '#0ea5e91a' : '#fff',
-                          border: `1px solid ${isSel ? '#0ea5e9' : '#e9ecef'}`,
-                          color: isSel ? '#0369a1' : '#1e293b',
+                          background: isSel ? 'var(--info-soft)' : 'var(--surface-1)',
+                          border: `1px solid ${isSel ? 'var(--info)' : 'var(--border-subtle)'}`,
+                          color: isSel ? 'var(--info-text)' : 'var(--text-primary)',
                           borderRadius: 10,
                           padding: '8px 12px',
                           fontSize: '0.78rem',
@@ -154,7 +155,7 @@ export default function ReassignApcLeadTab() {
                               {a.ownerName ? ` · TL: ${a.ownerName}` : ' · No TL'}
                             </div>
                           </div>
-                          {isSel && <i className="bi bi-check-circle-fill" style={{ color: '#0ea5e9' }} />}
+                          {isSel && <i className="bi bi-check-circle-fill" style={{ color: 'var(--info-text)' }} />}
                         </div>
                       </button>
                     );
@@ -186,9 +187,9 @@ export default function ReassignApcLeadTab() {
                           className="btn text-start"
                           disabled={isCurrent}
                           style={{
-                            background: isSel ? '#16a34a1a' : isCurrent ? '#f8fafc' : '#fff',
-                            border: `1px solid ${isSel ? '#16a34a' : isCurrent ? '#cbd5e1' : '#e9ecef'}`,
-                            color: isSel ? '#15803d' : isCurrent ? '#94a3b8' : '#1e293b',
+                            background: isSel ? 'var(--success-soft)' : isCurrent ? 'var(--surface-2)' : 'var(--surface-1)',
+                            border: `1px solid ${isSel ? 'var(--success)' : isCurrent ? 'var(--border-default)' : 'var(--border-subtle)'}`,
+                            color: isSel ? 'var(--success-text)' : isCurrent ? 'var(--text-muted)' : 'var(--text-primary)',
                             borderRadius: 10,
                             padding: '8px 12px',
                             fontSize: '0.78rem',
@@ -203,7 +204,7 @@ export default function ReassignApcLeadTab() {
                                 {t.role?.toUpperCase()}{isCurrent ? ' · Currently this APC\'s TL' : ''}
                               </div>
                             </div>
-                            {isSel && <i className="bi bi-check-circle-fill" style={{ color: '#16a34a' }} />}
+                            {isSel && <i className="bi bi-check-circle-fill" style={{ color: 'var(--success-text)' }} />}
                           </div>
                         </button>
                       );
@@ -217,28 +218,27 @@ export default function ReassignApcLeadTab() {
           {/* Confirm bar */}
           {selectedApc && selectedTL && !sameTl && (
             <div className="col-12">
-              <div className="card border-0 shadow-sm" style={{ borderRadius: 14, background: 'linear-gradient(135deg, #fffbeb, #ffffff)', border: '1px solid #fde68a' }}>
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 14, background: 'linear-gradient(135deg, var(--warning-soft), var(--surface-1))', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                 <div className="card-body p-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                   <div className="d-flex align-items-center gap-2">
-                    <i className="bi bi-info-circle-fill" style={{ color: '#d97706', fontSize: '1rem' }} />
+                    <i className="bi bi-info-circle-fill" style={{ color: 'var(--warning-text)', fontSize: '1rem' }} />
                     <div className="small">
                       <strong>{selectedApc.name}</strong>
                       {' will move from '}
-                      <span style={{ color: '#dc2626', fontWeight: 600 }}>{selectedApc.ownerName || 'no TL'}</span>
+                      <span style={{ color: 'var(--danger-text)', fontWeight: 600 }}>{selectedApc.ownerName || 'no TL'}</span>
                       {' to '}
-                      <span style={{ color: '#16a34a', fontWeight: 600 }}>{selectedTL.name}</span>
+                      <span style={{ color: 'var(--success-text)', fontWeight: 600 }}>{selectedTL.name}</span>
                       {`. ${(selectedApc.assignedBrands || []).length} brand${(selectedApc.assignedBrands || []).length === 1 ? '' : 's'} will follow.`}
                     </div>
                   </div>
                   <div className="d-flex gap-2">
-                    <button className="btn btn-sm btn-outline-secondary px-3"
+                    <Button variant="secondary" size="sm"
                       onClick={() => { setSelectedApcId(''); setSelectedTLId(''); }}
-                      disabled={saving}>Cancel</button>
-                    <button className="btn btn-sm btn-warning px-3 d-inline-flex align-items-center gap-1"
-                      style={{ borderRadius: 8 }}
+                      disabled={saving}>Cancel</Button>
+                    <Button size="sm" icon={<i className="bi bi-arrow-left-right" />}
                       onClick={() => setConfirming(true)} disabled={saving}>
-                      <i className="bi bi-arrow-left-right" /> Reassign
-                    </button>
+                      Reassign
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -250,12 +250,12 @@ export default function ReassignApcLeadTab() {
       {/* Confirm modal */}
       {confirming && selectedApc && selectedTL && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)' }} onClick={() => setConfirming(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={() => setConfirming(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', maxWidth: 460, borderRadius: 14 }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-center gap-3 mb-3">
                 <div className="rounded-circle d-flex align-items-center justify-content-center"
-                  style={{ width: 48, height: 48, background: '#fef3c7', color: '#d97706' }}>
+                  style={{ width: 48, height: 48, background: 'var(--warning-soft)', color: 'var(--warning-text)' }}>
                   <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: '1.2rem' }} />
                 </div>
                 <div>
@@ -264,7 +264,7 @@ export default function ReassignApcLeadTab() {
                 </div>
               </div>
               <div className="mb-3 small">
-                <div className="rounded-2 p-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div className="rounded-2 p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div><strong>APC:</strong> {selectedApc.name}</div>
                   <div><strong>From TL:</strong> {selectedApc.ownerName || '—'}</div>
                   <div><strong>To TL:</strong> {selectedTL.name}</div>
@@ -275,10 +275,10 @@ export default function ReassignApcLeadTab() {
                 </div>
               </div>
               <div className="d-flex gap-2 justify-content-end">
-                <button className="btn btn-sm btn-outline-secondary px-3" onClick={() => setConfirming(false)} disabled={saving}>Cancel</button>
-                <button className="btn btn-sm btn-warning px-3 d-inline-flex align-items-center gap-1" onClick={handleReassign} disabled={saving}>
-                  {saving ? <><span className="spinner-border spinner-border-sm" /> Reassigning…</> : <><i className="bi bi-check2" /> Confirm</>}
-                </button>
+                <Button variant="secondary" size="sm" onClick={() => setConfirming(false)} disabled={saving}>Cancel</Button>
+                <Button size="sm" onClick={handleReassign} loading={saving} icon={<i className="bi bi-check2" />}>
+                  {saving ? 'Reassigning…' : 'Confirm'}
+                </Button>
               </div>
             </div>
           </div>

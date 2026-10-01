@@ -26,13 +26,60 @@
 //   Charts capture at their real on-dashboard size, so they keep
 //   correct scaling / aspect ratio with no overflow.
 //
-//   The export reflects whatever theme the app is in (light/dark) —
-//   most users are on light; a light document is the clean default.
+//   The export ALWAYS renders in the light theme (withLightTheme): a
+//   client-facing PDF from a dark-mode user must not come out black.
 // ============================================================
 
 // Keep the raster within the browser's ~16384px canvas limit even
 // for very long reports — pixelRatio scales down past this.
 const MAX_CANVAS_PX = 14000;
+
+// Flip <html> to the light theme for the duration of a capture, then put the
+// user's theme back. html-to-image copies computed styles from the live DOM,
+// so the attributes have to be on the real document, not a clone. Every
+// [data-theme='dark'] descendant rule keys off <html>, which is why a scoped
+// attribute on the node alone isn't enough. No reload, no ThemeContext change.
+// Re-entrant: only the outermost call saves and restores. Restores the exact
+// attributes it found (pages like the portal force light without touching
+// storage) unless the user toggled the theme mid-capture, which then wins.
+let lightDepth = 0;
+let savedTheme = null;
+let savedBs = null;
+let savedPersisted = null;
+
+function persistedTheme() {
+  try {
+    const t = localStorage.getItem('wurxos-theme');
+    return t === 'light' || t === 'dark' ? t : null;
+  } catch { return null; }
+}
+
+export async function withLightTheme(fn) {
+  const root = document.documentElement;
+  if (lightDepth++ === 0) {
+    savedTheme = root.getAttribute('data-theme');
+    savedBs = root.getAttribute('data-bs-theme');
+    savedPersisted = persistedTheme();
+    root.setAttribute('data-theme', 'light');
+    root.setAttribute('data-bs-theme', 'light');
+  }
+  try {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return await fn();
+  } finally {
+    if (--lightDepth === 0) {
+      const now = persistedTheme();
+      if (now && now !== savedPersisted) {
+        root.setAttribute('data-theme', now);
+        root.setAttribute('data-bs-theme', now);
+      } else {
+        if (savedTheme === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', savedTheme);
+        if (savedBs === null) root.removeAttribute('data-bs-theme'); else root.setAttribute('data-bs-theme', savedBs);
+      }
+      savedTheme = savedBs = savedPersisted = null;
+    }
+  }
+}
 
 /**
  * Export a report view to a single-page PDF and download it.
@@ -68,12 +115,12 @@ export async function exportReportToPdf(node, { title = 'Report' } = {}) {
   // screen-only controls; cacheBust avoids stale cached images.
   // An opaque white backgroundColor guarantees no transparent
   // pixels (which would turn black once embedded as JPEG).
-  const canvas = await htmlToImage.toCanvas(node, {
+  const canvas = await withLightTheme(() => htmlToImage.toCanvas(node, {
     pixelRatio,
     cacheBust: true,
     backgroundColor: '#ffffff',
     filter: (el) => !(el.classList && el.classList.contains('no-print')),
-  });
+  }));
 
   // One PDF page sized exactly to the whole report — page
   // dimensions in CSS px (canvas px divided back by pixelRatio).

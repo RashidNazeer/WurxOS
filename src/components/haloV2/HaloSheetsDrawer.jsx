@@ -37,11 +37,11 @@ export default function HaloSheetsDrawer({ selected, onClose, onRefresh, onDelet
   return createPortal(
     // z-index 995 keeps the share modal (backdrop 1000) able to stack on top.
     <div style={{ position: 'fixed', inset: 0, zIndex: 995 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} />
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} />
       <div
         role="dialog"
         aria-label={`Sheets for ${brand.brand_name}`}
-        style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 'min(460px, 94vw)', background: 'var(--surface-1, #16161c)', borderLeft: '1px solid var(--border-default)', boxShadow: '-10px 0 40px rgba(0,0,0,0.28)', display: 'flex', flexDirection: 'column' }}
+        style={{ position: 'absolute', top: 0, right: 0, height: '100%', width: 'min(460px, 94vw)', background: 'var(--surface-1, #16161c)', borderLeft: '1px solid var(--border-default)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)', flex: '0 0 auto' }}>
           <div>
@@ -132,7 +132,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <strong style={{ fontSize: 12.5 }}>{meta.label}</strong>
         {dataset ? (
-          <span style={{ fontSize: 10.5, color: '#22c55e', fontWeight: 700 }}>✓ uploaded</span>
+          <span style={{ fontSize: 10.5, color: 'var(--success-text)', fontWeight: 700 }}>✓ uploaded</span>
         ) : (
           <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>none yet</span>
         )}
@@ -142,7 +142,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
       {dataset && (
         <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
           <strong style={{ color: 'var(--text-primary)' }}>{dataset.row_count}</strong> {rowsWord} · {dataset.period_start} → {dataset.period_end}
-          {' · '}<button type="button" onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--danger, #ef4444)', cursor: 'pointer', padding: 0, fontSize: 11.5 }}>Delete</button>
+          {' · '}<button type="button" onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--danger, var(--danger-text))', cursor: 'pointer', padding: 0, fontSize: 11.5 }}>Delete</button>
         </div>
       )}
 
@@ -150,7 +150,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
         aria-label={`Upload ${meta.label.toLowerCase()}`}
         onChange={(e) => onFile(e.target.files?.[0] || null)} />
 
-      {parseErr && <div style={{ fontSize: 11.5, color: 'var(--danger, #ef4444)' }}>{parseErr}</div>}
+      {parseErr && <div style={{ fontSize: 11.5, color: 'var(--danger, var(--danger-text))' }}>{parseErr}</div>}
 
       {parsed && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
@@ -160,7 +160,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
           </div>
           {parsed.products?.length > 0 && <div>Products: <strong style={{ color: 'var(--text-primary)' }}>{parsed.products.join(', ')}</strong></div>}
           {parsed.volumeKeywords?.length > 0 && <div>Search keywords: <strong style={{ color: 'var(--text-primary)' }}>{parsed.volumeKeywords.join(', ')}</strong></div>}
-          {parsed.warnings?.length > 0 && <div style={{ color: 'var(--warning, #f59e0b)' }}>⚠ {parsed.warnings.join(' ')}</div>}
+          {parsed.warnings?.length > 0 && <div style={{ color: 'var(--warning, var(--warning-text))' }}>⚠ {parsed.warnings.join(' ')}</div>}
           {parsed.missingColumns?.length > 0 && (
             <div style={{ color: parsed.missingAnchors?.length ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)' }}>
               ⚠ Not recognised: {parsed.missingColumns.map((m) => m.label).join(', ')}
@@ -252,15 +252,15 @@ function WeeklySearchBuilder({ brand, dailyDataset, hasWeekly, onDone }) {
           </div>
 
           {!dailyDataset ? (
-            <div style={{ color: 'var(--warning, #f59e0b)' }}>⚠ Upload the daily sheet first. The weekly build rolls it up for the metrics.</div>
+            <div style={{ color: 'var(--warning, var(--warning-text))' }}>⚠ Upload the daily sheet first. The weekly build rolls it up for the metrics.</div>
           ) : (
             <>
               <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="wx-input" style={{ fontSize: 11.5 }}
                 aria-label="Upload a weekly search volume roll-up sheet"
                 onChange={(e) => onFile(e.target.files?.[0] || null)} />
 
-              {err && <div style={{ color: 'var(--danger, #ef4444)' }}>{err}</div>}
-              {note && <div style={{ color: '#22c55e' }}>✓ {note}</div>}
+              {err && <div style={{ color: 'var(--danger, var(--danger-text))' }}>{err}</div>}
+              {note && <div style={{ color: 'var(--success-text)' }}>✓ {note}</div>}
 
               {sv && (
                 <>

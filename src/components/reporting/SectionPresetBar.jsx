@@ -172,7 +172,7 @@ export default function SectionPresetBar({
                   style={{
                     borderRadius: 8, fontSize: '0.74rem', fontWeight: 700,
                     background: canSave ? accent : 'var(--surface-3)',
-                    color: canSave ? '#fff' : 'var(--text-muted)',
+                    color: canSave ? 'var(--text-inverse)' : 'var(--text-muted)',
                     border: 'none', opacity: canSave ? 1 : 0.7, cursor: canSave ? 'pointer' : 'not-allowed',
                   }}
                   disabled={!canSave}
@@ -216,9 +216,9 @@ export default function SectionPresetBar({
                       </span>
                       <div className="d-flex gap-1 ms-auto">
                         <button type="button" className="btn btn-sm"
-                          style={{ borderRadius: 6, fontSize: '0.7rem', fontWeight: 700, background: accent, color: '#fff', border: 'none' }}
+                          style={{ borderRadius: 6, fontSize: '0.7rem', fontWeight: 700, background: accent, color: 'var(--text-inverse)', border: 'none' }}
                           onClick={() => doRestore(p)}>Replace</button>
-                        <button type="button" className="btn btn-sm btn-light"
+                        <button type="button" className="btn btn-sm btn-outline-secondary"
                           style={{ borderRadius: 6, fontSize: '0.7rem' }}
                           onClick={() => setConfirmingId(null)}>Cancel</button>
                       </div>
@@ -243,7 +243,7 @@ export default function SectionPresetBar({
                           <i className="bi bi-arrow-down-circle" /> Restore
                         </button>
                         <button type="button"
-                          className="btn btn-sm btn-light border-0 text-danger"
+                          className="btn btn-sm btn-outline-secondary border-0 text-danger"
                           style={{ padding: '2px 8px', fontSize: '0.7rem' }}
                           onClick={() => handleDelete(p)}
                           title="Delete this preset">

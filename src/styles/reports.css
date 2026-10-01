@@ -19,7 +19,7 @@
   border: 0;
   border-radius: 999px;
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .report-tab:hover { color: var(--text-primary); }
 .report-tab-active { background: var(--surface-1); color: var(--accent); box-shadow: var(--shadow-sm); }
@@ -58,9 +58,10 @@
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
-.report-card:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.report-card:hover { transform: translateY(-1px); border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.report-card:active { transform: scale(0.98); }
 .report-card-head {
   display: flex; align-items: center; gap: 10px; min-width: 0;
 }
@@ -127,7 +128,7 @@
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color var(--dur-fast);
+  transition: color var(--dur-fast) var(--ease-out);
   align-self: flex-start;
 }
 .report-back:hover { color: var(--accent); }
@@ -424,7 +425,9 @@
 .rich-content h2 { font-size: 1.25rem; font-weight: 700; margin: 0.5em 0; }
 .rich-content h3 { font-size: 1.05rem; font-weight: 600; margin: 0.4em 0; }
 .rich-content a { color: var(--accent); text-decoration: underline; }
-.rich-content,
+/* Descendants only: strip fonts baked into pasted HTML so everything inherits
+   the container's reading font (.rich-content gets --font-content in global.css;
+   including .rich-content itself here would override that). */
 .rich-content *:not(code):not(pre):not(kbd):not(samp) {
   font-family: inherit !important;
 }
@@ -483,7 +486,7 @@ mark.rh[data-color='orange'][data-intensity='dark']   { background: #fb923c; col
   text-align: left;
   color: var(--text-primary);
   font-size: 13px;
-  transition: all var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .period-picker-item:hover { border-color: var(--accent); background: var(--accent-soft); }
 .period-picker-item[data-used='true'] { opacity: 0.5; cursor: not-allowed; }

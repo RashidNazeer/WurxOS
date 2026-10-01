@@ -59,7 +59,7 @@ export default function GoalBar({ approved, goal, label, compact = false }) {
         </span>
       </div>
       <div style={{ height: compact ? 6 : 8, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: 999, transition: 'width 0.4s var(--ease-out)' }} />
+        <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );

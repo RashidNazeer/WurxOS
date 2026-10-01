@@ -492,7 +492,7 @@ function EditIPCModal({ ipc, brands, brandsPending, brandsError, isOL, onClose, 
                   <span style={{
                     marginLeft: 8, fontSize: 10.5, fontWeight: 700,
                     padding: '2px 8px', borderRadius: 999,
-                    background: 'var(--accent)', color: '#fff',
+                    background: 'var(--accent)', color: 'var(--on-accent)',
                   }}>{assigned.length}</span>
                 )}
               </label>

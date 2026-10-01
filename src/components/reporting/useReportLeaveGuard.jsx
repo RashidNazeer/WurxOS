@@ -116,11 +116,11 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1080,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 16, background: 'rgba(15,23,42,0.55)',
+      padding: 16, background: 'var(--backdrop)',
     }}>
       <div className="rounded-3" style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        boxShadow: '0 24px 64px rgba(2,6,23,0.45)', maxWidth: 440, width: '100%',
+        boxShadow: 'var(--shadow-xl)', maxWidth: 440, width: '100%',
         padding: '22px 22px 18px',
       }}>
         <div className="d-flex align-items-start gap-3 mb-2">

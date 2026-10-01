@@ -389,8 +389,10 @@ export function _normLeave(row) {
     startDate:       row.start_date || '',
     endDate:         row.end_date || '',
     reason:          row.reason || '',
-    paidDays:        Number(row.paid_days || 0),
-    unpaidDays:      Number(row.unpaid_days || 0),
+    // null = the server never stored a count (legacy rows); 0 is a real 0,
+    // e.g. a range that falls entirely on company holidays.
+    paidDays:        row.paid_days == null ? null : Number(row.paid_days),
+    unpaidDays:      row.unpaid_days == null ? null : Number(row.unpaid_days),
     isPaidTimeOff:   Number(row.unpaid_days || 0) === 0,
     requestedBy:     row.requester_id || null,
     requesterName:   row.requester?.display_name || '',

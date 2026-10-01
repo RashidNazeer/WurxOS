@@ -447,15 +447,15 @@ export default function PerformanceSimulatorPage() {
       </div>
 
       <div className="rounded-3 p-2 px-3 mb-4 d-inline-flex align-items-center gap-2"
-        style={{ background: 'color-mix(in srgb, var(--info,#0d6efd) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--info,#0d6efd) 30%, transparent)' }}>
-        <i className="bi bi-shield-lock-fill" style={{ color: 'var(--info,#0d6efd)' }} />
+        style={{ background: 'color-mix(in srgb, var(--info) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)' }}>
+        <i className="bi bi-shield-lock-fill" style={{ color: 'var(--info)' }} />
         <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>This is a private what-if tool. Nothing here ever changes your real score or salary — it only reads your current numbers to start you off.</span>
       </div>
 
       {loading ? (
         <div className="text-muted small d-flex align-items-center gap-2"><span className="spinner-border spinner-border-sm" /> Loading your performance…</div>
       ) : err ? (
-        <div className="rounded-3 p-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger)', fontSize: '0.85rem' }}>
+        <div className="rounded-3 p-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger-text)', fontSize: '0.85rem' }}>
           <i className="bi bi-exclamation-triangle me-2" />{err}
         </div>
       ) : (
@@ -641,14 +641,14 @@ export default function PerformanceSimulatorPage() {
                     <div className="d-inline-flex align-items-center justify-content-center rounded-circle my-2" style={{ width: 118, height: 118, background: level.bg, border: `4px solid ${level.color}` }}>
                       <span className="fw-bold" style={{ fontSize: simComposite == null ? '1.2rem' : '2.6rem', color: level.color, fontVariantNumeric: 'tabular-nums' }}>{simComposite == null ? 'Not rated' : simComposite}</span>
                     </div>
-                    <div className="d-flex align-items-center justify-content-center gap-1"><i className={`bi ${level.icon}`} style={{ color: level.color }} /><span className="fw-bold" style={{ color: level.color }}>{level.label}</span></div>
+                    <div className="d-flex align-items-center justify-content-center gap-1"><i className={`bi ${level.icon}`} style={{ color: level.color }} /><span className="fw-bold" style={{ color: level.color }}>{level.label === 'Termination' ? 'At risk' : level.label}</span></div>
                     <div className="d-flex align-items-center justify-content-center gap-2 mt-2" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                       <span>Your current: <strong style={{ color: 'var(--text-secondary)' }}>{realCompositeText}</strong></span>
                       {delta != null && delta !== 0 && (
                         <span className="badge rounded-pill" style={{ background: delta > 0 ? 'var(--success-soft)' : 'var(--danger-soft)', color: delta > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 800 }}><i className={`bi ${delta > 0 ? 'bi-arrow-up' : 'bi-arrow-down'}`} /> {Math.abs(delta)}</span>
                       )}
                     </div>
-                    {withheldReason && <div className="rounded-2 mt-3 px-2 py-2 text-start d-flex gap-2" style={{ background: 'var(--warning-soft)', fontSize: '0.68rem', color: 'var(--warning)' }}><i className="bi bi-info-circle mt-1" /><span>{withheldReason}</span></div>}
+                    {withheldReason && <div className="rounded-2 mt-3 px-2 py-2 text-start d-flex gap-2" style={{ background: 'var(--warning-soft)', fontSize: '0.68rem', color: 'var(--warning-text)' }}><i className="bi bi-info-circle mt-1" /><span>{withheldReason}</span></div>}
                   </div>
                 </div>
 
@@ -662,7 +662,7 @@ export default function PerformanceSimulatorPage() {
                           {p.present ? <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{Math.round(p.score)}<span className="text-muted" style={{ fontWeight: 500 }}> × {Math.round(p.effWeight)}% = {Math.round(p.contribution)}</span></span> : <span className="text-muted" style={{ fontSize: '0.68rem' }}>Not counted</span>}
                         </div>
                         <div className="rounded-pill overflow-hidden mt-1" style={{ height: 6, background: 'var(--surface-2)' }}>
-                          <div className="h-100 rounded-pill" style={{ width: `${p.present ? p.score : 0}%`, background: p.present ? getLevelTokens(p.score).color : 'var(--border-default)', transition: 'width .35s' }} />
+                          <div className="h-100 rounded-pill" style={{ width: `${p.present ? p.score : 0}%`, background: p.present ? getLevelTokens(p.score).color : 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                         </div>
                       </div>
                     ))}

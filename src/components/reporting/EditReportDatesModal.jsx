@@ -178,7 +178,7 @@ function MonthlyEditor({ report, siblings, onSaved, onClose }) {
 function Shell({ title, subtitle, onClose, children }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14, overflow: 'hidden' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start justify-content-between mb-3">
@@ -188,7 +188,7 @@ function Shell({ title, subtitle, onClose, children }) {
               </h6>
               {subtitle && <div className="text-muted small mt-1">{subtitle}</div>}
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
+            <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={onClose}
               style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className="bi bi-x-lg" style={{ fontSize: '0.8rem' }} />
             </button>
@@ -204,7 +204,7 @@ function Footer({ saving, disabled, onSave, onClose }) {
   return (
     <div className="d-flex justify-content-end gap-2">
       <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-      <button className="btn btn-sm btn-dark px-4 d-inline-flex align-items-center gap-1"
+      <button className="btn btn-sm btn-primary px-4 d-inline-flex align-items-center gap-1"
         style={{ borderRadius: 8 }} onClick={onSave} disabled={saving || disabled}>
         {saving ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Saving…</> : <><i className="bi bi-check-lg" /> Save dates</>}
       </button>

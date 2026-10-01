@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import BrandAvatar from '../brands/BrandAvatar';
 import { updateTask } from '../../lib/tasksApi';
 import { PencilIcon } from '../common/Icon';
+import { useDialogs } from '../common/useDialogs';
 
 const COLUMNS = [
   { status: 'todo',        label: 'To do',        tone: 'var(--border-strong)' },
@@ -10,6 +11,7 @@ const COLUMNS = [
 ];
 
 export default function TaskKanban({ rows, canEditRow, currentUserId, onEdit, onView, onLocalPatch }) {
+  const { ask, notify } = useDialogs();
   const [dragOver, setDragOver] = useState(null);
 
   const grouped = useMemo(() => {
@@ -45,7 +47,7 @@ export default function TaskKanban({ rows, canEditRow, currentUserId, onEdit, on
       const msg = String(err?.message || '');
       if (/brand is inactive|inactive brand/i.test(msg)) {
         onLocalPatch?.({ ...row, brand: { ...(row.brand || {}), status: 'inactive' } });
-        alert("This task's brand is inactive — the task is frozen until the brand is reactivated.");
+        notify.warning("This task's brand is inactive — the task is frozen until the brand is reactivated.");
       }
     }
   }
@@ -99,7 +101,9 @@ function KanbanCard({ task, canEdit, isAssignee, onEdit, onView }) {
         if (!canDrag) { e.preventDefault(); return; }
         e.dataTransfer.setData('text/task-id', task.id);
         e.dataTransfer.effectAllowed = 'move';
+        e.currentTarget.classList.add('is-dragging');
       }}
+      onDragEnd={(e) => e.currentTarget.classList.remove('is-dragging')}
       data-draggable={canDrag}
       onClick={onView ? () => onView() : undefined}
       style={{ cursor: onView ? 'pointer' : undefined }}

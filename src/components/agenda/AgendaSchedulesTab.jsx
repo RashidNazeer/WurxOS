@@ -296,7 +296,7 @@ export default function AgendaSchedulesTab() {
       )}
 
       <div className="d-flex align-items-center gap-2 mt-3">
-        <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
+        <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
           onClick={handleSaveClick} disabled={saving || !dirty}>
           {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save schedules</>}
         </button>
@@ -305,7 +305,7 @@ export default function AgendaSchedulesTab() {
 
       {askApply && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setAskApply(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setAskApply(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">
@@ -325,7 +325,7 @@ export default function AgendaSchedulesTab() {
                 <button className="btn btn-sm btn-outline-primary px-3" onClick={() => doSave(false)} disabled={saving}>
                   Only upcoming weeks
                 </button>
-                <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={() => doSave(true)} disabled={saving}>
+                <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={() => doSave(true)} disabled={saving}>
                   <i className="bi bi-check-lg" /> Apply to this week too
                 </button>
               </div>

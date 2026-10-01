@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { getCompositeFor, getLevelTokens } from '../../lib/performanceApi';
 import { tlPerfPreview, listTlDeductions, tlReportDeductRemove } from '../../lib/tlPerfApi';
+import { useToast } from '../ui';
 
 // How a Team Lead's performance pillar is built: 60% team score (average of the
 // TL's APCs' composites) + 40% reporting ((verified reports − deductions) ÷
@@ -10,6 +11,7 @@ import { tlPerfPreview, listTlDeductions, tlReportDeductRemove } from '../../lib
 const fmt = (v) => (v == null ? '—' : Math.round(Number(v)));
 
 export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, onClose, onChanged }) {
+  const toast = useToast();
   const tlId = tl?.id;
   const tlName = tl?.displayName || tl?.name || tl?.userName || 'Team Lead';
   const [preview, setPreview] = useState(null);
@@ -42,7 +44,7 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
   async function removeDed(id) {
     setBusy(id);
     try { await tlReportDeductRemove(id); await load(); onChanged?.(); }
-    catch (e) { alert(e.message || String(e)); } // eslint-disable-line no-alert
+    catch (e) { toast.error(e.message || String(e)); }
     finally { setBusy(null); }
   }
 
@@ -54,7 +56,7 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: '88vh', zIndex: 1, borderRadius: 14, display: 'flex', flexDirection: 'column' }}>
         <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
@@ -83,14 +85,14 @@ export default function TlPerfBreakdownModal({ tl, month, enabled, canManage, on
               </div>
 
               {!enabled && (
-                <div className="rounded-2 mb-3 px-2 py-1" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', fontSize: '0.68rem', color: 'var(--warning)' }}>
+                <div className="rounded-2 mb-3 px-2 py-1" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', fontSize: '0.68rem', color: 'var(--warning-text)' }}>
                   <i className="bi bi-flask me-1" />Trial mode — a preview; the TL’s official score still uses the old rating until the Boss switches this to Live.
                 </div>
               )}
 
               {/* Team score */}
               <div className="d-flex align-items-center justify-content-between mb-1">
-                <span className="fw-semibold" style={{ fontSize: '0.82rem' }}><i className="bi bi-people me-1 text-primary" />Team score</span>
+                <span className="fw-semibold" style={{ fontSize: '0.82rem' }}><i className="bi bi-people me-1 text-info" />Team score</span>
                 <span className="fw-bold" style={{ fontSize: '0.9rem' }}>{fmt(preview?.team)}<span className="text-muted">/100</span></span>
               </div>
               <div className="text-muted mb-2" style={{ fontSize: '0.68rem' }}>Average of {apcs.filter((a) => a.composite != null).length} rated APC{apcs.filter((a) => a.composite != null).length === 1 ? '' : 's'}</div>

@@ -7,6 +7,8 @@ import {
 } from '../../lib/incentivesApi';
 import { listBrandMetricsForMonth } from '../../lib/brandMetricsApi';
 import { currencySymbol } from '../../utils/currencies';
+import { formatMoney, formatPKR } from '../../lib/format';
+import { useToast, useConfirm } from '../ui';
 
 function getCurrentMonth() {
   const d = new Date();
@@ -121,7 +123,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
     }
   }
 
-  const lockStyle = isAtt ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined;
+  const lockStyle = isAtt ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined;
   const pct = item.commissionPct ?? '';
   const pctOverAllocated = Number(pct) > 100;
 
@@ -130,6 +132,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
   // that a blank benchmark means the commission is paid on EVERYTHING achieved,
   // since "achieved minus zero" is simply the whole achieved figure.
   const sym         = isComm ? currencySymbol(brandCurrency) : '';
+  const money       = (v) => formatMoney(v, brandCurrency || 'USD');
   const benchmark   = Math.max(Number(item.targetValue) || 0, 0);
   const achieved    = Number(item.achievedValue) || 0;
   const excess      = Math.max(achieved - benchmark, 0);
@@ -137,7 +140,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
   const earnedRaw   = excess * (pctClamped / 100);
 
   return (
-    <div className="rounded-3 p-2 mb-2" style={{ background: isAtt ? '#eff6ff' : '#f8f9fa', border: `1px solid ${isAtt ? '#bfdbfe' : '#e9ecef'}` }}>
+    <div className="rounded-3 p-2 mb-2" style={{ background: isAtt ? 'var(--info-soft)' : 'var(--surface-2)', border: `1px solid ${isAtt ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}` }}>
       {/* Description */}
       <div className="d-flex align-items-center gap-2 mb-2">
         <input
@@ -159,13 +162,13 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
 
       {/* Where "Achieved" comes from — ALWAYS shown, on every line. */}
       <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-        <span style={{ fontSize: '0.68rem', color: '#6c757d', fontWeight: 600 }}>
+        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
           <i className={`bi ${isAuto ? 'bi-magic' : 'bi-pencil'} me-1`} />Achieved
         </span>
         <select
           className="form-select form-select-sm"
           style={{ width: 'auto', minWidth: 210, fontSize: '0.72rem', borderRadius: 6,
-            ...(isAuto ? { borderColor: '#bfdbfe', background: '#eff6ff', color: '#1e40af', fontWeight: 600 } : {}) }}
+            ...(isAuto ? { borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 } : {}) }}
           value={source}
           onChange={e => applySource(e.target.value)}
         >
@@ -175,14 +178,14 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
         </select>
       </div>
       {isAtt && (
-        <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: 'var(--info-text)' }}>
           <i className="bi bi-info-circle me-1" />
           Achieved fills automatically from this person's attendance % — no manual entry.
           Target is pinned to 100% (≥90% attendance completes it).
         </div>
       )}
       {isGmvMax && (
-        <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: 'var(--info-text)' }}>
           <i className="bi bi-info-circle me-1" />
           Achieved tracks the brand's month figure in Brand Analytics — the number
           the APC enters at clock-in — so nobody types it by hand. Set the Target
@@ -190,7 +193,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
         </div>
       )}
       {isOlBrands && (
-        <div className="mb-2" style={{ fontSize: '0.68rem', color: '#1e40af' }}>
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: 'var(--info-text)' }}>
           <i className="bi bi-info-circle me-1" />
           Achieved fills automatically with the % of the OL's curated brands whose TL
           marked the GMV target complete. Set Target to the threshold (e.g. 70%);
@@ -198,8 +201,8 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
         </div>
       )}
       {isComm && (
-        <div className="rounded-3 p-2 mb-2" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-          <div style={{ fontSize: '0.68rem', color: '#166534', marginBottom: 8 }}>
+        <div className="rounded-3 p-2 mb-2" style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--success-text)', marginBottom: 8 }}>
             <i className="bi bi-percent me-1" />
             Pays a percentage of whatever this brand earns <strong>above the benchmark</strong> —
             leave the benchmark blank to pay on the whole figure. All three numbers are
@@ -207,7 +210,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           </div>
           <div className="d-flex gap-2 flex-wrap">
             <div style={{ flex: '1 1 120px', minWidth: 110 }}>
-              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
+              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: 'var(--success-text)', fontWeight: 600 }}>
                 GMV Benchmark <span style={{ fontWeight: 400 }}>(blank = all)</span>
               </label>
               <div className="input-group input-group-sm">
@@ -219,7 +222,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               </div>
             </div>
             <div style={{ flex: '1 1 120px', minWidth: 110 }}>
-              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
+              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: 'var(--success-text)', fontWeight: 600 }}>
                 Achieved
               </label>
               <div className="input-group input-group-sm">
@@ -230,14 +233,14 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               </div>
             </div>
             <div style={{ flex: '0 1 110px', minWidth: 100 }}>
-              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 600 }}>
+              <label className="form-label mb-1" style={{ fontSize: '0.62rem', color: 'var(--success-text)', fontWeight: 600 }}>
                 Commission
               </label>
               <div className="input-group input-group-sm">
                 <input type="number" className="form-control" placeholder="0.5" min="0" max="100" step="0.01"
                   value={pct}
                   onChange={e => onChange(item.id, 'commissionPct', e.target.value)}
-                  style={pctOverAllocated ? { borderColor: '#dc2626' } : undefined} />
+                  style={pctOverAllocated ? { borderColor: 'color-mix(in srgb, var(--danger) 35%, transparent)' } : undefined} />
                 <span className="input-group-text" style={{ fontSize: '0.7rem' }}>%</span>
               </div>
             </div>
@@ -246,9 +249,9 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           {/* Show the arithmetic rather than just the answer — the payout is
               three numbers and an exchange rate deep, and an OL setting it
               should be able to see where the figure came from. */}
-          <div style={{ fontSize: '0.66rem', color: '#166534', marginTop: 8, borderTop: '1px dashed #bbf7d0', paddingTop: 6 }}>
+          <div style={{ fontSize: '0.66rem', color: 'var(--success-text)', marginTop: 8, borderTop: '1px dashed color-mix(in srgb, var(--success) 35%, transparent)', paddingTop: 6 }}>
             {!Number(pct) ? (
-              <span style={{ color: '#92400e' }}>
+              <span style={{ color: 'var(--warning-text)' }}>
                 <i className="bi bi-exclamation-triangle me-1" />
                 No commission percentage set — this line will pay nothing.
               </span>
@@ -259,24 +262,24 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               // the whole achieved amount being paid on, not a silent zero.
               <>
                 <strong>No benchmark</strong>, so this pays on the whole achieved figure.{' '}
-                {pctClamped}% of {sym}{achieved.toLocaleString()} is{' '}
-                <strong>{sym}{earnedRaw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>,
+                {pctClamped}% of {money(achieved)} is{' '}
+                <strong>{money(earnedRaw)}</strong>,
                 converted to PKR at the rate the Boss sets in Settings.
               </>
             ) : excess <= 0 ? (
               <>Achieved is at or below the benchmark, so there is no excess yet and this
-                line pays nothing. It starts paying above {sym}{benchmark.toLocaleString()}.</>
+                line pays nothing. It starts paying above {money(benchmark)}.</>
             ) : (
               <>
-                {sym}{achieved.toLocaleString()} − {sym}{benchmark.toLocaleString()} = <strong>{sym}{excess.toLocaleString()}</strong> excess.{' '}
-                {pctClamped}% of that is <strong>{sym}{earnedRaw.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>,
+                {money(achieved)} − {money(benchmark)} = <strong>{money(excess)}</strong> excess.{' '}
+                {pctClamped}% of that is <strong>{money(earnedRaw)}</strong>,
                 converted to PKR at the rate the Boss sets in Settings.
               </>
             )}
           </div>
 
           {pctOverAllocated && (
-            <div style={{ fontSize: '0.65rem', color: '#b91c1c', marginTop: 4 }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--danger-text)', marginTop: 4 }}>
               <i className="bi bi-exclamation-triangle-fill me-1" />
               Over 100%. It will be saved as 100%.
             </div>
@@ -285,7 +288,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               items are independent JSONB, so several people can each be given a
               cut of the same brand and nothing would say so until payday. */}
           {othersPct > 0 && (
-            <div style={{ fontSize: '0.65rem', color: '#6c757d', marginTop: 4 }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 4 }}>
               <i className="bi bi-people me-1" />
               Other commission lines on this brand this month total {othersPct}%
               {Number(pct) > 0 && <> — <strong>{Math.round((othersPct + Number(pct)) * 100) / 100}% with this one</strong></>}.
@@ -301,7 +304,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
       {!isComm && (
       <div className="d-flex gap-2">
         <div className="flex-grow-1">
-          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
+          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
             {isAtt   ? <>Target <span className="text-muted">(auto · attendance %)</span></>
              : isComm ? <>Target <span className="text-muted">(auto · the brand&apos;s GMV goal)</span></>
              : goalLocked ? <>Target <span className="text-muted">(auto · the brand&apos;s monthly GMV goal)</span></>
@@ -346,7 +349,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           )}
         </div>
         <div style={{ width: 150 }}>
-          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: '#6c757d' }}>
+          <label className="form-label mb-1" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
             {isComm ? <>Compensation <span className="text-muted">(auto)</span></> : 'Compensation if achieved'}
           </label>
           <div className="input-group input-group-sm">
@@ -377,9 +380,9 @@ function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, comm
   const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const tier = brand.tier ? TIER_STYLE[String(brand.tier).toLowerCase()] : null;
   return (
-    <div className="rounded-3 mb-2" style={{ border: '1px solid #e2e8f0', background: '#fff', overflow: 'hidden' }}>
+    <div className="rounded-3 mb-2" style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', overflow: 'hidden' }}>
       <div className="d-flex align-items-center justify-content-between px-3 py-2"
-        style={{ background: '#f8fafc', borderBottom: items.length ? '1px solid #eef2f7' : 'none' }}>
+        style={{ background: 'var(--surface-2)', borderBottom: items.length ? '1px solid var(--border-subtle)' : 'none' }}>
         <span className="d-inline-flex align-items-center gap-2">
           <i className="bi bi-shop" style={{ color, fontSize: '0.8rem' }} />
           <span className="fw-semibold" style={{ fontSize: '0.82rem' }}>{brand.name}</span>
@@ -387,7 +390,7 @@ function BrandGroup({ brand, items, color, onChange, onRemove, onAdd, noun, comm
             <span className="rounded-pill" style={{ background: tier.bg, color: tier.fg, border: `1px solid ${tier.border}`, padding: '0 6px', fontSize: '0.58rem', fontWeight: 700 }}>{tier.label}</span>
           )}
         </span>
-        {total > 0 && <span className="fw-bold" style={{ fontSize: '0.75rem', color }}>+{total.toLocaleString()} PKR</span>}
+        {total > 0 && <span className="fw-bold" style={{ fontSize: '0.75rem', color }}>+{formatPKR(total)}</span>}
       </div>
       <div className="p-2">
         {items.length === 0
@@ -430,7 +433,7 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
             </div>
             <span className="fw-semibold small">{title}</span>
           </div>
-          {total > 0 && <span className="fw-bold small" style={{ color }}>+{total.toLocaleString()} PKR</span>}
+          {total > 0 && <span className="fw-bold small" style={{ color }}>+{formatPKR(total)}</span>}
         </div>
 
         {brands && brands.length > 0 ? (
@@ -450,8 +453,8 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
         )}
 
         {orphanItems.length > 0 && (
-          <div className="rounded-3 mb-2 mt-2 p-2" style={{ border: '1px dashed #f59e0b', background: '#fffbeb' }}>
-            <div className="fw-semibold mb-2" style={{ fontSize: '0.7rem', color: '#b45309' }}>
+          <div className="rounded-3 mb-2 mt-2 p-2" style={{ border: '1px dashed color-mix(in srgb, var(--warning) 40%, transparent)', background: 'var(--warning-soft)' }}>
+            <div className="fw-semibold mb-2" style={{ fontSize: '0.7rem', color: 'var(--warning-text)' }}>
               <i className="bi bi-exclamation-triangle me-1" />Linked to a brand no longer assigned{orphanItems[0]?.brandName ? ` (${orphanItems.map(o => o.brandName).filter((v, i, a) => v && a.indexOf(v) === i).join(', ')})` : ''} — remove, or it drops on the next carry-forward
             </div>
             {orphanItems.map((item) => <LineRow key={item.id} item={item} onChange={change} onRemove={remove} hideToggles
@@ -479,10 +482,10 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
 // glance and design tier-appropriate incentives. Tier styling matches the
 // chips used on the Brands page.
 const TIER_STYLE = {
-  gold:     { bg: '#fef3c7', fg: '#92400e', border: '#fcd34d', label: 'Gold' },
-  silver:   { bg: '#e2e8f0', fg: '#334155', border: '#cbd5e1', label: 'Silver' },
-  bronze:   { bg: '#fed7aa', fg: '#9a3412', border: '#fb923c', label: 'Bronze' },
-  platinum: { bg: '#e0e7ff', fg: '#3730a3', border: '#a5b4fc', label: 'Platinum' },
+  gold:     { bg: 'var(--warning-soft)', fg: 'var(--warning-text)', border: 'color-mix(in srgb, var(--warning) 40%, transparent)', label: 'Gold' },
+  silver:   { bg: 'var(--surface-3)', fg: 'var(--text-secondary)', border: 'var(--border-default)', label: 'Silver' },
+  bronze:   { bg: 'var(--warning-soft)', fg: 'var(--warning-text)', border: 'color-mix(in srgb, var(--warning) 40%, transparent)', label: 'Bronze' },
+  platinum: { bg: 'var(--purple-soft)', fg: 'var(--purple-text)', border: 'color-mix(in srgb, var(--purple) 35%, transparent)', label: 'Platinum' },
 };
 function BrandContextChip({ brand }) {
   const tier = brand.tier ? TIER_STYLE[String(brand.tier).toLowerCase()] : null;
@@ -492,11 +495,11 @@ function BrandContextChip({ brand }) {
       className="d-inline-flex align-items-center gap-2 rounded-pill"
       title={brand.notes || undefined}
       style={{
-        background: '#fff',
-        border: '1px solid #e2e8f0',
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border-subtle)',
         padding: '4px 10px',
         fontSize: '0.72rem',
-        color: '#0f172a',
+        color: 'var(--text-primary)',
         fontWeight: 600,
         opacity: inactive ? 0.65 : 1,
       }}
@@ -519,7 +522,7 @@ function BrandContextChip({ brand }) {
         </span>
       )}
       {inactive && (
-        <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 500 }}>
+        <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 500 }}>
           · {brand.status}
         </span>
       )}
@@ -529,6 +532,8 @@ function BrandContextChip({ brand }) {
 
 // ── Main IncentiveForm ────────────────────────────────────────────────────────
 export default function IncentiveForm() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const { apcId, userId } = useParams();
   const targetId = userId || apcId;
   const navigate = useNavigate();
@@ -681,7 +686,12 @@ export default function IncentiveForm() {
   }
 
   async function handleSaveTemplate() {
-    if (!window.confirm('Save the current basic salary, incentives and bonuses as the default template? This will overwrite any existing template.')) return;
+    const ok = await confirm({
+      title: 'Save as default template?',
+      message: 'Save the current basic salary, incentives and bonuses as the default template? This will overwrite any existing template.',
+      confirmLabel: 'Save template',
+    });
+    if (!ok) return;
     setTemplateBusy(true); setError('');
     try {
       const tplName = userProfile?.displayName || currentUser?.displayName || currentUser?.email || 'OL';
@@ -689,8 +699,7 @@ export default function IncentiveForm() {
         basicSalary, incentives, bonuses, savedByName: tplName,
       });
       setHasTemplate(true);
-      // eslint-disable-next-line no-alert
-      alert('Default template saved.');
+      toast.success('Default template saved.');
     } catch { setError('Failed to save template.'); }
     finally { setTemplateBusy(false); }
   }
@@ -775,11 +784,11 @@ export default function IncentiveForm() {
         {/* User identity banner */}
         <div
           className="rounded-3 p-3 mb-3 d-flex align-items-center gap-3"
-          style={{ background: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' }}
+          style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' }}
         >
           <div
             className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-            style={{ width: 44, height: 44, background: 'rgba(255,255,255,0.15)', fontSize: '0.9rem' }}
+            style={{ width: 44, height: 44, background: 'color-mix(in srgb, var(--spotlight-fg) 15%, transparent)', fontSize: '0.9rem' }}
           >
             {(targetUser?.displayName || '?').slice(0, 2).toUpperCase()}
           </div>
@@ -796,9 +805,9 @@ export default function IncentiveForm() {
             having to switch tabs. Hidden when the user owns no brands
             (e.g. an IPC who hasn't been assigned anything yet). */}
         {brands.length > 0 && (
-          <div className="rounded-3 mb-3 p-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div className="rounded-3 mb-3 p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
-              <span className="fw-semibold" style={{ fontSize: '0.78rem', color: '#0f172a' }}>
+              <span className="fw-semibold" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                 <i className="bi bi-shop me-1" />
                 Brands {targetUser?.displayName?.split(' ')[0] || 'they'} manage
                 <span className="text-muted ms-1" style={{ fontWeight: 400 }}>· {brands.length}</span>
@@ -822,7 +831,7 @@ export default function IncentiveForm() {
 
       {!existingDocId && carryoverInfo && (
         <div className="alert d-flex align-items-start gap-2 py-2 mb-3"
-          style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, color: '#1e40af', fontSize: '0.78rem' }}>
+          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', borderRadius: 10, color: 'var(--info-text)', fontSize: '0.78rem' }}>
           <i className="bi bi-arrow-down-circle-fill flex-shrink-0 mt-1" />
           <div>
             {carryoverInfo.source === 'prior'
@@ -834,7 +843,7 @@ export default function IncentiveForm() {
 
       {!existingDocId && !carryoverInfo && hasTemplate && (
         <div className="alert d-flex align-items-center justify-content-between gap-2 py-2 mb-3"
-          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: '0.78rem' }}>
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 10, fontSize: '0.78rem' }}>
           <div className="d-flex align-items-center gap-2">
             <i className="bi bi-file-earmark-text" />
             <span>No prior plan for this user — load your default template to get started?</span>
@@ -856,9 +865,9 @@ export default function IncentiveForm() {
             <div className="d-flex align-items-center gap-2 mb-3">
               <div
                 className="rounded-2 d-flex align-items-center justify-content-center"
-                style={{ width: 30, height: 30, background: '#f3f4f6' }}
+                style={{ width: 30, height: 30, background: 'var(--surface-2)' }}
               >
-                <i className="bi bi-wallet2" style={{ color: '#6c757d', fontSize: '0.85rem' }} />
+                <i className="bi bi-wallet2" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }} />
               </div>
               <span className="fw-semibold small">Basic / Fixed Salary</span>
               <span className="badge ms-auto" style={{
@@ -892,7 +901,7 @@ export default function IncentiveForm() {
         {/* Incentives — brand groups + Other */}
         <PlanSection
           title="Incentives"
-          color="#198754"
+          color="var(--success-text)"
           icon="bi-graph-up-arrow"
           items={incentives}
           setItems={setIncentives}
@@ -906,7 +915,7 @@ export default function IncentiveForm() {
         {/* Bonuses — brand groups + Other */}
         <PlanSection
           title="Bonuses"
-          color="#0d6efd"
+          color="var(--info-text)"
           icon="bi-trophy"
           items={bonuses}
           setItems={setBonuses}
@@ -918,7 +927,7 @@ export default function IncentiveForm() {
         />
 
         {/* Summary */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, background: '#f8f9fa' }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, background: 'var(--surface-2)' }}>
           <div className="card-body p-3">
             <p className="text-muted small fw-semibold mb-2 text-uppercase" style={{ letterSpacing: '0.05em', fontSize: '0.65rem' }}>
               Summary
@@ -926,29 +935,29 @@ export default function IncentiveForm() {
             <div className="d-flex flex-column gap-1" style={{ fontSize: '0.82rem' }}>
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Basic Salary</span>
-                <span>{(Number(basicSalary) || 0).toLocaleString()} PKR</span>
+                <span>{formatPKR((Number(basicSalary) || 0))}</span>
               </div>
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Total Incentives ({incentives.length})</span>
-                <span className="text-success fw-medium">+{incTotal.toLocaleString()} PKR</span>
+                <span className="text-success fw-medium">+{formatPKR(incTotal)}</span>
               </div>
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Total Bonuses ({bonuses.length})</span>
-                <span className="text-primary fw-medium">+{bonTotal.toLocaleString()} PKR</span>
+                <span className="text-info fw-medium">+{formatPKR(bonTotal)}</span>
               </div>
               <div
                 className="d-flex justify-content-between fw-bold pt-2 mt-1"
-                style={{ borderTop: '1.5px solid #dee2e6', fontSize: '0.95rem' }}
+                style={{ borderTop: '1.5px solid var(--border-subtle)', fontSize: '0.95rem' }}
               >
                 <span>Total Salary</span>
-                <span>{grandTotal.toLocaleString()} PKR</span>
+                <span>{formatPKR(grandTotal)}</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="d-flex gap-2 align-items-center flex-wrap">
-          <button type="submit" className="btn btn-dark d-inline-flex align-items-center gap-1" disabled={saving}>
+          <button type="submit" className="btn btn-primary d-inline-flex align-items-center gap-1" disabled={saving}>
             {saving
               ? <><span className="spinner-border spinner-border-sm" /> Saving…</>
               : <><i className="bi bi-check-lg" /> Save</>

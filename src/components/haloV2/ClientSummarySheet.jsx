@@ -43,6 +43,7 @@ export default function ClientSummarySheet({
       <div
         ref={sheetRef}
         data-theme="light"
+        data-bs-theme="light"
         style={{
           width: SUMMARY_WIDTH,
           padding: 36,

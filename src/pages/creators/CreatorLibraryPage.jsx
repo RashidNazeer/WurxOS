@@ -355,9 +355,9 @@ function BrandCard({ s, isIPC, onOpen, onRemind }) {
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ padding: 16, cursor: 'pointer', transition: 'box-shadow .15s, transform .15s', transform: hover ? 'translateY(-2px)' : 'none', boxShadow: hover ? '0 16px 34px -20px rgba(15,23,42,.55)' : undefined }}>
+      style={{ padding: 16, cursor: 'pointer', transition: 'box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out)', transform: hover ? 'translateY(-1px)' : 'none', boxShadow: hover ? 'var(--shadow-md)' : undefined }}>
       <div className="d-flex align-items-center gap-2 mb-3">
-        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
           {initials(brand.name)}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -421,7 +421,7 @@ function BrandDetail({
         <button className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onBack}>
           <i className="bi bi-arrow-left me-1" /> All brands
         </button>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
           {initials(brand.name)}
         </div>
         <div className="fw-bold" style={{ fontSize: '1.05rem' }}>{brand.name}</div>
@@ -485,7 +485,7 @@ function CreatorRow({ c, canTL, canOL, viewer, busyKey, onDecide, onClear }) {
     <div className="wx-card d-flex align-items-start flex-wrap gap-3" style={{ padding: '12px 14px' }}>
       {/* Identity */}
       <div className="d-flex align-items-center gap-2" style={{ minWidth: 200, flex: '1 1 220px' }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
           {initials(c.name, c.handle)}
         </div>
         <div style={{ minWidth: 0 }}>
@@ -613,7 +613,7 @@ function DecisionModal({ decision, busy, onClose, onSubmit }) {
         </div>
         <div className="wx-modal-footer">
           <button className="wx-btn wx-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="wx-btn" style={{ color: '#fff', background: isReject ? 'var(--danger)' : 'var(--success)', borderColor: 'transparent' }}
+          <button className="wx-btn" style={{ color: isReject ? 'var(--on-danger)' : 'var(--on-success)', background: isReject ? 'var(--danger)' : 'var(--success)', borderColor: 'transparent' }}
             onClick={() => onSubmit(note)} disabled={busy}>
             {busy ? <><span className="wx-spinner" /> Saving…</> : <><i className={`bi ${isReject ? 'bi-x-lg' : 'bi-check2'} me-1`} />{isReject ? 'Reject' : 'Approve'}</>}
           </button>
