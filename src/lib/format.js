@@ -34,12 +34,17 @@ export function formatMoney(n, currency = 'USD') {
   if (String(currency).toUpperCase() === 'PKR') return formatPKR(n);
   const v = toNumber(n);
   if (v === null) return DASH;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(v);
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(v);
+  } catch {
+    // Unknown currency code: keep the code as a prefix rather than throw.
+    return `${currency} ${money2.format(v)}`;
+  }
 }
 
 // formatPercent(12.345) → '12.3%'; formatPercent(0.1234, { ratio: true }) → '12.3%'.

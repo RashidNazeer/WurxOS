@@ -107,7 +107,7 @@ export default function WeeklyRatingFields({ apcId, meetingId, enabled = false, 
       </div>
 
       {!enabled && (
-        <div className="rounded-2 mt-2 px-2 py-1" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', fontSize: '0.66rem', color: 'var(--warning)' }}>
+        <div className="rounded-2 mt-2 px-2 py-1" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', fontSize: '0.66rem', color: 'var(--warning-text)' }}>
           <i className="bi bi-flask me-1" />Trial mode — this score is saved and previewed but does not yet affect the official monthly score.
         </div>
       )}

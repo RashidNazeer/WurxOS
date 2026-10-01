@@ -62,7 +62,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: '88vh', zIndex: 1, borderRadius: 14, display: 'flex', flexDirection: 'column' }}>
         <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
@@ -89,7 +89,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
           </div>
 
           {!enabled && (
-            <div className="rounded-2 mb-3 px-2 py-1" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', fontSize: '0.68rem', color: 'var(--warning)' }}>
+            <div className="rounded-2 mb-3 px-2 py-1" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', fontSize: '0.68rem', color: 'var(--warning-text)' }}>
               <i className="bi bi-flask me-1" />Trial mode — scores here are a preview and don’t affect the official monthly score until the Boss switches this to Live.
             </div>
           )}
@@ -122,7 +122,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
                       {rated ? (
                         <span className="rounded-pill px-2 py-1" style={{ background: rlvl.bg, color: rlvl.color, fontSize: '0.72rem', fontWeight: 800 }}>{ov}/100</span>
                       ) : (
-                        <span className="rounded-pill px-2 py-1" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.64rem', fontWeight: 700 }}>Not rated</span>
+                        <span className="rounded-pill px-2 py-1" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: '0.64rem', fontWeight: 700 }}>Not rated</span>
                       )}
                     </button>
                     {isOpen && (

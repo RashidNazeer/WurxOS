@@ -8,14 +8,15 @@ import {
 } from '../../lib/leaveApi';
 import { supabase } from '../../lib/supabase';
 import MonthNavigator from './MonthNavigator';
+import { useToast } from '../ui';
 
 // Readable in both themes: amber tint + neutral text (bg-warning/text-dark flipped unreadable in dark).
 const UNPAID_CHIP = { background: 'var(--warning-soft)', color: 'var(--text-primary)', border: '1px solid color-mix(in srgb, var(--warning) 45%, transparent)' };
 
 const REQUEST_CATEGORIES = [
-  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger)', bg: 'var(--danger-soft)' },
-  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info)', bg: 'var(--info-soft)' },
-  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: 'var(--warning)', bg: 'var(--warning-soft)' },
+  { value: 'leave',      label: 'Leave Request',  icon: 'bi-calendar-x',    color: 'var(--danger-text)', bg: 'var(--danger-soft)' },
+  { value: 'wfh',        label: 'Work From Home', icon: 'bi-house',         color: 'var(--info-text)', bg: 'var(--info-soft)' },
+  { value: 'half_leave', label: 'Half Leave',     icon: 'bi-clock-history', color: 'var(--warning-text)', bg: 'var(--warning-soft)' },
   { value: 'other',      label: 'Other',          icon: 'bi-three-dots',    color: 'var(--accent)', bg: 'var(--accent-soft)' },
 ];
 
@@ -59,12 +60,12 @@ function getRequestTitle(r) {
 }
 
 const STATUS_CFG = {
-  pending_tl:   { label: 'Pending TL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
-  pending_pctl: { label: 'Pending PCTL', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
-  pending_ol:   { label: 'Pending OL',   color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_tl:   { label: 'Pending TL',   color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_pctl: { label: 'Pending PCTL', color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
+  pending_ol:   { label: 'Pending OL',   color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-hourglass-split' },
   pending_boss: { label: 'Pending You',  color: 'var(--accent)', bg: 'var(--accent-soft)', icon: 'bi-hourglass-split' },
-  approved:     { label: 'Approved',     color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
-  rejected:     { label: 'Rejected',     color: 'var(--danger)', bg: 'var(--danger-soft)', icon: 'bi-x-circle-fill' },
+  approved:     { label: 'Approved',     color: 'var(--success-text)', bg: 'var(--success-soft)', icon: 'bi-check-circle-fill' },
+  rejected:     { label: 'Rejected',     color: 'var(--danger-text)', bg: 'var(--danger-soft)', icon: 'bi-x-circle-fill' },
 };
 function getStCfg(val) { return STATUS_CFG[val] || STATUS_CFG.pending_boss; }
 
@@ -76,7 +77,7 @@ function RejectModal({ request, onConfirm, onCancel, saving }) {
   if (!request) return null;
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -115,7 +116,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -135,7 +136,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
               {request.bossOverrideToPaid ? (
                 <>
                   <span className="badge" style={{ background: 'var(--success)', color: 'var(--on-success)', fontSize: '0.6rem' }}>Paid</span>
-                  <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.6rem' }}>Boss Override</span>
+                  <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: '0.6rem' }}>Boss Override</span>
                 </>
               ) : (
                 <>
@@ -177,7 +178,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
                   { label: 'Emergency', key: 'emergency', color: 'var(--warning)' },
                   { label: 'WFH',       key: 'wfh',       color: 'var(--info)' },
                 ].map(q => (
-                  <span key={q.key} className="d-inline-flex align-items-center gap-1 rounded-pill px-2" style={{ background: `color-mix(in srgb, ${q.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${q.color} 25%, transparent)`, fontSize: '0.65rem', fontWeight: 600, color: q.color, lineHeight: '20px' }}>
+                  <span key={q.key} className="d-inline-flex align-items-center gap-1 rounded-pill px-2" style={{ background: `color-mix(in srgb, ${q.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${q.color} 25%, transparent)`, fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '20px' }}>
                     {q.label}: {userQuota[q.key] ?? '—'}
                   </span>
                 ))}
@@ -229,7 +230,7 @@ function ExportModal({ defaultMonth, onConfirm, onCancel }) {
   })();
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -258,7 +259,7 @@ function ExportModal({ defaultMonth, onConfirm, onCancel }) {
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onCancel}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1"
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1"
               disabled={scope === 'month' && !month}
               onClick={() => onConfirm(scope === 'all' ? null : month)}>
               <i className="bi bi-download" /> Export {scope === 'all' ? 'all' : monthLabel}
@@ -273,6 +274,7 @@ function ExportModal({ defaultMonth, onConfirm, onCancel }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function BossLeaveRequestsPage() {
+  const toast = useToast();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   // Salary-deduction view is Boss-only. Developer accounts see this
@@ -384,7 +386,7 @@ export default function BossLeaveRequestsPage() {
       }
       setApproveTarget(null);
     } catch (e) {
-      alert('Failed to approve: ' + (e.message || 'unknown'));
+      toast.error('Failed to approve: ' + (e.message || 'unknown'));
     } finally { setActionSaving(false); }
   }
 
@@ -395,7 +397,7 @@ export default function BossLeaveRequestsPage() {
       await teamRejectLeave(rejectTarget.id, reason);
       setRejectTarget(null);
     } catch (e) {
-      alert('Failed to reject: ' + (e.message || 'unknown'));
+      toast.error('Failed to reject: ' + (e.message || 'unknown'));
     } finally { setActionSaving(false); }
   }
 
@@ -505,7 +507,7 @@ export default function BossLeaveRequestsPage() {
   }
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div>
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -530,10 +532,10 @@ export default function BossLeaveRequestsPage() {
           { key: 'all',      label: 'All',      count: stats.all,      color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)' },
         ].map(tab => (
           <button key={tab.key} className="d-flex align-items-center gap-2 px-3 py-2 rounded-2 border-0"
-            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? tab.on : tab.color, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
+            style={{ background: activeTab === tab.key ? tab.color : tab.bg, color: activeTab === tab.key ? tab.on : 'var(--text-primary)', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
             onClick={() => setActiveTab(tab.key)}>
             {tab.label}
-            <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? `color-mix(in srgb, ${tab.on} 18%, transparent)` : `color-mix(in srgb, ${tab.color} 20%, transparent)`, color: activeTab === tab.key ? tab.on : tab.color, fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>
+            <span className="rounded-pill px-2" style={{ background: activeTab === tab.key ? `color-mix(in srgb, ${tab.on} 18%, transparent)` : `color-mix(in srgb, ${tab.color} 20%, transparent)`, color: activeTab === tab.key ? tab.on : 'var(--text-primary)', fontSize: '0.68rem', fontWeight: 700, lineHeight: '18px' }}>
               {tab.key === 'unpaid' ? `${tab.count}d` : tab.count}
             </span>
           </button>
@@ -582,7 +584,7 @@ export default function BossLeaveRequestsPage() {
 
       {activeTab === 'pending' && (
         <div className="d-flex align-items-center gap-2 mb-3 rounded-2 px-3 py-2"
-          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)', fontSize: '0.74rem', color: 'var(--info)' }}>
+          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)', fontSize: '0.74rem', color: 'var(--info-text)' }}>
           <i className="bi bi-info-circle" />
           <span>Showing all pending requests across every month — including future-dated ones — so nothing waiting on you is hidden.</span>
         </div>
@@ -648,15 +650,15 @@ export default function BossLeaveRequestsPage() {
                             // suppress the original Unpaid badge so the row
                             // doesn't read as "Unpaid + Override to Paid"
                             // (confusing — looks contradictory).
-                            <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>Paid</span>
+                            <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.58rem' }}>Paid</span>
                           ) : (
                             <>
                               {r.unpaidDays > 0 && r.paidDays > 0 && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.58rem' }}>{r.paidDays}d paid · {r.unpaidDays}d unpaid</span>}
                               {r.unpaidDays > 0 && !r.paidDays && <span className="badge" style={{ ...UNPAID_CHIP, fontSize: '0.58rem' }}>Unpaid ({r.unpaidDays}d)</span>}
-                              {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.58rem' }}>Paid</span>}
+                              {(!r.unpaidDays || r.unpaidDays === 0) && <span className="badge" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.58rem' }}>Paid</span>}
                             </>
                           )}
-                          {r.bossOverrideToPaid && <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.58rem' }}>Boss Override to Paid</span>}
+                          {r.bossOverrideToPaid && <span className="badge" style={{ background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: '0.58rem' }}>Boss Override to Paid</span>}
                         </div>
                         <div className="fw-medium small mb-1">{title}</div>
                         <div className="text-muted" style={{ fontSize: '0.72rem' }}>

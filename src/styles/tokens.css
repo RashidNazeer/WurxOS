@@ -67,6 +67,10 @@
   /* Attendance "spotlight" cards: chocolate in light, peach in dark. */
   --att-spotlight-bg: #2b1d14;
   --att-spotlight-fg: #ffffff; /* 16.30 */
+  /* Generic banner / hero strip (incentive headers, payout tiles). */
+  --spotlight-bg: #2b1d14;
+  --spotlight-fg: #ffffff;               /* 16.30 */
+  --spotlight-fg-muted: rgba(255, 255, 255, 0.75); /* 10.4 */
 
   /* Inputs */
   --input-bg:     #ffffff;
@@ -173,6 +177,9 @@
   /* Attendance spotlight — keep the peach accent in dark (it reads well). */
   --att-spotlight-bg: var(--accent);
   --att-spotlight-fg: var(--on-accent);
+  --spotlight-bg: #2a2119;               /* peach-tinted dark */
+  --spotlight-fg: #faf7f2;               /* 14.9 */
+  --spotlight-fg-muted: rgba(250, 247, 242, 0.72); /* 8.3 */
 
   --input-bg:     #1a1a1a;
   --input-border: rgba(245, 213, 168, 0.45);   /* 3.52 on input, 3.55 on s1 */
@@ -320,6 +327,9 @@
   --t-press: transform var(--dur-instant) var(--ease-out);
 
   /* Aliases for names already used in components (undefined before) */
+  /* Toggle-switch thumb: white on every track, both themes. */
+  --switch-knob: #ffffff;
+
   --border:  var(--border-subtle);
   --primary: var(--accent);
 

@@ -332,8 +332,8 @@ function Switch({ checked, onChange, disabled }) {
           width: 18,
           height: 18,
           borderRadius: '50%',
-          background: '#fff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          background: 'var(--switch-knob)',
+          boxShadow: 'var(--shadow-sm)',
           transition: 'left var(--dur-fast) var(--ease-out)',
         }}
       />

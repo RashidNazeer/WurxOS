@@ -240,8 +240,8 @@ function MiniSwitch({ checked, disabled }) {
           width: 16,
           height: 16,
           borderRadius: '50%',
-          background: '#fff',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+          background: 'var(--switch-knob)',
+          boxShadow: 'var(--shadow-sm)',
           transition: 'left var(--dur-fast) var(--ease-out)',
         }}
       />

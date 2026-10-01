@@ -447,15 +447,15 @@ export default function PerformanceSimulatorPage() {
       </div>
 
       <div className="rounded-3 p-2 px-3 mb-4 d-inline-flex align-items-center gap-2"
-        style={{ background: 'color-mix(in srgb, var(--info,#0d6efd) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--info,#0d6efd) 30%, transparent)' }}>
-        <i className="bi bi-shield-lock-fill" style={{ color: 'var(--info,#0d6efd)' }} />
+        style={{ background: 'color-mix(in srgb, var(--info) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)' }}>
+        <i className="bi bi-shield-lock-fill" style={{ color: 'var(--info)' }} />
         <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>This is a private what-if tool. Nothing here ever changes your real score or salary — it only reads your current numbers to start you off.</span>
       </div>
 
       {loading ? (
         <div className="text-muted small d-flex align-items-center gap-2"><span className="spinner-border spinner-border-sm" /> Loading your performance…</div>
       ) : err ? (
-        <div className="rounded-3 p-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger)', fontSize: '0.85rem' }}>
+        <div className="rounded-3 p-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger-text)', fontSize: '0.85rem' }}>
           <i className="bi bi-exclamation-triangle me-2" />{err}
         </div>
       ) : (
@@ -648,7 +648,7 @@ export default function PerformanceSimulatorPage() {
                         <span className="badge rounded-pill" style={{ background: delta > 0 ? 'var(--success-soft)' : 'var(--danger-soft)', color: delta > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 800 }}><i className={`bi ${delta > 0 ? 'bi-arrow-up' : 'bi-arrow-down'}`} /> {Math.abs(delta)}</span>
                       )}
                     </div>
-                    {withheldReason && <div className="rounded-2 mt-3 px-2 py-2 text-start d-flex gap-2" style={{ background: 'var(--warning-soft)', fontSize: '0.68rem', color: 'var(--warning)' }}><i className="bi bi-info-circle mt-1" /><span>{withheldReason}</span></div>}
+                    {withheldReason && <div className="rounded-2 mt-3 px-2 py-2 text-start d-flex gap-2" style={{ background: 'var(--warning-soft)', fontSize: '0.68rem', color: 'var(--warning-text)' }}><i className="bi bi-info-circle mt-1" /><span>{withheldReason}</span></div>}
                   </div>
                 </div>
 

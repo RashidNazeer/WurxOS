@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatPKR } from '../../lib/format';
+import { Avatar, Button, ProgressBar, useConfirm } from '../ui';
 import {
   getIncentives, getMostRecentPriorPlan,
   listIncentivesMonth, listUsersByRoles,
@@ -72,12 +74,12 @@ function OlBrandPanel({ status, olItem, paid }) {
           <span>{p}%{paid && <span className="ms-1" style={{ opacity: 0.7 }}>· paid</span>}</span>
         </div>
         {!hasItem && total > 0 && (
-          <div className="mt-2 mb-1 px-2 py-1 rounded" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.7rem' }}>
+          <div className="mt-2 mb-1 px-2 py-1 rounded" style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: '0.7rem' }}>
             <i className="bi bi-exclamation-triangle me-1" />This roll-up isn't wired to an incentive line item yet, so it can't be earned. Ask the Boss to add a "Brands hit their GMV targets" incentive item to your plan.
           </div>
         )}
         {unmatched > 0 && (
-          <div className="mt-2 mb-1 px-2 py-1 rounded" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.7rem' }}>
+          <div className="mt-2 mb-1 px-2 py-1 rounded" style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: '0.7rem' }}>
             <i className="bi bi-exclamation-triangle me-1" />{unmatched} brand{unmatched === 1 ? '' : 's'} have no matching TL GMV-target item yet — they can't count until the Team Lead adds/renames that item to include the brand name.
           </div>
         )}
@@ -164,7 +166,7 @@ function computeCombinedStats(users, records) {
 function AttendanceBadge() {
   return (
     <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
-      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      style={{ fontSize: '0.55rem', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 }}>
       <i className="bi bi-calendar-check me-1" />Auto
     </span>
   );
@@ -179,7 +181,7 @@ function AutoBadge({ source }) {
   }[source] || { title: 'Auto-filled from monthly attendance %', icon: 'bi-calendar-check' };
   return (
     <span className="badge rounded-pill" title={meta.title}
-      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      style={{ fontSize: '0.55rem', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 }}>
       <i className={`bi ${meta.icon} me-1`} />Auto
     </span>
   );
@@ -189,10 +191,10 @@ function AutoBadge({ source }) {
 // (gold/silver/bronze/platinum) so the OL can spot tier mix at a glance
 // when designing incentives. Inactive brands fade.
 const _TIER_COLORS = {
-  gold:     '#eab308',
-  silver:   '#94a3b8',
-  bronze:   '#b45309',
-  platinum: '#6366f1',
+  gold:     'var(--chart-3)',
+  silver:   'var(--text-muted)',
+  bronze:   'var(--warning-text)',
+  platinum: 'var(--chart-4)',
 };
 function BrandTierChip({ brand }) {
   const tierKey = brand.tier ? String(brand.tier).toLowerCase() : null;
@@ -209,9 +211,9 @@ function BrandTierChip({ brand }) {
         brand.notes || null,
       ].filter(Boolean).join('\n')}
       style={{
-        background: hit ? '#e6f4ea' : '#f3f4f6',
-        color: hit ? '#15803d' : '#495057',
-        border: hit ? '1px solid #bbf7d0' : '1px solid transparent',
+        background: hit ? 'var(--success-soft)' : 'var(--surface-2)',
+        color: hit ? 'var(--success-text)' : 'var(--text-secondary)',
+        border: hit ? '1px solid color-mix(in srgb, var(--success) 35%, transparent)' : '1px solid transparent',
         fontSize: '0.6rem',
         fontWeight: 500,
         opacity: inactive ? 0.55 : 1,
@@ -224,7 +226,7 @@ function BrandTierChip({ brand }) {
         }} />
       )}
       {brand.name}
-      {hit && <i className="bi bi-check-circle-fill" style={{ color: '#16a34a', fontSize: '0.6rem', flexShrink: 0 }} />}
+      {hit && <i className="bi bi-check-circle-fill" style={{ color: 'var(--success-text)', fontSize: '0.6rem', flexShrink: 0 }} />}
     </span>
   );
 }
@@ -265,24 +267,24 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
     : isOlBrands
       ? (Number(achieved) >= (Number(target) || 70))
       : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
-  const lock     = { background: '#eef2f7', cursor: 'not-allowed' };
+  const lock     = { background: 'var(--surface-2)', cursor: 'not-allowed' };
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : ((isDerived || isComm) ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : ((isDerived || isComm) ? '#bfdbfe' : '#e9ecef')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? 'var(--success-soft)' : ((isDerived || isComm) ? 'var(--info-soft)' : 'var(--surface-2)'), border: `1.5px solid ${done ? 'color-mix(in srgb, var(--success) 35%, transparent)' : ((isDerived || isComm) ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
-          <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</div>
+          <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{formatPKR((Number(item.amount) || 0))}</div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
           {(isDerived || isComm) && <AutoBadge source={item.source} />}
-          <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? '#e6f4ea' : '#fff3e0', color: done ? '#198754' : '#fd7e14' }}>
+          <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? 'var(--success-soft)' : 'var(--warning-soft)', color: done ? 'var(--success-text)' : 'var(--warning-text)' }}>
             {done ? '✓ Completed' : `${p}%`}
           </span>
         </div>
       </div>
       <div className="row g-2">
         <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>{isComm ? 'GMV Benchmark' : 'Target'}{lockTgt && !isDerived && <span className="text-muted" style={{ fontSize: '0.6rem' }}> (set by Boss · read-only)</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{isComm ? 'GMV Benchmark' : 'Target'}{lockTgt && !isDerived && <span className="text-muted" style={{ fontSize: '0.6rem' }}> (set by Boss · read-only)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={target}
               onChange={e => onChange(cat, item.id, 'targetValue', e.target.value)}
@@ -291,7 +293,7 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
           </div>
         </div>
         <div className="col-5">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isDerived && <span className="text-muted"> (auto)</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Achieved{isDerived && <span className="text-muted"> (auto)</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
               onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
@@ -300,7 +302,7 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
           </div>
         </div>
         <div className="col-2">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Unit</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Unit</label>
           <input type="text" className="form-control form-control-sm" placeholder="%" maxLength={6}
             value={sfx} onChange={e => onChange(cat, item.id, 'suffix', e.target.value)}
             readOnly={isDerived || isComm} disabled={isDerived || isComm}
@@ -308,7 +310,7 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
         </div>
       </div>
       {(isDerived || isComm) && (
-        <div className="mt-2" style={{ fontSize: '0.66rem', color: isComm ? '#166534' : '#1e40af' }}>
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: isComm ? 'var(--success-text)' : 'var(--info-text)' }}>
           <i className={`bi ${isAtt ? 'bi-calendar-check' : isGmvMax ? 'bi-graph-up-arrow' : isComm ? 'bi-percent' : 'bi-bullseye'} me-1`} />
           {isAtt
             ? "Filled automatically from this month's attendance %."
@@ -383,7 +385,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -391,10 +393,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
               <h6 className="fw-bold mb-0">Edit My Progress</h6>
               <p className="text-muted small mb-0">Update your target & achieved values</p>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
           {editItems.incentives.length > 0 && (
             <div className="mb-3">
@@ -407,7 +406,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
           {editItems.bonuses.length > 0 && (
             <div className="mb-3">
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-trophy me-1 text-primary" />Bonuses
+                <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
               {editItems.bonuses.map(b => <EditRow key={b.id} item={b} cat="bonuses" onChange={handleChange} lockTarget month={record?.month} />)}
             </div>
@@ -415,7 +414,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
           {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save Progress</>}
             </button>
           </div>
@@ -485,28 +484,28 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
     const unitSfx = itemSuffix(item);
     const fmtN = n => Number(n || 0).toLocaleString();
     return (
-      <div className="rounded-3 p-2 mb-2" style={{ background: item.completed ? '#f0fdf4' : '#fafafa', border: `1px solid ${item.completed ? '#b7dfc4' : '#e9ecef'}` }}>
+      <div className="rounded-3 p-2 mb-2" style={{ background: item.completed ? 'var(--success-soft)' : 'var(--surface-2)', border: `1px solid ${item.completed ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}` }}>
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="small fw-semibold">{item.text || '—'}</div>
             {item.brandName && <div className="mt-1"><BrandChip name={item.brandName} /></div>}
-            <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>+{fmtN(item.amount)} PKR</div>
+            <div className="text-muted mt-1" style={{ fontSize: '0.72rem' }}>+{formatPKR(item.amount)}</div>
             {item.targetValue > 0 && (
               <div className="d-flex flex-wrap gap-3 mt-1" style={{ fontSize: '0.82rem' }}>
-                <span><span className="text-muted">Target:</span> <span className="fw-semibold" style={{ color: '#1e293b' }}>{fmtUnitValue(item.targetValue, unitSfx)}</span></span>
+                <span><span className="text-muted">Target:</span> <span className="fw-semibold" style={{ color: 'var(--text-primary)' }}>{fmtUnitValue(item.targetValue, unitSfx)}</span></span>
                 {item.achievedValue != null && (
                   <span>
                     <span className="text-muted">Achieved:</span>{' '}
-                    <span className="fw-semibold" style={{ color: item.completed ? '#15803d' : '#0f172a' }}>
+                    <span className="fw-semibold" style={{ color: item.completed ? 'var(--success-text)' : 'var(--text-primary)' }}>
                       {fmtUnitValue(item.achievedValue, unitSfx)}
                     </span>
-                    <span className="ms-1" style={{ color: item.completed ? '#16a34a' : '#475569', fontWeight: 600 }}>({p}%)</span>
+                    <span className="ms-1" style={{ color: item.completed ? 'var(--success-text)' : 'var(--text-secondary)', fontWeight: 600 }}>({p}%)</span>
                   </span>
                 )}
               </div>
             )}
             {item.completedBy && (
-              <div style={{ fontSize: '0.68rem', color: '#198754', marginTop: 4 }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--success-text)', marginTop: 4 }}>
                 <i className="bi bi-person-check me-1" />Marked by {item.completedBy}
               </div>
             )}
@@ -518,7 +517,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
                 nothing rendered it, so those lines showed a tick and no
                 explanation of where their number came from. */}
             {item.source && item.source !== 'attendance' && <AutoBadge source={item.source} />}
-            <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
+            <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? 'var(--success-soft)' : 'var(--surface-2)', color: item.completed ? 'var(--success-text)' : 'var(--text-muted)' }}>
               {item.completed ? '✓ Done' : `${p}%`}
             </span>
             {/* No manual tick on ANY derived line. stripAttendanceForSave blanks
@@ -529,7 +528,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
                 `source` rather than a list of names, so a fifth derived source
                 cannot reintroduce the phantom button by being forgotten here. */}
             {!readOnly && !item.source && (
-              <button className="btn btn-sm btn-link p-0" style={{ fontSize: '0.7rem', color: item.completed ? '#dc3545' : '#198754' }}
+              <button className="btn btn-sm btn-link p-0" style={{ fontSize: '0.7rem', color: item.completed ? 'var(--danger-text)' : 'var(--success-text)' }}
                 onClick={() => onToggleItem(rec, category, item.id, !item.completed)}
                 title={item.completed ? 'Mark incomplete' : 'Mark complete'}>
                 <i className={`bi ${item.completed ? 'bi-x-circle' : 'bi-check-circle'}`} />
@@ -539,9 +538,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
         </div>
         {item.targetValue > 0 && (
           <div className="mt-2">
-            <div className="rounded-pill overflow-hidden" style={{ height: 4, background: '#e9ecef' }}>
-              <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: item.completed ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
-            </div>
+            <ProgressBar size="sm" value={p} tone={item.completed ? 'success' : 'info'} />
           </div>
         )}
       </div>
@@ -550,7 +547,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -559,7 +556,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
               <p className="text-muted small mb-0 d-flex align-items-center gap-2 flex-wrap">
                 <span>{getMonthLabel(rec.month)} · {completed}/{allItems.length} completed</span>
                 {rec.ghosted && rec.sourceMonth && (
-                  <span className="badge rounded-pill" style={{ background: '#dbeafe', color: '#1e40af', fontSize: '0.6rem', fontWeight: 600 }}
+                  <span className="badge rounded-pill" style={{ background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: '0.6rem', fontWeight: 600 }}
                     title={`Plan carried forward from ${getMonthLabel(rec.sourceMonth)}; will be saved as a new doc on first edit/verify.`}>
                     <i className="bi bi-arrow-down-circle me-1" />Carried from {getMonthLabel(rec.sourceMonth)}
                   </span>
@@ -575,35 +572,32 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
                   <i className="bi bi-pencil" /> Edit
                 </button>
               )}
-              <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-                style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-              </button>
+              <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
             </div>
           </div>
 
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex justify-content-between small">
               <span className="text-muted">Basic Salary</span>
-              <span className="fw-medium">{basic.toLocaleString()} PKR</span>
+              <span className="fw-medium">{formatPKR(basic)}</span>
             </div>
             <div className="d-flex justify-content-between small">
               <span className="text-muted">Incentives Earned</span>
-              <span className="fw-medium text-success">+{incAchieved.toLocaleString()} / {incTotal.toLocaleString()} PKR</span>
+              <span className="fw-medium text-success">+{formatPKR(incAchieved)} / {formatPKR(incTotal)}</span>
             </div>
             <div className="d-flex justify-content-between small">
               <span className="text-muted">Bonuses Earned</span>
-              <span className="fw-medium text-primary">+{bonAchieved.toLocaleString()} / {bonTotal.toLocaleString()} PKR</span>
+              <span className="fw-medium text-info">+{formatPKR(bonAchieved)} / {formatPKR(bonTotal)}</span>
             </div>
-            <div className="d-flex justify-content-between fw-bold pt-2 mt-2" style={{ borderTop: '1.5px solid #dee2e6' }}>
+            <div className="d-flex justify-content-between fw-bold pt-2 mt-2" style={{ borderTop: '1.5px solid var(--border-subtle)' }}>
               <span>Total Earned</span>
-              <span>{(basic + incAchieved + bonAchieved).toLocaleString()} PKR</span>
+              <span>{formatPKR((basic + incAchieved + bonAchieved))}</span>
             </div>
           </div>
 
           {editMode && (
             <div className="alert d-flex align-items-start gap-2 py-2 mb-3"
-              style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, color: '#78350f', fontSize: '0.78rem' }}>
+              style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 10, color: 'var(--warning-text)', fontSize: '0.78rem' }}>
               <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" />
               <div>Edit Target / Achieved values below. Saving will verify the record and notify {user?.userName || user?.displayName} of the changes.</div>
             </div>
@@ -624,7 +618,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
           {(rec.bonuses || []).length > 0 && (
             <div className="mb-3">
               <p className="text-muted small fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-trophy me-1 text-primary" />Bonuses
+                <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
               {(editMode ? editItems.bonuses : rec.bonuses).map(b =>
                 editMode
@@ -663,7 +657,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
                 )}
                 {rec.verified && (
                   <span className="badge rounded-pill px-3 py-2 d-inline-flex align-items-center gap-1"
-                    style={{ background: '#e6f4ea', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.75rem' }}>
+                    style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', fontSize: '0.75rem' }}>
                     <i className="bi bi-patch-check-fill" /> Verified{rec.verifiedByRole ? ` by ${rec.verifiedByRole === 'boss' ? 'Boss' : rec.verifiedByRole.toUpperCase()}` : ''}
                   </span>
                 )}
@@ -689,6 +683,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function OLIncentivesPage() {
+  const confirm = useConfirm();
   // v2 auth shim
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
@@ -951,8 +946,13 @@ export default function OLIncentivesPage() {
 
   async function handleUnverify(rec) {
     if (rec.ghosted) return;
-    // eslint-disable-next-line no-alert
-    if (!window.confirm(`Mark ${rec.userName || 'this user'}'s incentives as unverified for ${getMonthLabel(rec.month)}? They will be notified.`)) return;
+    const ok = await confirm({
+      title: 'Mark as unverified?',
+      message: `Mark ${rec.userName || 'this user'}'s incentives as unverified for ${getMonthLabel(rec.month)}? They will be notified.`,
+      confirmLabel: 'Mark unverified',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setVerifying(rec.id);
     try {
       // inc_verify(rec.id, false) un-verifies and resets payout_cleared
@@ -1018,7 +1018,7 @@ export default function OLIncentivesPage() {
       )}
 
       {/* Tabs */}
-      <div className="d-flex gap-1 mb-4" style={{ borderBottom: '2px solid #e9ecef' }}>
+      <div className="d-flex gap-1 mb-4" style={{ borderBottom: '2px solid var(--border-subtle)' }}>
         {[
           { key: 'apcs', label: 'APC Incentives', icon: 'bi-people' },
           { key: 'ipcs', label: 'IPC Incentives', icon: 'bi-people-fill' },
@@ -1031,9 +1031,10 @@ export default function OLIncentivesPage() {
             className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
             style={{
               borderRadius: '8px 8px 0 0', fontWeight: 600, fontSize: '0.78rem',
-              background: tab === t.key ? '#1a1a2e' : 'transparent',
-              color: tab === t.key ? '#fff' : '#6c757d',
+              background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
+              color: tab === t.key ? 'var(--accent-text)' : 'var(--text-muted)',
               border: 'none', marginBottom: -2,
+              borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent',
             }}>
             <i className={`bi ${t.icon}`} />{t.label}
           </button>
@@ -1057,10 +1058,10 @@ export default function OLIncentivesPage() {
         ) : (
           <div style={{ maxWidth: 600 }}>
             <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ height: 4, background: myRecord.verified ? 'linear-gradient(90deg,#198754,#51cf66)' : 'linear-gradient(90deg,#fd7e14,#ffa94d)' }} />
-              <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' }}>
+              <div style={{ height: 4, background: myRecord.verified ? 'var(--success)' : 'var(--warning)' }} />
+              <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' }}>
                 <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                  style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.15)', fontSize: '0.85rem' }}>
+                  style={{ width: 42, height: 42, background: 'color-mix(in srgb, var(--spotlight-fg) 15%, transparent)', fontSize: '0.85rem' }}>
                   {myName.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-grow-1">
@@ -1068,31 +1069,29 @@ export default function OLIncentivesPage() {
                   <div style={{ fontSize: '0.72rem', opacity: 0.7 }}>{getMonthLabel(month)} · Operation Lead</div>
                 </div>
                 {myRecord.verified && (
-                  <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem' }}>
+                  <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.62rem' }}>
                     <i className="bi bi-patch-check-fill me-1" />{myRecord.verifiedByName ? `Verified by ${myRecord.verifiedByName}` : 'Verified'}
                   </span>
                 )}
               </div>
               <div className="card-body p-3">
                 <div className="d-flex flex-column gap-1 mb-3" style={{ fontSize: '0.82rem' }}>
-                  <div className="d-flex justify-content-between"><span className="text-muted">Basic Salary</span><span className="fw-medium">{myBasic.toLocaleString()} PKR</span></div>
-                  <div className="d-flex justify-content-between"><span className="text-muted">Earned ({myCompleted.length}/{myAllItems.length} items)</span><span className="fw-medium text-success">+{myEarned.toLocaleString()} PKR</span></div>
-                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1.5px solid #dee2e6', fontSize: '0.9rem' }}>
-                    <span>Total Earned</span><span>{myTotalEarned.toLocaleString()} PKR</span>
+                  <div className="d-flex justify-content-between"><span className="text-muted">Basic Salary</span><span className="fw-medium">{formatPKR(myBasic)}</span></div>
+                  <div className="d-flex justify-content-between"><span className="text-muted">Earned ({myCompleted.length}/{myAllItems.length} items)</span><span className="fw-medium text-success">+{formatPKR(myEarned)}</span></div>
+                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1.5px solid var(--border-subtle)', fontSize: '0.9rem' }}>
+                    <span>Total Earned</span><span>{formatPKR(myTotalEarned)}</span>
                   </div>
-                  <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>Potential: {(myBasic + myPotential).toLocaleString()} PKR</div>
+                  <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>Potential: {formatPKR((myBasic + myPotential))}</div>
                 </div>
                 <div className="mb-3">
                   <div className="d-flex justify-content-between mb-1" style={{ fontSize: '0.7rem' }}>
                     <span className="text-muted">Completion</span>
                     <span className="fw-semibold">{myCompleted.length}/{myAllItems.length} ({myCompletionPct}%)</span>
                   </div>
-                  <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-                    <div className="h-100 rounded-pill" style={{ width: `${myCompletionPct}%`, background: myCompletionPct === 100 ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
-                  </div>
+                  <ProgressBar size="md" value={myCompletionPct} tone={myCompletionPct === 100 ? 'success' : 'info'} />
                 </div>
                 {!myRecord.payoutCleared && (
-                  <button className="btn btn-sm btn-dark w-100 d-inline-flex align-items-center justify-content-center gap-1"
+                  <button className="btn btn-sm btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-1"
                     style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={() => setShowEditOwn(true)}>
                     <i className="bi bi-pencil" /> Edit Progress
                   </button>
@@ -1114,10 +1113,10 @@ export default function OLIncentivesPage() {
               {[
                 // This section's OWN role total, sitting right beside the combined
                 // (all-roles) total so the OL sees both figures in every section.
-                { label: `${roleWord} Payout`,  value: `${totalPayout.toLocaleString()} PKR`,               bg: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff', sub: `${roleWord} total` },
-                { label: 'Combined Payout',      value: `${snapshotStats.totalPayout.toLocaleString()} PKR`, bg: '#0f172a', color: '#fff', sub: 'all roles incl. OLs' },
-                { label: 'With Plans',           value: `${recordsCount} / ${list.length}`,                  bg: '#e8f0fe', color: '#0d6efd' },
-                { label: 'Verified',             value: `${verifiedCount} / ${recordsCount}`,                bg: '#e6f4ea', color: '#198754' },
+                { label: `${roleWord} Payout`,  value: `${formatPKR(totalPayout)}`,               bg: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)', sub: `${roleWord} total` },
+                { label: 'Combined Payout',      value: `${formatPKR(snapshotStats.totalPayout)}`, bg: 'var(--text-primary)', color: 'var(--surface-1)', sub: 'all roles incl. OLs' },
+                { label: 'With Plans',           value: `${recordsCount} / ${list.length}`,                  bg: 'var(--info-soft)', color: 'var(--info-text)' },
+                { label: 'Verified',             value: `${verifiedCount} / ${recordsCount}`,                bg: 'var(--success-soft)', color: 'var(--success-text)' },
               ].map(s => (
                 <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, color: s.color, minWidth: 120 }}>
                   <div style={{ fontSize: '0.6rem', opacity: 0.7, letterSpacing: 1, textTransform: 'uppercase' }}>{s.label}</div>
@@ -1171,7 +1170,7 @@ export default function OLIncentivesPage() {
           )}
 
           {list.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 12 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
               <i className="bi bi-people text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">
                 {hasFilters
@@ -1194,13 +1193,10 @@ export default function OLIncentivesPage() {
                 return (
                   <div key={user.id} className="col-md-6 col-xl-4">
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
-                      <div style={{ height: 4, background: hasData ? (rec.verified ? 'linear-gradient(90deg,#198754,#51cf66)' : 'linear-gradient(90deg,#fd7e14,#ffa94d)') : '#dee2e6' }} />
+                      <div style={{ height: 4, background: hasData ? (rec.verified ? 'var(--success)' : 'var(--warning)') : 'var(--surface-3)' }} />
                       <div className="card-body p-3">
                         <div className="d-flex align-items-center gap-2 mb-2">
-                          <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                            style={{ width: 36, height: 36, background: '#1a1a2e', fontSize: '0.75rem' }}>
-                            {(user.userName || '?').slice(0, 2).toUpperCase()}
-                          </div>
+                          <Avatar name={user.userName || '?'} toneKey={user.uid || user.id || user.userName} size={36} />
                           <div className="flex-grow-1 min-width-0">
                             <div className="fw-semibold text-truncate small">{user.userName}</div>
                             <div className="text-muted text-truncate" style={{ fontSize: '0.68rem' }}>
@@ -1208,13 +1204,13 @@ export default function OLIncentivesPage() {
                             </div>
                           </div>
                           {hasData && rec.verified && (
-                            <span className="badge rounded-pill" title="Verified" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.58rem' }}>
+                            <span className="badge rounded-pill" title="Verified" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.58rem' }}>
                               <i className="bi bi-patch-check-fill" />
                             </span>
                           )}
                           {hasData && rec.ghosted && (
                             <span className="badge rounded-pill" title={`Carried over from ${getMonthLabel(rec.sourceMonth)}`}
-                              style={{ background: '#dbeafe', color: '#1e40af', fontSize: '0.58rem', fontWeight: 600 }}>
+                              style={{ background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: '0.58rem', fontWeight: 600 }}>
                               <i className="bi bi-arrow-down-circle" /> Carried
                             </span>
                           )}
@@ -1230,10 +1226,10 @@ export default function OLIncentivesPage() {
 
                         {hasData ? (
                           <>
-                            <div className="rounded-3 p-2 mb-2" style={{ background: '#f8f9fa' }}>
+                            <div className="rounded-3 p-2 mb-2" style={{ background: 'var(--surface-2)' }}>
                               <div className="d-flex justify-content-between" style={{ fontSize: '0.7rem' }}>
                                 <span className="text-muted">Total Payout</span>
-                                <span className="fw-bold text-dark">{breakdown.total.toLocaleString()} PKR</span>
+                                <span className="fw-bold">{formatPKR(breakdown.total)}</span>
                               </div>
                               <div className="d-flex justify-content-between" style={{ fontSize: '0.65rem' }}>
                                 <span className="text-muted">Items</span>
@@ -1242,12 +1238,12 @@ export default function OLIncentivesPage() {
                             </div>
                             <div className="d-flex gap-1">
                               <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ border: '1.5px solid #dee2e6', borderRadius: 8, background: '#fff', color: '#495057', fontSize: '0.7rem' }}
+                                style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.7rem' }}
                                 onClick={() => setDetailsTarget({ user, rec })}>
                                 <i className="bi bi-eye" /> Details
                               </button>
                               {!readOnly && (
-                                <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 btn-dark"
+                                <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 btn-primary"
                                   style={{ borderRadius: 8, fontSize: '0.7rem' }}>
                                   <i className="bi bi-pencil" /> Edit Plan
                                 </Link>
@@ -1301,7 +1297,7 @@ export default function OLIncentivesPage() {
 // ── Combined payout snapshot block (APCs + IPCs cumulative) ─────────────────
 function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
   const fmt = n => Number(n || 0).toLocaleString();
-  const pkr = n => fmt(n) + ' PKR';
+  const pkr = n => formatPKR(n);
   const total = s.totalPayout || 1;
   const basePct = (s.totalBase    / total) * 100;
   const incPct  = (s.incEarned    / total) * 100;
@@ -1316,16 +1312,16 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
   const bonPotentialPct = s.bonPotential > 0 ? Math.round((s.bonEarned / s.bonPotential) * 100) : 0;
 
   return (
-    <div className="rounded-3 mb-4 p-3" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+    <div className="rounded-3 mb-4 p-3" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
-          <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#0f172a' }}>Combined payout · {monthLabel}</div>
+          <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>Combined payout · {monthLabel}</div>
           <div className="text-muted" style={{ fontSize: '0.72rem' }}>
             Cumulative across {s.teamSize} member{s.teamSize === 1 ? '' : 's'} ({s.withPlans} with plans, {s.noPlan} without)
           </div>
         </div>
         <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-          style={{ background: '#0f172a', color: '#fff', fontSize: '0.78rem', fontWeight: 700 }}>
+          style={{ background: 'var(--text-primary)', color: 'var(--surface-1)', fontSize: '0.78rem', fontWeight: 700 }}>
           <i className="bi bi-cash-coin" /> {pkr(s.totalPayout)}
         </span>
       </div>
@@ -1333,18 +1329,18 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
       {/* 4 KPI tiles */}
       <div className="row g-2 mb-3">
         <div className="col-6 col-lg-3">
-          <KpiTile label="Base Salary" value={pkr(s.totalBase)} sub={s.withPlans + ' members on payroll'} dot="#64748b" />
+          <KpiTile label="Base Salary" value={pkr(s.totalBase)} sub={s.withPlans + ' members on payroll'} dot="var(--text-muted)" />
         </div>
         <div className="col-6 col-lg-3">
           <KpiTile label="Incentives Earned" value={pkr(s.incEarned)}
-            sub={'of ' + pkr(s.incPotential) + ' (' + incPotentialPct + '%)'} dot="#16a34a" />
+            sub={'of ' + pkr(s.incPotential) + ' (' + incPotentialPct + '%)'} dot="var(--success)" />
         </div>
         <div className="col-6 col-lg-3">
           <KpiTile label="Bonuses Earned" value={pkr(s.bonEarned)}
-            sub={'of ' + pkr(s.bonPotential) + ' (' + bonPotentialPct + '%)'} dot="#3b82f6" />
+            sub={'of ' + pkr(s.bonPotential) + ' (' + bonPotentialPct + '%)'} dot="var(--info)" />
         </div>
         <div className="col-6 col-lg-3">
-          <KpiTile label="Total Payout" value={pkr(s.totalPayout)} sub="base + incentives + bonuses" dot="#0f172a" prominent />
+          <KpiTile label="Total Payout" value={pkr(s.totalPayout)} sub="base + incentives + bonuses" dot="var(--text-primary)" prominent />
         </div>
       </div>
 
@@ -1354,33 +1350,33 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
           <span className="text-muted fw-semibold">Payout composition</span>
           <span className="text-muted">{pkr(s.totalPayout)} total</span>
         </div>
-        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: '#64748b', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: '#3b82f6', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: 'var(--surface-2)' }}>
+          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: 'var(--text-muted)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: 'var(--success)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: 'var(--info)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
-          <Legend color="#64748b" label="Base" value={pkr(s.totalBase)} />
-          <Legend color="#16a34a" label="Incentives" value={pkr(s.incEarned)} />
-          <Legend color="#3b82f6" label="Bonuses" value={pkr(s.bonEarned)} />
+          <Legend color="var(--text-muted)" label="Base" value={pkr(s.totalBase)} />
+          <Legend color="var(--success-text)" label="Incentives" value={pkr(s.incEarned)} />
+          <Legend color="var(--info-text)" label="Bonuses" value={pkr(s.bonEarned)} />
         </div>
       </div>
 
       {/* Achievement breakdown */}
-      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
         <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.78rem' }}>
           <span className="text-muted fw-semibold">Incentive achievement</span>
           <span className="text-muted">{s.fullyAchieved + s.partial} of {s.fullyAchieved + s.partial + s.noneEarned} earned something</span>
         </div>
-        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: '#fbbf24', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: '#cbd5e1', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: 'var(--surface-2)' }}>
+          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: 'var(--success)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: 'var(--warning)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: 'var(--border-strong)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
-          <Legend color="#16a34a" label="Fully achieved" value={s.fullyAchieved} />
-          <Legend color="#fbbf24" label="Partial"        value={s.partial} />
-          <Legend color="#cbd5e1" label="Nothing earned" value={s.noneEarned} />
+          <Legend color="var(--success-text)" label="Fully achieved" value={s.fullyAchieved} />
+          <Legend color="var(--warning-text)" label="Partial"        value={s.partial} />
+          <Legend color="var(--border-strong)" label="Nothing earned" value={s.noneEarned} />
         </div>
       </div>
     </div>
@@ -1390,16 +1386,16 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
 function KpiTile({ label, value, sub, dot, prominent }) {
   return (
     <div className="rounded-3 h-100 p-3" style={{
-      background: prominent ? '#0f172a' : '#f8fafc',
-      border: prominent ? '1px solid #0f172a' : '1px solid #e2e8f0',
-      color: prominent ? '#fff' : '#0f172a',
+      background: prominent ? 'var(--text-primary)' : 'var(--surface-2)',
+      border: prominent ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+      color: prominent ? 'var(--surface-1)' : 'var(--text-primary)',
     }}>
-      <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: prominent ? 'rgba(255,255,255,0.7)' : '#64748b' }}>
+      <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: prominent ? 'color-mix(in srgb, var(--surface-1) 75%, transparent)' : 'var(--text-muted)' }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, display: 'inline-block' }} />
         {label}
       </div>
       <div className="fw-bold" style={{ fontSize: '1.05rem', letterSpacing: '-0.01em', lineHeight: 1.15, marginTop: 6 }}>{value}</div>
-      {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'rgba(255,255,255,0.6)' : '#64748b' }}>{sub}</div>}
+      {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'color-mix(in srgb, var(--surface-1) 70%, transparent)' : 'var(--text-muted)' }}>{sub}</div>}
     </div>
   );
 }
@@ -1408,8 +1404,8 @@ function Legend({ color, label, value }) {
   return (
     <div className="d-flex align-items-center gap-2">
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-      <span style={{ color: '#475569' }}>{label}</span>
-      <span className="fw-bold" style={{ color: '#0f172a' }}>{value}</span>
+      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      <span className="fw-bold" style={{ color: 'var(--text-primary)' }}>{value}</span>
     </div>
   );
 }

@@ -385,9 +385,9 @@ function formatBig(n) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 function statusTone(s) {
-  if (s === 'submitted') return { bg: 'color-mix(in srgb, var(--accent) 20%, transparent)',   fg: 'var(--accent)' };
-  if (s === 'verified')  return { bg: 'color-mix(in srgb, var(--success) 15%, transparent)',  fg: 'var(--success)' };
-  if (s === 'approved')  return { bg: 'color-mix(in srgb, var(--success) 20%, transparent)',  fg: 'var(--success)' };
-  if (s === 'rejected')  return { bg: 'color-mix(in srgb, var(--danger) 20%, transparent)',   fg: 'var(--danger)' };
+  if (s === 'submitted') return { bg: 'color-mix(in srgb, var(--accent) 20%, transparent)',   fg: 'var(--accent-text)' };
+  if (s === 'verified')  return { bg: 'color-mix(in srgb, var(--success) 15%, transparent)',  fg: 'var(--success-text)' };
+  if (s === 'approved')  return { bg: 'color-mix(in srgb, var(--success) 20%, transparent)',  fg: 'var(--success-text)' };
+  if (s === 'rejected')  return { bg: 'color-mix(in srgb, var(--danger) 20%, transparent)',   fg: 'var(--danger-text)' };
   return { bg: 'var(--surface-3)', fg: 'var(--text-muted)' };
 }

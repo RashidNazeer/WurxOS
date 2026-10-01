@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatPKR } from '../../lib/format';
+import { Avatar, Button, ProgressBar } from '../ui';
 import {
   listIncentivesMonth, listUsersByRoles,
   verifyIncentives, clearIncentivePayout,
@@ -39,7 +41,7 @@ function itemSuffix(item) {
 function AttendanceBadge() {
   return (
     <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
-      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      style={{ fontSize: '0.55rem', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 }}>
       <i className="bi bi-calendar-check me-1" />Auto
     </span>
   );
@@ -74,30 +76,28 @@ function DetailsModal({ rec, userName, onClose }) {
     const p = pct(item.achievedValue, item.targetValue);
     const unitSfx = itemSuffix(item);
     return (
-      <div className="rounded-3 p-2 mb-2" style={{ background: item.completed ? '#f0fdf4' : '#fafafa', border: `1px solid ${item.completed ? '#b7dfc4' : '#e9ecef'}` }}>
+      <div className="rounded-3 p-2 mb-2" style={{ background: item.completed ? 'var(--success-soft)' : 'var(--surface-2)', border: `1px solid ${item.completed ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}` }}>
         <div className="d-flex align-items-start justify-content-between gap-2">
           <div>
             <div className="small fw-semibold">{item.text || '—'}</div>
             {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-              +{(Number(item.amount) || 0).toLocaleString()} PKR
+              +{formatPKR((Number(item.amount) || 0))}
               {item.targetValue > 0 && <span className="ms-2">· Target: {fmtUnitValue(item.targetValue, unitSfx)}</span>}
               {item.achievedValue > 0 && <span className="ms-2">· Achieved: {fmtUnitValue(item.achievedValue, unitSfx)} ({p}%)</span>}
             </div>
-            {item.completedBy && <div style={{ fontSize: '0.63rem', color: '#198754' }}><i className="bi bi-person-check me-1" />Marked by {item.completedBy}</div>}
+            {item.completedBy && <div style={{ fontSize: '0.63rem', color: 'var(--success-text)' }}><i className="bi bi-person-check me-1" />Marked by {item.completedBy}</div>}
           </div>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
             {item.source === 'attendance' && <AttendanceBadge />}
-            <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? '#e6f4ea' : '#f3f4f6', color: item.completed ? '#198754' : '#6c757d' }}>
+            <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: item.completed ? 'var(--success-soft)' : 'var(--surface-2)', color: item.completed ? 'var(--success-text)' : 'var(--text-muted)' }}>
               {item.completed ? '✓ Done' : `${p}%`}
             </span>
           </div>
         </div>
         {item.targetValue > 0 && (
           <div className="mt-1">
-            <div className="rounded-pill overflow-hidden" style={{ height: 3, background: '#e9ecef' }}>
-              <div className="h-100 rounded-pill" style={{ width: `${p}%`, background: item.completed ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
-            </div>
+            <ProgressBar size="sm" value={p} tone={item.completed ? 'success' : 'info'} />
           </div>
         )}
       </div>
@@ -106,7 +106,7 @@ function DetailsModal({ rec, userName, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -114,10 +114,7 @@ function DetailsModal({ rec, userName, onClose }) {
               <h6 className="fw-bold mb-0">{userName} — Details</h6>
               <p className="text-muted small mb-0">{getMonthLabel(rec.month)} · {completed}/{allItems.length} completed</p>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
 
           {(rec.incentives || []).length > 0 && (
@@ -131,20 +128,20 @@ function DetailsModal({ rec, userName, onClose }) {
           {(rec.bonuses || []).length > 0 && (
             <div className="mb-3">
               <p className="text-muted small fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-trophy me-1 text-primary" />Bonuses
+                <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
               {rec.bonuses.map(b => <Item key={b.id} item={b} />)}
             </div>
           )}
 
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8f9fa', fontSize: '0.8rem' }}>
-            <div className="d-flex justify-content-between mb-1"><span className="text-muted">Basic</span><span>{basic.toLocaleString()} PKR</span></div>
-            <div className="d-flex justify-content-between mb-1"><span className="text-muted">Incentives earned</span><span className="text-success">+{incAchieved.toLocaleString()} / {incTotal.toLocaleString()} PKR</span></div>
-            <div className="d-flex justify-content-between mb-2"><span className="text-muted">Bonuses earned</span><span className="text-primary">+{bonAchieved.toLocaleString()} / {bonTotal.toLocaleString()} PKR</span></div>
-            <div className="d-flex justify-content-between fw-bold pt-2" style={{ borderTop: '1px dashed #dee2e6' }}>
-              <span>Payable</span><span>{totalAchieved.toLocaleString()} PKR</span>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', fontSize: '0.8rem' }}>
+            <div className="d-flex justify-content-between mb-1"><span className="text-muted">Basic</span><span>{formatPKR(basic)}</span></div>
+            <div className="d-flex justify-content-between mb-1"><span className="text-muted">Incentives earned</span><span className="text-success">+{formatPKR(incAchieved)} / {formatPKR(incTotal)}</span></div>
+            <div className="d-flex justify-content-between mb-2"><span className="text-muted">Bonuses earned</span><span className="text-info">+{formatPKR(bonAchieved)} / {formatPKR(bonTotal)}</span></div>
+            <div className="d-flex justify-content-between fw-bold pt-2" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
+              <span>Payable</span><span>{formatPKR(totalAchieved)}</span>
             </div>
-            <div className="text-muted text-end mt-1" style={{ fontSize: '0.68rem' }}>Potential: {totalPotential.toLocaleString()} PKR</div>
+            <div className="text-muted text-end mt-1" style={{ fontSize: '0.68rem' }}>Potential: {formatPKR(totalPotential)}</div>
           </div>
 
           <InactiveBrandsNotice userId={rec?.user_id} />
@@ -166,12 +163,12 @@ function ResetModal({ defaultSource, defaultTarget, recordCount, onConfirm, onCl
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff3e0' }}>
-              <i className="bi bi-arrow-repeat" style={{ fontSize: '1.1rem', color: '#fd7e14' }} />
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
+              <i className="bi bi-arrow-repeat" style={{ fontSize: '1.1rem', color: 'var(--warning-text)' }} />
             </div>
             <div>
               <h6 className="fw-bold mb-1">Clear Payouts & Reset</h6>
@@ -200,7 +197,7 @@ function ResetModal({ defaultSource, defaultTarget, recordCount, onConfirm, onCl
             </div>
           </div>
 
-          <div className="rounded-2 p-2 mb-3" style={{ background: '#f8f9fa', fontSize: '0.75rem' }}>
+          <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', fontSize: '0.75rem' }}>
             {[
               `${getMonthLabel(sourceMonth)} payouts marked as cleared (read-only for users)`,
               `${getMonthLabel(targetMonth)} records created with same structure`,
@@ -214,7 +211,7 @@ function ResetModal({ defaultSource, defaultTarget, recordCount, onConfirm, onCl
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={resetting}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1"
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1"
               onClick={() => onConfirm(sourceMonth, targetMonth)} disabled={resetting || sourceMonth === targetMonth}>
               {resetting ? <><span className="spinner-border spinner-border-sm" /> Resetting…</> : <><i className="bi bi-arrow-repeat" /> Clear & Reset</>}
             </button>
@@ -231,12 +228,12 @@ function ClearPayoutConfirmModal({ userName, roleTab, onConfirm, onClose, cleari
   const verifier = (roleTab === 'apcs' || roleTab === 'ipcs') ? 'OL' : 'Boss';
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
-            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: '#fff3e0' }}>
-              <i className="bi bi-exclamation-triangle" style={{ fontSize: '1.1rem', color: '#fd7e14' }} />
+            <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
+              <i className="bi bi-exclamation-triangle" style={{ fontSize: '1.1rem', color: 'var(--warning-text)' }} />
             </div>
             <div>
               <h6 className="fw-bold mb-1">Clear payout for {userName}?</h6>
@@ -431,10 +428,10 @@ export default function BossIncentivesPage() {
       {/* History banner */}
       {!isCurrentMonth && (
         <div className="alert py-2 d-flex align-items-center gap-2 mb-3"
-          style={{ background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: 10, fontSize: '0.78rem', color: '#e65100' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 10, fontSize: '0.78rem', color: 'var(--warning-text)' }}>
           <i className="bi bi-clock-history" />
           Viewing history for <strong>{getMonthLabel(month)}</strong>
-          <button className="btn btn-sm btn-link text-decoration-none p-0 ms-auto" style={{ color: '#e65100', fontSize: '0.75rem' }}
+          <button className="btn btn-sm btn-link text-decoration-none p-0 ms-auto" style={{ color: 'var(--warning-text)', fontSize: '0.75rem' }}
             onClick={() => setMonth(getCurrentMonth())}>
             Back to current month
           </button>
@@ -447,20 +444,20 @@ export default function BossIncentivesPage() {
       )}
 
       {/* Tabs */}
-      <div className="d-flex gap-1 mb-3" style={{ borderBottom: '2px solid #e9ecef' }}>
+      <div className="d-flex gap-1 mb-3" style={{ borderBottom: '2px solid var(--border-subtle)' }}>
         {TABS.map(t => (
           <button key={t.key}
             onClick={() => { setTab(t.key); setSearch(''); setStatusFilter('all'); }}
             className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
             style={{
               borderRadius: '8px 8px 0 0', fontWeight: 600, fontSize: '0.78rem',
-              background: tab === t.key ? '#1a1a2e' : 'transparent',
-              color: tab === t.key ? '#fff' : '#6c757d',
+              background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
+              color: tab === t.key ? 'var(--accent-text)' : 'var(--text-muted)',
               border: 'none', marginBottom: -2,
-              borderBottom: tab === t.key ? '2px solid #1a1a2e' : '2px solid transparent',
+              borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent',
             }}>
             <i className={`bi ${t.icon}`} /> {t.label}
-            <span className="badge bg-light text-dark ms-1" style={{ fontSize: '0.55rem' }}>{(allUsers[t.key] || []).length}</span>
+            <span className="badge ms-1" style={{ fontSize: '0.55rem', background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>{(allUsers[t.key] || []).length}</span>
           </button>
         ))}
       </div>
@@ -469,10 +466,10 @@ export default function BossIncentivesPage() {
       {!loading && tabRecords.length > 0 && (
         <div className="d-flex gap-2 flex-wrap mb-3">
           {[
-            { label: 'Total Payout',    value: `${totalPayout.toLocaleString()} PKR`, bg: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' },
-            { label: 'Records',          value: `${tabRecords.length} / ${users.length}`, bg: '#f3f4f6', color: '#495057' },
-            { label: 'Verified',         value: `${verifiedCount} / ${tabRecords.length}`, bg: '#e6f4ea', color: '#198754' },
-            { label: 'Payouts Cleared',  value: `${clearedCount} / ${tabRecords.length}`, bg: '#e8f0fe', color: '#0d6efd' },
+            { label: 'Total Payout',    value: `${formatPKR(totalPayout)}`, bg: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' },
+            { label: 'Records',          value: `${tabRecords.length} / ${users.length}`, bg: 'var(--surface-2)', color: 'var(--text-secondary)' },
+            { label: 'Verified',         value: `${verifiedCount} / ${tabRecords.length}`, bg: 'var(--success-soft)', color: 'var(--success-text)' },
+            { label: 'Payouts Cleared',  value: `${clearedCount} / ${tabRecords.length}`, bg: 'var(--info-soft)', color: 'var(--info-text)' },
           ].map(s => (
             <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, color: s.color, minWidth: 110 }}>
               <div style={{ fontSize: '0.58rem', opacity: 0.7, letterSpacing: 1, textTransform: 'uppercase' }}>{s.label}</div>
@@ -505,7 +502,7 @@ export default function BossIncentivesPage() {
           <span className="spinner-border spinner-border-sm" /> Loading…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 12 }}>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
           <i className="bi bi-inbox text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
           <p className="text-muted mt-3 mb-0">
             {search || statusFilter !== 'all' ? 'No matching results.' : `No ${TABS.find(t => t.key === tab)?.label} found.`}
@@ -523,10 +520,10 @@ export default function BossIncentivesPage() {
               : 0;
             const completionPct  = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-            let barColor = '#e9ecef';
-            if (hasData && rec.payoutCleared)  barColor = 'linear-gradient(90deg,#0d6efd,#6ea8fe)';
-            else if (hasData && rec.verified)  barColor = 'linear-gradient(90deg,#198754,#51cf66)';
-            else if (hasData)                  barColor = 'linear-gradient(90deg,#fd7e14,#ffa94d)';
+            let barColor = 'var(--surface-3)';
+            if (hasData && rec.payoutCleared)  barColor = 'var(--info)';
+            else if (hasData && rec.verified)  barColor = 'var(--success)';
+            else if (hasData)                  barColor = 'var(--warning)';
 
             return (
               <div key={u.id} className="col-sm-6 col-lg-4">
@@ -537,10 +534,7 @@ export default function BossIncentivesPage() {
                     {/* Identity + badges */}
                     <div className="d-flex align-items-start justify-content-between mb-2">
                       <div className="d-flex align-items-center gap-2">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                          style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#1a1a2e,#0f3460)', fontSize: '0.7rem' }}>
-                          {u.name.slice(0, 2).toUpperCase()}
-                        </div>
+                        <Avatar name={u.name} toneKey={u.id} size={36} />
                         <div>
                           <div className="fw-semibold small">{u.name}</div>
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>
@@ -553,8 +547,8 @@ export default function BossIncentivesPage() {
                         <div className="d-flex flex-column align-items-end gap-1">
                           <span className="badge rounded-pill" style={{
                             fontSize: '0.58rem',
-                            background: rec.verified ? '#e6f4ea' : '#fff3e0',
-                            color: rec.verified ? '#198754' : '#fd7e14',
+                            background: rec.verified ? 'var(--success-soft)' : 'var(--warning-soft)',
+                            color: rec.verified ? 'var(--success-text)' : 'var(--warning-text)',
                           }}>
                             {rec.verified
                               ? (tab === 'apcs' || tab === 'ipcs' ? '✓ OL Verified' : '✓ Verified')
@@ -562,8 +556,8 @@ export default function BossIncentivesPage() {
                           </span>
                           <span className="badge rounded-pill" style={{
                             fontSize: '0.58rem',
-                            background: rec.payoutCleared ? '#e8f0fe' : '#f3f4f6',
-                            color: rec.payoutCleared ? '#0d6efd' : '#6c757d',
+                            background: rec.payoutCleared ? 'var(--info-soft)' : 'var(--surface-2)',
+                            color: rec.payoutCleared ? 'var(--info-text)' : 'var(--text-muted)',
                           }}>
                             {rec.payoutCleared ? '✓ Payout Cleared' : '○ Payout Pending'}
                           </span>
@@ -576,7 +570,7 @@ export default function BossIncentivesPage() {
                       <div className="d-flex flex-wrap gap-1 mb-2">
                         {(u.assignedBrands || []).length > 0
                           ? u.assignedBrands.map(b => (
-                              <span key={b.id || b.name} className="badge bg-light text-dark border" style={{ fontSize: '0.63rem', fontWeight: 500 }}>{b.name}</span>
+                              <span key={b.id || b.name} className="badge border" style={{ fontSize: '0.63rem', fontWeight: 500, background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>{b.name}</span>
                             ))
                           : <span className="text-muted" style={{ fontSize: '0.68rem' }}>No brand</span>}
                       </div>
@@ -589,19 +583,19 @@ export default function BossIncentivesPage() {
                           <div style={{ fontSize: '0.75rem' }}>
                             <div className="d-flex justify-content-between">
                               <span className="text-muted">Basic</span>
-                              <span className="fw-medium">{bd.basic.toLocaleString()} PKR</span>
+                              <span className="fw-medium">{formatPKR(bd.basic)}</span>
                             </div>
                             <div className="d-flex justify-content-between mt-1">
                               <span className="text-muted">Incentives</span>
-                              <span className="fw-medium text-success">+{bd.incAchieved.toLocaleString()} / {bd.incTotal.toLocaleString()}</span>
+                              <span className="fw-medium text-success">+{formatPKR(bd.incAchieved)} / {formatPKR(bd.incTotal)}</span>
                             </div>
                             <div className="d-flex justify-content-between mt-1">
                               <span className="text-muted">Bonuses</span>
-                              <span className="fw-medium text-primary">+{bd.bonAchieved.toLocaleString()} / {bd.bonTotal.toLocaleString()}</span>
+                              <span className="fw-medium text-info">+{formatPKR(bd.bonAchieved)} / {formatPKR(bd.bonTotal)}</span>
                             </div>
-                            <div className="d-flex justify-content-between mt-2 pt-2 fw-bold" style={{ borderTop: '1px dashed #dee2e6', fontSize: '0.82rem' }}>
+                            <div className="d-flex justify-content-between mt-2 pt-2 fw-bold" style={{ borderTop: '1px dashed var(--border-subtle)', fontSize: '0.82rem' }}>
                               <span>Payable</span>
-                              <span>{bd.totalAchieved.toLocaleString()} PKR</span>
+                              <span>{formatPKR(bd.totalAchieved)}</span>
                             </div>
                           </div>
                           <div className="mt-2">
@@ -609,14 +603,11 @@ export default function BossIncentivesPage() {
                               <span className="text-muted">Completed</span>
                               <span className="fw-semibold">{completedItems}/{totalItems} ({completionPct}%)</span>
                             </div>
-                            <div className="rounded-pill overflow-hidden" style={{ height: 5, background: '#e9ecef' }}>
-                              <div className="h-100 rounded-pill"
-                                style={{ width: `${completionPct}%`, background: completionPct === 100 ? '#198754' : '#0d6efd', transition: 'width var(--dur-slow) var(--ease-out)' }} />
-                            </div>
+                            <ProgressBar size="sm" value={completionPct} tone={completionPct === 100 ? 'success' : 'info'} />
                           </div>
                         </>
                       ) : (
-                        <div className="rounded-2 p-2 text-center text-muted" style={{ background: '#f8f9fa', fontSize: '0.75rem' }}>
+                        <div className="rounded-2 p-2 text-center text-muted" style={{ background: 'var(--surface-2)', fontSize: '0.75rem' }}>
                           No data for {getMonthLabel(month)}
                         </div>
                       )}
@@ -628,9 +619,9 @@ export default function BossIncentivesPage() {
                         <button
                           className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
                           style={{
-                            background: hasData ? '#1a1a2e' : 'transparent',
-                            color: hasData ? '#fff' : '#1a1a2e',
-                            border: '1.5px solid #1a1a2e', borderRadius: 8, fontSize: '0.75rem',
+                            background: hasData ? 'var(--accent)' : 'transparent',
+                            color: hasData ? 'var(--on-accent)' : 'var(--accent-text)',
+                            border: '1.5px solid var(--accent)', borderRadius: 8, fontSize: '0.75rem',
                           }}
                           onClick={() => navigate(`/incentives/edit/${u.id}`)}>
                           <i className={`bi ${hasData ? 'bi-pencil' : 'bi-plus-lg'}`} /> {hasData ? 'Edit' : 'Add'}
@@ -638,7 +629,7 @@ export default function BossIncentivesPage() {
                         {hasData && (
                           <button
                             className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                            style={{ border: '1.5px solid #dee2e6', borderRadius: 8, background: '#fff', color: '#495057', fontSize: '0.75rem' }}
+                            style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}
                             onClick={() => setShowDetails({ rec, name: u.name })}>
                             <i className="bi bi-eye" /> Details
                           </button>
@@ -652,13 +643,13 @@ export default function BossIncentivesPage() {
                             !rec.verified ? (
                               <button
                                 className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ background: '#fff3e0', color: '#fd7e14', border: '1.5px solid #ffc070', borderRadius: 8, fontSize: '0.75rem' }}
+                                style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', border: '1.5px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
                                 onClick={() => handleVerify(u.id)} disabled={verifying === u.id}>
                                 {verifying === u.id ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-patch-check" /> Verify</>}
                               </button>
                             ) : (
                               <div className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ background: '#e6f4ea', color: '#198754', border: '1.5px solid #b7dfc4', borderRadius: 8, fontSize: '0.75rem', cursor: 'default' }}>
+                                style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1.5px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem', cursor: 'default' }}>
                                 <i className="bi bi-patch-check-fill" /> Verified
                               </div>
                             )
@@ -668,14 +659,14 @@ export default function BossIncentivesPage() {
                           {!rec.payoutCleared ? (
                             <button
                               className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: '#e8f0fe', color: '#0d6efd', border: '1.5px solid #b6d4fe', borderRadius: 8, fontSize: '0.75rem' }}
+                              style={{ background: 'var(--info-soft)', color: 'var(--info-text)', border: '1.5px solid color-mix(in srgb, var(--info) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
                               onClick={() => rec.verified ? handleClearPayout(u.id) : setConfirmClear({ userId: u.id, userName: u.name })}
                               disabled={clearing === u.id}>
                               {clearing === u.id ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-cash-stack" /> Clear Payout</>}
                             </button>
                           ) : (
                             <div className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: '#e6f4ea', color: '#198754', border: '1.5px solid #b7dfc4', borderRadius: 8, fontSize: '0.75rem', cursor: 'default' }}>
+                              style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1.5px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem', cursor: 'default' }}>
                               <i className="bi bi-check-circle-fill" /> Cleared
                             </div>
                           )}
@@ -715,7 +706,7 @@ export default function BossIncentivesPage() {
 // ── Combined payout snapshot block (APCs + TLs + OLs cumulative) ────────────
 function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
   const fmt = n => Number(n || 0).toLocaleString();
-  const pkr = n => fmt(n) + ' PKR';
+  const pkr = n => formatPKR(n);
   const total = s.totalPayout || 1;
   const basePct = (s.totalBase / total) * 100;
   const incPct  = (s.incEarned / total) * 100;
@@ -730,34 +721,34 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
   const bonPotentialPct = s.bonPotential > 0 ? Math.round((s.bonEarned / s.bonPotential) * 100) : 0;
 
   return (
-    <div className="rounded-3 mb-4 p-3" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+    <div className="rounded-3 mb-4 p-3" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
       <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <div>
-          <div className="fw-bold" style={{ fontSize: '0.95rem', color: '#0f172a' }}>Combined payout · {monthLabel}</div>
+          <div className="fw-bold" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>Combined payout · {monthLabel}</div>
           <div className="text-muted" style={{ fontSize: '0.72rem' }}>
             Cumulative across {s.teamSize} member{s.teamSize === 1 ? '' : 's'} ({s.withPlans} with plans, {s.noPlan} without)
           </div>
         </div>
         <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-          style={{ background: '#0f172a', color: '#fff', fontSize: '0.78rem', fontWeight: 700 }}>
+          style={{ background: 'var(--text-primary)', color: 'var(--surface-1)', fontSize: '0.78rem', fontWeight: 700 }}>
           <i className="bi bi-cash-coin" /> {pkr(s.totalPayout)}
         </span>
       </div>
 
       <div className="row g-2 mb-3">
         <div className="col-6 col-lg-3">
-          <KpiTile label="Base Salary" value={pkr(s.totalBase)} sub={s.withPlans + ' members on payroll'} dot="#64748b" />
+          <KpiTile label="Base Salary" value={pkr(s.totalBase)} sub={s.withPlans + ' members on payroll'} dot="var(--text-muted)" />
         </div>
         <div className="col-6 col-lg-3">
           <KpiTile label="Incentives Earned" value={pkr(s.incEarned)}
-            sub={'of ' + pkr(s.incPotential) + ' (' + incPotentialPct + '%)'} dot="#16a34a" />
+            sub={'of ' + pkr(s.incPotential) + ' (' + incPotentialPct + '%)'} dot="var(--success)" />
         </div>
         <div className="col-6 col-lg-3">
           <KpiTile label="Bonuses Earned" value={pkr(s.bonEarned)}
-            sub={'of ' + pkr(s.bonPotential) + ' (' + bonPotentialPct + '%)'} dot="#3b82f6" />
+            sub={'of ' + pkr(s.bonPotential) + ' (' + bonPotentialPct + '%)'} dot="var(--info)" />
         </div>
         <div className="col-6 col-lg-3">
-          <KpiTile label="Total Payout" value={pkr(s.totalPayout)} sub="base + incentives + bonuses" dot="#0f172a" prominent />
+          <KpiTile label="Total Payout" value={pkr(s.totalPayout)} sub="base + incentives + bonuses" dot="var(--text-primary)" prominent />
         </div>
       </div>
 
@@ -766,32 +757,32 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
           <span className="text-muted fw-semibold">Payout composition</span>
           <span className="text-muted">{pkr(s.totalPayout)} total</span>
         </div>
-        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: '#64748b', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: '#3b82f6', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: 'var(--surface-2)' }}>
+          {basePct > 0 && <div title={'Base ' + pkr(s.totalBase)} style={{ width: basePct + '%', background: 'var(--text-muted)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {incPct > 0  && <div title={'Incentives ' + pkr(s.incEarned)} style={{ width: incPct  + '%', background: 'var(--success)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {bonPct > 0  && <div title={'Bonuses ' + pkr(s.bonEarned)}    style={{ width: bonPct  + '%', background: 'var(--info)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
-          <Legend color="#64748b" label="Base" value={pkr(s.totalBase)} />
-          <Legend color="#16a34a" label="Incentives" value={pkr(s.incEarned)} />
-          <Legend color="#3b82f6" label="Bonuses" value={pkr(s.bonEarned)} />
+          <Legend color="var(--text-muted)" label="Base" value={pkr(s.totalBase)} />
+          <Legend color="var(--success-text)" label="Incentives" value={pkr(s.incEarned)} />
+          <Legend color="var(--info-text)" label="Bonuses" value={pkr(s.bonEarned)} />
         </div>
       </div>
 
-      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
         <div className="d-flex align-items-center justify-content-between mb-1" style={{ fontSize: '0.78rem' }}>
           <span className="text-muted fw-semibold">Incentive achievement</span>
           <span className="text-muted">{s.fullyAchieved + s.partial} of {s.fullyAchieved + s.partial + s.noneEarned} earned something</span>
         </div>
-        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: '#f1f5f9' }}>
-          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: '#16a34a', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: '#fbbf24', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
-          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: '#cbd5e1', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+        <div className="rounded-pill d-flex overflow-hidden" style={{ height: 16, background: 'var(--surface-2)' }}>
+          {fullPct > 0 && <div title={'Fully achieved: ' + s.fullyAchieved} style={{ width: fullPct + '%', background: 'var(--success)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {partPct > 0 && <div title={'Partial: ' + s.partial}              style={{ width: partPct + '%', background: 'var(--warning)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
+          {nonePct > 0 && <div title={'Nothing earned: ' + s.noneEarned}    style={{ width: nonePct + '%', background: 'var(--border-strong)', transition: 'width var(--dur-slow) var(--ease-out)' }} />}
         </div>
         <div className="d-flex flex-wrap gap-3 mt-2" style={{ fontSize: '0.78rem' }}>
-          <Legend color="#16a34a" label="Fully achieved" value={s.fullyAchieved} />
-          <Legend color="#fbbf24" label="Partial"        value={s.partial} />
-          <Legend color="#cbd5e1" label="Nothing earned" value={s.noneEarned} />
+          <Legend color="var(--success-text)" label="Fully achieved" value={s.fullyAchieved} />
+          <Legend color="var(--warning-text)" label="Partial"        value={s.partial} />
+          <Legend color="var(--border-strong)" label="Nothing earned" value={s.noneEarned} />
         </div>
       </div>
     </div>
@@ -801,16 +792,16 @@ function CombinedPayoutSnapshot({ stats: s, monthLabel }) {
 function KpiTile({ label, value, sub, dot, prominent }) {
   return (
     <div className="rounded-3 h-100 p-3" style={{
-      background: prominent ? '#0f172a' : '#f8fafc',
-      border: prominent ? '1px solid #0f172a' : '1px solid #e2e8f0',
-      color: prominent ? '#fff' : '#0f172a',
+      background: prominent ? 'var(--text-primary)' : 'var(--surface-2)',
+      border: prominent ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+      color: prominent ? 'var(--surface-1)' : 'var(--text-primary)',
     }}>
-      <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: prominent ? 'rgba(255,255,255,0.7)' : '#64748b' }}>
+      <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: prominent ? 'color-mix(in srgb, var(--surface-1) 75%, transparent)' : 'var(--text-muted)' }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, display: 'inline-block' }} />
         {label}
       </div>
       <div className="fw-bold" style={{ fontSize: '1.05rem', letterSpacing: '-0.01em', lineHeight: 1.15, marginTop: 6 }}>{value}</div>
-      {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'rgba(255,255,255,0.6)' : '#64748b' }}>{sub}</div>}
+      {sub && <div style={{ fontSize: '0.7rem', marginTop: 2, color: prominent ? 'color-mix(in srgb, var(--surface-1) 70%, transparent)' : 'var(--text-muted)' }}>{sub}</div>}
     </div>
   );
 }
@@ -819,8 +810,8 @@ function Legend({ color, label, value }) {
   return (
     <div className="d-flex align-items-center gap-2">
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-      <span style={{ color: '#475569' }}>{label}</span>
-      <span className="fw-bold" style={{ color: '#0f172a' }}>{value}</span>
+      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      <span className="fw-bold" style={{ color: 'var(--text-primary)' }}>{value}</span>
     </div>
   );
 }

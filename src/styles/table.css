@@ -279,6 +279,20 @@
   }
 }
 
+/* Rows that pass their columns as --cols instead of an inline
+   grid-template-columns, so the phone layout can take over (an inline grid
+   beat the rule above while it still hid columns 2 and 3). On phones:
+   .wx-col-lead + .wx-col-key share the first line, everything else stacks. */
+.wx-list-row.wx-cols { grid-template-columns: var(--cols); }
+@media (max-width: 640px) {
+  .wx-list-row.wx-cols { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
+  .wx-list-row.wx-cols > * { order: 2; grid-column: 1 / -1; }
+  .wx-list-row.wx-cols > :nth-child(2),
+  .wx-list-row.wx-cols > :nth-child(3) { display: block; }
+  .wx-list-row.wx-cols > .wx-col-lead { order: 0; grid-column: 1; }
+  .wx-list-row.wx-cols > .wx-col-key { order: 1; grid-column: 2; text-align: right; }
+}
+
 /* ============ Modal ============ */
 .wx-modal-backdrop {
   position: fixed;

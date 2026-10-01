@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  getCompensationFor, getHistoryFor, formatPKR, yearsCompletedSince,
+  getCompensationFor, getHistoryFor, yearsCompletedSince,
 } from '../../lib/salariesApi';
+import { formatPKR } from '../../lib/format';
+import { PageHeader, StatCard, StatGrid } from '../../components/ui';
 import { AlertIcon, StarIcon, CalendarIcon } from '../../components/common/Icon';
 import '../../styles/table.css';
 
@@ -47,12 +49,10 @@ export default function MyCompensationPage() {
 
   return (
     <>
-      <div className="page-header">
-        <h1 className="page-title">My compensation</h1>
-        <p className="page-subtitle">
-          Your fixed salary, work anniversary, and the full record of every change.
-        </p>
-      </div>
+      <PageHeader
+        title="My Compensation"
+        subtitle="Your fixed salary, work anniversary, and the full record of every change."
+      />
 
       {err && (
         <div className="wx-alert wx-alert-danger" style={{ marginBottom: 14 }}>
@@ -61,27 +61,22 @@ export default function MyCompensationPage() {
       )}
 
       {/* Top stat tiles */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))',
-        gap: 12, marginBottom: 18,
-      }}>
-        <StatTile
+      <StatGrid min={220} className="mb-3">
+        <StatCard
           icon={<StarIcon width="18" height="18" />}
           label="Current fixed salary"
           value={comp ? formatPKR(comp.basicSalary) : (loading ? '…' : 'Not set')}
-          sub={comp ? `Effective ${comp.effectiveFrom}` : 'Boss will set this shortly.'}
-          tone="accent"
+          hint={comp ? `Effective ${comp.effectiveFrom}` : 'Boss will set this shortly.'}
         />
-        <StatTile
+        <StatCard
           icon={<CalendarIcon width="18" height="18" />}
           label="Hire date"
           value={profile?.start_date || 'Not set'}
-          sub={profile?.start_date
+          hint={profile?.start_date
             ? `${yearsCompleted} ${yearsCompleted === 1 ? 'year' : 'years'} completed`
             : 'Ask the Boss to add this.'}
         />
-      </div>
+      </StatGrid>
 
       <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Change history</h2>
@@ -91,8 +86,8 @@ export default function MyCompensationPage() {
       </div>
 
       <div className="wx-list">
-        <div className="wx-list-row wx-list-header"
-          style={{ gridTemplateColumns: '110px 0.9fr 1.2fr 1fr 1.4fr' }}>
+        <div className="wx-list-row wx-cols wx-list-header"
+          style={{ '--cols': '110px 0.9fr 1.2fr 1fr 1.4fr' }}>
           <div>When</div>
           <div>Reason</div>
           <div>Change</div>
@@ -121,31 +116,6 @@ export default function MyCompensationPage() {
   );
 }
 
-function StatTile({ icon, label, value, sub, tone }) {
-  return (
-    <div style={{
-      padding: 14, borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--border-subtle)',
-      background: tone === 'accent' ? 'var(--accent-soft)' : 'var(--surface-1)',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase',
-        color: tone === 'accent' ? 'var(--accent)' : 'var(--text-muted)',
-        letterSpacing: 0.4, marginBottom: 6,
-      }}>
-        {icon}{label}
-      </div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>
-        {value}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-        {sub}
-      </div>
-    </div>
-  );
-}
-
 const REASON_LABELS = {
   initial_seed:     'Initial',
   annual_increment: 'Annual increment',
@@ -156,21 +126,21 @@ const REASON_LABELS = {
 
 function MyHistoryRow({ h }) {
   return (
-    <div className="wx-list-row"
-      style={{ gridTemplateColumns: '110px 0.9fr 1.2fr 1fr 1.4fr', alignItems: 'flex-start' }}>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+    <div className="wx-list-row wx-cols"
+      style={{ '--cols': '110px 0.9fr 1.2fr 1fr 1.4fr', alignItems: 'flex-start' }}>
+      <div className="wx-col-lead" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
         {h.effectiveFrom}
       </div>
       <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
         {REASON_LABELS[h.changeReason] || h.changeReason}
       </div>
-      <div style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>
+      <div className="wx-col-key" style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>
         {h.previousAmount != null
           ? <>{formatPKR(h.previousAmount)} → {formatPKR(h.newAmount)}</>
           : <>{formatPKR(h.newAmount)}</>}
         {h.incrementPct != null && (
           <div style={{ fontSize: 11, fontWeight: 600, marginTop: 2,
-            color: h.incrementPct >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+            color: h.incrementPct >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
             {h.incrementPct >= 0 ? '+' : ''}{Number(h.incrementPct).toFixed(1)}%
           </div>
         )}

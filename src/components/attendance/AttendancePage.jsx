@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { karachiYmd, karachiMonth } from '../../lib/serverTime';
 import ClockWidget from './ClockWidget';
+import { useConfirm, useToast } from '../ui';
 import {
   onTeamToday, onAllToday, onPendingApprovals, onActiveRecord,
   onPendingEditClockOutRequests,
@@ -66,9 +67,9 @@ function BreakDetailsModal({ record, onClose }) {
   }, 0);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
-        <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0' }}>
+        <div className="card-header border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0' }}>
           <div>
             <h6 className="fw-bold mb-0">
               <i className="bi bi-cup-hot-fill me-2" style={{ color: 'var(--warning)' }} />
@@ -76,7 +77,7 @@ function BreakDetailsModal({ record, onClose }) {
             </h6>
             <p className="text-muted small mb-0">{record.userName} · {record.date}</p>
           </div>
-          <button className="btn btn-sm btn-light border-0 px-2" onClick={onClose}><i className="bi bi-x-lg" /></button>
+          <button className="btn btn-sm btn-outline-secondary border-0 px-2" onClick={onClose}><i className="bi bi-x-lg" /></button>
         </div>
         <div className="card-body px-4 pb-4 pt-2">
           {breaks.length === 0 ? (
@@ -102,7 +103,7 @@ function BreakDetailsModal({ record, onClose }) {
                                     - (b.start.toMillis ? b.start.toMillis() : new Date(b.start).getTime())))
                       : '—';
                     return (
-                      <tr key={i} style={ongoing ? { background: 'var(--warning-soft)' } : undefined}>
+                      <tr key={i} style={ongoing ? { '--bs-table-bg-state': 'var(--warning-soft)' } : undefined}>
                         <td className="ps-0 fw-semibold text-muted small">{i + 1}</td>
                         <td className="small fw-medium">{start}</td>
                         <td className="small fw-medium">{end}</td>
@@ -122,7 +123,7 @@ function BreakDetailsModal({ record, onClose }) {
             </>
           )}
           <div className="d-flex justify-content-end mt-3">
-            <button className="btn btn-sm btn-dark px-3" onClick={onClose}>Close</button>
+            <button className="btn btn-sm btn-primary px-3" onClick={onClose}>Close</button>
           </div>
         </div>
       </div>
@@ -446,7 +447,7 @@ function ApprovalModal({ record, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 16 }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-clock-history me-2 text-primary" />Clock-Out Request</h6>
@@ -521,7 +522,7 @@ function EditRequestModal({ record, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 16 }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-pencil-square me-2 text-primary" />Clock-In Edit Request</h6>
@@ -601,7 +602,7 @@ function BreaksEditModal({ record, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 16 }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-cup-hot-fill me-2 text-warning" />Break Edit Request</h6>
@@ -730,10 +731,10 @@ function TodayTimeline({ record }) {
           </div>
           {t && (
             <div className="d-flex gap-2">
-              <span className="rounded-pill px-3 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.68rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+              <span className="rounded-pill px-3 py-1" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.68rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
                 <i className="bi bi-activity me-1" />{fmtDuration(t.totalWorkMs)}
               </span>
-              <span className="rounded-pill px-3 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: '0.68rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+              <span className="rounded-pill px-3 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: '0.68rem', fontWeight: 700, border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                 <i className="bi bi-cup-hot me-1" />{fmtDuration(t.totalBreakMs)}
               </span>
             </div>
@@ -783,6 +784,7 @@ function TodayTimeline({ record }) {
 
 /* ── Roster tab: per-user monthly summary with manual override ─────────────── */
 function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membersLoading, membersError }) {
+  const toast = useToast();
   const [month, setMonth] = useState(() => karachiMonth());
   const [records, setRecords] = useState([]);
   const [adjustments, setAdjustments] = useState([]);
@@ -1000,12 +1002,10 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membe
               setBulkOpen(false);
               setBulkProgress(null);
               setReloadKey(k => k + 1);
-              // eslint-disable-next-line no-alert
-              window.alert(`Marked ${res.adjustmentsCreated} day${res.adjustmentsCreated === 1 ? '' : 's'} present across ${res.usersTouched} user${res.usersTouched === 1 ? '' : 's'}.`);
+              toast.success(`Marked ${res.adjustmentsCreated} day${res.adjustmentsCreated === 1 ? '' : 's'} present across ${res.usersTouched} user${res.usersTouched === 1 ? '' : 's'}.`);
             } catch (err) {
               setBulkRunning(false);
-              // eslint-disable-next-line no-alert
-              window.alert(`Bulk mark failed: ${err.message || 'unknown error'}`);
+              toast.error(`Bulk mark failed: ${err.message || 'unknown error'}`);
             }
           }}
           onClose={() => { if (!bulkRunning) setBulkOpen(false); }}
@@ -1146,7 +1146,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={running ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={running ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 14, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-body p-4" style={{ overflowY: 'auto' }}>
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -1159,12 +1159,12 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
                 {monthLabel} · {preview.length} user{preview.length === 1 ? '' : 's'} affected · <strong>{totalDays}</strong> day{totalDays === 1 ? '' : 's'} will be marked present
               </div>
             </div>
-            <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} disabled={running} style={{ width: 32, height: 32 }}>
+            <button className="btn btn-sm btn-outline-secondary rounded-circle" onClick={onClose} disabled={running} style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
           </div>
 
-          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.78rem', color: 'var(--info)' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.78rem', color: 'var(--info-text)' }}>
             <i className="bi bi-shield-check me-1" />
             Existing clock-ins, approved leaves, and previous manual adjustments will <strong>not</strong> change. Only days that are currently missed (red on the calendar) will get a manual adjustment so they count as present.
           </div>
@@ -1212,7 +1212,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
                       {(p.user.role || 'apc').toUpperCase()}
                     </span>
                   </div>
-                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.66rem', fontWeight: 700 }}>
+                  <span className="rounded-pill px-2 flex-shrink-0" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: '0.66rem', fontWeight: 700 }}>
                     {p.dates.length} day{p.dates.length === 1 ? '' : 's'}
                   </span>
                 </div>
@@ -1222,7 +1222,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
         </div>
         <div className="px-4 pb-4 d-flex gap-2 justify-content-end">
           <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={running}>Cancel</button>
-          <button className="btn btn-sm btn-dark px-4" onClick={() => onRun(note)} disabled={running || totalDays === 0}>
+          <button className="btn btn-sm btn-primary px-4" onClick={() => onRun(note)} disabled={running || totalDays === 0}>
             {running
               ? <><span className="spinner-border spinner-border-sm me-1" />Working…</>
               : `Mark ${totalDays} day${totalDays === 1 ? '' : 's'} as present`}
@@ -1237,6 +1237,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
    day to undo. Shift+click extends a range so a manager can mark a whole
    week at once without clicking each day. */
 function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
+  const confirm = useConfirm();
   const [pendingDate, setPendingDate] = useState(null); // single-cell spinner
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null); // { done, total }
@@ -1370,7 +1371,12 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
     if (pendingDate || bulkSaving) return;
     const targets = days_.filter(d => d.kind === 'missed');
     if (targets.length === 0) return;
-    if (!window.confirm(`Mark all ${targets.length} missed day${targets.length === 1 ? '' : 's'} as present?`)) return;
+    const ok = await confirm({
+      title: 'Mark missed days present?',
+      message: `Mark all ${targets.length} missed day${targets.length === 1 ? '' : 's'} as present?`,
+      confirmLabel: 'Mark present',
+    });
+    if (!ok) return;
     setError('');
     setBulkSaving(true);
     setBulkProgress({ done: 0, total: targets.length });
@@ -1398,7 +1404,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={pendingDate ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={pendingDate ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -1409,13 +1415,13 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                 {' · '}Actual: <strong>{row.actualDays}</strong>{' · '}Effective: <strong>{row.effectiveDays}</strong>
               </div>
             </div>
-            <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} disabled={!!pendingDate} style={{ width: 32, height: 32 }}>
+            <button className="btn btn-sm btn-outline-secondary rounded-circle" onClick={onClose} disabled={!!pendingDate} style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
           </div>
 
           {/* How-to */}
-          <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.74rem', color: 'var(--info)' }}>
+          <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', fontSize: '0.74rem', color: 'var(--info-text)' }}>
             <i className="bi bi-info-circle mt-1" />
             <div>
               Tap a <strong style={{ color: 'var(--danger)' }}>red</strong> day to mark present, tap a <strong style={{ color: 'var(--warning)' }}>yellow</strong> day to undo.
@@ -1503,7 +1509,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
                       background: colors.bg,
                       color: colors.fg,
                       border: `1px solid ${isAnchor ? 'var(--text-primary)' : colors.border}`,
-                      boxShadow: isAnchor ? '0 0 0 2px rgba(15,23,42,0.2)' : 'none',
+                      boxShadow: isAnchor ? '0 0 0 2px var(--accent-ring)' : 'none',
                       fontSize: '0.7rem',
                       fontWeight: 700,
                       cursor: clickable && !pendingDate && !bulkSaving ? 'pointer' : 'default',
@@ -1607,12 +1613,12 @@ function ForceCloseModal({ record, closer, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h6 className="fw-bold mb-0"><i className="bi bi-box-arrow-right me-2" style={{ color: 'var(--danger)' }} />Close session for {record.userName}</h6>
-            <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} disabled={saving} style={{ width: 32, height: 32 }}>
+            <button className="btn btn-sm btn-outline-secondary rounded-circle" onClick={onClose} disabled={saving} style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
           </div>
@@ -1976,15 +1982,15 @@ export default function AttendancePage() {
             {(isBoss || isOL) ? 'Company-wide attendance tracking' : canSeeTeam ? 'Your team attendance' : 'Your attendance'}
           </p>
         </div>
-        <div className="d-flex gap-2">
+        <div className="wx-seg flex-wrap" role="group" aria-label="Attendance views">
           {(isBoss
               ? ['today', 'history', 'roster', 'quotas']
               : isOL ? ['today', 'team', 'history', 'roster']
               : canSeeTeam ? ['today', 'team', 'history']
               : ['today', 'history']
             ).map(t => (
-            <button key={t} className={`btn btn-sm px-3 ${tab === t ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: 8, fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setTab(t)}>
+            <button key={t} type="button" className={`wx-seg-btn${tab === t ? ' is-active' : ''}`}
+              aria-pressed={tab === t} onClick={() => setTab(t)}>
               {t === 'today' ? 'Today' : t === 'team' ? 'Team' : t === 'quotas' ? 'Leave Quotas' : t === 'roster' ? 'Roster' : 'History'}
             </button>
           ))}
@@ -1998,21 +2004,19 @@ export default function AttendancePage() {
         {!isBoss && tab === 'today' && (
           <div className="col-12 d-flex justify-content-center">
             <div style={{ width: '100%', maxWidth: 1100 }}>
-            <MyMonthlyAttendance userId={currentUser.uid} displayName={currentUser.displayName} />
-            <ClockWidget />
-
-            {/* Pending approvals for TL */}
+            {/* Order = how often it's needed: the TL's approval queue first
+                (it blocks other people), then the clock, then the month. */}
             {isTL && (pendingApprovals.length > 0 || pendingEditRequests.length > 0 || pendingEditOutRequests.length > 0 || pendingEditBreaksRequests.length > 0) && (
-              <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 16 }}>
+              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 16 }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <span className="rounded-circle" style={{ width: 8, height: 8, background: 'var(--danger)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--danger) 19%, transparent)' }} />
-                    <span className="fw-bold" style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>Pending Approvals</span>
+                    <span className="fw-bold" style={{ fontSize: '0.82rem', color: 'var(--danger-text)' }}>Needs your action</span>
                     <span className="badge rounded-pill ms-auto" style={{ background: 'var(--danger)', color: 'var(--on-danger)' }}>{pendingApprovals.length + pendingEditRequests.length + pendingEditOutRequests.length + pendingEditBreaksRequests.length}</span>
                   </div>
                   <div className="d-flex flex-column gap-2">
                     {pendingApprovals.map(r => (
-                      <div key={`co-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
+                      <button type="button" key={`co-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between w-100 text-start"
                         style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setApprovalTarget(r)}>
                         <div>
@@ -2023,10 +2027,10 @@ export default function AttendancePage() {
                           <div className="text-muted" style={{ fontSize: '0.65rem' }}>Clock-out · {fmtTime(r.clockIn)} · {locLabel(r.location)}</div>
                         </div>
                         <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>Review</span>
-                      </div>
+                      </button>
                     ))}
                     {pendingEditRequests.map(r => (
-                      <div key={`ed-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
+                      <button type="button" key={`ed-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between w-100 text-start"
                         style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setEditRequestTarget(r)}>
                         <div>
@@ -2039,10 +2043,10 @@ export default function AttendancePage() {
                           </div>
                         </div>
                         <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>Review</span>
-                      </div>
+                      </button>
                     ))}
                     {pendingEditOutRequests.map(r => (
-                      <div key={`eo-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
+                      <button type="button" key={`eo-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between w-100 text-start"
                         style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setEditOutTarget(r)}>
                         <div>
@@ -2055,10 +2059,10 @@ export default function AttendancePage() {
                           </div>
                         </div>
                         <span className="badge rounded-pill" style={{ background: 'var(--danger)', color: 'var(--on-danger)', fontSize: '0.6rem' }}>Review</span>
-                      </div>
+                      </button>
                     ))}
                     {pendingEditBreaksRequests.map(r => (
-                      <div key={`eb-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between"
+                      <button type="button" key={`eb-${r.id}`} className="rounded-3 p-2 d-flex align-items-center justify-content-between w-100 text-start"
                         style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', cursor: 'pointer' }}
                         onClick={() => setEditBreaksTarget(r)}>
                         <div>
@@ -2070,13 +2074,17 @@ export default function AttendancePage() {
                             Edit breaks · {(r.editBreaksRequest?.requestedBreaks || []).length} break(s) proposed
                           </div>
                         </div>
-                        <span className="badge rounded-pill" style={{ background: 'var(--warning)', color: '#000', fontSize: '0.6rem' }}>Review</span>
-                      </div>
+                        <span className="badge rounded-pill" style={{ background: 'var(--warning)', color: 'var(--on-warning)', fontSize: '0.6rem' }}>Review</span>
+                      </button>
                     ))}
                   </div>
                 </div>
               </div>
             )}
+            <ClockWidget />
+            <div className="mt-3">
+              <MyMonthlyAttendance userId={currentUser.uid} displayName={currentUser.displayName} />
+            </div>
             </div>
           </div>
         )}
@@ -2090,12 +2098,12 @@ export default function AttendancePage() {
               {/* Stats */}
               <div className="d-flex gap-2 mb-3 flex-wrap">
                 {[
-                  { key: '',                 label: 'Total',    value: stats.total,   color: 'var(--info)', bg: 'var(--info-soft)' },
-                  { key: 'clocked-in',       label: 'Working',  value: stats.working, color: 'var(--success)', bg: 'var(--success-soft)' },
-                  { key: 'on-break',         label: 'On Break', value: stats.onBreak, color: 'var(--warning)', bg: 'var(--warning-soft)' },
-                  { key: 'pending-approval', label: 'Pending',  value: stats.pending, color: 'var(--danger)', bg: 'var(--danger-soft)' },
+                  { key: '',                 label: 'Total',    value: stats.total,   color: 'var(--info-text)', bg: 'var(--info-soft)' },
+                  { key: 'clocked-in',       label: 'Working',  value: stats.working, color: 'var(--success-text)', bg: 'var(--success-soft)' },
+                  { key: 'on-break',         label: 'On Break', value: stats.onBreak, color: 'var(--warning-text)', bg: 'var(--warning-soft)' },
+                  { key: 'pending-approval', label: 'Pending',  value: stats.pending, color: 'var(--danger-text)', bg: 'var(--danger-soft)' },
                   { key: 'clocked-out',      label: 'Done',     value: stats.done,    color: 'var(--text-secondary)', bg: 'var(--surface-0)' },
-                  { key: 'missing',          label: 'Missing',  value: stats.missing, color: 'var(--danger)', bg: 'var(--danger-soft)' },
+                  { key: 'missing',          label: 'Missing',  value: stats.missing, color: 'var(--danger-text)', bg: 'var(--danger-soft)' },
                 ].map(s => {
                   const active = filterStatus === s.key;
                   return (
@@ -2167,7 +2175,7 @@ export default function AttendancePage() {
                 <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden' }}>
                   <div className="table-responsive">
                     <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.82rem' }}>
-                      <thead><tr style={{ background: 'var(--surface-0)' }}>
+                      <thead><tr style={{ '--bs-table-bg-state': 'var(--surface-2)' }}>
                         <th className="fw-semibold text-muted border-0 ps-3" style={{ fontSize: '0.72rem' }}>Date</th>
                         <th className="fw-semibold text-muted border-0" style={{ fontSize: '0.72rem' }}>Name</th>
                         <th className="fw-semibold text-muted border-0 text-center" style={{ fontSize: '0.72rem' }}>Location</th>
@@ -2184,7 +2192,7 @@ export default function AttendancePage() {
                           const eff = missing ? null : getEffectiveStatus(r);
                           const sc = missing ? 'var(--danger)' : statusColor(eff);
                           return (
-                            <tr key={r.id} style={missing ? { background: 'var(--danger-soft)' } : undefined}>
+                            <tr key={r.id} style={missing ? { '--bs-table-bg-state': 'var(--danger-soft)' } : undefined}>
                               <td className="ps-3 fw-semibold" style={missing ? { color: 'var(--text-muted)' } : { color: 'var(--text-primary)' }}>
                                 {missing ? todayDateStr : r.date}
                                 {!missing && r.date !== todayDateStr && (
@@ -2204,7 +2212,7 @@ export default function AttendancePage() {
                               </td>
                               <td className="text-center">
                                 {missing ? <span className="text-muted" style={{ fontSize: '0.7rem' }}>—</span>
-                                  : <span className="badge bg-light text-dark border" style={{ fontSize: '0.62rem' }}>{locLabel(r.location)}</span>}
+                                  : <span className="badge border" style={{ fontSize: '0.62rem', background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>{locLabel(r.location)}</span>}
                               </td>
                               <td className="text-center">{missing ? <span className="text-muted">—</span> : fmtTime(r.clockIn)}</td>
                               <td className="text-center fw-semibold" style={{ color: missing ? 'var(--text-muted)' : 'var(--success)' }}>
@@ -2372,7 +2380,7 @@ export default function AttendancePage() {
                 <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden' }}>
                   <div className="table-responsive">
                     <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.82rem' }}>
-                      <thead><tr style={{ background: 'var(--surface-0)' }}>
+                      <thead><tr style={{ '--bs-table-bg-state': 'var(--surface-2)' }}>
                         <th className="fw-semibold text-muted border-0 ps-3" style={{ fontSize: '0.72rem' }}>Date</th>
                         {canSeeTeam && <th className="fw-semibold text-muted border-0" style={{ fontSize: '0.72rem' }}>Name</th>}
                         <th className="fw-semibold text-muted border-0 text-center" style={{ fontSize: '0.72rem' }}>Location</th>
@@ -2391,7 +2399,7 @@ export default function AttendancePage() {
                             <tr key={r.id}>
                               <td className="ps-3 fw-semibold">{r.date}</td>
                               {canSeeTeam && <td>{r.userName} <span className="text-muted" style={{ fontSize: '0.62rem' }}>({r.userRole})</span></td>}
-                              <td className="text-center"><span className="badge bg-light text-dark border" style={{ fontSize: '0.62rem' }}>{locLabel(r.location)}</span></td>
+                              <td className="text-center"><span className="badge border" style={{ fontSize: '0.62rem', background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>{locLabel(r.location)}</span></td>
                               <td className="text-center"><TimeWithDate ts={r.clockIn} rowDate={r.date} /></td>
                               <td className="text-center">
                                 <TimeWithDate ts={r.clockOut} rowDate={r.date} />
@@ -2471,7 +2479,7 @@ export default function AttendancePage() {
               </div>
             ))}
 
-            <button className="btn btn-dark btn-sm px-4 d-inline-flex align-items-center gap-1 mt-2"
+            <button className="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1 mt-2"
               onClick={handleSaveQuota} disabled={quotaSaving}>
               {quotaSaving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><i className="bi bi-check-lg" /> Save Quotas</>}
             </button>
@@ -2482,7 +2490,7 @@ export default function AttendancePage() {
       {/* Quota conflict confirmation modal */}
       {quotaConflicts && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setQuotaConflicts(null)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setQuotaConflicts(null)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <div className="card-body p-4" style={{ overflowY: 'auto' }}>
               <div className="d-flex align-items-start gap-3 mb-3">
@@ -2513,7 +2521,7 @@ export default function AttendancePage() {
               </div>
               <div className="d-flex gap-2 justify-content-end">
                 <button className="btn btn-sm btn-outline-secondary px-3" onClick={() => setQuotaConflicts(null)} disabled={quotaSaving}>Cancel</button>
-                <button className="btn btn-sm btn-dark px-3" onClick={handleConfirmSaveWithConflicts} disabled={quotaSaving}>
+                <button className="btn btn-sm btn-primary px-3" onClick={handleConfirmSaveWithConflicts} disabled={quotaSaving}>
                   {quotaSaving ? <><span className="spinner-border spinner-border-sm me-1" />Saving…</> : 'Save Anyway (existing stay paid)'}
                 </button>
               </div>
@@ -2597,12 +2605,12 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: 'var(--danger)' }} />Review Clock-Out Adjustment</h6>
-            <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} disabled={saving} style={{ width: 32, height: 32 }}>
+            <button className="btn btn-sm btn-outline-secondary rounded-circle" onClick={onClose} disabled={saving} style={{ width: 32, height: 32 }}>
               <i className="bi bi-x-lg" />
             </button>
           </div>

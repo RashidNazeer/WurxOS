@@ -4,6 +4,7 @@ import {
   listAllHolidays, createHoliday, updateHoliday, deleteHoliday,
 } from '../../lib/holidaysApi';
 import { PlusIcon, PencilIcon, TrashIcon, CalendarIcon, XIcon } from '../../components/common/Icon';
+import { useConfirm, useToast } from '../../components/ui';
 
 function fmtDate(ds) {
   if (!ds) return '';
@@ -33,6 +34,8 @@ function weekdayCount(startDate, endDate) {
 }
 
 export default function HolidaysPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const { data: holidays = [], isLoading, error, refetch } = useQuery({
     queryKey: ['company-holidays', 'all'],
@@ -85,12 +88,12 @@ export default function HolidaysPage() {
                 isLast={i === holidays.length - 1}
                 onEdit={() => setEditTarget(h)}
                 onDelete={async () => {
-                  if (!confirm(`Delete holiday "${h.label}"?`)) return;
+                  if (!(await confirm({ title: `Delete holiday "${h.label}"?`, message: 'It will no longer be excluded from leave counts.', confirmLabel: 'Delete', tone: 'danger' }))) return;
                   try {
                     await deleteHoliday(h.id);
                     reload();
                   } catch (err) {
-                    alert(err.message || 'Failed to delete');
+                    toast.error(err.message || 'Failed to delete');
                   }
                 }}
               />
@@ -129,8 +132,8 @@ function HolidayRow({ h, isLast, onEdit, onDelete }) {
       <div
         style={{
           width: 40, height: 40, borderRadius: 'var(--radius-md)',
-          background: 'rgba(168, 85, 247, 0.15)',
-          color: '#a855f7',
+          background: 'var(--purple-soft)',
+          color: 'var(--purple-text)',
           display: 'grid', placeItems: 'center',
         }}
       >
@@ -218,7 +221,7 @@ function HolidayModal({ target, onClose, onSaved }) {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(15, 23, 42, 0.55)',
+        background: 'var(--backdrop)',
         display: 'grid', placeItems: 'center',
         zIndex: 1100,
         padding: 16,
@@ -234,7 +237,7 @@ function HolidayModal({ target, onClose, onSaved }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 36, height: 36, borderRadius: 'var(--radius-md)',
-              background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7',
+              background: 'var(--purple-soft)', color: 'var(--purple-text)',
               display: 'grid', placeItems: 'center',
             }}>
               <CalendarIcon width="18" height="18" />
@@ -297,7 +300,7 @@ function HolidayModal({ target, onClose, onSaved }) {
           {totalDays > 0 && (
             <div style={{
               fontSize: 12.5, padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(168, 85, 247, 0.08)',
+              background: 'color-mix(in srgb, var(--purple) 8%, transparent)',
               color: 'var(--text-secondary)',
             }}>
               <strong>{totalDays}</strong> calendar day{totalDays === 1 ? '' : 's'}
@@ -307,7 +310,7 @@ function HolidayModal({ target, onClose, onSaved }) {
             </div>
           )}
           {err && (
-            <div style={{ fontSize: 12, color: 'var(--danger)', padding: '8px 12px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--danger-text)', padding: '8px 12px', background: 'var(--danger-soft)', borderRadius: 8 }}>
               {err}
             </div>
           )}
