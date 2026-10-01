@@ -13,7 +13,7 @@ import '../../styles/buddy.css';
 export const BUDDY_SETTINGS_PATH = '/settings?section=buddy';
 const HISTORY_PINNED_KEY = 'wurxos.buddy.history.pinned';
 const OLD_COLLAPSED_KEY = 'wurxos.buddy.history.collapsed';   // the old manual toggle, retired
-const IDLE_MS = 6500;      // collapse this long after the pointer leaves
+const IDLE_MS = 1000;      // collapse this long after the pointer leaves (Owner: 1 s)
 const INTENT_MS = 150;     // hover this long on the rail before it opens (no flicker on a pass-over)
 
 // The history panel on desktop: open while hovered, focused or in use (search,
@@ -29,6 +29,7 @@ function useAutoHistory(active) {
   const busy = useRef(false);
   const idleT = useRef(null);
   const intentT = useRef(null);
+  const closedByUser = useRef(false);   // manual close: don't reopen on hover until the pointer has left once
   const clear = () => { clearTimeout(idleT.current); clearTimeout(intentT.current); };
   const focusInside = () => !!ref.current && ref.current.contains(document.activeElement);
   const scheduleClose = useCallback(() => {
@@ -49,19 +50,31 @@ function useAutoHistory(active) {
       return !v;
     });
   }, []);
-  const expand = useCallback(() => { clear(); setOpen(true); }, []);
+  const expand = useCallback(() => { clear(); closedByUser.current = false; setOpen(true); }, []);
+  // Manual close button: fold now (and unpin), and stay folded while the pointer is still over it.
+  const collapse = useCallback(() => {
+    clear();
+    closedByUser.current = true;
+    if (document.activeElement && ref.current?.contains(document.activeElement)) document.activeElement.blur();
+    setPinned((v) => {
+      if (v) { try { localStorage.setItem(HISTORY_PINNED_KEY, '0'); } catch { /* private mode */ } }
+      return false;
+    });
+    setOpen(false);
+  }, []);
   const handlers = active && !pinned ? {
     onMouseEnter: () => {
       hover.current = true;
       clearTimeout(idleT.current);
-      if (!open) intentT.current = setTimeout(() => setOpen(true), INTENT_MS);
+      if (!open && !closedByUser.current) intentT.current = setTimeout(() => setOpen(true), INTENT_MS);
     },
     onMouseLeave: () => {
       hover.current = false;
+      closedByUser.current = false;
       clearTimeout(intentT.current);
       if (!focusInside()) scheduleClose();
     },
-    onFocus: () => { clear(); setOpen(true); },
+    onFocus: () => { if (closedByUser.current) return; clear(); setOpen(true); },
     onBlur: (e) => {
       if (ref.current && !ref.current.contains(e.relatedTarget) && !hover.current) scheduleClose();
     },
@@ -70,7 +83,7 @@ function useAutoHistory(active) {
     busy.current = b;
     if (!b && !hover.current && !focusInside()) scheduleClose();
   }, [scheduleClose]);
-  return { pinned, togglePin, open: !active || pinned || open, overlay: active && !pinned, ref, handlers, expand, setBusy };
+  return { pinned, togglePin, open: !active || pinned || open, overlay: active && !pinned, ref, handlers, expand, collapse, setBusy };
 }
 
 function useMedia(query) {
@@ -282,6 +295,11 @@ function History({ open, auto, onClose, activeKey, onPick, onNew }) {
       <i className={`bi ${auto.pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}`} aria-hidden="true" />
     </button>
   );
+  const closeBtn = auto && (
+    <button type="button" className="bd-icon-btn" onClick={auto.collapse} aria-label="Close history" title="Close history">
+      <i className="bi bi-chevron-double-left" aria-hidden="true" />
+    </button>
+  );
 
   // Idle (desktop, not pinned): a 56 px rail. Hovering it (after a short
   // intent delay) or clicking its empty space opens the full panel over the chat.
@@ -321,6 +339,7 @@ function History({ open, auto, onClose, activeKey, onPick, onNew }) {
       <div className="bd-history-top">
         <button type="button" className="bd-new" onClick={onNew}><i className="bi bi-plus-lg" aria-hidden="true" /> New chat</button>
         {pinBtn}
+        {closeBtn}
         <button type="button" className="bd-icon-btn d-lg-none" onClick={onClose} aria-label="Close history"><i className="bi bi-x-lg" aria-hidden="true" /></button>
       </div>
       <div className="bd-search">
