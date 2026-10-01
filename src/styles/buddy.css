@@ -389,6 +389,10 @@
 .bd-starter:hover { border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---------- Settings ---------- */
+/* Settings › Wurx Buddy: category pills, only on phones (the Settings nav has
+   the sub-tabs on wider screens; it becomes a plain list at 900 px). */
+.bd-subtabs { display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+@media (max-width: 900px) { .bd-subtabs { display: flex; } }
 /* Inside Settings › Wurx Buddy: flows with the Settings page, no inner scroll box. */
 .bd-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .bd-card { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; background: var(--surface-1); }

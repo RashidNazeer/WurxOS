@@ -29,21 +29,33 @@ const BuddyUsage = lazy(() => import('./BuddyUsage'));
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 
-export default function BuddySettings({ canEdit }) {
+// One category at a time (Settings › Wurx Buddy › <tab>); each card loads its
+// own data, so a tab only fetches what it shows (Usage's charts included).
+export default function BuddySettings({ canEdit, tab = 'models' }) {
   const readOnly = !canEdit;
   return (
     <div className="bd-settings">
-      <IngestionCard readOnly={readOnly} />
-      <Suspense fallback={<div className="bd-card"><SkeletonLines n={4} /></div>}>
-        <BuddyUsage readOnly={readOnly} />
-      </Suspense>
-      <ModelCard readOnly={readOnly} />
-      <RoleModelsCard readOnly={readOnly} />
-      <AllowedRolesCard readOnly={readOnly} />
-      <SourcesCard readOnly={readOnly} />
-      <ExcludedCard readOnly={readOnly} />
-      <BehaviourCard readOnly={readOnly} />
-      <KnowledgeCard readOnly={readOnly} />
+      {tab === 'models' && (
+        <>
+          <ModelCard readOnly={readOnly} />
+          <RoleModelsCard readOnly={readOnly} />
+        </>
+      )}
+      {tab === 'access' && <AllowedRolesCard readOnly={readOnly} />}
+      {tab === 'knowledge' && (
+        <>
+          <IngestionCard readOnly={readOnly} />
+          <SourcesCard readOnly={readOnly} />
+          <ExcludedCard readOnly={readOnly} />
+          <KnowledgeCard readOnly={readOnly} />
+        </>
+      )}
+      {tab === 'personality' && <BehaviourCard readOnly={readOnly} />}
+      {tab === 'usage' && (
+        <Suspense fallback={<div className="bd-card"><SkeletonLines n={4} /></div>}>
+          <BuddyUsage readOnly={readOnly} />
+        </Suspense>
+      )}
     </div>
   );
 }
