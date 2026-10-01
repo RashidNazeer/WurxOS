@@ -137,7 +137,7 @@ export default function AppShell() {
         subtitle={meta.subtitle}
         onMobileMenu={openMobile}
       />
-      <main className="shell-content">
+      <main className="shell-content" tabIndex={-1}>
         <div className="shell-content-inner">
           {/* Error boundary catches render errors in lazy routes so
               a bug on one page doesn't leave the user staring at a
