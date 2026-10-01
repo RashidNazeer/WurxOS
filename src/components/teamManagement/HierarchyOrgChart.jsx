@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
-import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf } from './hierarchyTheme';
+import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf, alpha } from './hierarchyTheme';
 
 /**
  * Org chart view — Boss → OLs → TLs (with APC/IPC roster + brand chips).
@@ -88,9 +88,9 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
   return (
     <div ref={wrapRef} className="position-relative rounded-4 p-4"
       style={{
-        background: 'radial-gradient(circle at 20% 0%, rgba(124,58,237,0.10), transparent 50%), radial-gradient(circle at 80% 30%, rgba(59,130,246,0.08), transparent 50%), #fff',
-        border: '1px solid #e2e8f0',
-        backgroundImage: `radial-gradient(rgba(15,23,42,0.06) 1px, transparent 1px), radial-gradient(circle at 20% 0%, rgba(124,58,237,0.10), transparent 50%), radial-gradient(circle at 80% 30%, rgba(59,130,246,0.08), transparent 50%)`,
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border-subtle)',
+        backgroundImage: 'radial-gradient(color-mix(in srgb, var(--text-primary) 6%, transparent) 1px, transparent 1px), radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--purple) 10%, transparent), transparent 50%), radial-gradient(circle at 80% 30%, color-mix(in srgb, var(--info) 8%, transparent), transparent 50%)',
         backgroundSize: '14px 14px, auto, auto',
         overflow: 'hidden',
       }}>
@@ -99,12 +99,12 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <defs>
           <linearGradient id="grad-purple" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.85" />
-            <stop offset="100%" stopColor="#4f46e5" stopOpacity="0.55" />
+            <stop offset="0%"   stopColor="var(--purple)" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="var(--purple)" stopOpacity="0.55" />
           </linearGradient>
           <linearGradient id="grad-soft" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="#7c3aed" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#16a34a" stopOpacity="0.4"  />
+            <stop offset="0%"   stopColor="var(--purple)" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="var(--success)" stopOpacity="0.4"  />
           </linearGradient>
         </defs>
         {paths.map(p => (
@@ -112,7 +112,7 @@ export default function HierarchyOrgChart({ boss, ols, tls, teamFilter, onSelect
             stroke={p.stroke} strokeWidth="2" strokeLinecap="round"
             strokeDasharray="0"
             opacity={p.opacity ?? 1}
-            style={{ filter: 'drop-shadow(0 0 4px rgba(124,58,237,0.25))' }} />
+            style={{ filter: 'drop-shadow(0 0 4px color-mix(in srgb, var(--purple) 25%, transparent))' }} />
         ))}
       </svg>
 
@@ -175,7 +175,7 @@ function curve(x1, y1, x2, y2) {
 
 // Renders the user's real profile photo when available, otherwise the
 // role-coloured initials box.
-function AvatarBox({ src, name, size, fontSize, background, color = '#fff' }) {
+function AvatarBox({ src, name, size, fontSize, background, color = 'var(--text-inverse)' }) {
   if (src) {
     return (
       <img src={src} alt={name || ''} className="rounded-3 flex-shrink-0"
@@ -195,17 +195,17 @@ function BossCard({ nodeRef, user }) {
   return (
     <div ref={nodeRef} className="node-pop d-inline-flex align-items-center gap-2 rounded-3 px-3 py-2"
       style={{
-        background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-        color: '#fff',
-        boxShadow: '0 10px 30px rgba(15,23,42,0.35)',
+        background: c.solid,
+        color: c.on,
+        boxShadow: 'var(--shadow-lg)',
         minWidth: 220,
       }}>
       <AvatarBox src={user.avatar_url} name={user.displayName || user.email}
-        size={38} fontSize="0.8rem" background="#fff" color={c.solid} />
+        size={38} fontSize="0.8rem" background="var(--surface-1)" color={c.solid} />
       <div className="min-w-0">
         <div className="fw-bold text-truncate" style={{ fontSize: '0.92rem' }}>{user.displayName || user.email}</div>
         <div className="d-inline-block rounded-pill px-2"
-          style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', background: '#fff', color: '#0f172a' }}>
+          style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
           BOSS
         </div>
       </div>
@@ -217,13 +217,13 @@ function OLCard({ nodeRef, user, reportCount }) {
   const c = ROLE_COLORS.ol;
   return (
     <div ref={nodeRef} className="node-pop d-inline-flex align-items-center gap-2 rounded-3 px-3 py-2"
-      style={{ background: c.light, border: `1px solid ${c.solid}30`, boxShadow: '0 4px 14px rgba(124,58,237,0.18)', minWidth: 220 }}>
+      style={{ background: c.light, border: `1px solid ${alpha(c.solid, 19)}`, boxShadow: `0 4px 14px ${alpha(c.solid, 18)}`, minWidth: 220 }}>
       <AvatarBox src={user.avatar_url} name={user.displayName || user.email}
-        size={38} fontSize="0.78rem" background={`linear-gradient(135deg, ${c.solid}, #5b21b6)`} />
+        size={38} fontSize="0.78rem" background={c.solid} color={c.on} />
       <div className="min-w-0">
-        <div className="fw-bold text-truncate" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{user.displayName || user.email}</div>
+        <div className="fw-bold text-truncate" style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>{user.displayName || user.email}</div>
         <div className="d-flex align-items-center gap-1" style={{ fontSize: '0.6rem' }}>
-          <span className="rounded-pill px-2 py-0" style={{ background: c.solid, color: '#fff', fontWeight: 800, letterSpacing: '0.06em' }}>OL</span>
+          <span className="rounded-pill px-2 py-0" style={{ background: c.solid, color: c.on, fontWeight: 800, letterSpacing: '0.06em' }}>OL</span>
           <span className="text-muted" style={{ fontWeight: 700, letterSpacing: '0.06em' }}>· {reportCount} TLS</span>
         </div>
       </div>
@@ -241,12 +241,12 @@ function TeamCard({ nodeRef, tl, onClickTl, onClickMember, onClickBrand }) {
       {/* Header */}
       <button type="button" onClick={onClickTl}
         className="d-flex align-items-center gap-2 p-3 text-start border-0 w-100"
-        style={{ background: c.light, borderBottom: `1px solid ${c.solid}25`, cursor: 'pointer' }}>
+        style={{ background: c.light, borderBottom: `1px solid ${alpha(c.solid, 15)}`, cursor: 'pointer' }}>
         <AvatarBox src={tl.avatar_url} name={tl.displayName || tl.email}
-          size={36} fontSize="0.72rem" background={`linear-gradient(135deg, ${c.solid}, ${c.text})`} />
+          size={36} fontSize="0.72rem" background={c.solid} color={c.on} />
         <div className="flex-grow-1 min-w-0">
-          <div className="fw-semibold text-truncate" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{tl.displayName || tl.email}</div>
-          <span className="rounded-pill px-2" style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: '#fff' }}>
+          <div className="fw-semibold text-truncate" style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>{tl.displayName || tl.email}</div>
+          <span className="rounded-pill px-2" style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: c.on }}>
             {kind.headerLabel}
           </span>
         </div>
@@ -296,15 +296,15 @@ function MemberRow({ m, onClickMember, onClickBrand }) {
   const role = (m.userType || 'apc');
   const c = ROLE_COLORS[role] || ROLE_COLORS.apc;
   return (
-    <div className="rounded-3 p-2" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+    <div className="rounded-3 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
       <button type="button" onClick={onClickMember}
         className="d-flex align-items-center gap-2 border-0 w-100 text-start"
         style={{ background: 'transparent', cursor: 'pointer' }}>
         <AvatarBox src={m.avatar_url} name={m.userName || m.email}
-          size={28} fontSize="0.62rem" background={`linear-gradient(135deg, ${c.solid}, ${c.text})`} />
+          size={28} fontSize="0.62rem" background={c.solid} color={c.on} />
         <div className="flex-grow-1 min-w-0">
-          <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: '#0f172a' }}>{m.userName || m.email}</div>
-          <span className="rounded-pill px-2" style={{ fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: '#fff' }}>
+          <div className="fw-semibold text-truncate" style={{ fontSize: '0.78rem', color: 'var(--text-primary)' }}>{m.userName || m.email}</div>
+          <span className="rounded-pill px-2" style={{ fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em', background: c.solid, color: c.on }}>
             {roleShortLabel(role)}
           </span>
         </div>
@@ -328,7 +328,7 @@ function SectionHeader({ icon, label, count, className }) {
       <div className="text-muted" style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
         <i className={`bi ${icon} me-1`} />{label}
       </div>
-      <span className="rounded-pill px-2" style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.62rem', fontWeight: 700 }}>{count}</span>
+      <span className="rounded-pill px-2" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.62rem', fontWeight: 700 }}>{count}</span>
     </div>
   );
 }
@@ -344,16 +344,16 @@ function BrandChip({ name, onClick, small }) {
     <button type="button" onClick={onClick}
       className="rounded-pill border-0"
       style={{
-        background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
-        color: '#9a3412',
-        border: '1px solid #fed7aa',
+        background: 'var(--warning-soft)',
+        color: 'var(--warning-text)',
+        border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)',
         fontSize: small ? '0.6rem' : '0.66rem',
         fontWeight: 600,
         padding: small ? '2px 8px' : '4px 10px',
         cursor: 'pointer',
         transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(154,52,18,0.18)'; }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
       title={`Reassign ${name}`}>
       {name}

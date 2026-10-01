@@ -6,6 +6,7 @@ import {
 } from '../../lib/agendaApi';
 import AgendaTaskModal from '../../components/agenda/AgendaTaskModal';
 import AgendaResetScheduleModal from '../../components/agenda/AgendaResetScheduleModal';
+import { useDialogs } from '../../components/common/useDialogs';
 
 // Weekly Agenda Meetings — Tasks. A recurring per-APC task system,
 // fully separate from the main /tasks module.
@@ -103,7 +104,7 @@ export default function AgendaTasksPage() {
   }, [rows, apcFilter, statusFilter, search]);
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -122,7 +123,7 @@ export default function AgendaTasksPage() {
               <i className="bi bi-arrow-repeat" /> Reset schedule
             </button>
           )}
-          <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
+          <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
             style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setModalOpen(true)}>
             <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} />
             {isApc ? 'Add task' : 'Assign task'}
@@ -193,7 +194,7 @@ export default function AgendaTasksPage() {
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-list-check text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No agenda tasks</p>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No agenda tasks</p>
           <p className="text-muted small mb-0">{isApc ? 'Add your first agenda task.' : 'Assign the first agenda task.'}</p>
         </div>
       ) : (
@@ -224,6 +225,7 @@ export default function AgendaTasksPage() {
 
 // ── Task card ──────────────────────────────────────────────────────────
 function TaskCard({ task, uid, isManager, isOLBoss, onChanged }) {
+  const { ask, notify: toast } = useDialogs();
   const [busy, setBusy]     = useState(false);
   const [notify, setNotify] = useState(false);
 
@@ -240,20 +242,20 @@ function TaskCard({ task, uid, isManager, isOLBoss, onChanged }) {
       await updateAgendaTask(task.id, { status: next, notify });
       onChanged();
     } catch (e) {
-      alert('Failed to update: ' + (e.message || 'unknown'));
+      toast.error('Failed to update: ' + (e.message || 'unknown'));
     } finally {
       setBusy(false);
     }
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Delete "${task.title}"?`)) return;
+    if (!(await ask(`Delete "${task.title}"?`, { danger: true, confirmLabel: 'Delete' }))) return;
     setBusy(true);
     try {
       await deleteAgendaTask(task.id);
       onChanged();
     } catch (e) {
-      alert('Failed to delete: ' + (e.message || 'unknown'));
+      toast.error('Failed to delete: ' + (e.message || 'unknown'));
     } finally {
       setBusy(false);
     }

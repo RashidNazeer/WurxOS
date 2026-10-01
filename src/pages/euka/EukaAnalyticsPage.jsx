@@ -288,7 +288,7 @@ function TrendSection({ storeId, start, end }) {
     points: perf.map((p) => ({ x: (p.date || '').slice(5), y: Number(p.total_shop_gmv ?? p.total_gmv) || 0 })),
   };
   const ordSeries = {
-    label: 'Orders', color: '#f59e0b',
+    label: 'Orders', color: 'var(--warning-text)',
     points: perf.map((p) => ({ x: (p.date || '').slice(5), y: Number(p.total_orders) || 0 })),
   };
   return (
@@ -308,9 +308,9 @@ function AffiliateFunnelSection({ storeId, start, end }) {
   const q = useEuka(['affFunnel', storeId, start, end], (f) => eukaAffiliateFunnel(storeId, start, end, f), true);
   const d = q.data || {};
   return (
-    <Section span={4} title="Affiliate funnel" icon="bi-funnel" color="#8b5cf6">
+    <Section span={4} title="Affiliate funnel" icon="bi-funnel" color="var(--purple-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
-        <FunnelBars color="#8b5cf6" rows={[
+        <FunnelBars color="var(--purple-text)" rows={[
           { label: 'Unique creators', value: d.unique },
           { label: 'Posted', value: d.posted },
           { label: 'Samples shipped', value: d.samplesShipped },
@@ -324,9 +324,9 @@ function OutreachFunnelSection({ storeId, start, end }) {
   const q = useEuka(['outreach', storeId, start, end], (f) => eukaOutreachFunnel(storeId, start, end, {}, f), true);
   const stages = q.data?.stages || [];
   return (
-    <Section span={4} title="Creator outreach funnel" icon="bi-people" color="#06b6d4">
+    <Section span={4} title="Creator outreach funnel" icon="bi-people" color="var(--info-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
-        <FunnelBars color="#06b6d4" rows={stages.map((s) => ({ label: s.label, value: s.value, sub: s.convFromPrev != null ? `${Number(s.convFromPrev).toFixed(0)}%` : null }))} />
+        <FunnelBars color="var(--info-text)" rows={stages.map((s) => ({ label: s.label, value: s.value, sub: s.convFromPrev != null ? `${Number(s.convFromPrev).toFixed(0)}%` : null }))} />
       )}
     </Section>
   );
@@ -335,9 +335,9 @@ function ConversionFunnelSection({ storeId, start, end }) {
   const q = useEuka(['convFunnel', storeId, start, end], (f) => eukaConversionFunnel(storeId, start, end, f), true);
   const c = q.data?.conversionFunnel || {};
   return (
-    <Section span={4} title="Conversion funnel" icon="bi-cart-check" color="#10b981">
+    <Section span={4} title="Conversion funnel" icon="bi-cart-check" color="var(--success-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
-        <FunnelBars color="#10b981" rows={[
+        <FunnelBars color="var(--success-text)" rows={[
           { label: 'Impressions', value: c.impressions },
           { label: 'PDP impressions', value: c.pdp_impressions },
           { label: 'Checkout', value: c.checkout },
@@ -352,7 +352,7 @@ function TopCreatorsSection({ storeId, start, end }) {
   const q = useEuka(['topCreators', storeId, start, end], (f) => eukaTopCreators(storeId, start, end, { limit: 10 }, f), true);
   const rows = q.data?.affiliates || [];
   return (
-    <Section span={6} title="Top creators by GMV" icon="bi-star-fill" color="#f59e0b">
+    <Section span={6} title="Top creators by GMV" icon="bi-star-fill" color="var(--warning-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <Table empty="No creators in range." rows={rows} cols={[
           { key: 'handle', label: 'Creator', render: (r) => <span className="fw-semibold">@{r.handle}</span> },
@@ -368,7 +368,7 @@ function TopProductsSection({ storeId, start, end }) {
   const q = useEuka(['topProducts', storeId, start, end], (f) => eukaTopProducts(storeId, start, end, { pageSize: 10 }, f), true);
   const rows = q.data?.products || [];
   return (
-    <Section span={6} title="Top products by GMV" icon="bi-box-seam" color="#3b82f6">
+    <Section span={6} title="Top products by GMV" icon="bi-box-seam" color="var(--info-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <Table empty="No products in range." rows={rows} cols={[
           { key: 'title', label: 'Product', render: (r) => <span className="fw-semibold text-truncate d-inline-block" style={{ maxWidth: 260 }}>{r.title || r.productId}</span> },
@@ -385,7 +385,7 @@ function TopVideosSection({ storeId, start, end }) {
   const q = useEuka(['topVideos', storeId, start, end], (f) => eukaTopVideos(storeId, start, end, {}, f), true);
   const rows = (q.data?.videos || []).slice(0, 12);
   return (
-    <Section span={12} title="Top videos by revenue" icon="bi-play-btn" color="#ec4899">
+    <Section span={12} title="Top videos by revenue" icon="bi-play-btn" color="var(--danger-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <Table empty="No videos in range." rows={rows} cols={[
           { key: 'creatorHandle', label: 'Creator', render: (r) => <span className="fw-semibold">@{r.creatorHandle || '—'}</span> },
@@ -406,7 +406,7 @@ function ContentSection({ storeId, start, end }) {
   const t = q.data?.totals || {};
   const monthly = q.data?.monthly || [];
   return (
-    <Section span={6} title="Content overview" icon="bi-collection-play" color="#0ea5e9">
+    <Section span={6} title="Content overview" icon="bi-collection-play" color="var(--info-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <>
           <div className="row g-2 mb-3">
@@ -419,7 +419,7 @@ function ContentSection({ storeId, start, end }) {
               </div>
             ))}
           </div>
-          <LineChart series={[{ label: 'Videos', color: '#0ea5e9', points: monthly.map((m) => ({ x: m.month, y: m.tiktok })) }]} yFmt={fmtCompact} height={160} />
+          <LineChart series={[{ label: 'Videos', color: 'var(--info-text)', points: monthly.map((m) => ({ x: m.month, y: m.tiktok })) }]} yFmt={fmtCompact} height={160} />
         </>
       )}
     </Section>
@@ -430,7 +430,7 @@ function AdsSection({ storeId, start, end }) {
   const s = q.data?.stats || {};
   const top = q.data?.topBoosted || [];
   return (
-    <Section span={6} title="Ads overview" icon="bi-megaphone" color="#ef4444">
+    <Section span={6} title="Ads overview" icon="bi-megaphone" color="var(--danger-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <>
           <div className="row g-2 mb-3">
@@ -460,7 +460,7 @@ function CreatorTiersSection({ storeId, start, end }) {
   const q = useEuka(['tiers', storeId, start, end], (f) => eukaCreatorTiers(storeId, start, end, {}, f), true);
   const rows = q.data?.tiers || [];
   return (
-    <Section span={12} title="Creator level breakdown" icon="bi-bar-chart-steps" color="#8b5cf6">
+    <Section span={12} title="Creator level breakdown" icon="bi-bar-chart-steps" color="var(--purple-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <Table empty="No tier data." rows={rows} cols={[
           { key: 'tier', label: 'Tier', render: (r) => <span className="fw-semibold">{r.tier} <span className="text-muted fw-normal">{r.range}</span></span> },
@@ -510,7 +510,7 @@ function CampaignSection({ storeId, start, end }) {
   const reach = q.data?.creators_reached_data || [];
   const reachBy = Object.fromEntries(reach.map((r) => [r.campaign_id, r]));
   return (
-    <Section span={12} title="Campaign breakdown" icon="bi-diagram-3" color="#f59e0b">
+    <Section span={12} title="Campaign breakdown" icon="bi-diagram-3" color="var(--warning-text)">
       {q.isLoading ? <Loading /> : q.isError ? <Err q={q} /> : (
         <Table empty="No campaigns in range." rows={rows} cols={[
           { key: 'campaign_name', label: 'Campaign', render: (r) => <span className="fw-semibold">{r.campaign_name || `#${r.campaign_id}`}</span> },
@@ -554,7 +554,7 @@ function ExportSection({ storeId, start, end, store }) {
     }
   }
   return (
-    <Section span={12} title="Data export" eyebrow="Download the raw data (JSON) for the selected store & range" icon="bi-download" color="#64748b">
+    <Section span={12} title="Data export" eyebrow="Download the raw data (JSON) for the selected store & range" icon="bi-download" color="var(--text-secondary)">
       <div className="d-flex flex-wrap gap-2">
         {EXPORTS.map((e) => (
           <button key={e.type} className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 9 }}

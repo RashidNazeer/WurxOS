@@ -34,7 +34,7 @@ export default function GmvMaxReportingPage() {
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>
           <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-            <i className="bi bi-bar-chart-line-fill me-2" style={{ color: '#0ea5e9' }} />
+            <i className="bi bi-bar-chart-line-fill me-2" style={{ color: 'var(--info-text)' }} />
             GMV Max Reporting
           </h4>
           <p className="text-muted small mb-0">Enter monthly and weekly GMV Max metrics from TikTok Ads Manager / Seller Center for each brand.</p>
@@ -74,14 +74,14 @@ export default function GmvMaxReportingPage() {
                         style={{
                           borderRadius: 10,
                           padding: '8px 10px',
-                          background: isSel ? 'color-mix(in srgb, #0ea5e9 18%, transparent)' : 'var(--surface-1)',
-                          border: `1px solid ${isSel ? '#0ea5e9' : 'var(--border-subtle)'}`,
-                          color: isSel ? '#0ea5e9' : 'var(--text-primary)',
+                          background: isSel ? 'color-mix(in srgb, var(--info) 18%, transparent)' : 'var(--surface-1)',
+                          border: `1px solid ${isSel ? 'var(--info)' : 'var(--border-subtle)'}`,
+                          color: isSel ? 'var(--info-text)' : 'var(--text-primary)',
                           fontSize: '0.82rem', fontWeight: isSel ? 600 : 500,
                         }}
                         onClick={() => setSelectedId(b.id)}>
-                        <div className="rounded-circle d-flex align-items-center justify-content-center text-white"
-                          style={{ width: 26, height: 26, background: '#0ea5e9', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0 }}>
+                        <div className="rounded-circle d-flex align-items-center justify-content-center"
+                          style={{ width: 26, height: 26, background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0 }}>
                           {(name || '??').slice(0, 2).toUpperCase()}
                         </div>
                         <span className="text-truncate flex-grow-1">{name}</span>

@@ -4,8 +4,10 @@ import {
   listTaskAttachments, uploadTaskAttachment, deleteTaskAttachment, attachmentUrl,
 } from '../../lib/taskAttachmentsApi';
 import { AlertIcon, XIcon, PlusIcon } from '../common/Icon';
+import { useDialogs } from '../common/useDialogs';
 
 export default function TaskAttachmentsPanel({ taskId }) {
+  const { ask, notify } = useDialogs();
   const { user, profile } = useAuth();
   const isBoss = profile?.role === 'boss';
 
@@ -42,7 +44,7 @@ export default function TaskAttachmentsPanel({ taskId }) {
   }
 
   async function remove(row) {
-    if (!confirm(`Delete "${row.file_name}"?`)) return;
+    if (!(await ask(`Delete "${row.file_name}"?`, { danger: true }))) return;
     try { await deleteTaskAttachment(row); setRows((rs) => rs.filter((x) => x.id !== row.id)); }
     catch (e) { setErr(e.message); }
   }

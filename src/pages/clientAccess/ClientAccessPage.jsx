@@ -184,16 +184,16 @@ export default function ClientAccessPage() {
 
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)' }} onClick={() => setDeleteTarget(null)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={() => setDeleteTarget(null)} />
           <div className="wx-card" style={{ position: 'relative', maxWidth: 420, padding: 22, textAlign: 'center' }}>
-            <div style={{ fontSize: 30, color: '#dc2626' }}>⚠️</div>
+            <div style={{ fontSize: 30, color: 'var(--danger-text)' }}>⚠️</div>
             <h6 style={{ fontWeight: 800, marginTop: 8, marginBottom: 6 }}>Delete this client link?</h6>
             <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: '0 0 14px' }}>
               <strong>{deleteTarget.client_name || deleteTarget.label || 'Untitled'}</strong> will be permanently removed and the link will stop working immediately.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="wx-btn wx-btn-ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button className="wx-btn wx-btn-primary" style={{ background: '#dc2626' }} onClick={handleDelete}>Delete</button>
+              <button className="wx-btn wx-btn-primary" style={{ background: 'var(--danger)' }} onClick={handleDelete}>Delete</button>
             </div>
           </div>
         </div>
@@ -285,8 +285,8 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
 
         {link.legacy_v1 && (
           <div style={{
-            fontSize: 10.5, fontWeight: 700, color: '#92400e',
-            background: '#fef3c7', border: '1px solid #fde68a',
+            fontSize: 10.5, fontWeight: 700, color: 'var(--warning-text)',
+            background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)',
             borderRadius: 999, padding: '2px 8px',
             display: 'inline-flex', alignItems: 'center', gap: 4,
             marginBottom: 6, alignSelf: 'flex-start',
@@ -358,7 +358,7 @@ function ClientAccessModal({ link, brands, existingClientNames = [], onClose, on
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={onClose} />
       <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, borderRadius: 18 }}>
         <div style={{ padding: '18px 22px 12px', borderBottom: '1px solid var(--border)' }}>
           <h6 style={{ fontWeight: 800, margin: '0 0 4px', fontSize: 15 }}>

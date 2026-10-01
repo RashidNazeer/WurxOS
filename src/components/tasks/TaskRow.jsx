@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import BrandAvatar from '../brands/BrandAvatar';
 import { CheckIcon, PencilIcon, ChevronDownIcon } from '../common/Icon';
 import { updateTask } from '../../lib/tasksApi';
+import { useDialogs } from '../common/useDialogs';
 import '../../styles/tasks.css';
 
 const STATUS_OPTIONS = [
@@ -16,6 +17,7 @@ const STATUS_LABEL = Object.fromEntries(STATUS_OPTIONS.map((o) => [o.v, o.label]
 const NEXT_STATUS = { todo: 'in_progress', in_progress: 'done', done: 'todo' };
 
 export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, currentUserId, selected, onToggleSelect }) {
+  const { ask, notify } = useDialogs();
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null); // { top, left }
@@ -101,7 +103,7 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
         // Patch the local row's brand status so the UI disables
         // controls without waiting for a refetch.
         onChanged?.({ ...task, brand: { ...(task.brand || {}), status: 'inactive' } });
-        alert("This task's brand is inactive — the task is frozen until the brand is reactivated.");
+        notify.warning("This task's brand is inactive — the task is frozen until the brand is reactivated.");
         return;
       }
       throw err;
@@ -307,9 +309,9 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
           className="task-chip task-col-edit"
           title="This brand is inactive — task is frozen until reactivated"
           style={{
-            background: '#f3f4f6',
-            color: '#6b7280',
-            border: '1px solid #d1d5db',
+            background: 'var(--surface-2)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border-default)',
             fontSize: 11,
             fontWeight: 600,
             padding: '4px 10px',

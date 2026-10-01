@@ -27,11 +27,13 @@ function brandColor(name = '') {
   return BRAND_PALETTE[Math.abs(h) % BRAND_PALETTE.length];
 }
 
+const tint = (c, pct) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
 const TYPE_CFG = {
-  link:  { icon: 'bi-link-45deg',       label: 'Link',  color: '#0d6efd', bg: '#e8f0fe' },
-  image: { icon: 'bi-image-fill',        label: 'Image', color: '#6610f2', bg: '#f3e8ff' },
-  video: { icon: 'bi-camera-video-fill', label: 'Video', color: '#dc3545', bg: '#ffe8e8' },
-  file:  { icon: 'bi-file-earmark-text', label: 'File',  color: '#0dcaf0', bg: '#e0f7fa' },
+  link:  { icon: 'bi-link-45deg',       label: 'Link',  color: 'var(--info-text)', bg: 'var(--info-soft)' },
+  image: { icon: 'bi-image-fill',        label: 'Image', color: 'var(--purple-text)', bg: 'var(--purple-soft)' },
+  video: { icon: 'bi-camera-video-fill', label: 'Video', color: 'var(--danger-text)', bg: 'var(--danger-soft)' },
+  file:  { icon: 'bi-file-earmark-text', label: 'File',  color: 'var(--text-secondary)', bg: 'var(--surface-2)' },
 };
 
 function detectType(url = '') {
@@ -270,7 +272,7 @@ export default function AllResourcesPage() {
             <div
               key={type}
               className="d-flex align-items-center gap-2 px-3 py-2 rounded-2"
-              style={{ background: cfg.bg, border: `1px solid ${cfg.color}22`, cursor: 'pointer' }}
+              style={{ background: cfg.bg, border: `1px solid ${tint(cfg.color, 13)}`, cursor: 'pointer' }}
               onClick={() => setFilterType(filterType === type ? '' : type)}
               title={`Filter by ${cfg.label}`}
             >
@@ -330,7 +332,7 @@ export default function AllResourcesPage() {
                   className="btn btn-sm d-inline-flex align-items-center gap-1"
                   style={{
                     borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap',
-                    background: filterScope === v.key ? '#0d6efd' : 'var(--surface-2)',
+                    background: filterScope === v.key ? 'var(--info)' : 'var(--surface-2)',
                     color: filterScope === v.key ? '#fff' : 'var(--text-secondary)',
                     border: filterScope === v.key ? '1.5px solid #0d6efd' : '1.5px solid var(--border-subtle)',
                   }}
@@ -463,12 +465,12 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
             </p>
             <div className="d-flex align-items-center gap-1 flex-wrap mt-1">
               <span className="badge rounded-pill"
-                style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tCfg.color}30`, fontSize: '0.6rem', fontWeight: 600 }}>
+                style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tint(tCfg.color, 19)}`, fontSize: '0.6rem', fontWeight: 600 }}>
                 {tCfg.label}
               </span>
               {isGeneral && visCfg && (
                 <span className="badge rounded-pill d-inline-flex align-items-center gap-1"
-                  style={{ background: `${visCfg.color}15`, color: visCfg.color, border: `1px solid ${visCfg.color}30`, fontSize: '0.58rem', fontWeight: 600 }}
+                  style={{ background: tint(visCfg.color, 8), color: visCfg.color, border: `1px solid ${tint(visCfg.color, 19)}`, fontSize: '0.58rem', fontWeight: 600 }}
                   title={visCfg.label}>
                   <i className={`bi ${visCfg.icon}`} style={{ fontSize: '0.55rem' }} />
                   {r.visibility === 'private' ? 'Private' : r.visibility === 'office' ? 'Office' : r.visibility === 'user' ? 'Shared' : 'Group'}
@@ -583,7 +585,7 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
                     </div>
                   </td>
                   <td style={{ padding: '11px 16px', verticalAlign: 'middle' }}>
-                    <span className="badge rounded-pill" style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tCfg.color}30`, fontSize: '0.65rem', fontWeight: 600 }}>
+                    <span className="badge rounded-pill" style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tint(tCfg.color, 19)}`, fontSize: '0.65rem', fontWeight: 600 }}>
                       {tCfg.label}
                     </span>
                   </td>
@@ -691,7 +693,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div className="card-body p-4" style={{ overflowY: 'auto' }}>
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -720,13 +722,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                   onClick={() => setScope('brand')}
                   className="d-inline-flex align-items-center gap-2 rounded-3 border flex-grow-1 p-2"
                   style={{
-                    background: scope === 'brand' ? '#e8f0fe' : 'var(--surface-1)',
-                    borderColor: scope === 'brand' ? '#0d6efd' : 'var(--border-subtle)',
+                    background: scope === 'brand' ? 'var(--info-soft)' : 'var(--surface-1)',
+                    borderColor: scope === 'brand' ? 'var(--info)' : 'var(--border-subtle)',
                     cursor: 'pointer',
                   }}>
-                  <i className="bi bi-shop" style={{ color: '#0d6efd' }} />
+                  <i className="bi bi-shop" style={{ color: 'var(--info-text)' }} />
                   <div className="text-start" style={{ lineHeight: 1.2 }}>
-                    <div className="small fw-semibold" style={{ color: scope === 'brand' ? '#0d6efd' : 'var(--text-secondary)' }}>Brand resource</div>
+                    <div className="small fw-semibold" style={{ color: scope === 'brand' ? 'var(--info-text)' : 'var(--text-secondary)' }}>Brand resource</div>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Tied to a specific brand</div>
                   </div>
                 </button>
@@ -734,13 +736,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                   onClick={() => setScope('general')}
                   className="d-inline-flex align-items-center gap-2 rounded-3 border flex-grow-1 p-2"
                   style={{
-                    background: scope === 'general' ? '#e8f0fe' : 'var(--surface-1)',
-                    borderColor: scope === 'general' ? '#0d6efd' : 'var(--border-subtle)',
+                    background: scope === 'general' ? 'var(--info-soft)' : 'var(--surface-1)',
+                    borderColor: scope === 'general' ? 'var(--info)' : 'var(--border-subtle)',
                     cursor: 'pointer',
                   }}>
-                  <i className="bi bi-globe2" style={{ color: '#0d6efd' }} />
+                  <i className="bi bi-globe2" style={{ color: 'var(--info-text)' }} />
                   <div className="text-start" style={{ lineHeight: 1.2 }}>
-                    <div className="small fw-semibold" style={{ color: scope === 'general' ? '#0d6efd' : 'var(--text-secondary)' }}>General</div>
+                    <div className="small fw-semibold" style={{ color: scope === 'general' ? 'var(--info-text)' : 'var(--text-secondary)' }}>General</div>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Personal or shared</div>
                   </div>
                 </button>
@@ -770,7 +772,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                       <label key={v}
                         className="d-flex align-items-center gap-2 p-2 rounded-2"
                         style={{
-                          background: visibility === v ? `${cfg.color}15` : 'var(--surface-1)',
+                          background: visibility === v ? `${tint(cfg.color, 8)}` : 'var(--surface-1)',
                           border: `1.5px solid ${visibility === v ? cfg.color + '55' : 'var(--border-subtle)'}`,
                           cursor: 'pointer',
                         }}>
@@ -804,7 +806,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                           className="d-flex align-items-center gap-2 p-2"
                           style={{
                             cursor: 'pointer',
-                            background: visibleToUid === u.id ? '#e8f0fe' : 'transparent',
+                            background: visibleToUid === u.id ? 'var(--info-soft)' : 'transparent',
                             borderBottom: '1px solid var(--border-subtle)',
                           }}
                           onClick={() => setVisibleToUid(u.id)}>
@@ -831,7 +833,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                           onClick={() => toggleRole(r)}
                           className="btn btn-sm rounded-pill d-inline-flex align-items-center gap-1"
                           style={{
-                            background: checked ? cfg.color : `${cfg.color}15`,
+                            background: checked ? cfg.color : `${tint(cfg.color, 8)}`,
                             color: checked ? '#fff' : cfg.color,
                             border: `1px solid ${cfg.color}${checked ? '' : '55'}`,
                             fontSize: '0.72rem',
@@ -869,13 +871,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
             {((scope === 'brand' && brandId) || (scope === 'general' && visibility === 'user' && visibleToUid)) && (
               <div
                 className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3"
-                style={{ background: notifyInApp ? '#e8f0fe' : 'var(--surface-0)', border: `1.5px solid ${notifyInApp ? '#c5d5ff' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
+                style={{ background: notifyInApp ? 'var(--info-soft)' : 'var(--surface-0)', border: `1.5px solid ${notifyInApp ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                 onClick={() => setNotifyInApp(v => !v)}
               >
                 <input type="checkbox" className="form-check-input flex-shrink-0"
                   checked={notifyInApp} onChange={e => setNotifyInApp(e.target.checked)}
                   onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
-                <span className="small mb-0" style={{ cursor: 'pointer', color: notifyInApp ? '#0d6efd' : 'var(--text-secondary)' }}>
+                <span className="small mb-0" style={{ cursor: 'pointer', color: notifyInApp ? 'var(--info-text)' : 'var(--text-secondary)' }}>
                   <i className="bi bi-bell me-1" />
                   Notify {scope === 'brand' ? 'brand members' : 'the recipient'}
                 </span>

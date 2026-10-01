@@ -60,20 +60,20 @@ export default function ClientMultiSelect({ options = [], selected = [], onChang
         <i className="bi bi-people" />
         <span className="text-truncate">{label}</span>
         {count > 0 && (
-          <span className="badge rounded-pill" style={{ background: '#3b82f6', color: 'white', fontSize: '0.6rem' }}>{count}</span>
+          <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>{count}</span>
         )}
         <i className="bi bi-chevron-down" style={{ fontSize: '0.62rem', opacity: 0.7 }} />
       </button>
 
       {open && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(15, 23, 42, 0.25)', backdropFilter: 'blur(2px)' }}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'color-mix(in srgb, var(--backdrop) 50%, transparent)', backdropFilter: 'blur(2px)' }}
             onClick={() => setOpen(false)} />
           <div ref={popRef}
             style={{
               position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 1000, width: 280,
               background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 14,
-              boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.35), 0 8px 16px -6px rgba(15, 23, 42, 0.15)',
+              boxShadow: 'var(--shadow-xl)',
               overflow: 'hidden',
             }}>
             <div className="d-flex align-items-center justify-content-between"
@@ -125,7 +125,7 @@ export default function ClientMultiSelect({ options = [], selected = [], onChang
               </div>
 
               <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <button type="button" className="btn btn-sm btn-dark px-3" style={{ borderRadius: 8, fontSize: '0.76rem' }}
+                <button type="button" className="btn btn-sm btn-primary px-3" style={{ borderRadius: 8, fontSize: '0.76rem' }}
                   onClick={() => setOpen(false)}>Done</button>
               </div>
             </div>

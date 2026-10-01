@@ -22,6 +22,7 @@ import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandRep
 import { useAuth } from '../../contexts/AuthContext';
 import BrandSectionsPanel from '../portal/BrandSectionsPanel';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
+import { useDialogs } from '../common/useDialogs';
 
 /* ─── Editorial palette ───────────────────────────────────────────────────
  *   Every entry is a CSS variable so the entire view re-themes when
@@ -37,7 +38,7 @@ const C = {
   line:       'var(--border-subtle)',
   surface:    'var(--surface-1)',
   surfaceAlt: 'var(--surface-2)',
-  hero:       '#1f1208',
+  hero:       'var(--spotlight-bg)',
   amber:      'var(--warning)',
   amberSoft:  'var(--warning-soft)',
   amberLine:  'color-mix(in srgb, var(--warning) 50%, transparent)',
@@ -109,8 +110,8 @@ function avatarColor(name) {
   let h = 0;
   const s = String(name || '');
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  const hue = Math.abs(h) % 360;
-  return `hsl(${hue}, 55%, 48%)`;
+  // Chart palette slots (theme-aware, text-inverse readable); amber slot 3 skipped.
+  return `var(--chart-${[1, 2, 4, 5, 6, 7, 8][Math.abs(h) % 7]})`;
 }
 function posterGradient(seed) {
   const palette = [
@@ -174,13 +175,13 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
     height: '100%',
     border: `1px solid ${C.line}`,
     background: primary ? C.hero : C.surface,
-    color: primary ? '#f5f5f4' : C.ink,
-    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+    color: primary ? 'var(--spotlight-fg)' : C.ink,
+    boxShadow: 'var(--shadow-sm)',
   };
   const labelStyle = {
     fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: primary ? '#a8a29e' : C.muted,
+    color: primary ? 'var(--spotlight-fg-muted)' : C.muted,
   };
 
   return (
@@ -193,7 +194,7 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
       {prevValue !== undefined && prevValue !== null && (
         <div style={{
           fontSize: '0.74rem', marginTop: 6,
-          color: primary ? '#a8a29e' : C.inkDim,
+          color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim,
         }}>
           Prev week <span style={{ fontWeight: 500 }}>{typeof prevValue === 'string' ? prevValue : ''}</span>
         </div>
@@ -202,14 +203,14 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
         <div className="mt-2">
           <DeltaPill pct={pct} />
           {pct !== null && (
-            <span style={{ fontSize: '0.66rem', color: primary ? '#a8a29e' : C.inkDim, marginLeft: 6 }}>
+            <span style={{ fontSize: '0.66rem', color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim, marginLeft: 6 }}>
               {pct >= 0 ? '+' : ''}{(num(current) - num(prevValue)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </span>
           )}
         </div>
       )}
       {subText && (
-        <div style={{ fontSize: '0.75rem', color: primary ? '#e7e5e4' : C.inkDim, marginTop: 8, fontWeight: 600 }}>{subText}</div>
+        <div style={{ fontSize: '0.75rem', color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim, marginTop: 8, fontWeight: 600 }}>{subText}</div>
       )}
       {sparkData && sparkData.length > 1 && (
         <Sparkline data={sparkData} color={primary ? C.amber : color} />
@@ -328,7 +329,9 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
       <SectionHead title={title} eyebrow={eyebrow} />
       {list.map((g, i) => {
         const spend = num(g.spend), gmv = num(g.gmv);
-        const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
+        // Both bar segments stay visible (15–85%): when ROI < 1 the old 100% `in`
+  // segment left the `returned` label with zero width.
+  const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
         const prev = showCompare ? prevByName.get(normName(g.campaign)) : null;
         return (
           <div key={i} className={i > 0 ? 'mt-3 pt-3' : ''} style={{ borderTop: i > 0 ? `1px solid ${C.line}` : 'none' }}>
@@ -346,7 +349,7 @@ function GmvMaxBlock({ rows, title, eyebrow, currency = DEFAULT_CURRENCY, showEf
                   <span>{sym}1 → {sym}{(gmv / spend).toFixed(2)}</span>
                 </div>
                 <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>{ms(spend)} in</div>
+                  <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.min(85, Math.max(15, ratio * 100))}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>{ms(spend)} in</div>
                   <div style={{ flex: 1, background: C.amber, color: C.hero, fontSize: '0.66rem', fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>{ms(gmv)} returned →</div>
                 </div>
               </div>
@@ -379,7 +382,7 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
       }}>{rank}</div>
       <div style={{
         width: 32, height: 32, borderRadius: '50%',
-        background: avatarColor(creator.name), color: '#fff',
+        background: avatarColor(creator.name), color: 'var(--text-inverse)',
         fontSize: '0.7rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{initials(creator.name)}</div>
@@ -439,7 +442,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
         borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.line}`,
         background: C.surface, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
-      onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(15,23,42,0.10)'; } }}
+      onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; } }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
       title={linkOk ? 'Open TikTok video' : undefined}>
       {/* Poster (vertical 9:16-ish) */}
@@ -450,7 +453,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
         {/* View count badge */}
         <div style={{
           position: 'absolute', top: 10, left: 10,
-          background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: 999,
+          background: 'var(--backdrop)', color: '#fff', borderRadius: 999,
           fontSize: '0.7rem', fontWeight: 600, padding: '3px 9px',
           display: 'inline-flex', alignItems: 'center', gap: 4,
         }}>
@@ -462,7 +465,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
             must also stay dark in both themes (not theme-aware). */}
         <div style={{
           position: 'absolute', top: 10, right: 10,
-          background: 'rgba(255,255,255,0.92)', color: '#0f172a', borderRadius: 4,
+          background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)', color: 'var(--text-primary)', borderRadius: 4,
           fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', minWidth: 22, textAlign: 'center',
         }}>{rank}</div>
         {/* Big initials in middle */}
@@ -483,9 +486,9 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
             width: 30, height: 30, borderRadius: '50%',
             // Same reasoning as the Rank pill — pill is fixed-white,
             // so the icon underneath stays dark in both themes.
-            background: 'rgba(255,255,255,0.95)', color: '#0f172a',
+            background: 'color-mix(in srgb, var(--surface-1) 95%, transparent)', color: 'var(--text-primary)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--shadow-md)',
           }}>
             <i className="bi bi-play-fill" style={{ fontSize: '0.95rem', marginLeft: 1 }} />
           </div>
@@ -729,7 +732,7 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
                 <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<TrendTooltip />} cursor={{ fill: 'var(--chart-track)' }} />
-                <Bar dataKey="videosPosted" fill="#f97316" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
+                <Bar dataKey="videosPosted" fill="var(--warning)" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -769,6 +772,7 @@ function InsightBox({ text, report, fieldKey, highlighterActive, highlightColor,
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
 export default function WeeklyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'weekly', reportLinks = null, productGoals: productGoalsProp = null }) {
+  const { ask, askText, notify } = useDialogs();
   const printRef = useRef();
   const { profile } = useAuth();
   const userRole = profile?.role || '';
@@ -968,6 +972,33 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
     );
   };
 
+  // All hooks sit above the early return below (rules of hooks): a report
+  // prop that turns null after a render used to throw. The export/copy
+  // handlers are defined after the return, so the effect reaches them via a ref.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [docxBusy, setDocxBusy] = useState(false);
+  const actionsRef = useRef({});
+  const hasReport = !!report;
+
+  // Hand the report-bar actions up to the parent list page so they
+  // can live in the sticky "Other options" menu. When onActions is
+  // supplied, this view skips rendering its own action bar.
+  React.useEffect(() => {
+    if (!hasReport || !onActions || clientView) return;
+    onActions({
+      highlighterActive,
+      onToggleHighlighter: () => setHighlighterActive((v) => !v),
+      onExportPdf: () => actionsRef.current.handleExport(),
+      pdfBusy,
+      onExportWord: () => actionsRef.current.handleExportWord(),
+      docxBusy,
+      canCopyInsights: userRole === 'tl',
+      onCopyInsights: () => actionsRef.current.handleCopyInsights(),
+      copyDone: copyState === 'done',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasReport, onActions, clientView, highlighterActive, pdfBusy, docxBusy, copyState, userRole]);
+
   if (!report) return null;
 
   const currency = report.currency || DEFAULT_CURRENCY;
@@ -1052,7 +1083,6 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
   };
 
   // Single continuous-page PDF export — see utils/exportReportPdf.js.
-  const [pdfBusy, setPdfBusy] = useState(false);
   const handleExport = async () => {
     if (pdfBusy) return;
     setPdfBusy(true);
@@ -1062,7 +1092,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
       });
     } catch (err) {
       console.error('[export-pdf] failed:', err);
-      alert('Failed to export the PDF. Please try again.');
+      notify.error('Failed to export the PDF. Please try again.');
     } finally {
       setPdfBusy(false);
     }
@@ -1070,7 +1100,6 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
 
   // Word (.docx) export. Lazy-import the docx builder so the ~150KB
   // library only loads on demand, not on every weekly-report view.
-  const [docxBusy, setDocxBusy] = useState(false);
   const handleExportWord = async () => {
     if (docxBusy) return;
     setDocxBusy(true);
@@ -1092,30 +1121,13 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error('[export-word] failed:', err);
-      alert('Failed to export Word document. Please try again.');
+      notify.error('Failed to export Word document. Please try again.');
     } finally {
       setDocxBusy(false);
     }
   };
 
-  // Hand the report-bar actions up to the parent list page so they
-  // can live in the sticky "Other options" menu. When onActions is
-  // supplied, this view skips rendering its own action bar.
-  React.useEffect(() => {
-    if (!onActions || clientView) return;
-    onActions({
-      highlighterActive,
-      onToggleHighlighter: () => setHighlighterActive((v) => !v),
-      onExportPdf: handleExport,
-      pdfBusy,
-      onExportWord: handleExportWord,
-      docxBusy,
-      canCopyInsights: userRole === 'tl',
-      onCopyInsights: handleCopyInsights,
-      copyDone: copyState === 'done',
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActions, clientView, highlighterActive, pdfBusy, docxBusy, copyState, userRole]);
+  actionsRef.current = { handleExport, handleExportWord, handleCopyInsights };
 
   return (
     <div>
@@ -1484,8 +1496,8 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   </div>
                   <div className="col-12 col-md-4">
                     <div style={{ background: C.hero, padding: '12px 16px', borderRadius: 10, height: '100%' }}>
-                      <div style={{ fontSize: '0.74rem', color: '#a8a29e', marginBottom: 4 }}>Combined reach</div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ms(num(offsite.offsiteGmv) + num(offsite.tiktokShopGmv))}</div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--spotlight-fg-muted)', marginBottom: 4 }}>Combined reach</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--spotlight-fg)', fontVariantNumeric: 'tabular-nums' }}>{ms(num(offsite.offsiteGmv) + num(offsite.tiktokShopGmv))}</div>
                     </div>
                   </div>
                 </div>
@@ -1508,7 +1520,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           return (
             <ContentSection
               icon="bi-megaphone-fill"
-              color="#ec4899"
+              color="var(--danger-text)"
               title="Current & Upcoming Campaigns"
               eyebrow="Active and planned promotional activities">
               {hasContent && (
@@ -1517,7 +1529,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
               )}
               {renderExtraStatCards('upcomingCampaigns')}
-              <EmbeddedLinks section={links} accent="#ec4899" />
+              <EmbeddedLinks section={links} accent="var(--chart-5)" />
             </ContentSection>
           );
         })()}
@@ -1529,7 +1541,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           return (
             <ContentSection
               icon="bi-gear-fill"
-              color="#6366f1"
+              color="var(--purple-text)"
               title="Operational Updates"
               eyebrow="What changed this week behind the scenes">
               {hasContent && (
@@ -1538,7 +1550,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
                   style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
               )}
               {renderExtraStatCards('operationalUpdates')}
-              <EmbeddedLinks section={links} accent="#6366f1" />
+              <EmbeddedLinks section={links} accent="var(--chart-6)" />
             </ContentSection>
           );
         })()}
@@ -1615,7 +1627,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             const hasData = (entry.rows || []).some((r) => cols.some((c) => r?.[c.id] != null && r[c.id] !== ''));
             if (!hasData) return null;
             return (
-              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="#0ea5e9" title={entry.name}>
+              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="var(--info-text)" title={entry.name}>
                 <CustomTableView entry={entry} />
               </ContentSection>
             );
@@ -1635,7 +1647,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             return (
               <ContentSection key={groupKey}
                 icon="bi-table"
-                color="#0ea5e9"
+                color="var(--info-text)"
                 title={group.name}>
                 <div className="row g-3">
                   {nonEmpty.map((r) => {
@@ -1672,14 +1684,14 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
             return (
               <ContentSection key={fieldId}
                 icon="bi-sliders"
-                color="#8b5cf6"
+                color="var(--purple-text)"
                 title={name || 'Custom Field'}>
                 {!isEmpty && (
                   <HighlightableContent html={value} report={report} fieldKey={`customField_${fieldId}`}
                     highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                     style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
                 )}
-                <EmbeddedLinks section={links} accent="#8b5cf6" />
+                <EmbeddedLinks section={links} accent="var(--chart-4)" />
               </ContentSection>
             );
           });
@@ -1718,7 +1730,7 @@ export default function WeeklyReportView({ report, previousReport, allReports, c
           return (
             <ContentSection
               icon="bi-stars"
-              color="#7c3aed"
+              color="var(--purple-text)"
               title="Insights"
               eyebrow="The reporter's read on the week across every section">
               <HighlightableContent html={html} report={report} fieldKey="reportInsights"

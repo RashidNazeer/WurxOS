@@ -475,13 +475,33 @@
 }
 
 /* Compact width breakpoint */
+/* Back-to-list button in the thread header — phones only. */
+.chat-back-btn {
+  display: none;
+  flex: none;
+  width: 36px; height: 36px;
+  margin-left: -6px;
+  border: 0; border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  place-items: center;
+  cursor: pointer;
+}
+.chat-back-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+
 @media (max-width: 860px) {
+  /* One pane at a time: the list, or the open thread (with a back button).
+     The shell fills the viewport under the topbar so the thread body scrolls
+     and the composer stays pinned at the bottom. */
   .chat-shell {
     grid-template-columns: 1fr;
-    height: auto;
+    height: calc(100dvh - var(--topbar-h, 60px) - 24px);
+    min-height: 0;
     margin-top: 0;
   }
-  .chat-rail { max-height: 320px; }
+  .chat-shell.is-list .chat-thread { display: none; }
+  .chat-shell.is-thread .chat-rail { display: none; }
+  .chat-back-btn { display: grid; }
   .chat-thread-body { padding: 14px 14px; }
   .chat-cluster-bubbles { max-width: 88%; }
   .chat-cluster.is-mine .chat-cluster-bubbles { max-width: 88%; }

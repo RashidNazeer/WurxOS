@@ -13,6 +13,7 @@ import MonthlyReportView from './MonthlyReportView';
 import ReportRatingBar from './ReportRatingBar';
 import { notifyReportVerified, notifyReportRejected } from '../../utils/reportNotifications';
 import { deductPromptApcReport } from '../../lib/apcReportingApi';
+import { useDialogs } from '../common/useDialogs';
 
 function StatusBadge({ status }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -33,6 +34,7 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export default function MonthlyReportsPage() {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -103,7 +105,7 @@ export default function MonthlyReportsPage() {
 
   /* ── Status actions (TL verifies) ─────────────────────────────────────── */
   const handleVerify = async (report) => {
-    if (!window.confirm(`Verify this report (${report.monthLabel}) and pass it to OL?`)) return;
+    if (!(await ask(`Verify this report (${report.monthLabel}) and pass it to OL?`))) return;
     const senderName = currentUser.displayName || 'Team Lead';
     try {
       await updateReportStatus(report.id, 'verified', {
@@ -112,11 +114,11 @@ export default function MonthlyReportsPage() {
       setReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'verified' } : r));
       setDetailReport(r => r ? { ...r, status: 'verified' } : r);
       notifyReportVerified({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly' });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   const handleRejectToApc = async (report) => {
-    const note = window.prompt('Reason for sending back to APC (required):');
+    const note = await askText('Reason for sending back to APC (required):');
     if (!note || !note.trim()) return;
     const senderName = currentUser.displayName || 'Team Lead';
     try {
@@ -129,16 +131,16 @@ export default function MonthlyReportsPage() {
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'monthly', toRole: 'apc', note: note.trim() });
       // Optional reporting dock for the APC (all cadences now — mig 304 symmetry).
       try { await deductPromptApcReport(report.id); } catch { /* best-effort; the return already happened */ }
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   const handleDelete = async (report) => {
-    if (!window.confirm(`Delete the ${report.monthLabel} report for ${report.brandName}? This cannot be undone.`)) return;
+    if (!(await ask(`Delete the ${report.monthLabel} report for ${report.brandName}? This cannot be undone.`, { danger: true }))) return;
     try {
       await deleteMonthlyReport(report.id);
       setReports(prev => prev.filter(r => r.id !== report.id));
       setDetailReport(null);
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   /* ── Views ────────────────────────────────────────────────────────────── */
@@ -204,8 +206,8 @@ export default function MonthlyReportsPage() {
               </button>
             )}
             {canTlVerify && (
-              <button className="btn btn-sm d-inline-flex align-items-center gap-1 text-white"
-                style={{ borderRadius: 8, background: '#7c3aed', border: 'none' }}
+              <button className="btn btn-sm d-inline-flex align-items-center gap-1"
+                style={{ borderRadius: 8, background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerify(detailReport)}>
                 <i className="bi bi-patch-check-fill" /> Verify
               </button>
@@ -257,7 +259,7 @@ export default function MonthlyReportsPage() {
             {isTL ? 'Reports for your brands' : 'Your monthly brand reports'} · {reports.length} total
           </p>
         </div>
-        <button className="btn btn-dark btn-sm d-inline-flex align-items-center gap-1 px-3"
+        <button className="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 px-3"
           style={{ borderRadius: 8 }} onClick={() => setView('new')}>
           <i className="bi bi-plus-circle" /> New Monthly Report
         </button>
@@ -324,24 +326,24 @@ export default function MonthlyReportsPage() {
                 <div className="card h-100" style={{
                   borderRadius: 14, cursor: 'pointer',
                   border: '1px solid var(--border-subtle)',
-                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                  boxShadow: 'var(--shadow-sm)',
                   transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
                 }}
                   onClick={() => setDetailReport(r)}
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.08)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
                     e.currentTarget.style.borderColor = 'var(--border-default)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04)';
+                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
                     e.currentTarget.style.borderColor = 'var(--border-subtle)';
                   }}>
                   <div className="card-body p-3">
                     <div className="d-flex align-items-center gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                      <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                        style={{ width: 26, height: 26, fontSize: '0.58rem', background: '#3b82f6' }}>
+                      <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                        style={{ width: 26, height: 26, fontSize: '0.58rem', background: 'var(--info)', color: 'var(--on-info)' }}>
                         {(r.brandName || '??').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="fw-bold text-truncate" style={{ fontSize: '0.85rem', minWidth: 0 }}>{r.brandName}</div>

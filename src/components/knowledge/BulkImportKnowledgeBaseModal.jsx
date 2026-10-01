@@ -209,7 +209,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 820, zIndex: 1, borderRadius: 14, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="px-4 pt-4 pb-3 d-flex align-items-start justify-content-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
@@ -219,7 +219,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
             </h6>
             <div className="text-muted small mt-1">Paste CSV text or upload a .csv file. All rows are approved & visible by your rules.</div>
           </div>
-          <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
+          <button className="btn btn-sm border-0 rounded-circle" aria-label="Close" onClick={onClose}
             style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className="bi bi-x-lg" />
           </button>
@@ -274,7 +274,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
               <i className="bi bi-search" /> Parse & validate
             </button>
             {parsed && parsed.validCount > 0 && (
-              <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
+              <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
                 style={{ borderRadius: 8, fontSize: '0.78rem' }}
                 onClick={handleImport} disabled={saving}>
                 {saving ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Importing…</>

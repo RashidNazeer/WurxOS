@@ -12,6 +12,7 @@ import {
   findDuplicateByUrl,
   listAllArticles,
 } from '../../lib/kbApi';
+import { useDialogs } from '../common/useDialogs';
 
 const SOP_TABS = ['delivery_roadmap', 'operational_sops', 'training_sops', 'policies'];
 const SOP_TAB_TO_CHANGE_TYPE = { delivery_roadmap: 'delivery_roadmap', operational_sops: 'operational', training_sops: 'training', policies: 'policies' };
@@ -80,7 +81,7 @@ function VideoEmbed({ url }) {
         </button>
       ) : (
         <div className="position-relative" style={{ borderRadius: 10, overflow: 'hidden', background: '#000' }}>
-          <button className="btn btn-sm btn-dark position-absolute d-inline-flex align-items-center justify-content-center"
+          <button className="btn btn-sm btn-primary position-absolute d-inline-flex align-items-center justify-content-center"
             style={{ top: 8, right: 8, zIndex: 2, width: 28, height: 28, borderRadius: '50%', padding: 0, opacity: 0.8 }}
             onClick={() => setShow(false)} title="Close">
             <i className="bi bi-x" style={{ fontSize: '0.9rem' }} />
@@ -166,7 +167,7 @@ function CommentSection({ docId, docTitle, currentUser, userName }) {
           placeholder="Add a comment or suggestion…" value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
-        <button className="btn btn-sm btn-dark flex-shrink-0 d-inline-flex align-items-center gap-1"
+        <button className="btn btn-sm btn-primary flex-shrink-0 d-inline-flex align-items-center gap-1"
           style={{ borderRadius: 8 }} onClick={handleSend} disabled={sending || !text.trim()}>
           <i className="bi bi-send" style={{ fontSize: '0.7rem' }} />
         </button>
@@ -178,6 +179,7 @@ function CommentSection({ docId, docTitle, currentUser, userName }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function KnowledgeBasePage() {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   // Stable primitives for useEffect dependencies — building a new
   // currentUser object every render caused effects to re-run forever
@@ -355,7 +357,7 @@ export default function KnowledgeBasePage() {
       const dupe = findDuplicateByUrl(data.url, allDocs);
       if (dupe) {
         setProposeSaving(false);
-        alert(`This URL is already in the Knowledge Base as "${dupe.title}". Please use a different link.`);
+        notify.warning(`This URL is already in the Knowledge Base as "${dupe.title}". Please use a different link.`);
         return;
       }
       await userProposeArticle({
@@ -375,7 +377,7 @@ export default function KnowledgeBasePage() {
   }
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
@@ -416,7 +418,7 @@ export default function KnowledgeBasePage() {
               {tab.label}
               {count > 0 && (
                 <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700,
-                  background: activeTab === tab.value ? 'rgba(255,255,255,0.25)' : 'var(--surface-3)',
+                  background: activeTab === tab.value ? 'color-mix(in srgb, var(--on-accent) 22%, transparent)' : 'var(--surface-3)',
                   color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-muted)',
                   lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
                   {count}
@@ -521,7 +523,7 @@ export default function KnowledgeBasePage() {
                             </div>
                             {docChanges.map(c => {
                               // Use semantic-token CSS variables so the dots/pills read in both themes.
-                              const stTokens = { pending: 'var(--warning)', approved: 'var(--success)', in_progress: 'var(--info)', completed: '#8b5cf6', implemented: 'var(--success)' };
+                              const stTokens = { pending: 'var(--warning)', approved: 'var(--success)', in_progress: 'var(--info)', completed: 'var(--purple)', implemented: 'var(--success)' };
                               const stLabels = { pending: 'Pending', approved: 'Approved', in_progress: 'In Progress', completed: 'Completed', implemented: 'Implemented' };
                               const tint = stTokens[c.status] || 'var(--text-muted)';
                               return (
@@ -571,7 +573,7 @@ export default function KnowledgeBasePage() {
       {/* ── Submission Success Dialog ── */}
       {proposeSuccess && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setProposeSuccess(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setProposeSuccess(false)} />
           <div className="card border-0 shadow-lg text-center" style={{ position: 'relative', width: '100%', maxWidth: 400, zIndex: 1, borderRadius: 16, background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
             <div className="card-body p-4">
               <div className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
@@ -631,7 +633,7 @@ function ProposeModal({ onClose, onSave, saving }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">

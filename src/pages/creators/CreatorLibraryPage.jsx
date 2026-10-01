@@ -357,7 +357,7 @@ function BrandCard({ s, isIPC, onOpen, onRemind }) {
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ padding: 16, cursor: 'pointer', transition: 'box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out)', transform: hover ? 'translateY(-1px)' : 'none', boxShadow: hover ? 'var(--shadow-md)' : undefined }}>
       <div className="d-flex align-items-center gap-2 mb-3">
-        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
           {initials(brand.name)}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -421,7 +421,7 @@ function BrandDetail({
         <button className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onBack}>
           <i className="bi bi-arrow-left me-1" /> All brands
         </button>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
           {initials(brand.name)}
         </div>
         <div className="fw-bold" style={{ fontSize: '1.05rem' }}>{brand.name}</div>
@@ -485,7 +485,7 @@ function CreatorRow({ c, canTL, canOL, viewer, busyKey, onDecide, onClear }) {
     <div className="wx-card d-flex align-items-start flex-wrap gap-3" style={{ padding: '12px 14px' }}>
       {/* Identity */}
       <div className="d-flex align-items-center gap-2" style={{ minWidth: 200, flex: '1 1 220px' }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
           {initials(c.name, c.handle)}
         </div>
         <div style={{ minWidth: 0 }}>

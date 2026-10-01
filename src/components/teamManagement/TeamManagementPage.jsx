@@ -25,8 +25,8 @@ export default function TeamManagementPage() {
     <div style={{ padding: '24px 28px 48px' }}>
       <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-3">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#0f172a' }}>
-            <i className="bi bi-people-fill me-2" style={{ color: '#0ea5e9' }} />
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+            <i className="bi bi-people-fill me-2" style={{ color: 'var(--info-text)' }} />
             Team Management
           </h4>
           <p className="text-muted small mb-0">Move brands between team members, and reassign APCs to different team leads.</p>
@@ -34,19 +34,19 @@ export default function TeamManagementPage() {
       </div>
 
       {/* Tab pills */}
-      <div className="d-flex p-1 rounded-3 mb-3" style={{ background: '#f1f5f9', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)', width: 'fit-content' }}>
+      <div className="d-flex p-1 rounded-3 mb-3" style={{ background: 'var(--surface-2)', boxShadow: 'inset 0 1px 2px color-mix(in srgb, var(--text-primary) 6%, transparent)', width: 'fit-content' }}>
         {TABS.map(t => {
           const isActive = tab === t.key;
           return (
             <button key={t.key} type="button"
               className="btn btn-sm d-inline-flex align-items-center gap-2"
               style={{
-                background: isActive ? '#fff' : 'transparent',
-                color: isActive ? '#0f172a' : '#64748b',
+                background: isActive ? 'var(--surface-1)' : 'transparent',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                 border: 'none', borderRadius: 10,
                 padding: '8px 18px', fontSize: '0.82rem', fontWeight: 700,
                 letterSpacing: '-0.01em',
-                boxShadow: isActive ? '0 2px 8px rgba(15,23,42,0.08)' : 'none',
+                boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
                 transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
               }}
               onClick={() => setTab(t.key)}>

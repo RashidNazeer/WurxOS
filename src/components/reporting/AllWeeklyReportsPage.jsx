@@ -23,6 +23,7 @@ import ToolbarSelect from './ToolbarSelect';
 import EditReportDatesModal from './EditReportDatesModal';
 import { notifyReportApproved, notifyReportRejected, notifyReportSubmitted, notifyReportVerified } from '../../utils/reportNotifications';
 import { remindReports } from '../../lib/reportsApi';
+import { useDialogs } from '../common/useDialogs';
 
 function StatusBadge({ status, style }) {
   const cfg = REPORT_STATUSES[status] || REPORT_STATUSES.approved;
@@ -97,6 +98,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 function monthKey(y, m) { return `${y}-${String(m + 1).padStart(2, '0')}`; }
 
 export default function AllWeeklyReportsPage() {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -402,7 +404,7 @@ export default function AllWeeklyReportsPage() {
     if (!targets.length) return;
     const who  = kind === 'draft' ? 'APC' : 'Team Lead';
     const verb = kind === 'draft' ? 'submit' : 'verify';
-    if (!window.confirm(`Send a reminder to the ${who}s to ${verb} ${targets.length} ${kind} report${targets.length === 1 ? '' : 's'}?`)) return;
+    if (!(await ask(`Send a reminder to the ${who}s to ${verb} ${targets.length} ${kind} report${targets.length === 1 ? '' : 's'}?`))) return;
     setNotifyBusy(kind);
     try {
       const res = await remindReports(targets.map(r => r.id));
@@ -443,7 +445,7 @@ export default function AllWeeklyReportsPage() {
   // When the APC is unavailable, OL can move a draft straight to "submitted"
   // so the workflow keeps moving. Audit trail records OL as the submitter.
   const handleSubmitAsApc = async (report) => {
-    if (!window.confirm(`Submit this draft (${report.weekLabel}) on the APC's behalf? It will move to "submitted" for TL verification.`)) return;
+    if (!(await ask(`Submit this draft (${report.weekLabel}) on the APC's behalf? It will move to "submitted" for TL verification.`))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'submitted', {
@@ -454,12 +456,12 @@ export default function AllWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'submitted', rejectionNote: null } : r));
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: null } : r);
       notifyReportSubmitted({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly' });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   /* ── OL acting as TL: verify a submitted report ───────────────────────── */
   const handleVerifyAsTl = async (report) => {
-    if (!window.confirm(`Verify this report (${report.weekLabel}) on the TL's behalf? It will move to "verified" for OL approval.`)) return;
+    if (!(await ask(`Verify this report (${report.weekLabel}) on the TL's behalf? It will move to "verified" for OL approval.`))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'verified', {
@@ -469,12 +471,12 @@ export default function AllWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'verified' } : r));
       setViewReport(r => r ? { ...r, status: 'verified' } : r);
       notifyReportVerified({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly' });
-    } catch (err) { alert('Failed: ' + err.message); }
+    } catch (err) { notify.error('Failed: ' + err.message); }
   };
 
   /* ── Approve / Reject (OL only) ────────────────────────────────────────── */
   const handleApprove = async (report) => {
-    if (!window.confirm(`Approve this report (${report.weekLabel})? This is the final approval.`)) return;
+    if (!(await ask(`Approve this report (${report.weekLabel})? This is the final approval.`))) return;
     try {
       const senderName = currentUser.displayName || 'OL';
       await updateReportStatus(report.id, 'approved', {
@@ -485,11 +487,11 @@ export default function AllWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'approved' } : r));
       setViewReport(r => r ? { ...r, status: 'approved' } : r);
       notifyReportApproved({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly' });
-    } catch (err) { alert('Failed to approve: ' + err.message); }
+    } catch (err) { notify.error('Failed to approve: ' + err.message); }
   };
 
   const handleRejectToTL = async (report) => {
-    const note = window.prompt('Reason for returning to Team Lead (required):');
+    const note = await askText('Reason for returning to Team Lead (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -503,12 +505,12 @@ export default function AllWeeklyReportsPage() {
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'tl', note: note.trim() });
       try { await deductPrompt(report.id); } catch { /* deduction is best-effort; the return already happened */ }
-    } catch (err) { alert('Failed to reject: ' + err.message); }
+    } catch (err) { notify.error('Failed to reject: ' + err.message); }
   };
 
   /* ── Reopen approved reports (OL only) ─────────────────────────────────── */
   const handleReopenToAPC = async (report) => {
-    const note = window.prompt('Reason for sending this approved report back to APC (required):');
+    const note = await askText('Reason for sending this approved report back to APC (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -521,11 +523,11 @@ export default function AllWeeklyReportsPage() {
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'draft', rejectionNote: note.trim() } : r));
       setViewReport(r => r ? { ...r, status: 'draft', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'apc', note: note.trim(), isReopen: true });
-    } catch (err) { alert('Failed to reopen: ' + err.message); }
+    } catch (err) { notify.error('Failed to reopen: ' + err.message); }
   };
 
   const handleReopenForEdit = async (report) => {
-    if (!window.confirm('Reopen this approved report for your own edits? It will move back to "verified" so you can edit and re-approve.')) return;
+    if (!(await ask('Reopen this approved report for your own edits? It will move back to "verified" so you can edit and re-approve.'))) return;
     try {
       await updateReportStatus(report.id, 'verified', {
         reopenedBy: currentUser.uid,
@@ -534,22 +536,22 @@ export default function AllWeeklyReportsPage() {
       });
       setRawReports(prev => prev.map(r => r.id === report.id ? { ...r, status: 'verified' } : r));
       setViewReport(r => r ? { ...r, status: 'verified' } : r);
-    } catch (err) { alert('Failed to reopen: ' + err.message); }
+    } catch (err) { notify.error('Failed to reopen: ' + err.message); }
   };
 
   const handleDeleteReport = async (report) => {
-    if (!window.confirm(`Delete this report for ${report.brandName} (${report.weekLabel})? This cannot be undone.`)) return;
+    if (!(await ask(`Delete this report for ${report.brandName} (${report.weekLabel})? This cannot be undone.`, { danger: true }))) return;
     try {
       await deleteReport(report.id);
       setRawReports(prev => prev.filter(r => r.id !== report.id));
       setViewReport(null);
-    } catch (err) { alert('Failed to delete: ' + err.message); }
+    } catch (err) { notify.error('Failed to delete: ' + err.message); }
   };
 
   const handleBulkDelete = async () => {
     const ids = [...selected];
     if (ids.length === 0) return;
-    if (!window.confirm(`Delete ${ids.length} weekly report${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    if (!(await ask(`Delete ${ids.length} weekly report${ids.length === 1 ? '' : 's'}? This cannot be undone.`, { danger: true }))) return;
     setBulkBusy(true);
     try {
       const failures = [];
@@ -557,12 +559,12 @@ export default function AllWeeklyReportsPage() {
       const removedIds = new Set(ids.filter((id) => !failures.some((f) => f.id === id)));
       setRawReports((prev) => prev.filter((r) => !removedIds.has(r.id)));
       clearSelected();
-      if (failures.length) alert(`${failures.length} of ${ids.length} could not be deleted:\n` + failures.map((f) => f.msg).join('\n'));
+      if (failures.length) notify.error(`${failures.length} of ${ids.length} could not be deleted:\n` + failures.map((f) => f.msg).join('\n'));
     } finally { setBulkBusy(false); }
   };
 
   const handleReopenToTL = async (report) => {
-    const note = window.prompt('Reason for sending this approved report back to Team Lead (required):');
+    const note = await askText('Reason for sending this approved report back to Team Lead (required):');
     if (!note || !note.trim()) return;
     try {
       const senderName = currentUser.displayName || 'OL';
@@ -576,7 +578,7 @@ export default function AllWeeklyReportsPage() {
       setViewReport(r => r ? { ...r, status: 'submitted', rejectionNote: note.trim() } : r);
       notifyReportRejected({ report, sender: { uid: currentUser.uid, name: senderName }, type: 'weekly', toRole: 'tl', note: note.trim(), isReopen: true });
       try { await deductPrompt(report.id); } catch { /* deduction is best-effort */ }
-    } catch (err) { alert('Failed to reopen: ' + err.message); }
+    } catch (err) { notify.error('Failed to reopen: ' + err.message); }
   };
 
   /* ── Edit view ──────────────────────────────────────────────────────────── */
@@ -651,7 +653,7 @@ export default function AllWeeklyReportsPage() {
             )}
             {canVerifyAsTl && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: '#7c3aed', color: 'white', border: 'none' }}
+                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerifyAsTl(viewReport)}
                 title="Verify this submitted report (acting on behalf of the TL)">
                 <i className="bi bi-patch-check-fill" /> Verify as TL
@@ -765,7 +767,7 @@ export default function AllWeeklyReportsPage() {
             <span>{userRole === 'tl' ? 'Reports from your team' : 'All brand reports across the organization'}</span>
             <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
               style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.72rem', fontWeight: 600 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
               Live · synced {syncedAgo}
             </span>
           </div>
@@ -785,29 +787,29 @@ export default function AllWeeklyReportsPage() {
         {/* Total GMV — dark prominent card */}
         <div className="col-12 col-md-6 col-xl">
           <div className="rounded-3 h-100 position-relative overflow-hidden"
-            style={{ background: 'linear-gradient(135deg,#0a0a0a,#1a1a1f)', color: '#fff', padding: '14px 16px' }}>
+            style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)', padding: '14px 16px' }}>
             <div className="d-flex align-items-start justify-content-between mb-3">
               <div className="rounded-2 d-flex align-items-center justify-content-center"
-                style={{ width: 30, height: 30, background: 'rgba(255,255,255,0.1)' }}>
+                style={{ width: 30, height: 30, background: 'color-mix(in srgb, var(--spotlight-fg) 10%, transparent)' }}>
                 <i className="bi bi-currency-dollar" style={{ fontSize: '0.8rem' }} />
               </div>
               <div className="d-flex align-items-center gap-2">
                 {monthStats.gmvTrend != null && (
                   <span className="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1"
-                    style={{ background: monthStats.gmvTrend >= 0 ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)',
-                             color: monthStats.gmvTrend >= 0 ? '#86efac' : '#fca5a5', fontSize: '0.66rem', fontWeight: 600 }}>
+                    style={{ background: monthStats.gmvTrend >= 0 ? 'color-mix(in srgb, var(--success) 22%, transparent)' : 'color-mix(in srgb, var(--danger) 22%, transparent)',
+                             color: 'var(--spotlight-fg)', fontSize: '0.66rem', fontWeight: 600 }}>
                     <i className={`bi bi-arrow-${monthStats.gmvTrend >= 0 ? 'up' : 'down'}-right`} />
                     {formatPctChange(monthStats.gmvTrend)}
                   </span>
                 )}
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} />
               </div>
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>Total GMV this period</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--spotlight-fg-muted)', fontWeight: 500 }}>Total GMV this period</div>
             <div className="fw-bold" style={{ fontSize: '1.6rem', letterSpacing: '-0.02em', lineHeight: 1.1, marginTop: 2 }}>
               {fmtCompactDollars(monthStats.totalGmv, currencySymbol(monthStats.currency))}
             </div>
-            <Sparkbars values={monthStats.barPcts} highlightLast color="rgba(255,255,255,0.85)" muted="rgba(255,255,255,0.18)" />
+            <Sparkbars values={monthStats.barPcts} highlightLast color="color-mix(in srgb, var(--spotlight-fg) 85%, transparent)" muted="color-mix(in srgb, var(--spotlight-fg) 18%, transparent)" />
           </div>
         </div>
 
@@ -954,7 +956,7 @@ export default function AllWeeklyReportsPage() {
       {/* Month navigator + filters — sleek inline pill row */}
       <div className="rounded-3 mb-4" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', padding: '10px 12px' }}>
         <div className="d-flex flex-wrap gap-2 align-items-center">
-          <button className="btn btn-sm btn-light border d-inline-flex align-items-center justify-content-center rounded-circle" onClick={prevMonth}
+          <button className="btn btn-sm btn-outline-secondary border d-inline-flex align-items-center justify-content-center rounded-circle" onClick={prevMonth}
             style={{ width: 30, height: 30, padding: 0 }}>
             <i className="bi bi-chevron-left" style={{ fontSize: '0.78rem' }} />
           </button>
@@ -963,11 +965,11 @@ export default function AllWeeklyReportsPage() {
             <i className="bi bi-calendar3" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }} />
             {MONTH_NAMES[calMonth]} {calYear}
           </div>
-          <button className="btn btn-sm btn-light border d-inline-flex align-items-center justify-content-center rounded-circle" onClick={nextMonth}
+          <button className="btn btn-sm btn-outline-secondary border d-inline-flex align-items-center justify-content-center rounded-circle" onClick={nextMonth}
             style={{ width: 30, height: 30, padding: 0 }}>
             <i className="bi bi-chevron-right" style={{ fontSize: '0.78rem' }} />
           </button>
-          <button className="btn btn-sm btn-light border rounded-3 px-3"
+          <button className="btn btn-sm btn-outline-secondary border rounded-3 px-3"
             style={{ fontSize: '0.78rem', fontWeight: 500 }}
             onClick={() => { setCalYear(now.getFullYear()); setCalMonth(now.getMonth()); setFilterWeek(''); }}>
             Today
@@ -990,7 +992,7 @@ export default function AllWeeklyReportsPage() {
           )}
 
           {hasFilters && (
-            <button className="btn btn-sm btn-light border d-inline-flex align-items-center gap-1 rounded-3"
+            <button className="btn btn-sm btn-outline-secondary border d-inline-flex align-items-center gap-1 rounded-3"
               style={{ fontSize: '0.74rem' }}
               onClick={clearAllFilters}>
               <i className="bi bi-x-circle" /> Clear
@@ -1087,11 +1089,11 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
   const initials  = brandName.slice(0, 2).toUpperCase();
   const avatarColor = avatarColorFor(brandName);
 
-  // Status pill style — match the screenshot's lavender "APPROVED"
+  // Status pill style — same tones as ui/StatusBadge STATUS_TONES.report (approved = green).
   const statusPillStyle = (() => {
-    if (status === 'approved')  return { bg: 'var(--purple-soft)', color: 'var(--purple)' };
-    if (status === 'verified')  return { bg: 'var(--warning-soft)', color: 'var(--warning)' };
-    if (status === 'submitted') return { bg: 'var(--info-soft)', color: 'var(--info)' };
+    if (status === 'approved')  return { bg: 'var(--success-soft)', color: 'var(--success-text)' };
+    if (status === 'verified')  return { bg: 'var(--purple-soft)', color: 'var(--purple-text)' };
+    if (status === 'submitted') return { bg: 'var(--info-soft)', color: 'var(--info-text)' };
     return { bg: 'var(--surface-2)', color: 'var(--text-secondary)' };
   })();
 
@@ -1117,7 +1119,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         onClick={onClick}
         onMouseEnter={e => {
           e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 8px 20px rgba(15,23,42,0.08)';
+          e.currentTarget.style.boxShadow = 'var(--shadow-md)';
           if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-default)';
         }}
         onMouseLeave={e => {
@@ -1130,10 +1132,10 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             className="position-absolute d-flex align-items-center justify-content-center"
             style={{
               top: 8, left: 8, width: 24, height: 24,
-              background: isSelected ? 'var(--danger)' : 'rgba(255,255,255,0.95)',
+              background: isSelected ? 'var(--danger)' : 'var(--surface-1)',
               border: `1.5px solid ${isSelected ? 'var(--danger)' : 'var(--border-default)'}`,
               borderRadius: 6, cursor: 'pointer', zIndex: 2,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              boxShadow: 'var(--shadow-sm)',
             }}
             onClick={(e) => { e.stopPropagation(); onToggleSelect && onToggleSelect(); }}
             title={isSelected ? 'Unselect' : 'Select'}
@@ -1143,8 +1145,8 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
         )}
         {/* Header row — avatar, brand, "by …", status pill, chevron */}
         <div className="d-flex align-items-start gap-2 p-3 pb-2" style={{ paddingLeft: selectable ? 40 : undefined }}>
-          <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-            style={{ width: 36, height: 36, fontSize: '0.78rem', background: avatarColor }}>
+          <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+            style={{ width: 36, height: 36, fontSize: '0.78rem', background: avatarColor, color: 'var(--text-inverse)' }}>
             {initials}
           </div>
           <div className="flex-grow-1" style={{ minWidth: 0 }}>
@@ -1227,7 +1229,7 @@ function CardStat({ label, value, note, noteColor, subNote }) {
 }
 
 function avatarColorFor(name) {
-  const palette = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#8b5cf6'];
+  const palette = ['var(--chart-6)','var(--chart-4)','var(--chart-7)','var(--chart-1)','var(--chart-5)','var(--chart-2)','var(--chart-8)'];
   let h = 0;
   for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return palette[h % palette.length];

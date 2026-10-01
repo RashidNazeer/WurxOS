@@ -20,6 +20,7 @@ import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandRep
 import { useAuth } from '../../contexts/AuthContext';
 import BrandSectionsPanel from '../portal/BrandSectionsPanel';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
+import { useDialogs } from '../common/useDialogs';
 
 /* ─── Editorial palette ───────────────────────────────────────────────────
  *   Same theme-aware structure as WeeklyReportView. Hero stays as a
@@ -32,7 +33,7 @@ const C = {
   line:       'var(--border-subtle)',
   surface:    'var(--surface-1)',
   surfaceAlt: 'var(--surface-2)',
-  hero:       '#1f1208',
+  hero:       'var(--spotlight-bg)',
   amber:      'var(--warning)',
   amberSoft:  'var(--warning-soft)',
   amberLine:  'color-mix(in srgb, var(--warning) 50%, transparent)',
@@ -106,8 +107,8 @@ function avatarColor(name) {
   let h = 0;
   const s = String(name || '');
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  const hue = Math.abs(h) % 360;
-  return `hsl(${hue}, 55%, 48%)`;
+  // Chart palette slots (theme-aware, text-inverse readable); amber slot 3 skipped.
+  return `var(--chart-${[1, 2, 4, 5, 6, 7, 8][Math.abs(h) % 7]})`;
 }
 function posterGradient(seed) {
   const palette = [
@@ -173,13 +174,13 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
     height: '100%',
     border: `1px solid ${C.line}`,
     background: primary ? C.hero : C.surface,
-    color: primary ? '#f5f5f4' : C.ink,
-    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+    color: primary ? 'var(--spotlight-fg)' : C.ink,
+    boxShadow: 'var(--shadow-sm)',
   };
   const labelStyle = {
     fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: primary ? '#a8a29e' : C.muted,
+    color: primary ? 'var(--spotlight-fg-muted)' : C.muted,
   };
 
   return (
@@ -192,7 +193,7 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
       {prevValue !== undefined && prevValue !== null && (
         <div style={{
           fontSize: '0.74rem', marginTop: 6,
-          color: primary ? '#a8a29e' : C.inkDim,
+          color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim,
         }}>
           Prev month <span style={{ fontWeight: 500 }}>{typeof prevValue === 'string' ? prevValue : ''}</span>
         </div>
@@ -200,13 +201,13 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
       {pct !== null && (
         <div className="mt-2">
           <DeltaPill pct={pct} />
-          <span style={{ fontSize: '0.66rem', color: primary ? '#a8a29e' : C.inkDim, marginLeft: 6 }}>
+          <span style={{ fontSize: '0.66rem', color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim, marginLeft: 6 }}>
             {pct >= 0 ? '+' : ''}{(num(current) - num(prevValue)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </span>
         </div>
       )}
       {subText && (
-        <div style={{ fontSize: '0.66rem', color: primary ? '#a8a29e' : C.muted, marginTop: 6 }}>{subText}</div>
+        <div style={{ fontSize: '0.66rem', color: primary ? 'var(--spotlight-fg-muted)' : C.muted, marginTop: 6 }}>{subText}</div>
       )}
       {sparkData && sparkData.length > 1 && (
         <Sparkline data={sparkData} color={primary ? C.amber : color} />
@@ -273,7 +274,7 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
       }}>{rank}</div>
       <div style={{
         width: 32, height: 32, borderRadius: '50%',
-        background: avatarColor(handle), color: '#fff',
+        background: avatarColor(handle), color: 'var(--text-inverse)',
         fontSize: '0.7rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{initials(handle)}</div>
@@ -324,7 +325,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
         borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.line}`,
         background: C.surface, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
-      onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(15,23,42,0.10)'; } }}
+      onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; } }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
       title={linkOk ? 'Open TikTok video' : undefined}>
       <div style={{
@@ -336,7 +337,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
           position: 'absolute', top: 10, right: 10,
           // Pill is fixed-white in both themes (video thumbnail
           // background), so the rank text stays dark in both themes.
-          background: 'rgba(255,255,255,0.92)', color: '#0f172a', borderRadius: 4,
+          background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)', color: 'var(--text-primary)', borderRadius: 4,
           fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', minWidth: 22, textAlign: 'center',
         }}>{rank}</div>
         <div style={{
@@ -354,9 +355,9 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
             position: 'absolute', right: 10, bottom: 10,
             width: 30, height: 30, borderRadius: '50%',
             // Fixed-white play icon button — text stays dark in both themes.
-            background: 'rgba(255,255,255,0.95)', color: '#0f172a',
+            background: 'color-mix(in srgb, var(--surface-1) 95%, transparent)', color: 'var(--text-primary)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--shadow-md)',
           }}>
             <i className="bi bi-play-fill" style={{ fontSize: '0.95rem', marginLeft: 1 }} />
           </div>
@@ -656,7 +657,7 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} />
                 <Tooltip content={<TrendTooltip />} cursor={{ fill: 'var(--chart-track)' }} />
-                <Bar dataKey="newVideos" fill="#f97316" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
+                <Bar dataKey="newVideos" fill="var(--warning)" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -710,7 +711,7 @@ function MetricTile({ label, value, prevValue, formatter, accent = C.amber, subT
     <div style={{
       background: C.surface, border: `1px solid ${C.line}`,
       borderRadius: 12, padding: '14px 14px 12px',
-      boxShadow: '0 1px 3px rgba(15,23,42,0.04)', height: '100%',
+      boxShadow: 'var(--shadow-sm)', height: '100%',
     }}>
       <div style={{
         fontSize: '0.6rem', fontWeight: 700, color: C.muted,
@@ -768,6 +769,8 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
     { label: 'CPO', value: m(row.cpo) },
   ];
   const spend = num(row.spend), gmv = num(row.gmv);
+  // Both bar segments stay visible (15–85%): when ROI < 1 the old 100% `in`
+  // segment left the `returned` label with zero width.
   const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
   return (
     <div className={isFirst ? '' : 'mt-3 pt-3'} style={{ borderTop: isFirst ? 'none' : `1px solid ${C.line}` }}>
@@ -791,7 +794,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
             <span>{sym}1 → {sym}{(gmv / spend).toFixed(2)}</span>
           </div>
           <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
+            <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.min(85, Math.max(15, ratio * 100))}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
               {ms(spend)} in
             </div>
             <div style={{ flex: 1, background: C.amber, color: C.hero, fontSize: '0.66rem', fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -806,6 +809,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
 export default function MonthlyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'monthly', reportLinks = null }) {
+  const { ask, askText, notify } = useDialogs();
   const printRef = useRef();
   // Per-product monthly sample goals for this report's brand (keyed by
   // normalized product name). Self-fetched like the weekly view; never in the
@@ -976,7 +980,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       });
     } catch (err) {
       console.error('[export-pdf] failed:', err);
-      alert('Failed to export the PDF. Please try again.');
+      notify.error('Failed to export the PDF. Please try again.');
     } finally {
       setPdfBusy(false);
     }
@@ -1177,26 +1181,26 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
               key: 'affiliate',
               label: 'Affiliate GMV',
               value: num(g.affiliateGmv),
-              color: '#0891b2',
+              color: 'var(--info-text)',
               children: [
-                { label: 'LIVE GMV',  value: num(g.liveGmv),  color: '#ef4444' },
-                { label: 'Video GMV', value: num(g.videoGmv), color: '#8b5cf6' },
+                { label: 'LIVE GMV',  value: num(g.liveGmv),  color: 'var(--danger-text)' },
+                { label: 'Video GMV', value: num(g.videoGmv), color: 'var(--purple-text)' },
               ],
             },
             {
               key: 'organic',
               label: 'Organic GMV',
               value: num(g.organicGmv),
-              color: '#10b981',
+              color: 'var(--success-text)',
               children: [
-                { label: 'Product Card GMV', value: num(g.productCardGmv), color: '#f59e0b' },
+                { label: 'Product Card GMV', value: num(g.productCardGmv), color: 'var(--warning-text)' },
               ],
             },
           ];
           const total = parents.reduce((s, p) => s + p.value, 0);
           if (!total) return null;
           return (
-            <ContentSection icon="bi-pie-chart-fill" color="#0891b2" title="GMV breakdown" eyebrow="Revenue mix by traffic source">
+            <ContentSection icon="bi-pie-chart-fill" color="var(--info-text)" title="GMV breakdown" eyebrow="Revenue mix by traffic source">
               <HierarchicalGmvDonut parents={parents} total={total} currencySym={sym} />
             </ContentSection>
           );
@@ -1294,24 +1298,24 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const v = report.videoPerformance || {};
           const pv = prev.videoPerformance || {};
           const items = [
-            { label: 'Product Impressions', value: v.productImpressions, prevValue: pv.productImpressions, formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Product Clicks',      value: v.productClicks,      prevValue: pv.productClicks,      formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Video Views',         value: v.videoViews,         prevValue: pv.videoViews,         formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'CTR',                 value: v.ctr,                prevValue: pv.ctr,                formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: '#6366f1' },
-            { label: 'CTOR',                value: v.ctor,               prevValue: pv.ctor,               formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: '#6366f1' },
-            { label: 'SKU Orders',          value: v.skuOrders,          prevValue: pv.skuOrders,          formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Video GMV',           value: v.gmv,                prevValue: pv.gmv,                formatter: m, accent: '#6366f1' },
-            { label: 'New Videos Posted',   value: v.newVideosPosted,    prevValue: pv.newVideosPosted,    formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos 1M+ views',    value: v.videos1MViews,      prevValue: pv.videos1MViews,      formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos 100k+ views',  value: v.videos100kViews,    prevValue: pv.videos100kViews,    formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos 10k+ views',   value: v.videos10kViews,     prevValue: pv.videos10kViews,     formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos $1k+ GMV',     value: v.videos1000Gmv,      prevValue: pv.videos1000Gmv,      formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos $100+ GMV',    value: v.videos100Gmv,       prevValue: pv.videos100Gmv,       formatter: fmtRaw, accent: '#6366f1' },
+            { label: 'Product Impressions', value: v.productImpressions, prevValue: pv.productImpressions, formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Product Clicks',      value: v.productClicks,      prevValue: pv.productClicks,      formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Video Views',         value: v.videoViews,         prevValue: pv.videoViews,         formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'CTR',                 value: v.ctr,                prevValue: pv.ctr,                formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: 'var(--purple)' },
+            { label: 'CTOR',                value: v.ctor,               prevValue: pv.ctor,               formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: 'var(--purple)' },
+            { label: 'SKU Orders',          value: v.skuOrders,          prevValue: pv.skuOrders,          formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Video GMV',           value: v.gmv,                prevValue: pv.gmv,                formatter: m, accent: 'var(--purple)' },
+            { label: 'New Videos Posted',   value: v.newVideosPosted,    prevValue: pv.newVideosPosted,    formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos 1M+ views',    value: v.videos1MViews,      prevValue: pv.videos1MViews,      formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos 100k+ views',  value: v.videos100kViews,    prevValue: pv.videos100kViews,    formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos 10k+ views',   value: v.videos10kViews,     prevValue: pv.videos10kViews,     formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos $1k+ GMV',     value: v.videos1000Gmv,      prevValue: pv.videos1000Gmv,      formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos $100+ GMV',    value: v.videos100Gmv,       prevValue: pv.videos100Gmv,       formatter: fmtRaw, accent: 'var(--purple)' },
           ];
           const grid = <MetricGrid items={items} cols={4} />;
           if (!grid) return null;
           return (
-            <ContentSection icon="bi-camera-reels-fill" color="#6366f1" title="Video performance" eyebrow="Reach, engagement and content output">
+            <ContentSection icon="bi-camera-reels-fill" color="var(--purple-text)" title="Video performance" eyebrow="Reach, engagement and content output">
               {grid}
             </ContentSection>
           );
@@ -1322,16 +1326,16 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const c = report.creatorsPerformance || {};
           const pc = prev.creatorsPerformance || {};
           const items = [
-            { label: 'Creators 1+ videos',  value: c.creators1Plus,  prevValue: pc.creators1Plus,  formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators 3+ videos',  value: c.creators3Plus,  prevValue: pc.creators3Plus,  formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators 10+ videos', value: c.creators10Plus, prevValue: pc.creators10Plus, formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators $1k+ GMV',   value: c.creators1kGmv,  prevValue: pc.creators1kGmv,  formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators $100+ GMV',  value: c.creators100Gmv, prevValue: pc.creators100Gmv, formatter: fmtRaw, accent: '#a855f7' },
+            { label: 'Creators 1+ videos',  value: c.creators1Plus,  prevValue: pc.creators1Plus,  formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators 3+ videos',  value: c.creators3Plus,  prevValue: pc.creators3Plus,  formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators 10+ videos', value: c.creators10Plus, prevValue: pc.creators10Plus, formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators $1k+ GMV',   value: c.creators1kGmv,  prevValue: pc.creators1kGmv,  formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators $100+ GMV',  value: c.creators100Gmv, prevValue: pc.creators100Gmv, formatter: fmtRaw, accent: 'var(--purple)' },
           ];
           const grid = <MetricGrid items={items} cols={5} />;
           if (!grid) return null;
           return (
-            <ContentSection icon="bi-person-video3" color="#a855f7" title="Creators' performance" eyebrow="Activation tiers across the affiliate roster">
+            <ContentSection icon="bi-person-video3" color="var(--purple-text)" title="Creators' performance" eyebrow="Activation tiers across the affiliate roster">
               {grid}
             </ContentSection>
           );
@@ -1371,16 +1375,16 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const c = report.customers || {};
           const pc = prev.customers || {};
           const items = [
-            { label: 'Aware Customers',         value: c.awareCustomers,        prevValue: pc.awareCustomers,        formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'New Customers',           value: c.newCustomers,          prevValue: pc.newCustomers,          formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'Potential New Customers', value: c.potentialNewCustomers, prevValue: pc.potentialNewCustomers, formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'CRM Messages Sent',       value: c.crmMessagesSent,       prevValue: pc.crmMessagesSent,       formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'Converted Customers',     value: c.convertedCustomers,    prevValue: pc.convertedCustomers,    formatter: fmtRaw, accent: '#0ea5e9' },
+            { label: 'Aware Customers',         value: c.awareCustomers,        prevValue: pc.awareCustomers,        formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'New Customers',           value: c.newCustomers,          prevValue: pc.newCustomers,          formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'Potential New Customers', value: c.potentialNewCustomers, prevValue: pc.potentialNewCustomers, formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'CRM Messages Sent',       value: c.crmMessagesSent,       prevValue: pc.crmMessagesSent,       formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'Converted Customers',     value: c.convertedCustomers,    prevValue: pc.convertedCustomers,    formatter: fmtRaw, accent: 'var(--info)' },
           ];
           const grid = <MetricGrid items={items} cols={5} />;
           if (!grid) return null;
           return (
-            <ContentSection icon="bi-people" color="#0ea5e9" title="Customers" eyebrow="Awareness, acquisition and CRM activity">
+            <ContentSection icon="bi-people" color="var(--info-text)" title="Customers" eyebrow="Awareness, acquisition and CRM activity">
               {grid}
             </ContentSection>
           );
@@ -1406,7 +1410,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           return (
             <ContentSection
               icon="bi-megaphone-fill"
-              color="#ec4899"
+              color="var(--danger-text)"
               title="Campaigns"
               eyebrow="Active and upcoming TikTok Shop campaigns">
               {has && (
@@ -1414,7 +1418,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                   style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
               )}
-              <EmbeddedLinks section={links} accent="#ec4899" />
+              <EmbeddedLinks section={links} accent="var(--chart-5)" />
             </ContentSection>
           );
         })()}
@@ -1482,7 +1486,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             const hasData = (entry.rows || []).some((r) => cols.some((c) => r?.[c.id] != null && r[c.id] !== ''));
             if (!hasData) return null;
             return (
-              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="#0ea5e9" title={entry.name}>
+              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="var(--info-text)" title={entry.name}>
                 <CustomTableView entry={entry} />
               </ContentSection>
             );
@@ -1495,7 +1499,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
             if (nonEmpty.length === 0) return null;
             return (
-              <ContentSection key={`tbl:${group.sectionId}`} icon="bi-table" color="#0ea5e9" title={group.name}>
+              <ContentSection key={`tbl:${group.sectionId}`} icon="bi-table" color="var(--info-text)" title={group.name}>
                 <div className="row g-3">
                   {nonEmpty.map((r) => {
                     const numericType = (r.type === 'number' || r.type === 'currency');
@@ -1529,13 +1533,13 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             if (name) customNames.push(name);
             if (isEmpty && !links) return null;
             return (
-              <ContentSection key={fieldId} icon="bi-sliders" color="#8b5cf6" title={name || 'Custom Field'}>
+              <ContentSection key={fieldId} icon="bi-sliders" color="var(--purple-text)" title={name || 'Custom Field'}>
                 {!isEmpty && (
                   <HighlightableContent html={value} report={report} fieldKey={`customField_${fieldId}`}
                     highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                     style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
                 )}
-                <EmbeddedLinks section={links} accent="#8b5cf6" />
+                <EmbeddedLinks section={links} accent="var(--chart-4)" />
               </ContentSection>
             );
           });

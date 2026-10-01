@@ -775,7 +775,7 @@ export default function CampaignTrackerPage() {
           Add / Edit Modal
       ══════════════════════════════════════════════════════════════════════ */}
       {showModal && (
-        <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.55)', zIndex: 1050 }}>
+        <div className="modal show d-block" style={{ background: 'var(--backdrop)', zIndex: 1050 }}>
           <div className="modal-dialog modal-lg modal-dialog-scrollable" style={{ maxWidth: modalTab === 'paste' && pasteRows ? 860 : 600 }}>
             <div className="modal-content">
 

@@ -105,16 +105,16 @@ export default class RouteErrorBoundary extends React.Component {
     return (
       <div style={{
         margin: '32px auto', maxWidth: 520, padding: 0,
-        background: 'var(--surface-1, #fff)',
-        color: 'var(--text-primary, #0f172a)',
-        border: '1px solid var(--border-subtle, #e5e7eb)',
+        background: 'var(--surface-1)',
+        color: 'var(--text-primary)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 16,
-        boxShadow: '0 20px 40px rgba(15, 23, 42, 0.18)',
+        boxShadow: 'var(--shadow-xl)',
         overflow: 'hidden',
       }}>
         <div style={{
-          background: 'linear-gradient(135deg, #fb923c, #ef4444)',
-          padding: '14px 18px', color: '#fff',
+          background: 'var(--danger)',
+          padding: '14px 18px', color: 'var(--on-danger)',
           display: 'flex', alignItems: 'center', gap: 10,
         }}>
           <div style={{
@@ -135,12 +135,12 @@ export default class RouteErrorBoundary extends React.Component {
             <strong>Mr Rashid</strong> on Discord so it can be fixed quickly.
           </p>
           <div style={{
-            background: 'var(--surface-2, #f9fafb)',
-            border: '1px solid var(--border-subtle, #e5e7eb)',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: 10, padding: 10, fontSize: 12, marginBottom: 12,
             maxHeight: 180, overflow: 'auto',
           }}>
-            <div style={{ fontWeight: 700, color: 'var(--danger, #b91c1c)' }}>
+            <div style={{ fontWeight: 700, color: 'var(--danger, var(--danger-text))' }}>
               {String(error?.message || error)}
             </div>
           </div>
@@ -152,9 +152,9 @@ export default class RouteErrorBoundary extends React.Component {
               fontSize: 11,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
               padding: 8, borderRadius: 8,
-              border: '1px solid var(--border-subtle, #e5e7eb)',
-              background: 'var(--surface-2, #f9fafb)',
-              color: 'var(--text-primary, #0f172a)',
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-primary)',
               resize: 'vertical', marginBottom: 14,
             }}
           />
@@ -178,9 +178,9 @@ export default class RouteErrorBoundary extends React.Component {
               type="button"
               onClick={() => this.setState({ error: null, copied: false })}
               style={{
-                background: 'var(--surface-2, #f3f4f6)',
-                color: 'var(--text-primary, #0f172a)',
-                border: '1px solid var(--border-subtle, #e5e7eb)',
+                background: 'var(--surface-2)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-subtle)',
                 padding: '10px 14px', borderRadius: 10,
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
               }}>
@@ -190,9 +190,9 @@ export default class RouteErrorBoundary extends React.Component {
               type="button"
               onClick={() => window.location.reload()}
               style={{
-                background: 'var(--surface-2, #f3f4f6)',
-                color: 'var(--text-primary, #0f172a)',
-                border: '1px solid var(--border-subtle, #e5e7eb)',
+                background: 'var(--surface-2)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-subtle)',
                 padding: '10px 14px', borderRadius: 10,
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
               }}>

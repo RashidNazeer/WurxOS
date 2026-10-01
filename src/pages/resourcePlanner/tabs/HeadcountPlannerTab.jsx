@@ -33,9 +33,9 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
   return (
     <>
       {/* Part A: Planning horizon control */}
-      <div style={{ padding: 16, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', marginBottom: 14 }}>
+      <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', marginBottom: 14 }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Planning horizon</div>
-        <div style={{ fontSize: 13, color: '#475569', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
           You're planning for the next <strong>{horizonLabel}</strong>. Expected pipeline:{' '}
           <strong>{config.targetNewBrandsPerMonth}/month × {config.planningHorizonMonths} = {projectedNew} new brands</strong>.
         </div>
@@ -49,9 +49,9 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
                 className="wx-btn"
                 onClick={() => onConfigChange({ planningHorizonMonths: h.months })}
                 style={{
-                  background: active ? '#2563eb' : 'transparent',
-                  color: active ? '#fff' : '#475569',
-                  border: active ? 'none' : '1px solid #e5e7eb',
+                  background: active ? 'var(--accent)' : 'transparent',
+                  color: active ? 'var(--on-accent)' : 'var(--text-secondary)',
+                  border: active ? 'none' : '1px solid var(--border-subtle)',
                 }}
               >
                 {h.label}
@@ -61,7 +61,7 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ fontSize: 13, color: '#475569' }}>What-if extra brands in horizon:</label>
+          <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>What-if extra brands in horizon:</label>
           <input
             type="range" min="0" max="30" step="1"
             value={whatIf}
@@ -82,16 +82,16 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
           <Pill
             label="Total gap"
             value={totalGap > 0 ? `+${totalGap}` : totalGap}
-            tone={totalGap < 0 ? '#dc2626' : '#16a34a'}
+            tone={totalGap < 0 ? 'var(--danger-text)' : 'var(--success-text)'}
           />
         </div>
       </div>
 
       {/* Part B: Required headcount by dept */}
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff', marginBottom: 14 }}>
-        <div style={{ padding: 14, borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)', marginBottom: 14 }}>
+        <div style={{ padding: 14, borderBottom: '1px solid var(--border-subtle)' }}>
           <strong>Required headcount by department</strong>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
             HC Needed = ceil(Projected Brands ÷ Avg Brands/Role) + Buffer ({config.minBufferHeadcount}).
             Gap = HC Available − HC Needed. Negative = need to hire; positive = spare capacity.
           </div>
@@ -117,12 +117,12 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
                   <td style={{ textAlign: 'right' }}>{r.currentTeam}</td>
                   <td style={{ textAlign: 'right' }}>{r.currentBrands}</td>
                   <td style={{ textAlign: 'right' }}>{r.projectedBrands}</td>
-                  <td style={{ textAlign: 'right', color: '#475569' }}>{r.avgBrandsPerRole ?? '—'}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{r.avgBrandsPerRole ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{r.hcNeeded ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>
                     {r.gap === null
-                      ? <span style={{ color: '#94a3b8' }}>—</span>
-                      : <span style={{ color: r.gap < 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+                      ? <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      : <span style={{ color: r.gap < 0 ? 'var(--danger-text)' : 'var(--success-text)', fontWeight: 700 }}>
                           {r.gap > 0 ? `+${r.gap}` : r.gap}
                         </span>}
                   </td>
@@ -135,12 +135,12 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
       </div>
 
       {/* Part C: Monthly outlook */}
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
-        <div style={{ padding: 14, borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
+        <div style={{ padding: 14, borderBottom: '1px solid var(--border-subtle)' }}>
           <strong>Monthly outlook — next 12 months</strong>
         </div>
         {config.targetNewBrandsPerMonth === 0 && (
-          <div style={{ padding: 14, background: '#eff6ff', color: '#1e40af', fontSize: 13 }}>
+          <div style={{ padding: 14, background: 'var(--info-soft)', color: 'var(--info-text)', fontSize: 13 }}>
             Set a monthly target in Inputs to see a real forecast.
           </div>
         )}
@@ -161,18 +161,18 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
               {outlookRows.map((r) => {
                 const isHorizon = r.monthOffset === config.planningHorizonMonths;
                 return (
-                  <tr key={r.monthOffset} style={{ background: isHorizon ? '#eff6ff' : undefined }}>
+                  <tr key={r.monthOffset} style={{ background: isHorizon ? 'var(--info-soft)' : undefined }}>
                     <td>
                       <span style={{ fontWeight: 600 }}>M+{r.monthOffset}</span>{' '}
-                      <span style={{ color: '#64748b', fontSize: 12 }}>· {r.monthLabel}</span>
-                      {isHorizon && <span style={{ marginLeft: 8, padding: '1px 8px', background: '#dbeafe', color: '#1e40af', borderRadius: 999, fontSize: 11, fontWeight: 600 }}>Horizon</span>}
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>· {r.monthLabel}</span>
+                      {isHorizon && <span style={{ marginLeft: 8, padding: '1px 8px', background: 'var(--info-soft)', color: 'var(--info-text)', borderRadius: 999, fontSize: 11, fontWeight: 600 }}>Horizon</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>{r.newBrandsCumulative}</td>
                     <td style={{ textAlign: 'right' }}>{r.projectedBrands}</td>
                     <td style={{ textAlign: 'right' }}>{r.hcNeeded}</td>
                     <td style={{ textAlign: 'right' }}>{r.hcAvailable}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <span style={{ color: r.gap < 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+                      <span style={{ color: r.gap < 0 ? 'var(--danger-text)' : 'var(--success-text)', fontWeight: 700 }}>
                         {r.gap > 0 ? `+${r.gap}` : r.gap}
                       </span>
                     </td>
@@ -190,9 +190,9 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
 
 function Pill({ label, value, tone }) {
   return (
-    <div style={{ padding: '10px 12px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-      <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: tone || '#0f172a', marginTop: 2 }}>{value}</div>
+    <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: tone || 'var(--text-primary)', marginTop: 2 }}>{value}</div>
     </div>
   );
 }
@@ -200,24 +200,24 @@ function Pill({ label, value, tone }) {
 function PriorityBadge({ priority, label }) {
   if (priority === 'urgent') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: '#fef2f2', color: '#991b1b', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <AlertIcon width="12" height="12" /> {label}
       </span>
     );
   }
   if (priority === 'soon') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: 12, fontWeight: 600 }}>
         {label}
       </span>
     );
   }
   if (priority === 'ok') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: '#f0fdf4', color: '#166534', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <CheckIcon width="12" height="12" /> {label}
       </span>
     );
   }
-  return <span style={{ color: '#94a3b8', fontSize: 12 }}>{label}</span>;
+  return <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{label}</span>;
 }

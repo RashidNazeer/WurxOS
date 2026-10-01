@@ -6,7 +6,7 @@ export default function DeptCapacityTab({ deptSummary, config }) {
 
   return (
     <>
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="wx-table" style={{ minWidth: 760 }}>
             <thead>
@@ -24,7 +24,7 @@ export default function DeptCapacityTab({ deptSummary, config }) {
                 <tr key={d.department}>
                   <td style={{ fontWeight: 600 }}>{d.department}</td>
                   <td style={{ textAlign: 'right' }}>{d.headcount}</td>
-                  <td style={{ textAlign: 'right', color: '#475569' }}>{d.fullTime}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{d.fullTime}</td>
                   <td style={{ textAlign: 'right' }}>{d.totalBrands}</td>
                   <td>
                     <UtilBar value={d.avgUtilization} target={target} status={d.status} />
@@ -39,10 +39,10 @@ export default function DeptCapacityTab({ deptSummary, config }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 12, color: '#64748b', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#10b981', borderRadius: 2, marginRight: 4 }} /> OK — below target</span>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#f59e0b', borderRadius: 2, marginRight: 4 }} /> Moderate — above {target}%</span>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#ef4444', borderRadius: 2, marginRight: 4 }} /> At Capacity — {'>'}100%</span>
+      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-secondary)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--success)', borderRadius: 2, marginRight: 4 }} /> OK — below target</span>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--warning)', borderRadius: 2, marginRight: 4 }} /> Moderate — above {target}%</span>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--danger)', borderRadius: 2, marginRight: 4 }} /> At Capacity — {'>'}100%</span>
       </div>
     </>
   );
@@ -50,21 +50,21 @@ export default function DeptCapacityTab({ deptSummary, config }) {
 
 function UtilBar({ value, target, status }) {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return <span style={{ color: '#94a3b8' }}>—</span>;
+    return <span style={{ color: 'var(--text-muted)' }}>—</span>;
   }
   const clamped = Math.min(value, 150);
   const pct = (clamped / 150) * 100;
-  let color = '#10b981';
-  if (status === 'over') color = '#ef4444';
-  else if (status === 'moderate') color = '#f59e0b';
+  let color = 'var(--success-text)';
+  if (status === 'over') color = 'var(--danger-text)';
+  else if (status === 'moderate') color = 'var(--warning-text)';
 
   const targetPct = (target / 150) * 100;
 
   return (
-    <div style={{ position: 'relative', background: '#f1f5f9', borderRadius: 4, height: 18, overflow: 'visible' }}>
+    <div style={{ position: 'relative', background: 'var(--surface-2)', borderRadius: 4, height: 18, overflow: 'visible' }}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width var(--dur-base) var(--ease-out)' }} />
-      <div style={{ position: 'absolute', left: `${targetPct}%`, top: -2, bottom: -2, width: 2, background: '#475569' }} />
-      <div style={{ position: 'absolute', right: 6, top: 0, height: 18, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, color: '#0f172a' }}>
+      <div style={{ position: 'absolute', left: `${targetPct}%`, top: -2, bottom: -2, width: 2, background: 'var(--text-secondary)' }} />
+      <div style={{ position: 'absolute', right: 6, top: 0, height: 18, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
         {value}%
       </div>
     </div>
@@ -74,23 +74,23 @@ function UtilBar({ value, target, status }) {
 function StatusBadge({ status, label }) {
   if (status === 'over') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: '#fef2f2', color: '#991b1b', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <AlertIcon width="12" height="12" /> {label}
       </span>
     );
   }
   if (status === 'moderate') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: 12, fontWeight: 600 }}>
         {label}
       </span>
     );
   }
   if (status === 'na') {
-    return <span style={{ color: '#94a3b8', fontSize: 12 }}>{label}</span>;
+    return <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{label}</span>;
   }
   return (
-    <span style={{ padding: '3px 10px', borderRadius: 999, background: '#f0fdf4', color: '#166534', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       <CheckIcon width="12" height="12" /> {label}
     </span>
   );

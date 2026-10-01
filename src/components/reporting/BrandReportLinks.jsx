@@ -16,23 +16,24 @@ import { getBrandReportResources, sectionAppliesTo } from '../../utils/brandRepo
  *    by useBrandReportLinks().getUnmatched(knownNames).
  */
 
-const PALETTE = ['#d97706', '#0ea5e9', '#16a34a', '#8b5cf6', '#ec4899', '#f97316'];
+const PALETTE = ['var(--chart-1)', 'var(--chart-6)', 'var(--chart-7)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-2)'];
+const mix = (c, pct) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 
 const norm = (s) => (s || '').trim().toLowerCase();
 
 function detectLinkKind(url = '') {
   const u = url.toLowerCase();
-  if (u.includes('docs.google.com/document'))   return { icon: 'bi-file-earmark-text', tint: '#4285F4', bg: '#e8f0fe', label: 'Google Docs' };
-  if (u.includes('docs.google.com/spreadsheet') || u.includes('sheets.google.com')) return { icon: 'bi-grid-3x3', tint: '#0F9D58', bg: '#e6f4ea', label: 'Google Sheets' };
-  if (u.includes('docs.google.com/presentation') || u.includes('slides.google.com')) return { icon: 'bi-easel2', tint: '#F4B400', bg: '#fef7e0', label: 'Google Slides' };
-  if (u.includes('drive.google.com'))            return { icon: 'bi-cloud-fill', tint: '#4285F4', bg: '#e8f0fe', label: 'Google Drive' };
-  if (u.includes('youtube.com') || u.includes('youtu.be')) return { icon: 'bi-youtube', tint: '#FF0000', bg: '#fff0f0', label: 'YouTube' };
-  if (u.includes('tiktok.com'))                  return { icon: 'bi-tiktok', tint: '#1e293b', bg: '#f1f5f9', label: 'TikTok' };
-  if (u.includes('figma.com'))                   return { icon: 'bi-pentagon-fill', tint: '#F24E1E', bg: '#fff3f0', label: 'Figma' };
-  if (u.includes('notion.so'))                   return { icon: 'bi-journal-richtext', tint: '#37352F', bg: '#f5f5f5', label: 'Notion' };
-  if (u.includes('dropbox.com'))                 return { icon: 'bi-box', tint: '#0061FF', bg: '#e8f0ff', label: 'Dropbox' };
-  if (u.includes('airtable.com'))                return { icon: 'bi-table', tint: '#FCB400', bg: '#fff7e0', label: 'Airtable' };
-  return { icon: 'bi-link-45deg', tint: '#475569', bg: '#f1f5f9', label: 'Link' };
+  if (u.includes('docs.google.com/document'))   return { icon: 'bi-file-earmark-text', tint: '#4285F4', bg: 'color-mix(in srgb, #4285F4 12%, var(--surface-1))', label: 'Google Docs' };
+  if (u.includes('docs.google.com/spreadsheet') || u.includes('sheets.google.com')) return { icon: 'bi-grid-3x3', tint: '#0F9D58', bg: 'color-mix(in srgb, #0F9D58 12%, var(--surface-1))', label: 'Google Sheets' };
+  if (u.includes('docs.google.com/presentation') || u.includes('slides.google.com')) return { icon: 'bi-easel2', tint: '#F4B400', bg: 'color-mix(in srgb, #F4B400 12%, var(--surface-1))', label: 'Google Slides' };
+  if (u.includes('drive.google.com'))            return { icon: 'bi-cloud-fill', tint: '#4285F4', bg: 'color-mix(in srgb, #4285F4 12%, var(--surface-1))', label: 'Google Drive' };
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return { icon: 'bi-youtube', tint: '#FF0000', bg: 'color-mix(in srgb, #FF0000 12%, var(--surface-1))', label: 'YouTube' };
+  if (u.includes('tiktok.com'))                  return { icon: 'bi-tiktok', tint: 'var(--text-primary)', bg: 'var(--surface-2)', label: 'TikTok' };
+  if (u.includes('figma.com'))                   return { icon: 'bi-pentagon-fill', tint: '#F24E1E', bg: 'color-mix(in srgb, #F24E1E 12%, var(--surface-1))', label: 'Figma' };
+  if (u.includes('notion.so'))                   return { icon: 'bi-journal-richtext', tint: 'var(--text-primary)', bg: 'var(--surface-2)', label: 'Notion' };
+  if (u.includes('dropbox.com'))                 return { icon: 'bi-box', tint: '#0061FF', bg: 'color-mix(in srgb, #0061FF 12%, var(--surface-1))', label: 'Dropbox' };
+  if (u.includes('airtable.com'))                return { icon: 'bi-table', tint: '#FCB400', bg: 'color-mix(in srgb, #FCB400 12%, var(--surface-1))', label: 'Airtable' };
+  return { icon: 'bi-link-45deg', tint: 'var(--text-secondary)', bg: 'var(--surface-2)', label: 'Link' };
 }
 
 function getDomain(url) {
@@ -58,8 +59,8 @@ function LinkCard({ link, accent }) {
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.boxShadow = '0 6px 18px rgba(15,23,42,0.08)';
-        e.currentTarget.style.borderColor = accent + '88';
+        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+        e.currentTarget.style.borderColor = mix(accent, 53);
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = '';
@@ -90,7 +91,7 @@ function LinkCard({ link, accent }) {
       </div>
       <div style={{
         width: 32, height: 32, borderRadius: '50%',
-        background: accent + '14', color: accent,
+        background: mix(accent, 8), color: accent,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
         <i className="bi bi-arrow-up-right" style={{ fontSize: '0.85rem' }} />
@@ -107,7 +108,7 @@ function LinkCard({ link, accent }) {
  *   section — the saved-section object (or null/undefined → renders nothing)
  *   accent — accent color for the open-button circle (defaults to amber)
  */
-export function EmbeddedLinks({ section, accent = '#d97706' }) {
+export function EmbeddedLinks({ section, accent = 'var(--warning)' }) {
   const links = (section && section.links) ? section.links.filter(l => l && l.url) : [];
   if (links.length === 0) return null;
   return (
@@ -140,7 +141,7 @@ function StandaloneSection({ section, accent }) {
       <div className="d-flex align-items-center gap-3 mb-3">
         <div style={{
           width: 38, height: 38, borderRadius: 10,
-          background: accent + '15', color: accent,
+          background: mix(accent, 8), color: accent,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
           <i className="bi bi-bookmark-fill" style={{ fontSize: '1rem' }} />

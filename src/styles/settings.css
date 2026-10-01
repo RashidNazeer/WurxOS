@@ -155,7 +155,7 @@
 }
 .settings-nav-btn[data-active='true'] {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 .settings-nav-btn[data-active='true']::before {

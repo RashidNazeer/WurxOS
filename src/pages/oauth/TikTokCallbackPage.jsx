@@ -21,7 +21,7 @@ const wrap = {
   padding: 24, background: 'var(--surface-2, #f6f7f9)',
 };
 const card = {
-  width: '100%', maxWidth: 520, background: 'var(--surface-1, #fff)',
+  width: '100%', maxWidth: 520, background: 'var(--surface-1)',
   border: '1px solid var(--border-subtle, #e4e7ec)',
   borderRadius: 'var(--radius-lg, 14px)', padding: 28,
   boxShadow: '0 8px 28px rgba(16,24,40,0.08)',
@@ -159,7 +159,7 @@ export default function TikTokCallbackPage() {
         )}
 
         <div style={{ marginTop: 22, paddingTop: 14, borderTop: '1px solid var(--border-subtle, #e4e7ec)' }}>
-          <Link to="/settings?section=tiktokAds" style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary, #4338ca)' }}>
+          <Link to="/settings?section=tiktokAds" style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary, var(--purple-text))' }}>
             Go to TikTok Ads settings
           </Link>
         </div>

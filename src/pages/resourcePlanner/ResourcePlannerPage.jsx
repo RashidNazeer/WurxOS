@@ -86,12 +86,12 @@ export default function ResourcePlannerPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {saving && (
-            <span style={{ fontSize: 12, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span className="wx-spinner" style={{ width: 12, height: 12 }} /> Saving…
             </span>
           )}
           {!saving && showSavedPulse && (
-            <span style={{ fontSize: 12, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--success-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <CheckIcon width="14" height="14" /> Saved
             </span>
           )}
@@ -107,7 +107,7 @@ export default function ResourcePlannerPage() {
         </div>
       )}
 
-      <div className="rp-tabs-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16, borderBottom: '1px solid var(--wx-border, #e5e7eb)', paddingBottom: 8 }}>
+      <div className="rp-tabs-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16, borderBottom: '1px solid var(--wx-border, var(--border-subtle))', paddingBottom: 8 }}>
         {TABS.map((t) => {
           const active = t.key === activeKey;
           const Icon = t.Icon;
@@ -117,8 +117,8 @@ export default function ResourcePlannerPage() {
               onClick={() => setActiveKey(t.key)}
               className="wx-btn"
               style={{
-                background: active ? 'var(--wx-primary, #2563eb)' : 'transparent',
-                color: active ? '#fff' : 'var(--wx-muted, #475569)',
+                background: active ? 'var(--accent)' : 'transparent',
+                color: active ? 'var(--on-accent)' : 'var(--text-secondary)',
                 border: active ? 'none' : '1px solid transparent',
                 fontWeight: active ? 600 : 500,
               }}
@@ -130,7 +130,7 @@ export default function ResourcePlannerPage() {
       </div>
 
       {loading && (
-        <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
           <span className="wx-spinner" /> Loading planner…
         </div>
       )}

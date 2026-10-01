@@ -120,7 +120,7 @@
   color: var(--hue);
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.wri-navitem.active .wri-chip { background: var(--hue); color: #fff; }
+.wri-navitem.active .wri-chip { background: var(--hue); color: var(--text-inverse); }
 .wri-chip i { font-size: 0.95rem; }
 .wri-nm { font-weight: 600; font-size: 0.81rem; letter-spacing: -0.005em; }
 .wri-track {
@@ -183,10 +183,10 @@
 .wri-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .wri-btn i { font-size: 0.9rem; }
 .wri-btn-euka {
-  border-color: color-mix(in srgb, #0d9488 45%, var(--border-default));
-  color: #0d9488;
+  border-color: color-mix(in srgb, var(--chart-2) 45%, var(--border-default));
+  color: var(--chart-2);
 }
-.wri-btn-euka:hover:not(:disabled) { background: color-mix(in srgb, #0d9488 12%, transparent); }
+.wri-btn-euka:hover:not(:disabled) { background: color-mix(in srgb, var(--chart-2) 12%, transparent); }
 .wri-btn-primary {
   border-color: var(--accent);
   background: var(--accent);
@@ -277,7 +277,7 @@
   height: 100%;
   width: 0;
   border-radius: 99px;
-  background: linear-gradient(90deg, #4f46e5, #0d9488);
+  background: linear-gradient(90deg, var(--chart-6), var(--chart-2));
   transition: width var(--dur-slow) var(--ease-out);
 }
 .wri-overall .pct {
@@ -383,8 +383,60 @@
 
 /* ── Responsive: collapse rail on narrow viewports ─────────── */
 @media (max-width: 720px) {
-  .wri-rail { width: 210px; }
-  .wri-scroll { padding: 16px 16px 90px 14px; }
+  /* Phones: the 258px rail would leave ~120px for the form. Stack instead —
+     the section nav becomes a horizontal chip strip on top and the save /
+     submit actions a bar pinned to the bottom of the screen. */
+  .wri-root { flex-direction: column; }
+  .wri-rail {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .wri-railtop { display: none; }
+  .wri-navscroll {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 10px;
+    scrollbar-width: none;
+  }
+  .wri-navscroll::-webkit-scrollbar { display: none; }
+  .wri-navgroup { flex: none; }
+  .wri-navrow { display: block; }
+  .wri-navitem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    padding: 6px 10px 6px 6px;
+    margin: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill);
+  }
+  .wri-navitem.active::before { display: none; }
+  .wri-navitem.active { border-color: var(--hue); }
+  .wri-chip { width: 26px; height: 26px; border-radius: 50%; }
+  .wri-chip i { font-size: 0.8rem; }
+  .wri-track, .wri-arrow, .wri-submenu { display: none; }
+  .wri-actions {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 3;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    box-shadow: var(--shadow-lg);
+  }
+  .wri-actions > .wri-btn { flex: 1 1 auto; width: auto; }
+  .wri-actions .wri-actrow { flex: 1 1 100%; }
+  .wri-topstrip { height: auto; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .wri-topright { margin-left: 0; width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .wri-overall .lbl { display: none; }
+  .wri-obar { width: 80px; }
+  .wri-curr select { max-width: 140px; }
+  .wri-scroll { padding: 14px 12px 150px; }
 }
 
 
@@ -464,7 +516,7 @@
   display: grid;
   place-items: center;
   background: var(--hue);
-  color: #fff;
+  color: var(--text-inverse);
   box-shadow: var(--shadow-sm);
 }
 .wri-gd-icon i { font-size: 0.9rem; }
@@ -618,3 +670,17 @@
   .wri-gd-title { font-size: 1.02rem; }
   .wri-sec-body { padding: 13px; }
 }
+
+/* ── Submit validation (shown after a blocked Submit, updates live) ── */
+.wri-section.has-issues { box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 55%, transparent); }
+.wri-sec-issues {
+  list-style: none; margin: 12px 0 0; padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  font-size: 12.5px; font-weight: 600;
+  display: grid; gap: 4px;
+}
+.wri-sec-issues i { margin-right: 4px; }
+.wri-field-error { margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--danger-text); }
+.wri-root .form-control.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 22%, transparent); }
