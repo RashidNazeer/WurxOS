@@ -7,15 +7,14 @@ import {
 import {
   runIngestion, ingestStats, INGEST_SOURCES, getIngestSources, setIngestSources,
   listExcluded, addExcluded, removeExcluded, getBuddyConfig, setAllowedRoles,
-  listModelCatalog, refreshModelList, getModelConfig, saveModelConfig, listKeySlots, usageSummary,
+  listModelCatalog, refreshModelList, getModelConfig, saveModelConfig, listKeySlots,
 } from '../../lib/buddyApi';
 import {
   ALL_ROLES, ALWAYS_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles,
   FALLBACK_MAX, DEFAULT_SLOT_META, keySlotMeta, chainAdd, chainMove, chainRemove, creditsExhausted, fmtUsd, lastChecked,
   modelLabel, modelOptions, optionKey, parseOptionKey, allOptions, filterOptions, slotLabel,
   chainEntryStatus, vectorsByModel, freeSourcesValue, toggleInList, fmtCount,
-  ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, setRoleEconomy,
-  budgetSaverState, validSaverPct, pktDate,
+  ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups,
 } from '../../lib/buddyLogic';
 import { LoadError } from '../../components/buddy/BuddyThread';
 
@@ -648,15 +647,19 @@ function ChainEditor({ idPrefix, chain, onChange, shown, slots, meta, catalog, d
   );
 }
 
-// Per-role model, backup order and economy model, plus the budget saver.
-// Hidden until ai_assistant_config.role_models exists.
+// Per-role main model and backup order (Owner: no budget-based switching; the Boss and
+// developers simply choose models per role). Hidden until ai_assistant_config.role_models exists.
+const withoutEconomy = (rm) => Object.fromEntries(Object.entries(rm || {}).map(([role, v]) => {
+  const { economy: _drop, ...rest } = v || {};
+  return [role, rest];
+}));
+
 function RoleModelsCard({ readOnly }) {
   const [global, setGlobal] = useState(null);
-  const [saved, setSaved] = useState(null);   // { role_models, budget_saver_pct }
+  const [saved, setSaved] = useState(null);   // { role_models }
   const [draft, setDraft] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [meta, setMeta] = useState(DEFAULT_SLOT_META);
-  const [mtd, setMtd] = useState(null);
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -665,14 +668,12 @@ function RoleModelsCard({ readOnly }) {
   useEffect(() => {
     getAiConfig().then((c) => {
       if (!c || !('role_models' in c)) { setHidden(true); return; }
-      const d = { role_models: normalizeRoleModels(c.role_models), budget_saver_pct: c.budget_saver_pct ?? null };
+      const d = { role_models: withoutEconomy(normalizeRoleModels(c.role_models)) };
       setGlobal({ model: c.model, model_key_slot: c.model_key_slot, fallback_models: c.fallback_models });
       setSaved(d); setDraft(d);
     }).catch(() => setHidden(true));
     listModelCatalog().then(setCatalog).catch(() => {});
     listKeySlots().then((rows) => setMeta(keySlotMeta(rows)));
-    const today = pktDate();
-    usageSummary(today, today).then((u) => setMtd(u?.month_to_date || null)).catch(() => {});
   }, []);
 
   if (hidden) return null;
@@ -684,16 +685,13 @@ function RoleModelsCard({ readOnly }) {
   const rm = draft.role_models;
   const setRm = (role_models) => setDraft({ ...draft, role_models });
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
-  const saver = budgetSaverState(draft.budget_saver_pct, mtd);
-  const pctOk = validSaverPct(draft.budget_saver_pct);
 
   const save = async () => {
-    if (!pctOk) { setMsg('The budget saver needs a whole number from 1 to 100, or leave it empty to switch it off.'); return; }
     setSaving(true); setMsg('');
     try {
-      const patch = { role_models: draft.role_models, budget_saver_pct: draft.budget_saver_pct === '' || draft.budget_saver_pct == null ? null : Number(draft.budget_saver_pct) };
-      await updateAiConfig(patch);
-      setSaved({ ...draft, budget_saver_pct: patch.budget_saver_pct }); setDraft({ ...draft, budget_saver_pct: patch.budget_saver_pct });
+      // budget_saver_pct null keeps budget-based switching off for good.
+      await updateAiConfig({ role_models: withoutEconomy(draft.role_models), budget_saver_pct: null });
+      setSaved(draft);
       setMsg('Saved. New questions use this from now on.');
     } catch (e) { setMsg(`Not saved: ${e.message}`); }
     finally { setSaving(false); }
@@ -701,7 +699,8 @@ function RoleModelsCard({ readOnly }) {
 
   const globalName = global?.model ? modelLabel(global.model) : 'the main model';
   return (
-    <Card icon="bi-people-fill" title="Models by role" sub="Give each role its own model, backup order and a cheaper economy model. Default follows the Model section.">
+    <Card icon="bi-people-fill" title="Models by role" sub="Choose a main model and backup order for each role. Default follows the Model section.">
+
       <div className="bd-search bd-model-search">
         <i className="bi bi-search" aria-hidden="true" />
         <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter models" aria-label="Filter the model lists" />
@@ -710,7 +709,7 @@ function RoleModelsCard({ readOnly }) {
         <legend className="visually-hidden">Models by role</legend>
         <div className="bd-role-models">
           <div className="bd-role-head" aria-hidden="true">
-            <span>Role</span><span>Main model</span><span>Backup order</span><span>Economy model</span>
+            <span>Role</span><span>Main model</span><span>Backup order</span>
           </div>
           {ROLE_MODEL_ROLES.map((role) => {
             const v = roleModelView(rm, role, global || {});
@@ -737,35 +736,11 @@ function RoleModelsCard({ readOnly }) {
                       disabled={readOnly} onChange={(chain) => setRm(setRoleBackups(rm, role, chain))} />
                   )}
                 </div>
-                <div>
-                  <label className="bd-role-label" htmlFor={`${id}-eco`}>Economy model</label>
-                  <ModelSelect id={`${id}-eco`} value={v.economy} shown={shown} slots={slots} meta={meta}
-                    empty="None" label={`${roleLabel(role)}: economy model`}
-                    onChange={(t) => setRm(setRoleEconomy(rm, role, t))} />
-                </div>
               </div>
             );
           })}
         </div>
-
-        <h4 className="bd-subhead">Budget saver</h4>
-        <div className="bd-saver">
-          <label htmlFor="bd-saver-pct" className="small">When this month's spend reaches</label>
-          <input id="bd-saver-pct" type="number" min="1" max="100" step="1" inputMode="numeric" className="form-control form-control-sm"
-            style={{ width: 80 }} placeholder="off" value={draft.budget_saver_pct ?? ''} aria-invalid={!pctOk}
-            disabled={!saver.hasBudget && draft.budget_saver_pct == null}
-            onChange={(e) => setDraft({ ...draft, budget_saver_pct: e.target.value === '' ? null : e.target.value })} />
-          <span className="small">% of the budget, roles with an economy model switch to it.</span>
-        </div>
-        <div className="bd-card-sub mt-1" role="status">
-          {!saver.hasBudget
-            ? 'Set a monthly budget in Usage to use this.'
-            : `This month so far: ${saver.usedPct == null ? '—' : `${saver.usedPct}%`} of the budget${saver.active ? ' · the saver is ON now' : ''}.`}
-        </div>
       </fieldset>
-      <div className="bd-card-sub mt-2">
-        Tip: keep the Boss and OLs on the best model without an economy model, and give APCs a free Gemini model as their economy model.
-      </div>
       {!readOnly && (
         <div className="d-flex align-items-center gap-2 flex-wrap mt-3">
           <button type="button" className="btn btn-sm btn-primary" disabled={!dirty || saving} onClick={save}>
