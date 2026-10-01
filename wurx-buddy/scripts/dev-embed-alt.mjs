@@ -13,8 +13,17 @@ const left = async () => (await db.query(`select count(*)::int n from public.ai_
   where d.status = 'active' and c.embedding_alt is null and d.source_type = any(coalesce((select free_provider_sources from public.ai_assistant_config where id = 1), '{}'::text[]))`)).rows[0].n;
 let before = await left();
 console.log(`embed_alt_always on; chunks needing an NVIDIA vector: ${before}`);
+let failures = 0;
 for (let i = 1; i <= max && before > 0; i++) {
-  execFileSync(process.execPath, ['--experimental-strip-types', 'scripts/ingest.mjs', '--drain', '--owner-approved'], { stdio: 'ignore' });
+  try {
+    execFileSync(process.execPath, ['--experimental-strip-types', 'scripts/ingest.mjs', '--drain', '--owner-approved'], { stdio: 'ignore' });
+    failures = 0;
+  } catch {
+    // Flaky dev pooler / provider hiccup: wait and retry; give up after 5 in a row.
+    if (++failures >= 5) { console.log(`run ${i}: 5 failed runs in a row; stopping.`); break; }
+    await new Promise((r) => setTimeout(r, 15000));
+    continue;
+  }
   const now = await left();
   if (i % 10 === 0 || now === 0) console.log(`run ${i}: ${now} left`);
   if (now >= before) { console.log(`run ${i}: no progress (${now} left); stopping. Check ai_ingest_stats / ai_vector_state.`); break; }
