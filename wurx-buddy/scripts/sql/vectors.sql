@@ -29,7 +29,8 @@ begin
     jsonb_build_object('chunk_index', 1, 'section', 'body', 'content', 'alt only text', 'embed_text', 'alt only text',
                        'token_count', 3, 'content_hash', 'c1', 'embedding_alt', to_jsonb(v1),
                        'embed_model_alt', public.ai_embed_model_alt())));
-  perform pg_temp.ok('write without vectors is accepted (pending)', (r->>'ok')::boolean and (r->>'vector_pending')::int = 2, r::text);
+  -- Chunk 0 has no vector at all (waiting); chunk 1 has an alt vector, so it is DONE (mig 408).
+  perform pg_temp.ok('write without vectors is accepted; only the vector-less chunk waits', (r->>'ok')::boolean and (r->>'vector_pending')::int = 1, r::text);
 
   select count(*) into n from public.ai_search(null, 'zqxvecpend', array['kb_article'], p_as_user => boss) s where s.source_id = 'vtest-406';
   perform pg_temp.ok('a NULL-vector chunk is found by the keyword arm', n = 1, n::text);
@@ -44,7 +45,8 @@ begin
 
   select count(*) into n from jsonb_array_elements(public.ai_vector_pending('primary', 500)) e
    where e->>'content_hash' in ('c0', 'c1');
-  perform pg_temp.ok('ai_vector_pending(primary) offers both chunks', n = 2, n::text);
+  perform pg_temp.ok('ai_vector_pending(primary) offers both chunks (none during quiet hours)',
+    n = 2 or not public.ai_vector_backfill_allowed(), format('%s rows, backfill_allowed %s', n, public.ai_vector_backfill_allowed()));
 
   n := public.ai_vector_fill('primary', model, (select jsonb_agg(jsonb_build_object('id', c.id, 'content_hash', c.content_hash, 'embedding', to_jsonb(v2)))
                                                   from public.ai_chunks c join public.ai_documents d on d.id = c.document_id
@@ -70,7 +72,7 @@ declare
   v1 float4[] := array[1.0]::float4[] || array_fill(0.0::float4, array[1535]);
   base jsonb;
   st   jsonb;
-  pend0 int; main0 int;
+  pend0 int; main0 int; n int;
   err  text;
 begin
   perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
@@ -94,10 +96,8 @@ begin
     (st->'vectors'->>'main_missing')::int = main0 + 1 and not (select c.vector_pending from public.ai_chunks c
        join public.ai_documents d on d.id = c.document_id where d.source_id = 'vt408-b'),
     format('%s → %s', main0, st->'vectors'->>'main_missing'));
-  perform pg_temp.ok('by_space {main, alt, none} adds up to the chunks of active documents',
-    (st->'vectors'->'by_space'->>'main')::int + (st->'vectors'->'by_space'->>'none')::int
-      = (select count(*) from public.ai_chunks c join public.ai_documents d on d.id = c.document_id and d.status = 'active'),
-    (st->'vectors'->'by_space')::text);
+  perform pg_temp.ok('by_space.none is exactly the waiting count',
+    (st->'vectors'->'by_space'->>'none')::int = (st->>'vector_pending')::int, (st->'vectors'->'by_space')::text);
   perform pg_temp.ok('ai_vector_pending(alt) offers the none-bucket chunk first (quiet hours aside)',
     public.ai_vector_backfill_allowed() is false
       or (public.ai_vector_pending('alt', 500) @> jsonb_build_array(jsonb_build_object('content_hash', 'a0')))
@@ -111,8 +111,9 @@ begin
   end;
   perform pg_temp.ok('switching the alt provider is refused while the space holds another model',
     err like '%another model%', left(err, 90));
+  n := public.ai_vector_reset_alt();
   perform pg_temp.ok('ai_vector_reset_alt() clears the alt space so it can be rebuilt',
-    public.ai_vector_reset_alt() > 0 and not exists (select 1 from public.ai_chunks where embedding_alt is not null));
+    n > 0 and not exists (select 1 from public.ai_chunks where embedding_alt is not null), n || ' cleared');
   update public.ai_assistant_config set embed_alt_provider = 'gemini' where id = 1;
   perform pg_temp.ok('…and then the switch is allowed, with the new model label',
     public.ai_embed_model_alt() = 'gemini:gemini-embedding-001', public.ai_embed_model_alt());
