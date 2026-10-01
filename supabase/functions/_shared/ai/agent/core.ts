@@ -13,6 +13,7 @@ import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
 import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, monthSpend, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, saverOn, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
 import { chatRespond } from '../llm/chat.ts';
+import { stripToolMarkup } from '../llm/textTools.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
 import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIssue } from '../providerErrors.ts';
@@ -413,7 +414,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
         if (issue) chainIssues.push({ issue, model: target.model, slot: target.keySlot, waitMs: (e as any)?.retryAfterMs ?? null });
         if (!(e as any)?.streamed) coolDown(target, e);
         const status = Number((e as any)?.status);
-        const why = issue ?? (status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');
+        const why = issue ?? ((e as any)?.code === 'bad_tool_format' ? 'bad_tool_format'
+          : status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');
         // Text already shown cannot be taken back: only a clean failure moves on.
         if (!(e as any)?.streamed && ti + 1 < targets.length && attempts.length < MAX_MODEL_ATTEMPTS && left() > SWITCH_MIN_LEFT_MS) {
           moveOn(why);
@@ -457,6 +459,13 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       });
       usage = add(usage, res.usage);
       llmMs.push(Date.now() - tl);
+      // Tool calls written as text, not as tool_calls: remembered for this model.
+      if (res.textToolCalls) {
+        flags.text_tool_calls = true;
+        if (!(catalog.find((c) => c.key_slot === target.keySlot && c.model === target.model)?.params as any)?.text_tool_calls) {
+          await rememberParams(admin, target, { text_tool_calls: true }, catalog);
+        }
+      }
       if (!res.toolCalls.length) break;
       rounds++;
       input.push(...res.output);
@@ -490,6 +499,11 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (await checkCancel()) throw new Stop();
     const tail = cstream.flush();
     if (tail) { answer += tail; emit({ delta: tail }); }
+    // Last safety net: tool-call markup is never part of an answer.
+    if (/<tool_call|<function=|<\/parameter>|<\|tool_call\|>/.test(answer)) {
+      flags.stripped_tool_markup = true;
+      answer = stripToolMarkup(answer).trim();
+    }
     if (!answer.trim()) {
       const sorry = "Sorry, I couldn't put an answer together this time. Could you try asking again, maybe a little more specifically?";
       answer = sorry;

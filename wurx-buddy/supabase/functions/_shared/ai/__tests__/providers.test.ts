@@ -3,6 +3,7 @@
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chatBody, chatRespond, toMessages } from '../llm/chat.ts';
+import { looksLikeToolMarkup, parseTextToolCalls, stripToolMarkup } from '../llm/textTools.ts';
 import { LlmError, type LlmRequest, type LlmResult } from '../llm/openai.ts';
 import { _resetCooldowns, chooseTargets, coolDown, coolingDown, netRank, refreshModels, extraFor, KEY_SLOTS, resolveRoleConfig, safetyNet, saverOn, skipReason, SLOTS, unsupportedParam, type CatalogRow } from '../agent/models.ts';
 import { runTurn } from '../agent/core.ts';
@@ -468,4 +469,67 @@ test('fullwidth citation brackets (【S1】) are read as [S1]; an in-stream "ser
   const e: any = await chatRespond({ apiKey: 'k', model: 'm', instructions: 'I', input: [], onDelta: () => {}, endpoint: 'https://x/chat/completions',
     fetchImpl: (async () => sseOf([{ error: { message: 'busy', code: 'service_unavailable' } }])) as any }).then(() => null, (x) => x);
   assert.equal(e.status, 503);
+});
+// ── tool calls written as TEXT (live bug 2026-10-01: nemotron showed raw markup) ──
+
+const RANK = { name: 'rank_brands', description: 'Rank brands', parameters: { type: 'object',
+  properties: { period: { type: 'string' }, type: { type: 'string' }, order: { type: 'string' }, metric: { type: 'string' }, top_n: { type: 'integer' }, all: { type: 'boolean' }, ids: { type: 'array' } }, required: ['metric'] } };
+const QWEN_RAW = '<tool_call>\n<function=rank_brands>\n<parameter=period>\nAugust 2026\n</parameter>\n<parameter=type>\nmonthly\n</parameter>\n<parameter=order>\ndesc\n</parameter>\n<parameter=metric>\ngmv\n</parameter>\n<parameter=top_n>\n5\n</parameter>\n<parameter=all>\nfalse\n</parameter>\n<parameter=ids>\n["a","b"]\n</parameter>\n</function>\n</tool_call>';
+
+test('textTools: every format parses, values are typed, unknown names are refused, markup is stripped', () => {
+  const one = (text: string) => parseTextToolCalls(text, [RANK]);
+  // Qwen3-coder, the exact live text: values across lines, trimmed and coerced
+  const q = one(QWEN_RAW)!;
+  assert.equal(q.length, 1);
+  assert.deepEqual([q[0].name, JSON.parse(q[0].arguments)],
+    ['rank_brands', { period: 'August 2026', type: 'monthly', order: 'desc', metric: 'gmv', top_n: 5, all: false, ids: ['a', 'b'] }]);
+  assert.ok(one(QWEN_RAW.replace(/<\/?tool_call>/g, '')), 'also without the wrapper');
+  // Hermes, <|tool_call|>, a bare object, an array of objects, "parameters" instead of "arguments"
+  assert.deepEqual(JSON.parse(one('<tool_call>{"name":"rank_brands","arguments":{"metric":"gmv"}}</tool_call>')![0].arguments), { metric: 'gmv' });
+  const pipe = one('<|tool_call|>{"name":"rank_brands","arguments":"{\\"metric\\":\\"gmv\\"}"}')!;   // arguments as a JSON string
+  assert.deepEqual([pipe[0].name, JSON.parse(pipe[0].arguments)], ['rank_brands', { metric: 'gmv' }]);
+  assert.equal(one('  {"name":"rank_brands","parameters":{"metric":"gmv"}}')!.length, 1);
+  assert.equal(one('[{"name":"rank_brands","arguments":{}},{"name":"rank_brands","arguments":{}}]')!.length, 2);
+  // refused: a name the tool list does not have, no tools offered, ordinary prose
+  assert.equal(one('<tool_call><function=drop_table><parameter=x>1</parameter></function></tool_call>'), null);
+  assert.equal(parseTextToolCalls(QWEN_RAW, []), null);
+  assert.equal(one('Our SOP says to shortlist creators.'), null);
+  assert.equal(looksLikeToolMarkup('Our SOP says…'), false);
+  assert.equal(looksLikeToolMarkup('\n<tool_call>'), true);
+  // the strip net
+  assert.equal(stripToolMarkup(`Top brands:${QWEN_RAW}`).trim(), 'Top brands:');
+  assert.equal(stripToolMarkup('A <tool_call>{"name":"x"}</tool_call> B').replace(/\s+/g, ' ').trim(), 'A B');
+});
+
+test('a Nemotron-style turn: the markup never reaches the user, the call runs, and the answer streams', async () => {
+  const deltas: string[] = [];
+  let n = 0;
+  const fetchImpl = async () => (++n === 1
+    ? sseOf([...QWEN_RAW.match(/[\s\S]{1,30}/g)!.map((c) => ({ choices: [{ delta: { content: c } }] })), { choices: [{ delta: {}, finish_reason: 'stop' }] }])
+    : sseOf([{ choices: [{ delta: { content: 'Obagi leads on GMV.' }, finish_reason: 'stop' }] }]));
+  const d = db({ model: 'nvidia/nemotron-3-ultra-550b-a55b', model_key_slot: 'nvidia' });
+  const calls: string[] = [];
+  const searchRpc = async (fn: string) => { calls.push(fn); return []; };
+  const res = await runTurn({ userId: 'u1', role: 'boss', message: 'Top brands by GMV this month' },
+    deps(d, fetchImpl, { nvidiaKey: 'nk', searchRpc, catalog: [row('nvidia', 'nvidia/nemotron-3-ultra-550b-a55b')] }), (e) => { if (e.delta) deltas.push(e.delta); });
+  assert.equal(res.answer, 'Obagi leads on GMV.');
+  assert.ok(!deltas.join('').includes('<tool_call'), 'no markup was streamed');
+  assert.ok(!deltas.join('').includes('<function='));
+  const log = d.inserts.ai_request_log[0];
+  assert.deepEqual([log.flags.text_tool_calls, log.rounds, log.tools[0]?.name], [true, 1, 'rank_brands']);
+  assert.ok(calls.length >= 0);
+});
+
+test('markup that cannot be read is a model failure: the turn moves on, nothing raw is shown', async () => {
+  const deltas: string[] = [];
+  const fetchImpl = async (url: string) => (url.includes('nvidia')
+    ? sseOf([{ choices: [{ delta: { content: '<tool_call>\n<function=not_a_tool>\n<parameter=x>1</parameter>' } }, ] }, { choices: [{ delta: {}, finish_reason: 'stop' }] }])
+    : sseOf([{ choices: [{ delta: { content: 'Here are the top brands.' }, finish_reason: 'stop' }] }]));
+  const d = db({ model: 'nvidia/nemotron-3-ultra-550b-a55b', model_key_slot: 'nvidia',
+    fallback_models: [{ key_slot: 'gemini', model: 'gemini-3.6-flash' }] });
+  const res = await runTurn({ userId: 'u1', role: 'boss', message: 'top brands?' },
+    deps(d, fetchImpl, { nvidiaKey: 'nk', catalog: [row('nvidia', 'nvidia/nemotron-3-ultra-550b-a55b'), row('gemini', 'gemini-3.6-flash')] }), (e) => { if (e.delta) deltas.push(e.delta); });
+  assert.equal(res.answer, 'Here are the top brands.');
+  assert.ok(!deltas.join('').includes('<tool_call'));
+  assert.deepEqual(d.inserts.ai_request_log[0].flags.fallback_used, { from: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', to: 'gemini:gemini-3.6-flash', reason: 'bad_tool_format' });
 });
