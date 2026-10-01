@@ -112,8 +112,8 @@ export default function NotificationPrefsSection() {
           <span style={{
             position: 'absolute', top: 1, left: soundOn ? 17 : 1,
             width: 16, height: 16, borderRadius: '50%',
-            background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+            background: 'var(--surface-1)',
+            boxShadow: 'var(--shadow-sm)',
             transition: 'left var(--dur-fast) var(--ease-out)',
           }} />
         </span>
@@ -155,8 +155,8 @@ export default function NotificationPrefsSection() {
                 <span style={{
                   position: 'absolute', top: 1, left: on ? 17 : 1,
                   width: 16, height: 16, borderRadius: '50%',
-                  background: '#fff',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                  background: 'var(--surface-1)',
+                  boxShadow: 'var(--shadow-sm)',
                   transition: 'left var(--dur-fast) var(--ease-out)',
                 }} />
               </span>

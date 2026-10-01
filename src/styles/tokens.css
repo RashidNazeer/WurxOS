@@ -71,6 +71,8 @@
   --spotlight-bg: #2b1d14;
   --spotlight-fg: #ffffff;               /* 16.30 */
   --spotlight-fg-muted: rgba(255, 255, 255, 0.75); /* 10.4 */
+  /* Neutral plate behind brand logos (many are dark-on-transparent). */
+  --logo-plate: #ffffff;
 
   /* Inputs */
   --input-bg:     #ffffff;
@@ -180,6 +182,7 @@
   --spotlight-bg: #2a2119;               /* peach-tinted dark */
   --spotlight-fg: #faf7f2;               /* 14.9 */
   --spotlight-fg-muted: rgba(250, 247, 242, 0.72); /* 8.3 */
+  --logo-plate: #f3ece2;              /* light plate so dark logos stay visible */
 
   --input-bg:     #1a1a1a;
   --input-border: rgba(245, 213, 168, 0.45);   /* 3.52 on input, 3.55 on s1 */

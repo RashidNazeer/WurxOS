@@ -93,8 +93,8 @@ export default function TierNotificationsSection() {
         }}>
           <span style={{
             position: 'absolute', top: 1, left: enabled ? 17 : 1,
-            width: 16, height: 16, borderRadius: '50%', background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'left var(--dur-fast) var(--ease-out)',
+            width: 16, height: 16, borderRadius: '50%', background: 'var(--surface-1)',
+            boxShadow: 'var(--shadow-sm)', transition: 'left var(--dur-fast) var(--ease-out)',
           }} />
         </span>
       </div>

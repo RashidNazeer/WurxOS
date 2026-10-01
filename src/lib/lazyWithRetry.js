@@ -19,8 +19,13 @@ import ChunkReloadNotice from '../components/common/ChunkReloadNotice';
 //      "update available" banner and we render a calm refresh notice
 //      instead of a blank page. Critically, it never reloads out from
 //      under an in-progress form.
+//
+// The returned component also carries .preload(): it starts the same
+// import early (hover / touch on a menu link, idle time after login) so the
+// later render finds the chunk in the module cache. A failed preload is
+// harmless; the real render still goes through the retry path below.
 export function lazyWithRetry(importFn) {
-  return lazy(async () => {
+  const Component = lazy(async () => {
     try {
       const mod = await importFn();
       clearReloadGuard(); // clean load — reset the one-shot guard
@@ -46,4 +51,6 @@ export function lazyWithRetry(importFn) {
       }
     }
   });
+  Component.preload = () => importFn();
+  return Component;
 }

@@ -182,7 +182,7 @@ export default function PayoutRatesSection() {
                     {savingCur === code ? 'Saving…' : dirty ? 'Save' : unset ? '—' : 'Saved'}
                   </button>
                   {unset && (
-                    <span style={{ fontSize: 11, color: 'var(--warning, #fd7e14)', fontWeight: 600 }}>
+                    <span style={{ fontSize: 11, color: 'var(--warning, var(--warning-text))', fontWeight: 600 }}>
                       Not set for {getMonthLabel(month)}
                     </span>
                   )}

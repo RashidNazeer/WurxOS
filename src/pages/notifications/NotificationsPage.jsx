@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { formatRelTime } from '../../lib/notificationsApi';
+import { resolveNotificationLink } from '../../lib/notificationLinks';
+import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import {
   CheckIcon, BellIcon, RefreshIcon, ReportIcon, MegaphoneIcon, StarIcon,
 } from '../../components/common/Icon';
@@ -81,7 +83,10 @@ export default function NotificationsPage() {
 
   function handleClick(n) {
     markRead(n.id);
-    if (n.link) navigate(n.link);
+    const to = resolveNotificationLink(n);
+    // Same leave-guard as the bell and toaster: a dirty report editor gets
+    // the Save & leave modal instead of being unmounted.
+    if (to) { const go = () => navigate(to); if (!maybeGuardLeave(go)) go(); }
   }
 
   return (

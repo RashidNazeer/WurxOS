@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import AuthShell from './AuthShell';
+import { preloadPath } from '../../routes/pages';
 import {
   MailIcon, LockIcon, EyeIcon, EyeOffIcon, ArrowRightIcon, AlertIcon,
 } from '../common/Icon';
@@ -28,6 +29,8 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await signIn({ email: email.trim(), password });
+      // Start the landing page's chunk now, in parallel with the profile load (S7a).
+      preloadPath('/dashboard');
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err.message || 'Could not sign in. Check your credentials.');

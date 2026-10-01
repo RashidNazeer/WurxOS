@@ -2,6 +2,9 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getMenuForRole, applyMenuLayout } from './menu';
+import { withApprovals, sectionMenu } from './navStructure';
+import { useApprovalsCount } from '../../lib/approvalsBadge';
+import { preloadPath } from '../../routes/pages';
 import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
 import { useNotifications } from '../../contexts/NotificationsContext';
@@ -11,7 +14,17 @@ export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileO
   // Role menu + the user's saved order/pins (Settings → Menu Layout). Pinned
   // entries are tagged `_pinned` and floated to the top by applyMenuLayout.
   const buddy = !!useBuddy()?.allowed;
-  const menu = useMemo(() => applyMenuLayout(getMenuForRole(role, { buddy }), menuLayout), [role, buddy, menuLayout]);
+  const menu = useMemo(
+    () => applyMenuLayout(withApprovals(getMenuForRole(role, { buddy }), role), menuLayout),
+    [role, buddy, menuLayout],
+  );
+  // Default layout → headed sections ordered by daily use (F4). A saved
+  // layout renders flat, exactly as the user arranged it.
+  const hasSavedLayout = !!(menuLayout?.order?.length || menuLayout?.pinned?.length);
+  const sections = useMemo(
+    () => (hasSavedLayout ? null : sectionMenu(menu, role)),
+    [hasSavedLayout, menu, role],
+  );
   const [query, setQuery] = useState('');
 
   // v1-style menu filter — substring match against item labels +
@@ -119,15 +132,22 @@ export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileO
           <div className="shell-nav-empty">No menu items match.</div>
         ) : q ? (
           filtered.map((item, i) => renderEntry(item, i))
+        ) : sections ? (
+          sections.map((s) => (
+            <div key={s.label} className="shell-nav-section" role="group" aria-label={s.label}>
+              <div className="shell-nav-section-label" aria-hidden="true">{s.label}</div>
+              {s.entries.map((item, i) => renderEntry(item, `${s.label}-${i}`))}
+            </div>
+          ))
         ) : (
           <>
             {pinnedItems.length > 0 && (
               <>
                 {!collapsed && (
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 16px 4px' }}>Pinned</div>
+                  <div className="shell-nav-section-label">Pinned</div>
                 )}
                 {pinnedItems.map((item, i) => renderEntry(item, `p${i}`))}
-                <div style={{ height: 1, background: 'var(--border-subtle)', margin: '8px 14px' }} />
+                <div className="shell-nav-divider" aria-hidden="true" />
               </>
             )}
             {restItems.map((item, i) => renderEntry(item, `r${i}`))}
@@ -163,6 +183,8 @@ function NavItem({ item, collapsed }) {
   return (
     <NavLink
       to={item.to}
+      onPointerEnter={() => preloadPath(item.to)}
+      onFocus={() => preloadPath(item.to)}
       end={item.to === '/dashboard'}
       title={collapsed ? item.label : undefined}
       className={({ isActive }) => `shell-nav-link ${isActive ? 'active' : ''}${alertN ? ' shell-nav-link--alert' : ''}`}
@@ -173,6 +195,7 @@ function NavItem({ item, collapsed }) {
       </span>
       <span className="label">{item.label}</span>
       {alertN > 0 && <span className="shell-nav-alert-badge">{alertN}</span>}
+      {item.badge === 'approvals' && <ApprovalsBadge />}
     </NavLink>
   );
 }
@@ -199,6 +222,8 @@ function NavGroup({ item, collapsed, forceOpen = false }) {
         data-open={open}
         onClick={() => setOpen((o) => !o)}
         title={collapsed ? item.label : undefined}
+        aria-label={item.label}
+        aria-expanded={open}
       >
         <span className="icon" style={{ position: 'relative' }}>
           {Icon ? <Icon width="17" height="17" /> : null}
@@ -215,6 +240,8 @@ function NavGroup({ item, collapsed, forceOpen = false }) {
             <NavLink
               key={i}
               to={c.to}
+              onPointerEnter={() => preloadPath(c.to)}
+              onFocus={() => preloadPath(c.to)}
               end={!c.prefix}
               className={({ isActive }) => `shell-nav-link ${isActive ? 'active' : ''}`}
             >
@@ -419,6 +446,8 @@ function NavFlyoutGroup({ item }) {
             <NavLink
               key={i}
               to={c.to}
+              onPointerEnter={() => preloadPath(c.to)}
+              onFocus={() => preloadPath(c.to)}
               end={!c.prefix}
               className={({ isActive }) => `shell-nav-link ${isActive ? 'active' : ''}`}
               onClick={onLinkClick}
@@ -431,4 +460,11 @@ function NavFlyoutGroup({ item }) {
       )}
     </>
   );
+}
+
+// Count bubble for the Approvals entry; hidden at zero.
+function ApprovalsBadge() {
+  const n = useApprovalsCount();
+  if (!n) return null;
+  return <span className="shell-nav-alert-badge" aria-label={`${n} waiting`}>{n > 99 ? '99+' : n}</span>;
 }

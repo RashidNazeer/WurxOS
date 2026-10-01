@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   // call back into snooze-notification).
   const { data: note, error: nErr } = await admin
     .from('notifications')
-    .select('id, recipient_id, title, body, category, action, link, snooze_token')
+    .select('id, recipient_id, title, body, category, action, link, entity_type, entity_id, snooze_token')
     .eq('id', notification_id)
     .single();
   if (nErr || !note) return new Response('notification not found', { status: 404 });
@@ -71,7 +71,10 @@ Deno.serve(async (req) => {
   const payload = JSON.stringify({
     title:          note.title,
     body:           note.body ?? '',
-    link:           note.link ?? '/notifications',
+    // Same rule as src/lib/notificationLinks.js: reports open by id.
+    link:           note.entity_type === 'report' && note.entity_id
+                      ? `/r/${note.entity_id}`
+                      : (note.link ?? '/notifications'),
     tag:            note.category,
     id:             note.id,
     snooze_token:   note.snooze_token,

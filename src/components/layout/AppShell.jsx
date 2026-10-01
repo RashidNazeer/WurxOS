@@ -10,6 +10,12 @@ import RouteErrorBoundary from '../common/RouteErrorBoundary';
 import UpdateAvailableBanner from '../common/UpdateAvailableBanner';
 import BuddyFab from '../buddy/BuddyFab';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
+import { recordVisit, setRecentUser } from '../../lib/recentVisits';
+import { useQueryClient } from '@tanstack/react-query';
+import BottomTabBar from './BottomTabBar';
+import { bottomTabsFor } from './navStructure';
+import { preloadWhenIdle } from '../../routes/pages';
+import { prefetchToday } from '../../lib/todayPrefetch';
 import '../../styles/shell.css';
 
 // Suspense fallback for lazy-loaded route chunks. Keeps the shell
@@ -94,6 +100,7 @@ const PAGE_META = {
   '/boss/resource-planner':   { title: 'Resource Planner',       subtitle: 'Capacity and allocation' },
   '/boss/salaries':           { title: 'Salaries',               subtitle: 'Compensation and history' },
   '/me/compensation':         { title: 'My Compensation',        subtitle: 'Your salary and history' },
+  '/approvals':               { title: 'Approvals',              subtitle: 'Everything waiting for your decision' },
   '/development/roadmap':     { title: 'Roadmap',                subtitle: DEV },
   '/development/overview':    { title: 'Overview',               subtitle: DEV },
   '/development/projects':    { title: 'Projects',               subtitle: DEV },
@@ -106,6 +113,10 @@ const PAGE_META = {
   '/changes':                 { title: 'Change Management',      subtitle: 'SOP change requests' },
 };
 const PAGE_META_PREFIX = [
+  ['/weekly-reports/',       { title: 'Weekly Reports',       subtitle: REPORTING }],
+  ['/biweekly-reports/',     { title: 'Bi-Weekly Reports',    subtitle: REPORTING }],
+  ['/monthly-reports/',      { title: 'Monthly Reports',      subtitle: REPORTING }],
+  ['/r/',                    { title: 'Report',               subtitle: REPORTING }],
   ['/brands/',               { title: 'Brand',                subtitle: '' }],
   ['/incentives/edit/',      { title: 'Edit Incentive Plan',  subtitle: 'Incentives' }],
   ['/development/projects/', { title: 'Project',              subtitle: DEV }],
@@ -172,6 +183,23 @@ export default function AppShell() {
 
   // Auto-close the mobile drawer on every route change.
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  // Recently visited (global search). Pages with a better title (a brand
+  // or report name) call recordVisit({ title }) themselves after loading.
+  useEffect(() => { setRecentUser(profile?.id); }, [profile?.id]);
+
+  // Speed (S3/S7): once signed in, fetch Today's data and, when the browser
+  // is idle, the chunks behind this role's bottom tabs.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!profile?.id) return;
+    try { prefetchToday(queryClient, profile); } catch { /* best effort */ }
+    preloadWhenIdle(bottomTabsFor(profile.role).map((t) => t.to));
+  }, [profile?.id, profile?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!profile?.id) return;
+    recordVisit({ path: location.pathname + location.search, title: metaFor(location.pathname).title });
+  }, [location.pathname, location.search, profile?.id]);
 
   // Route change fade: restart a CSS animation by toggling a class instead
   // of keying the subtree, so nothing remounts that wouldn't anyway.
@@ -240,6 +268,7 @@ export default function AppShell() {
       </main>
       {/* Non-blocking "new version available" banner. Never reloads
           on its own — the user reloads when their work is safe. */}
+      <BottomTabBar role={profile?.role} onMore={openMobile} moreOpen={mobileOpen} />
       <UpdateAvailableBanner />
       {/* Top-right popup queue for incoming notifications. */}
       <NotificationToaster />

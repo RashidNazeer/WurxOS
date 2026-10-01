@@ -10,3 +10,4 @@ export { default as Avatar, initialsOf, toneFor } from './Avatar';
 export { default as Modal } from './Modal';
 export { default as ConfirmDialog, ConfirmProvider, useConfirm } from './ConfirmDialog';
 export { ToastProvider, useToast } from './Toast';
+export { default as Skeleton, SkeletonRows, SkeletonCard } from './Skeleton';

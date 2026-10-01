@@ -285,7 +285,7 @@
 }
 
 .shell-nav-section-label {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -293,6 +293,18 @@
   padding: 14px 10px 6px;
 }
 
+/* Sectioned sidebar (default layout): headed groups ordered by daily use. */
+.shell-nav-section { display: flex; flex-direction: column; gap: 2px; }
+.shell-nav-section:first-child > .shell-nav-section-label { padding-top: 4px; }
+.shell-nav-divider { height: 1px; background: var(--border-subtle); margin: 8px 14px; }
+@media (min-width: 861px) {
+  /* Collapsed rail: labels are hidden, so a hairline marks each section. */
+  .shell[data-collapsed='true'] .shell-nav-section + .shell-nav-section {
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+}
 .shell-nav-link,
 .shell-nav-toggle {
   display: flex;
@@ -837,7 +849,11 @@
 
 /* Below 480px: hide avatars in the user menu trigger to save space
    when global search and the bell are also competing for room. */
+/* The theme button moves into the user menu on small phones. */
+.shell-user-menu-theme { display: none; }
 @media (max-width: 480px) {
+  .shell-topbar .shell-theme-toggle { display: none; }
+  .shell-user-menu-theme { display: flex; }
   .shell-content { padding: 16px 12px 32px; }
   .shell-content-inner { padding: 0; }
   .shell-user-btn .shell-user-avatar { font-size: 11px; }
@@ -945,7 +961,9 @@
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.global-search-item:hover { background: var(--surface-2); }
+.global-search-item:hover,
+.global-search-item.is-active { background: var(--surface-2); }
+.global-search-item.is-active { box-shadow: inset 2px 0 0 var(--accent); }
 
 /* Glass for the notification panel + toasts (structure lives in
    notifications.css). `html` prefix so these win regardless of the
@@ -1007,4 +1025,81 @@ html .notif-toast-ghost {
 }
 @media (max-width: 860px) {
   .shell[data-fill='true'] .shell-content { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---------- Mobile bottom tab bar (F5) ----------
+   4 role tabs + More, ≤860px only. BottomTabBar toggles html.has-bottom-bar
+   while it's shown; other fixed UI lifts by --bottom-bar-h. */
+.shell-bottom-bar { display: none; }
+@media (max-width: 860px) {
+  html.has-bottom-bar { --bottom-bar-h: 56px; }
+  .shell-bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-topbar);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    border-top: 1px solid var(--glass-border);
+  }
+  .shell-bottom-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--t-colors), var(--t-press);
+  }
+  .shell-bottom-tab:hover { color: var(--text-primary); }
+  .shell-bottom-tab:active { transform: scale(0.96); }
+  .shell-bottom-tab.is-active { color: var(--accent-text); }
+  .shell-bottom-tab__icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 26px;
+    border-radius: var(--radius-pill);
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+  .shell-bottom-tab.is-active .shell-bottom-tab__icon { background: var(--accent-soft); }
+  .shell-bottom-tab__label {
+    max-width: 100%;
+    padding: 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shell-bottom-tab__badge {
+    position: absolute;
+    top: -5px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--danger);
+    color: var(--on-danger);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
+  html.has-bottom-bar .shell-content { padding-bottom: calc(56px + 12px + env(safe-area-inset-bottom)); }
+  html.has-bottom-bar .ui-toast-region { bottom: calc(56px + 12px + env(safe-area-inset-bottom)); }
 }

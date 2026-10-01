@@ -136,9 +136,10 @@ export default defineConfig(({ mode }) => {
           // IMPORTANT: only the framework libs are named here — everything else
           // (recharts, xlsx, jspdf, pdfjs, docx, …) is left to Rollup's default
           // splitting so the existing dynamic-import()/lazy chunks stay intact.
-          manualChunks(id) {
-            if (!id.includes('node_modules')) return;
-            if (id.includes('@supabase')) return 'supabase';
+          manualChunks(rawId) {
+            const id = rawId.replace(/\\/g, '/');
+            if (!id.includes('node_modules/')) return;
+            if (id.includes('node_modules/@supabase/')) return 'supabase';
             if (id.includes('@tanstack')) return 'react-vendor';
             if (id.includes('node_modules/react-router')) return 'react-vendor';
             if (id.includes('node_modules/react-dom')) return 'react-vendor';

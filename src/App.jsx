@@ -15,7 +15,9 @@ import RoleGuard from './components/auth/RoleGuard';
 import AppShell from './components/layout/AppShell';
 import { ToastProvider } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
+import { TextPromptProvider } from './components/common/useDialogs';
 import { DEMO_MODE } from './lib/demoMode';
+import { LegacyReportRedirect, ReportQueryRedirect } from './routes/redirects';
 
 // Sales-demo role switcher. Behind DEMO_MODE *and* lazy, so a production build
 // resolves this to null and never downloads the chunk — the switcher cannot
@@ -28,107 +30,92 @@ const DemoBar = DEMO_MODE ? lazy(() => import('./components/demo/DemoBar')) : nu
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 
-// Every other page is code-split via React.lazy. Each becomes its own
-// chunk that downloads only when its route is hit. This shrinks the
-// initial bundle from ~1.6MB to a few hundred KB and makes the first
-// paint dramatically faster.
-const BossDashboard         = lazy(() => import('./pages/boss/BossDashboard'));
-const RoleDashboard         = lazy(() => import('./pages/dashboards/RoleDashboard'));
-const TLsPage               = lazy(() => import('./pages/boss/manage/TLsPage'));
-const PCTLsPage             = lazy(() => import('./pages/boss/manage/PCTLsPage'));
-const OLsPage               = lazy(() => import('./pages/boss/manage/OLsPage'));
-const APCsPage              = lazy(() => import('./pages/boss/manage/APCsPage'));
-const IPCsPage              = lazy(() => import('./pages/boss/manage/IPCsPage'));
-const AdsManagersPage       = lazy(() => import('./pages/boss/manage/AdsManagersPage'));
-const DevelopersPage        = lazy(() => import('./pages/boss/manage/DevelopersPage'));
-const BrandsPage            = lazy(() => import('./pages/brands/BrandsPage'));
-const BrandDetailPage       = lazy(() => import('./pages/brands/BrandDetailPage'));
-const TasksPage             = lazy(() => import('./pages/tasks/TasksPage'));
-const PaidCollabBrandsPage  = lazy(() => import('./pages/paidCollab/BrandsPage'));
-const PaidCollabCreatorsPage= lazy(() => import('./pages/paidCollab/CreatorsPage'));
-const PaidCollabVideosPage  = lazy(() => import('./pages/paidCollab/VideosPage'));
-const PaidCollabDashboardPage = lazy(() => import('./pages/paidCollab/DashboardPage'));
-const PCTLIPCsPage          = lazy(() => import('./pages/pctl/IPCsPage'));
-const ReportPortalPage      = lazy(() => import('./pages/portal/ReportPortalPage'));
-const HaloPortalPage        = lazy(() => import('./pages/portal/HaloPortalPage'));
-const HaloV2PortalPage      = lazy(() => import('./pages/portal/HaloV2PortalPage'));
-const ClientPortalPage      = lazy(() => import('./pages/portal/ClientPortalPage'));
-const GmvMaxReportingPage   = lazy(() => import('./components/reporting/GmvMaxReportingPage'));
-const WeeklyReportsRouter   = lazy(() => import('./components/reporting/WeeklyReportsRouter'));
-const BiWeeklyReportsRouter = lazy(() => import('./components/reporting/BiWeeklyReportsRouter'));
-const MonthlyReportsRouter  = lazy(() => import('./components/reporting/MonthlyReportsRouter'));
-const ClientAccessPage      = lazy(() => import('./pages/clientAccess/ClientAccessPage'));
-// v1 verbatim port — tabbed Brand Switcher + Reassign APC Lead. Replaces
-// v2's bespoke single-roster page.
-const TeamManagementPage    = lazy(() => import('./components/teamManagement/TeamManagementPage'));
-const TeamHierarchyPage     = lazy(() => import('./pages/teamManagement/TeamHierarchyPage'));
-const HolidaysPage          = lazy(() => import('./pages/holidays/HolidaysPage'));
-const LeavePage             = lazy(() => import('./components/leave/LeaveRouter'));
-const LeaveApprovalsPage    = lazy(() => import('./components/leave/LeaveRouter'));
-const BrandAnalyticsPage    = lazy(() => import('./pages/analytics/BrandAnalyticsPage'));
-// Replaced the v2-original page with the v1-port that lives under
-// components/attendance. Keeps the /attendance route + menu link
-// pointing at the new file.
-const AttendancePage        = lazy(() => import('./components/attendance/AttendancePage'));
-// v1 verbatim port replaces the v2-original ResourcesPage. The v1 file
-// (components/resources/AllResourcesPage.jsx) uses Bootstrap-styled
-// brand cards + general visibility model (private/user/group/office).
-const ResourcesPage         = lazy(() => import('./components/resources/AllResourcesPage'));
-// Replaced the v2-original page with the v1-port that lives under
-// components/performance. Keeps the /performance route + menu link
-// pointing at the new file.
-const PerformancePage       = lazy(() => import('./components/performance/PerformancePage'));
-const PerformanceSimulatorPage = lazy(() => import('./components/performance/PerformanceSimulatorPage'));
-// Replaced the v2-original single-page Incentives with v1-style
-// per-role pages, dispatched by IncentivesRouter. The plan editor
-// (IncentiveForm) is shared between Boss and OL via /incentives/edit/:userId.
-const IncentivesPage        = lazy(() => import('./components/incentives/IncentivesRouter'));
-const AchievementsPage      = lazy(() => import('./pages/achievements/AchievementsPage'));
-const CreatorLibraryPage    = lazy(() => import('./pages/creators/CreatorLibraryPage'));
-const IncentivePlanEditorPage = lazy(() => import('./components/incentives/IncentiveForm'));
-const BroadcastsPage        = lazy(() => import('./pages/broadcasts/BroadcastsPage'));
-// Replaced v2-original campaigns pages with v1 verbatim ports under
-// components/campaigns. Routes + menu links unchanged.
-const ProductCampaignsPage  = lazy(() => import('./components/campaigns/ProductCampaignsPage'));
-const CampaignTrackerPage   = lazy(() => import('./components/campaigns/CampaignTrackerPage'));
-const RemindersPage         = lazy(() => import('./pages/reminders/RemindersPage'));
-const KnowledgeBasePage     = lazy(() => import('./components/knowledge/KnowledgeBaseRouter'));
-const ChatPage              = lazy(() => import('./pages/chat/ChatPage'));
-const BrandSwitcherPage     = lazy(() => import('./pages/brands/BrandSwitcherPage'));
-const TLTeamPage            = lazy(() => import('./pages/tl/TeamPage'));
-const AuditPage             = lazy(() => import('./pages/audit/AuditPage'));
-const SettingsPage          = lazy(() => import('./pages/settings/SettingsPage'));
-const NotificationsPage     = lazy(() => import('./pages/notifications/NotificationsPage'));
-const BuddyPage             = lazy(() => import('./pages/buddy/BuddyPage'));
-const ResourcePlannerPage   = lazy(() => import('./pages/resourcePlanner/ResourcePlannerPage'));
-const BossSalariesPage      = lazy(() => import('./pages/boss/salaries/BossSalariesPage'));
-const MyCompensationPage    = lazy(() => import('./pages/me/MyCompensationPage'));
-const BugsPage              = lazy(() => import('./pages/bugs/BugsPage'));
-const SuggestionsPage       = lazy(() => import('./pages/suggestions/SuggestionsPage'));
-// v1 verbatim port — boss gets BossChangeManagementPage, others get
-// the submitter-side ChangeManagementPage. Routed via the role router.
-const ChangesPage           = lazy(() => import('./components/changes/ChangeManagementRouter'));
-const AgendaTasksPage       = lazy(() => import('./pages/agenda/AgendaTasksPage'));
-const AgendaResourcesPage   = lazy(() => import('./pages/agenda/AgendaResourcesPage'));
-const AgendaSettingsPage    = lazy(() => import('./pages/agenda/AgendaSettingsPage'));
-const AgendaUpcomingPage    = lazy(() => import('./pages/agenda/AgendaUpcomingPage'));
-const AgendaOngoingPage     = lazy(() => import('./pages/agenda/AgendaOngoingPage'));
-const AgendaPriorPage       = lazy(() => import('./pages/agenda/AgendaPriorPage'));
-const AgendaCheckpointPage  = lazy(() => import('./pages/agenda/AgendaCheckpointPage'));
-const EukaAnalyticsPage     = lazy(() => import('./pages/euka/EukaAnalyticsPage'));
-const HaloV2Page            = lazy(() => import('./pages/boss/HaloV2Page'));
-const VideoReviewsPage      = lazy(() => import('./pages/video-reviews/VideoReviewsPage'));
-const TikTokCallbackPage    = lazy(() => import('./pages/oauth/TikTokCallbackPage'));
-const DevelopmentLayout     = lazy(() => import('./pages/development/DevelopmentLayout'));
-const devPage = (name) => lazy(() => import('./pages/development/pages').then((m) => ({ default: m[name] })));
-const DevRoadmapPage   = devPage('RoadmapPage');
-const DevOverviewPage  = devPage('OverviewPage');
-const DevProjectsPage  = devPage('ProjectsPage');
-const DevProjectPage   = devPage('ProjectPage');
-const DevTaskListPage  = devPage('AllTasksPage');
-const DevBugsPage      = devPage('BugsPage');
-const DevTeamPage      = devPage('TeamPage');
-const DevActivityPage  = devPage('ActivityPage');
+// Lazy pages live in the route registry (src/routes/pages.js) so the shell
+// can preload them; App only wires them to paths.
+import {
+  TodayRouter,
+  ReportLinkResolver,
+  ApprovalsPage,
+  TLsPage,
+  PCTLsPage,
+  OLsPage,
+  APCsPage,
+  IPCsPage,
+  AdsManagersPage,
+  DevelopersPage,
+  BrandsPage,
+  BrandDetailPage,
+  TasksPage,
+  PaidCollabBrandsPage,
+  PaidCollabCreatorsPage,
+  PaidCollabVideosPage,
+  PaidCollabDashboardPage,
+  PCTLIPCsPage,
+  ReportPortalPage,
+  HaloPortalPage,
+  HaloV2PortalPage,
+  ClientPortalPage,
+  GmvMaxReportingPage,
+  WeeklyReportsRouter,
+  BiWeeklyReportsRouter,
+  MonthlyReportsRouter,
+  ClientAccessPage,
+  TeamManagementPage,
+  TeamHierarchyPage,
+  HolidaysPage,
+  LeavePage,
+  LeaveApprovalsPage,
+  BrandAnalyticsPage,
+  AttendancePage,
+  ResourcesPage,
+  PerformancePage,
+  PerformanceSimulatorPage,
+  IncentivesPage,
+  AchievementsPage,
+  CreatorLibraryPage,
+  IncentivePlanEditorPage,
+  BroadcastsPage,
+  ProductCampaignsPage,
+  CampaignTrackerPage,
+  RemindersPage,
+  KnowledgeBasePage,
+  ChatPage,
+  BrandSwitcherPage,
+  TLTeamPage,
+  AuditPage,
+  SettingsPage,
+  NotificationsPage,
+  BuddyPage,
+  ResourcePlannerPage,
+  BossSalariesPage,
+  MyCompensationPage,
+  BugsPage,
+  SuggestionsPage,
+  ChangesPage,
+  AgendaTasksPage,
+  AgendaResourcesPage,
+  AgendaSettingsPage,
+  AgendaUpcomingPage,
+  AgendaOngoingPage,
+  AgendaPriorPage,
+  AgendaCheckpointPage,
+  EukaAnalyticsPage,
+  HaloV2Page,
+  VideoReviewsPage,
+  TikTokCallbackPage,
+  DevelopmentLayout,
+  DevRoadmapPage,
+  DevOverviewPage,
+  DevProjectsPage,
+  DevProjectPage,
+  DevTaskListPage,
+  DevBugsPage,
+  DevTeamPage,
+  DevActivityPage,
+} from './routes/pages';
+
+// Roles that read and write brand reports. IPCs are deliberately absent.
+const REPORT_ROLES = ['boss', 'ol', 'tl', 'pctl', 'apc'];
 
 // Lightweight fallback for chunk loads — kept minimal so it doesn't
 // flash distractingly on fast networks where the chunk arrives in
@@ -185,8 +172,7 @@ function DashboardRouter() {
     );
   }
   if (profile.role === 'developer') return <Navigate to="/development/roadmap" replace />;
-  if (profile.role === 'boss')      return <BossDashboard />;
-  return <RoleDashboard />;
+  return <TodayRouter profile={profile} />;
 }
 
 export default function App() {
@@ -198,6 +184,7 @@ export default function App() {
           <BrowserRouter>
           <ToastProvider>
           <ConfirmProvider>
+          <TextPromptProvider>
           <Routes>
             {/* Public */}
             <Route path="/login"  element={<PublicOnly><LoginPage /></PublicOnly>} />
@@ -414,27 +401,48 @@ export default function App() {
               {/* Tasks — everyone authenticated (RLS enforces row visibility) */}
               <Route path="/tasks"         element={<TasksPage />} />
               {/* v1-port reports — separate routes per cadence, role-routed inside */}
+              {/* Trailing * so the report deep links (F2) can live under each cadence;
+                  the pages ignore the extra path until B ships them. IPCs
+                  don't write reports (owner, 2026-10-01): the guard sends
+                  them to their landing page. */}
               <Route
-                path="/weekly-reports"
+                path="/weekly-reports/*"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
-                    <WeeklyReportsRouter />
+                  <RoleGuard allow={REPORT_ROLES}>
+                    <ReportQueryRedirect><WeeklyReportsRouter /></ReportQueryRedirect>
                   </RoleGuard>
                 }
               />
               <Route
-                path="/biweekly-reports"
+                path="/biweekly-reports/*"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
-                    <BiWeeklyReportsRouter />
+                  <RoleGuard allow={REPORT_ROLES}>
+                    <ReportQueryRedirect><BiWeeklyReportsRouter /></ReportQueryRedirect>
                   </RoleGuard>
                 }
               />
               <Route
-                path="/monthly-reports"
+                path="/monthly-reports/*"
                 element={
-                  <RoleGuard allow={['boss','ol','tl','pctl','apc','ipc']}>
-                    <MonthlyReportsRouter />
+                  <RoleGuard allow={REPORT_ROLES}>
+                    <ReportQueryRedirect><MonthlyReportsRouter /></ReportQueryRedirect>
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="/r/:reportId"
+                element={
+                  <RoleGuard allow={REPORT_ROLES}>
+                    <ReportLinkResolver />
+                  </RoleGuard>
+                }
+              />
+              {/* Approvals inbox (F3). */}
+              <Route
+                path="/approvals"
+                element={
+                  <RoleGuard allow={['boss', 'ol', 'tl', 'pctl']}>
+                    <ApprovalsPage />
                   </RoleGuard>
                 }
               />
@@ -450,7 +458,7 @@ export default function App() {
               <Route path="/reports"           element={<Navigate to="/weekly-reports" replace />} />
               <Route path="/reports/gmv-max"   element={<Navigate to="/gmv-max" replace />} />
               <Route path="/reports/new"       element={<Navigate to="/weekly-reports" replace />} />
-              <Route path="/reports/:id"       element={<Navigate to="/weekly-reports" replace />} />
+              <Route path="/reports/:id"       element={<LegacyReportRedirect />} />
               <Route
                 path="/client-access"
                 element={
@@ -722,6 +730,7 @@ export default function App() {
               <DemoBar />
             </Suspense>
           )}
+          </TextPromptProvider>
           </ConfirmProvider>
           </ToastProvider>
         </BrowserRouter>

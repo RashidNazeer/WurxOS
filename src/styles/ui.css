@@ -475,3 +475,41 @@
 
 /* Reduced motion is handled globally (tokens.css durations, --motion-*
    distances and the global.css block). */
+
+/* ---------- Skeleton ---------- */
+.ui-skeleton {
+  display: block;
+  flex: 0 0 auto;
+  background:
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--surface-1) 55%, transparent) 50%, transparent 100%)
+    0 0 / 200% 100% no-repeat,
+    var(--surface-3);
+  animation: ui-shimmer 1.4s var(--ease-in-out) infinite;
+}
+@keyframes ui-shimmer {
+  from { background-position: 150% 0, 0 0; }
+  to   { background-position: -50% 0, 0 0; }
+}
+.ui-skeleton-rows { display: flex; flex-direction: column; }
+.ui-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ui-skeleton-row:last-child { border-bottom: 0; }
+.ui-skeleton-row__lines { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ui-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+/* Still visible without motion: a flat placeholder, no shimmer. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton { animation: none; background: var(--surface-3); }
+}
