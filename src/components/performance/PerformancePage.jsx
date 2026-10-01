@@ -29,6 +29,7 @@ import TlPerfBreakdownModal from './TlPerfBreakdownModal';
 import { karachiMonth } from '../../lib/serverTime';
 import { Avatar, Button, useConfirm, useToast } from '../ui';
 import { formatPKR } from '../../lib/format';
+import { useDialogs } from '../common/useDialogs';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,12 @@ function getLevel(score) {
   if (score >= 70) return { label: 'Good',         color: 'var(--info-text)', bg: 'var(--info-soft)', icon: 'bi-hand-thumbs-up-fill' };
   if (score >= 50) return { label: 'Warning',      color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-exclamation-triangle' };
   return              { label: 'Termination',   color: 'var(--danger-text)', bg: 'var(--danger-soft)', icon: 'bi-x-octagon-fill' };
+}
+
+// An employee's OWN view says "At risk" instead of the HR term; manager
+// views (team cards, the level filter) keep "Termination". Copy only.
+function selfLevel(level) {
+  return level?.label === 'Termination' ? { ...level, label: 'At risk' } : level;
 }
 
 function calcMetricsAvg(metrics) {
@@ -375,6 +382,7 @@ function ViewFlagsModal({
 }) {
   const toast = useToast();
   const confirm = useConfirm();
+  const { askText } = useDialogs();
   const [tab, setTab] = useState('green');
   const [busy, setBusy] = useState({}); // flagId → bool (per-flag spinner)
   const filtered = flags.filter(f => f.type === tab);
@@ -407,9 +415,10 @@ function ViewFlagsModal({
   const canBossRemove = (f) => isBoss;
 
   async function handleRequestRemoval(flag) {
-    const reason = window.prompt(
+    const reason = await askText(
       'Why should this flag be removed? Boss will see your reason.\n\n(Short explanation, e.g. "Was a misunderstanding — the campaign was completed on time.")',
-      ''
+      '',
+      { title: 'Request flag removal', confirmLabel: 'Send request' },
     );
     if (!reason || !reason.trim()) return;
     if (reason.trim().length < 3) {
@@ -576,14 +585,16 @@ function ViewFlagsModal({
 function FlagRemovalRequestsPanel({ requests, onChanged }) {
   const toast = useToast();
   const confirm = useConfirm();
+  const { askText } = useDialogs();
   const [busy, setBusy] = useState({}); // requestId → bool
 
   async function handleDecide(req, action) {
     let note = null;
     if (action === 'reject') {
-      note = window.prompt(
+      note = await askText(
         'Optional note for the OL on why you rejected this:',
-        ''
+        '',
+        { title: 'Reject removal request', confirmLabel: 'Continue' },
       );
       if (note === null) return; // cancelled
     }
@@ -1546,7 +1557,7 @@ export default function PerformancePage() {
   const myFlagScore = calcFlagsScore(myFlags, month);
   const myPillarScores = { performance: myPerfScore, incentives: myIncScore, attendance: myAttScore, flags: myFlagScore };
   const myComposite = calcComposite(myPillarScores, weights);
-  const myLevel = getLevel(myComposite);
+  const myLevel = selfLevel(getLevel(myComposite));
 
   // Stats
   const tabUsers = teamUsers.filter(u => u._tab === teamSubTab);

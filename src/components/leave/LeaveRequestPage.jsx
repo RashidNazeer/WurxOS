@@ -78,6 +78,14 @@ function countDays(start, end) {
   return count;
 }
 
+// Day total for a stored request: the server's holiday-aware count
+// (paid_days + unpaid_days, set at submit by _leave_working_days, mig 167).
+// Falls back to the weekday count only for rows that carry neither (both null).
+function requestDays(r) {
+  if (r?.paidDays == null && r?.unpaidDays == null) return countDays(r?.startDate, r?.endDate);
+  return Number(r?.paidDays || 0) + Number(r?.unpaidDays || 0);
+}
+
 function getRequestTitle(r) {
   if (r.category === 'leave') { const lt = LEAVE_TYPES.find(l => l.value === r.leaveType); return lt ? lt.label : 'Leave Request'; }
   if (r.category === 'other') return r.otherTitle || 'Other Request';
@@ -103,7 +111,7 @@ function computeRemainingQuota(leaveQuota, requests) {
   requests.forEach(r => {
     if (r.status === 'rejected' || r.status === 'withdrawn') return;
     if (!isInCurrentMonth(r)) return;
-    const days = countDays(r.startDate, r.endDate);
+    const days = requestDays(r);
     if (r.category === 'leave' && r.leaveType) {
       if (r.leaveType === 'emergency') used.emergency += days;
       else if (r.leaveType === 'medical' || r.leaveType === 'medical_emergency') used.medical += days;
@@ -118,11 +126,12 @@ function computeRemainingQuota(leaveQuota, requests) {
   };
 }
 
-// Paid / unpaid split for a request, exactly as the confirm step has always
-// computed it (moved here unchanged so the form can show it live and skip the
-// confirm when nothing is unpaid). Uses countDays, not analyzeLeaveRange.
-function computePaidSplit(data, remainingQuota) {
-  const days = countDays(data.startDate, data.endDate);
+// Paid / unpaid split for a new request. `actualDays` is the holiday-aware
+// count from analyzeLeaveRange (the same number as "Charged to your quota",
+// and what the server's _leave_working_days charges); the weekday count is
+// only a fallback before the range is known.
+function computePaidSplit(data, remainingQuota, actualDays) {
+  const days = actualDays ?? countDays(data.startDate, data.endDate);
   let quotaKey = null;
   let remaining = null;
   let paidDays = days;
@@ -158,12 +167,12 @@ function computePaidSplit(data, remainingQuota) {
 
 // ── Confirm Submit Modal — shown only when part of the request is unpaid ─────
 
-function ConfirmSubmitModal({ data, remainingQuota, onConfirm, onCancel, paidOverrideCount }) {
+function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCancel, paidOverrideCount }) {
   const catCfg = getCatCfg(data.category);
   const title = data.category === 'leave'
     ? (LEAVE_TYPES.find(l => l.value === data.leaveType)?.label || 'Leave Request')
     : data.category === 'other' ? (data.otherTitle || 'Other') : catCfg.label;
-  const { paidDays, unpaidDays, effectiveDays, allPaid, allUnpaid } = computePaidSplit(data, remainingQuota);
+  const { paidDays, unpaidDays, effectiveDays, allPaid, allUnpaid } = computePaidSplit(data, remainingQuota, actualDays);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -297,7 +306,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
     };
     // One step when it's all paid: submit the same payload the confirm would
     // have sent. Any unpaid day still asks for an explicit confirmation.
-    const split = computePaidSplit(data, remainingQuota);
+    const split = computePaidSplit(data, remainingQuota, rangeBreakdown?.actualDays);
     if (split.allPaid) {
       onSubmit({ ...data, paidDays: split.paidDays, unpaidDays: split.unpaidDays, isPaidTimeOff: true });
       return;
@@ -307,7 +316,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
 
   // Live preview of the split the submit will use.
   const liveSplit = (startDate && endDate && endDate >= startDate)
-    ? computePaidSplit({ category, leaveType: category === 'leave' ? leaveType : null, startDate, endDate }, remainingQuota)
+    ? computePaidSplit({ category, leaveType: category === 'leave' ? leaveType : null, startDate, endDate }, remainingQuota, rangeBreakdown?.actualDays)
     : null;
 
   function handleConfirm({ paidDays, unpaidDays }) {
@@ -323,6 +332,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
     return (
       <ConfirmSubmitModal
         data={pendingData}
+        actualDays={rangeBreakdown?.actualDays}
         remainingQuota={remainingQuota}
         onConfirm={handleConfirm}
         onCancel={() => setPendingData(null)}
@@ -522,7 +532,7 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
   const [forwardToBoss, setForwardToBoss] = useState(false);
   if (!request) return null;
   const catCfg = getCatCfg(request.category);
-  const days = countDays(request.startDate, request.endDate);
+  const days = requestDays(request);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -952,7 +962,7 @@ export default function LeaveRequestPage() {
     const catCfg = getCatCfg(r.category);
     const stCfg = getStCfg(r.status);
     const title = getRequestTitle(r);
-    const days = countDays(r.startDate, r.endDate);
+    const days = requestDays(r);
     // Same breakdown the new-request form preview shows. Tells the
     // approver at a glance how many of the calendar days are weekend /
     // holiday vs. actual leave being granted.

@@ -39,11 +39,18 @@ function countDays(start, end) {
   }
   return count;
 }
+// Day total for a stored request: the server's holiday-aware count
+// (paid_days + unpaid_days, set at submit by _leave_working_days, mig 167).
+// Falls back to the weekday count only for rows that carry neither (both null).
+function requestDays(r) {
+  if (r?.paidDays == null && r?.unpaidDays == null) return countDays(r?.startDate, r?.endDate);
+  return Number(r?.paidDays || 0) + Number(r?.unpaidDays || 0);
+}
 // Human day-count label for a request. A half_leave is 0.5 day — show it
 // as "½ day" so a bare "0.5"/"1 day" never looks like a bug to an approver.
 function daysLabel(r) {
   if (r?.category === 'half_leave' || r?.type === 'half_leave') return '½ day';
-  const n = countDays(r?.startDate, r?.endDate);
+  const n = requestDays(r);
   return `${n} day${n > 1 ? 's' : ''}`;
 }
 function formatDate(ts) { if (!ts) return '—'; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
@@ -342,7 +349,7 @@ export default function BossLeaveRequestsPage() {
         if (req.status === 'rejected' || req.status === 'withdrawn') return;
         const rs = new Date(req.startDate + 'T00:00:00');
         if (rs < monthStart || rs > monthEnd) return;
-        const days = countDays(req.startDate, req.endDate);
+        const days = requestDays(req);
         if (req.category === 'leave' && req.leaveType) {
           if (req.leaveType === 'emergency') used.emergency += days;
           else if (req.leaveType === 'medical' || req.leaveType === 'medical_emergency') used.medical += days;
@@ -488,7 +495,7 @@ export default function BossLeaveRequestsPage() {
       : requests;
     const rows = [['Name', 'Email', 'Role', 'Category', 'Leave Type', 'Start', 'End', 'Days', 'Paid Days', 'Unpaid Days', 'Reason', 'Status', 'Approved By', 'Reject Reason', 'Submitted']];
     src.forEach(r => {
-      const days = countDays(r.startDate, r.endDate);
+      const days = requestDays(r);
       const approvedBy = r.intermediateApproval?.approverName ? `${r.intermediateApproval.approverName}${r.bossApproval ? ' + Boss' : ''}` : (r.bossApproval ? 'Boss' : '');
       const rejectReason = r.bossApproval?.rejectReason || r.intermediateApproval?.rejectReason || '';
       rows.push([

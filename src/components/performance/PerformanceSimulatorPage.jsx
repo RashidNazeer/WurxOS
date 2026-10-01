@@ -641,7 +641,7 @@ export default function PerformanceSimulatorPage() {
                     <div className="d-inline-flex align-items-center justify-content-center rounded-circle my-2" style={{ width: 118, height: 118, background: level.bg, border: `4px solid ${level.color}` }}>
                       <span className="fw-bold" style={{ fontSize: simComposite == null ? '1.2rem' : '2.6rem', color: level.color, fontVariantNumeric: 'tabular-nums' }}>{simComposite == null ? 'Not rated' : simComposite}</span>
                     </div>
-                    <div className="d-flex align-items-center justify-content-center gap-1"><i className={`bi ${level.icon}`} style={{ color: level.color }} /><span className="fw-bold" style={{ color: level.color }}>{level.label}</span></div>
+                    <div className="d-flex align-items-center justify-content-center gap-1"><i className={`bi ${level.icon}`} style={{ color: level.color }} /><span className="fw-bold" style={{ color: level.color }}>{level.label === 'Termination' ? 'At risk' : level.label}</span></div>
                     <div className="d-flex align-items-center justify-content-center gap-2 mt-2" style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                       <span>Your current: <strong style={{ color: 'var(--text-secondary)' }}>{realCompositeText}</strong></span>
                       {delta != null && delta !== 0 && (
