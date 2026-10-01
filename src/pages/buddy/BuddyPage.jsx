@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBuddy } from '../../contexts/BuddyContext';
 import { canEditSettings, groupConversations, isTmpKey, orderSources, starterCards } from '../../lib/buddyLogic';
 import { searchConversationIds } from '../../lib/buddyApi';
@@ -135,7 +135,6 @@ export default function BuddyPage() {
         activeKey={key}
         onPick={pick}
         onNew={() => pick(null)}
-        canSettings={settingsOk}
       />
       {historyOpen && <div className="bd-scrim" onClick={() => setHistoryOpen(false)} aria-hidden="true" />}
 
@@ -186,7 +185,7 @@ function HistorySkeleton() {
   );
 }
 
-function History({ open, railed, onToggleCollapse, onClose, activeKey, onPick, onNew, canSettings }) {
+function History({ open, railed, onToggleCollapse, onClose, activeKey, onPick, onNew }) {
   const { state, rename, pin, remove, refreshConvs } = useBuddy();
   const [q, setQ] = useState('');
   const [hits, setHits] = useState(null);
@@ -287,11 +286,6 @@ function History({ open, railed, onToggleCollapse, onClose, activeKey, onPick, o
           </div>
         ))}
       </nav>
-      {canSettings && (
-        <Link to={BUDDY_SETTINGS_PATH} className="bd-settings-btn">
-          <i className="bi bi-gear" aria-hidden="true" /> Buddy settings → Settings › Wurx Buddy
-        </Link>
-      )}
     </aside>
   );
 }
