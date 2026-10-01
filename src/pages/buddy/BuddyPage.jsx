@@ -109,7 +109,7 @@ export default function BuddyPage() {
   const desktop = useMedia('(min-width: 992px)');
   const [historyOpen, setHistoryOpen] = useState(false);
   const auto = useAutoHistory(desktop);   // phones keep the drawer
-  const [sourcesOpen, setSourcesOpen] = useState(() => window.matchMedia?.('(min-width: 1200px)').matches ?? false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);   // Owner: collapsed by default; the Sources button or a citation opens it
   const [sourceSel, setSourceSel] = useState(null); // { msg, id }
   const key = state.pageKey;
 
