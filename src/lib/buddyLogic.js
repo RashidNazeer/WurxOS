@@ -887,7 +887,8 @@ export function orderSources(sources) {
     .map((s, i) => ({ ...s, n: i + 1 }));
 }
 
-const CITE_RE = /\[((?:[SD]\d{1,3})(?:\s*[,;]\s*[SD]\d{1,3})*)\]/g;
+// [S1] / [D1, S2], and the fullwidth 【S1】 some models write.
+const CITE_RE = /[[【]((?:[SD]\d{1,3})(?:\s*[,;，]\s*[SD]\d{1,3})*)[\]】]/g;
 // A tag, with quoted attribute values allowed to contain '>'.
 const TAG_RE = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g;
 
@@ -896,7 +897,7 @@ const TAG_RE = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g;
 // alone. Only the ids the regex matched are emitted, so nothing unsafe gets in.
 export function citeHtml(html, sources) {
   const num = new Map(orderSources(sources).map((s) => [s.id, s.n]));
-  const cite = (text) => text.replace(CITE_RE, (_m, group) => group.split(/[,;]/).map((raw) => {
+  const cite = (text) => text.replace(CITE_RE, (_m, group) => group.split(/[,;，]/).map((raw) => {
     const id = raw.trim();
     const n = num.get(id);
     return `<button type="button" class="bd-cite" data-cite="${id}" aria-label="Source ${n ?? id}">${n ?? id}</button>`;

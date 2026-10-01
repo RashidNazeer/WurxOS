@@ -11,7 +11,67 @@ import '../../styles/buddy.css';
 // The Wurx Buddy tab (ui-design.md §4): history · chat · sources. Buddy's
 // settings live in Settings › Wurx Buddy (/settings?section=buddy).
 export const BUDDY_SETTINGS_PATH = '/settings?section=buddy';
-const HISTORY_COLLAPSED_KEY = 'wurxos.buddy.history.collapsed';
+const HISTORY_PINNED_KEY = 'wurxos.buddy.history.pinned';
+const OLD_COLLAPSED_KEY = 'wurxos.buddy.history.collapsed';   // the old manual toggle, retired
+const IDLE_MS = 6500;      // collapse this long after the pointer leaves
+const INTENT_MS = 150;     // hover this long on the rail before it opens (no flicker on a pass-over)
+
+// The history panel on desktop: open while hovered, focused or in use (search,
+// rename), folding to a rail IDLE_MS after the pointer leaves. Pinned = always
+// open, in the layout. Starts open.
+function useAutoHistory(active) {
+  const [pinned, setPinned] = useState(() => {
+    try { localStorage.removeItem(OLD_COLLAPSED_KEY); return localStorage.getItem(HISTORY_PINNED_KEY) === '1'; } catch { return false; }
+  });
+  const [open, setOpen] = useState(true);
+  const ref = useRef(null);
+  const hover = useRef(false);
+  const busy = useRef(false);
+  const idleT = useRef(null);
+  const intentT = useRef(null);
+  const clear = () => { clearTimeout(idleT.current); clearTimeout(intentT.current); };
+  const focusInside = () => !!ref.current && ref.current.contains(document.activeElement);
+  const scheduleClose = useCallback(() => {
+    clearTimeout(idleT.current);
+    idleT.current = setTimeout(() => {
+      if (!hover.current && !busy.current && !focusInside()) setOpen(false);
+    }, IDLE_MS);
+  }, []);
+  useEffect(() => {
+    if (!active || pinned) { clear(); setOpen(true); return undefined; }
+    scheduleClose();   // first load: open, then the same idle rule
+    return clear;
+  }, [active, pinned, scheduleClose]);
+
+  const togglePin = useCallback(() => {
+    setPinned((v) => {
+      try { localStorage.setItem(HISTORY_PINNED_KEY, v ? '0' : '1'); } catch { /* private mode */ }
+      return !v;
+    });
+  }, []);
+  const expand = useCallback(() => { clear(); setOpen(true); }, []);
+  const handlers = active && !pinned ? {
+    onMouseEnter: () => {
+      hover.current = true;
+      clearTimeout(idleT.current);
+      if (!open) intentT.current = setTimeout(() => setOpen(true), INTENT_MS);
+    },
+    onMouseLeave: () => {
+      hover.current = false;
+      clearTimeout(intentT.current);
+      if (!focusInside()) scheduleClose();
+    },
+    onFocus: () => { clear(); setOpen(true); },
+    onBlur: (e) => {
+      if (ref.current && !ref.current.contains(e.relatedTarget) && !hover.current) scheduleClose();
+    },
+  } : {};
+  const setBusy = useCallback((b) => {
+    busy.current = b;
+    if (!b && !hover.current && !focusInside()) scheduleClose();
+  }, [scheduleClose]);
+  return { pinned, togglePin, open: !active || pinned || open, overlay: active && !pinned, ref, handlers, expand, setBusy };
+}
 
 function useMedia(query) {
   const get = () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : true);
@@ -35,16 +95,7 @@ export default function BuddyPage() {
   const settingsOk = canEditSettings(profile);
   const desktop = useMedia('(min-width: 992px)');
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(HISTORY_COLLAPSED_KEY) === '1'; } catch { return false; }
-  });
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((v) => {
-      try { localStorage.setItem(HISTORY_COLLAPSED_KEY, v ? '0' : '1'); } catch { /* private mode */ }
-      return !v;
-    });
-  }, []);
-  const railed = collapsed && desktop;   // phones keep the drawer
+  const auto = useAutoHistory(desktop);   // phones keep the drawer
   const [sourcesOpen, setSourcesOpen] = useState(() => window.matchMedia?.('(min-width: 1200px)').matches ?? false);
   const [sourceSel, setSourceSel] = useState(null); // { msg, id }
   const key = state.pageKey;
@@ -126,11 +177,10 @@ export default function BuddyPage() {
   );
 
   return (
-    <div className={`bd-page ${railed ? 'is-collapsed' : ''}`}>
+    <div className={`bd-page ${auto.overlay ? 'is-history-auto' : ''}`}>
       <History
         open={historyOpen}
-        railed={railed}
-        onToggleCollapse={toggleCollapsed}
+        auto={desktop ? auto : null}
         onClose={() => setHistoryOpen(false)}
         activeKey={key}
         onPick={pick}
@@ -185,12 +235,24 @@ function HistorySkeleton() {
   );
 }
 
-function History({ open, railed, onToggleCollapse, onClose, activeKey, onPick, onNew }) {
+// `auto` (desktop only) = useAutoHistory: rail when idle, overlay when opened
+// from the rail, a normal column when pinned. Phones get the drawer.
+function History({ open, auto, onClose, activeKey, onPick, onNew }) {
   const { state, rename, pin, remove, refreshConvs } = useBuddy();
   const [q, setQ] = useState('');
   const [hits, setHits] = useState(null);
   const [editing, setEditing] = useState(null); // { id, title }
   const [err, setErr] = useState('');
+  const searchRef = useRef(null);
+  const wantSearch = useRef(false);
+
+  // Searching or renaming keeps the panel open.
+  const setBusy = auto?.setBusy;
+  useEffect(() => { setBusy?.(!!q.trim() || !!editing); }, [q, editing, setBusy]);
+  const expanded = !auto || auto.open;
+  useEffect(() => {
+    if (expanded && wantSearch.current) { wantSearch.current = false; searchRef.current?.focus(); }
+  }, [expanded]);
 
   useEffect(() => {
     const term = q.trim();
@@ -214,34 +276,56 @@ function History({ open, railed, onToggleCollapse, onClose, activeKey, onPick, o
     try { await fn(); } catch (e) { setErr(e.message || 'That did not work, please try again.'); }
   };
 
-  // Collapsed (desktop): a thin rail with New chat and Expand.
-  if (railed) {
-    const unread = Object.keys(state.unread).length;
+  const pinBtn = auto && (
+    <button type="button" className={`bd-icon-btn ${auto.pinned ? 'is-on' : ''}`} onClick={auto.togglePin}
+      aria-label="Keep history open" aria-pressed={auto.pinned} title={auto.pinned ? 'History stays open (click to let it fold away)' : 'Keep history open'}>
+      <i className={`bi ${auto.pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}`} aria-hidden="true" />
+    </button>
+  );
+
+  // Idle (desktop, not pinned): a 56 px rail. Hovering it (after a short
+  // intent delay) or clicking its empty space opens the full panel over the chat.
+  if (auto && !auto.open) {
+    const recent = state.convs.slice(0, 5);
     return (
-      <aside className="bd-history is-rail" aria-label="Chat history (collapsed)">
-        <button type="button" className="bd-icon-btn" onClick={onToggleCollapse} aria-label="Expand chat history" aria-expanded="false" title="Expand">
-          <i className="bi bi-chevron-double-right" aria-hidden="true" />
-        </button>
+      <aside ref={auto.ref} {...auto.handlers} className="bd-history is-rail" aria-label="Chat history (folded)"
+        onClick={(e) => { if (e.target === e.currentTarget) auto.expand(); }}>
         <button type="button" className="bd-rail-new" onClick={onNew} aria-label="New chat" title="New chat">
           <i className="bi bi-plus-lg" aria-hidden="true" />
         </button>
-        {unread > 0 && <span className="bd-dot" role="img" aria-label={`${unread} unread ${unread === 1 ? 'reply' : 'replies'}`} />}
+        <button type="button" className="bd-icon-btn" aria-label="Search chats" title="Search chats"
+          onClick={() => { wantSearch.current = true; auto.expand(); }}>
+          <i className="bi bi-search" aria-hidden="true" />
+        </button>
+        <div className="bd-rail-recent" role="list" aria-label="Recent chats">
+          {recent.map((c) => {
+            const title = c.title || 'New chat';
+            return (
+              <button key={c.id} type="button" role="listitem" className={`bd-rail-chat ${activeKey === c.id ? 'is-active' : ''}`}
+                onClick={() => onPick(c.id)} title={title} aria-label={`${title}${state.unread[c.id] ? ' (unread reply)' : ''}`}
+                aria-current={activeKey === c.id ? 'true' : undefined}>
+                <span aria-hidden="true">{title.trim().charAt(0).toUpperCase() || '?'}</span>
+                {state.unread[c.id] && <span className="bd-dot" aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+        <div className="bd-rail-foot">{pinBtn}</div>
       </aside>
     );
   }
 
   return (
-    <aside className={`bd-history ${open ? 'is-open' : ''}`} aria-label="Chat history">
+    <aside ref={auto?.ref} {...(auto?.handlers || {})}
+      className={`bd-history ${open ? 'is-open' : ''} ${auto?.overlay ? 'is-overlay' : ''}`} aria-label="Chat history">
       <div className="bd-history-top">
         <button type="button" className="bd-new" onClick={onNew}><i className="bi bi-plus-lg" aria-hidden="true" /> New chat</button>
-        <button type="button" className="bd-icon-btn d-none d-lg-inline-grid" onClick={onToggleCollapse} aria-label="Collapse chat history" aria-expanded="true" title="Collapse">
-          <i className="bi bi-chevron-double-left" aria-hidden="true" />
-        </button>
+        {pinBtn}
         <button type="button" className="bd-icon-btn d-lg-none" onClick={onClose} aria-label="Close history"><i className="bi bi-x-lg" aria-hidden="true" /></button>
       </div>
       <div className="bd-search">
         <i className="bi bi-search" aria-hidden="true" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats" aria-label="Search chats" />
+        <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats" aria-label="Search chats" />
       </div>
       {err && <div className="bd-error mx-2" role="alert">{err}</div>}
       <nav className="bd-history-list" aria-label="Chats" aria-busy={!state.convsLoaded}>
