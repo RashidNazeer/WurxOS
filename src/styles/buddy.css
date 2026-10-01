@@ -388,6 +388,21 @@
 .bd-starter i { color: var(--accent); }
 .bd-starter:hover { border-color: var(--accent); background: var(--accent-soft); }
 
+/* Buddy tab only (the quick panel keeps its compact column): use wide screens.
+   Thread and composer share one centred column up to 1100 px; it shrinks with
+   the Sources panel open (minmax(0, 1fr) grid track). Answers may span it, so
+   tables and code breathe; plain prose stays readable at ~85ch. */
+.bd-main .bd-scroll { padding: 20px clamp(14px, 2.4vw, 32px) 8px; }
+.bd-main .bd-col { max-width: min(1100px, 100%); }
+.bd-main .bd-composer { padding-left: clamp(12px, 2.4vw, 32px); padding-right: clamp(12px, 2.4vw, 32px); }
+.bd-main .bd-input-wrap { max-width: min(1100px, 100%); }
+.bd-main .bd-bubble.is-user { max-width: 75%; }
+.bd-main .ai-md > p, .bd-main .ai-md > ul, .bd-main .ai-md > ol,
+.bd-main .ai-md > blockquote, .bd-main .ai-md > h1, .bd-main .ai-md > h2, .bd-main .ai-md > h3,
+.bd-main .ai-md > h4 { max-width: 85ch; }
+.bd-main .bd-starters { max-width: 980px; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+.bd-main .bd-empty-sub { max-width: 620px; }
+
 /* ---------- Settings ---------- */
 /* Settings › Wurx Buddy: category pills, only on phones (the Settings nav has
    the sub-tabs on wider screens; it becomes a plain list at 900 px). */
