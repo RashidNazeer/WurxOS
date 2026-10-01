@@ -1,9 +1,12 @@
 // mig 406: the NVIDIA alt vector space, pending vectors and their backfill. Faked providers only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALT_EMBED_MODEL, NVIDIA_EMBED_ENDPOINT, NVIDIA_EMBED_MODEL, queryVectors } from '../embedder.ts';
+import {
+  ALT_EMBED_MODEL, ALT_MODEL_LABEL, GEMINI_EMBED_ENDPOINT, GEMINI_EMBED_MODEL,
+  NVIDIA_EMBED_ENDPOINT, NVIDIA_EMBED_MODEL, queryVectors,
+} from '../embedder.ts';
 import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../config.ts';
-import { backfillVectors, emptyStats, nvidiaEmbedder, processBatch, PROVIDER_DEFER_SECONDS } from '../ingest/worker.ts';
+import { altEmbedder, backfillVectors, emptyStats, nvidiaEmbedder, processBatch, PROVIDER_DEFER_SECONDS } from '../ingest/worker.ts';
 import * as F from './fixtures/reports.ts';
 
 const O = { pipelineVersion: PIPELINE_VERSION, model: DEFAULT_CONFIG.EMBED_MODEL };
@@ -84,6 +87,27 @@ test('OpenAI down: a free-provider type gets an NVIDIA vector (embed_model_alt l
   await processBatch([item], { rpc: b.rpc, workerId: 'w', ...O, embed: noCredits, embedAlt: async (t) => { sent++; return altOk(t); } }, emptyStats());
   assert.equal(sent, 0);
   assert.ok(b.calls.find(([f]) => f === 'ai_ingest_write')![1].p_chunks.every((c: any) => c.embedding === null && !('embedding_alt' in c)));
+});
+
+test('mig 408: the alt provider comes from the config; Gemini is asked with its own model and label', async () => {
+  const a = fakeRpc({ free: ['report'] });
+  const withGemini = async (fn: string, args: any = {}) =>
+    (fn === 'ai_embed_settings' ? { alt_always: false, free_sources: ['report'], alt_provider: 'gemini', alt_model: ALT_MODEL_LABEL.gemini } : a.rpc(fn, args));
+  const { f, seen } = fakeFetch((_u, b) => ok(b.input.length));
+  const st = emptyStats();
+  await processBatch([item], { rpc: withGemini, workerId: 'w', ...O, embed: noCredits,
+    embedAlt: altEmbedder('gemini', { gemini: 'g1' }, f) }, st);
+  assert.equal(seen[0].url, GEMINI_EMBED_ENDPOINT);
+  assert.deepEqual([seen[0].body.model, seen[0].body.dimensions, 'input_type' in seen[0].body], [GEMINI_EMBED_MODEL, 1536, false]);
+  const w = a.calls.find(([f2]) => f2 === 'ai_ingest_write')![1];
+  assert.ok(w.p_chunks.every((c: any) => c.embed_model_alt === ALT_MODEL_LABEL.gemini && c.embedding_alt.length === 1536));
+  assert.equal(ALT_MODEL_LABEL.gemini, 'gemini:gemini-embedding-001');
+  // one model per column: the alt keys of the OTHER provider are never used
+  assert.equal(altEmbedder('gemini', { nvidia: 'nv1' }, f), undefined);
+  // a query vector for the alt space uses the configured provider too
+  const q = await queryVectors('x', { nvidia: 'nv1', gemini: 'g1' }, { alt: 'always', altProvider: 'gemini', fetchImpl: f });
+  assert.equal(q.alt?.length, 1536);
+  assert.ok(!seen.some((s) => s.url === NVIDIA_EMBED_ENDPOINT));
 });
 
 test('backfill: pending vectors filled when OpenAI works; deferred (no fill) on an account problem', async () => {

@@ -16,15 +16,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { supabaseRpc } from '../_shared/ai/ingest/db.ts';
 import { parseMode, runIngest } from '../_shared/ai/ingest/run.ts';
-import { nvidiaEmbedder, openAiEmbedder } from '../_shared/ai/ingest/worker.ts';
+import { openAiEmbedder } from '../_shared/ai/ingest/worker.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const INGEST_SECRET = Deno.env.get('AI_INGEST_SECRET') ?? '';
 const OPENAI_KEY = Deno.env.get('OPEN_AI_API_KEY') ?? '';
 const OPENAI_KEY_FALLBACK = Deno.env.get('OPEN_AI_API_KEY_FALLBACK') ?? '';
-// The second vector space (mig 406): NVIDIA embeddings, when OpenAI has no credits.
-const NVIDIA_KEYS = [Deno.env.get('NVIDIA_API_KEY') ?? '', Deno.env.get('NVIDIA_API_KEY_2') ?? ''].filter(Boolean);
+// The second vector space (mig 406): the provider is a setting (mig 408,
+// embed_alt_provider), so every key is handed over and the worker picks.
+const ALT_KEYS = {
+  nvidia: Deno.env.get('NVIDIA_API_KEY') ?? null,
+  nvidia2: Deno.env.get('NVIDIA_API_KEY_2') ?? null,
+  gemini: Deno.env.get('GEMINI_API_KEY') ?? null,
+};
 
 // Constant-time, so response timing does not leak how much of a guess matched.
 function sameSecret(a: string, b: string): boolean {
@@ -56,7 +61,7 @@ Deno.serve(async (req) => {
     const result = await runIngest(mode, {
       rpc: supabaseRpc(admin),
       embed: openAiEmbedder([OPENAI_KEY, OPENAI_KEY_FALLBACK]),
-      ...(NVIDIA_KEYS.length ? { embedAlt: nvidiaEmbedder(NVIDIA_KEYS) } : {}),
+      altKeys: ALT_KEYS,
     });
     return json({ ok: true, ...result });
   } catch (e) {

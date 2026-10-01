@@ -29,7 +29,7 @@ import { loaders } from '../supabase/functions/_shared/ai/ingest/loaders.ts';
 import { pgRpc } from '../supabase/functions/_shared/ai/ingest/db.ts';
 import { planDocument } from '../supabase/functions/_shared/ai/ingest/plan.ts';
 import { crawlToRows } from '../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { nvidiaEmbedder, openAiEmbedder, runWorker } from '../supabase/functions/_shared/ai/ingest/worker.ts';
+import { openAiEmbedder, runWorker } from '../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const PRICE_PER_M = 0.02;   // text-embedding-3-small, USD per 1M tokens (check on the day)
 const args = process.argv.slice(2);
@@ -168,15 +168,17 @@ async function drain() {
   const env = readEnv();
   const key = env.OPEN_AI_API_KEY;
   if (!key) { console.error('OPEN_AI_API_KEY missing in ../.env.dev'); process.exit(1); }
-  // mig 406: the fallback OpenAI key, and NVIDIA (.env.dev OPEN_AI_NVA / NEM_API) for embedding_alt.
-  const nvidia = [env.OPEN_AI_NVA, env.NEM_API].filter(Boolean);
+  // mig 406/408: the fallback OpenAI key, and the alt space's keys (.env.dev
+  // OPEN_AI_NVA / NEM_API for NVIDIA, Gemini_Fallback for Gemini). The provider
+  // comes from ai_assistant_config.embed_alt_provider.
+  const altKeys = { nvidia: env.OPEN_AI_NVA, nvidia2: env.NEM_API, gemini: env.Gemini_Fallback };
   const c = await newClient();
   try {
     const rpc = pgRpc(c);
     let total = 0;
     for (;;) {
       const s = await runWorker({ rpc, embed: openAiEmbedder([key, env.OPEN_AI_API_KEY_FALLBACK]),
-        ...(nvidia.length ? { embedAlt: nvidiaEmbedder(nvidia) } : {}),
+        altKeys,
         maxItems: LIMIT === null ? undefined : LIMIT - total, log: (m) => console.log(m) });
       total += s.claimed;
       console.log(JSON.stringify({ claimed: s.claimed, succeeded: s.succeeded, failed: s.failed, skipped: s.skipped_unchanged,

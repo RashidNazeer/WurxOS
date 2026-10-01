@@ -25,7 +25,7 @@
 // a space for 30 min on an account problem (ai_vector_defer).
 
 import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../config.ts';
-import { embedWithKeys, nvidiaEmbedOptions, ALT_EMBED_MODEL } from '../embedder.ts';
+import { altEmbedOptions, altKeysFor, embedWithKeys, isAltProvider, ALT_MODEL_LABEL, type AltKeys, type AltProvider } from '../embedder.ts';
 import { providerAccountIssue, type ProviderIssue } from '../providerErrors.ts';
 import { SOURCE_TYPES } from '../extractors/index.ts';
 import type { SourceType } from '../extractors/index.ts';
@@ -49,20 +49,30 @@ export function openAiEmbedder(keys: string | Array<string | null | undefined>, 
   };
 }
 
-// The second vector space: NVIDIA (key nvidia, then nvidia2), into embedding_alt only.
-export function nvidiaEmbedder(keys: Array<string | null | undefined>, fetchImpl?: typeof fetch, sleep?: (ms: number) => Promise<void>): Embedder {
+// The second vector space (mig 408): the provider chosen in
+// ai_assistant_config.embed_alt_provider, into embedding_alt only. One model
+// per column, so the keys of ONE provider are tried, never the other's.
+export function altEmbedder(provider: AltProvider, keys: AltKeys, fetchImpl?: typeof fetch, sleep?: (ms: number) => Promise<void>): Embedder | undefined {
+  const list = altKeysFor(provider, keys);
+  if (!list.some(Boolean)) return undefined;
   return async (texts) => {
-    const r = await embedWithKeys(texts, keys, nvidiaEmbedOptions('passage', { fetchImpl, sleep }));
+    const r = await embedWithKeys(texts, list, altEmbedOptions(provider, 'passage', { fetchImpl, sleep }));
     return { vectors: r.vectors, tokens: r.usage.totalTokens, requests: r.requests };
   };
 }
 
-export type EmbedSettings = { alt_always: boolean; free_sources: string[] };
+// Back-compat for callers that pass NVIDIA keys directly (scripts, tests).
+export const nvidiaEmbedder = (keys: Array<string | null | undefined>, fetchImpl?: typeof fetch, sleep?: (ms: number) => Promise<void>): Embedder =>
+  altEmbedder('nvidia', { nvidia: keys[0], nvidia2: keys[1] }, fetchImpl, sleep)!;
+
+export type EmbedSettings = { alt_always: boolean; free_sources: string[]; alt_provider: AltProvider; alt_model: string };
 
 // Per run: which spaces answered, so a dead provider is asked once, not per batch.
 type EmbedState = { settings: EmbedSettings; primaryDown: boolean; altDown: boolean };
 
-export const BACKFILL = { primaryBatch: 64, primaryBatches: 4, altBatch: 32, altBatches: 2 };
+// Per run: enough batches to drain dev's backlog in a few ticks, bounded by the
+// time budget. The `none` bucket (no vector at all) is served first by SQL.
+export const BACKFILL = { primaryBatch: 64, primaryBatches: 8, altBatch: 32, altBatches: 20 };
 
 export type RunStats = {
   claimed: number;
@@ -102,7 +112,9 @@ export const emptyStats = (): RunStats => ({
 export type WorkerOptions = {
   rpc: Rpc;
   embed: Embedder;                // OpenAI → ai_chunks.embedding
-  embedAlt?: Embedder;            // NVIDIA → ai_chunks.embedding_alt (optional)
+  embedAlt?: Embedder;            // the alt space's embedder, if the caller built it
+  altKeys?: AltKeys;              // or its keys: the provider comes from the config (mig 408)
+  fetchImpl?: typeof fetch;       // test seam for altKeys
   backfill?: boolean;             // default true: fill pending vectors after the queue
   workerId?: string;
   pipelineVersion?: string;       // tests override; production uses PIPELINE_VERSION
@@ -126,8 +138,10 @@ async function embedState(o: BatchOptions): Promise<EmbedState> {
   if (!o.state) {
     const s = (await o.rpc('ai_embed_settings').catch(() => null)) ?? {};
     const ready = async (space: string) => (await o.rpc('ai_vector_ready', { p_space: space }).catch(() => true)) !== false;
+    const provider: AltProvider = isAltProvider(s.alt_provider) ? s.alt_provider : 'nvidia';
     o.state = {
-      settings: { alt_always: s.alt_always === true, free_sources: Array.isArray(s.free_sources) ? s.free_sources : [] },
+      settings: { alt_always: s.alt_always === true, free_sources: Array.isArray(s.free_sources) ? s.free_sources : [],
+        alt_provider: provider, alt_model: typeof s.alt_model === 'string' ? s.alt_model : ALT_MODEL_LABEL[provider] },
       primaryDown: !(await ready('primary')),
       altDown: !o.embedAlt || !(await ready('alt')),
     };
@@ -147,7 +161,7 @@ async function tryEmbed(o: BatchOptions, space: 'primary' | 'alt', embed: Embedd
     return r;
   } catch (e) {
     const issue = providerAccountIssue(e);
-    const who = space === 'primary' ? 'OpenAI' : 'NVIDIA';
+    const who = space === 'primary' ? 'OpenAI' : st.settings.alt_provider;
     if (stats.errors.length < 10) stats.errors.push(`${who} embeddings: ${issue ?? 'error'} (${errText(e).slice(0, 160)})`);
     if (issue) {
       if (space === 'primary') { st.primaryDown = true; stats.provider_issue = issue; } else { st.altDown = true; stats.alt_issue = issue; }
@@ -302,10 +316,11 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
         ok = (await rpc('ai_ingest_delete', { p_type: it.source_type, p_id: it.source_id, p_soft: plan.soft, ...lock }))?.ok === true;
         if (ok) plan.soft ? stats.soft_deleted++ : stats.deleted++;
       } else {
+        const altModel = (await embedState(o)).settings.alt_model;
         const chunks = plan.chunks.map((c) => ({
           ...c,
           embedding: vectors.get(c.content_hash) ?? null,
-          ...(altVectors.has(c.content_hash) ? { embedding_alt: altVectors.get(c.content_hash), embed_model_alt: ALT_EMBED_MODEL } : {}),
+          ...(altVectors.has(c.content_hash) ? { embedding_alt: altVectors.get(c.content_hash), embed_model_alt: altModel } : {}),
         }));
         const w = await rpc('ai_ingest_write', { p_doc: plan.docRow, p_chunks: chunks, ...lock });
         ok = w?.ok === true;
@@ -327,14 +342,16 @@ export async function processBatch(items: QueueItem[], o: BatchOptions, stats: R
   }
 }
 
-// Pending vectors, a few small batches per run and per space (free limits):
-// OpenAI fills `embedding` (vector_pending), NVIDIA fills `embedding_alt` for the
-// free-provider source types. Stops a space on its first account problem.
+// Fills missing vectors in batches until a space runs out, the time budget
+// ends, or its provider has an account problem. SQL serves the `none` bucket
+// (no vector at all) first and returns nothing during quiet hours, so
+// "waiting for vectors" drains to zero across ticks.
+// The alt space is filled for the free-provider source types only.
 export async function backfillVectors(o: BatchOptions, stats: RunStats, more: () => boolean, log?: (m: string) => void): Promise<void> {
   const st = await embedState(o);
   const spaces = [
+    { space: 'alt' as const, embed: o.embedAlt, down: () => st.altDown, batch: BACKFILL.altBatch, n: BACKFILL.altBatches, model: st.settings.alt_model },
     { space: 'primary' as const, embed: o.embed, down: () => st.primaryDown, batch: BACKFILL.primaryBatch, n: BACKFILL.primaryBatches, model: o.model },
-    { space: 'alt' as const, embed: o.embedAlt, down: () => st.altDown, batch: BACKFILL.altBatch, n: BACKFILL.altBatches, model: ALT_EMBED_MODEL },
   ];
   for (const s of spaces) {
     if (!s.embed) continue;
@@ -382,6 +399,13 @@ export async function runWorker(opts: WorkerOptions): Promise<RunStats> {
 
   try {
     if (opts.checkPipeline !== false) await assertPipeline(o.rpc, o);
+    // The alt space's provider is a setting (mig 408), so build its embedder
+    // once the settings are read, from the keys the caller handed over.
+    if (!o.embedAlt && opts.altKeys) {
+      const st = await embedState(o);
+      o.embedAlt = altEmbedder(st.settings.alt_provider, opts.altKeys, opts.fetchImpl);
+      st.altDown = !o.embedAlt || st.altDown;
+    }
     if (record) runId = await o.rpc('ai_ingest_run_start', { p_kind: 'ingest', p_worker: o.workerId });
     while (now() - t0 < budget) {
       const room = opts.maxItems === undefined ? batch : Math.min(batch, opts.maxItems - stats.claimed);

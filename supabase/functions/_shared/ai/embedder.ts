@@ -167,15 +167,27 @@ export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<E
   return { vectors, usage, requests, batches: batches.length };
 }
 
-// ── the second vector space (mig 406) ────────────────────────────────────────
-// NVIDIA llama-nemotron-embed-vl-1b-v2 (OpenAI-compatible endpoint), asked for
-// 1536 dims. Its vectors live ONLY in ai_chunks.embedding_alt, labelled
-// ALT_EMBED_MODEL: a different model's space, never compared with OpenAI's.
-// An asymmetric model: documents are embedded as 'passage', questions as 'query'.
-// Free (dev/test) keys: one request at a time, small batches.
-export const ALT_EMBED_MODEL = 'nvidia:llama-nemotron-embed-vl-1b-v2';   // the label stored in embed_model_alt
+// ── the second vector space (mig 406; providers mig 408) ────────────────────
+// ai_chunks.embedding_alt holds ONE model's vectors, chosen by
+// ai_assistant_config.embed_alt_provider and labelled in embed_model_alt:
+//   nvidia  llama-nemotron-embed-vl-1b-v2 — asymmetric: documents are embedded
+//           as 'passage', questions as 'query'
+//   gemini  gemini-embedding-001 — 1536 of its 3072 dims, so L2-normalised here
+// Never compared with OpenAI's space. Free keys: one request at a time.
+export type AltProvider = 'nvidia' | 'gemini';
+
 export const NVIDIA_EMBED_MODEL = 'nvidia/llama-nemotron-embed-vl-1b-v2';
 export const NVIDIA_EMBED_ENDPOINT = 'https://integrate.api.nvidia.com/v1/embeddings';
+export const GEMINI_EMBED_MODEL = 'gemini-embedding-001';
+export const GEMINI_EMBED_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/embeddings';
+
+// The label stored in embed_model_alt; ai_alt_model_for() in SQL must agree.
+export const ALT_MODEL_LABEL: Record<AltProvider, string> = {
+  nvidia: 'nvidia:llama-nemotron-embed-vl-1b-v2',
+  gemini: 'gemini:gemini-embedding-001',
+};
+export const ALT_EMBED_MODEL = ALT_MODEL_LABEL.nvidia;   // the default provider's label
+export const isAltProvider = (p: unknown): p is AltProvider => p === 'nvidia' || p === 'gemini';
 
 export function nvidiaEmbedOptions(kind: 'passage' | 'query', extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
   return {
@@ -183,6 +195,18 @@ export function nvidiaEmbedOptions(kind: 'passage' | 'query', extra: Partial<Emb
     extraBody: { input_type: kind, encoding_format: 'float' },
     batchInputs: 32, batchTokens: 16_000, concurrency: 1, ...extra,
   };
+}
+
+export function geminiEmbedOptions(extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
+  return {
+    model: GEMINI_EMBED_MODEL, endpoint: GEMINI_EMBED_ENDPOINT, dims: 1536, dimensions: 1536, normalize: true,
+    batchInputs: 100, batchTokens: 20_000, concurrency: 1, ...extra,
+  };
+}
+
+// Gemini embeds questions and documents the same way; NVIDIA does not.
+export function altEmbedOptions(provider: AltProvider, kind: 'passage' | 'query', extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
+  return provider === 'gemini' ? geminiEmbedOptions(extra) : nvidiaEmbedOptions(kind, extra);
 }
 
 // Keys in order (OpenAI: primary then fallback; NVIDIA: nvidia then nvidia2):
@@ -200,13 +224,23 @@ export async function embedWithKeys(texts: string[], keys: Array<string | null |
   throw last;
 }
 
+// Every key of the alt space's configured provider, in order.
+export const altKeysFor = (provider: AltProvider, keys: AltKeys): Array<string | null | undefined> =>
+  (provider === 'gemini' ? [keys.gemini] : [keys.nvidia, keys.nvidia2]);
+
+export type AltKeys = { nvidia?: string | null; nvidia2?: string | null; gemini?: string | null };
+
 // ── query vectors for ai_search ──────────────────────────────────────────────
 // CONTRACT (ai_search mig 406; wired in agent/server.ts → searchIndex):
-//   const qv = await queryVectors(question, { openai, openaiFallback, nvidia, nvidia2 }, { alt: 'fallback' });
+//   const qv = await queryVectors(question, { openai, openaiFallback, nvidia, nvidia2, gemini },
+//                                 { altProvider: 'nvidia', alt: 'fallback' });
 //   rpc('ai_search', { p_query_embedding: qv.primary && vec(qv.primary),
 //                      p_query_embedding_alt: qv.alt && vec(qv.alt), ... })
 //   • primary: OpenAI (primary key, then the fallback key) → the `embedding` space.
-//   • alt:     NVIDIA (input_type 'query') → the `embedding_alt` space.
+//   • alt:     the configured alt provider (ai_assistant_config.embed_alt_provider,
+//              default 'nvidia'; questions use input_type 'query') → the
+//              `embedding_alt` space. It must be the provider that FILLED that
+//              column, so never fall back to the other one here.
 //              alt:'fallback' (default) asks for it only when no OpenAI key could
 //              embed; 'always' also when one could (chunks written during an
 //              OpenAI outage have only an alt vector until the backfill runs);
@@ -218,26 +252,29 @@ export async function embedWithKeys(texts: string[], keys: Array<string | null |
 export type QueryVectors = {
   primary: number[] | null;
   alt: number[] | null;
-  issues: Array<{ provider: 'openai' | 'nvidia'; issue: string; message: string }>;
+  issues: Array<{ provider: 'openai' | AltProvider; issue: string; message: string }>;
 };
 
 export async function queryVectors(text: string,
-  keys: { openai?: string | null; openaiFallback?: string | null; nvidia?: string | null; nvidia2?: string | null },
-  o: { alt?: 'fallback' | 'always' | 'never'; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; timeoutMs?: number } = {}): Promise<QueryVectors> {
+  keys: { openai?: string | null; openaiFallback?: string | null } & AltKeys,
+  o: { alt?: 'fallback' | 'always' | 'never'; altProvider?: AltProvider; fetchImpl?: typeof fetch;
+       sleep?: (ms: number) => Promise<void>; timeoutMs?: number } = {}): Promise<QueryVectors> {
   const out: QueryVectors = { primary: null, alt: null, issues: [] };
   const q = String(text ?? '').trim();
   if (!q) return out;
   const common = { fetchImpl: o.fetchImpl, sleep: o.sleep, maxRetries: 1, timeoutMs: o.timeoutMs ?? 8000 };
-  const note = (provider: 'openai' | 'nvidia', e: unknown) =>
+  const note = (provider: 'openai' | AltProvider, e: unknown) =>
     out.issues.push({ provider, issue: providerAccountIssue(e) ?? 'error', message: String((e as Error)?.message ?? e).slice(0, 200) });
   if (keys.openai || keys.openaiFallback) {
     try { out.primary = (await embedWithKeys([q], [keys.openai, keys.openaiFallback], common)).vectors[0]; }
     catch (e) { note('openai', e); }
   }
   const wantAlt = o.alt === 'always' || ((o.alt ?? 'fallback') === 'fallback' && !out.primary);
-  if (wantAlt && (keys.nvidia || keys.nvidia2)) {
-    try { out.alt = (await embedWithKeys([q], [keys.nvidia, keys.nvidia2], nvidiaEmbedOptions('query', common))).vectors[0]; }
-    catch (e) { note('nvidia', e); }
+  const provider = o.altProvider ?? 'nvidia';
+  const altKeys = altKeysFor(provider, keys);
+  if (wantAlt && altKeys.some(Boolean)) {
+    try { out.alt = (await embedWithKeys([q], altKeys, altEmbedOptions(provider, 'query', common))).vectors[0]; }
+    catch (e) { note(provider, e); }
   }
   return out;
 }

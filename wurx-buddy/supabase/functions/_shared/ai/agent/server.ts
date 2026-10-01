@@ -8,7 +8,7 @@ import { RETRIEVAL_DEFAULTS } from '../retrieval/config.ts';
 import { DEFAULT_CONFIG } from '../config.ts';
 import { pricesFrom, UsageMeter } from '../prices.ts';
 import { providerAccountIssue } from '../providerErrors.ts';
-import { embedWithKeys, nvidiaEmbedOptions } from '../embedder.ts';
+import { altEmbedOptions, altKeysFor, embedWithKeys, type AltProvider } from '../embedder.ts';
 import { isSlot, refreshModels, type KeySlot } from './models.ts';
 import { cleanPageContext, cleanSurface, requestCancel, type CoreDeps } from './core.ts';
 import { json, turnResponse, type TurnHttp } from './http.ts';
@@ -82,6 +82,7 @@ export type ServerEnv = {
   geminiKey?: string | null;             // GEMINI_API_KEY: the 'gemini' key slot (optional, free tier)
   nvidiaKey?: string | null;             // NVIDIA_API_KEY: the 'nvidia' key slot (optional; free, dev/test only)
   nvidia2Key?: string | null;            // NVIDIA_API_KEY_2: the 'nvidia2' key slot
+  altProvider?: AltProvider;             // which provider filled embedding_alt (mig 408; default nvidia)
   modelKeySlot?: KeySlot;                // with modelOverride: that key (serve-assistant --key-slot)
   noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
 };
@@ -98,11 +99,14 @@ export const _resetEmbedDown = () => { embedDownUntil = 0; };   // tests
 // when the OpenAI embed gave none. Down for 10 minutes on an account problem too.
 let altDownUntil = 0;
 export function altQueryEmbedder(env: ServerEnv): ((t: string) => Promise<number[] | null>) | undefined {
-  const keys = [env.nvidiaKey, env.nvidia2Key].filter(Boolean) as string[];
+  // Must be the provider that FILLED embedding_alt
+  // (ai_assistant_config.embed_alt_provider, mig 408; default nvidia).
+  const provider = env.altProvider ?? 'nvidia';
+  const keys = altKeysFor(provider, { nvidia: env.nvidiaKey, nvidia2: env.nvidia2Key, gemini: env.geminiKey }).filter(Boolean) as string[];
   if (!keys.length) return undefined;
   const one = async (text: string): Promise<number[]> => {
     if (Date.now() < altDownUntil) throw new Error('alt query embeddings unavailable');
-    try { return (await embedWithKeys([text], keys, nvidiaEmbedOptions('query', { fetchImpl: env.fetchImpl, maxRetries: 1, timeoutMs: 8000 }))).vectors[0]; }
+    try { return (await embedWithKeys([text], keys, altEmbedOptions(provider, 'query', { fetchImpl: env.fetchImpl, maxRetries: 1, timeoutMs: 8000 }))).vectors[0]; }
     catch (e) { if (providerAccountIssue(e)) altDownUntil = Date.now() + EMBED_DOWN_MS; throw e; }
   };
   return cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS);
