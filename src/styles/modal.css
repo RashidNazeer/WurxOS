@@ -36,7 +36,7 @@
 
 /* ---- Richer backdrop (subtle darker glass for contrast) ---- */
 .wx-m-backdrop {
-  background: rgba(8, 10, 14, 0.56);
+  background: var(--backdrop);
   backdrop-filter: blur(6px);
 }
 
@@ -84,7 +84,7 @@
   place-items: center;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
   flex-shrink: 0;
 }
 .wx-m-head-close:hover {
@@ -120,7 +120,7 @@
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
-  transition: all var(--dur-fast);
+  transition: var(--t-colors);
 }
 .wx-m-step.is-active { color: var(--text-primary); }
 .wx-m-step.is-active .wx-m-step-dot {
@@ -222,7 +222,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-1);
   overflow: hidden;
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .wx-m-input-shell:focus-within {
   border-color: var(--accent);
@@ -361,14 +361,17 @@
   border-radius: var(--radius-md);
   text-align: left;
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition: var(--t-colors), transform var(--dur-fast) var(--ease-out);
   font-family: inherit;
   color: var(--text-primary);
 }
 .wx-m-card:hover {
   border-color: var(--border-strong);
   background: var(--surface-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
+.wx-m-card:active { transform: scale(0.98); transition-duration: var(--dur-instant); }
 .wx-m-card-icon {
   width: 28px;
   height: 28px;
@@ -417,7 +420,7 @@
   box-shadow: 0 0 0 3px var(--surface-1);
   opacity: 0;
   transform: scale(0.6);
-  transition: all var(--dur-fast);
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-emphasized);
 }
 .wx-m-card.is-active .wx-m-card-check { opacity: 1; transform: scale(1); }
 
@@ -445,7 +448,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-1);
   cursor: pointer;
-  transition: background var(--dur-fast);
+  transition: var(--t-colors);
 }
 .wx-m-optin:hover { background: var(--surface-2); }
 .wx-m-optin.is-active {

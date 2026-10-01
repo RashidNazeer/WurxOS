@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 
 const ThemeContext = createContext(null);
 
@@ -66,12 +67,14 @@ export function ThemeProvider({ children }) {
     document.documentElement.setAttribute('data-bs-theme', theme);
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
       'content',
-      theme === 'dark' ? '#000000' : '#c2704e',
+      // Matches the canvas so the mobile browser chrome blends into the topbar.
+      theme === 'dark' ? '#000000' : '#faf7f2',
     );
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  // Font family → data-font-family attribute, tokens.css swaps --font-sans
+  // Font family → data-font-family attribute. tokens.css maps sans choices to
+  // --font-sans-ui (whole UI) and Lora/Mono to --font-content (reading content only).
   useEffect(() => {
     document.documentElement.setAttribute('data-font-family', fontFamily);
     localStorage.setItem(FONT_FAMILY_KEY, fontFamily);
@@ -83,10 +86,45 @@ export function ThemeProvider({ children }) {
     localStorage.setItem(FONT_SIZE_KEY, fontSize);
   }, [fontSize]);
 
-  const setTheme      = useCallback((t) => setThemeState(t), []);
+  // User-initiated switches cross-fade. The attribute is written inside the
+  // transition callback so the "new" snapshot already has the new palette;
+  // the effect above then re-writes the same values (no-op). Initial load
+  // never goes through here, so nothing animates on boot.
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const fadeTimer = useRef(null);
+  const switchTheme = useCallback((next) => {
+    if (next !== 'light' && next !== 'dark') return;
+    if (next === themeRef.current) return;
+    const root = document.documentElement;
+    const commit = () => {
+      root.setAttribute('data-theme', next);
+      root.setAttribute('data-bs-theme', next);
+      themeRef.current = next;
+      flushSync(() => setThemeState(next));
+    };
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { commit(); return; }
+    if (typeof document.startViewTransition === 'function') {
+      try {
+        const vt = document.startViewTransition(commit);
+        vt.ready?.catch(() => {});
+        vt.finished?.catch(() => {});
+        return;
+      } catch { /* fall through */ }
+      if (root.getAttribute('data-theme') === next) return;
+    }
+    root.classList.add('theme-transition');
+    commit();
+    clearTimeout(fadeTimer.current);
+    fadeTimer.current = setTimeout(() => root.classList.remove('theme-transition'), 300);
+  }, []);
+  useEffect(() => () => clearTimeout(fadeTimer.current), []);
+
+  const setTheme      = useCallback((t) => switchTheme(t), [switchTheme]);
   const toggleTheme   = useCallback(
-    () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark')),
-    [],
+    () => switchTheme(themeRef.current === 'dark' ? 'light' : 'dark'),
+    [switchTheme],
   );
   const setFontFamily = useCallback((f) => setFontFamilyState(f), []);
   const setFontSize   = useCallback((s) => setFontSizeState(s), []);

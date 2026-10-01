@@ -3,67 +3,84 @@
    Every color in the app MUST reference a var(--token).
    Never hardcode hex values in components. This is how we
    avoid the dark/light mode inconsistencies from v1.
+
+   Contrast notes give WCAG ratios against surface-0 / 1 / 2 / 3
+   (s0–s3). Text needs 4.5, large text and UI boundaries 3.
    ============================================================ */
 
+/* Light: warm cream + chocolate, from the logo
+   (peach #F5CBA0, cream #F5E6D3, chocolate #5A3A22). */
 :root,
 [data-theme='light'] {
   /* Surfaces (layered from base up) */
-  --surface-0: #f8fafc;        /* page background */
+  --surface-0: #faf7f2;        /* page canvas (cream) */
   --surface-1: #ffffff;        /* cards, modals */
-  --surface-2: #f1f5f9;        /* hover / secondary cards */
-  --surface-3: #e2e8f0;        /* tertiary / wells */
+  --surface-2: #f3ece2;        /* hover / secondary cards */
+  --surface-3: #e9dfd1;        /* tertiary / wells */
 
-  /* Text */
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
-  --text-muted:     #94a3b8;
+  /* Text — s0 / s1 / s2 / s3 */
+  --text-primary:   #2b1d14;   /* 15.25 / 16.30 / 13.90 / 12.37 */
+  --text-secondary: #5c4a3b;   /*  7.87 /  8.41 /  7.17 /  6.38 */
+  --text-muted:     #725d4b;   /*  5.81 /  6.21 /  5.29 /  4.71 */
   --text-inverse:   #ffffff;
 
-  /* Borders */
-  --border-subtle: #e2e8f0;
-  --border-default: #cbd5e1;
-  --border-strong: #94a3b8;
+  /* Borders. subtle/default are decorative dividers; strong and
+     --input-border are control boundaries (>= 3:1 on s0–s2). */
+  --border-subtle:  #e6dccd;
+  --border-default: #d6c9b8;
+  --border-strong:  #8f857a;   /* 3.39 / 3.62 / 3.09 */
 
-  /* Brand / accent (WurxOS peach — warmer tone on light backgrounds) */
-  --accent:       #c2704e;   /* deeper terracotta peach — readable on white */
-  --accent-hover: #a65a3b;
-  --accent-soft:  #fdf0e6;   /* very pale cream for subtle fills */
-  --accent-ring:  rgba(194, 112, 78, 0.30);
-  /* White on #c2704e is only 3.67:1. Phase 1 (warm palette) darkens the
-     light accent fill (e.g. #ad5f3e → white 4.68:1); keep #fff until then. */
-  --on-accent:    #ffffff;
+  /* Brand / accent. Fill darkened from #c2704e so white text passes. */
+  --accent:       #ad5f3e;     /* white on it 4.68; as icon 4.38 on s0 */
+  --accent-hover: #8f4c2c;
+  --accent-soft:  #fbeee3;
+  --accent-ring:  rgba(173, 95, 62, 0.30);
+  --on-accent:    #ffffff;     /* 4.68 on accent, 6.49 on accent-hover */
+  --accent-text:  #94502f;     /* 5.70 / 6.09 / 5.19 / 4.62; 5.35 on accent-soft */
 
-  /* Semantic */
-  --success:      #10b981;
+  /* Semantic fills: white text passes on all but warning (amber, dark ink). */
+  --success:      #047857;     /* white 5.48 */
   --success-soft: #ecfdf5;
-  --danger:       #ef4444;
+  --danger:       #dc2626;     /* white 4.83 */
   --danger-soft:  #fef2f2;
-  --warning:      #f59e0b;
+  --warning:      #d97706;     /* ink #1a1407 5.75; 2.98 on s0, so not for text */
   --warning-soft: #fffbeb;
   --insight-fg:   #7c4c00;     /* readable text on the amber insight callout */
-  --info:         #0ea5e9;
+  --info:         #0369a1;     /* white 5.93 */
   --info-soft:    #f0f9ff;
+  --purple:       #6d28d9;     /* white 7.10 */
+  --purple-soft:  #f3eefe;
 
-  /* Purple — WFH/Other/Pending-Boss accents (no Bootstrap equivalent) */
-  --purple:       #6610f2;
-  --purple-soft:  #f0ebff;
+  --on-success: #ffffff;
+  --on-danger:  #ffffff;
+  --on-warning: #1a1407;
+  --on-info:    #ffffff;
+  --on-purple:  #ffffff;
 
-  /* Attendance "spotlight" cards (Hours-worked tile + Today/clock card):
-     dark navy in light mode (original look) — flips to the peach accent in dark. */
-  --att-spotlight-bg: #0f172a;
-  --att-spotlight-fg: #ffffff;
+  /* Text-safe semantic colour — s0 / s1 / own -soft fill / s2 */
+  --success-text: #047857;     /* 5.13 / 5.48 / 5.21 / 4.68 */
+  --danger-text:  #b91c1c;     /* 6.05 / 6.47 / 5.91 / 5.52 */
+  --warning-text: #a1460a;     /* 5.79 / 6.18 / 5.96 / 5.27 */
+  --info-text:    #0369a1;     /* 5.55 / 5.93 / 5.57 / 5.06 */
+  --purple-text:  #6d28d9;     /* 6.65 / 7.10 / 6.25 / 6.06 */
+
+  /* Attendance "spotlight" cards: chocolate in light, peach in dark. */
+  --att-spotlight-bg: #2b1d14;
+  --att-spotlight-fg: #ffffff; /* 16.30 */
 
   /* Inputs */
   --input-bg:     #ffffff;
-  --input-border: #cbd5e1;
-  --input-text:   #0f172a;
-  --input-placeholder: #94a3b8;
+  --input-border: #8f857a;     /* 3.62 on #fff */
+  --input-text:   #2b1d14;
+  --input-placeholder: #725d4b; /* 6.21 */
 
-  /* Elevation */
-  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
-  --shadow-xl: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  /* Elevation — chocolate-tinted */
+  --shadow-sm: 0 1px 2px 0 rgba(90, 58, 34, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(90, 58, 34, 0.09), 0 2px 4px -2px rgba(90, 58, 34, 0.06);
+  --shadow-lg: 0 10px 25px -5px rgba(90, 58, 34, 0.13), 0 8px 10px -6px rgba(90, 58, 34, 0.08);
+  --shadow-xl: 0 25px 50px -12px rgba(90, 58, 34, 0.26);
+
+  --backdrop: rgba(43, 29, 20, 0.5);
 
   /* Auth page decorative gradient (light) — warm peach + cream */
   --auth-bg: radial-gradient(ellipse at top left,     #fde8d6 0%, transparent 55%),
@@ -74,38 +91,25 @@
 
   color-scheme: light;
 
-  /* Accent used AS TEXT (links, active nav). The fill accent is 3.67:1 on
-     white; this is 5.72 on #fff, 5.47 on surface-0, 5.12 on accent-soft. */
-  --accent-text: #9c5234;
+  --focus-ring: #94502f;       /* >= 4.62 on every surface */
 
-  /* Readable text on a solid semantic fill. White only where it reaches
-     4.5:1 (purple 7.19); white on success/danger/warning/info is 2.15–3.76,
-     so those take the warm ink (7.22 / 4.87 / 8.52 / 6.61). */
-  --on-success: #1a1407;
-  --on-danger:  #1a1407;
-  --on-warning: #1a1407;
-  --on-info:    #1a1407;
-  --on-purple:  #ffffff;
-
-  --focus-ring: #9c5234;       /* 5.72 on #fff, 4.64 on surface-3 */
-
-  /* Charts — categorical series are >= 3:1 on surface-0 and surface-1 */
+  /* Charts — categorical series are >= 3:1 on s0 and s1 */
   --chart-grid:       var(--border-subtle);
   --chart-axis:       var(--text-secondary);
   --chart-track:      var(--surface-2);
   --chart-tooltip-bg: var(--surface-1);
   --chart-tooltip-fg: var(--text-primary);
-  --chart-1: #c2704e;   /* terracotta */
-  --chart-2: #0f766e;   /* teal */
-  --chart-3: #b7791f;   /* amber */
-  --chart-4: #7c3aed;   /* violet */
-  --chart-5: #be185d;   /* rose */
-  --chart-6: #2563eb;   /* blue */
-  --chart-7: #4d7c0f;   /* olive */
-  --chart-8: #5a3a22;   /* chocolate */
+  --chart-1: #ad5f3e;   /* terracotta   4.38 / 4.68 */
+  --chart-2: #0f766e;   /* teal         5.12 / 5.47 */
+  --chart-3: #b7791f;   /* amber        3.41 / 3.64 */
+  --chart-4: #7c3aed;   /* violet       5.33 / 5.70 */
+  --chart-5: #be185d;   /* rose         5.65 / 6.04 */
+  --chart-6: #2563eb;   /* blue         4.84 / 5.17 */
+  --chart-7: #4d7c0f;   /* olive        4.67 / 4.99 */
+  --chart-8: #5a3a22;   /* chocolate    9.53 / 10.18 */
 
-  /* Glass (chrome only). Alpha is high on purpose: secondary text keeps
-     >= 6:1 even with pure black directly behind the pane. */
+  /* Glass (chrome only). With pure black directly behind the pane:
+     primary 13.3, secondary 6.9, muted 5.08, accent-text 4.68 at 0.92. */
   --glass-bg:        rgba(255, 252, 247, 0.92);
   --glass-bg-strong: rgba(255, 252, 247, 0.96);
   --glass-border:    rgba(90, 58, 34, 0.12);
@@ -120,22 +124,23 @@
   --surface-2: #181818;
   --surface-3: #222222;
 
-  /* Warm off-white text (v1: #faf7f2) */
-  --text-primary:   #faf7f2;
-  --text-secondary: rgba(250, 247, 242, 0.78);
-  --text-muted:     rgba(250, 247, 242, 0.5);
+  /* Warm off-white text (v1: #faf7f2) — s0 / s1 / s2 / s3 */
+  --text-primary:   #faf7f2;                    /* 19.65 / 17.94 / 16.62 / 14.89 */
+  --text-secondary: rgba(250, 247, 242, 0.78);  /* 11.68 / 11.01 / 10.41 / 9.52 */
+  --text-muted:     rgba(250, 247, 242, 0.55);  /* >= 5.46 (was 0.5: 4.77 on s3) */
   --text-inverse:   #0f0f0f;
 
-  --border-subtle:  rgba(245, 213, 168, 0.12);
-  --border-default: rgba(245, 213, 168, 0.22);
-  --border-strong:  rgba(245, 213, 168, 0.38);
+  --border-subtle:  rgba(245, 213, 168, 0.12);  /* decorative only */
+  --border-default: rgba(245, 213, 168, 0.22);  /* decorative only */
+  --border-strong:  rgba(245, 213, 168, 0.45);  /* 3.55 on s1 */
 
   /* Peach accent (v1's #f5d5a8) */
   --accent:       #f5d5a8;
   --accent-hover: #fce4c2;
   --accent-soft:  rgba(245, 213, 168, 0.12);
   --accent-ring:  rgba(245, 213, 168, 0.38);
-  --on-accent:    #1a1407;   /* dark text reads better on light peach */
+  --on-accent:    #1a1407;     /* 13.05 */
+  --accent-text:  #f5d5a8;     /* 13.66 on s1, 10.58 on accent-soft */
 
   --success:      #5bd49b;
   --success-soft: rgba(91, 212, 155, 0.14);
@@ -146,34 +151,8 @@
   --insight-fg:   #fbe3b3;     /* warm light amber — readable on the dark insight callout */
   --info:         #7bc7ed;
   --info-soft:    rgba(123, 199, 237, 0.14);
-
-  /* Purple — readable lavender on near-black + translucent fill */
   --purple:       #c4b5fd;
   --purple-soft:  rgba(168, 85, 247, 0.16);
-
-  /* Attendance spotlight — keep the peach accent in dark (it reads well). */
-  --att-spotlight-bg: var(--accent);
-  --att-spotlight-fg: var(--on-accent);
-
-  --input-bg:     #1a1a1a;
-  --input-border: rgba(245, 213, 168, 0.18);
-  --input-text:   #faf7f2;
-  --input-placeholder: rgba(250, 247, 242, 0.35);
-
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.55), 0 2px 4px -2px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.55);
-  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
-
-  --auth-bg: radial-gradient(ellipse at top left,     rgba(245, 213, 168, 0.14) 0%, transparent 55%),
-             radial-gradient(ellipse at bottom right, rgba(245, 190, 130, 0.10) 0%, transparent 55%),
-             #000000;
-  --auth-glow-1: rgba(245, 213, 168, 0.50);
-  --auth-glow-2: rgba(245, 190, 130, 0.30);
-
-  color-scheme: dark;
-
-  --accent-text: #f5d5a8;      /* 13.66 on surface-1, 10.58 on accent-soft */
 
   /* Dark fills are light, so every fill takes the dark inverse text
      (success 10.35, danger 6.93, warning 11.48, info 10.25, purple 10.38). */
@@ -183,6 +162,38 @@
   --on-info:    var(--text-inverse);
   --on-purple:  var(--text-inverse);
 
+  /* Text-safe = the fill itself. Worst case (on own -soft over s2):
+     success 7.29, danger 5.27, warning 7.91, info 7.13, purple 8.04. */
+  --success-text: var(--success);
+  --danger-text:  var(--danger);
+  --warning-text: var(--warning);
+  --info-text:    var(--info);
+  --purple-text:  var(--purple);
+
+  /* Attendance spotlight — keep the peach accent in dark (it reads well). */
+  --att-spotlight-bg: var(--accent);
+  --att-spotlight-fg: var(--on-accent);
+
+  --input-bg:     #1a1a1a;
+  --input-border: rgba(245, 213, 168, 0.45);   /* 3.52 on input, 3.55 on s1 */
+  --input-text:   #faf7f2;
+  --input-placeholder: rgba(250, 247, 242, 0.55); /* 5.74 on input */
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.55), 0 2px 4px -2px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
+
+  --backdrop: rgba(0, 0, 0, 0.65);
+
+  --auth-bg: radial-gradient(ellipse at top left,     rgba(245, 213, 168, 0.14) 0%, transparent 55%),
+             radial-gradient(ellipse at bottom right, rgba(245, 190, 130, 0.10) 0%, transparent 55%),
+             #000000;
+  --auth-glow-1: rgba(245, 213, 168, 0.50);
+  --auth-glow-2: rgba(245, 190, 130, 0.30);
+
+  color-scheme: dark;
+
   --focus-ring: #f5d5a8;
 
   --chart-grid:       var(--border-subtle);
@@ -190,7 +201,7 @@
   --chart-track:      var(--surface-3);
   --chart-tooltip-bg: #1c1612;
   --chart-tooltip-fg: var(--text-primary);
-  --chart-1: #f2a77a;
+  --chart-1: #f2a77a;   /* >= 6.5 on s0–s2 for every series */
   --chart-2: #2dd4bf;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
@@ -217,6 +228,57 @@
   --radius-2xl: 28px;
   --radius-pill: 999px;
 
+  /* Type scale. 12px is the floor for UI text. */
+  --fs-xs:   12px;
+  --fs-sm:   13px;
+  --fs-base: 14px;
+  --fs-md:   15px;
+  --fs-lg:   17px;
+  --fs-xl:   20px;
+  --fs-2xl:  24px;
+  --fs-3xl:  30px;
+  --lh-tight: 1.2;
+  --lh-snug:  1.35;
+  --lh-base:  1.5;
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  /* Spacing — 4/8 grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 48px;
+
+  /* One height for buttons, inputs and topbar controls */
+  --control-h-sm: 32px;
+  --control-h:    38px;
+  --control-h-lg: 44px;
+
+  /* Stacking. Page sticky toolbars should use --z-sticky; the topbar
+     and the mobile drawer sit above them. */
+  --z-sticky:   10;
+  --z-topbar:   30;
+  --z-overlay:  40;   /* mobile drawer scrim */
+  --z-drawer:   41;
+  --z-dropdown: 1000;
+  --z-modal:    1050;
+  --z-popover:  1100; /* user menu, search, notification panel */
+  --z-flyout:   1150;
+  --z-dialog-top: 2100; /* ui/Modal + useConfirm: above legacy inline dialogs (1070–2000) */
+  --z-toast:    2200;
+
+  /* Breakpoints (custom properties can't be used inside @media, so
+     these are the agreed literals):
+       sm  576px  — phones: modals become full-screen sheets
+       md  860px  — shell: sidebar becomes the mobile drawer
+       lg 1200px  — wide desktop */
+
   /* Every family falls back to a system sans stack if Google Fonts
      haven't loaded yet — UI never renders in Times New Roman. */
   --fallback-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
@@ -229,13 +291,33 @@
   --font-outfit:   'Outfit',            var(--fallback-sans);
   --font-lora:     'Lora', Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-mono:     'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-code:     ui-monospace, 'SF Mono', Menlo, Consolas, monospace; /* never user-overridden */
 
-  --font-sans:  var(--font-inter);
+  /* --font-sans-ui: chrome (nav, buttons, tables, forms) — always a sans.
+     --font-content: reading surfaces (rich text, report bodies).
+     --font-sans is kept as an alias of the UI font for existing CSS. */
+  --font-sans-ui: var(--font-inter);
+  --font-content: var(--font-sans-ui);
+  --font-sans:    var(--font-sans-ui);
 
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 120ms;
-  --dur-base: 200ms;
-  --dur-slow: 320ms;
+  /* Motion. One curve family; exits are shorter than entries. Only
+     opacity/transform animate (colours for hover). */
+  --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:     cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in:         cubic-bezier(0.4, 0, 1, 1);    /* exits */
+  --dur-instant: 80ms;    /* press feedback */
+  --dur-fast:    120ms;   /* hover colour changes */
+  --dur-base:    200ms;
+  --dur-enter:   220ms;   /* things appearing */
+  --dur-exit:    160ms;   /* things leaving */
+  --dur-slow:    320ms;
+  /* Shared hover transition for colour-only state changes */
+  --t-colors: color var(--dur-fast) var(--ease-out),
+              background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+  --t-press: transform var(--dur-instant) var(--ease-out);
 
   /* Aliases for names already used in components (undefined before) */
   --border:  var(--border-subtle);
@@ -243,6 +325,24 @@
 
   --glass-blur:   14px;
   --glass-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+/* Reduced motion: near-zero durations everywhere; entries keep a short
+   opacity fade (transforms are dropped in global.css). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 1ms;
+    --dur-fast:    1ms;
+    --dur-base:    1ms;
+    --dur-slow:    1ms;
+    --dur-enter:   100ms;
+    --dur-exit:    1ms;
+  }
+}
+
+/* Touch targets: 40px minimum on the mobile shell */
+@media (max-width: 860px) {
+  :root { --control-h: 40px; }
 }
 
 /* No backdrop blur, or the user asked for less transparency: every glass
@@ -265,13 +365,14 @@
 
 /* ------------------------------------------------------------
    User font-family preference — applied to <html> from
-   ThemeContext. Overrides the main --font-sans token so every
-   component that already uses it picks up the new family.
+   ThemeContext. Sans choices drive the whole UI; Lora and
+   JetBrains Mono apply to reading content only, so fixed-width
+   chrome and dense tables stay legible.
    ------------------------------------------------------------ */
-html[data-font-family='inter']   { --font-sans: var(--font-inter); }
-html[data-font-family='jakarta'] { --font-sans: var(--font-jakarta); }
-html[data-font-family='manrope'] { --font-sans: var(--font-manrope); }
-html[data-font-family='dm-sans'] { --font-sans: var(--font-dm-sans); }
-html[data-font-family='outfit']  { --font-sans: var(--font-outfit); }
-html[data-font-family='lora']    { --font-sans: var(--font-lora); }
-html[data-font-family='mono']    { --font-sans: var(--font-mono); }
+html[data-font-family='inter']   { --font-sans-ui: var(--font-inter); }
+html[data-font-family='jakarta'] { --font-sans-ui: var(--font-jakarta); }
+html[data-font-family='manrope'] { --font-sans-ui: var(--font-manrope); }
+html[data-font-family='dm-sans'] { --font-sans-ui: var(--font-dm-sans); }
+html[data-font-family='outfit']  { --font-sans-ui: var(--font-outfit); }
+html[data-font-family='lora']    { --font-content: var(--font-lora); }
+html[data-font-family='mono']    { --font-content: var(--font-mono); }

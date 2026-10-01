@@ -1,37 +1,19 @@
 import { useTheme } from '../../contexts/ThemeContext';
 
+// Styled by .shell-icon-btn (shell.css) so it shares the topbar control
+// height and gets hover + keyboard focus from CSS instead of JS.
 export default function ThemeToggle({ className = '' }) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
+  const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className={className}
-      style={{
-        width: 40,
-        height: 40,
-        display: 'grid',
-        placeItems: 'center',
-        border: '1px solid var(--border-subtle)',
-        background: 'var(--surface-1)',
-        color: 'var(--text-secondary)',
-        borderRadius: 'var(--radius-pill)',
-        cursor: 'pointer',
-        transition: 'all var(--dur-fast) var(--ease-out)',
-        boxShadow: 'var(--shadow-sm)',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = 'var(--text-primary)';
-        e.currentTarget.style.borderColor = 'var(--border-strong)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = 'var(--text-secondary)';
-        e.currentTarget.style.borderColor = 'var(--border-subtle)';
-      }}
+      aria-label={label}
+      title={label}
+      className={`shell-icon-btn ${className}`.trim()}
     >
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>

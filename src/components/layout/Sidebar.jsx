@@ -207,7 +207,9 @@ function NavGroup({ item, collapsed, forceOpen = false }) {
         <span className="label">{item.label}</span>
         <span className="chev"><ChevronRightIcon width="14" height="14" /></span>
       </button>
-      {open && (
+      {/* Always rendered so open/close can animate (grid rows 0fr ↔ 1fr);
+          inert keeps the hidden links out of the tab order. */}
+      <div className="shell-nav-sub-wrap" data-open={open} inert={!open || undefined}>
         <div className="shell-nav-sub">
           {item.children.map((c, i) => (
             <NavLink
@@ -220,7 +222,7 @@ function NavGroup({ item, collapsed, forceOpen = false }) {
             </NavLink>
           ))}
         </div>
-      )}
+      </div>
     </>
   );
 }

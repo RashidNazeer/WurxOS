@@ -29,7 +29,7 @@
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
 }
 .wx-segmented-btn:hover { color: var(--text-primary); }
 .wx-segmented-btn[data-active='true'] {
@@ -184,7 +184,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.wx-badge-success { background: var(--success-soft); color: var(--success); }
+.wx-badge-success { background: var(--success-soft); color: var(--success-text); }
 .wx-badge-muted   { background: var(--surface-3);    color: var(--text-muted); }
 .wx-badge-dot {
   width: 6px;
@@ -283,19 +283,14 @@
 .wx-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--backdrop);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: var(--z-modal);
   display: grid;
   place-items: center;
   padding: 20px;
-  animation: wx-fade 0.15s var(--ease-out);
+  animation: wx-enter-fade var(--dur-enter) var(--ease-out);
 }
-@keyframes wx-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-[data-theme='dark'] .wx-modal-backdrop { background: rgba(0, 0, 0, 0.65); }
 
 /* Glass without its own backdrop-filter: .wx-modal-backdrop already blurs
    the page, so the translucent pane shows that blur through it. A filter
@@ -311,7 +306,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: wx-rise 0.18s var(--ease-out);
+  animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
 }
 
 /* When the modal's direct child is a <form>, make it the flex column so
@@ -322,10 +317,6 @@
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
-}
-@keyframes wx-rise {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .wx-modal-header {
   display: flex;
@@ -381,7 +372,7 @@
   font-size: 12.5px;
   font-weight: 600;
   text-align: left;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition: var(--t-colors), var(--t-press);
 }
 .wx-role-chip:hover { border-color: var(--accent); color: var(--text-primary); }
 .wx-role-chip-active {

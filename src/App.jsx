@@ -13,6 +13,8 @@ import BuddyGate from './components/buddy/BuddyGate';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
 import AppShell from './components/layout/AppShell';
+import { ToastProvider } from './components/ui/Toast';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { DEMO_MODE } from './lib/demoMode';
 
 // Sales-demo role switcher. Behind DEMO_MODE *and* lazy, so a production build
@@ -98,8 +100,6 @@ const AuditPage             = lazy(() => import('./pages/audit/AuditPage'));
 const SettingsPage          = lazy(() => import('./pages/settings/SettingsPage'));
 const NotificationsPage     = lazy(() => import('./pages/notifications/NotificationsPage'));
 const BuddyPage             = lazy(() => import('./pages/buddy/BuddyPage'));
-const ReportsPage           = lazy(() => import('./pages/reports/ReportsPage'));
-const ReportPage            = lazy(() => import('./pages/reports/ReportPage'));
 const ResourcePlannerPage   = lazy(() => import('./pages/resourcePlanner/ResourcePlannerPage'));
 const BossSalariesPage      = lazy(() => import('./pages/boss/salaries/BossSalariesPage'));
 const MyCompensationPage    = lazy(() => import('./pages/me/MyCompensationPage'));
@@ -196,6 +196,8 @@ export default function App() {
         <AuthProvider>
           <ErrorReporterProvider>
           <BrowserRouter>
+          <ToastProvider>
+          <ConfirmProvider>
           <Routes>
             {/* Public */}
             <Route path="/login"  element={<PublicOnly><LoginPage /></PublicOnly>} />
@@ -720,6 +722,8 @@ export default function App() {
               <DemoBar />
             </Suspense>
           )}
+          </ConfirmProvider>
+          </ToastProvider>
         </BrowserRouter>
           </ErrorReporterProvider>
         </AuthProvider>

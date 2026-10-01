@@ -8,6 +8,8 @@ import {
   SearchIcon, XIcon, StoreIcon, ChecklistIcon, ReportIcon, UsersIcon,
 } from '../common/Icon';
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
 export default function GlobalSearch() {
   const navigate = useNavigate();
   const inputRef = useRef(null);
@@ -89,7 +91,12 @@ export default function GlobalSearch() {
       const trig = document.querySelector('.global-search-trigger');
       if (!trig) return;
       const r = trig.getBoundingClientRect();
-      setPos({ top: r.bottom + 6, left: r.left, width: Math.max(380, r.width) });
+      // Clamp inside the viewport: on phones the trigger is a 40px icon near
+      // the right edge, so a 380px panel anchored to its left ran off-screen.
+      const vw = window.innerWidth;
+      const width = Math.min(Math.max(380, r.width), vw - 24);
+      const left = Math.max(12, Math.min(r.left, vw - width - 12));
+      setPos({ top: r.bottom + 6, left, width });
     }
     reposition();
     window.addEventListener('resize', reposition);
@@ -118,7 +125,7 @@ export default function GlobalSearch() {
       >
         <SearchIcon width="14" height="14" />
         <span className="global-search-label">Search…</span>
-        <span className="global-search-kbd">⌘K</span>
+        <span className="global-search-kbd">{IS_MAC ? '⌘K' : 'Ctrl K'}</span>
       </button>
 
       {open && pos && createPortal(

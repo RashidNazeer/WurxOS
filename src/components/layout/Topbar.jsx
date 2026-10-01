@@ -35,8 +35,8 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
   }, []);
 
   // Anchor the portaled menu under the trigger; the profile dropdown is portaled
-  // (like NotificationBell/GlobalSearch) so it escapes the topbar's z-index:5
-  // stacking context and never renders under sticky page toolbars (.ck-topbar etc.).
+  // (like NotificationBell/GlobalSearch) so it escapes the topbar's stacking
+  // context (z-index: var(--z-topbar)) and layers at --z-popover above everything.
   useLayoutEffect(() => {
     if (!menuOpen) return undefined;
     const place = () => {

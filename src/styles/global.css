@@ -1,6 +1,7 @@
 /* Inter is already loaded via the font <link> in index.html — a duplicate CSS
    @import here just adds a render-blocking, serialized request chain. */
 @import './tokens.css';
+@import './ui.css';
 
 *,
 *::before,
@@ -50,8 +51,6 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color var(--dur-base) var(--ease-out),
-              color var(--dur-base) var(--ease-out);
 }
 
 /* User font-size preference — zoom scales text + spacing + icons
@@ -113,14 +112,14 @@ a:hover { color: var(--accent-hover); }
 
 /* Bootstrap's default `.form-control::placeholder` color (around #6c757d)
    is too close to entered-text grey, making example-value placeholders
-   on report forms look like real data. Force it to the same faded tone
-   we use for our wx-* inputs so users can immediately tell empty fields
-   apart from filled ones. */
+   on report forms look like real data. Use the wx-* placeholder token:
+   it reads as clearly lighter than entered text (6.2 vs 16.3 in light)
+   while still passing 4.5:1, so no extra opacity. */
 .form-control::placeholder,
 .form-control-sm::placeholder,
 .form-select::placeholder {
   color: var(--input-placeholder) !important;
-  opacity: 0.7;
+  opacity: 1;
 }
 
 /* ============================================================
@@ -137,17 +136,17 @@ a:hover { color: var(--accent-hover); }
   --bs-body-bg: var(--surface-1);
   --bs-body-bg-rgb: 255, 255, 255;
   --bs-body-color: var(--text-primary);
-  --bs-body-color-rgb: 15, 23, 42;
+  --bs-body-color-rgb: 43, 29, 20;
   --bs-emphasis-color: var(--text-primary);
-  --bs-emphasis-color-rgb: 15, 23, 42;
-  /* light --text-muted is 2.56:1 until the warm palette lands; secondary passes */
-  --bs-secondary-color: var(--text-secondary);
+  --bs-emphasis-color-rgb: 43, 29, 20;
+  --bs-secondary-color: var(--text-muted);
+  --bs-secondary-color-rgb: 114, 93, 75;
   --bs-primary: var(--accent);
-  --bs-primary-rgb: 194, 112, 78;
+  --bs-primary-rgb: 173, 95, 62;
   --bs-link-color: var(--accent-text);
-  --bs-link-color-rgb: 156, 82, 52;
+  --bs-link-color-rgb: 148, 80, 47;
   --bs-link-hover-color: var(--accent-hover);
-  --bs-link-hover-color-rgb: 166, 90, 59;
+  --bs-link-hover-color-rgb: 143, 76, 44;
 }
 [data-theme='dark'] {
   /* -rgb triplets mirror the token hexes in tokens.css; update them with the palette. */
@@ -181,6 +180,20 @@ a:hover { color: var(--accent-hover); }
 }
 
 .text-primary { color: var(--accent-text) !important; }
+.text-success { color: var(--success-text) !important; }
+.text-danger  { color: var(--danger-text)  !important; }
+.text-warning { color: var(--warning-text) !important; }
+.text-info    { color: var(--info-text)    !important; }
+
+/* Control boundaries need 3:1; --bs-border-color is a decorative divider. */
+.form-control,
+.form-select,
+.form-check-input { border-color: var(--input-border); }
+
+/* Lora / JetBrains Mono from the font picker apply to reading content only. */
+.rich-content,
+.rte-container .ProseMirror { font-family: var(--font-content); }
+code, kbd, samp, pre { font-family: var(--font-code); }
 
 .btn-primary {
   --bs-btn-color: var(--on-accent);
@@ -457,12 +470,6 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-muted);
 }
 
-/* Bootstrap text-* utility tints — keep semantic meaning but use
-   our brighter dark-mode variants so they read on near-black. */
-[data-theme='dark'] .text-success { color: var(--success) !important; }
-[data-theme='dark'] .text-danger  { color: var(--danger)  !important; }
-[data-theme='dark'] .text-warning { color: var(--warning) !important; }
-[data-theme='dark'] .text-info    { color: var(--info)    !important; }
 
 /* bg-light is used as a chip/pill background in many v1-port files.
    On dark theme the white pill stays white otherwise. */
@@ -572,7 +579,7 @@ a:hover { color: var(--accent-hover); }
 }
 /* SVG fills below mirror token hexes (accent, on-accent, cream); update them with the palette. */
 .form-switch .form-check-input:focus {
-  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23c2704e'/%3e%3c/svg%3e");
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ad5f3e'/%3e%3c/svg%3e");
 }
 .form-switch .form-check-input:checked {
   --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
@@ -655,7 +662,7 @@ select.wx-input {
   -webkit-appearance: none;
   -moz-appearance: none;
   padding-right: 36px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23725d4b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat;
   background-position: right 12px center;
   cursor: pointer;
@@ -728,14 +735,10 @@ input[type="checkbox"] {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-out),
-              background-color var(--dur-fast) var(--ease-out),
-              border-color var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-fast) var(--ease-out);
+  transition: var(--t-colors), var(--t-press);
   user-select: none;
 }
 .wx-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.wx-btn:active:not(:disabled) { transform: translateY(1px); }
 
 .wx-btn-primary {
   background: var(--accent);
@@ -769,9 +772,9 @@ input[type="checkbox"] {
   gap: 10px;
   border: 1px solid transparent;
 }
-.wx-alert-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
-.wx-alert-success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
-.wx-alert-info    { background: var(--info-soft);    color: var(--info);    border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+.wx-alert-danger  { background: var(--danger-soft);  color: var(--danger-text);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.wx-alert-success { background: var(--success-soft); color: var(--success-text); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+.wx-alert-info    { background: var(--info-soft);    color: var(--info-text);    border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 
 /* ============ Card ============ */
 .wx-card {
@@ -795,6 +798,135 @@ input[type="checkbox"] {
   to { transform: rotate(360deg); }
 }
 
+/* ============ Motion ============
+   Keyframes read --motion-* so reduced motion (tokens.css) turns every
+   entrance into a plain short fade. `from`-only keyframes animate to the
+   element's resting style. */
+:root {
+  --motion-rise:  8px;
+  --motion-scale: 0.98;
+  --motion-pop:   4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-rise: 0px; --motion-scale: 1; --motion-pop: 0px; }
+}
+@keyframes wx-enter-fade { from { opacity: 0; } }
+@keyframes wx-exit-fade  { to   { opacity: 0; } }
+@keyframes wx-enter-rise {
+  from { opacity: 0; transform: translateY(var(--motion-rise)) scale(var(--motion-scale)); }
+}
+@keyframes wx-exit-rise {
+  to { opacity: 0; transform: translateY(calc(var(--motion-rise) / 2)) scale(var(--motion-scale)); }
+}
+/* Popovers drop from an anchor above them */
+@keyframes wx-enter-pop { from { opacity: 0; transform: translateY(calc(var(--motion-pop) * -1)); } }
+/* Flyout grows from the rail on its left */
+@keyframes wx-enter-pop-x { from { opacity: 0; transform: translateX(calc(var(--motion-pop) * -1)); } }
+/* Shared legacy names used by page CSS. Defined once, here only. */
+@keyframes wx-fade { from { opacity: 0; } }
+@keyframes wx-rise {
+  from { opacity: 0; transform: translateY(var(--motion-rise)) scale(var(--motion-scale)); }
+}
+@keyframes wx-pop { from { opacity: 0; transform: translateY(calc(var(--motion-pop) * -1)); } }
+/* Toasts */
+@keyframes wx-enter-up  { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+@keyframes wx-exit-down { to   { opacity: 0; transform: translateY(var(--motion-rise)); } }
+
+/* Press feedback: buttons sink slightly while held */
+.btn { transition: var(--t-colors), var(--t-press); }
+:is(.wx-btn, .btn, .wx-seg-btn):active:not(:disabled):not(.disabled) {
+  transform: scale(0.98);
+}
+
+/* Clickable cards lift on hover. Opt in with .wx-card--interactive
+   (anchors/buttons styled as .wx-card get it automatically). */
+.wx-card--interactive,
+a.wx-card,
+button.wx-card {
+  cursor: pointer;
+  transition: var(--t-colors), transform var(--dur-fast) var(--ease-out);
+}
+.wx-card--interactive:hover,
+a.wx-card:hover,
+button.wx-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.wx-card--interactive:active,
+a.wx-card:active,
+button.wx-card:active {
+  transform: scale(0.99);
+  transition-duration: var(--dur-instant);
+}
+
+/* Bootstrap dialogs and menus (React mounts them already "shown", so the
+   entrance is a keyframe rather than Bootstrap's class transition). */
+.modal.show .modal-dialog {
+  animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
+}
+.modal-backdrop.show { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+/* Opacity only: some menus are positioned with an inline transform. */
+.dropdown-menu.show { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+.popover.show { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+.tooltip.show { animation: wx-enter-fade var(--dur-fast) var(--ease-out); }
+.wx-metric-tip { transition: opacity var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
+
+/* Route change: the page container fades in (opacity only, so no
+   transform turns it into a containing block for fixed dialogs). The
+   class is re-applied per pathname by AppShell. */
+.route-enter { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+/* Lazy-route spinner waits 200ms so fast chunk loads never flash it. */
+.route-fallback { animation: wx-enter-fade var(--dur-base) var(--ease-out) 200ms both; }
+
+/* Theme switch cross-fade. Preferred path is a View Transition
+   (ThemeContext); browsers without it get this class for ~300ms.
+   Never present on initial load. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 250ms;
+  animation-timing-function: var(--ease-in-out);
+}
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color var(--dur-base) var(--ease-in-out),
+              color var(--dur-base) var(--ease-in-out),
+              border-color var(--dur-base) var(--ease-in-out),
+              fill var(--dur-base) var(--ease-in-out),
+              stroke var(--dur-base) var(--ease-in-out) !important;
+  transition-delay: 0s !important;
+}
+
+/* Reduced motion, app-wide (covers page CSS too): transitions become
+   instant, animations play once and briefly (entrances are fades only via
+   --motion-*); spinners keep turning because they signal progress. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 100ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .wx-spinner,
+  .ui-btn__spinner,
+  .spinner-border,
+  .spinner-grow,
+  .bd-spin,
+  .dv-spinner,
+  .ai-dots::after {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}
+
 /* ============ Segmented toggle (reusable) ============ */
 .wx-seg {
   display: inline-flex;
@@ -813,7 +945,7 @@ input[type="checkbox"] {
   padding: 6px 12px;
   border-radius: calc(var(--radius-md) - 3px);
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
 }
 .wx-seg-btn:hover { color: var(--text-primary); }
 .wx-seg-btn.is-active {

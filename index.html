@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/Logo.png" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#c2704e" />
+    <meta name="theme-color" content="#000000" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/Logo.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -53,6 +53,8 @@
         // switch knob, close button, native popups via color-scheme).
         root.setAttribute('data-theme', t);
         root.setAttribute('data-bs-theme', t);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', t === 'dark' ? '#000000' : '#faf7f2');
         try {
           var f = localStorage.getItem('wurxos-font-family');
           if (f) root.setAttribute('data-font-family', f);

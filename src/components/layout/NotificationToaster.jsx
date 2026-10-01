@@ -28,7 +28,7 @@ const CATEGORY_META = {
   system:      { label: 'System',      icon: MessageIcon,   cat: 'system' },
 };
 
-const LEAVE_MS = 240;   // keep in sync with the .is-leaving animation duration
+const LEAVE_MS = 160;   // keep in sync with the .is-leaving animation duration (--dur-exit)
 
 export default function NotificationToaster() {
   const { toasts, dismissToast, clearToasts, markRead, markAllRead } = useNotifications();

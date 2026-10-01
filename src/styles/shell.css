@@ -18,7 +18,9 @@
     'sidebar content';
   min-height: 100vh;
   background: var(--surface-0);
-  transition: grid-template-columns var(--dur-base) var(--ease-out);
+  /* The one layout animation we keep: the rail collapse. Emphasized curve
+     so it settles fast; labels hide instantly so text never reflows. */
+  transition: grid-template-columns var(--dur-base) var(--ease-emphasized);
   /* Topbar height — consumed by in-page sticky headers so they pin
      flush under the topbar. Kept in sync with .shell-topbar's
      min-height (overridden to 60px on mobile below). */
@@ -45,7 +47,7 @@
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  z-index: 10;
+  z-index: var(--z-sticky);
 }
 .shell-sidebar-header {
   display: flex;
@@ -67,7 +69,7 @@
   background: var(--surface-1);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
 }
 .shell-sidebar-toggle:hover {
   background: var(--surface-2);
@@ -82,7 +84,7 @@
   background: var(--surface-2);
   display: grid;
   place-items: center;
-  color: var(--on-accent);
+  color: var(--text-primary);
   font-weight: 800;
   font-size: 15px;
   box-shadow: 0 4px 10px -4px var(--accent-ring);
@@ -234,7 +236,7 @@
   border-radius: 50%;
   font-size: 12px;
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  transition: var(--t-colors);
 }
 .shell-sidebar-footer-btn:hover {
   background: var(--surface-2);
@@ -263,11 +265,6 @@
   background: var(--success);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent);
   flex: 0 0 auto;
-  animation: footer-dot-pulse 3s ease-in-out infinite;
-}
-@keyframes footer-dot-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent); }
-  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 28%, transparent); }
 }
 
 /* Collapsed sidebar — show just the logo tile, hide text */
@@ -312,8 +309,7 @@
   background: transparent;
   width: 100%;
   text-align: left;
-  transition: background var(--dur-fast) var(--ease-out),
-              color var(--dur-fast) var(--ease-out);
+  transition: var(--t-colors);
   white-space: nowrap;
 }
 .shell-nav-link:hover,
@@ -340,7 +336,7 @@
    sidebar's overflow and z-index can't clip it. */
 .shell-nav-flyout {
   position: fixed;
-  z-index: 1150;
+  z-index: var(--z-flyout);
   min-width: 200px;
   max-width: 280px;
   max-height: calc(100vh - 16px);
@@ -355,7 +351,8 @@
   box-shadow: var(--glass-shadow), var(--glass-highlight);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
-  animation: shell-pop 0.15s var(--ease-out);
+  transform-origin: left top;
+  animation: wx-enter-pop-x var(--dur-enter) var(--ease-emphasized);
 }
 .shell-nav-flyout-title {
   font-size: 11px;
@@ -368,9 +365,6 @@
 .shell-nav-flyout .shell-nav-link {
   font-size: 13px;
   padding: 8px 10px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .shell-nav-flyout { animation: none; }
 }
 
 /* Time-critical alert (Creator Library review nudges). Colours come from theme
@@ -406,9 +400,6 @@
   text-align: center;
 }
 .shell[data-collapsed='true'] .shell-nav-alert-badge { display: none; }
-@media (prefers-reduced-motion: reduce) {
-  .shell-nav-link--alert { animation: none; }
-}
 .shell-nav-link .icon,
 .shell-nav-toggle .icon {
   flex: 0 0 18px;
@@ -426,7 +417,7 @@
 .shell-nav-toggle .chev {
   flex: 0 0 auto;
   opacity: 0.6;
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: transform var(--dur-base) var(--ease-emphasized);
 }
 .shell-nav-toggle[data-open='true'] .chev { transform: rotate(90deg); }
 
@@ -441,6 +432,24 @@
 .shell-nav-sub .shell-nav-link {
   font-size: 13px;
   padding: 7px 10px;
+}
+/* Group expand/collapse: animate the row from 0fr to 1fr (no measured
+   heights). The closed list keeps no padding so nothing peeks out. */
+.shell-nav-sub-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-base) var(--ease-emphasized);
+}
+.shell-nav-sub-wrap[data-open='true'] { grid-template-rows: 1fr; }
+.shell-nav-sub-wrap > .shell-nav-sub {
+  min-height: 0;
+  overflow: hidden;
+  transition: padding var(--dur-base) var(--ease-emphasized), opacity var(--dur-base) var(--ease-out);
+}
+.shell-nav-sub-wrap[data-open='false'] > .shell-nav-sub {
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
 }
 
 /* v1-parity menu search — sits between the brand header and the
@@ -469,7 +478,7 @@
   border-radius: var(--radius-md);
   color: var(--text-primary);
   outline: none;
-  transition: border-color var(--dur-fast) var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .shell-sidebar-search-input:focus {
   border-color: var(--accent);
@@ -553,7 +562,7 @@
   border-bottom: 1px solid var(--glass-border);
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: var(--z-topbar);
   min-height: 68px;
 }
 .shell-topbar-left { display: flex; align-items: center; gap: 14px; }
@@ -570,9 +579,11 @@
   color: var(--text-muted);
 }
 
+/* Topbar controls (icon buttons, theme toggle, bell, search, user pill,
+   mobile menu) all share --control-h so the right cluster lines up. */
 .shell-icon-btn {
-  width: 38px;
-  height: 38px;
+  width: var(--control-h);
+  height: var(--control-h);
   display: grid;
   place-items: center;
   border-radius: var(--radius-pill);
@@ -580,7 +591,7 @@
   background: var(--surface-1);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition: var(--t-colors), var(--t-press);
 }
 .shell-icon-btn:hover {
   color: var(--text-primary);
@@ -592,25 +603,26 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px 6px 6px;
+  height: var(--control-h);
+  padding: 0 10px 0 3px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   background: var(--surface-1);
   cursor: pointer;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition: var(--t-colors), var(--t-press);
 }
 .shell-user-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
 .shell-user-avatar {
-  width: 40px;
-  height: 40px;
+  width: calc(var(--control-h) - 8px);
+  height: calc(var(--control-h) - 8px);
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: var(--on-accent);
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 14px;
-  flex: 0 0 40px;
+  font-size: 12px;
+  flex: 0 0 auto;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
 }
@@ -619,7 +631,7 @@
 .shell-user-role { font-size: 11px; color: var(--text-muted); }
 
 /* User dropdown — portaled to <body> (Topbar.jsx) so it escapes the topbar's
-   z-index:5 stacking context and always paints above sticky page toolbars
+   stacking context and always paints above sticky page toolbars
    (.ck-topbar, reports header, …). `top`/`right` are set inline from the
    trigger's measured rect; position is fixed to the viewport. */
 .shell-user-menu {
@@ -632,12 +644,13 @@
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
   padding: 6px;
-  z-index: 1200;
-  animation: shell-pop 0.15s var(--ease-out);
+  z-index: var(--z-popover);
+  transform-origin: top right;
+  animation: wx-enter-pop var(--dur-enter) var(--ease-emphasized);
 }
+/* Kept for any page CSS still referencing it */
 @keyframes shell-pop {
   from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 .shell-user-menu-item {
   display: flex;
@@ -654,7 +667,7 @@
   text-align: left;
 }
 .shell-user-menu-item:hover { background: var(--surface-2); }
-.shell-user-menu-item.danger { color: var(--danger); }
+.shell-user-menu-item.danger { color: var(--danger-text); }
 .shell-user-menu-item.danger:hover { background: var(--danger-soft); }
 .shell-user-menu-divider {
   height: 1px;
@@ -698,8 +711,8 @@
 /* ---------- Mobile menu button (hamburger in topbar) ---------- */
 .shell-mobile-menu-btn {
   display: none;
-  width: 38px;
-  height: 38px;
+  width: var(--control-h);
+  height: var(--control-h);
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border-subtle);
@@ -708,7 +721,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   flex: 0 0 auto;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
 }
 .shell-mobile-menu-btn:hover {
   background: var(--surface-2);
@@ -716,6 +729,9 @@
 }
 .shell-topbar-titles { min-width: 0; }
 .shell-topbar-title  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Drawer scrim exists only on mobile */
+.shell-mobile-overlay { display: none; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 860px) {
@@ -732,17 +748,25 @@
     top: 0;
     width: 260px;
     transform: translateX(-100%);
-    transition: transform var(--dur-base) var(--ease-out);
+    /* Closing uses the exit timing; visibility drops the closed drawer's
+       links out of the tab order once it has slid away (Audit S9). */
+    visibility: hidden;
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+    transition: transform var(--dur-exit) var(--ease-in),
+                visibility 0s linear var(--dur-exit);
     box-shadow: var(--shadow-xl);
     /* Respect iOS safe-area so the sidebar header (W logo + close
        button) sits below the notch / status bar instead of behind it. */
     padding-top: env(safe-area-inset-top);
+    /* Above page sticky toolbars (--z-sticky) and the topbar */
+    z-index: var(--z-drawer);
   }
   .shell[data-mobile-open='true'] .shell-sidebar {
     transform: translateX(0);
-    background: var(--glass-bg-strong);
-    -webkit-backdrop-filter: var(--glass-filter);
-    backdrop-filter: var(--glass-filter);
+    visibility: visible;
+    transition: transform var(--dur-enter) var(--ease-emphasized), visibility 0s;
   }
   /* Force the drawer to render in EXPANDED mode regardless of the
      desktop `collapsed` preference — an icons-only rail makes no sense
@@ -767,12 +791,23 @@
     flex-direction: row;
   }
   .shell[data-collapsed='true'] .shell-sidebar-footer { padding: 8px 10px 10px; }
+  /* Always mounted on mobile so the scrim can fade out as well as in. */
   .shell-mobile-overlay {
+    display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--backdrop);
+    -webkit-backdrop-filter: blur(2px);
     backdrop-filter: blur(2px);
-    z-index: 9;
+    z-index: var(--z-overlay);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--dur-exit) var(--ease-in), visibility 0s linear var(--dur-exit);
+  }
+  .shell[data-mobile-open='true'] .shell-mobile-overlay {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--dur-enter) var(--ease-out), visibility 0s;
   }
   .shell-content { padding: 20px 16px 40px; }
 
@@ -796,7 +831,7 @@
 
   /* Drop the user name + role text down to a tap target. The avatar
      + chevron are still visible so the dropdown still works. */
-  .shell-user-btn { padding: 4px 6px 4px 4px; gap: 6px; }
+  .shell-user-btn { padding: 0 6px 0 3px; gap: 6px; }
   .shell-user-meta { display: none; }
 }
 
@@ -805,7 +840,7 @@
 @media (max-width: 480px) {
   .shell-content { padding: 16px 12px 32px; }
   .shell-content-inner { padding: 0; }
-  .shell-user-btn .shell-user-avatar { width: 28px; height: 28px; font-size: 11px; }
+  .shell-user-btn .shell-user-avatar { font-size: 11px; }
 }
 
 /* ------------------------------------------------------------
@@ -815,13 +850,14 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px 7px 11px;
+  height: var(--control-h);
+  padding: 0 10px 0 11px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-1);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
   font-size: 12.5px;
   min-width: 180px;
 }
@@ -850,8 +886,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 1200;
-  animation: wx-pop 0.14s var(--ease-out);
+  z-index: var(--z-popover);
+  transform-origin: top center;
+  animation: wx-enter-pop var(--dur-enter) var(--ease-emphasized);
 }
 .global-search-input-row {
   display: flex;
@@ -906,7 +943,7 @@
   color: inherit;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .global-search-item:hover { background: var(--surface-2); }
 
@@ -922,12 +959,20 @@ html .notif-toast {
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
 }
+html .notif-panel {
+  transform-origin: top right;
+  animation: wx-enter-pop var(--dur-enter) var(--ease-emphasized);
+}
+html .notif-bell {
+  width: var(--control-h);
+  height: var(--control-h);
+}
 html .notif-toast-ghost {
   background: var(--glass-bg-strong);
   border-color: var(--glass-border);
 }
 
 @media (max-width: 720px) {
-  .global-search-trigger { min-width: 40px; padding: 7px 10px; }
+  .global-search-trigger { min-width: var(--control-h); padding: 0 10px; }
   .global-search-label, .global-search-kbd { display: none; }
 }
