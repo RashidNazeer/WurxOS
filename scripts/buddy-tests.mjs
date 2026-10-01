@@ -18,6 +18,7 @@ import {
   TRANSIENT_REASON, chainEntryStatus, vectorsByModel, freeSourcesValue, toggleInList,
   keySlotMeta, canEditSettings,
   normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, setRoleEconomy, budgetSaverState, modelSourceLabel,
+  ingestRing, quietHours, hhmm,
 } from '../src/lib/buddyLogic.js';
 import { markdownToHtml } from '../src/lib/markdownCore.js';
 
@@ -566,6 +567,22 @@ async function watchTests() {
     && markdownToHtml('a\n\n---\n\nb').includes('<hr>') && markdownToHtml('~~x~~').includes('<del>x</del>')
     && markdownToHtml('- [x] done').includes('type="checkbox"'));
   check('md: half-streamed table / fence never throws', typeof markdownToHtml('| a | b |\n|--') === 'string' && typeof markdownToHtml('```py\nprint(') === 'string');
+}
+
+// ── ingestion ring + quiet hours ────────────────────────────────────
+{
+  check('ring: percentage of the queue read', JSON.stringify(ingestRing({ queue: { done: 30, pending: 60, processing: 10 } }))
+    === '{"indeterminate":false,"pct":30,"done":30,"total":100,"left":70}');
+  check('ring: gone when the queue is empty', ingestRing({ queue: { done: 100 } }) === null && ingestRing({}) === null && ingestRing(null) === null);
+  check('ring: indeterminate right after Run, and until totals arrive',
+    ingestRing({ queue: { done: 100 } }, true).indeterminate === true && ingestRing({ queue: { pending: 5 }, }).pct === 0);
+  check('ring: 100% only when nothing is left', ingestRing({ queue: { done: 99, pending: 1 } }).pct === 99);
+
+  check('quiet hours: hidden until the backend has them', quietHours({}) === null && quietHours(null) === null);
+  const qh = quietHours({ quiet_hours: { enabled: true, start: '18:00:00', end: '02:00:00', tz: 'Asia/Karachi', active_now: true, next_allowed_at: '2026-10-02T21:00:00Z' } });
+  check('quiet hours: normalised for the time inputs', qh.start === '18:00' && qh.end === '02:00' && qh.activeNow && qh.tz === 'Asia/Karachi' && !!qh.nextAllowedAt);
+  check('quiet hours: off reads as off', quietHours({ quiet_hours: { enabled: false, start: '18:00', end: '02:00' } }).enabled === false);
+  check('hhmm: pads and drops seconds', hhmm('9:05:00') === '09:05' && hhmm('18:00') === '18:00' && hhmm(null) === '');
 }
 
 await watchTests();

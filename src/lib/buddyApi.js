@@ -302,8 +302,14 @@ export async function getBuddyConfig() {
 }
 
 // ── settings ───────────────────────────────────────────────────────
-export async function runIngestion() {
-  const { data, error } = await supabase.rpc('ai_run_ingestion');
+// `force` runs during quiet hours. Older backends have no p_force argument, so
+// a "no such function" answer retries without it.
+export async function runIngestion(force = false) {
+  const call = (args) => supabase.rpc('ai_run_ingestion', args);
+  let { data, error } = force ? await call({ p_force: true }) : await call();
+  if (error && force && (error.code === 'PGRST202' || /function .*ai_run_ingestion.* does not exist|without parameters/i.test(error.message || ''))) {
+    ({ data, error } = await call());
+  }
   if (error) throw new Error(/not allowed/i.test(error.message) ? 'not allowed' : error.message);
   return data;
 }

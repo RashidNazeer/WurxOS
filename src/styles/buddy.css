@@ -408,6 +408,24 @@
 .bd-main .bd-empty-sub { max-width: 620px; }
 
 /* ---------- Settings ---------- */
+/* Ingestion ring: how much of the queue is read, while a run works. */
+.bd-ring-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
+.bd-ring { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.bd-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.bd-ring circle { fill: none; stroke-width: 6; }
+.bd-ring-track { stroke: var(--surface-3); }
+.bd-ring-fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray var(--dur-slow) var(--ease-out); }
+.bd-ring-pct {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.bd-ring.is-indeterminate svg { animation: bd-ring-spin 1.1s linear infinite; }
+@keyframes bd-ring-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .bd-ring.is-indeterminate svg { animation: none; }
+  .bd-ring-fill { transition: none; }
+}
+
 /* Settings › Wurx Buddy: category pills, only on phones (the Settings nav has
    the sub-tabs on wider screens; it becomes a plain list at 900 px). */
 .bd-subtabs { display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }

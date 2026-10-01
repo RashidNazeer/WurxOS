@@ -871,6 +871,39 @@ export function ingestProgress(stats) {
   return { queue, vectors };
 }
 
+// The circular ring in the ingestion card, shown only while a run is working.
+// `justStarted` covers the seconds between clicking Run and the first stats.
+export function ingestRing(stats, justStarted = false) {
+  const q = stats?.queue || {};
+  const left = num(q.pending) + num(q.processing);
+  const done = num(q.done);
+  const total = left + done;
+  if (left <= 0) return justStarted ? { indeterminate: true, done: 0, total: 0, left: 0 } : null;
+  if (total <= 0) return { indeterminate: true, done: 0, total: 0, left };
+  return { indeterminate: false, pct: Math.round((done / total) * 100), done, total, left };
+}
+
+// A postgres `time` ("18:00:00") → "18:00" for <input type="time">.
+export function hhmm(t) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t ?? ''));
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : '';
+}
+
+// Ingestion quiet hours (ai_ingest_stats().quiet_hours). null until the
+// backend has them, so the UI stays hidden.
+export function quietHours(stats) {
+  const q = stats?.quiet_hours;
+  if (!q || typeof q !== 'object') return null;
+  return {
+    enabled: q.enabled !== false,
+    start: hhmm(q.start),
+    end: hhmm(q.end),
+    tz: q.tz || 'Asia/Karachi',
+    activeNow: q.active_now === true,
+    nextAllowedAt: q.next_allowed_at || null,
+  };
+}
+
 // Document types that may go to free AI providers. Incentive plans contain pay
 // amounts, so they are left out unless the Boss ticks them.
 export const FREE_SOURCES_DEFAULT_OFF = ['incentive'];

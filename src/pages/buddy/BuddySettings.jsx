@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { lazyWithRetry as lazy } from '../../lib/lazyWithRetry';
 import {
   getAiConfig, updateAiConfig, listDocs, saveDoc, deleteDoc,
@@ -13,7 +13,7 @@ import {
   ALL_ROLES, ALWAYS_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles,
   FALLBACK_MAX, DEFAULT_SLOT_META, keySlotMeta, chainAdd, chainMove, chainRemove, creditsExhausted, fmtUsd, lastChecked,
   modelLabel, modelOptions, optionKey, parseOptionKey, allOptions, filterOptions, slotLabel,
-  chainEntryStatus, vectorsByModel, ingestProgress, freeSourcesValue, toggleInList, fmtCount,
+  chainEntryStatus, vectorsByModel, ingestProgress, ingestRing, quietHours, hhmm, freeSourcesValue, toggleInList, fmtCount,
   ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups,
 } from '../../lib/buddyLogic';
 import { LoadError } from '../../components/buddy/BuddyThread';
@@ -96,18 +96,41 @@ function IngestionCard({ readOnly }) {
   const [statsErr, setStatsErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [justStarted, setJustStarted] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     ingestStats().then((s) => { setStats(s); setStatsErr(''); })
       .catch((e) => setStatsErr(e.message === 'not allowed' ? 'boss-only' : e.message));
-  };
-  useEffect(load, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const quiet = quietHours(stats);
+  const ring = ingestRing(stats, justStarted);
+
+  // Follow a run while it works: every 3 s, only while this tab is visible.
+  useEffect(() => {
+    if (!ring) return undefined;
+    let t = null;
+    const tick = () => {
+      if (document.visibilityState === 'visible') load();
+      t = setTimeout(tick, 3000);
+    };
+    t = setTimeout(tick, 3000);
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [!!ring, load]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = async () => {
+    // Quiet hours: ask before overriding them.
+    const force = !!quiet?.activeNow;
+    if (force && !window.confirm("It's quiet hours. Run anyway?")) return;
     setBusy(true); setMsg('');
     try {
-      const r = await runIngestion();
+      const r = await runIngestion(force);
       setMsg((RUN_MESSAGES[r?.status] || (() => 'Done.'))(r || {}));
+      setJustStarted(true);
+      setTimeout(() => setJustStarted(false), 12000);
       load();
     } catch (e) {
       setMsg(e.message === 'not allowed' ? "You don't have permission to run ingestion." : `Couldn't start: ${e.message}`);
@@ -126,18 +149,26 @@ function IngestionCard({ readOnly }) {
         </button>
         {msg && <span className="small" role="status">{msg}</span>}
       </div>
+      {quiet?.activeNow && (
+        <div className="bd-card-sub mb-2" role="status">
+          <i className="bi bi-moon-stars" aria-hidden="true" /> Quiet hours — ingestion resumes at {fmt(quiet.nextAllowedAt) || quiet.end}.
+        </div>
+      )}
+      {ring && <IngestRing ring={ring} />}
       {statsErr === 'boss-only' && <div className="bd-card-sub">Run history and queue numbers aren't available to your role.</div>}
       {statsErr && statsErr !== 'boss-only' && <LoadError what="the ingestion stats" onRetry={load} compact />}
       {stats && (
         <div className="bd-stats">
           <Stat label="Last run" value={fmt(stats.last_sweep_at)} />
-          <Stat label="Next due" value={fmt(stats.next_sweep_due_at)} />
+          <Stat label="Next due" value={fmt(stats.next_sweep_due_at)}
+            sub={quiet?.activeNow && quiet.nextAllowedAt ? `after quiet hours: ${fmt(quiet.nextAllowedAt)}` : null} />
           <Stat label="Queued" value={(q.pending || 0) + (q.processing || 0)} />
           <Stat label="Failed" value={q.failed || 0} warn={(q.failed || 0) > 0} />
           {/* mig 402: saved and keyword-searchable, still waiting for a main-key vector. */}
           {stats.vector_pending != null && <Stat label="Waiting for vectors" value={fmtCount(stats.vector_pending)} warn={Number(stats.vector_pending) > 0} />}
         </div>
       )}
+      {quiet && <QuietHoursRow readOnly={readOnly} />}
       {prog?.queue && prog.queue.left > 0 && (
         <Progress label="Reading documents" done={prog.queue.done} total={prog.queue.total} pct={prog.queue.pct}
           note={`${fmtCount(prog.queue.left)} left in the queue`} />
@@ -249,11 +280,101 @@ function IngestionFallbacks({ readOnly }) {
   );
 }
 
-function Stat({ label, value, warn }) {
+function Stat({ label, value, warn, sub }) {
   return (
     <div className={`bd-stat ${warn ? 'is-warn' : ''}`}>
       <div className="bd-stat-label">{label}</div>
       <div className="bd-stat-value">{value}</div>
+      {sub && <div className="bd-card-sub">{sub}</div>}
+    </div>
+  );
+}
+
+// A run in progress: a ring with the percentage in the middle. Indeterminate
+// (spinning) until the totals are known, and gone once the queue is empty.
+function IngestRing({ ring }) {
+  const R = 26;
+  const C = 2 * Math.PI * R;
+  const pct = ring.indeterminate ? 25 : Math.min(100, Math.max(0, ring.pct));
+  return (
+    <div className="bd-ring-row">
+      <div className={`bd-ring ${ring.indeterminate ? 'is-indeterminate' : ''}`}
+        role="progressbar" aria-label="Ingestion progress"
+        aria-valuenow={ring.indeterminate ? undefined : pct} aria-valuemin={0} aria-valuemax={100}
+        aria-valuetext={ring.indeterminate ? 'Starting…' : `${pct}%`}>
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle className="bd-ring-track" cx="32" cy="32" r={R} />
+          <circle className="bd-ring-fill" cx="32" cy="32" r={R}
+            strokeDasharray={`${(C * pct) / 100} ${C}`} />
+        </svg>
+        <span className="bd-ring-pct">{ring.indeterminate ? '…' : `${pct}%`}</span>
+      </div>
+      <div className="bd-card-sub">
+        {ring.indeterminate
+          ? 'Starting the run…'
+          : `Reading ${fmtCount(ring.done)} of ${fmtCount(ring.total)} documents`}
+      </div>
+    </div>
+  );
+}
+
+// Ingestion quiet hours (config ingest_quiet_*): hidden until those columns
+// exist. The Boss and developers edit; the database is the real boundary.
+function QuietHoursRow({ readOnly }) {
+  const [saved, setSaved] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    getAiConfig().then((c) => {
+      if (!c || !('ingest_quiet_start' in c)) return;
+      const d = {
+        ingest_quiet_enabled: c.ingest_quiet_enabled !== false,
+        ingest_quiet_start: hhmm(c.ingest_quiet_start) || '18:00',
+        ingest_quiet_end: hhmm(c.ingest_quiet_end) || '02:00',
+      };
+      setSaved(d); setDraft(d);
+    }).catch(() => { /* optional row: nothing to show */ });
+  }, []);
+
+  if (!draft) return null;
+  const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try { await updateAiConfig(draft); setSaved(draft); setMsg('Saved.'); }
+    catch (e) { setMsg(`Not saved: ${e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="mt-3">
+      <fieldset disabled={readOnly || saving} className="bd-fieldset">
+        <legend className="visually-hidden">Quiet hours</legend>
+        <div className="form-check form-switch">
+          <input className="form-check-input" type="checkbox" role="switch" id="bd-quiet-on" checked={draft.ingest_quiet_enabled}
+            onChange={(e) => setDraft({ ...draft, ingest_quiet_enabled: e.target.checked })} />
+          <label className="form-check-label small fw-semibold" htmlFor="bd-quiet-on">Quiet hours</label>
+        </div>
+        <div className="bd-saver mt-1">
+          <label className="small" htmlFor="bd-quiet-start">From</label>
+          <input id="bd-quiet-start" type="time" className="form-control form-control-sm" style={{ width: 120 }}
+            value={draft.ingest_quiet_start} onChange={(e) => setDraft({ ...draft, ingest_quiet_start: e.target.value })} />
+          <label className="small" htmlFor="bd-quiet-end">to</label>
+          <input id="bd-quiet-end" type="time" className="form-control form-control-sm" style={{ width: 120 }}
+            value={draft.ingest_quiet_end} onChange={(e) => setDraft({ ...draft, ingest_quiet_end: e.target.value })} />
+        </div>
+        <div className="bd-card-sub mt-1">Ingestion never runs during these hours (Pakistan time). It resumes automatically afterwards.</div>
+      </fieldset>
+      {!readOnly && (
+        <div className="d-flex align-items-center gap-2 flex-wrap mt-2">
+          <button type="button" className="btn btn-sm btn-primary" disabled={!dirty || saving} onClick={save}>
+            {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save quiet hours'}
+          </button>
+          {dirty && <button type="button" className="btn btn-sm btn-link" onClick={() => setDraft(saved)}>Undo</button>}
+          {msg && <span className="small" role="status">{msg}</span>}
+        </div>
+      )}
     </div>
   );
 }
