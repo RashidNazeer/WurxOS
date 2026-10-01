@@ -6,6 +6,7 @@
 
 import type { Db, ToolCtx, ToolSource } from './types.ts';
 import { allowed, isBoss, rlsDecides, viewableBrandIds } from './acl.ts';
+import { assignmentText, coverText, loadAssignments } from './assignments.ts';
 import { fmtMoney, fmtNum, fmtSigned, normTier, parseMetric, reportCurrency } from './metrics.ts';
 import { addDays, applyPeriod, type Period, resolveBrands, resolvePeriod } from './period.ts';
 import { clip, has, htmlToText, insightBlock, metricsLine, tableBlock, writtenBlock } from './v1format.ts';
@@ -874,7 +875,8 @@ export async function brandOverview(admin: Db, ctx: ToolCtx, args: any): Promise
   const lines = [
     `${full?.brand_name || b.brand_name}${full?.client_name ? ` (client: ${full.client_name})` : ''}`,
     `- Status: ${full?.status || 'n/a'} · tier: ${normTier(full?.tier) ?? 'not set'} · currency: ${cur}`,
-    `- Owner: ${owner || 'not set'}`,
+    `- Owner (Team Lead): ${owner || 'not set'}`,
+    `- Assigned: ${assignmentText((await loadAssignments(admin, [b.id])).get(b.id)) || 'nobody assigned'}`,
     full?.gmv_max_status || full?.paid_collab_status ? `- GMV Max: ${full?.gmv_max_status || 'n/a'} · paid collab: ${full?.paid_collab_status || 'n/a'}` : null,
     full?.last_sale_generated_date ? `- Last sale generated: ${full.last_sale_generated_date}` : null,
     metLines.length ? `- Monthly targets vs achieved (latest ${metLines.length}):\n${metLines.join('\n')}` : isBoss(ctx) ? '- Monthly targets: none recorded.' : '- Monthly targets: none I can show you.',   // bmm RLS is narrower than brands; no hint which
@@ -894,12 +896,70 @@ export async function listBrands(admin: Db, ctx: ToolCtx): Promise<Out> {
   const ids = brands.map((b: any) => b.owner_id).filter(Boolean);
   const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000']);
   const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+  // Owner = the Team Lead; the APCs/IPCs come from brand_assignments.
+  const assigned = await loadAssignments(admin, brands.map((b: any) => b.id));
   src.ids = brands.map((b: any) => b.id).slice(0, 50);
+  src.extra = { assignments: 'brand_assignments' };
   return {
-    text: `${visible ? 'Brands you can see' : 'Brands'} (${brands.length}):\n` + brands.map((b: any) =>
-      `- ${b.brand_name} (${b.status || 'n/a'})${b.owner_id ? ` — owner: ${nameOf.get(b.owner_id) || 'unknown'}` : ''}`).join('\n'),
+    text: `${visible ? 'Brands you can see' : 'Brands'} (${brands.length}):\n` + brands.map((b: any) => {
+      const team = assignmentText(assigned.get(b.id));
+      return `- ${b.brand_name} (${b.status || 'n/a'})${b.owner_id ? ` — owner: ${nameOf.get(b.owner_id) || 'unknown'}` : ''}${team ? `; ${team}` : ''}`;
+    }).join('\n'),
     source: src,
   };
+}
+
+// ------------------------------------------------------------------ get_brand_assignments
+// "Who handles X / which brands does Y handle": per brand the owner (the Team
+// Lead, brands.owner_id) and the assigned APCs/IPCs (brand_assignments).
+export async function getBrandAssignments(admin: Db, ctx: ToolCtx, args: any): Promise<Out> {
+  const src: ToolSource = { table: 'brand_assignments', extra: { owner: 'brands.owner_id' } };
+  const scope = await brandScope(admin, ctx, args?.brand ? String(args.brand) : undefined);
+  if (scope.error) return { text: scope.error, source: src };
+  let person: any = null;
+  if (args?.person) {
+    const { data: people } = await admin.from('profiles').select('id, display_name, role')
+      .ilike('display_name', `%${String(args.person).trim()}%`).is('deleted_at', null).eq('is_active', true).limit(8);
+    if (!people?.length) return { text: `No active employee matches "${args.person}".`, source: src };
+    if (people.length > 1) return { text: `Multiple people match "${args.person}": ${people.map((p: any) => p.display_name).join(', ')}. Ask which one.`, source: src };
+    person = people[0];
+  }
+  let q = admin.from('brands').select('id, brand_name, status, owner_id').order('brand_name').limit(300);
+  if (scope.ids) q = q.in('id', scope.ids);
+  if (!args?.brand && !args?.include_inactive) q = q.eq('status', 'active');
+  const { data: brands, error } = await q;
+  if (error) throw error;
+  const list = brands || [];
+  if (!list.length) return { text: 'No brands found.', source: src };
+  const assigned = await loadAssignments(admin, list.map((b: any) => b.id));
+  const ownerIds = [...new Set(list.map((b: any) => b.owner_id).filter(Boolean))];
+  const { data: owners } = ownerIds.length ? await admin.from('profiles').select('id, display_name').in('id', ownerIds) : { data: [] };
+  const ownerName = new Map<string, string>((owners || []).map((p: any) => [p.id, String(p.display_name)]));
+  const role = args?.role ? String(args.role).toLowerCase() : null;
+  const rows: Array<{ brand: string; brand_id: string; person: string; relation: string; until: string | null }> = [];
+  const lines: string[] = [];
+  for (const b of list) {
+    const team = (assigned.get(b.id) ?? []).filter((a) => !role || a.role === role);
+    const owner = b.owner_id ? ownerName.get(b.owner_id) ?? 'unknown' : null;
+    if (owner && (!role || role === 'tl' || role === 'owner')) rows.push({ brand: b.brand_name, brand_id: b.id, person: owner, relation: 'owner (Team Lead)', until: null });
+    for (const a of team) rows.push({ brand: b.brand_name, brand_id: b.id, person: a.name, relation: `assigned ${a.role.toUpperCase()}`, until: a.until });
+    if (person) {
+      const mine = [b.owner_id === person.id ? 'owner (Team Lead)' : null,
+        ...team.filter((a) => a.user_id === person.id).map((a) => `assigned ${a.role.toUpperCase()}${coverText(a)}`)]
+        .filter(Boolean);
+      if (mine.length) lines.push(`- ${b.brand_name} (${b.status || 'n/a'}): ${mine.join(', ')}`);
+    } else {
+      const ownerPart = role && role !== 'tl' && role !== 'owner' ? '' : `owner (Team Lead): ${owner ?? 'not set'}`;
+      const teamPart = role === 'tl' || role === 'owner' ? '' : assignmentText(team) || 'no APC/IPC assigned';
+      lines.push(`- ${b.brand_name} (${b.status || 'n/a'}) — ${[ownerPart, teamPart].filter(Boolean).join('; ')}`);
+    }
+  }
+  src.ids = list.map((b: any) => b.id).slice(0, 50);
+  const data = { rows: person ? rows.filter((r) => r.person === person.display_name) : rows };
+  if (person) {
+    return { text: lines.length ? `Brands ${person.display_name} handles (${lines.length}):\n${lines.join('\n')}` : `${person.display_name} owns no brand and is assigned to none that you can see.`, source: src, data };
+  }
+  return { text: `Brand teams (${lines.length}; owner = Team Lead, assigned = APCs/IPCs):\n${lines.join('\n')}`, source: src, data };
 }
 
 // ------------------------------------------------------------------ get_agenda_tasks

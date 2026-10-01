@@ -111,8 +111,21 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'list_brands',
-    description: 'List client brands with their status and owner. Use for "which brands do we have / who owns X".',
+    description: 'List client brands with their status, owner (the Team Lead) and the APCs/IPCs assigned to each. Use for "which brands do we have / who owns X".',
     parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_brand_assignments',
+    description: "Who handles which brand: per brand the owner (Team Lead) and the assigned APCs/IPCs (temporary cover marked). Use for 'which APC is responsible for / assigned to / handles brand X' and 'which brands does person Y handle'. Never infer APCs from reports or owners; use this.",
+    parameters: {
+      type: 'object',
+      properties: {
+        brand: { type: 'string', description: 'Brand name (partial ok); omit for all brands.' },
+        person: { type: 'string', description: 'Employee name: the brands they own or are assigned to.' },
+        role: { type: 'string', enum: ['apc', 'ipc', 'tl'], description: 'Only this role (tl = the owner).' },
+        include_inactive: { type: 'boolean', description: 'Include inactive brands (default: active only, unless a brand is named).' },
+      },
+    },
   },
   {
     name: 'get_top_creators',
@@ -214,6 +227,7 @@ const IMPL: Record<string, Impl> = {
   brand_overview: R.brandOverview,
   get_gmv_max: R.getGmvMax,
   get_agenda_tasks: R.getAgendaTasks,
+  get_brand_assignments: R.getBrandAssignments,
 };
 export const TOOL_NAMES = Object.keys(IMPL);
 

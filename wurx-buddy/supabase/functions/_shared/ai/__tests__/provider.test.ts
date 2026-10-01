@@ -103,7 +103,7 @@ test('F2: every ai_usage_log row carries every column (no NULL from a bulk inser
 
 // ── the ingest worker ───────────────────────────────────────────────────────
 
-test('ingest: no credits → items deferred (attempt kept, not failed), run stops', async () => {
+test('ingest: no credits → chunks written pending (keyword-searchable), OpenAI asked once per run and its space deferred (mig 406)', async () => {
   const s = { source_id: 'r1', indexable: true, fp: 'fp1', payload: { row: F.weeklyLegacy(), brand: F.CTX.brand } };
   const calls: Array<[string, any]> = [];
   const rpc = async (fn: string, args: any = {}) => {
@@ -118,17 +118,22 @@ test('ingest: no credits → items deferred (attempt kept, not failed), run stop
     if (fn === 'ai_pipeline_version' || fn === 'ai_embed_model') return fn === 'ai_pipeline_version' ? PIPELINE_VERSION : DEFAULT_CONFIG.EMBED_MODEL;
     return null;
   };
-  const embed = async () => { throw new EmbedError(`embeddings HTTP 429: ${NO_CREDITS_BODY}`, false, 429); };
-  const stats = await runWorker({ rpc, embed, recordRun: false, checkPipeline: false, workerId: 'w' });
-  const defers = calls.filter(([f]) => f === 'ai_ingest_defer');
-  assert.equal(defers.length, 2);
-  assert.equal(defers[0][1].p_delay_seconds, PROVIDER_DEFER_SECONDS);
-  assert.equal(calls.filter(([f]) => f === 'ai_ingest_fail').length, 0);
-  assert.deepEqual([stats.deferred, stats.failed, stats.provider_issue], [2, 0, 'quota']);
-  assert.equal(calls.filter(([f]) => f === 'ai_ingest_claim').length, 1, 'stopped after the batch');
-  // an ordinary embedding error still counts as a failure
+  let asked = 0;
+  const embed = async () => { asked++; throw new EmbedError(`embeddings HTTP 429: ${NO_CREDITS_BODY}`, false, 429); };
+  const stats = await runWorker({ rpc, embed, recordRun: false, checkPipeline: false, workerId: 'w', backfill: false });
+  const writes = calls.filter(([f]) => f === 'ai_ingest_write');
+  assert.equal(writes.length, 2, 'both documents written');
+  assert.ok(writes.every(([, a]) => a.p_chunks.every((c: any) => c.embedding === null)), 'without vectors: pending');
+  assert.equal(asked, 1, 'a provider with no credits is asked once per run');
+  const defer = calls.find(([f]) => f === 'ai_vector_defer')!;
+  assert.deepEqual([defer[1].p_space, defer[1].p_seconds], ['primary', PROVIDER_DEFER_SECONDS]);
+  assert.equal(calls.filter(([f]) => f === 'ai_ingest_fail' || f === 'ai_ingest_defer').length, 0);
+  assert.deepEqual([stats.failed, stats.provider_issue], [0, 'quota']);
+  // an ordinary embedding error: also written pending, the space not deferred
   const s2 = emptyStats();
+  const before = calls.filter(([f]) => f === 'ai_vector_defer').length;
   await processBatch([{ id: 3, source_type: 'report', source_id: 'r3', op: 'upsert', attempts: 1 }],
     { rpc, workerId: 'w', pipelineVersion: PIPELINE_VERSION, model: DEFAULT_CONFIG.EMBED_MODEL, embed: async () => { throw new Error('socket hang up'); } }, s2);
-  assert.deepEqual([s2.failed, s2.deferred, s2.provider_issue], [1, 0, null]);
+  assert.deepEqual([s2.failed, s2.provider_issue], [0, null]);
+  assert.equal(calls.filter(([f]) => f === 'ai_vector_defer').length, before);
 });

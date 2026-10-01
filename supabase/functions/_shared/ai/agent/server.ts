@@ -8,6 +8,7 @@ import { RETRIEVAL_DEFAULTS } from '../retrieval/config.ts';
 import { DEFAULT_CONFIG } from '../config.ts';
 import { pricesFrom, UsageMeter } from '../prices.ts';
 import { providerAccountIssue } from '../providerErrors.ts';
+import { embedWithKeys, nvidiaEmbedOptions } from '../embedder.ts';
 import { isSlot, refreshModels, type KeySlot } from './models.ts';
 import { cleanPageContext, cleanSurface, requestCancel, type CoreDeps } from './core.ts';
 import { json, turnResponse, type TurnHttp } from './http.ts';
@@ -92,13 +93,25 @@ export type ServerEnv = {
 export const EMBED_DOWN_MS = 600_000;
 let embedDownUntil = 0;
 export const _resetEmbedDown = () => { embedDownUntil = 0; };   // tests
-// TODO(Engineer 2, mig 402 second vector space): the query embedding is built
-// here, for the OpenAI `embedding` column only. Add the Gemini query embed for
-// `embedding_alt` next to it (env.geminiKey is already in ServerEnv), return it
-// alongside `embed`, and pass it through makeDeps → CoreDeps → ToolEnv →
-// searchIndex (p_query_embedding_alt). `down` feeds the keyword-only prompt note
-// in core.ts, so it should only be true when no query vector can be made at all.
-export function chainEmbedder(env: ServerEnv, meter: UsageMeter): { embed: (t: string) => Promise<number[]>; down: () => boolean } {
+// The second vector space (mig 406): an NVIDIA query vector for `embedding_alt`
+// (keys nvidia, then nvidia2; input_type 'query'). searchIndex asks for it only
+// when the OpenAI embed gave none. Down for 10 minutes on an account problem too.
+let altDownUntil = 0;
+export function altQueryEmbedder(env: ServerEnv): ((t: string) => Promise<number[] | null>) | undefined {
+  const keys = [env.nvidiaKey, env.nvidia2Key].filter(Boolean) as string[];
+  if (!keys.length) return undefined;
+  const one = async (text: string): Promise<number[]> => {
+    if (Date.now() < altDownUntil) throw new Error('alt query embeddings unavailable');
+    try { return (await embedWithKeys([text], keys, nvidiaEmbedOptions('query', { fetchImpl: env.fetchImpl, maxRetries: 1, timeoutMs: 8000 }))).vectors[0]; }
+    catch (e) { if (providerAccountIssue(e)) altDownUntil = Date.now() + EMBED_DOWN_MS; throw e; }
+  };
+  return cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS);
+}
+
+// `down` feeds the keyword-only prompt note in core.ts: true only when no query
+// vector can be made at all (neither OpenAI nor the NVIDIA alt space).
+export function chainEmbedder(env: ServerEnv, meter: UsageMeter):
+  { embed: (t: string) => Promise<number[]>; alt?: (t: string) => Promise<number[] | null>; down: () => boolean } {
   const slots = ([['primary', env.openAiKey], ['fallback', env.openAiKeyFallback]] as const).filter(([, k]) => !!k);
   const one = async (text: string): Promise<number[]> => {
     if (Date.now() < embedDownUntil) throw new Error('query embeddings unavailable: no OpenAI key can embed right now');
@@ -110,7 +123,12 @@ export function chainEmbedder(env: ServerEnv, meter: UsageMeter): { embed: (t: s
     embedDownUntil = Date.now() + EMBED_DOWN_MS;
     throw last;
   };
-  return { embed: cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS), down: () => Date.now() < embedDownUntil };
+  const alt = altQueryEmbedder(env);
+  return {
+    embed: cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
+    alt,
+    down: () => Date.now() < embedDownUntil && (!alt || Date.now() < altDownUntil),
+  };
 }
 
 // Search runs with the caller's JWT so the database ACL applies; without one
@@ -138,6 +156,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     nvidia2Key: env.nvidia2Key ?? null,
     ...(env.noRateLimit ? { rateLimitExempt: true } : {}),
     embed: emb.embed,
+    ...(emb.alt ? { embedAlt: emb.alt } : {}),
     embedDown: emb.down,
     rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl, onUsage: meter.onRerank(RETRIEVAL_DEFAULTS.RERANK_MODEL) }),
     meter,

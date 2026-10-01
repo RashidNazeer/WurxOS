@@ -8,6 +8,7 @@ import {
 } from '../tools/reports.ts';
 import { bound, NOT_YOURS, ROLE_ANGLES, runDataTool, STAFF_ROLES, TOOL_DEFS, TOOL_NAMES, TOOL_RESULT_CHAR_CAP } from '../tools/index.ts';
 import { _resetAclProbe } from '../tools/acl.ts';
+import { assignmentText, loadAssignments } from '../tools/assignments.ts';
 import { fakeDb } from './fixtures/fakeDb.ts';
 
 // ------------------------------------------------------------------ parseMetric
@@ -621,6 +622,53 @@ test('reports with the caller JWT: can_view_report decides, including the author
   assert.match((await runDataTool(fakeDb({}), { userId: 'u-apc', role: 'apc', userClient: user }, 'list_brands', {})).text, /^Brands you can see \(1\):/);
   const ov = await runDataTool(fakeDb({}), { userId: 'u-apc', role: 'apc', userClient: fakeDb({ brands: BRANDS.filter((b) => b.id === 'b2'), brand_monthly_metrics: [], reports: [], profiles: [] }) }, 'brand_overview', { brand: 'Aqua' });
   assert.match(ov.text, /Monthly targets: none I can show you\./);
+});
+
+// ------------------------------------------------------------------ brand assignments (APCs/IPCs)
+const TEAM = [
+  { id: 't1', display_name: 'Tina TL', role: 'tl', is_active: true, deleted_at: null },
+  { id: 'a1', display_name: 'Ali APC', role: 'apc', is_active: true, deleted_at: null },
+  { id: 'a2', display_name: 'Bea APC', role: 'apc', is_active: true, deleted_at: null },
+  { id: 'a3', display_name: 'Gone APC', role: 'apc', is_active: false, deleted_at: null },
+  { id: 'i1', display_name: 'Ivy IPC', role: 'ipc', is_active: true, deleted_at: null },
+];
+const TEAM_BRANDS = [
+  { id: 'bA', brand_name: 'Alpha', status: 'active', owner_id: 't1', currency: 'USD' },
+  { id: 'bB', brand_name: 'Beta', status: 'active', owner_id: 't1', currency: 'USD' },
+];
+const ASG = [
+  { brand_id: 'bA', user_id: 'a1', expires_at: null },
+  { brand_id: 'bA', user_id: 'a2', expires_at: '2099-10-12T10:00:00Z' },   // temporary cover
+  { brand_id: 'bA', user_id: 'a3', expires_at: null },                     // inactive: left out
+  { brand_id: 'bA', user_id: 'i1', expires_at: null },
+  { brand_id: 'bB', user_id: 'a2', expires_at: '2000-01-01T00:00:00Z' },   // expired cover: left out
+];
+
+test('assignments: grouped by role, temporary cover marked, inactive and expired left out', async () => {
+  const m = await loadAssignments(fakeDb({ brand_assignments: ASG, profiles: TEAM }), ['bA', 'bB']);
+  assert.equal(assignmentText(m.get('bA')), 'APCs: Ali APC, Bea APC (temporary cover until 12 Oct); IPCs: Ivy IPC');
+  assert.equal(m.get('bB'), undefined);
+  assert.equal(assignmentText([]), '');
+});
+
+test('list_brands / brand_overview / get_brand_assignments show the assigned APCs, via the caller JWT for non-Boss', async () => {
+  const boss = fakeDb({ brands: TEAM_BRANDS, brand_assignments: ASG, profiles: TEAM, brand_monthly_metrics: [], reports: [] });
+  const lb = await runDataTool(boss, BOSS, 'list_brands', {});
+  assert.match(lb.text, /- Alpha \(active\) — owner: Tina TL; APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\); IPCs: Ivy IPC/);
+  assert.match(lb.text, /- Beta \(active\) — owner: Tina TL$/m);
+  const ov = await runDataTool(boss, BOSS, 'brand_overview', { brand: 'Alpha' });
+  assert.match(ov.text, /- Owner \(Team Lead\): Tina TL\n- Assigned: APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\); IPCs: Ivy IPC/);
+  const who = await runDataTool(boss, BOSS, 'get_brand_assignments', { brand: 'Alpha', role: 'apc' });
+  assert.match(who.text, /- Alpha \(active\) — APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\)/);
+  const mine = await runDataTool(boss, BOSS, 'get_brand_assignments', { person: 'Bea' });
+  assert.match(mine.text, /^Brands Bea APC handles \(1\):\n- Alpha \(active\): assigned APC \(temporary cover until 12 Oct\)$/);
+  const tl = await runDataTool(boss, BOSS, 'get_brand_assignments', { person: 'Tina' });
+  assert.match(tl.text, /- Alpha \(active\): owner \(Team Lead\)\n- Beta \(active\): owner \(Team Lead\)/);
+  // Non-Boss: read with the caller's client (RLS): the service client's rows are never used.
+  const user = fakeDb({ brands: TEAM_BRANDS.slice(0, 1), brand_assignments: ASG.slice(0, 1), profiles: TEAM });
+  const svc = fakeDb({ brands: TEAM_BRANDS, brand_assignments: ASG, profiles: TEAM });
+  const apcView = await runDataTool(svc, { userId: 'a1', role: 'apc', userClient: user }, 'list_brands', {});
+  assert.match(apcView.text, /^Brands you can see \(1\):\n- Alpha \(active\) — owner: Tina TL; APCs: Ali APC$/);
 });
 
 test('tool catalog: every definition has an implementation and a JSON schema', () => {

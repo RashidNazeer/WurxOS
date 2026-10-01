@@ -88,6 +88,7 @@ export type CoreDeps = {
   rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
   embedDown?: () => boolean;         // query embeddings known to be failing on every key
   embed: (text: string) => Promise<number[] | null>;
+  embedAlt?: (text: string) => Promise<number[] | null>;   // NVIDIA query vector (mig 406)
   rerank?: Reranker;
   model?: string;                    // local override (serve-assistant --model); still allow-listed
   monthSpend?: () => Promise<number | null>;   // test seam: month-to-date spend (budget saver)
@@ -306,7 +307,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   };
   const reg = new CiteRegistry();
   const env: ToolEnv = {
-    admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: embedWatched, rerank: deps.rerank,
+    admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: embedWatched, embedAlt: deps.embedAlt, rerank: deps.rerank,
     // userClient: the caller's own JWT client, so people & pay tools read under
     // that user's RLS (Engineer 2, ui-design §8). None on the internal (Boss) path.
     retrieval, agent, ctx: { userId: req.userId, role: req.role, ...(deps.userClient ? { userClient: deps.userClient } : {}) }, now,
