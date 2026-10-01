@@ -132,10 +132,7 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
           onChange={onToggleSelect}
           onClick={(e) => e.stopPropagation()}
           title="Select"
-          style={{
-            position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)',
-            width: 14, height: 14, cursor: 'pointer',
-          }}
+          className="task-select"
         />
       )}
 
@@ -192,8 +189,9 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
         </div>
       </div>
 
-      {/* Due */}
-      <div>
+      {/* Due — columns are hidden on phones by class, not nth-child: the
+          optional select checkbox shifts every child index by one. */}
+      <div className="task-col-due">
         {dueInfo && <div className={`task-due ${dueInfo.cls}`}>{dueInfo.label}</div>}
       </div>
 
@@ -298,7 +296,7 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
           is reactivated (mig 171 blocks server-side too). */}
       {canEdit && !brandInactive ? (
         <button
-          className="wx-btn wx-btn-ghost"
+          className="wx-btn wx-btn-ghost task-col-edit"
           onClick={onEdit}
           style={{ padding: '6px 10px', fontSize: 12 }}
         >
@@ -306,7 +304,7 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
         </button>
       ) : brandInactive ? (
         <span
-          className="task-chip"
+          className="task-chip task-col-edit"
           title="This brand is inactive — task is frozen until reactivated"
           style={{
             background: '#f3f4f6',
@@ -324,7 +322,7 @@ export default function TaskRow({ task, canEdit, onEdit, onView, onChanged, curr
           <i className="bi bi-snow" /> Frozen
         </span>
       ) : (
-        <span />
+        <span className="task-col-edit" />
       )}
     </div>
   );
