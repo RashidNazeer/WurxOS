@@ -297,13 +297,16 @@
 }
 [data-theme='dark'] .wx-modal-backdrop { background: rgba(0, 0, 0, 0.65); }
 
+/* Glass without its own backdrop-filter: .wx-modal-backdrop already blurs
+   the page, so the translucent pane shows that blur through it. A filter
+   here would also trap position:fixed menus inside the dialog. */
 .wx-modal {
   width: 100%;
   max-width: 480px;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-xl), var(--glass-highlight);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -384,5 +387,5 @@
 .wx-role-chip-active {
   background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }

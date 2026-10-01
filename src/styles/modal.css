@@ -126,14 +126,14 @@
 .wx-m-step.is-active .wx-m-step-dot {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .wx-m-step.is-done { color: var(--text-secondary); }
 .wx-m-step.is-done .wx-m-step-dot {
   background: color-mix(in srgb, var(--accent) 22%, var(--surface-1));
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .wx-m-step-sep {
   flex: 1;
@@ -211,7 +211,7 @@
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.wx-m-field-meta.is-required { color: var(--accent); }
+.wx-m-field-meta.is-required { color: var(--accent-text); }
 .wx-m-field-meta.is-warn     { color: var(--warning); }
 
 /* ---- Input shell (prefix + input + suffix) ------------------ */
@@ -401,7 +401,7 @@
 }
 .wx-m-card.is-active .wx-m-card-icon {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .wx-m-card-check {
   position: absolute;
@@ -411,7 +411,7 @@
   height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   display: grid;
   place-items: center;
   box-shadow: 0 0 0 3px var(--surface-1);

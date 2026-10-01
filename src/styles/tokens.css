@@ -29,6 +29,8 @@
   --accent-hover: #a65a3b;
   --accent-soft:  #fdf0e6;   /* very pale cream for subtle fills */
   --accent-ring:  rgba(194, 112, 78, 0.30);
+  /* White on #c2704e is only 3.67:1. Phase 1 (warm palette) darkens the
+     light accent fill (e.g. #ad5f3e → white 4.68:1); keep #fff until then. */
   --on-accent:    #ffffff;
 
   /* Semantic */
@@ -69,6 +71,46 @@
              #faf7f2;
   --auth-glow-1: rgba(245, 213, 168, 0.55);
   --auth-glow-2: rgba(245, 190, 130, 0.35);
+
+  color-scheme: light;
+
+  /* Accent used AS TEXT (links, active nav). The fill accent is 3.67:1 on
+     white; this is 5.72 on #fff, 5.47 on surface-0, 5.12 on accent-soft. */
+  --accent-text: #9c5234;
+
+  /* Readable text on a solid semantic fill. White only where it reaches
+     4.5:1 (purple 7.19); white on success/danger/warning/info is 2.15–3.76,
+     so those take the warm ink (7.22 / 4.87 / 8.52 / 6.61). */
+  --on-success: #1a1407;
+  --on-danger:  #1a1407;
+  --on-warning: #1a1407;
+  --on-info:    #1a1407;
+  --on-purple:  #ffffff;
+
+  --focus-ring: #9c5234;       /* 5.72 on #fff, 4.64 on surface-3 */
+
+  /* Charts — categorical series are >= 3:1 on surface-0 and surface-1 */
+  --chart-grid:       var(--border-subtle);
+  --chart-axis:       var(--text-secondary);
+  --chart-track:      var(--surface-2);
+  --chart-tooltip-bg: var(--surface-1);
+  --chart-tooltip-fg: var(--text-primary);
+  --chart-1: #c2704e;   /* terracotta */
+  --chart-2: #0f766e;   /* teal */
+  --chart-3: #b7791f;   /* amber */
+  --chart-4: #7c3aed;   /* violet */
+  --chart-5: #be185d;   /* rose */
+  --chart-6: #2563eb;   /* blue */
+  --chart-7: #4d7c0f;   /* olive */
+  --chart-8: #5a3a22;   /* chocolate */
+
+  /* Glass (chrome only). Alpha is high on purpose: secondary text keeps
+     >= 6:1 even with pure black directly behind the pane. */
+  --glass-bg:        rgba(255, 252, 247, 0.92);
+  --glass-bg-strong: rgba(255, 252, 247, 0.96);
+  --glass-border:    rgba(90, 58, 34, 0.12);
+  --glass-shadow:    0 12px 32px -12px rgba(90, 58, 34, 0.22);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 [data-theme='dark'] {
@@ -128,6 +170,42 @@
              #000000;
   --auth-glow-1: rgba(245, 213, 168, 0.50);
   --auth-glow-2: rgba(245, 190, 130, 0.30);
+
+  color-scheme: dark;
+
+  --accent-text: #f5d5a8;      /* 13.66 on surface-1, 10.58 on accent-soft */
+
+  /* Dark fills are light, so every fill takes the dark inverse text
+     (success 10.35, danger 6.93, warning 11.48, info 10.25, purple 10.38). */
+  --on-success: var(--text-inverse);
+  --on-danger:  var(--text-inverse);
+  --on-warning: var(--text-inverse);
+  --on-info:    var(--text-inverse);
+  --on-purple:  var(--text-inverse);
+
+  --focus-ring: #f5d5a8;
+
+  --chart-grid:       var(--border-subtle);
+  --chart-axis:       var(--text-secondary);
+  --chart-track:      var(--surface-3);
+  --chart-tooltip-bg: #1c1612;
+  --chart-tooltip-fg: var(--text-primary);
+  --chart-1: #f2a77a;
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f472b6;
+  --chart-6: #60a5fa;
+  --chart-7: #a3e635;
+  --chart-8: #a8a29e;
+
+  /* Peach-tinted near-black. At 0.90 muted text stays >= 4.5:1 even with
+     pure white directly behind the pane. */
+  --glass-bg:        rgba(22, 17, 13, 0.90);
+  --glass-bg-strong: rgba(22, 17, 13, 0.95);
+  --glass-border:    rgba(245, 213, 168, 0.14);
+  --glass-shadow:    0 16px 40px -12px rgba(0, 0, 0, 0.75);
+  --glass-highlight: inset 0 1px 0 rgba(245, 213, 168, 0.07);
 }
 
 /* Shared non-color tokens */
@@ -158,6 +236,31 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
+
+  /* Aliases for names already used in components (undefined before) */
+  --border:  var(--border-subtle);
+  --primary: var(--accent);
+
+  --glass-blur:   14px;
+  --glass-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+/* No backdrop blur, or the user asked for less transparency: every glass
+   surface falls back to a solid pane. html[data-theme] outranks the theme
+   blocks above. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-theme] {
+    --glass-bg: var(--surface-1);
+    --glass-bg-strong: var(--surface-1);
+    --glass-filter: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  html[data-theme] {
+    --glass-bg: var(--surface-1);
+    --glass-bg-strong: var(--surface-1);
+    --glass-filter: none;
+  }
 }
 
 /* ------------------------------------------------------------

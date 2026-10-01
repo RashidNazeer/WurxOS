@@ -69,7 +69,7 @@ html[data-font-size='comfortable'] .shell-content { zoom: 1.075; }
 html[data-font-size='large']       .shell-content { zoom: 1.15;  }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease-out);
 }
@@ -124,6 +124,126 @@ a:hover { color: var(--accent-hover); }
 }
 
 /* ============================================================
+   Bootstrap ↔ token bridge (both themes). data-bs-theme is set next
+   to data-theme (index.html, ThemeContext, useForceLightTheme), so
+   Bootstrap's own dark variants switch on; these map its variables
+   onto our tokens so "primary" is the brand, not #0d6efd.
+   --bs-body-bg is the COMPONENT surface (cards, inputs, modals,
+   tables read it); the page canvas is set on body below.
+   ============================================================ */
+:root,
+[data-theme='light'] {
+  /* -rgb triplets mirror the token hexes in tokens.css; update them with the palette. */
+  --bs-body-bg: var(--surface-1);
+  --bs-body-bg-rgb: 255, 255, 255;
+  --bs-body-color: var(--text-primary);
+  --bs-body-color-rgb: 15, 23, 42;
+  --bs-emphasis-color: var(--text-primary);
+  --bs-emphasis-color-rgb: 15, 23, 42;
+  /* light --text-muted is 2.56:1 until the warm palette lands; secondary passes */
+  --bs-secondary-color: var(--text-secondary);
+  --bs-primary: var(--accent);
+  --bs-primary-rgb: 194, 112, 78;
+  --bs-link-color: var(--accent-text);
+  --bs-link-color-rgb: 156, 82, 52;
+  --bs-link-hover-color: var(--accent-hover);
+  --bs-link-hover-color-rgb: 166, 90, 59;
+}
+[data-theme='dark'] {
+  /* -rgb triplets mirror the token hexes in tokens.css; update them with the palette. */
+  --bs-body-bg: var(--surface-1);
+  --bs-body-bg-rgb: 15, 15, 15;
+  --bs-body-color: var(--text-primary);
+  --bs-body-color-rgb: 250, 247, 242;
+  --bs-emphasis-color: var(--text-primary);
+  --bs-emphasis-color-rgb: 250, 247, 242;
+  --bs-secondary-color: var(--text-muted);
+  --bs-secondary-color-rgb: 250, 247, 242;
+  --bs-tertiary-color: var(--text-muted);
+  --bs-primary: var(--accent);
+  --bs-primary-rgb: 245, 213, 168;
+  --bs-link-color: var(--accent-text);
+  --bs-link-color-rgb: 245, 213, 168;
+  --bs-link-hover-color: var(--accent-hover);
+  --bs-link-hover-color-rgb: 252, 228, 194;
+}
+:root,
+[data-theme='light'],
+[data-theme='dark'] {
+  --bs-secondary-bg: var(--surface-3);
+  --bs-tertiary-bg: var(--surface-2);
+  --bs-border-color: var(--border-default);
+  --bs-border-color-translucent: var(--border-subtle);
+  --bs-primary-text-emphasis: var(--accent-text);
+  --bs-primary-bg-subtle: var(--accent-soft);
+  --bs-primary-border-subtle: color-mix(in srgb, var(--accent) 40%, transparent);
+  --bs-focus-ring-color: var(--accent-ring);
+}
+
+.text-primary { color: var(--accent-text) !important; }
+
+.btn-primary {
+  --bs-btn-color: var(--on-accent);
+  --bs-btn-bg: var(--accent);
+  --bs-btn-border-color: var(--accent);
+  --bs-btn-hover-color: var(--on-accent);
+  --bs-btn-hover-bg: var(--accent-hover);
+  --bs-btn-hover-border-color: var(--accent-hover);
+  --bs-btn-active-color: var(--on-accent);
+  --bs-btn-active-bg: var(--accent-hover);
+  --bs-btn-active-border-color: var(--accent-hover);
+  --bs-btn-disabled-color: var(--on-accent);
+  --bs-btn-disabled-bg: var(--accent);
+  --bs-btn-disabled-border-color: var(--accent);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--accent-text);
+  --bs-btn-border-color: var(--accent);
+  --bs-btn-hover-color: var(--on-accent);
+  --bs-btn-hover-bg: var(--accent);
+  --bs-btn-hover-border-color: var(--accent);
+  --bs-btn-active-color: var(--on-accent);
+  --bs-btn-active-bg: var(--accent);
+  --bs-btn-active-border-color: var(--accent);
+  --bs-btn-disabled-color: var(--accent-text);
+  --bs-btn-disabled-border-color: var(--accent);
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+.table { --bs-table-border-color: var(--border-subtle); }
+.dropdown-menu {
+  --bs-dropdown-color: var(--text-primary);
+  --bs-dropdown-border-color: var(--glass-border);
+  --bs-dropdown-link-color: var(--text-primary);
+  --bs-dropdown-link-hover-color: var(--text-primary);
+  --bs-dropdown-link-hover-bg: var(--surface-2);
+  --bs-dropdown-link-active-color: var(--on-accent);
+  --bs-dropdown-link-active-bg: var(--accent);
+  --bs-dropdown-header-color: var(--text-secondary);
+  --bs-dropdown-divider-bg: var(--border-subtle);
+}
+.nav-pills {
+  --bs-nav-pills-link-active-bg: var(--accent);
+  --bs-nav-pills-link-active-color: var(--on-accent);
+}
+.pagination {
+  --bs-pagination-active-color: var(--on-accent);
+  --bs-pagination-active-bg: var(--accent);
+  --bs-pagination-active-border-color: var(--accent);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+.list-group {
+  --bs-list-group-active-color: var(--on-accent);
+  --bs-list-group-active-bg: var(--accent);
+  --bs-list-group-active-border-color: var(--accent);
+}
+.progress,
+.progress-stacked { --bs-progress-bar-bg: var(--accent); }
+
+/* ============================================================
    Bootstrap class overrides for DARK theme only.
    Many v1-port pages render with raw Bootstrap classes (.card,
    .form-control, .btn-light, .table, etc.) which Bootstrap paints
@@ -165,7 +285,9 @@ a:hover { color: var(--accent-hover); }
 [data-theme='dark'] .text-muted {
   color: var(--text-muted) !important;
 }
-[data-theme='dark'] .text-dark {
+/* Not on yellow fills: Bootstrap's warning stays #ffc107 in dark, and cream
+   on it is 1.53:1. Those keep Bootstrap's dark text (about 10:1). */
+[data-theme='dark'] .text-dark:not(.bg-warning):not(.btn-warning):not(.text-bg-warning) {
   color: var(--text-primary) !important;
 }
 [data-theme='dark'] .text-secondary {
@@ -215,17 +337,6 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-primary);
   border-color: var(--border-strong);
 }
-[data-theme='dark'] .btn-outline-primary {
-  color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 50%, transparent);
-  background-color: transparent;
-}
-[data-theme='dark'] .btn-outline-primary:hover,
-[data-theme='dark'] .btn-outline-primary:focus {
-  background-color: color-mix(in srgb, var(--info) 18%, transparent);
-  color: var(--info);
-  border-color: var(--info);
-}
 [data-theme='dark'] .table {
   color: var(--text-primary) !important;
   border-color: var(--border-subtle);
@@ -253,8 +364,6 @@ a:hover { color: var(--accent-hover); }
   border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 [data-theme='dark'] .dropdown-menu {
-  background-color: var(--surface-1);
-  border-color: var(--border-subtle);
   color: var(--text-primary);
 }
 [data-theme='dark'] .dropdown-item {
@@ -283,9 +392,7 @@ a:hover { color: var(--accent-hover); }
    (CampaignTracker, ProductCampaigns, brand tabs). Without these
    overrides the dialog renders white-on-black in dark mode. */
 [data-theme='dark'] .modal-content {
-  background-color: var(--surface-1);
   color: var(--text-primary);
-  border-color: var(--border-subtle);
 }
 [data-theme='dark'] .modal-header,
 [data-theme='dark'] .modal-footer {
@@ -293,11 +400,6 @@ a:hover { color: var(--accent-hover); }
 }
 [data-theme='dark'] .modal-title {
   color: var(--text-primary);
-}
-/* The default Bootstrap close X is a black SVG — invisible on dark.
-   `filter: invert()` flips it white without touching light mode. */
-[data-theme='dark'] .btn-close {
-  filter: invert(0.9);
 }
 [data-theme='dark'] .modal-backdrop.show {
   opacity: 0.65;
@@ -361,8 +463,6 @@ a:hover { color: var(--accent-hover); }
 [data-theme='dark'] .text-danger  { color: var(--danger)  !important; }
 [data-theme='dark'] .text-warning { color: var(--warning) !important; }
 [data-theme='dark'] .text-info    { color: var(--info)    !important; }
-[data-theme='dark'] .text-primary { color: var(--info)    !important; }
-[data-theme='dark'] .text-white   { color: var(--text-inverse) !important; }
 
 /* bg-light is used as a chip/pill background in many v1-port files.
    On dark theme the white pill stays white otherwise. */
@@ -422,11 +522,6 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-inverse);
   border-color: var(--warning);
 }
-[data-theme='dark'] .btn-primary {
-  background-color: var(--info);
-  color: var(--text-inverse);
-  border-color: var(--info);
-}
 [data-theme='dark'] .btn-outline-success {
   color: var(--success);
   border-color: color-mix(in srgb, var(--success) 50%, transparent);
@@ -463,12 +558,44 @@ a:hover { color: var(--accent-hover); }
   background-color: var(--input-bg);
   border-color: var(--input-border);
 }
-[data-theme='dark'] .form-check-input:checked {
+[data-theme='dark'] .form-check-label {
+  color: var(--text-primary);
+}
+.form-check-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+.form-check-input:checked,
+.form-check-input[type='checkbox']:indeterminate {
   background-color: var(--accent);
   border-color: var(--accent);
 }
-[data-theme='dark'] .form-check-label {
-  color: var(--text-primary);
+/* SVG fills below mirror token hexes (accent, on-accent, cream); update them with the palette. */
+.form-switch .form-check-input:focus {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23c2704e'/%3e%3c/svg%3e");
+}
+.form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+/* Dark: the white tick/dot/knob is 1.4:1 on the peach fill, and Bootstrap's
+   25%-white unchecked knob is near-invisible on the dark input. */
+[data-theme='dark'] .form-check-input:checked[type='checkbox'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%231a1407' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-check-input[type='checkbox']:indeterminate {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%231a1407' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10h8'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-check-input:checked[type='radio'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%231a1407'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-switch .form-check-input:not(:checked):not(:focus) {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28250, 247, 242, 0.6%29'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-switch .form-check-input:focus:not(:checked) {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23f5d5a8'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231a1407'/%3e%3c/svg%3e");
 }
 
 /* Range sliders (.form-range) — Bootstrap forces appearance:none + a fixed
@@ -496,16 +623,9 @@ a:hover { color: var(--accent-hover); }
 .form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 0.2rem var(--accent-ring, rgba(13, 110, 253, 0.25)); }
 .form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 0.2rem var(--accent-ring, rgba(13, 110, 253, 0.25)); }
 
-/* Native datetime/date input picker icon — Chromium renders it
-   black, which becomes invisible on a dark input. Invert it. */
-[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='datetime-local']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='month']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='week']::-webkit-calendar-picker-indicator {
-  filter: invert(0.85);
-  cursor: pointer;
-}
+/* Native date/time picker icons are themed by `color-scheme` (tokens.css);
+   the old dark-mode invert() hack would now flip them back to black. */
+input::-webkit-calendar-picker-indicator { cursor: pointer; }
 
 /* Bootstrap "border" utilities (used as "border" plain) — make them
    visible against dark surfaces */
@@ -550,9 +670,6 @@ select.wx-input {
   cursor: pointer;
 }
 .wx-input:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
-[data-theme='dark'] .wx-input::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
 
 /* Native checkbox color — respect accent */
 input[type="checkbox"] {
@@ -701,7 +818,7 @@ input[type="checkbox"] {
 .wx-seg-btn:hover { color: var(--text-primary); }
 .wx-seg-btn.is-active {
   background: var(--surface-1);
-  color: var(--accent);
+  color: var(--accent-text);
   box-shadow: var(--shadow-sm);
 }
 
@@ -817,6 +934,73 @@ input[type="checkbox"] {
     padding: 6px 12px !important;
     font-size: 12.5px !important;
   }
+}
+
+/* ============ Keyboard focus ============
+   One ring for every interactive element. :focus-visible keeps it off
+   mouse clicks. Text inputs keep their own accent border + glow. The
+   Bootstrap selectors are listed because Bootstrap sets outline:0 on them. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='menuitem']:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible,
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible,
+input[type='range']:focus-visible,
+.btn:focus-visible,
+.btn-close:focus-visible,
+.nav-link:focus-visible,
+.page-link:focus-visible,
+.dropdown-item:focus-visible,
+.wx-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.nav-link:focus-visible,
+.page-link:focus-visible { box-shadow: none; }
+.btn { --bs-btn-focus-box-shadow: none; }
+.btn-close { --bs-btn-close-focus-shadow: none; }
+
+/* ============ Glass: Bootstrap menus, popovers, dialogs ============
+   Tokens fall back to solid panes without backdrop-filter support or
+   under prefers-reduced-transparency (tokens.css). */
+.dropdown-menu {
+  --bs-dropdown-bg: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+}
+.popover {
+  --bs-popover-bg: var(--glass-bg-strong);
+  --bs-popover-border-color: var(--glass-border);
+  --bs-popover-header-bg: transparent;
+  --bs-popover-body-color: var(--text-primary);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+/* The blur lives on a pseudo-element: backdrop-filter on .modal-content
+   itself would become the containing block for position:fixed menus
+   inside the dialog and misplace them. */
+.modal-content {
+  --bs-modal-bg: transparent;
+  --bs-modal-border-color: var(--glass-border);
+  isolation: isolate;
+  box-shadow: var(--glass-shadow);
+}
+.modal-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-highlight);
+  pointer-events: none;
 }
 
 /* Hover-tooltip used beside metric labels on the Performance page.

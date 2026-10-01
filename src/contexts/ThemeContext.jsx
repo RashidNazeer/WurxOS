@@ -63,6 +63,7 @@ export function ThemeProvider({ children }) {
   // Theme → data-theme attribute + meta color
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
       'content',
       theme === 'dark' ? '#000000' : '#c2704e',

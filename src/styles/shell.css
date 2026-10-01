@@ -27,10 +27,13 @@
 .shell[data-collapsed='true'] { --sidebar-w: 68px; }
 
 /* ---------- Sidebar ---------- */
+/* Glass tint only on desktop: nothing scrolls behind the sidebar column,
+   so a blur would cost GPU for no visible effect. The mobile drawer
+   (below) adds the blur because the page sits behind it. */
 .shell-sidebar {
   grid-area: sidebar;
-  background: var(--surface-1);
-  border-right: 1px solid var(--border-subtle);
+  background: var(--glass-bg);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -320,8 +323,54 @@
 }
 .shell-nav-link.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
+}
+/* Collapsed rail: the group whose child is the current page */
+.shell-nav-toggle.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.shell-nav-toggle.is-open {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+/* Collapsed-rail flyout for grouped items. Portaled to <body> so the
+   sidebar's overflow and z-index can't clip it. */
+.shell-nav-flyout {
+  position: fixed;
+  z-index: 1150;
+  min-width: 200px;
+  max-width: 280px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  animation: shell-pop 0.15s var(--ease-out);
+}
+.shell-nav-flyout-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  padding: 6px 10px 4px;
+}
+.shell-nav-flyout .shell-nav-link {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-nav-flyout { animation: none; }
 }
 
 /* Time-critical alert (Creator Library review nudges). Colours come from theme
@@ -425,6 +474,9 @@
 .shell-sidebar-search-input:focus {
   border-color: var(--accent);
 }
+.shell-sidebar-search-input:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
 .shell-sidebar-search-input::placeholder {
   color: var(--text-muted);
 }
@@ -493,8 +545,12 @@
      under the system area. env() is a no-op on devices without a
      safe-area-inset, so desktop is unaffected. */
   padding-top: max(12px, env(safe-area-inset-top));
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--border-subtle);
+  /* Sticky glass: page content scrolls under it. Every topbar popup is
+     portaled to <body>, so the filter can't trap a fixed descendant. */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border-bottom: 1px solid var(--glass-border);
   position: sticky;
   top: 0;
   z-index: 5;
@@ -569,10 +625,12 @@
 .shell-user-menu {
   position: fixed;
   min-width: 220px;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   padding: 6px;
   z-index: 1200;
   animation: shell-pop 0.15s var(--ease-out);
@@ -615,6 +673,8 @@
      this box instead of the viewport — so they'd scroll away. */
   overflow-x: clip;
 }
+/* Programmatic focus target after flyout navigation (tabIndex=-1) */
+.shell-content:focus { outline: none; }
 /* Fill the available width — dashboards feel cramped with a 1200px
    cap on wide monitors. Pages can still self-constrain if they want. */
 .shell-content-inner { max-width: none; margin: 0; }
@@ -678,7 +738,12 @@
        button) sits below the notch / status bar instead of behind it. */
     padding-top: env(safe-area-inset-top);
   }
-  .shell[data-mobile-open='true'] .shell-sidebar { transform: translateX(0); }
+  .shell[data-mobile-open='true'] .shell-sidebar {
+    transform: translateX(0);
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+  }
   /* Force the drawer to render in EXPANDED mode regardless of the
      desktop `collapsed` preference — an icons-only rail makes no sense
      for a slide-in drawer and was the source of the "menu broken when
@@ -775,10 +840,12 @@
   font-family: ui-monospace, monospace;
 }
 .global-search-panel {
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-xl), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   max-height: 460px;
   display: flex;
   flex-direction: column;
@@ -842,6 +909,23 @@
   transition: background var(--dur-fast);
 }
 .global-search-item:hover { background: var(--surface-2); }
+
+/* Glass for the notification panel + toasts (structure lives in
+   notifications.css). `html` prefix so these win regardless of the
+   order the two sheets land in the bundle. Toast ghosts get the tint
+   without a blur; they're decorative. */
+html .notif-panel,
+html .notif-toast {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-xl), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+html .notif-toast-ghost {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border);
+}
 
 @media (max-width: 720px) {
   .global-search-trigger { min-width: 40px; padding: 7px 10px; }

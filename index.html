@@ -45,10 +45,14 @@
       // Apply theme + font preferences before paint so there's no flash.
       (function () {
         var root = document.documentElement;
+        var t = 'dark';
         try {
-          var t = localStorage.getItem('wurxos-theme') || 'dark';
-          root.setAttribute('data-theme', t);
-        } catch (e) { root.setAttribute('data-theme', 'dark'); }
+          if (localStorage.getItem('wurxos-theme') === 'light') t = 'light';
+        } catch (e) {}
+        // data-bs-theme drives Bootstrap's own dark variants (select chevron,
+        // switch knob, close button, native popups via color-scheme).
+        root.setAttribute('data-theme', t);
+        root.setAttribute('data-bs-theme', t);
         try {
           var f = localStorage.getItem('wurxos-font-family');
           if (f) root.setAttribute('data-font-family', f);
