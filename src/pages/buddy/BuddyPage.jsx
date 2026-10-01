@@ -1,6 +1,5 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { lazyWithRetry as lazy } from '../../lib/lazyWithRetry';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useBuddy } from '../../contexts/BuddyContext';
 import { canEditSettings, groupConversations, isTmpKey, orderSources, starterCards } from '../../lib/buddyLogic';
 import { searchConversationIds } from '../../lib/buddyApi';
@@ -9,17 +8,43 @@ import BuddyThread, { LoadError, SourceChip } from '../../components/buddy/Buddy
 import { ComingSoon } from '../../components/buddy/BuddyPanel';
 import '../../styles/buddy.css';
 
-// The Wurx Buddy tab (ui-design.md §4): history · chat · sources.
-const BuddySettings = lazy(() => import('./BuddySettings'));
+// The Wurx Buddy tab (ui-design.md §4): history · chat · sources. Buddy's
+// settings live in Settings › Wurx Buddy (/settings?section=buddy).
+export const BUDDY_SETTINGS_PATH = '/settings?section=buddy';
+const HISTORY_COLLAPSED_KEY = 'wurxos.buddy.history.collapsed';
+
+function useMedia(query) {
+  const get = () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : true);
+  const [match, setMatch] = useState(get);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return undefined;
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, [query]);
+  return match;
+}
 
 export default function BuddyPage() {
   const buddy = useBuddy();
   const { state, role, profile, greeting, selectPage, setPageActive, send } = buddy;
   const [params, setParams] = useSearchParams();
-  // Settings: the Boss and active developers, both with full edit (Owner, 2026-10-01).
+  const navigate = useNavigate();
+  // The Boss and active developers (full edit, Owner 2026-10-01) get a link to Settings.
   const settingsOk = canEditSettings(profile);
-  const showSettings = params.get('view') === 'settings' && settingsOk;
+  const desktop = useMedia('(min-width: 992px)');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(HISTORY_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((v) => {
+      try { localStorage.setItem(HISTORY_COLLAPSED_KEY, v ? '0' : '1'); } catch { /* private mode */ }
+      return !v;
+    });
+  }, []);
+  const railed = collapsed && desktop;   // phones keep the drawer
   const [sourcesOpen, setSourcesOpen] = useState(() => window.matchMedia?.('(min-width: 1200px)').matches ?? false);
   const [sourceSel, setSourceSel] = useState(null); // { msg, id }
   const key = state.pageKey;
@@ -28,6 +53,15 @@ export default function BuddyPage() {
     setPageActive(true);
     return () => setPageActive(false);
   }, [setPageActive]);
+
+  // Old links (/buddy?view=settings) go to the settings' new home.
+  useEffect(() => {
+    if (params.get('view') !== 'settings') return;
+    if (settingsOk) { navigate(BUDDY_SETTINGS_PATH, { replace: true }); return; }
+    const next = new URLSearchParams(params);
+    next.delete('view');
+    setParams(next, { replace: true });
+  }, [params, settingsOk, navigate, setParams]);
 
   // ?c=<id> opens that conversation (links, reloads); the URL follows the selection.
   const didInit = useRef(false);
@@ -39,7 +73,7 @@ export default function BuddyPage() {
     else if (key) selectPage(key);
   }, [params, key, selectPage]);
   useEffect(() => {
-    if (!didInit.current) return;
+    if (!didInit.current || params.get('view') === 'settings') return;
     const want = key && !isTmpKey(key) ? key : null;
     if ((params.get('c') || null) === want) return;
     const next = new URLSearchParams(params);
@@ -66,11 +100,6 @@ export default function BuddyPage() {
     || [...messages].reverse().find((m) => m.role === 'assistant' && (m.sources || []).length);
   const panelSources = orderSources(panelMsg?.sources).filter((s) => s.cited !== false);
 
-  const openSettings = (on) => {
-    const next = new URLSearchParams(params);
-    if (on) next.set('view', 'settings'); else next.delete('view');
-    setParams(next);
-  };
   const onCite = (id, msg) => {
     setSourceSel({ msg, id });
     setSourcesOpen(true);
@@ -78,7 +107,6 @@ export default function BuddyPage() {
   const pick = (id) => {
     selectPage(id);
     setHistoryOpen(false);
-    if (showSettings) openSettings(false);
   };
 
   const empty = (
@@ -98,49 +126,41 @@ export default function BuddyPage() {
   );
 
   return (
-    <div className="bd-page">
+    <div className={`bd-page ${railed ? 'is-collapsed' : ''}`}>
       <History
         open={historyOpen}
+        railed={railed}
+        onToggleCollapse={toggleCollapsed}
         onClose={() => setHistoryOpen(false)}
         activeKey={key}
         onPick={pick}
         onNew={() => pick(null)}
         canSettings={settingsOk}
-        onSettings={() => { openSettings(true); setHistoryOpen(false); }}
-        settingsActive={showSettings}
       />
       {historyOpen && <div className="bd-scrim" onClick={() => setHistoryOpen(false)} aria-hidden="true" />}
 
       <section className="bd-main" aria-label="Chat">
         <header className="bd-main-head">
-          <button type="button" className="bd-icon-btn d-lg-none" onClick={() => setHistoryOpen(true)} aria-label="Show chat history"><i className="bi bi-list" /></button>
+          <button type="button" className="bd-icon-btn d-lg-none" onClick={() => setHistoryOpen(true)} aria-label="Show chat history"><i className="bi bi-list" aria-hidden="true" /></button>
           <BuddyMascot clip={state.inflight[key] ? 'thinking' : 'idle'} size={34} />
-          <div className="bd-main-title text-truncate">
-            {showSettings ? 'Buddy settings' : (conv?.title || (key ? 'Chat' : 'New chat'))}
-          </div>
-          {showSettings
-            ? <button type="button" className="bd-pill" onClick={() => openSettings(false)}><i className="bi bi-arrow-left" /> Back to chat</button>
-            : (
-              <button type="button" className={`bd-pill ${sourcesOpen ? 'is-on' : ''}`} onClick={() => setSourcesOpen((v) => !v)}
-                aria-expanded={sourcesOpen} aria-controls="bd-sources-panel">
-                <i className="bi bi-journal-text" /> Sources{panelSources.length ? ` (${panelSources.length})` : ''}
-              </button>
-            )}
+          <div className="bd-main-title text-truncate">{conv?.title || (key ? 'Chat' : 'New chat')}</div>
+          <button type="button" className={`bd-pill ${sourcesOpen ? 'is-on' : ''}`} onClick={() => setSourcesOpen((v) => !v)}
+            aria-expanded={sourcesOpen} aria-controls="bd-sources-panel">
+            <i className="bi bi-journal-text" aria-hidden="true" /> Sources{panelSources.length ? ` (${panelSources.length})` : ''}
+          </button>
         </header>
-        {showSettings
-          ? <Suspense fallback={<div className="bd-center"><span className="wx-spinner" style={{ color: 'var(--accent)' }} /></div>}><BuddySettings canEdit={settingsOk} /></Suspense>
-          : state.denied
-            ? <ComingSoon />
-            : <BuddyThread convKey={key} surface="full" pageContext={{ route: '/buddy' }} empty={empty} onCite={onCite} activeSourceMsg={sourceSel?.msg} />}
+        {state.denied
+          ? <ComingSoon />
+          : <BuddyThread convKey={key} surface="full" pageContext={{ route: '/buddy' }} empty={empty} onCite={onCite} activeSourceMsg={sourceSel?.msg} />}
       </section>
 
-      {!showSettings && sourcesOpen && (
+      {sourcesOpen && (
         <>
           <div className="bd-scrim is-sheet" onClick={() => setSourcesOpen(false)} aria-hidden="true" />
           <aside id="bd-sources-panel" className="bd-sources-panel" aria-label="Sources">
             <div className="bd-side-head">
               <span>Sources</span>
-              <button type="button" className="bd-icon-btn" onClick={() => setSourcesOpen(false)} aria-label="Close sources"><i className="bi bi-x-lg" /></button>
+              <button type="button" className="bd-icon-btn" onClick={() => setSourcesOpen(false)} aria-label="Close sources"><i className="bi bi-x-lg" aria-hidden="true" /></button>
             </div>
             {panelSources.length === 0
               ? <div className="bd-side-empty">Sources for Buddy's answers show up here. Tap a number in an answer to jump to it.</div>
@@ -166,7 +186,7 @@ function HistorySkeleton() {
   );
 }
 
-function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSettings, settingsActive }) {
+function History({ open, railed, onToggleCollapse, onClose, activeKey, onPick, onNew, canSettings }) {
   const { state, rename, pin, remove, refreshConvs } = useBuddy();
   const [q, setQ] = useState('');
   const [hits, setHits] = useState(null);
@@ -195,11 +215,30 @@ function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSetti
     try { await fn(); } catch (e) { setErr(e.message || 'That did not work, please try again.'); }
   };
 
+  // Collapsed (desktop): a thin rail with New chat and Expand.
+  if (railed) {
+    const unread = Object.keys(state.unread).length;
+    return (
+      <aside className="bd-history is-rail" aria-label="Chat history (collapsed)">
+        <button type="button" className="bd-icon-btn" onClick={onToggleCollapse} aria-label="Expand chat history" aria-expanded="false" title="Expand">
+          <i className="bi bi-chevron-double-right" aria-hidden="true" />
+        </button>
+        <button type="button" className="bd-rail-new" onClick={onNew} aria-label="New chat" title="New chat">
+          <i className="bi bi-plus-lg" aria-hidden="true" />
+        </button>
+        {unread > 0 && <span className="bd-dot" role="img" aria-label={`${unread} unread ${unread === 1 ? 'reply' : 'replies'}`} />}
+      </aside>
+    );
+  }
+
   return (
     <aside className={`bd-history ${open ? 'is-open' : ''}`} aria-label="Chat history">
       <div className="bd-history-top">
-        <button type="button" className="bd-new" onClick={onNew}><i className="bi bi-plus-lg" /> New chat</button>
-        <button type="button" className="bd-icon-btn d-lg-none" onClick={onClose} aria-label="Close history"><i className="bi bi-x-lg" /></button>
+        <button type="button" className="bd-new" onClick={onNew}><i className="bi bi-plus-lg" aria-hidden="true" /> New chat</button>
+        <button type="button" className="bd-icon-btn d-none d-lg-inline-grid" onClick={onToggleCollapse} aria-label="Collapse chat history" aria-expanded="true" title="Collapse">
+          <i className="bi bi-chevron-double-left" aria-hidden="true" />
+        </button>
+        <button type="button" className="bd-icon-btn d-lg-none" onClick={onClose} aria-label="Close history"><i className="bi bi-x-lg" aria-hidden="true" /></button>
       </div>
       <div className="bd-search">
         <i className="bi bi-search" aria-hidden="true" />
@@ -220,7 +259,7 @@ function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSetti
                     <input autoFocus value={editing.title} maxLength={120} aria-label="Chat title"
                       onChange={(e) => setEditing({ ...editing, title: e.target.value })}
                       onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null); }} />
-                    <button type="submit" className="bd-icon-btn" aria-label="Save title"><i className="bi bi-check-lg" /></button>
+                    <button type="submit" className="bd-icon-btn" aria-label="Save title"><i className="bi bi-check-lg" aria-hidden="true" /></button>
                   </form>
                 )
                 : (
@@ -249,9 +288,9 @@ function History({ open, onClose, activeKey, onPick, onNew, canSettings, onSetti
         ))}
       </nav>
       {canSettings && (
-        <button type="button" className={`bd-settings-btn ${settingsActive ? 'is-active' : ''}`} onClick={onSettings}>
-          <i className="bi bi-gear" /> Buddy settings
-        </button>
+        <Link to={BUDDY_SETTINGS_PATH} className="bd-settings-btn">
+          <i className="bi bi-gear" aria-hidden="true" /> Buddy settings → Settings › Wurx Buddy
+        </Link>
       )}
     </aside>
   );

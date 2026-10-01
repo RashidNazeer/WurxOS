@@ -847,3 +847,35 @@
   .global-search-trigger { min-width: 40px; padding: 7px 10px; }
   .global-search-label, .global-search-kbd { display: none; }
 }
+
+/* ---------- Full-height pages (data-fill, set by AppShell for /buddy) ----------
+   The shell is exactly the viewport and the document never scrolls, so the
+   sidebar and topbar can't move; the page fills the content area through a
+   flex chain (min-height: 0 at every step) and scrolls only its own panels.
+   Sizes come from the parent, not from a 100dvh calc, so the topbar's real
+   height, the content padding and the font-size zoom on .shell-content can't
+   make it overflow (they did: the old calc was a few px too tall at some
+   widths and up to 15% too tall with a larger font size). */
+.shell[data-fill='true'] {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.shell[data-fill='true'] .shell-content {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 16px;
+}
+.shell[data-fill='true'] .shell-content-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 860px) {
+  .shell[data-fill='true'] .shell-content { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}

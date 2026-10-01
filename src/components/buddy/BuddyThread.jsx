@@ -29,17 +29,32 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
   const messages = thread?.messages || [];
   const inflight = convKey ? state.inflight[convKey] : null;
   const scrollRef = useRef(null);
+  // Follow the reply while the reader is at the bottom; once they scroll up to
+  // read, stop following and offer "Jump to latest" instead.
   const stick = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
+  const toBottom = (smooth) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stick.current = true;
+    setAtBottom(true);
+    if (smooth && el.scrollTo) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    else el.scrollTop = el.scrollHeight;
+  };
 
   const onScroll = () => {
     const el = scrollRef.current;
-    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stick.current = bottom;
+    setAtBottom(bottom);
   };
+  // A chat opens at its latest message (runs before the follow effect below).
+  useLayoutEffect(() => { toBottom(false); }, [convKey]);
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, inflight?.status]);
-  useEffect(() => { stick.current = true; }, [convKey]);
 
   const last = messages[messages.length - 1];
   const orphanStatus = inflight && (!last || last.role === 'user');
@@ -76,9 +91,15 @@ export default function BuddyThread({ convKey, surface, pageContext, empty, onCi
           {orphanStatus && <StatusLine status={inflight.status} />}
         </div>
       </div>
+      {!atBottom && messages.length > 0 && (
+        <button type="button" className="bd-jump" onClick={() => toBottom(true)}>
+          {inflight ? 'New reply below' : 'Jump to latest'} <i className="bi bi-arrow-down" aria-hidden="true" />
+        </button>
+      )}
       <Composer
         busy={!!inflight}
-        onSend={(text) => send({ key: convKey, text, surface, pageContext })}
+        // Sending is "I want to see this": follow again.
+        onSend={(text) => { toBottom(false); send({ key: convKey, text, surface, pageContext }); }}
         onStop={() => stop(convKey)}
         surface={surface}
       />
