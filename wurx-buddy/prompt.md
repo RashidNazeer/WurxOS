@@ -59,10 +59,15 @@ You are taking **Wurx Buddy** (the new in-app AI assistant) live on the **produc
    - `git status` is clean, you're on `main`, and it's up to date with `origin/main`.
    - Tag the commit **currently running on production**; ask the human which one it is, or use the last deploy in the Vercel dashboard: `git tag stable-pre-buddy-<date> <sha>`, then push the tag.
 2. **Supabase backup:** in the Supabase dashboard (project `WurxOSV2` → Database → Backups), confirm a backup from today exists, or have the human trigger one or check that point-in-time recovery is on. ⛔ Don't continue without one.
-3. **Link the CLI to production.** The human types the database password:
+3. **Link the CLI to production, but NEVER in the app folder.** This is the Owner's hard rule: the app checkout must never be linked to production. The CLI writes its link into the folder you run it from (`supabase/.temp/`), so work only in a separate scratch folder:
+   - create one outside the repo, e.g. `C:\temp\prodlink\supabase\migrations\`;
+   - copy the repo's `supabase/migrations/*.sql` into it;
+   - `cd` into it, and run every production CLI command **from there**, with `--workdir <that folder>`:
    ```
-   npx supabase link --project-ref xoaaidgvblondjpvxjqp
+   cd C:\temp\prodlink
+   npx supabase link --project-ref xoaaidgvblondjpvxjqp --workdir C:\temp\prodlink
    ```
+   After you finish, confirm the repo's `supabase/.temp/` has no `linked-project.json` or `project-ref`. In every step below, `--linked` means run from the scratch folder with `--workdir`.
 4. **Extensions on production:** run through the SQL editor or `npx supabase db query` (read-only):
    ```sql
    select extname, extnamespace::regnamespace from pg_extension where extname in ('vector','pg_trgm','pg_cron','pg_net');
