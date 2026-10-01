@@ -17,35 +17,50 @@ import {
 
 const SOP_TAB_MAP = { delivery_roadmap: 'delivery_roadmap', policies: 'policies', operational: 'operational_sops', training: 'training_sops' };
 
+// Semantic hue -> readable text on its own -soft tint, in both themes
+// (pulls the hue toward the theme's text colour; raw hue on -soft is ~2-3:1).
+const ink = (c) => `color-mix(in srgb, ${c} 55%, var(--text-primary))`;
+const tint = (c, pct = 12) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
+const ROLE_TONES = {
+  boss: { color: 'var(--danger)',  on: 'var(--on-danger)' },
+  tl:   { color: 'var(--info)',    on: 'var(--on-info)' },
+  ol:   { color: 'var(--purple)',  on: 'var(--on-purple)' },
+  apc:  { color: 'var(--success)', on: 'var(--on-success)' },
+  pctl: { color: 'var(--accent)',  on: 'var(--on-accent)' },
+  ipc:  { color: 'var(--warning)', on: 'var(--on-warning)' },
+  other: { color: 'var(--text-secondary)', on: 'var(--surface-1)' },
+};
+
 const SOP_TYPES = [
-  { key: 'delivery_roadmap', label: 'Delivery Roadmap', icon: 'bi-map',           color: '#0ea5e9' },
-  { key: 'policies',         label: 'Policies',         icon: 'bi-shield-check',  color: '#2563eb' },
-  { key: 'operational',      label: 'Operational SOPs', icon: 'bi-gear-wide',     color: '#7c3aed' },
-  { key: 'training',         label: 'Training SOPs',    icon: 'bi-mortarboard',   color: '#059669' },
+  { key: 'delivery_roadmap', label: 'Delivery Roadmap', icon: 'bi-map',           color: 'var(--info)',    on: 'var(--on-info)' },
+  { key: 'policies',         label: 'Policies',         icon: 'bi-shield-check',  color: 'var(--accent)',  on: 'var(--on-accent)' },
+  { key: 'operational',      label: 'Operational SOPs', icon: 'bi-gear-wide',     color: 'var(--purple)',  on: 'var(--on-purple)' },
+  { key: 'training',         label: 'Training SOPs',    icon: 'bi-mortarboard',   color: 'var(--success)', on: 'var(--on-success)' },
 ];
 
 const PRIORITIES = [
-  { key: 'low',    label: 'Low',    color: '#6c757d', bg: '#f3f4f6' },
-  { key: 'medium', label: 'Medium', color: '#fd7e14', bg: '#fff3e0' },
-  { key: 'high',   label: 'High',   color: '#dc3545', bg: '#fce4ec' },
+  { key: 'low',    label: 'Low',    color: 'var(--text-secondary)', on: 'var(--surface-1)',  bg: 'var(--surface-2)' },
+  { key: 'medium', label: 'Medium', color: 'var(--warning)',        on: 'var(--on-warning)', bg: 'var(--warning-soft)' },
+  { key: 'high',   label: 'High',   color: 'var(--danger)',         on: 'var(--on-danger)',  bg: 'var(--danger-soft)' },
 ];
 
 const STATUS_MAP = {
-  pending:       { label: 'Pending Review', color: '#fd7e14', bg: '#fff3e0', icon: 'bi-clock' },
-  approved:      { label: 'Approved',       color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle' },
-  rejected:      { label: 'Rejected',       color: '#dc3545', bg: '#fce4ec', icon: 'bi-x-circle' },
-  in_progress:   { label: 'In Progress',    color: '#0d6efd', bg: '#e8f0fe', icon: 'bi-arrow-repeat' },
-  paused:        { label: 'Paused',         color: '#f59e0b', bg: '#fffbeb', icon: 'bi-pause-circle' },
-  delayed:       { label: 'Delayed',        color: '#ef4444', bg: '#fef2f2', icon: 'bi-exclamation-triangle' },
-  completed:     { label: 'Completed',      color: '#8b5cf6', bg: '#f5f3ff', icon: 'bi-check-circle-fill' },
-  implemented:   { label: 'Implemented',    color: '#198754', bg: '#e6f4ea', icon: 'bi-check-all' },
+  pending:       { label: 'Pending Review', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-clock' },
+  approved:      { label: 'Approved',       color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-circle' },
+  rejected:      { label: 'Rejected',       color: 'var(--danger)',  bg: 'var(--danger-soft)',  icon: 'bi-x-circle' },
+  in_progress:   { label: 'In Progress',    color: 'var(--info)',    bg: 'var(--info-soft)',    icon: 'bi-arrow-repeat' },
+  paused:        { label: 'Paused',         color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-pause-circle' },
+  delayed:       { label: 'Delayed',        color: 'var(--danger)',  bg: 'var(--danger-soft)',  icon: 'bi-exclamation-triangle' },
+  completed:     { label: 'Completed',      color: 'var(--purple)',  bg: 'var(--purple-soft)',  icon: 'bi-check-circle-fill' },
+  implemented:   { label: 'Implemented',    color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-all' },
 };
 
 const OWNER_STATUSES = [
-  { key: 'in_progress', label: 'In Progress', icon: 'bi-arrow-repeat',        color: '#0d6efd' },
-  { key: 'paused',      label: 'Paused',      icon: 'bi-pause-circle',        color: '#f59e0b' },
-  { key: 'delayed',     label: 'Delayed',     icon: 'bi-exclamation-triangle', color: '#ef4444' },
-  { key: 'completed',   label: 'Completed',   icon: 'bi-check-circle-fill',   color: '#8b5cf6' },
+  { key: 'in_progress', label: 'In Progress', icon: 'bi-arrow-repeat',        color: 'var(--info)',    on: 'var(--on-info)' },
+  { key: 'paused',      label: 'Paused',      icon: 'bi-pause-circle',        color: 'var(--warning)', on: 'var(--on-warning)' },
+  { key: 'delayed',     label: 'Delayed',     icon: 'bi-exclamation-triangle', color: 'var(--danger)',  on: 'var(--on-danger)' },
+  { key: 'completed',   label: 'Completed',   icon: 'bi-check-circle-fill',   color: 'var(--purple)',  on: 'var(--on-purple)' },
 ];
 
 function fmtDate(ts) {
@@ -113,7 +128,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 600, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <h6 className="fw-bold mb-1">Submit Change Request</h6>
           <p className="text-muted small mb-0">Request a change to an SOP</p>
         </div>
@@ -130,16 +145,16 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
             <div className="d-flex gap-2">
               {SOP_TYPES.map(s => (
                 <button key={s.key} type="button" className="btn btn-sm flex-fill d-flex align-items-center justify-content-center gap-1"
-                  style={{ borderRadius: 10, fontSize: '0.78rem', fontWeight: 600, padding: '8px 12px', background: form.sopType === s.key ? s.color : '#f8f9fa', color: form.sopType === s.key ? '#fff' : s.color, border: `2px solid ${form.sopType === s.key ? s.color : '#e2e8f0'}` }}
+                  style={{ borderRadius: 10, fontSize: '0.78rem', fontWeight: 600, padding: '8px 12px', background: form.sopType === s.key ? s.color : 'var(--surface-2)', color: form.sopType === s.key ? s.on : ink(s.color), border: `2px solid ${form.sopType === s.key ? s.color : 'var(--border-subtle)'}` }}
                   onClick={() => f('sopType', s.key)}>
                   <i className={`bi ${s.icon}`} />{s.label}
                 </button>
               ))}
             </div>
             {currentVersion && (
-              <div className="d-flex align-items-center gap-2 mt-2 rounded-2 px-3 py-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                <i className="bi bi-info-circle text-primary" style={{ fontSize: '0.75rem' }} />
-                <span style={{ fontSize: '0.75rem', color: '#2563eb' }}>Current version: <strong>{currentVersion}</strong></span>
+              <div className="d-flex align-items-center gap-2 mt-2 rounded-2 px-3 py-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+                <i className="bi bi-info-circle" style={{ fontSize: '0.75rem', color: 'var(--info)' }} />
+                <span style={{ fontSize: '0.75rem', color: ink('var(--info)') }}>Current version: <strong>{currentVersion}</strong></span>
               </div>
             )}
           </div>
@@ -148,12 +163,12 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
           {availableSopDocs.length > 0 && (
             <div className="mb-3">
               <label className="form-label small fw-semibold">Affected SOP Documents</label>
-              <div className="rounded-2 p-2" style={{ background: '#f8f9fa', border: '1px solid #e9ecef', maxHeight: 150, overflowY: 'auto' }}>
+              <div className="rounded-2 p-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', maxHeight: 150, overflowY: 'auto' }}>
                 {availableSopDocs.map(d => {
                   const sel = form.affectedSopIds.includes(d.id);
                   return (
                     <div key={d.id} className="d-flex align-items-center gap-2 rounded-2 px-2 py-1 mb-1"
-                      style={{ background: sel ? '#e8f0fe' : '#fff', border: `1px solid ${sel ? '#bfdbfe' : '#e9ecef'}`, cursor: 'pointer', transition: 'all 0.1s' }}
+                      style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', color: 'var(--text-primary)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'all 0.1s' }}
                       onClick={() => f('affectedSopIds', sel ? form.affectedSopIds.filter(x => x !== d.id) : [...form.affectedSopIds, d.id])}>
                       <input type="checkbox" className="form-check-input flex-shrink-0" checked={sel} readOnly style={{ cursor: 'pointer' }} />
                       <div className="flex-grow-1" style={{ minWidth: 0 }}>
@@ -207,7 +222,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
             <div className="d-flex gap-2">
               {PRIORITIES.map(p => (
                 <button key={p.key} type="button" className="btn btn-sm px-3"
-                  style={{ borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, background: form.priority === p.key ? p.color : p.bg, color: form.priority === p.key ? '#fff' : p.color, border: `1.5px solid ${p.color}40` }}
+                  style={{ borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, background: form.priority === p.key ? p.color : p.bg, color: form.priority === p.key ? p.on : ink(p.color), border: `1.5px solid ${tint(p.color, 25)}` }}
                   onClick={() => f('priority', form.priority === p.key ? '' : p.key)}>{p.label}</button>
               ))}
             </div>
@@ -215,7 +230,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
 
           {error && <div className="alert alert-danger py-2 small">{error}</div>}
         </div>
-        <div className="px-4 py-3 flex-shrink-0 d-flex gap-2 justify-content-end" style={{ borderTop: '1px solid #f1f5f9' }}>
+        <div className="px-4 py-3 flex-shrink-0 d-flex gap-2 justify-content-end" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-sm btn-dark px-4 d-inline-flex align-items-center gap-1" onClick={handleSubmit} disabled={saving || !valid}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Submitting...</> : <><i className="bi bi-send" /> Submit</>}
@@ -250,13 +265,13 @@ function ChangeThread({ changeId, changeDocId, participants }) {
     } catch { /* ignore */ } finally { setSending(false); }
   }
 
-  const roleColors = { boss: '#dc2626', tl: '#0d6efd', ol: '#6610f2', apc: '#198754', pctl: '#0ea5e9', ipc: '#14b8a6' };
+  const roleTone = (r) => ROLE_TONES[r] || ROLE_TONES.other;
 
   return (
     <div className="mt-3">
       <div className="d-flex align-items-center gap-2 mb-2">
-        <i className="bi bi-chat-left-dots" style={{ fontSize: '0.72rem', color: '#64748b' }} />
-        <span className="fw-semibold" style={{ fontSize: '0.72rem', color: '#475569' }}>Discussion Thread</span>
+        <i className="bi bi-chat-left-dots" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }} />
+        <span className="fw-semibold" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Discussion Thread</span>
         <span className="text-muted" style={{ fontSize: '0.6rem' }}>({messages.length})</span>
       </div>
 
@@ -264,9 +279,9 @@ function ChangeThread({ changeId, changeDocId, participants }) {
       <div className="d-flex gap-1 mb-2 flex-wrap">
         {participants.filter(p => p.id).map(p => (
           <span key={p.id} className="badge rounded-pill d-inline-flex align-items-center gap-1"
-            style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.58rem', fontWeight: 500 }}>
-            <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold"
-              style={{ width: 14, height: 14, background: roleColors[p.role] || '#6c757d', fontSize: '0.4rem' }}>
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.58rem', fontWeight: 500 }}>
+            <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
+              style={{ width: 14, height: 14, background: roleTone(p.role).color, color: roleTone(p.role).on, fontSize: '0.4rem' }}>
               {(p.name || '?').slice(0, 1).toUpperCase()}
             </span>
             {p.name} <span className="text-muted">({p.roleLabel})</span>
@@ -283,7 +298,7 @@ function ChangeThread({ changeId, changeDocId, participants }) {
             if (isSysMsg) {
               return (
                 <div key={m.id} className="text-center py-1">
-                  <span className="badge rounded-pill" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.58rem', fontWeight: 500 }}>
+                  <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.58rem', fontWeight: 500 }}>
                     <i className="bi bi-arrow-repeat me-1" />{m.text}
                   </span>
                   <div className="text-muted" style={{ fontSize: '0.52rem' }}>{fmtTime(m.createdAt)}</div>
@@ -293,12 +308,12 @@ function ChangeThread({ changeId, changeDocId, participants }) {
             return (
               <div key={m.id} className={`d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
                 <div className="rounded-3 px-3 py-2" style={{
-                  maxWidth: '80%', background: isMe ? '#0d6efd' : '#f1f5f9',
-                  color: isMe ? '#fff' : '#1e293b', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  maxWidth: '80%', background: isMe ? 'var(--accent)' : 'var(--surface-2)',
+                  color: isMe ? 'var(--on-accent)' : 'var(--text-primary)', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                 }}>
                   {!isMe && (
                     <div className="d-flex align-items-center gap-1 mb-1">
-                      <span className="fw-semibold" style={{ fontSize: '0.65rem', color: roleColors[m.userRole] || '#6c757d' }}>{m.userName}</span>
+                      <span className="fw-semibold" style={{ fontSize: '0.65rem', color: ink(roleTone(m.userRole).color) }}>{m.userName}</span>
                     </div>
                   )}
                   <div style={{ fontSize: '0.78rem', whiteSpace: 'pre-wrap' }}>{m.text}</div>
@@ -359,18 +374,18 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 620, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <h6 className="fw-bold mb-1">{change.title}</h6>
               <div className="d-flex gap-2 flex-wrap">
-                <span className="badge rounded-pill" style={{ background: st.bg, color: st.color, fontSize: '0.62rem' }}><i className={`bi ${st.icon} me-1`} />{st.label}</span>
-                <span className="badge rounded-pill" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.62rem' }}>{change.changeId}</span>
-                {sop && <span className="badge rounded-pill" style={{ background: `${sop.color}15`, color: sop.color, fontSize: '0.62rem' }}><i className={`bi ${sop.icon} me-1`} />{sop.label}</span>}
-                {pr && <span className="badge rounded-pill" style={{ background: pr.bg, color: pr.color, fontSize: '0.62rem' }}>{pr.label}</span>}
+                <span className="badge rounded-pill" style={{ background: st.bg, color: ink(st.color), fontSize: '0.62rem' }}><i className={`bi ${st.icon} me-1`} />{st.label}</span>
+                <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.62rem' }}>{change.changeId}</span>
+                {sop && <span className="badge rounded-pill" style={{ background: tint(sop.color), color: ink(sop.color), fontSize: '0.62rem' }}><i className={`bi ${sop.icon} me-1`} />{sop.label}</span>}
+                {pr && <span className="badge rounded-pill" style={{ background: pr.bg, color: ink(pr.color), fontSize: '0.62rem' }}>{pr.label}</span>}
               </div>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose} style={{ width: 32, height: 32 }}><i className="bi bi-x-lg" style={{ fontSize: '0.8rem' }} /></button>
+            <button className="btn btn-sm border-0 rounded-circle" onClick={onClose} style={{ width: 32, height: 32, background: 'var(--surface-2)', color: 'var(--text-secondary)' }}><i className="bi bi-x-lg" style={{ fontSize: '0.8rem' }} /></button>
           </div>
         </div>
         <div className="px-4 py-3 flex-grow-1" style={{ overflowY: 'auto' }}>
@@ -387,7 +402,7 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
               { l: 'Approved By', v: change.approvedBy || '—' },
             ].map(ff => (
               <div key={ff.l} className="col-6 col-md-3">
-                <div style={{ fontSize: '0.58rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ff.l}</div>
+                <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{ff.l}</div>
                 <div className="small fw-medium">{ff.v}</div>
               </div>
             ))}
@@ -398,7 +413,7 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
               <div className="text-muted small fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Affected SOP Documents</div>
               <div className="d-flex gap-1 flex-wrap">
                 {change.affectedSopNames.map((name, i) => (
-                  <span key={i} className="badge rounded-pill" style={{ background: '#f5f3ff', color: '#7c3aed', fontSize: '0.62rem', border: '1px solid #ddd6fe' }}>
+                  <span key={i} className="badge rounded-pill" style={{ background: 'var(--purple-soft)', color: ink('var(--purple)'), fontSize: '0.62rem', border: '1px solid color-mix(in srgb, var(--purple) 30%, transparent)' }}>
                     <i className="bi bi-file-earmark-text me-1" />{name}
                   </span>
                 ))}
@@ -414,33 +429,33 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
           ].filter(ff => ff.v).map(ff => (
             <div key={ff.l} className="mb-3">
               <div className="text-muted small fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>{ff.l}</div>
-              <div className="rounded-2 p-2 small" style={{ background: '#f8f9fa', whiteSpace: 'pre-wrap' }}>{ff.v}</div>
+              <div className="rounded-2 p-2 small" style={{ background: 'var(--surface-2)', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{ff.v}</div>
             </div>
           ))}
 
           {change.rejectionReason && (
-            <div className="rounded-3 p-3 mb-2" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
+            <div className="rounded-3 p-3 mb-2" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)' }}>
               <div className="small fw-semibold text-danger mb-1"><i className="bi bi-x-circle me-1" />Rejection Reason</div>
               <div className="small">{change.rejectionReason}</div>
             </div>
           )}
 
           {change.bossComment && (
-            <div className="rounded-3 p-3 mb-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <div className="small fw-semibold text-primary mb-1"><i className="bi bi-chat-left-text me-1" />Boss Comment</div>
+            <div className="rounded-3 p-3 mb-2" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 30%, transparent)' }}>
+              <div className="small fw-semibold mb-1" style={{ color: ink('var(--info)') }}><i className="bi bi-chat-left-text me-1" />Boss Comment</div>
               <div className="small">{change.bossComment}</div>
             </div>
           )}
 
           {canOwnerAct && (
-            <div className="rounded-3 p-3 mb-3" style={{ background: '#fafafa', border: '1px solid #e2e8f0' }}>
-              <div className="fw-semibold small mb-2" style={{ fontSize: '0.72rem', color: '#334155' }}>
+            <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+              <div className="fw-semibold small mb-2" style={{ fontSize: '0.72rem', color: 'var(--text-primary)' }}>
                 <i className="bi bi-toggles me-1" />Update Status
               </div>
               <div className="d-flex gap-2 flex-wrap">
                 {OWNER_STATUSES.filter(s => s.key !== change.status).map(s => (
                   <button key={s.key} className="btn btn-sm d-inline-flex align-items-center gap-1 px-3"
-                    style={{ borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, background: s.color, color: '#fff', border: 'none', opacity: updating ? 0.6 : 1 }}
+                    style={{ borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, background: s.color, color: s.on, border: 'none', opacity: updating ? 0.6 : 1 }}
                     onClick={() => handleOwnerStatus(s.key)} disabled={updating}>
                     {updating ? <span className="spinner-border spinner-border-sm" /> : <i className={`bi ${s.icon}`} />}
                     {s.label}
@@ -454,7 +469,7 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
             <ChangeThread changeId={change.changeId} changeDocId={change.id} participants={participants} />
           )}
         </div>
-        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid #f1f5f9' }}>
+        <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button className="btn btn-sm btn-outline-secondary px-3 w-100" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -535,7 +550,7 @@ export default function ChangeManagementPage() {
     <div>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#0f172a' }}>Change Management</h4>
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Change Management</h4>
           <p className="text-muted small mb-0">Submit and track SOP change requests</p>
         </div>
         <div className="d-flex gap-2">
@@ -544,7 +559,7 @@ export default function ChangeManagementPage() {
               style={{ borderRadius: 8, fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setViewTab(t)}>
               {t === 'my' ? 'My Requests' : 'Assigned to Me'}
               {t === 'assigned' && assignedChanges.length > 0 && (
-                <span className="badge bg-primary rounded-pill ms-1" style={{ fontSize: '0.55rem' }}>{assignedChanges.length}</span>
+                <span className="badge rounded-pill ms-1" style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.55rem' }}>{assignedChanges.length}</span>
               )}
             </button>
           ))}
@@ -556,22 +571,22 @@ export default function ChangeManagementPage() {
 
       <div className="d-flex gap-2 flex-wrap mb-4">
         {[
-          { label: 'Total', value: stats.total, color: '#3b82f6', bg: '#eff6ff' },
-          { label: 'Pending', value: stats.pending, color: '#fd7e14', bg: '#fff3e0' },
-          { label: 'Approved', value: stats.approved, color: '#198754', bg: '#e6f4ea' },
-          { label: 'Rejected', value: stats.rejected, color: '#dc3545', bg: '#fce4ec' },
+          { label: 'Total', value: stats.total, color: 'var(--info)', bg: 'var(--info-soft)' },
+          { label: 'Pending', value: stats.pending, color: 'var(--warning)', bg: 'var(--warning-soft)' },
+          { label: 'Approved', value: stats.approved, color: 'var(--success)', bg: 'var(--success-soft)' },
+          { label: 'Rejected', value: stats.rejected, color: 'var(--danger)', bg: 'var(--danger-soft)' },
         ].map(s => (
           <div key={s.label} className="rounded-3 px-3 py-2 text-center" style={{ background: s.bg, minWidth: 80 }}>
-            <div className="fw-bold" style={{ fontSize: '1.1rem', color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '0.58rem', color: s.color, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
+            <div className="fw-bold" style={{ fontSize: '1.1rem', color: ink(s.color) }}>{s.value}</div>
+            <div style={{ fontSize: '0.58rem', color: ink(s.color), textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       <div className="d-flex gap-2 mb-3 flex-wrap">
         <div className="input-group input-group-sm" style={{ maxWidth: 230 }}>
-          <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
-          <input type="text" className="form-control border-0" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+          <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
+          <input type="text" className="form-control border-0" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
         </div>
         <select className="form-select form-select-sm" value={sopFilter} onChange={e => setSopFilter(e.target.value)} style={{ maxWidth: 170 }}>
           <option value="all">All SOPs</option>
@@ -584,7 +599,7 @@ export default function ChangeManagementPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
+        <div className="text-center py-4"><div className="spinner-border" style={{ color: 'var(--accent)' }} /></div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
           <i className="bi bi-file-earmark-diff text-muted" style={{ fontSize: '2.5rem', opacity: 0.55 }} />
@@ -605,13 +620,13 @@ export default function ChangeManagementPage() {
                     <div className="fw-semibold small text-truncate">{c.title}</div>
                     <div className="d-flex gap-2 mt-1 flex-wrap">
                       <span className="text-muted" style={{ fontSize: '0.65rem' }}>{c.changeId}</span>
-                      {sop && <span className="badge rounded-pill" style={{ background: `${sop.color}12`, color: sop.color, fontSize: '0.55rem' }}>{sop.label}</span>}
-                      {viewTab === 'assigned' && <span className="badge rounded-pill" style={{ background: '#f5f3ff', color: '#7c3aed', fontSize: '0.55rem' }}>Owner</span>}
+                      {sop && <span className="badge rounded-pill" style={{ background: tint(sop.color), color: ink(sop.color), fontSize: '0.55rem' }}>{sop.label}</span>}
+                      {viewTab === 'assigned' && <span className="badge rounded-pill" style={{ background: 'var(--purple-soft)', color: ink('var(--purple)'), fontSize: '0.55rem' }}>Owner</span>}
                       {(c.affectedSopNames || []).length > 0 && <span className="text-muted" style={{ fontSize: '0.6rem' }}>{c.affectedSopNames.length} SOP{c.affectedSopNames.length > 1 ? 's' : ''} affected</span>}
                       <span className="text-muted" style={{ fontSize: '0.65rem' }}>{fmtDate(c.dateSubmitted)}</span>
                     </div>
                   </div>
-                  <span className="badge rounded-pill" style={{ background: st.bg, color: st.color, fontSize: '0.6rem' }}>{st.label}</span>
+                  <span className="badge rounded-pill" style={{ background: st.bg, color: ink(st.color), fontSize: '0.6rem' }}>{st.label}</span>
                   <i className="bi bi-chevron-right text-muted" style={{ fontSize: '0.7rem' }} />
                 </div>
               </div>

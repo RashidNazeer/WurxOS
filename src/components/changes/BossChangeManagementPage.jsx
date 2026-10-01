@@ -20,26 +20,41 @@ import {
   updateChangeV1, postChangeMessageV1,
 } from '../../lib/changesApiV1';
 
+// Semantic hue -> readable text on its own -soft tint, in both themes
+// (pulls the hue toward the theme's text colour; raw hue on -soft is ~2-3:1).
+const ink = (c) => `color-mix(in srgb, ${c} 55%, var(--text-primary))`;
+const tint = (c, pct = 12) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
+const ROLE_TONES = {
+  boss: { color: 'var(--danger)',  on: 'var(--on-danger)' },
+  tl:   { color: 'var(--info)',    on: 'var(--on-info)' },
+  ol:   { color: 'var(--purple)',  on: 'var(--on-purple)' },
+  apc:  { color: 'var(--success)', on: 'var(--on-success)' },
+  pctl: { color: 'var(--accent)',  on: 'var(--on-accent)' },
+  ipc:  { color: 'var(--warning)', on: 'var(--on-warning)' },
+  other: { color: 'var(--text-secondary)', on: 'var(--surface-1)' },
+};
+
 const SOP_TYPES = [
-  { key: 'delivery_roadmap', label: 'Delivery Roadmap', icon: 'bi-map',          color: '#0ea5e9' },
-  { key: 'policies',         label: 'Policies',         icon: 'bi-shield-check', color: '#2563eb' },
-  { key: 'operational',      label: 'Operational SOPs', icon: 'bi-gear-wide',    color: '#7c3aed' },
-  { key: 'training',         label: 'Training SOPs',    icon: 'bi-mortarboard',  color: '#059669' },
+  { key: 'delivery_roadmap', label: 'Delivery Roadmap', icon: 'bi-map',          color: 'var(--info)' },
+  { key: 'policies',         label: 'Policies',         icon: 'bi-shield-check', color: 'var(--accent)' },
+  { key: 'operational',      label: 'Operational SOPs', icon: 'bi-gear-wide',    color: 'var(--purple)' },
+  { key: 'training',         label: 'Training SOPs',    icon: 'bi-mortarboard',  color: 'var(--success)' },
 ];
 const PRIORITIES = [
-  { key: 'low', label: 'Low', color: '#6c757d', bg: '#f3f4f6' },
-  { key: 'medium', label: 'Medium', color: '#fd7e14', bg: '#fff3e0' },
-  { key: 'high', label: 'High', color: '#dc3545', bg: '#fce4ec' },
+  { key: 'low', label: 'Low', color: 'var(--text-secondary)', bg: 'var(--surface-2)' },
+  { key: 'medium', label: 'Medium', color: 'var(--warning)', bg: 'var(--warning-soft)' },
+  { key: 'high', label: 'High', color: 'var(--danger)', bg: 'var(--danger-soft)' },
 ];
 const STATUS_LIST = [
-  { key: 'pending',     label: 'Pending Review', color: '#fd7e14', bg: '#fff3e0', icon: 'bi-clock' },
-  { key: 'approved',    label: 'Approved',       color: '#198754', bg: '#e6f4ea', icon: 'bi-check-circle' },
-  { key: 'rejected',    label: 'Rejected',       color: '#dc3545', bg: '#fce4ec', icon: 'bi-x-circle' },
-  { key: 'in_progress', label: 'In Progress',    color: '#0d6efd', bg: '#e8f0fe', icon: 'bi-arrow-repeat' },
-  { key: 'paused',      label: 'Paused',         color: '#f59e0b', bg: '#fffbeb', icon: 'bi-pause-circle' },
-  { key: 'delayed',     label: 'Delayed',        color: '#ef4444', bg: '#fef2f2', icon: 'bi-exclamation-triangle' },
-  { key: 'completed',   label: 'Completed',      color: '#8b5cf6', bg: '#f5f3ff', icon: 'bi-check-circle-fill' },
-  { key: 'implemented', label: 'Implemented',    color: '#198754', bg: '#e6f4ea', icon: 'bi-check-all' },
+  { key: 'pending',     label: 'Pending Review', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-clock' },
+  { key: 'approved',    label: 'Approved',       color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-circle' },
+  { key: 'rejected',    label: 'Rejected',       color: 'var(--danger)',  bg: 'var(--danger-soft)',  icon: 'bi-x-circle' },
+  { key: 'in_progress', label: 'In Progress',    color: 'var(--info)',    bg: 'var(--info-soft)',    icon: 'bi-arrow-repeat' },
+  { key: 'paused',      label: 'Paused',         color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-pause-circle' },
+  { key: 'delayed',     label: 'Delayed',        color: 'var(--danger)',  bg: 'var(--danger-soft)',  icon: 'bi-exclamation-triangle' },
+  { key: 'completed',   label: 'Completed',      color: 'var(--purple)',  bg: 'var(--purple-soft)',  icon: 'bi-check-circle-fill' },
+  { key: 'implemented', label: 'Implemented',    color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-check-all' },
 ];
 
 const SOP_TABS = ['delivery_roadmap', 'operational_sops', 'training_sops', 'policies'];
@@ -87,21 +102,21 @@ function BossChangeThread({ changeId, changeDocId, participants }) {
     } catch { /* ignore */ } finally { setSending(false); }
   }
 
-  const roleColors = { boss: '#dc2626', tl: '#0d6efd', ol: '#6610f2', apc: '#198754', pctl: '#0ea5e9', ipc: '#14b8a6' };
+  const roleTone = (r) => ROLE_TONES[r] || ROLE_TONES.other;
 
   return (
     <div className="mt-3">
       <div className="d-flex align-items-center gap-2 mb-2">
-        <i className="bi bi-chat-left-dots" style={{ fontSize: '0.72rem', color: '#64748b' }} />
-        <span className="fw-semibold" style={{ fontSize: '0.72rem', color: '#475569' }}>Discussion Thread</span>
+        <i className="bi bi-chat-left-dots" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }} />
+        <span className="fw-semibold" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Discussion Thread</span>
         <span className="text-muted" style={{ fontSize: '0.6rem' }}>({messages.length})</span>
       </div>
       <div className="d-flex gap-1 mb-2 flex-wrap">
         {participants.filter(p => p.id).map(p => (
           <span key={p.id} className="badge rounded-pill d-inline-flex align-items-center gap-1"
-            style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.58rem', fontWeight: 500 }}>
-            <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold"
-              style={{ width: 14, height: 14, background: roleColors[p.role] || '#6c757d', fontSize: '0.4rem' }}>
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.58rem', fontWeight: 500 }}>
+            <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold"
+              style={{ width: 14, height: 14, background: roleTone(p.role).color, color: roleTone(p.role).on, fontSize: '0.4rem' }}>
               {(p.name || '?').slice(0, 1).toUpperCase()}
             </span>
             {p.name} <span className="text-muted">({p.roleLabel})</span>
@@ -115,7 +130,7 @@ function BossChangeThread({ changeId, changeDocId, participants }) {
             if (m.type === 'status_change') {
               return (
                 <div key={m.id} className="text-center py-1">
-                  <span className="badge rounded-pill" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.58rem', fontWeight: 500 }}>
+                  <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.58rem', fontWeight: 500 }}>
                     <i className="bi bi-arrow-repeat me-1" />{m.text}
                   </span>
                   <div className="text-muted" style={{ fontSize: '0.52rem' }}>{fmtTime(m.createdAt)}</div>
@@ -125,12 +140,12 @@ function BossChangeThread({ changeId, changeDocId, participants }) {
             return (
               <div key={m.id} className={`d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
                 <div className="rounded-3 px-3 py-2" style={{
-                  maxWidth: '80%', background: isMe ? '#dc2626' : '#f1f5f9',
-                  color: isMe ? '#fff' : '#1e293b', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  maxWidth: '80%', background: isMe ? 'var(--accent)' : 'var(--surface-2)',
+                  color: isMe ? 'var(--on-accent)' : 'var(--text-primary)', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                 }}>
                   {!isMe && (
                     <div className="d-flex align-items-center gap-1 mb-1">
-                      <span className="fw-semibold" style={{ fontSize: '0.65rem', color: roleColors[m.userRole] || '#6c757d' }}>{m.userName}</span>
+                      <span className="fw-semibold" style={{ fontSize: '0.65rem', color: ink(roleTone(m.userRole).color) }}>{m.userName}</span>
                     </div>
                   )}
                   <div style={{ fontSize: '0.78rem', whiteSpace: 'pre-wrap' }}>{m.text}</div>
@@ -249,23 +264,23 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 640, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
               <h6 className="fw-bold mb-1">{change.title}</h6>
               <div className="d-flex gap-2 flex-wrap">
-                <span className="badge rounded-pill" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.62rem' }}>{change.changeId}</span>
-                {sop && <span className="badge rounded-pill" style={{ background: `${sop.color}15`, color: sop.color, fontSize: '0.62rem' }}><i className={`bi ${sop.icon} me-1`} />{sop.label}</span>}
-                {pr && <span className="badge rounded-pill" style={{ background: pr.bg, color: pr.color, fontSize: '0.62rem' }}>{pr.label}</span>}
+                <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.62rem' }}>{change.changeId}</span>
+                {sop && <span className="badge rounded-pill" style={{ background: tint(sop.color), color: ink(sop.color), fontSize: '0.62rem' }}><i className={`bi ${sop.icon} me-1`} />{sop.label}</span>}
+                {pr && <span className="badge rounded-pill" style={{ background: pr.bg, color: ink(pr.color), fontSize: '0.62rem' }}>{pr.label}</span>}
               </div>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose} style={{ width: 32, height: 32 }}><i className="bi bi-x-lg" style={{ fontSize: '0.8rem' }} /></button>
+            <button className="btn btn-sm border-0 rounded-circle" onClick={onClose} style={{ width: 32, height: 32, background: 'var(--surface-2)', color: 'var(--text-secondary)' }}><i className="bi bi-x-lg" style={{ fontSize: '0.8rem' }} /></button>
           </div>
         </div>
 
         <div className="px-4 py-3 flex-grow-1" style={{ overflowY: 'auto' }}>
           {/* Submitter info */}
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="row g-2">
               {[
                 { l: 'Submitted By', v: `${change.submittedByName} (${change.submittedByRole})` },
@@ -274,7 +289,7 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
                 { l: 'SOP Type', v: sop?.label || '—' },
               ].map(ff => (
                 <div key={ff.l} className="col-6">
-                  <div style={{ fontSize: '0.58rem', color: '#94a3b8', textTransform: 'uppercase' }}>{ff.l}</div>
+                  <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{ff.l}</div>
                   <div className="small fw-medium">{ff.v}</div>
                 </div>
               ))}
@@ -286,7 +301,7 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
               <div className="text-muted small fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>Affected SOP Documents</div>
               <div className="d-flex gap-1 flex-wrap">
                 {change.affectedSopNames.map((name, i) => (
-                  <span key={i} className="badge rounded-pill" style={{ background: '#f5f3ff', color: '#7c3aed', fontSize: '0.62rem', border: '1px solid #ddd6fe' }}>
+                  <span key={i} className="badge rounded-pill" style={{ background: 'var(--purple-soft)', color: ink('var(--purple)'), fontSize: '0.62rem', border: '1px solid color-mix(in srgb, var(--purple) 30%, transparent)' }}>
                     <i className="bi bi-file-earmark-text me-1" />{name}
                   </span>
                 ))}
@@ -295,10 +310,10 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
           )}
 
           {change.status === 'completed' && (
-            <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-2" style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
-              <i className="bi bi-check-circle-fill" style={{ color: '#8b5cf6', fontSize: '1rem' }} />
+            <div className="rounded-3 p-3 mb-3 d-flex align-items-center gap-2" style={{ background: 'var(--purple-soft)', border: '1px solid color-mix(in srgb, var(--purple) 30%, transparent)' }}>
+              <i className="bi bi-check-circle-fill" style={{ color: 'var(--purple)', fontSize: '1rem' }} />
               <div>
-                <div className="fw-semibold small" style={{ color: '#7c3aed' }}>Owner has marked this change as completed</div>
+                <div className="fw-semibold small" style={{ color: ink('var(--purple)') }}>Owner has marked this change as completed</div>
                 <div className="text-muted" style={{ fontSize: '0.68rem' }}>Review the implementation and update the SOP by setting status to "Implemented".</div>
               </div>
             </div>
@@ -312,13 +327,13 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
           ].filter(ff => ff.v).map(ff => (
             <div key={ff.l} className="mb-3">
               <div className="text-muted small fw-semibold mb-1" style={{ fontSize: '0.68rem' }}>{ff.l}</div>
-              <div className="rounded-2 p-2 small" style={{ background: '#f8f9fa', whiteSpace: 'pre-wrap' }}>{ff.v}</div>
+              <div className="rounded-2 p-2 small" style={{ background: 'var(--surface-2)', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{ff.v}</div>
             </div>
           ))}
 
           <hr className="my-3" />
 
-          <h6 className="fw-bold small mb-3"><i className="bi bi-shield-lock me-1 text-primary" />Boss Decision</h6>
+          <h6 className="fw-bold small mb-3"><i className="bi bi-shield-lock me-1" style={{ color: 'var(--accent)' }} />Boss Decision</h6>
 
           <div className="row g-3 mb-3">
             <div className="col-6">
@@ -365,11 +380,11 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
           )}
 
           {isImplementing && affectedDocs.length > 0 && (
-            <div className="rounded-3 p-3 mb-3" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-              <h6 className="fw-bold small mb-2" style={{ color: '#16a34a' }}><i className="bi bi-arrow-up-circle me-1" />Update SOP Documents</h6>
+            <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)' }}>
+              <h6 className="fw-bold small mb-2" style={{ color: ink('var(--success)') }}><i className="bi bi-arrow-up-circle me-1" />Update SOP Documents</h6>
               <p className="text-muted mb-3" style={{ fontSize: '0.7rem' }}>v1 created new knowledge-base versions here. v2 leaves SOP versioning to the KB module — set the new version on each affected article from there.</p>
               {affectedDocs.map(d => (
-                <div key={d.id} className="d-flex align-items-center gap-2 mb-2 rounded-2 p-2" style={{ background: '#fff', border: '1px solid #e9ecef' }}>
+                <div key={d.id} className="d-flex align-items-center gap-2 mb-2 rounded-2 p-2" style={{ background: 'var(--surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}>
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="fw-medium small text-truncate">{d.title}</div>
                     <div className="text-muted" style={{ fontSize: '0.62rem' }}>Current: {d.version || 'N/A'}</div>
@@ -391,7 +406,7 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
           })()}
         </div>
 
-        <div className="px-4 py-3 flex-shrink-0 d-flex gap-2 justify-content-end" style={{ borderTop: '1px solid #f1f5f9' }}>
+        <div className="px-4 py-3 flex-shrink-0 d-flex gap-2 justify-content-end" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-sm btn-dark px-4 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving || needsReason}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Saving...</> : <><i className="bi bi-check-lg" /> Save</>}
@@ -455,9 +470,9 @@ function ChangeLogView() {
     else { setSortCol(ci); setSortDir('asc'); }
   }
 
-  if (loading) return <div className="text-center py-4"><div className="spinner-border text-primary" /></div>;
+  if (loading) return <div className="text-center py-4"><div className="spinner-border" style={{ color: 'var(--accent)' }} /></div>;
   if (rows.length === 0) return (
-    <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16 }}>
+    <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16 }}>
       <i className="bi bi-journal-text text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
       <p className="text-muted mt-3 mb-0">No log entries yet.</p>
     </div>
@@ -471,18 +486,18 @@ function ChangeLogView() {
     <div>
       <div className="d-flex gap-2 flex-wrap mb-4">
         {[
-          { label: 'Total Entries', value: totalEntries, icon: 'bi-journal-text', color: '#3b82f6', bg: '#eff6ff' },
-          { label: `Unique ${headers[0] || 'Col 1'}`, value: uniqueCol0, icon: 'bi-hash', color: '#8b5cf6', bg: '#f5f3ff' },
-          ...(headers.length > 1 ? [{ label: `Unique ${headers[1]}`, value: uniqueCol1, icon: 'bi-collection', color: '#059669', bg: '#ecfdf5' }] : []),
-          { label: 'Showing', value: filtered.length, icon: 'bi-funnel', color: '#f59e0b', bg: '#fffbeb' },
+          { label: 'Total Entries', value: totalEntries, icon: 'bi-journal-text', color: 'var(--info)', bg: 'var(--info-soft)' },
+          { label: `Unique ${headers[0] || 'Col 1'}`, value: uniqueCol0, icon: 'bi-hash', color: 'var(--purple)', bg: 'var(--purple-soft)' },
+          ...(headers.length > 1 ? [{ label: `Unique ${headers[1]}`, value: uniqueCol1, icon: 'bi-collection', color: 'var(--success)', bg: 'var(--success-soft)' }] : []),
+          { label: 'Showing', value: filtered.length, icon: 'bi-funnel', color: 'var(--warning)', bg: 'var(--warning-soft)' },
         ].map(s => (
           <div key={s.label} className="rounded-3 px-3 py-2 d-flex align-items-center gap-2" style={{ background: s.bg, minWidth: 120 }}>
-            <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: `${s.color}15` }}>
+            <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: tint(s.color) }}>
               <i className={`bi ${s.icon}`} style={{ color: s.color, fontSize: '0.85rem' }} />
             </div>
             <div>
-              <div className="fw-bold" style={{ fontSize: '1rem', color: s.color, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: '0.55rem', color: s.color, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>{s.label}</div>
+              <div className="fw-bold" style={{ fontSize: '1rem', color: ink(s.color), lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: '0.55rem', color: ink(s.color), textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>{s.label}</div>
             </div>
           </div>
         ))}
@@ -490,8 +505,8 @@ function ChangeLogView() {
 
       <div className="d-flex gap-2 mb-3 flex-wrap align-items-center">
         <div className="input-group input-group-sm" style={{ maxWidth: 260 }}>
-          <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
-          <input type="text" className="form-control border-0" placeholder="Search all columns..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+          <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
+          <input type="text" className="form-control border-0" placeholder="Search all columns..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
           {search && <button className="btn btn-sm btn-outline-secondary border-0" onClick={() => setSearch('')}><i className="bi bi-x" /></button>}
         </div>
         {Object.entries(columnOptions).slice(0, 4).map(([ci, vals]) => (
@@ -530,20 +545,20 @@ function ChangeLogView() {
             const title = r[0] || '—';
             const subtitle = headers.length > 1 ? r[1] || '' : '';
             return (
-              <div key={ri} className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer', borderLeft: '4px solid #3b82f6' }}
+              <div key={ri} className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer', borderLeft: '4px solid var(--info)' }}
                 onClick={() => setExpandedRow(isExpanded ? null : ri)}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="flex-grow-1" style={{ minWidth: 0 }}>
                       <div className="d-flex align-items-center gap-2">
                         <span className="fw-semibold small text-truncate">{title}</span>
-                        {subtitle && <span className="badge rounded-pill" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.58rem' }}>{subtitle}</span>}
+                        {subtitle && <span className="badge rounded-pill" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: '0.58rem' }}>{subtitle}</span>}
                       </div>
                       {!isExpanded && headers.length > 2 && (
                         <div className="d-flex gap-2 mt-1 flex-wrap">
                           {headers.slice(2, 5).map((h, hi) => r[hi + 2] ? (
                             <span key={hi} className="text-muted" style={{ fontSize: '0.62rem' }}>
-                              <span style={{ color: '#94a3b8' }}>{h}:</span> {r[hi + 2]}
+                              <span style={{ color: 'var(--text-muted)' }}>{h}:</span> {r[hi + 2]}
                             </span>
                           ) : null)}
                         </div>
@@ -552,11 +567,11 @@ function ChangeLogView() {
                     <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-muted flex-shrink-0`} style={{ fontSize: '0.7rem' }} />
                   </div>
                   {isExpanded && (
-                    <div className="mt-3 pt-3" style={{ borderTop: '1px solid #f1f5f9' }}>
+                    <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                       <div className="row g-2">
                         {headers.map((h, hi) => (
                           <div key={hi} className="col-6 col-md-4">
-                            <div style={{ fontSize: '0.58rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>{h}</div>
+                            <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>{h}</div>
                             <div className="small fw-medium" style={{ wordBreak: 'break-word' }}>{r[hi] || '—'}</div>
                           </div>
                         ))}
@@ -573,9 +588,9 @@ function ChangeLogView() {
           <div className="table-responsive">
             <table className="table table-hover table-sm mb-0" style={{ fontSize: '0.75rem' }}>
               <thead>
-                <tr style={{ background: '#f8fafc' }}>
+                <tr style={{ background: 'var(--surface-2)' }}>
                   {headers.map((h, i) => (
-                    <th key={i} className="border-0 text-nowrap px-3 py-2" style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', userSelect: 'none' }}
+                    <th key={i} className="border-0 text-nowrap px-3 py-2" style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', userSelect: 'none' }}
                       onClick={() => handleSort(i)}>
                       {h}
                       {sortCol === i && <i className={`bi bi-caret-${sortDir === 'asc' ? 'up' : 'down'}-fill ms-1`} style={{ fontSize: '0.55rem' }} />}
@@ -648,7 +663,7 @@ export default function BossChangeManagementPage() {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h4 className="fw-bold mb-1" style={{ color: '#0f172a' }}>Change Management</h4>
+          <h4 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>Change Management</h4>
           <p className="text-muted small mb-0">Review change requests and track implementation</p>
         </div>
         <div className="d-flex gap-2">
@@ -656,7 +671,7 @@ export default function BossChangeManagementPage() {
             <button key={t} className={`btn btn-sm px-3 ${tab === t ? 'btn-dark' : 'btn-outline-secondary'}`}
               style={{ borderRadius: 8, fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setTab(t)}>
               {t === 'requests' ? 'Requests' : 'Change Log'}
-              {t === 'requests' && (pendingCount + completedCount) > 0 && <span className="badge bg-danger rounded-pill ms-1" style={{ fontSize: '0.55rem' }}>{pendingCount + completedCount}</span>}
+              {t === 'requests' && (pendingCount + completedCount) > 0 && <span className="badge rounded-pill ms-1" style={{ background: 'var(--danger)', color: 'var(--on-danger)', fontSize: '0.55rem' }}>{pendingCount + completedCount}</span>}
             </button>
           ))}
         </div>
@@ -668,8 +683,8 @@ export default function BossChangeManagementPage() {
         <>
           <div className="d-flex gap-2 mb-3 flex-wrap">
             <div className="input-group input-group-sm" style={{ maxWidth: 230 }}>
-              <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
-              <input type="text" className="form-control border-0" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+              <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}><i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} /></span>
+              <input type="text" className="form-control border-0" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
             </div>
             <select className="form-select form-select-sm" value={sopFilter} onChange={e => setSopFilter(e.target.value)} style={{ maxWidth: 170 }}>
               <option value="all">All SOPs</option>
@@ -683,9 +698,9 @@ export default function BossChangeManagementPage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
+            <div className="text-center py-4"><div className="spinner-border" style={{ color: 'var(--accent)' }} /></div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed #dee2e6', borderRadius: 16 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16 }}>
               <i className="bi bi-inbox text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">No change requests.</p>
             </div>
@@ -704,13 +719,13 @@ export default function BossChangeManagementPage() {
                         <div className="d-flex gap-2 mt-1 flex-wrap">
                           <span className="text-muted" style={{ fontSize: '0.65rem' }}>{c.changeId}</span>
                           <span className="text-muted" style={{ fontSize: '0.65rem' }}>by {c.submittedByName}</span>
-                          {sop && <span className="badge rounded-pill" style={{ background: `${sop.color}12`, color: sop.color, fontSize: '0.55rem' }}>{sop.label}</span>}
+                          {sop && <span className="badge rounded-pill" style={{ background: tint(sop.color), color: ink(sop.color), fontSize: '0.55rem' }}>{sop.label}</span>}
                           {c.currentVersion && <span className="text-muted" style={{ fontSize: '0.65rem' }}>{c.currentVersion}</span>}
-                          {c.newVersion && <span style={{ fontSize: '0.65rem', color: '#16a34a' }}>→ {c.newVersion}</span>}
-                          {pr && <span className="badge rounded-pill" style={{ background: pr.bg, color: pr.color, fontSize: '0.55rem' }}>{pr.label}</span>}
+                          {c.newVersion && <span style={{ fontSize: '0.65rem', color: ink('var(--success)') }}>→ {c.newVersion}</span>}
+                          {pr && <span className="badge rounded-pill" style={{ background: pr.bg, color: ink(pr.color), fontSize: '0.55rem' }}>{pr.label}</span>}
                         </div>
                       </div>
-                      <span className="badge rounded-pill" style={{ background: st.bg, color: st.color, fontSize: '0.62rem' }}><i className={`bi ${st.icon} me-1`} />{st.label}</span>
+                      <span className="badge rounded-pill" style={{ background: st.bg, color: ink(st.color), fontSize: '0.62rem' }}><i className={`bi ${st.icon} me-1`} />{st.label}</span>
                       <i className="bi bi-chevron-right text-muted" style={{ fontSize: '0.7rem' }} />
                     </div>
                   </div>
