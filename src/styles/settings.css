@@ -44,7 +44,9 @@
 
 /* Sub-tabs of a section (Settings › Wurx Buddy › Models …). */
 .settings-subnav { padding: 2px 0 6px 30px; }
-.settings-subnav-btn { grid-template-columns: 1fr; padding: 7px 12px; font-size: 12.5px; font-weight: 600; }
+/* Two classes so it beats the later .settings-nav-btn grid (20px icon column),
+   which squeezed the label into the icon slot ("M…", "A…"). */
+.settings-nav-btn.settings-subnav-btn { grid-template-columns: minmax(0, 1fr); padding: 7px 12px; font-size: 12.5px; font-weight: 600; }
 
 /* Panel header — back arrow + label, echoes the ss */
 .settings-panel-header {
