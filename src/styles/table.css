@@ -306,21 +306,34 @@
   animation: wx-enter-fade var(--dur-enter) var(--ease-out);
 }
 
-/* Glass without its own backdrop-filter: .wx-modal-backdrop already blurs
-   the page, so the translucent pane shows that blur through it. A filter
-   here would also trap position:fixed menus inside the dialog. */
+/* Glass pane. The filter lives on a pseudo-element, never on .wx-modal
+   itself: backdrop-filter there would become the containing block for
+   position:fixed menus inside the dialog and misplace them. */
 .wx-modal {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   max-width: 480px;
-  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-glass);
-  box-shadow: var(--shadow-xl), var(--glass-highlight);
+  box-shadow: var(--shadow-xl);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
+}
+.wx-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-highlight);
+  pointer-events: none;
 }
 
 /* When the modal's direct child is a <form>, make it the flex column so

@@ -67,6 +67,108 @@
     </script>
   </head>
   <body>
+    <!-- Glass refraction (edge lensing). Referenced from CSS as
+         `backdrop-filter: ... url(#wx-glass-refract)`; see --glass-refract-fn
+         in tokens.css. Inlined here so the filters exist before any glass
+         surface paints, exactly once for the whole app.
+
+         How it works: two feImage primitives stretch a one-axis gradient over
+         the pane to build a displacement map — red carries the horizontal
+         offset, green the vertical. Both channels sit at 0x80 (= 0.5, no
+         offset) across the middle ~88% of each axis, so the centre of the
+         pane stays undistorted and readable, and ramp to the extremes over
+         the outer ~6%, so the backdrop bends and compresses toward the rim.
+         feDisplacementMap samples at scale * (channel - 0.5), i.e. max offset
+         = scale/2 px. The ramp runs white -> black left-to-right (and
+         top-to-bottom), which makes the rim sample from FURTHER INSIDE the
+         pane: content compresses outward into the rim and nothing is gathered
+         from outside the backdrop, which would clamp and smear.
+
+         The X and Y maps vary one colour channel each, so feComposite
+         operator="arithmetic" k2=1 k3=1 just adds them into one (R,G,·) map —
+         no colour matrices needed. color-interpolation-filters="sRGB" is
+         load-bearing: the linearRGB default would move the 0.5 neutral point
+         and the pane centre would drift. The filter region is pinned to the
+         object box (the default -10%/120% would put the rim profile outside
+         the visible pane) and preserveAspectRatio="none" lets one map serve
+         every pane size and both corner radii: a wider element gets a wider,
+         softer ramp, but the displacement magnitude stays capped by `scale`.
+
+         Chromium only — Safari and Firefox parse the url() and render
+         nothing. tokens.css gates it. -->
+    <svg aria-hidden="true" focusable="false"
+         style="position:absolute;width:0;height:0;overflow:hidden"
+         xmlns="http://www.w3.org/2000/svg">
+      <filter id="wx-glass-refract" x="0%" y="0%" width="100%" height="100%"
+              color-interpolation-filters="sRGB">
+        <feImage preserveAspectRatio="none" result="mx"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23ff0000'/%3E%3Cstop offset='.012' stop-color='%23db0000'/%3E%3Cstop offset='.028' stop-color='%23ad0000'/%3E%3Cstop offset='.046' stop-color='%238e0000'/%3E%3Cstop offset='.062' stop-color='%23800000'/%3E%3Cstop offset='.938' stop-color='%23800000'/%3E%3Cstop offset='.954' stop-color='%23720000'/%3E%3Cstop offset='.972' stop-color='%23520000'/%3E%3Cstop offset='.988' stop-color='%23240000'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feImage preserveAspectRatio="none" result="my"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feComposite in="mx" in2="my" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="map" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="14"
+                           xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- Softer: used on the always-on-screen chrome. -->
+      <filter id="wx-glass-refract-soft" x="0%" y="0%" width="100%" height="100%"
+              color-interpolation-filters="sRGB">
+        <feImage preserveAspectRatio="none" result="mx"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23ff0000'/%3E%3Cstop offset='.012' stop-color='%23db0000'/%3E%3Cstop offset='.028' stop-color='%23ad0000'/%3E%3Cstop offset='.046' stop-color='%238e0000'/%3E%3Cstop offset='.062' stop-color='%23800000'/%3E%3Cstop offset='.938' stop-color='%23800000'/%3E%3Cstop offset='.954' stop-color='%23720000'/%3E%3Cstop offset='.972' stop-color='%23520000'/%3E%3Cstop offset='.988' stop-color='%23240000'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feImage preserveAspectRatio="none" result="my"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feComposite in="mx" in2="my" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="map" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="9"
+                           xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- Stronger: available if the owner wants the lensing pushed further. -->
+      <filter id="wx-glass-refract-strong" x="0%" y="0%" width="100%" height="100%"
+              color-interpolation-filters="sRGB">
+        <feImage preserveAspectRatio="none" result="mx"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23ff0000'/%3E%3Cstop offset='.012' stop-color='%23db0000'/%3E%3Cstop offset='.028' stop-color='%23ad0000'/%3E%3Cstop offset='.046' stop-color='%238e0000'/%3E%3Cstop offset='.062' stop-color='%23800000'/%3E%3Cstop offset='.938' stop-color='%23800000'/%3E%3Cstop offset='.954' stop-color='%23720000'/%3E%3Cstop offset='.972' stop-color='%23520000'/%3E%3Cstop offset='.988' stop-color='%23240000'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feImage preserveAspectRatio="none" result="my"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feComposite in="mx" in2="my" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="map" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="22"
+                           xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+
+      <!-- Chromatic aberration: R/G/B displaced at slightly different scales,
+           which is how real glass splits colour at the rim. NOT wired up by
+           default — it is three displacement passes instead of one, so it
+           roughly doubles the filter cost. Swap --glass-refract-fn to this id
+           to try it. -->
+      <filter id="wx-glass-refract-ca" x="0%" y="0%" width="100%" height="100%"
+              color-interpolation-filters="sRGB">
+        <feImage preserveAspectRatio="none" result="mx"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23ff0000'/%3E%3Cstop offset='.012' stop-color='%23db0000'/%3E%3Cstop offset='.028' stop-color='%23ad0000'/%3E%3Cstop offset='.046' stop-color='%238e0000'/%3E%3Cstop offset='.062' stop-color='%23800000'/%3E%3Cstop offset='.938' stop-color='%23800000'/%3E%3Cstop offset='.954' stop-color='%23720000'/%3E%3Cstop offset='.972' stop-color='%23520000'/%3E%3Cstop offset='.988' stop-color='%23240000'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feImage preserveAspectRatio="none" result="my"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feComposite in="mx" in2="my" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="map" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="11"
+                           xChannelSelector="R" yChannelSelector="G" result="dr" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="14"
+                           xChannelSelector="R" yChannelSelector="G" result="dg" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="17"
+                           xChannelSelector="R" yChannelSelector="G" result="db" />
+        <feColorMatrix in="dr" result="cr" type="matrix"
+                       values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" />
+        <feColorMatrix in="dg" result="cg" type="matrix"
+                       values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" />
+        <feColorMatrix in="db" result="cb" type="matrix"
+                       values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" />
+        <feComposite in="cr" in2="cg" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="crg" />
+        <feComposite in="crg" in2="cb" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" />
+      </filter>
+    </svg>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

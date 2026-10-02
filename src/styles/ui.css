@@ -307,21 +307,35 @@
   pointer-events: none;
   animation: wx-exit-fade var(--dur-exit) var(--ease-in) forwards;
 }
-/* Glass pane without its own filter (the backdrop already blurs; a filter
-   here would trap position:fixed menus inside the dialog). */
+/* Glass pane. The filter lives on a pseudo-element, never on .ui-modal
+   itself: backdrop-filter there would become the containing block for
+   position:fixed menus inside the dialog and misplace them. */
 .ui-modal {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   width: 100%;
   max-height: 90vh;
   max-height: 90dvh;
-  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-glass);
-  box-shadow: var(--shadow-xl), var(--glass-highlight);
+  box-shadow: var(--shadow-xl);
   color: var(--text-primary);
   outline: none;
   animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
+}
+.ui-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-highlight);
+  pointer-events: none;
 }
 .ui-modal-backdrop.is-closing .ui-modal {
   animation: wx-exit-rise var(--dur-exit) var(--ease-in) forwards;
