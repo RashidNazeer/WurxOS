@@ -59,7 +59,7 @@
   max-height: min(560px, 75vh);
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-glass);
   box-shadow: var(--shadow-xl);
   z-index: 1100;
   display: flex;
@@ -489,7 +489,7 @@
   right: 0;
   bottom: 0;
   height: 46px;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-glass-sm);
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-md);
@@ -504,7 +504,7 @@
   z-index: 1;
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-glass-sm);
   box-shadow: var(--shadow-xl);
   padding: 13px 14px 11px 18px;
   overflow: hidden;
