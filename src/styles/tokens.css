@@ -114,13 +114,28 @@
   --chart-7: #4d7c0f;   /* olive        4.67 / 4.99 */
   --chart-8: #5a3a22;   /* chocolate    9.53 / 10.18 */
 
-  /* Glass (chrome only). With pure black directly behind the pane:
-     primary 13.3, secondary 6.9, muted 5.08, accent-text 4.68 at 0.92. */
-  --glass-bg:        rgba(255, 252, 247, 0.92);
-  --glass-bg-strong: rgba(255, 252, 247, 0.96);
+  /* Glass (chrome only). The pane alpha is the contrast floor and the only
+     thing that sets it — saturate() is luminance-preserving. With pure black
+     directly behind the pane: at 0.92 muted is 5.06, primary 13.3,
+     accent-text 4.98; at 0.88 muted is 4.62. 0.88 is the hard floor in
+     light — below it --text-muted drops under 4.5:1. */
+  --glass-pane-alpha:        0.92;
+  --glass-pane-alpha-strong: 0.96;
+  --glass-bg:        rgba(255, 252, 247, var(--glass-pane-alpha));
+  --glass-bg-strong: rgba(255, 252, 247, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(90, 58, 34, 0.12);
   --glass-shadow:    0 12px 32px -12px rgba(90, 58, 34, 0.22);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --glass-brightness: 1.02;
+  --glass-saturate:  180%;
+  /* Specular rim: a bright hairline on the very edge, a soft bleed under it,
+     a faint full ring so the light wraps the corners, and a weaker bounce
+     from below — light caught on a refracting rim rather than a flat bevel.
+     All inset box-shadows, so none of it re-rasterises. */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.98),
+                     inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+                     inset 0 3px 8px -5px rgba(255, 255, 255, 0.90),
+                     inset 0 -2px 6px -5px rgba(255, 255, 255, 0.55),
+                     inset 0 -1px 0 rgba(90, 58, 34, 0.12);
 }
 
 [data-theme='dark'] {
@@ -220,13 +235,22 @@
   --chart-7: #a3e635;
   --chart-8: #a8a29e;
 
-  /* Peach-tinted near-black. At 0.90 muted text stays >= 4.5:1 even with
-     pure white directly behind the pane. */
-  --glass-bg:        rgba(22, 17, 13, 0.90);
-  --glass-bg-strong: rgba(22, 17, 13, 0.95);
+  /* Peach-tinted near-black. With pure white directly behind the pane,
+     --text-muted is 5.18 at 0.90 and 4.77 at 0.86; 0.85 is the hard floor
+     in dark (0.82 measures 4.35, i.e. a fail). */
+  --glass-pane-alpha:        0.90;
+  --glass-pane-alpha-strong: 0.95;
+  --glass-bg:        rgba(22, 17, 13, var(--glass-pane-alpha));
+  --glass-bg-strong: rgba(22, 17, 13, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(245, 213, 168, 0.14);
   --glass-shadow:    0 16px 40px -12px rgba(0, 0, 0, 0.75);
-  --glass-highlight: inset 0 1px 0 rgba(245, 213, 168, 0.07);
+  --glass-brightness: 0.92;
+  --glass-saturate:  180%;
+  --glass-highlight: inset 0 1px 0 rgba(255, 241, 219, 0.26),
+                     inset 0 0 0 1px rgba(245, 213, 168, 0.08),
+                     inset 0 3px 8px -5px rgba(245, 213, 168, 0.22),
+                     inset 0 -2px 6px -5px rgba(245, 213, 168, 0.14),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.50);
 }
 
 /* Shared non-color tokens */
@@ -337,7 +361,44 @@
   --primary: var(--accent);
 
   --glass-blur:   14px;
-  --glass-filter: blur(var(--glass-blur)) saturate(140%);
+
+  /* Refraction / edge lensing. The SVG displacement filters are inlined in
+     index.html; this token picks which one (or none). Empty by default — the
+     @supports gate near the bottom of this file fills it in on engines that
+     actually render it. It stays a SEPARATE token from --glass-filter so the
+     solid fallbacks can blank --glass-filter wholesale without a specificity
+     fight. Available ids, by displacement scale (max offset = scale / 2):
+       #wx-glass-refract-soft    scale  9  → 4.5px
+       #wx-glass-refract         scale 14  → 7px    (default)
+       #wx-glass-refract-strong  scale 22  → 11px
+       #wx-glass-refract-ca      scale 14 + per-channel chromatic aberration
+                                 (three displacement passes — ~2x the cost) */
+  --glass-refract-fn: ;
+  /* saturate() lets a pane pick up the colour of what's behind it. The
+     matrix is luminance-preserving, so the text-contrast floor is set by
+     the pane alpha alone. */
+  --glass-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+                  brightness(var(--glass-brightness)) var(--glass-refract-fn);
+
+  /* Always-on-screen chrome (topbar, mobile tab bar). Same stack, but its
+     refraction is a separate dial: its backdrop changes on every scroll
+     frame, so it re-runs the whole filter continuously. If low-end laptops
+     jank, empty --glass-refract-sticky-fn first — that leaves every
+     transient surface (modals, menus, panels) refracting. */
+  --glass-refract-sticky-fn: ;
+  --glass-filter-sticky: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+                         brightness(var(--glass-brightness))
+                         var(--glass-refract-sticky-fn);
+
+  /* Glass chrome sits a radius step above flat surfaces (cards are md/lg),
+     in two sizes: large panes vs small transient surfaces, so a 3-item
+     menu doesn't take a modal's corner. */
+  --radius-glass:    var(--radius-xl);
+  --radius-glass-sm: var(--radius-lg);
+
+  /* Dialog scrim blur — much weaker than the pane blur; it only has to
+     take the edge off the page behind a modal. */
+  --glass-blur-backdrop: 6px;
 }
 
 /* Reduced motion: near-zero durations everywhere; entries keep a short
@@ -358,14 +419,65 @@
   :root { --control-h: 40px; }
 }
 
+/* ------------------------------------------------------------
+   Refraction gate.
+
+   Only Chromium renders an SVG filter referenced from backdrop-filter.
+   Safari and Firefox both PARSE `backdrop-filter: url(#x)` as valid and
+   then paint nothing, so @supports on the property alone reports a
+   capability neither one has. The gate is therefore "parses url(), and is
+   neither WebKit nor Gecko":
+     -webkit-named-image  is WebKit-only — this also correctly excludes
+                          Chrome and Firefox on iOS, which are WebKit;
+     -moz-appearance      is Gecko-only.
+   A false positive is benign: an engine that ignores the url() still gets
+   a frosted pane, only at the lower alpha — and that alpha is itself at
+   the 4.5:1 floor, so nothing becomes unreadable.
+
+   Refraction is invisible through an opaque pane, so this is also where the
+   pane alpha drops. The values are the per-theme contrast floors documented
+   in the theme blocks above; treat them as the lower bound.
+   ------------------------------------------------------------ */
+@supports (backdrop-filter: url('#wx-glass-refract')) or
+          (-webkit-backdrop-filter: url('#wx-glass-refract')) {
+  html[data-theme] {
+    --glass-refract-fn:        url('#wx-glass-refract');
+    --glass-refract-sticky-fn: url('#wx-glass-refract-soft');
+  }
+  html[data-theme='light'] {
+    --glass-pane-alpha:        0.88;   /* muted 4.62 on pure black */
+    --glass-pane-alpha-strong: 0.91;
+  }
+  html[data-theme='dark'] {
+    --glass-pane-alpha:        0.86;   /* muted 4.77 on pure white */
+    --glass-pane-alpha-strong: 0.90;
+  }
+
+  @supports (background: -webkit-named-image(apple-pay-logo-black)) {
+    html[data-theme] { --glass-refract-fn: ; --glass-refract-sticky-fn: ; }
+    html[data-theme='light'] { --glass-pane-alpha: 0.92; --glass-pane-alpha-strong: 0.96; }
+    html[data-theme='dark']  { --glass-pane-alpha: 0.90; --glass-pane-alpha-strong: 0.95; }
+  }
+  @supports (-moz-appearance: none) {
+    html[data-theme] { --glass-refract-fn: ; --glass-refract-sticky-fn: ; }
+    html[data-theme='light'] { --glass-pane-alpha: 0.92; --glass-pane-alpha-strong: 0.96; }
+    html[data-theme='dark']  { --glass-pane-alpha: 0.90; --glass-pane-alpha-strong: 0.95; }
+  }
+}
+
 /* No backdrop blur, or the user asked for less transparency: every glass
    surface falls back to a solid pane. html[data-theme] outranks the theme
-   blocks above. */
+   blocks above. The specular edge goes too: a solid pane has no material
+   to light, and `none` isn't legal inside a box-shadow list, so it's
+   zeroed instead. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-theme] {
     --glass-bg: var(--surface-1);
     --glass-bg-strong: var(--surface-1);
     --glass-filter: none;
+    --glass-filter-sticky: none;
+    --glass-highlight: inset 0 0 0 0 transparent;
+    --glass-blur-backdrop: 0px;
   }
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -373,6 +485,9 @@
     --glass-bg: var(--surface-1);
     --glass-bg-strong: var(--surface-1);
     --glass-filter: none;
+    --glass-filter-sticky: none;
+    --glass-highlight: inset 0 0 0 0 transparent;
+    --glass-blur-backdrop: 0px;
   }
 }
 

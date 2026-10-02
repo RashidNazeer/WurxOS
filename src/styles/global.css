@@ -1103,6 +1103,8 @@ input[type='range']:focus-visible,
    under prefers-reduced-transparency (tokens.css). */
 .dropdown-menu {
   --bs-dropdown-bg: var(--glass-bg-strong);
+  --bs-dropdown-border-radius: var(--radius-glass-sm);
+  --bs-dropdown-inner-border-radius: var(--radius-glass-sm);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
@@ -1110,10 +1112,13 @@ input[type='range']:focus-visible,
 .popover {
   --bs-popover-bg: var(--glass-bg-strong);
   --bs-popover-border-color: var(--glass-border);
+  --bs-popover-border-radius: var(--radius-glass-sm);
+  --bs-popover-inner-border-radius: var(--radius-glass-sm);
   --bs-popover-header-bg: transparent;
   --bs-popover-body-color: var(--text-primary);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
 }
 /* The blur lives on a pseudo-element: backdrop-filter on .modal-content
    itself would become the containing block for position:fixed menus
@@ -1121,6 +1126,8 @@ input[type='range']:focus-visible,
 .modal-content {
   --bs-modal-bg: transparent;
   --bs-modal-border-color: var(--glass-border);
+  --bs-modal-border-radius: var(--radius-glass);
+  --bs-modal-inner-border-radius: var(--radius-glass);
   isolation: isolate;
   box-shadow: var(--glass-shadow);
 }
