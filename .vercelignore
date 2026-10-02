@@ -30,3 +30,11 @@ vercel.dev.json
 dist
 migration
 scripts/tts-ingest/failures.json
+
+# Separate projects / docs that aren't part of the Vite site. Uploading them
+# (~42 MB, ~2,000 files) made CLI deploys abort on slow connections.
+Assistant
+wurx-buddy
+*.pdf
+V2_JOURNAL.md
+.claude

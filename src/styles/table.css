@@ -314,7 +314,7 @@
   max-width: 480px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-glass);
   box-shadow: var(--shadow-xl), var(--glass-highlight);
   max-height: 90vh;
   display: flex;
@@ -366,7 +366,7 @@
   padding: 16px 22px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-2);
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  border-radius: 0 0 var(--radius-glass) var(--radius-glass);
   flex: 0 0 auto;
 }
 

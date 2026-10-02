@@ -37,7 +37,8 @@
 /* ---- Richer backdrop (subtle darker glass for contrast) ---- */
 .wx-m-backdrop {
   background: var(--backdrop);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-backdrop));
+  backdrop-filter: blur(var(--glass-blur-backdrop));
 }
 
 /* ---- Header ------------------------------------------------- */
@@ -477,7 +478,7 @@
   padding: 14px 22px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-2);
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  border-radius: 0 0 var(--radius-glass) var(--radius-glass);
   flex: 0 0 auto;
 }
 .wx-m-kbd-hints {

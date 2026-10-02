@@ -317,7 +317,7 @@
   max-height: 90dvh;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-glass);
   box-shadow: var(--shadow-xl), var(--glass-highlight);
   color: var(--text-primary);
   outline: none;
@@ -374,7 +374,7 @@
   padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-2);
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  border-radius: 0 0 var(--radius-glass) var(--radius-glass);
 }
 .ui-confirm__text { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); line-height: var(--lh-base); }
 
@@ -425,7 +425,7 @@
   pointer-events: auto;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-glass-sm);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);

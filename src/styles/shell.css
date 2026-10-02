@@ -36,6 +36,7 @@
   grid-area: sidebar;
   background: var(--glass-bg);
   border-right: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -359,7 +360,8 @@
   padding: 6px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  /* -sm: a 2-3 link group renders ~200x100, smaller than a toast. */
+  border-radius: var(--radius-glass-sm);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
@@ -572,6 +574,8 @@
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
   border-bottom: 1px solid var(--glass-border);
+  /* Full-bleed: square corners, but it still gets the specular edge. */
+  box-shadow: var(--glass-highlight);
   position: sticky;
   top: 0;
   z-index: var(--z-topbar);
@@ -651,7 +655,7 @@
   min-width: 220px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-glass);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
@@ -768,7 +772,8 @@
     backdrop-filter: var(--glass-filter);
     transition: transform var(--dur-exit) var(--ease-in),
                 visibility 0s linear var(--dur-exit);
-    box-shadow: var(--shadow-xl);
+    /* Edge-anchored: square outer edges, specular edge only. */
+    box-shadow: var(--shadow-xl), var(--glass-highlight);
     /* Respect iOS safe-area so the sidebar header (W logo + close
        button) sits below the notch / status bar instead of behind it. */
     padding-top: env(safe-area-inset-top);
@@ -894,7 +899,7 @@
 .global-search-panel {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-glass);
   box-shadow: var(--shadow-xl), var(--glass-highlight);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
