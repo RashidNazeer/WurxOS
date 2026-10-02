@@ -240,7 +240,6 @@ export default function AppShell() {
         role={profile?.role}
         menuLayout={profile?.menu_layout}
         collapsed={collapsed}
-        onToggle={toggleCollapsed}
         mobileOpen={mobileOpen}
         onMobileClose={closeMobile}
       />
@@ -251,6 +250,8 @@ export default function AppShell() {
         title={meta.title}
         subtitle={meta.subtitle}
         onMobileMenu={openMobile}
+        sidebarCollapsed={collapsed}
+        onToggleSidebar={toggleCollapsed}
       />
       <main className="shell-content" tabIndex={-1}>
         <div className="shell-content-inner" ref={pageRef}>

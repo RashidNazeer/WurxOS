@@ -15,7 +15,7 @@ import { canInstall, onInstallAvailable, promptInstall, isStandalone } from '../
 // this sheet without importing it; the top bar is on every page, so it loads it.
 import '../../styles/table.css';
 
-export default function Topbar({ title, subtitle, onMobileMenu }) {
+export default function Topbar({ title, subtitle, onMobileMenu, sidebarCollapsed, onToggleSidebar }) {
   const { user, profile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -79,6 +79,18 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
             aria-label="Open menu"
           >
             <MenuIcon width="20" height="20" />
+          </button>
+        )}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            className="shell-icon-btn shell-collapse-btn"
+            onClick={onToggleSidebar}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <MenuIcon width="17" height="17" />
           </button>
         )}
         <div className="shell-topbar-titles">
