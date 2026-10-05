@@ -160,10 +160,17 @@
   /* Lit outer edge. Must be an OUTER shadow: with a ring border in play, an
      inset shadow is clipped to the padding box and would land on the
      interior instead of the true rim. */
-  --glass-rim-lit: 0 0 0 1px rgba(90, 58, 34, 0.16);
+  --glass-rim-lit: 0 0 0 1px rgba(90, 58, 34, 0.16),
+                   0 -1px 0 rgba(255, 255, 255, 0.95);
   /* Specular on the interior edge â€” now the INNER wall of the ring, which is
-     what reads as glass thickness. All inset, so none of it re-rasterises. */
-  --glass-highlight: inset 0 0 0 0 transparent;
+     what reads as glass thickness. All inset, so none of it re-rasterises.
+     With the ring at 0 these land on the pane's own edge rather than a ring's
+     inner wall, so the light reads as the surface catching it, not as a band. */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                     inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+                     inset 0 6px 12px -8px rgba(255, 255, 255, 0.85),
+                     inset 0 -2px 7px -6px rgba(255, 255, 255, 0.55),
+                     inset 0 -1px 0 rgba(90, 58, 34, 0.12);
 }
 
 [data-theme='dark'] {
@@ -297,10 +304,15 @@
      1px warm edge at the top, and a deliberately faint full-perimeter wrap
      (0.18) so it reads as light catching one edge of a dark material rather
      than as a glowing border. */
-  --glass-rim-lit: 0 0 0 1px rgba(245, 213, 168, 0.14);
+  --glass-rim-lit: 0 0 0 1px rgba(245, 213, 168, 0.18),
+                   0 -1px 0 rgba(255, 247, 235, 0.58);
   /* Interior edge, brightened well past the old 0.26 â€” this hairline is the
      single strongest "it's glass" cue in dark mode. */
-  --glass-highlight: inset 0 0 0 0 transparent;
+  --glass-highlight: inset 0 1px 0 rgba(255, 247, 235, 0.48),
+                     inset 0 0 0 1px rgba(245, 213, 168, 0.11),
+                     inset 0 6px 14px -9px rgba(255, 241, 219, 0.34),
+                     inset 0 -2px 8px -6px rgba(245, 213, 168, 0.20),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.55);
 }
 
 /* Shared non-color tokens */
