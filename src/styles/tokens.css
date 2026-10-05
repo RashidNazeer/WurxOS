@@ -153,22 +153,17 @@
      above the top edge, biased left. It is painted UNDER the opaque interior
      (see the ring block in global.css), so only the part crossing the ring
      is ever visible and it cannot lift the pane behind text. */
-  --glass-rim-spec: radial-gradient(70% 180% at 22% -40%,
-                      rgba(255, 255, 255, 0.95) 0%,
-                      rgba(255, 255, 255, 0.45) 38%,
-                      rgba(255, 255, 255, 0) 70%);
+  /* No bright point and no lit top line: both read as a glow band distinct
+     from the pane. The material is uniform edge to edge; the hairline below
+     only says where it ends. */
+  --glass-rim-spec: none;
   /* Lit outer edge. Must be an OUTER shadow: with a ring border in play, an
      inset shadow is clipped to the padding box and would land on the
      interior instead of the true rim. */
-  --glass-rim-lit: 0 0 0 1px rgba(90, 58, 34, 0.16),
-                   0 -1px 0 rgba(255, 255, 255, 0.95);
+  --glass-rim-lit: 0 0 0 1px rgba(90, 58, 34, 0.16);
   /* Specular on the interior edge â€” now the INNER wall of the ring, which is
      what reads as glass thickness. All inset, so none of it re-rasterises. */
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95),
-                     inset 0 0 0 1px rgba(255, 255, 255, 0.45),
-                     inset 0 6px 12px -8px rgba(255, 255, 255, 0.85),
-                     inset 0 -2px 7px -6px rgba(255, 255, 255, 0.55),
-                     inset 0 -1px 0 rgba(90, 58, 34, 0.12);
+  --glass-highlight: inset 0 0 0 0 transparent;
 }
 
 [data-theme='dark'] {
@@ -297,23 +292,15 @@
   --glass-rim-bg:    rgba(26, 19, 14, var(--glass-rim-alpha));
   /* Warm, not white, and weaker than light's: on a near-black pane a
      white core blows out into a neon outline. */
-  --glass-rim-spec: radial-gradient(70% 180% at 22% -40%,
-                      rgba(255, 246, 232, 0.52) 0%,
-                      rgba(255, 238, 214, 0.22) 38%,
-                      rgba(255, 238, 214, 0) 70%);
+  --glass-rim-spec: none;
   /* On a dark UI the LIT EDGE does the work the refraction can't: a defined
      1px warm edge at the top, and a deliberately faint full-perimeter wrap
      (0.18) so it reads as light catching one edge of a dark material rather
      than as a glowing border. */
-  --glass-rim-lit: 0 0 0 1px rgba(245, 213, 168, 0.18),
-                   0 -1px 0 rgba(255, 247, 235, 0.58);
+  --glass-rim-lit: 0 0 0 1px rgba(245, 213, 168, 0.14);
   /* Interior edge, brightened well past the old 0.26 â€” this hairline is the
      single strongest "it's glass" cue in dark mode. */
-  --glass-highlight: inset 0 1px 0 rgba(255, 247, 235, 0.48),
-                     inset 0 0 0 1px rgba(245, 213, 168, 0.11),
-                     inset 0 6px 14px -9px rgba(255, 241, 219, 0.34),
-                     inset 0 -2px 8px -6px rgba(245, 213, 168, 0.20),
-                     inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+  --glass-highlight: inset 0 0 0 0 transparent;
 }
 
 /* Shared non-color tokens */
@@ -548,11 +535,13 @@
           (-webkit-backdrop-filter: url('#wx-glass-refract')) {
   html[data-theme] {
     --glass-refract-sticky-fn: url('#wx-glass-refract-soft');
-    /* The ring. This is the dial that decides whether the effect is visible
-       at all: at 0px the pane is uniform and the bend has nothing to show. */
-    --glass-rim-w-lg: 14px;
-    --glass-rim-w-sm: 9px;
-    --glass-rim-w-xs: 8px;
+    /* Ring width 0: the pane is ONE uniform material edge to edge. The ring
+       existed to reveal the bend back when the interior was ~88% opaque; now
+       the whole pane is translucent, so the bend shows across all of it and a
+       separate rim band only read as a glow border. */
+    --glass-rim-w-lg: 0px;
+    --glass-rim-w-sm: 0px;
+    --glass-rim-w-xs: 0px;
   }
   html[data-theme='light'] {
     --glass-pane-alpha:        0.68;
