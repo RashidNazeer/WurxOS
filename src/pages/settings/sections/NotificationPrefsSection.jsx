@@ -102,7 +102,7 @@ export default function NotificationPrefsSection() {
           </div>
         </div>
         <span style={{
-          width: 36, height: 20, borderRadius: 999,
+          width: 36, height: 20, borderRadius: 'var(--radius-pill)',
           background: soundOn ? 'var(--accent)' : 'var(--surface-3)',
           border: '1px solid',
           borderColor: soundOn ? 'var(--accent)' : 'var(--border-default)',
@@ -144,7 +144,7 @@ export default function NotificationPrefsSection() {
               </div>
               <span
                 style={{
-                  width: 36, height: 20, borderRadius: 999,
+                  width: 36, height: 20, borderRadius: 'var(--radius-pill)',
                   background: on ? 'var(--accent)' : 'var(--surface-3)',
                   border: '1px solid',
                   borderColor: on ? 'var(--accent)' : 'var(--border-default)',

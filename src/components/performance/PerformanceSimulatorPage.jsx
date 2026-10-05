@@ -123,10 +123,10 @@ function Stepper({ label, value, min = 0, max = 20, onChange, color = 'var(--tex
       <div className="d-flex align-items-center justify-content-between">
         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{label}</span>
         <div className="d-flex align-items-center gap-2">
-          <button type="button" aria-label={`Decrease ${label}`} className="btn btn-sm btn-outline-secondary" style={{ width: 30, height: 30, borderRadius: 8, padding: 0, lineHeight: 1 }}
+          <button type="button" aria-label={`Decrease ${label}`} className="btn btn-sm btn-outline-secondary" style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', padding: 0, lineHeight: 1 }}
             onClick={() => set(value - 1)} disabled={value <= min}>−</button>
           <span style={{ minWidth: 24, textAlign: 'center', fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }} aria-live="polite">{value}</span>
-          <button type="button" aria-label={`Increase ${label}`} className="btn btn-sm btn-outline-secondary" style={{ width: 30, height: 30, borderRadius: 8, padding: 0, lineHeight: 1 }}
+          <button type="button" aria-label={`Increase ${label}`} className="btn btn-sm btn-outline-secondary" style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', padding: 0, lineHeight: 1 }}
             onClick={() => set(value + 1)} disabled={value >= max}>+</button>
         </div>
       </div>
@@ -153,7 +153,7 @@ function WeekTab({ active, label, value, onClick }) {
   return (
     <button type="button" onClick={onClick} className="btn btn-sm px-3 flex-shrink-0"
       style={{
-        borderRadius: 10, fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
+        borderRadius: 'var(--radius-md)', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap',
         background: active ? 'var(--accent-soft)' : 'var(--surface-2)',
         color: active ? 'var(--accent)' : 'var(--text-secondary)',
         border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'transparent'}`,
@@ -166,7 +166,7 @@ function WeekTab({ active, label, value, onClick }) {
 function ControlCard({ icon, title, weight, pillarValue, dropped, children }) {
   const lv = pillarValue == null ? null : getLevelTokens(pillarValue);
   return (
-    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
+    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)' }}>
       <div className="card-body p-3 p-md-4">
         <div className="d-flex align-items-center justify-content-between mb-3">
           <h6 className="fw-bold mb-0 d-inline-flex align-items-center gap-2" style={{ fontSize: '0.92rem' }}>
@@ -461,7 +461,7 @@ export default function PerformanceSimulatorPage() {
       ) : (
         <>
           {/* ── How your score works (role-aware explainer) ── */}
-          <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
+          <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
             <div style={{ height: 4, background: 'linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 40%, transparent))' }} />
             <div className="card-body p-3 p-md-4">
               <h6 className="fw-bold mb-3" style={{ fontSize: '0.95rem' }}><i className="bi bi-info-circle me-2" style={{ color: 'var(--accent)' }} />How your score is built ({roleLabel})</h6>
@@ -520,7 +520,7 @@ export default function PerformanceSimulatorPage() {
                     <div className="pt-2" style={{ borderTop: '1px dashed var(--border-subtle)' }}>
                       <div className="d-flex align-items-center justify-content-between mb-2 mt-1">
                         <div className="fw-semibold" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>OL star rating — each week (60% of reporting)</div>
-                        <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.68rem', padding: '2px 8px' }} onClick={addTlWeek}><i className="bi bi-plus" />Add week</button>
+                        <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', padding: '2px 8px' }} onClick={addTlWeek}><i className="bi bi-plus" />Add week</button>
                       </div>
                       {tlWeeks.length === 0 && <div className="rounded-2 px-2 py-2 mb-2" style={{ background: 'var(--surface-2)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>No weekly star ratings yet — add a week to simulate them.</div>}
                       {tlWeeks.map((wk, i) => (
@@ -547,7 +547,7 @@ export default function PerformanceSimulatorPage() {
                     <div className="mb-2" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Your OL rates 4 things each week after you present — your checkpoint is the average. Pick a week to edit it, or add a what-if week.</div>
                     <div className="d-flex gap-2 flex-nowrap mb-3" style={{ overflowX: 'auto', paddingBottom: 4 }}>
                       {apcWeeks.map((wk, i) => <WeekTab key={i} active={i === activeApc} label={wk.label} value={apcWeekCheckpoint(wk)} onClick={() => setActiveApc(i)} />)}
-                      <button type="button" className="btn btn-sm flex-shrink-0" style={{ borderRadius: 10, fontSize: '0.72rem', fontWeight: 700, border: '1px dashed var(--border-strong)', color: 'var(--text-secondary)' }} onClick={addApcWeek}><i className="bi bi-plus" />Week</button>
+                      <button type="button" className="btn btn-sm flex-shrink-0" style={{ borderRadius: 'var(--radius-md)', fontSize: '0.72rem', fontWeight: 700, border: '1px dashed var(--border-strong)', color: 'var(--text-secondary)' }} onClick={addApcWeek}><i className="bi bi-plus" />Week</button>
                     </div>
                     {aw && (
                       <div className="rounded-3 p-3" style={{ background: 'var(--surface-2)' }}>
@@ -573,7 +573,7 @@ export default function PerformanceSimulatorPage() {
                           simulate (mirrors the TL's OL-star-per-week lever). */}
                       <div className="d-flex align-items-center justify-content-between mb-2">
                         <div className="fw-semibold" style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>Your TL's star per report — one per week (60% of external report)</div>
-                        <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.68rem', padding: '2px 8px' }} onClick={addApcStarWeek}><i className="bi bi-plus" />Add week</button>
+                        <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', padding: '2px 8px' }} onClick={addApcStarWeek}><i className="bi bi-plus" />Add week</button>
                       </div>
                       {apcStarWeeks.length === 0 && <div className="rounded-2 px-2 py-2 mb-2" style={{ background: 'var(--surface-2)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>No report star ratings yet — add a week to simulate your TL rating each week's report.</div>}
                       {apcStarWeeks.map((wk, i) => (
@@ -634,7 +634,7 @@ export default function PerformanceSimulatorPage() {
             {/* ── RIGHT: live result + goal-seek (shown first on mobile) ── */}
             <div className="col-lg-5 order-1 order-lg-2">
               <div style={{ position: 'sticky', top: 'calc(var(--topbar-h, 68px) + 16px)' }}>
-                <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div style={{ height: 4, background: `linear-gradient(90deg, ${level.color}, color-mix(in srgb, ${level.color} 45%, transparent))` }} />
                   <div className="card-body p-4 text-center">
                     <div className="text-uppercase" style={{ fontSize: '0.66rem', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--text-muted)' }}>Simulated composite</div>
@@ -652,7 +652,7 @@ export default function PerformanceSimulatorPage() {
                   </div>
                 </div>
 
-                <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
+                <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)' }}>
                   <div className="card-body p-3 p-md-4">
                     <h6 className="fw-bold mb-3" style={{ fontSize: '0.85rem' }}><i className="bi bi-layers me-2" />What's driving it</h6>
                     {pillarRows.map((p) => (
@@ -669,7 +669,7 @@ export default function PerformanceSimulatorPage() {
                   </div>
                 </div>
 
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+                <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
                   <div className="card-body p-3 p-md-4">
                     <h6 className="fw-bold mb-2" style={{ fontSize: '0.85rem' }}><i className="bi bi-bullseye me-2" style={{ color: 'var(--accent)' }} />Reach a goal</h6>
                     <Slider label="I want my composite to be" value={goal} min={40} max={100} onChange={setGoal} suffix=" +" accent="var(--accent)" />

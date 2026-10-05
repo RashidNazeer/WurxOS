@@ -263,7 +263,7 @@ export function useClockActions() {
     {clockedInToast && (
       <div style={{
         position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 1100,
-        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 12,
+        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 'var(--radius-md)',
         background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
         boxShadow: 'var(--shadow-lg)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
       }}>
@@ -275,7 +275,7 @@ export function useClockActions() {
     {showClockOut && (
       <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={() => setShowClockOut(false)} />
-        <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 16 }}>
+        <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
           <div className="card-body p-4">
             <h6 className="fw-bold mb-1">Clock Out</h6>
             <p className="text-muted small mb-3">This ends your shift for today — you won't be able to clock back in until tomorrow.</p>

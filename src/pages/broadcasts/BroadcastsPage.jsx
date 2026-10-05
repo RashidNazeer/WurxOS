@@ -119,7 +119,7 @@ function BroadcastCard({ row, isMine, onClick }) {
             {row.title}
             {hasPoll && (
               <span style={{
-                fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999,
+                fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 'var(--radius-pill)',
                 background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
                 color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em',
               }}>Poll</span>
@@ -421,7 +421,7 @@ function ComposeStepModal({ authorId, authorRole, onClose, onSent }) {
               )}
 
               {target === 'users' && (
-                <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
+                <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
                   {candidates.length === 0 ? (
                     <div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>
                       No candidates available.
@@ -457,7 +457,7 @@ function ComposeStepModal({ authorId, authorRole, onClose, onSent }) {
               {target === 'my_team' && (
                 <div style={{
                   padding: 12, background: 'var(--surface-1)',
-                  border: '1px solid var(--border-subtle)', borderRadius: 8,
+                  border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
                   fontSize: 12.5, color: 'var(--text-secondary)',
                 }}>
                   Goes to your {candidates.length} direct report{candidates.length === 1 ? '' : 's'}:{' '}
@@ -694,13 +694,13 @@ function BroadcastDetailModal({ broadcast, meId, onClose, onChanged }) {
                     return (
                       <div key={opt.id} style={{
                         padding: 10, border: '1px solid var(--border-subtle)',
-                        borderRadius: 8, background: 'var(--surface-1)',
+                        borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)',
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700 }}>
                           <span>{opt.label}</span>
                           <span style={{ color: 'var(--text-muted)' }}>{n} · {pct}%</span>
                         </div>
-                        <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 999, marginTop: 6, overflow: 'hidden' }}>
+                        <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 'var(--radius-pill)', marginTop: 6, overflow: 'hidden' }}>
                           <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)' }} />
                         </div>
                       </div>
@@ -723,7 +723,7 @@ function BroadcastDetailModal({ broadcast, meId, onClose, onChanged }) {
                     return (
                       <div key={u.id} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 12px', borderRadius: 8,
+                        padding: '8px 12px', borderRadius: 'var(--radius-sm)',
                         background: resp
                           ? 'color-mix(in srgb, var(--success) 10%, var(--surface-1))'
                           : 'color-mix(in srgb, var(--warning) 10%, var(--surface-1))',

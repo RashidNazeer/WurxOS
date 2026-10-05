@@ -202,7 +202,7 @@ function Row({ entry, keyStr, section, isPinned, canUp, canDown, onUp, onDown, o
   if (!entry) return null;
   const Icon = entry.icon;
   const isGroup = !!entry.children;
-  const btn = { display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', cursor: 'pointer', color: 'var(--text-secondary)' };
+  const btn = { display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', cursor: 'pointer', color: 'var(--text-secondary)' };
   const btnDim = (on) => ({ ...btn, opacity: on ? 1 : 0.35, cursor: on ? 'pointer' : 'not-allowed' });
   return (
     <div
@@ -221,7 +221,7 @@ function Row({ entry, keyStr, section, isPinned, canUp, canDown, onUp, onDown, o
       </span>
       <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
         {entry.label}
-        {isGroup && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-2)', borderRadius: 5, padding: '1px 6px' }}>group</span>}
+        {isGroup && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '1px 6px' }}>group</span>}
         {section && <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>· {section}</span>}
       </span>
       <button type="button" style={btnDim(canUp)} disabled={!canUp} onClick={onUp} aria-label="Move up"><ChevronDownIcon width="14" height="14" style={{ transform: 'rotate(180deg)' }} /></button>

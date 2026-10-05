@@ -18,7 +18,7 @@
   transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 .bd-fab:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow-xl); }
-.bd-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.bd-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .bd-fab.is-thinking { animation: bd-ring 1.6s var(--ease-in-out) infinite; }
 .bd-fab.is-open { box-shadow: 0 0 0 3px var(--accent), var(--shadow-lg); }
 .bd-fab.is-bounce { animation: bd-bounce 0.9s var(--ease-out) 1; }
@@ -117,7 +117,7 @@
 .ai-md ul:has(> li > input[type='checkbox']) { list-style: none; padding-left: 0.3rem; }
 .ai-md li > input[type='checkbox'] { margin-right: 6px; vertical-align: -1px; accent-color: var(--accent); }
 .ai-md blockquote {
-  margin: 0.4rem 0 0.6rem; padding: 0.35rem 0.75rem; border-left: 3px solid var(--accent);
+  margin: 0.4rem 0 0.6rem; padding: 0.35rem 0.75rem; border-left: 2px solid var(--accent);
   background: var(--accent-soft); color: var(--text-secondary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .ai-md blockquote > :last-child { margin-bottom: 0; }
@@ -125,7 +125,7 @@
 .ai-md del { color: var(--text-muted); }
 .ai-md a:not([href]) { color: inherit; }
 .ai-md :not(pre) > code {
-  font-family: var(--font-mono); font-size: 0.82em; padding: 0.08rem 0.35rem; border-radius: 5px;
+  font-family: var(--font-mono); font-size: 0.82em; padding: 0.08rem 0.35rem; border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary);
 }
 
@@ -178,21 +178,21 @@
 .bd-inline-clip { display: inline-block; vertical-align: middle; margin-right: 6px; }
 .bd-msg { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .bd-bubble {
-  padding: 10px 14px; border-radius: 16px; font-size: 0.88rem; line-height: 1.6;
+  padding: 10px 14px; border-radius: var(--radius-lg); font-size: 0.88rem; line-height: 1.6;
   word-break: break-word; max-width: 100%;
 }
 .bd-bubble.is-user {
   background: var(--accent); color: var(--on-accent); white-space: pre-wrap;
-  border-bottom-right-radius: 5px; max-width: 85%;
+  border-bottom-right-radius: var(--radius-sm); max-width: 85%;
 }
 .bd-bubble.is-bot {
   background: color-mix(in srgb, var(--surface-2) 88%, transparent); color: var(--text-primary);
-  border: 1px solid var(--border-subtle); border-bottom-left-radius: 5px;
+  border: 1px solid var(--border-subtle); border-bottom-left-radius: var(--radius-sm);
 }
 .bd-row.is-active .bd-bubble.is-bot { border-color: var(--accent); }
 .bd-status {
   display: inline-flex; align-items: center; font-size: 0.85rem; color: var(--text-secondary);
-  padding: 8px 12px; border-radius: 14px; background: var(--accent-soft);
+  padding: 8px 12px; border-radius: var(--radius-lg); background: var(--accent-soft);
 }
 .bd-status.is-inline { background: transparent; padding: 6px 0 0; font-size: 0.78rem; color: var(--text-muted); }
 .bd-error {
@@ -254,7 +254,7 @@
 }
 .bd-input-wrap {
   display: flex; align-items: flex-end; gap: 8px; max-width: 760px; margin: 0 auto;
-  background: color-mix(in srgb, var(--input-bg) 88%, transparent); border: 1.5px solid var(--input-border); border-radius: 22px; padding: 5px 5px 5px 14px;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent); border: 1px solid var(--input-border); border-radius: var(--radius-xl); padding: 5px 5px 5px 14px;
 }
 .bd-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .bd-input {
@@ -372,7 +372,7 @@
 .bd-conv-acts { display: none; gap: 1px; padding-right: 4px; }
 .bd-conv:hover .bd-conv-acts, .bd-conv:focus-within .bd-conv-acts { display: flex; }
 .bd-conv-acts button {
-  border: 0; background: transparent; color: var(--text-muted); padding: 3px 5px; border-radius: 6px; font-size: 12px;
+  border: 0; background: transparent; color: var(--text-muted); padding: 3px 5px; border-radius: var(--radius-sm); font-size: 12px;
 }
 .bd-conv-acts button:hover { color: var(--text-primary); background: var(--surface-3); }
 .bd-conv-acts button.is-danger:hover { color: var(--danger); background: var(--danger-soft); }

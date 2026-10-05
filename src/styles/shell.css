@@ -228,7 +228,7 @@
   gap: 10px;
   align-items: center;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background:
     linear-gradient(135deg,
       color-mix(in srgb, var(--accent) 9%, transparent),
@@ -239,7 +239,7 @@
 .shell-sidebar-footer-logo {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   display: grid;
@@ -272,7 +272,7 @@
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--shell-fill-hover);
 }
 .shell-sidebar-user-avatar {
@@ -481,7 +481,7 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
   font-size: 11px;
@@ -592,7 +592,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .shell-sidebar-search-clear:hover {
   color: var(--text-primary);
@@ -980,7 +980,7 @@
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--text-secondary);
   font-family: ui-monospace, monospace;
 }

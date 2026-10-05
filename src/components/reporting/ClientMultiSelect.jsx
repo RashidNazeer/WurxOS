@@ -50,7 +50,7 @@ export default function ClientMultiSelect({ options = [], selected = [], onChang
       <button ref={anchorRef} type="button"
         className="btn btn-sm d-inline-flex align-items-center gap-1"
         style={{
-          borderRadius: 8, fontSize: '0.78rem', fontWeight: 500, maxWidth: 220,
+          borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: 500, maxWidth: 220,
           border: `1px solid ${count ? 'var(--info)' : 'var(--border-default)'}`,
           background: count ? 'var(--info-soft)' : 'var(--surface-1)',
           color: count ? 'var(--info)' : 'var(--text-secondary)',
@@ -72,7 +72,7 @@ export default function ClientMultiSelect({ options = [], selected = [], onChang
           <div ref={popRef}
             style={{
               position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 1000, width: 280,
-              background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 14,
+              background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)',
               boxShadow: 'var(--shadow-xl)',
               overflow: 'hidden',
             }}>
@@ -93,7 +93,7 @@ export default function ClientMultiSelect({ options = [], selected = [], onChang
             <div style={{ padding: 12 }}>
               {options.length > 8 && (
                 <input type="text" className="form-control form-control-sm mb-2" placeholder="Search clients…"
-                  style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
                   value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
               )}
               <div className="d-flex align-items-center justify-content-between mb-2" style={{ fontSize: '0.7rem' }}>
@@ -125,7 +125,7 @@ export default function ClientMultiSelect({ options = [], selected = [], onChang
               </div>
 
               <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <button type="button" className="btn btn-sm btn-primary px-3" style={{ borderRadius: 8, fontSize: '0.76rem' }}
+                <button type="button" className="btn btn-sm btn-primary px-3" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.76rem' }}
                   onClick={() => setOpen(false)}>Done</button>
               </div>
             </div>

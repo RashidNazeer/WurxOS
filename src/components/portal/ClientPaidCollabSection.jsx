@@ -107,7 +107,7 @@ export default function ClientPaidCollabSection({ brands = [] }) {
 
 function Stat({ label, value, tint }) {
   return (
-    <div className="wx-card" style={{ padding: 14, borderRadius: 12 }}>
+    <div className="wx-card" style={{ padding: 14, borderRadius: 'var(--radius-md)' }}>
       <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, marginBottom: 6 }}>
         {label}
       </div>
@@ -124,7 +124,7 @@ function PayBadge({ value }) {
   const cfg = v === 'paid'    ? { bg: '#dcfce7', fg: '#16a34a' }
             : v === 'pending' ? { bg: '#fef3c7', fg: '#d97706' }
                               : { bg: '#f1f5f9', fg: '#64748b' };
-  return <span style={{ ...cfgToCss(cfg), padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{value || 'Not Yet'}</span>;
+  return <span style={{ ...cfgToCss(cfg), padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700 }}>{value || 'Not Yet'}</span>;
 }
 function VidBadge({ value, link }) {
   const v = (value || '').toLowerCase();
@@ -133,8 +133,8 @@ function VidBadge({ value, link }) {
                                   : { bg: '#f1f5f9', fg: '#64748b' };
   const label = value || 'Not Yet';
   if (link) {
-    return <a href={link} target="_blank" rel="noopener noreferrer" style={{ ...cfgToCss(cfg), padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>{label} ↗</a>;
+    return <a href={link} target="_blank" rel="noopener noreferrer" style={{ ...cfgToCss(cfg), padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>{label} ↗</a>;
   }
-  return <span style={{ ...cfgToCss(cfg), padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{label}</span>;
+  return <span style={{ ...cfgToCss(cfg), padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700 }}>{label}</span>;
 }
 function cfgToCss(cfg) { return { background: cfg.bg, color: cfg.fg }; }

@@ -170,7 +170,7 @@ export default function NotificationsSection() {
                       {isThis && (
                         <span style={{
                           fontSize: 10, fontWeight: 800, padding: '2px 7px',
-                          borderRadius: 999, background: 'var(--accent)', color: 'var(--on-accent)',
+                          borderRadius: 'var(--radius-pill)', background: 'var(--accent)', color: 'var(--on-accent)',
                           textTransform: 'uppercase', letterSpacing: '0.05em',
                         }}>This device</span>
                       )}

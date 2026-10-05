@@ -402,7 +402,7 @@ code, kbd, samp, pre { font-family: var(--font-code); }
   color: var(--accent);
   background-color: var(--surface-2);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 /* Bootstrap modal classes — used heavily by v1-port pages

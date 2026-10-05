@@ -219,7 +219,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
                   style={{
                     textAlign: 'left', padding: '10px 12px', cursor: 'pointer',
                     borderRadius: 'var(--radius-md)',
-                    border: `1.5px solid ${on ? 'var(--accent)' : 'var(--border-subtle)'}`,
+                    border: `${on ? '2px' : '1px'} solid ${on ? 'var(--accent)' : 'var(--border-subtle)'}`,
                     background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
                     color: 'var(--text-primary)',
                   }}>

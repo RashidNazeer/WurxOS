@@ -40,7 +40,7 @@ function formatDateTime(d) {
 
 const chipBase = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '4px 10px', borderRadius: 999,
+  padding: '4px 10px', borderRadius: 'var(--radius-pill)',
   fontSize: 11.5, fontWeight: 600,
   background: 'var(--surface-2)',
   border: '1px solid var(--border-subtle)',
@@ -140,7 +140,7 @@ export default function TaskDetailModal({ task, canEdit, onClose, onEdit }) {
                 background: 'var(--surface-2)',
                 border: '1px solid var(--border-default)',
                 color: 'var(--text-primary)',
-                borderRadius: 8,
+                borderRadius: 'var(--radius-sm)',
                 padding: '10px 12px',
                 marginBottom: 14,
                 fontSize: 13,

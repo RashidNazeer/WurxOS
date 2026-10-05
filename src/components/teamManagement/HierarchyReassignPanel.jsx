@@ -260,7 +260,7 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
           style={{
             background: mode === 'tl' ? 'var(--surface-1)' : 'transparent',
             color: mode === 'tl' ? 'var(--text-primary)' : 'var(--text-secondary)',
-            border: 'none', borderRadius: 8,
+            border: 'none', borderRadius: 'var(--radius-sm)',
             fontWeight: 600, fontSize: '0.78rem',
             boxShadow: mode === 'tl' ? 'var(--shadow-sm)' : 'none',
           }}>
@@ -272,7 +272,7 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
           style={{
             background: mode === 'apc' ? 'var(--surface-1)' : 'transparent',
             color: mode === 'apc' ? 'var(--text-primary)' : 'var(--text-secondary)',
-            border: 'none', borderRadius: 8,
+            border: 'none', borderRadius: 'var(--radius-sm)',
             fontWeight: 600, fontSize: '0.78rem',
             boxShadow: mode === 'apc' ? 'var(--shadow-sm)' : 'none',
           }}>

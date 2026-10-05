@@ -270,7 +270,7 @@ function BrandCard({ brand, highlighted, onClick }) {
             {highlighted && (
               <span style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-                padding: '1px 6px', borderRadius: 999, textTransform: 'uppercase',
+                padding: '1px 6px', borderRadius: 'var(--radius-pill)', textTransform: 'uppercase',
                 background: 'var(--accent)', color: 'var(--on-accent)',
               }}>Managed</span>
             )}
@@ -301,7 +301,7 @@ function BrandCard({ brand, highlighted, onClick }) {
           if (!n) return null;
           return (
             <span key={s.v} style={{
-              fontSize: 10.5, padding: '2px 7px', borderRadius: 999,
+              fontSize: 10.5, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
               fontWeight: 700,
               background: tone(s.tone).bg, color: tone(s.tone).fg,
             }}>{n} {s.label.toLowerCase()}</span>
@@ -317,7 +317,7 @@ function StatTile({ label, value, hint }) {
     <div style={{
       padding: 10, background: 'var(--surface-1)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: 10,
+      borderRadius: 'var(--radius-md)',
     }}>
       <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
       <div style={{ fontSize: 17, fontWeight: 800, marginTop: 2 }}>{value}</div>
@@ -553,7 +553,7 @@ function TabBtn({ active, onClick, children }) {
         border: 0,
         background: 'transparent',
         padding: '8px 14px',
-        borderRadius: 8,
+        borderRadius: 'var(--radius-sm)',
         fontSize: 13,
         fontWeight: 700,
         cursor: 'pointer',
@@ -566,7 +566,7 @@ function TabBtn({ active, onClick, children }) {
       {active && (
         <div style={{
           position: 'absolute', left: 10, right: 10, bottom: -11, height: 2,
-          background: 'var(--accent)', borderRadius: 2,
+          background: 'var(--accent)', borderRadius: 'var(--radius-xs)',
         }} />
       )}
     </button>
@@ -615,7 +615,7 @@ function StatusBadge({ statuses, v }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
-      padding: '2px 8px', borderRadius: 999,
+      padding: '2px 8px', borderRadius: 'var(--radius-pill)',
       fontSize: 11, fontWeight: 700,
       background: t.bg, color: t.fg,
     }}>{s.label}</span>

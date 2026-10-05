@@ -30,7 +30,7 @@ export default function UpdateAvailableBanner() {
         gap: 12,
         maxWidth: 'calc(100vw - 32px)',
         padding: '10px 12px 10px 16px',
-        borderRadius: 12,
+        borderRadius: 'var(--radius-md)',
         background: 'var(--surface-1)',
         border: '1px solid var(--border-default, var(--border-subtle))',
         boxShadow: 'var(--shadow-xl)',
@@ -49,7 +49,7 @@ export default function UpdateAvailableBanner() {
         style={{
           flex: '0 0 auto',
           background: 'var(--accent)', color: 'var(--on-accent)',
-          border: 'none', borderRadius: 8,
+          border: 'none', borderRadius: 'var(--radius-sm)',
           padding: '6px 12px', fontSize: 12.5, fontWeight: 700,
           cursor: 'pointer',
           display: 'inline-flex', alignItems: 'center', gap: 6,

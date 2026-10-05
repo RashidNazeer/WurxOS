@@ -207,7 +207,7 @@ function Section({ title, items, onDelete, past }) {
                       border: 0, background: 'transparent',
                       color: 'var(--text-muted)',
                       cursor: 'pointer',
-                      borderRadius: 8,
+                      borderRadius: 'var(--radius-sm)',
                       display: 'grid', placeItems: 'center',
                       transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
                     }}

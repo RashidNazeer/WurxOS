@@ -49,15 +49,15 @@ export default function BrandAllocationTab({ employees, brands }) {
         ))}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 12, background: 'var(--success)', borderRadius: 2 }} /> Assigned
+            <span style={{ width: 12, height: 12, background: 'var(--success)', borderRadius: 'var(--radius-xs)' }} /> Assigned
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 12, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 2 }} /> Not assigned
+            <span style={{ width: 12, height: 12, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)' }} /> Not assigned
           </span>
         </div>
       </div>
 
-      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
         <div style={{ overflow: 'auto', maxHeight: '70vh' }}>
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
             <thead>

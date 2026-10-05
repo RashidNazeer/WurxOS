@@ -233,7 +233,7 @@ export default function AllResourcesPage() {
           <div className="btn-group btn-group-sm" role="group">
             <button
               className={`btn ${viewMode === 'grid' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: '8px 0 0 8px' }}
+              style={{ borderRadius: 'var(--radius-sm) 0 0 var(--radius-sm)' }}
               onClick={() => setViewMode('grid')}
               title="Grid view"
             >
@@ -241,7 +241,7 @@ export default function AllResourcesPage() {
             </button>
             <button
               className={`btn ${viewMode === 'list' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: '0 8px 8px 0' }}
+              style={{ borderRadius: '0 var(--radius-sm) var(--radius-sm) 0' }}
               onClick={() => setViewMode('list')}
               title="List view"
             >
@@ -252,7 +252,7 @@ export default function AllResourcesPage() {
           {/* Add Resource */}
           <button
             className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.8rem' }}
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
             onClick={() => setShowAddModal(true)}
           >
             <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} />
@@ -285,7 +285,7 @@ export default function AllResourcesPage() {
       )}
 
       {/* Filters */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           <div className="d-flex flex-wrap gap-2 align-items-center">
 
@@ -296,7 +296,7 @@ export default function AllResourcesPage() {
                 type="text"
                 className="form-control form-control-sm"
                 placeholder="Search by name, URL, description…"
-                style={{ paddingLeft: 30, borderRadius: 8 }}
+                style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -304,7 +304,7 @@ export default function AllResourcesPage() {
 
             <select
               className="form-select form-select-sm"
-              style={{ borderRadius: 8, width: 'auto', minWidth: 140 }}
+              style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 140 }}
               value={filterBrand}
               onChange={e => setFilterBrand(e.target.value)}
             >
@@ -314,7 +314,7 @@ export default function AllResourcesPage() {
 
             <select
               className="form-select form-select-sm"
-              style={{ borderRadius: 8, width: 'auto', minWidth: 120 }}
+              style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 120 }}
               value={filterType}
               onChange={e => setFilterType(e.target.value)}
             >
@@ -331,10 +331,10 @@ export default function AllResourcesPage() {
                 <button key={v.key}
                   className="btn btn-sm d-inline-flex align-items-center gap-1"
                   style={{
-                    borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap',
+                    borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap',
                     background: filterScope === v.key ? 'var(--info)' : 'var(--surface-2)',
                     color: filterScope === v.key ? '#fff' : 'var(--text-secondary)',
-                    border: filterScope === v.key ? '1.5px solid #0d6efd' : '1.5px solid var(--border-subtle)',
+                    border: filterScope === v.key ? '2px solid #0d6efd' : '1px solid var(--border-subtle)',
                   }}
                   onClick={() => setFilterScope(filterScope === v.key ? '' : v.key)}>
                   <i className={`bi ${v.icon}`} style={{ fontSize: '0.65rem' }} />{v.label}
@@ -345,7 +345,7 @@ export default function AllResourcesPage() {
             {hasFilters && (
               <button
                 className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 ms-auto"
-                style={{ borderRadius: 8, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                 onClick={clearFilters}
               >
                 <i className="bi bi-x-circle" /> Clear filters
@@ -364,7 +364,7 @@ export default function AllResourcesPage() {
       ) : filtered.length === 0 ? (
         <div
           className="d-flex flex-column align-items-center justify-content-center py-5"
-          style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}
+          style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}
         >
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-collection text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
@@ -376,7 +376,7 @@ export default function AllResourcesPage() {
             {hasFilters ? 'Try adjusting your search or filters.' : 'Click "Add Resource" to create one.'}
           </p>
           {hasFilters && (
-            <button className="btn btn-sm btn-outline-secondary mt-3" style={{ borderRadius: 8 }} onClick={clearFilters}>
+            <button className="btn btn-sm btn-outline-secondary mt-3" style={{ borderRadius: 'var(--radius-sm)' }} onClick={clearFilters}>
               Clear filters
             </button>
           )}
@@ -447,11 +447,11 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
   return (
     <div
       className="card border-0 shadow-sm h-100"
-      style={{ borderRadius: 14, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)', position: 'relative' }}
+      style={{ borderRadius: 'var(--radius-lg)', transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)', position: 'relative' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.1)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
     >
-      <div style={{ height: 4, borderRadius: '14px 14px 0 0', background: isGeneral ? `linear-gradient(90deg,${tCfg.color},#6610f2)` : `linear-gradient(90deg,${bc},${tCfg.color})` }} />
+      <div style={{ height: 4, borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', background: isGeneral ? `linear-gradient(90deg,${tCfg.color},#6610f2)` : `linear-gradient(90deg,${bc},${tCfg.color})` }} />
 
       <div className="card-body p-3 d-flex flex-column gap-2" style={{ minWidth: 0, overflow: 'hidden' }}>
         <div className="d-flex align-items-start gap-2" style={{ minWidth: 0 }}>
@@ -546,7 +546,7 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
 
 function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRole, brands }) {
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto' }}>
         <table className="table table-hover mb-0" style={{ fontSize: '0.83rem', minWidth: 640 }}>
           <thead>
@@ -694,7 +694,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div className="card-body p-4" style={{ overflowY: 'auto' }}>
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
@@ -753,7 +753,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
             {scope === 'brand' && (
               <div className="mb-3">
                 <label className="form-label small fw-semibold">Brand <span className="text-danger">*</span></label>
-                <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+                <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                   value={brandId} onChange={e => setBrandId(e.target.value)}>
                   <option value="">Select a brand…</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.brandName || b.brand_name}</option>)}
@@ -773,7 +773,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                         className="d-flex align-items-center gap-2 p-2 rounded-2"
                         style={{
                           background: visibility === v ? `${tint(cfg.color, 8)}` : 'var(--surface-1)',
-                          border: `1.5px solid ${visibility === v ? cfg.color + '55' : 'var(--border-subtle)'}`,
+                          border: `${visibility === v ? '2px' : '1px'} solid ${visibility === v ? cfg.color + '55' : 'var(--border-subtle)'}`,
                           cursor: 'pointer',
                         }}>
                         <input type="radio" className="form-check-input" checked={visibility === v} onChange={() => setVisibility(v)} />
@@ -795,9 +795,9 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                       placeholder="Search users…"
                       value={userSearch}
                       onChange={e => setUserSearch(e.target.value)}
-                      style={{ borderRadius: 8 }}
+                      style={{ borderRadius: 'var(--radius-sm)' }}
                     />
-                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
                       {userOptions.length === 0 && (
                         <div className="text-center py-2 small text-muted">No users match</div>
                       )}
@@ -851,19 +851,19 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
 
             <div className="mb-3">
               <label className="form-label small fw-semibold">URL <span className="text-danger">*</span></label>
-              <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+              <input type="url" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} autoFocus />
             </div>
 
             <div className="mb-3">
               <label className="form-label small fw-semibold">Name <span className="text-danger">*</span></label>
-              <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+              <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 placeholder="A short name for this resource" value={name} onChange={e => setName(e.target.value)} />
             </div>
 
             <div className="mb-3">
               <label className="form-label small fw-semibold">Description <span className="text-muted fw-normal">(optional)</span></label>
-              <textarea className="form-control form-control-sm" style={{ borderRadius: 8 }} rows={2}
+              <textarea className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }} rows={2}
                 placeholder="What is this resource for?" value={description} onChange={e => setDescription(e.target.value)} />
             </div>
 
@@ -871,7 +871,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
             {((scope === 'brand' && brandId) || (scope === 'general' && visibility === 'user' && visibleToUid)) && (
               <div
                 className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3"
-                style={{ background: notifyInApp ? 'var(--info-soft)' : 'var(--surface-0)', border: `1.5px solid ${notifyInApp ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
+                style={{ background: notifyInApp ? 'var(--info-soft)' : 'var(--surface-0)', border: `${notifyInApp ? '2px' : '1px'} solid ${notifyInApp ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                 onClick={() => setNotifyInApp(v => !v)}
               >
                 <input type="checkbox" className="form-check-input flex-shrink-0"

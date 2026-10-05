@@ -86,7 +86,7 @@ export default function TierNotificationsSection() {
           </div>
         </div>
         <span style={{
-          width: 36, height: 20, borderRadius: 999,
+          width: 36, height: 20, borderRadius: 'var(--radius-pill)',
           background: enabled ? 'var(--accent)' : 'var(--surface-3)',
           border: '1px solid', borderColor: enabled ? 'var(--accent)' : 'var(--border-default)',
           position: 'relative', flex: '0 0 auto', transition: 'background-color var(--dur-fast) var(--ease-out)',
@@ -101,7 +101,7 @@ export default function TierNotificationsSection() {
 
       <div style={{
         padding: '10px 12px',
-        background: 'var(--surface-2)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)',
+        background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', fontSize: 12.5, color: 'var(--text-secondary)',
       }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>How it works</div>
         <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>

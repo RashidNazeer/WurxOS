@@ -149,7 +149,7 @@ export default function PayoutRatesSection() {
               return (
                 <div key={code} style={{
                   display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                  padding: '10px 12px', borderRadius: 10,
+                  padding: '10px 12px', borderRadius: 'var(--radius-md)',
                   border: `1px solid ${unset ? 'var(--warning, #fd7e14)' : 'var(--border)'}`,
                   background: unset ? 'rgba(253,126,20,0.06)' : 'transparent',
                 }}>

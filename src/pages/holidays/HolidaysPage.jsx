@@ -299,7 +299,7 @@ function HolidayModal({ target, onClose, onSaved }) {
           </div>
           {totalDays > 0 && (
             <div style={{
-              fontSize: 12.5, padding: '8px 12px', borderRadius: 8,
+              fontSize: 12.5, padding: '8px 12px', borderRadius: 'var(--radius-sm)',
               background: 'color-mix(in srgb, var(--purple) 8%, transparent)',
               color: 'var(--text-secondary)',
             }}>
@@ -310,7 +310,7 @@ function HolidayModal({ target, onClose, onSaved }) {
             </div>
           )}
           {err && (
-            <div style={{ fontSize: 12, color: 'var(--danger-text)', padding: '8px 12px', background: 'var(--danger-soft)', borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--danger-text)', padding: '8px 12px', background: 'var(--danger-soft)', borderRadius: 'var(--radius-sm)' }}>
               {err}
             </div>
           )}

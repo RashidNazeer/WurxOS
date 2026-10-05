@@ -99,7 +99,7 @@ export default function SectionPresetBar({
         onClick={() => setOpen((o) => !o)}
         className="d-inline-flex align-items-center gap-1"
         style={{
-          fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+          fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-pill)',
           border: `1px solid ${open ? accent : 'var(--border-default)'}`,
           background: open ? softBg : 'var(--surface-1)',
           color: open ? accent : 'var(--text-secondary)', cursor: 'pointer',
@@ -115,7 +115,7 @@ export default function SectionPresetBar({
           className="mt-2"
           style={{
             background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-            borderRadius: 10, padding: 12,
+            borderRadius: 'var(--radius-md)', padding: 12,
           }}>
           {/* ── Save current as a preset ── */}
           <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: 0.2, marginBottom: 6 }}>
@@ -132,7 +132,7 @@ export default function SectionPresetBar({
                   <button
                     type="button" onClick={toggleAll}
                     style={{
-                      fontSize: '0.66rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+                      fontSize: '0.66rem', fontWeight: 700, padding: '2px 8px', borderRadius: 'var(--radius-pill)',
                       border: '1px dashed var(--border-default)', background: 'transparent',
                       color: 'var(--text-muted)', cursor: 'pointer',
                     }}
@@ -145,7 +145,7 @@ export default function SectionPresetBar({
                       <button
                         key={f.key} type="button" onClick={() => toggleField(f.key)}
                         style={{
-                          fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+                          fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 'var(--radius-pill)',
                           border: `1px solid ${on ? accent : 'var(--border-default)'}`,
                           background: on ? softBg : 'var(--surface-1)',
                           color: on ? accent : 'var(--text-muted)', cursor: 'pointer',
@@ -160,7 +160,7 @@ export default function SectionPresetBar({
               <div className="d-flex gap-2">
                 <input
                   className="form-control form-control-sm"
-                  style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
                   placeholder="Preset name (e.g. Launch campaigns)"
                   value={name}
                   maxLength={80}
@@ -170,7 +170,7 @@ export default function SectionPresetBar({
                   type="button"
                   className="btn btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
                   style={{
-                    borderRadius: 8, fontSize: '0.74rem', fontWeight: 700,
+                    borderRadius: 'var(--radius-sm)', fontSize: '0.74rem', fontWeight: 700,
                     background: canSave ? accent : 'var(--surface-3)',
                     color: canSave ? 'var(--text-inverse)' : 'var(--text-muted)',
                     border: 'none', opacity: canSave ? 1 : 0.7, cursor: canSave ? 'pointer' : 'not-allowed',
@@ -207,7 +207,7 @@ export default function SectionPresetBar({
                 <div key={p.id}
                   style={{
                     background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-                    borderRadius: 8, padding: '6px 8px',
+                    borderRadius: 'var(--radius-sm)', padding: '6px 8px',
                   }}>
                   {confirmingId === p.id ? (
                     <div className="d-flex align-items-center gap-2 flex-wrap">
@@ -216,10 +216,10 @@ export default function SectionPresetBar({
                       </span>
                       <div className="d-flex gap-1 ms-auto">
                         <button type="button" className="btn btn-sm"
-                          style={{ borderRadius: 6, fontSize: '0.7rem', fontWeight: 700, background: accent, color: 'var(--text-inverse)', border: 'none' }}
+                          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', fontWeight: 700, background: accent, color: 'var(--text-inverse)', border: 'none' }}
                           onClick={() => doRestore(p)}>Replace</button>
                         <button type="button" className="btn btn-sm btn-outline-secondary"
-                          style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}
                           onClick={() => setConfirmingId(null)}>Cancel</button>
                       </div>
                     </div>
@@ -237,7 +237,7 @@ export default function SectionPresetBar({
                       <div className="d-flex gap-1 ms-auto flex-shrink-0">
                         <button type="button"
                           className="btn btn-sm d-inline-flex align-items-center gap-1"
-                          style={{ borderRadius: 6, fontSize: '0.7rem', fontWeight: 700, border: `1px solid ${accent}`, color: accent, background: 'transparent' }}
+                          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', fontWeight: 700, border: `1px solid ${accent}`, color: accent, background: 'transparent' }}
                           onClick={() => handleRestoreClick(p)}
                           title="Fill this section from this preset">
                           <i className="bi bi-arrow-down-circle" /> Restore

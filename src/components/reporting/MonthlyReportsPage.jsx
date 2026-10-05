@@ -200,28 +200,28 @@ export default function MonthlyReportsPage() {
             <StatusBadge status={rStatus} />
             {(canApcEdit || canTlEdit) && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8 }}
+                style={{ borderRadius: 'var(--radius-sm)' }}
                 onClick={() => { setEditId(detailReport.id); setView('edit'); }}>
                 <i className="bi bi-pencil" /> Edit
               </button>
             )}
             {canTlVerify && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerify(detailReport)}>
                 <i className="bi bi-patch-check-fill" /> Verify
               </button>
             )}
             {canTlReject && (
               <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8 }}
+                style={{ borderRadius: 'var(--radius-sm)' }}
                 onClick={() => handleRejectToApc(detailReport)}>
                 <i className="bi bi-arrow-counterclockwise" /> Return to APC
               </button>
             )}
             {(isOwner || isTL) && rStatus === 'draft' && (
               <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8 }}
+                style={{ borderRadius: 'var(--radius-sm)' }}
                 onClick={() => handleDelete(detailReport)}>
                 <i className="bi bi-trash3" /> Delete
               </button>
@@ -236,7 +236,7 @@ export default function MonthlyReportsPage() {
         />
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -260,7 +260,7 @@ export default function MonthlyReportsPage() {
           </p>
         </div>
         <button className="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 px-3"
-          style={{ borderRadius: 8 }} onClick={() => setView('new')}>
+          style={{ borderRadius: 'var(--radius-sm)' }} onClick={() => setView('new')}>
           <i className="bi bi-plus-circle" /> New Monthly Report
         </button>
       </div>
@@ -271,26 +271,26 @@ export default function MonthlyReportsPage() {
           <i className="bi bi-search position-absolute text-muted"
             style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
           <input type="text" className="form-control form-control-sm" placeholder="Search brand…"
-            style={{ paddingLeft: 28, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+            style={{ paddingLeft: 28, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <select className="form-select form-select-sm" value={year} onChange={e => setYear(Number(e.target.value))}
-          style={{ width: 120, borderRadius: 8 }}>
+          style={{ width: 120, borderRadius: 'var(--radius-sm)' }}>
           {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <select className="form-select form-select-sm" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
-          style={{ width: 140, borderRadius: 8 }}>
+          style={{ width: 140, borderRadius: 'var(--radius-sm)' }}>
           <option value="">All Months</option>
           {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
         {myBrands.length > 1 && (
           <select className="form-select form-select-sm" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}
-            style={{ width: 200, borderRadius: 8 }}>
+            style={{ width: 200, borderRadius: 'var(--radius-sm)' }}>
             <option value="">All Brands</option>
             {myBrands.map(b => <option key={b.id} value={b.id}>{b.brandName || b.name}</option>)}
           </select>
         )}
         <select className="form-select form-select-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ width: 150, borderRadius: 8 }}>
+          style={{ width: 150, borderRadius: 'var(--radius-sm)' }}>
           <option value="">All Statuses</option>
           <option value="draft">Draft</option>
           <option value="submitted">Submitted</option>
@@ -324,7 +324,7 @@ export default function MonthlyReportsPage() {
             return (
               <div key={r.id} className="col-12 col-md-6 col-lg-4">
                 <div className="card h-100" style={{
-                  borderRadius: 14, cursor: 'pointer',
+                  borderRadius: 'var(--radius-lg)', cursor: 'pointer',
                   border: '1px solid var(--border-subtle)',
                   boxShadow: 'var(--shadow-sm)',
                   transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',

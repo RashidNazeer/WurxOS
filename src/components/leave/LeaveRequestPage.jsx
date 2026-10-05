@@ -183,7 +183,7 @@ function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCan
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: catCfg.bg }}>
@@ -359,7 +359,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-        <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflowY: 'auto' }}>
+        <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', overflowY: 'auto' }}>
           <div className="card-body p-4">
             <div className="d-flex align-items-center justify-content-between mb-4">
               <div>
@@ -554,7 +554,7 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--success-soft)' }}>
@@ -585,7 +585,7 @@ function ApproveTeamModal({ request, onConfirm, onCancel, saving, approverRole }
 
           <div
             className="d-flex align-items-center gap-2 rounded-2 p-2 mb-4"
-            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `1.5px solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
+            style={{ background: forwardToBoss ? 'var(--purple-soft)' : 'var(--surface-0)', border: `${forwardToBoss ? '2px' : '1px'} solid ${forwardToBoss ? 'color-mix(in srgb, var(--purple) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)' }}
             onClick={() => setForwardToBoss(v => !v)}
           >
             <input type="checkbox" className="form-check-input flex-shrink-0" checked={forwardToBoss}
@@ -615,7 +615,7 @@ function RejectTeamModal({ request, onConfirm, onCancel, saving }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--danger-soft)' }}>
@@ -991,7 +991,7 @@ export default function LeaveRequestPage() {
     const hasReduction = breakdown.weekendDays > 0 || breakdown.holidayDays > 0;
 
     return (
-      <div key={r.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${catCfg.color}` }}>
+      <div key={r.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', borderLeft: `4px solid ${catCfg.color}` }}>
         <div className="card-body p-3">
           <div className="d-flex align-items-start justify-content-between">
             <div className="d-flex gap-3 flex-grow-1">
@@ -1157,18 +1157,18 @@ export default function LeaveRequestPage() {
               ) && (
                 <div className="d-flex gap-1">
                   <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2"
-                    style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => setApproveTarget(r)}>
+                    style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }} onClick={() => setApproveTarget(r)}>
                     <i className="bi bi-check" /> Approve
                   </button>
                   <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2"
-                    style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => setRejectTarget(r)}>
+                    style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }} onClick={() => setRejectTarget(r)}>
                     <i className="bi bi-x" /> Reject
                   </button>
                 </div>
               )}
               {!showActions && (r.status?.startsWith('pending') || r.status === 'rejected') && (
                 <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2"
-                  style={{ fontSize: '0.7rem', borderRadius: 6 }}
+                  style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }}
                   onClick={() => handleWithdraw(r)} disabled={actionSaving}
                   title="Withdraw this request and restore your quota">
                   <i className="bi bi-arrow-counterclockwise" /> Withdraw
@@ -1199,7 +1199,7 @@ export default function LeaveRequestPage() {
             onNext={() => setViewMonth(m => stepMonthStr(m, 1))}
             onReset={() => setViewMonth(currentMonthStr())}
           />
-          <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setShowModal(true)}>
+          <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }} onClick={() => setShowModal(true)}>
             <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} /> New Request
           </button>
         </div>
@@ -1208,11 +1208,11 @@ export default function LeaveRequestPage() {
       {canReviewTeam && (
         <div className="d-flex gap-2 mb-4">
           <button className={`btn btn-sm ${activeTab === 'my' ? 'btn-primary' : 'btn-outline-secondary'}`}
-            style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setActiveTab('my')}>
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }} onClick={() => setActiveTab('my')}>
             My Requests
           </button>
           <button className={`btn btn-sm ${activeTab === 'team' ? 'btn-primary' : 'btn-outline-secondary'} d-inline-flex align-items-center gap-1`}
-            style={{ borderRadius: 8, fontSize: '0.8rem' }} onClick={() => setActiveTab('team')}>
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }} onClick={() => setActiveTab('team')}>
             {isOL ? 'All Requests' : 'Team Requests'}
             {teamPendingCount > 0 && <span className="badge rounded-pill" style={{ background: 'var(--warning)', color: 'var(--on-warning)', fontSize: '0.62rem' }}>{teamPendingCount}</span>}
           </button>
@@ -1254,32 +1254,32 @@ export default function LeaveRequestPage() {
           )}
 
           {!loading && myRequests.length > 0 && (
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
               <div className="card-body p-3">
                 <div className="d-flex flex-wrap gap-2 align-items-center">
                   <div className="position-relative" style={{ flex: '1 1 180px', minWidth: 160 }}>
                     <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
                     <input type="text" className="form-control form-control-sm" placeholder="Search requests…"
-                      style={{ paddingLeft: 30, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+                      style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
                   </div>
-                  <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 140 }}
+                  <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 140 }}
                     value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
                     <option value="">All Categories</option>
                     {REQUEST_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                   <div className="d-flex align-items-center gap-1">
                     <span className="text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>From</span>
-                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
+                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto' }}
                       value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
                   </div>
                   <div className="d-flex align-items-center gap-1">
                     <span className="text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>To</span>
-                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
+                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto' }}
                       value={dateTo} onChange={e => setDateTo(e.target.value)} />
                   </div>
                   {(search || filterCategory || dateFrom || dateTo) && (
                     <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                      style={{ borderRadius: 8, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                       onClick={() => { setSearch(''); setFilterCategory(''); setDateFrom(''); setDateTo(''); }}>
                       <i className="bi bi-x-circle" /> Clear
                     </button>
@@ -1292,7 +1292,7 @@ export default function LeaveRequestPage() {
           {loading ? (
             <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
           ) : myFiltered.length === 0 ? (
-            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
               </div>
@@ -1310,7 +1310,7 @@ export default function LeaveRequestPage() {
           <div className="d-flex gap-2 mb-3">
             {['pending', 'approved', 'rejected'].map(t => (
               <button key={t} className={`btn btn-sm ${teamFilter === t ? 'btn-primary' : 'btn-outline-secondary'}`}
-                style={{ borderRadius: 8, fontSize: '0.78rem', textTransform: 'capitalize' }} onClick={() => setTeamFilter(t)}>
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', textTransform: 'capitalize' }} onClick={() => setTeamFilter(t)}>
                 {t}
               </button>
             ))}
@@ -1327,22 +1327,22 @@ export default function LeaveRequestPage() {
           )}
 
           {!loading && teamRequests.length > 0 && (
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
               <div className="card-body p-3">
                 <div className="d-flex flex-wrap gap-2 align-items-center">
                   <div className="position-relative" style={{ flex: '1 1 180px', minWidth: 160 }}>
                     <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
                     <input type="text" className="form-control form-control-sm" placeholder="Search by name, reason…"
-                      style={{ paddingLeft: 30, borderRadius: 8 }} value={teamSearch} onChange={e => setTeamSearch(e.target.value)} />
+                      style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }} value={teamSearch} onChange={e => setTeamSearch(e.target.value)} />
                   </div>
-                  <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 140 }}
+                  <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 140 }}
                     value={teamFilterCategory} onChange={e => setTeamFilterCategory(e.target.value)}>
                     <option value="">All Categories</option>
                     {REQUEST_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                   {isOL && (
                     <>
-                      <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 150 }}
+                      <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 150 }}
                         value={teamPendingStage} onChange={e => setTeamPendingStage(e.target.value)}
                         title="Filter by pending stage">
                         <option value="">All Stages</option>
@@ -1350,7 +1350,7 @@ export default function LeaveRequestPage() {
                         <option value="pending_ol">Pending OL</option>
                         <option value="pending_boss">Pending Boss</option>
                       </select>
-                      <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 140 }}
+                      <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 140 }}
                         value={teamRequesterRole} onChange={e => setTeamRequesterRole(e.target.value)}
                         title="Filter by requester role">
                         <option value="">All Roles</option>
@@ -1363,17 +1363,17 @@ export default function LeaveRequestPage() {
                   )}
                   <div className="d-flex align-items-center gap-1">
                     <span className="text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>From</span>
-                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
+                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto' }}
                       value={teamDateFrom} onChange={e => setTeamDateFrom(e.target.value)} />
                   </div>
                   <div className="d-flex align-items-center gap-1">
                     <span className="text-muted" style={{ fontSize: '0.72rem', whiteSpace: 'nowrap' }}>To</span>
-                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
+                    <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto' }}
                       value={teamDateTo} onChange={e => setTeamDateTo(e.target.value)} />
                   </div>
                   {(teamSearch || teamFilterCategory || teamDateFrom || teamDateTo || teamPendingStage || teamRequesterRole) && (
                     <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                      style={{ borderRadius: 8, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                       onClick={() => { setTeamSearch(''); setTeamFilterCategory(''); setTeamDateFrom(''); setTeamDateTo(''); setTeamPendingStage(''); setTeamRequesterRole(''); }}>
                       <i className="bi bi-x-circle" /> Clear
                     </button>
@@ -1386,7 +1386,7 @@ export default function LeaveRequestPage() {
           {loading ? (
             <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
           ) : teamFiltered.length === 0 ? (
-            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
                 <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
               </div>

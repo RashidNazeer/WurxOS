@@ -119,7 +119,7 @@ export default function ReassignApcLeadTab() {
         <div className="row g-3">
           {/* APC picker */}
           <div className="col-md-6">
-            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14 }}>
+            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)' }}>
               <div className="card-body p-3">
                 <div className="d-flex align-items-center justify-content-between mb-2">
                   <h6 className="fw-bold mb-0" style={{ fontSize: '0.85rem' }}>
@@ -141,7 +141,7 @@ export default function ReassignApcLeadTab() {
                           background: isSel ? 'var(--info-soft)' : 'var(--surface-1)',
                           border: `1px solid ${isSel ? 'var(--info)' : 'var(--border-subtle)'}`,
                           color: isSel ? 'var(--info-text)' : 'var(--text-primary)',
-                          borderRadius: 10,
+                          borderRadius: 'var(--radius-md)',
                           padding: '8px 12px',
                           fontSize: '0.78rem',
                           fontWeight: isSel ? 600 : 500,
@@ -167,7 +167,7 @@ export default function ReassignApcLeadTab() {
 
           {/* TL picker */}
           <div className="col-md-6">
-            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14 }}>
+            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)' }}>
               <div className="card-body p-3">
                 <h6 className="fw-bold mb-2" style={{ fontSize: '0.85rem' }}>
                   <i className="bi bi-people-fill me-1" />2. Pick new Team Lead
@@ -190,7 +190,7 @@ export default function ReassignApcLeadTab() {
                             background: isSel ? 'var(--success-soft)' : isCurrent ? 'var(--surface-2)' : 'var(--surface-1)',
                             border: `1px solid ${isSel ? 'var(--success)' : isCurrent ? 'var(--border-default)' : 'var(--border-subtle)'}`,
                             color: isSel ? 'var(--success-text)' : isCurrent ? 'var(--text-muted)' : 'var(--text-primary)',
-                            borderRadius: 10,
+                            borderRadius: 'var(--radius-md)',
                             padding: '8px 12px',
                             fontSize: '0.78rem',
                             fontWeight: isSel ? 600 : 500,
@@ -218,7 +218,7 @@ export default function ReassignApcLeadTab() {
           {/* Confirm bar */}
           {selectedApc && selectedTL && !sameTl && (
             <div className="col-12">
-              <div className="card border-0 shadow-sm" style={{ borderRadius: 14, background: 'linear-gradient(135deg, var(--warning-soft), var(--surface-1))', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', background: 'linear-gradient(135deg, var(--warning-soft), var(--surface-1))', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                 <div className="card-body p-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                   <div className="d-flex align-items-center gap-2">
                     <i className="bi bi-info-circle-fill" style={{ color: 'var(--warning-text)', fontSize: '1rem' }} />
@@ -251,7 +251,7 @@ export default function ReassignApcLeadTab() {
       {confirming && selectedApc && selectedTL && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={() => setConfirming(false)} />
-          <div className="card border-0 shadow-lg" style={{ position: 'relative', maxWidth: 460, borderRadius: 14 }}>
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', maxWidth: 460, borderRadius: 'var(--radius-lg)' }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-center gap-3 mb-3">
                 <div className="rounded-circle d-flex align-items-center justify-content-center"

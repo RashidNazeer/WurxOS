@@ -42,7 +42,7 @@ export default function StatusPanel({
       className="wx-card"
       style={{
         padding: 18,
-        borderLeft: '3px solid var(--warning)',
+        borderLeft: '2px solid var(--warning)',
         background: 'linear-gradient(to right, rgba(245,158,11,.05), transparent 60%)',
       }}
     >

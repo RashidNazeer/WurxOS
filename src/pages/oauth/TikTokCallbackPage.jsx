@@ -68,7 +68,7 @@ export default function TikTokCallbackPage() {
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 10, display: 'grid', placeItems: 'center',
+            width: 40, height: 40, borderRadius: 'var(--radius-md)', display: 'grid', placeItems: 'center',
             background: phase === 'error' ? 'var(--danger-soft, #fee4e2)' : 'var(--surface-2, #f2f4f7)',
             color: phase === 'error' ? 'var(--danger, #d92d20)' : 'var(--text-primary, #1f2430)',
             flex: '0 0 auto',
@@ -98,7 +98,7 @@ export default function TikTokCallbackPage() {
           <>
             <div style={{
               display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, marginBottom: 14,
-              borderRadius: 10, background: 'var(--success-soft, #ecfdf3)', color: 'var(--success, #027a48)',
+              borderRadius: 'var(--radius-md)', background: 'var(--success-soft, #ecfdf3)', color: 'var(--success, #027a48)',
               fontSize: 13.5, lineHeight: 1.5,
             }}>
               <CheckIcon width="18" height="18" style={{ flex: '0 0 auto', marginTop: 1 }} />
@@ -123,7 +123,7 @@ export default function TikTokCallbackPage() {
                 {accounts.map((a) => (
                   <li key={a.advertiserId} style={{
                     display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 12px',
-                    border: '1px solid var(--border-subtle, #e4e7ec)', borderRadius: 8,
+                    border: '1px solid var(--border-subtle, #e4e7ec)', borderRadius: 'var(--radius-sm)',
                     fontSize: 13.5, color: 'var(--text-primary, #1f2430)',
                   }}>
                     <span style={{ fontWeight: 600 }}>{a.name || 'Unnamed ad account'}</span>
@@ -145,7 +145,7 @@ export default function TikTokCallbackPage() {
         {phase === 'error' && (
           <>
             <div style={{
-              padding: 12, borderRadius: 10, background: 'var(--danger-soft, #fee4e2)',
+              padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--danger-soft, #fee4e2)',
               color: 'var(--danger, #b42318)', fontSize: 13.5, lineHeight: 1.55, marginBottom: 14,
             }}>
               {error}

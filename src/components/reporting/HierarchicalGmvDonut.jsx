@@ -90,7 +90,7 @@ export default function HierarchicalGmvDonut({ parents, total, currencySym = '$'
                 ) : (
                   <span style={{ width: 10 }} />
                 )}
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: p.color, flexShrink: 0 }} />
+                <span style={{ width: 10, height: 10, borderRadius: 'var(--radius-xs)', background: p.color, flexShrink: 0 }} />
                 <span style={{ fontSize: '0.78rem', color: DONUT_C.ink, flex: 1, fontWeight: 600 }}>{p.label}</span>
                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: DONUT_C.ink, fontVariantNumeric: 'tabular-nums' }}>
                   {currencySym}{v.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -109,7 +109,7 @@ export default function HierarchicalGmvDonut({ parents, total, currencySym = '$'
                     return (
                       <div key={ci} className="d-flex align-items-center gap-2 mb-1" style={{ paddingLeft: 4 }}>
                         <span style={{
-                          width: 8, height: 8, borderRadius: 2,
+                          width: 8, height: 8, borderRadius: 'var(--radius-xs)',
                           background: c.color, flexShrink: 0, opacity: 0.85,
                         }} />
                         <span style={{ fontSize: '0.72rem', color: DONUT_C.inkDim, flex: 1 }}>{c.label}</span>

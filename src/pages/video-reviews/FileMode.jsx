@@ -246,7 +246,7 @@ export default function FileMode() {
         {/* ============ LEFT · control rail ============ */}
         <aside className="vrx-rail">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))' }}>
               <i className="bi bi-filetype-xlsx" style={{ color: 'var(--on-accent)', fontSize: '1.05rem' }} />
             </div>
@@ -270,7 +270,7 @@ export default function FileMode() {
               </select>
             ) : (
               <div style={{ height: 46, padding: '0 14px', display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700,
-                color: 'var(--text-primary)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 11 }}>{brandLabel}</div>
+                color: 'var(--text-primary)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>{brandLabel}</div>
             )}
           </Step>
 
@@ -315,7 +315,7 @@ export default function FileMode() {
               The day you're sending reviews for. We read each creator's full history to place them; videos before this day just count toward where they stand. Defaults to today (PKT).
             </span>
             {parsed && runDate && (runDate < parsed.stats.minDay || runDate > parsed.stats.maxDay) && (
-              <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 11.5, lineHeight: 1.5,
+              <div style={{ padding: '9px 12px', borderRadius: 'var(--radius-md)', fontSize: 11.5, lineHeight: 1.5,
                 background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 30%, transparent)', color: 'var(--warning)' }}>
                 <i className="bi bi-exclamation-triangle me-1" />
                 {prettyDate(runDate)} is outside this file's data ({parsed.stats.minDay} → {parsed.stats.maxDay}) — no videos fall on it, so nobody can reach a new 1st, 2nd or 3rd video that day. Pick a day within the range.
@@ -333,7 +333,7 @@ export default function FileMode() {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)',
-                  background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '5px 12px' }}>
+                  background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', padding: '5px 12px' }}>
                   <i className="bi bi-funnel" style={{ color: 'var(--accent)' }} />{excludeSet.size} to exclude
                   {excludeName ? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· {excludeName}</span> : null}
                 </span>
@@ -344,7 +344,7 @@ export default function FileMode() {
 
           <button className="vrx-cta" onClick={generate} disabled={generating || !brandId || !parsed}
             style={{ marginTop: 'auto', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 13, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 'var(--radius-lg)', cursor: 'pointer',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
               boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent)' }}>
             {generating ? <><span className="wx-spinner" style={{ width: 16, height: 16 }} /> Working…</> : <><i className="bi bi-lightning-charge-fill" /> Generate review lists</>}
@@ -362,7 +362,7 @@ export default function FileMode() {
           {result ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 640 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', padding: '5px 11px', borderRadius: 999,
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', padding: '5px 11px', borderRadius: 'var(--radius-pill)',
                   background: totalDue ? 'var(--success-soft)' : 'var(--surface-2)', border: `1px solid ${totalDue ? 'color-mix(in srgb, var(--success) 30%, transparent)' : 'var(--border-default)'}` }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: totalDue ? 'var(--success)' : 'var(--text-muted)' }} />
                   <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: totalDue ? 'var(--success)' : 'var(--text-muted)', letterSpacing: '0.04em' }}>{totalDue ? 'READY' : 'NOTHING DUE'}</span>
@@ -383,8 +383,8 @@ export default function FileMode() {
                   const sent = sentGroups.has(def.key);
                   return (
                     <div key={def.key} className="vrx-filerow" style={{ display: 'flex', alignItems: 'center', gap: 15, padding: '14px 16px',
-                      background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, opacity: sent ? 0.7 : 1 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', opacity: sent ? 0.7 : 1 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'color-mix(in srgb, var(--accent) 14%, transparent)' }}>
                         <i className="bi bi-filetype-csv" style={{ color: 'var(--accent)', fontSize: '1.05rem' }} />
                       </div>
@@ -412,7 +412,7 @@ export default function FileMode() {
                   worse, the SAME answer for several unrelated reasons — so it
                   has to name which one, with the numbers behind it. */}
               {totalDue === 0 && result.why && (
-                <div style={{ padding: '13px 15px', border: '1px solid var(--border-default)', borderRadius: 12,
+                <div style={{ padding: '13px 15px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
                   background: 'var(--surface-2)', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
                   <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
                     <i className="bi bi-question-circle me-1" style={{ color: 'var(--accent)' }} />
@@ -465,7 +465,7 @@ export default function FileMode() {
                   the tracker (sentCount IS the milestone that was sent), and
                   these buttons deliberately do NOT re-mark anything. */}
               {result.prev && (result.prev.group1.length + result.prev.group2.length + result.prev.group3.length) > 0 && (
-                <div style={{ padding: '13px 15px', border: '1px solid var(--border-subtle)', borderRadius: 12, background: 'var(--surface-1)' }}>
+                <div style={{ padding: '13px 15px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--surface-1)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
                     <i className="bi bi-clock-history me-1" style={{ color: 'var(--text-muted)' }} />
                     Last messaged on {prettyDate(runDate)}
@@ -493,7 +493,7 @@ export default function FileMode() {
                 </div>
               )}
 
-              <div style={{ padding: '11px 14px', border: '1px dashed var(--border-default)', borderRadius: 12, background: 'var(--surface-2)', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <div style={{ padding: '11px 14px', border: '1px dashed var(--border-default)', borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <i className="bi bi-info-circle me-1" style={{ color: 'var(--accent)' }} />
                 Download each list and send it — <strong>downloading a list automatically marks those creators as sent</strong>, so they advance in the queue (no extra step). Creators who posted several videos get their next message the following day, so run again tomorrow with a fresh file.
               </div>
@@ -506,7 +506,7 @@ export default function FileMode() {
             </div>
           ) : (
             <div style={{ minHeight: '58vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, textAlign: 'center' }}>
-              <div style={{ width: 68, height: 68, borderRadius: 18, border: '1.5px dashed var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 68, height: 68, borderRadius: 'var(--radius-xl)', border: '1px dashed var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <i className="bi bi-cloud-arrow-up" style={{ fontSize: 28, color: 'var(--text-muted)', opacity: 0.6 }} />
               </div>
               <div>

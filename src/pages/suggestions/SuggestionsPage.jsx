@@ -124,7 +124,7 @@ export default function SuggestionsPage() {
           <span className="wx-spinner" /> Loading…
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: 10, background: 'var(--surface-1)' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--surface-1)' }}>
           <LightbulbIcon width="28" height="28" />
           <div style={{ marginTop: 8, fontWeight: 600, color: 'var(--text-secondary)' }}>No suggestions yet.</div>
         </div>
@@ -136,13 +136,13 @@ export default function SuggestionsPage() {
             const mine = r.submitted_by === user?.id;
             const editable = mine && r.status === 'new';
             return (
-              <div key={r.id} className="suggestion-card" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+              <div key={r.id} className="suggestion-card" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
                 {/* Vote */}
                 <button onClick={() => doVote(r)}
                   style={{
                     all: 'unset', cursor: 'pointer',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '6px 10px', borderRadius: 10,
+                    padding: '6px 10px', borderRadius: 'var(--radius-md)',
                     background: r.i_upvoted ? 'var(--info-soft)' : 'var(--surface-0)',
                     border: `1px solid ${r.i_upvoted ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`,
                     minWidth: 46,
@@ -154,12 +154,12 @@ export default function SuggestionsPage() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                     <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{r.title}</strong>
-                    <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: c.color + '22', color: c.color }}>{c.label}</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: s.bg, color: s.fg }}>{s.label}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 600, background: c.color + '22', color: c.color }}>{c.label}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700, background: s.bg, color: s.fg }}>{s.label}</span>
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', marginBottom: 6 }}>{r.description}</div>
                   {r.dev_notes && (
-                    <div style={{ padding: 8, background: 'var(--info-soft)', color: 'var(--info)', borderRadius: 6, fontSize: 12, marginBottom: 6 }}>
+                    <div style={{ padding: 8, background: 'var(--info-soft)', color: 'var(--info)', borderRadius: 'var(--radius-sm)', fontSize: 12, marginBottom: 6 }}>
                       <strong>Dev response:</strong> {r.dev_notes}
                     </div>
                   )}
@@ -201,7 +201,7 @@ export default function SuggestionsPage() {
 
 function Stat({ label, value, tone }) {
   return (
-    <div style={{ padding: 12, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+    <div style={{ padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
       <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: tone, marginTop: 2 }}>{value}</div>
     </div>

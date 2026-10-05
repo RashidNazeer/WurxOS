@@ -79,7 +79,7 @@ export default function AmazonHaloSection() {
               ) : filtered.map((b) => {
                 const on = enabledSet.has(b.id);
                 return (
-                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 6, background: on ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer', fontSize: 13 }}>
+                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 'var(--radius-sm)', background: on ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer', fontSize: 13 }}>
                     <input type="checkbox" checked={on} disabled={busyId === b.id} onChange={(e) => toggle(b.id, e.target.checked)} />
                     <span style={{ color: 'var(--text-primary)', fontWeight: on ? 600 : 400 }}>{b.brand_name}</span>
                     {b.client_name && <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>· {b.client_name}</span>}

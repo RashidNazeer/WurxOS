@@ -140,7 +140,7 @@ export default function CampaignExpirySection({ section }) {
           </div>
         </div>
         <span style={{
-          width: 36, height: 20, borderRadius: 999,
+          width: 36, height: 20, borderRadius: 'var(--radius-pill)',
           background: pushOn ? 'var(--accent)' : 'var(--surface-3)',
           border: '1px solid', borderColor: pushOn ? 'var(--accent)' : 'var(--border-default)',
           position: 'relative', flex: '0 0 auto', transition: 'background-color var(--dur-fast) var(--ease-out)',
@@ -208,7 +208,7 @@ export default function CampaignExpirySection({ section }) {
         </div>
 
         {days.length === 0 && (
-          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--text-muted)' }}>
             With no lead times selected, expiry reminders won't fire even though the master switch is on.
           </div>
         )}

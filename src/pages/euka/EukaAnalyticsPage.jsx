@@ -107,7 +107,7 @@ export default function EukaAnalyticsPage() {
             TikTok Shop performance, creators &amp; content — live from Euka{meQ.data?.name ? ` · key: ${meQ.data.name}` : ''}
           </div>
         </div>
-        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 9 }} onClick={refreshAll}>
+        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-md)' }} onClick={refreshAll}>
           <i className="bi bi-arrow-clockwise" /> Refresh
         </button>
       </div>
@@ -118,7 +118,7 @@ export default function EukaAnalyticsPage() {
         {/* Brand — picks which Euka account/key to query */}
         <div className="d-inline-flex align-items-center gap-2">
           <i className="bi bi-shop text-muted" style={{ fontSize: '0.95rem' }} />
-          <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 168, borderRadius: 9 }}
+          <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: 168, borderRadius: 'var(--radius-md)' }}
             value={brand} onChange={(e) => changeBrand(e.target.value)}>
             {brands.map((b) => <option key={b.slug} value={b.slug}>{b.label}</option>)}
           </select>
@@ -131,7 +131,7 @@ export default function EukaAnalyticsPage() {
             return (
               <button key={p.k} type="button" className="btn btn-sm border-0"
                 style={{
-                  borderRadius: 7, fontSize: '0.78rem', fontWeight: 600, padding: '3px 14px',
+                  borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: 600, padding: '3px 14px',
                   background: on ? 'var(--surface-1)' : 'transparent',
                   color: on ? 'var(--accent)' : 'var(--text-secondary)',
                   boxShadow: on ? 'var(--shadow-sm)' : 'none',
@@ -143,10 +143,10 @@ export default function EukaAnalyticsPage() {
 
         {preset === 'custom' && (
           <div className="d-inline-flex align-items-center gap-2">
-            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 9 }}
+            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 'var(--radius-md)' }}
               value={customStart} max={customEnd} onChange={(e) => setCustomStart(e.target.value)} />
             <span className="text-muted">→</span>
-            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 9 }}
+            <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 'var(--radius-md)' }}
               value={customEnd} min={customStart} max={ymd(new Date())} onChange={(e) => setCustomEnd(e.target.value)} />
           </div>
         )}
@@ -170,7 +170,7 @@ export default function EukaAnalyticsPage() {
               return (
                 <button key={s.k} type="button" className="btn btn-sm border-0 d-inline-flex align-items-center gap-2"
                   style={{
-                    borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, padding: '5px 14px',
+                    borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', fontWeight: 600, padding: '5px 14px',
                     background: on ? 'var(--surface-1)' : 'transparent',
                     color: on ? 'var(--accent)' : 'var(--text-secondary)',
                     boxShadow: on ? 'var(--shadow-sm)' : 'none',
@@ -412,7 +412,7 @@ function ContentSection({ storeId, start, end }) {
           <div className="row g-2 mb-3">
             {[['Videos', t.videos], ['Views', t.views], ['Likes', t.likes], ['Comments', t.comments]].map(([l, v]) => (
               <div className="col-3" key={l}>
-                <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
+                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px', textAlign: 'center' }}>
                   <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase' }}>{l}</div>
                   <div className="fw-bold" style={{ fontSize: '0.95rem' }}>{fmtCompact(v)}</div>
                 </div>
@@ -436,7 +436,7 @@ function AdsSection({ storeId, start, end }) {
           <div className="row g-2 mb-3">
             {[['Boosted videos', fmtNum(s.boostedCount)], ['Coverage', fmtPct(s.coverage)], ['Boosted GMV', fmtMoney0(s.boostedGmv)], ['Total videos', fmtNum(s.totalVideos)]].map(([l, v]) => (
               <div className="col-3" key={l}>
-                <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '8px', textAlign: 'center' }}>
+                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px', textAlign: 'center' }}>
                   <div className="text-muted" style={{ fontSize: '0.58rem', fontWeight: 700, textTransform: 'uppercase' }}>{l}</div>
                   <div className="fw-bold" style={{ fontSize: '0.9rem' }}>{v}</div>
                 </div>
@@ -484,7 +484,7 @@ function SmallStatsSection({ storeId, start, end }) {
   const live = useEuka(['live', storeId, start, end], (f) => eukaLivestreamGmv(storeId, start, end, f), true);
   const card = (title, icon, color, value, delta) => (
     <div className="col-12 col-md-4">
-      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '16px 18px' }}>
+      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px' }}>
         <div className="d-flex align-items-center gap-2 mb-1">
           <i className={`bi ${icon}`} style={{ color }} />
           <span className="text-muted" style={{ fontSize: '0.66rem', fontWeight: 700, textTransform: 'uppercase' }}>{title}</span>
@@ -557,7 +557,7 @@ function ExportSection({ storeId, start, end, store }) {
     <Section span={12} title="Data export" eyebrow="Download the raw data (JSON) for the selected store & range" icon="bi-download" color="var(--text-secondary)">
       <div className="d-flex flex-wrap gap-2">
         {EXPORTS.map((e) => (
-          <button key={e.type} className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 9 }}
+          <button key={e.type} className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-md)' }}
             disabled={!!busy} onClick={() => download(e.type)}>
             {busy === e.type ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-filetype-json" />} {e.label}
           </button>

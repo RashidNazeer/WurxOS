@@ -68,8 +68,8 @@ function BreakDetailsModal({ record, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
-        <div className="card-header border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
+        <div className="card-header border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }}>
           <div>
             <h6 className="fw-bold mb-0">
               <i className="bi bi-cup-hot-fill me-2" style={{ color: 'var(--warning)' }} />
@@ -299,7 +299,7 @@ function MyMonthlyAttendance({ userId, displayName }) {
                 style={{
                   fontSize: 11, fontWeight: 600,
                   padding: '2px 8px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   background: 'var(--danger-soft)',
                   color: 'var(--danger)',
                   border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
@@ -448,7 +448,7 @@ function ApprovalModal({ record, onClose, onDone }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 16 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-clock-history me-2 text-primary" />Clock-Out Request</h6>
 
@@ -523,7 +523,7 @@ function EditRequestModal({ record, onClose, onDone }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 16 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-pencil-square me-2 text-primary" />Clock-In Edit Request</h6>
 
@@ -603,7 +603,7 @@ function BreaksEditModal({ record, onClose, onDone }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 16 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-cup-hot-fill me-2 text-warning" />Break Edit Request</h6>
 
@@ -717,7 +717,7 @@ function TodayTimeline({ record }) {
   const t = record ? calcTimes(record) : null;
 
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 18 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-xl)' }}>
       <div className="card-body p-4">
         <div className="d-flex align-items-center justify-content-between mb-3">
           <div>
@@ -742,7 +742,7 @@ function TodayTimeline({ record }) {
         </div>
 
         {events.length === 0 ? (
-          <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
+          <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
             <i className="bi bi-hourglass text-muted" style={{ fontSize: '2rem', opacity: 0.3 }} />
             <p className="text-muted mt-2 mb-0 small">No activity yet today. Clock in to get started.</p>
           </div>
@@ -1037,7 +1037,7 @@ function RosterTab({ isBoss, isOL, currentUser, userRole, expectedMembers, membe
             const healthLabel = !r.available ? 'Unavailable' : r.health === 'green' ? 'On track' : r.health === 'yellow' ? 'Watch' : 'Behind';
             return (
               <div key={r.user.id} className="col-12 col-md-6 col-xl-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14 }}>
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)' }}>
                   <div className="card-body p-3">
                     <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
                       <div className="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
@@ -1147,7 +1147,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={running ? undefined : onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 14, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-body p-4" style={{ overflowY: 'auto' }}>
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -1405,7 +1405,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={pendingDate ? undefined : onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -1614,7 +1614,7 @@ function ForceCloseModal({ record, closer, onClose, onDone }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h6 className="fw-bold mb-0"><i className="bi bi-box-arrow-right me-2" style={{ color: 'var(--danger)' }} />Close session for {record.userName}</h6>
@@ -1630,12 +1630,12 @@ function ForceCloseModal({ record, closer, onClose, onDone }) {
           <div className="mb-3">
             <label className="small text-muted d-block mb-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>Clock-out time</label>
             <input type="time" className="form-control form-control-sm"
-              style={{ borderRadius: 8 }} value={timeVal} onChange={e => setTimeVal(e.target.value)} />
+              style={{ borderRadius: 'var(--radius-sm)' }} value={timeVal} onChange={e => setTimeVal(e.target.value)} />
           </div>
           <div className="mb-3">
             <label className="small text-muted d-block mb-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>Reason (optional, shown to user)</label>
             <textarea className="form-control form-control-sm" rows="2"
-              style={{ borderRadius: 8, fontSize: '0.82rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}
               placeholder="e.g. Forgot to clock out — closing on your behalf."
               value={reason} onChange={e => setReason(e.target.value)} />
           </div>
@@ -2007,7 +2007,7 @@ export default function AttendancePage() {
             {/* Order = how often it's needed: the TL's approval queue first
                 (it blocks other people), then the clock, then the month. */}
             {isTL && (pendingApprovals.length > 0 || pendingEditRequests.length > 0 || pendingEditOutRequests.length > 0 || pendingEditBreaksRequests.length > 0) && (
-              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 16 }}>
+              <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)' }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <span className="rounded-circle" style={{ width: 8, height: 8, background: 'var(--danger)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--danger) 19%, transparent)' }} />
@@ -2167,12 +2167,12 @@ export default function AttendancePage() {
               {loading ? (
                 <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
               ) : filteredToday.length === 0 ? (
-                <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16 }}>
+                <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
                   <i className="bi bi-people text-muted" style={{ fontSize: '2rem', opacity: 0.3 }} />
                   <p className="text-muted mt-2 mb-0">No attendance records for today.</p>
                 </div>
               ) : (
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div className="table-responsive">
                     <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.82rem' }}>
                       <thead><tr style={{ '--bs-table-bg-state': 'var(--surface-2)' }}>
@@ -2367,7 +2367,7 @@ export default function AttendancePage() {
               {historyLoading ? (
                 <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
               ) : filteredHistory.length === 0 ? (
-                <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16 }}>
+                <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
                   <i className="bi bi-calendar-x text-muted" style={{ fontSize: '2rem', opacity: 0.3 }} />
                   <p className="text-muted mt-2 mb-0">
                     {hasHistoryFilters ? 'No records match the current filters.' : 'No records for this month.'}
@@ -2377,7 +2377,7 @@ export default function AttendancePage() {
                   )}
                 </div>
               ) : (
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div className="table-responsive">
                     <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.82rem' }}>
                       <thead><tr style={{ '--bs-table-bg-state': 'var(--surface-2)' }}>
@@ -2443,7 +2443,7 @@ export default function AttendancePage() {
 
       {/* Leave Quotas Tab (Boss Only) */}
       {tab === 'quotas' && isBoss && (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 16, maxWidth: 520 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', maxWidth: 520 }}>
           <div className="card-body p-4">
             <h6 className="fw-bold mb-1">Monthly Leave Quotas</h6>
             <p className="text-muted small mb-4">Set the default leave quota per month for all employees. Changes apply immediately.</p>
@@ -2491,7 +2491,7 @@ export default function AttendancePage() {
       {quotaConflicts && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setQuotaConflicts(null)} />
-          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <div className="card-body p-4" style={{ overflowY: 'auto' }}>
               <div className="d-flex align-items-start gap-3 mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
@@ -2606,7 +2606,7 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2" style={{ color: 'var(--danger)' }} />Review Clock-Out Adjustment</h6>
@@ -2633,7 +2633,7 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
             <div className="mb-3">
               <label className="small text-muted d-block mb-1" style={{ fontSize: '0.72rem', fontWeight: 600 }}>Rejection reason</label>
               <textarea className="form-control form-control-sm" rows="2"
-                style={{ borderRadius: 8, fontSize: '0.82rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}
                 value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
             </div>
           )}

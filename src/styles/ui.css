@@ -201,7 +201,7 @@
   bottom: 0;
   width: 1px;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--accent);
   transform-origin: left center;
   transform: translateX(var(--ui-tab-x, 0px)) scaleX(var(--ui-tab-w, 0));

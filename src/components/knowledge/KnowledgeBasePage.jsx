@@ -76,11 +76,11 @@ function VideoEmbed({ url }) {
     <div className="mt-2">
       {!show ? (
         <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
-          style={{ fontSize: '0.72rem', borderRadius: 6 }} onClick={() => setShow(true)}>
+          style={{ fontSize: '0.72rem', borderRadius: 'var(--radius-sm)' }} onClick={() => setShow(true)}>
           <i className="bi bi-play-circle" /> Play Video
         </button>
       ) : (
-        <div className="position-relative" style={{ borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+        <div className="position-relative" style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', background: '#000' }}>
           <button className="btn btn-sm btn-primary position-absolute d-inline-flex align-items-center justify-content-center"
             style={{ top: 8, right: 8, zIndex: 2, width: 28, height: 28, borderRadius: '50%', padding: 0, opacity: 0.8 }}
             onClick={() => setShow(false)} title="Close">
@@ -163,12 +163,12 @@ function CommentSection({ docId, docTitle, currentUser, userName }) {
       )}
 
       <div className="d-flex gap-2">
-        <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+        <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
           placeholder="Add a comment or suggestion…" value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
         <button className="btn btn-sm btn-primary flex-shrink-0 d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 8 }} onClick={handleSend} disabled={sending || !text.trim()}>
+          style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleSend} disabled={sending || !text.trim()}>
           <i className="bi bi-send" style={{ fontSize: '0.7rem' }} />
         </button>
       </div>
@@ -390,7 +390,7 @@ export default function KnowledgeBasePage() {
         {canPropose && (
           <button
             className="btn btn-sm d-inline-flex align-items-center gap-2"
-            style={{ borderRadius: 10, fontWeight: 600, fontSize: '0.82rem', padding: '7px 14px',
+            style={{ borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '0.82rem', padding: '7px 14px',
                      background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' }}
             onClick={() => setShowPropose(true)}
           >
@@ -438,11 +438,11 @@ export default function KnowledgeBasePage() {
           <div className="position-relative" style={{ maxWidth: 280 }}>
             <i className="bi bi-search position-absolute" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none', color: 'var(--text-muted)' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search documents…"
-              style={{ paddingLeft: 30, borderRadius: 8, background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+              style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)', background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           {availableVersions.length > 0 && (
-            <select className="form-select form-select-sm" style={{ maxWidth: 160, borderRadius: 8, background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
+            <select className="form-select form-select-sm" style={{ maxWidth: 160, borderRadius: 'var(--radius-sm)', background: 'var(--input-bg)', color: 'var(--input-text)', borderColor: 'var(--input-border)' }}
               value={versionFilter} onChange={e => setVersionFilter(e.target.value)}>
               <option value="all">All Versions</option>
               <option value="latest">Latest Only</option>
@@ -456,7 +456,7 @@ export default function KnowledgeBasePage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5" style={{ color: 'var(--text-muted)' }}><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : tabItems.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-book" style={{ fontSize: '1.6rem', opacity: 0.45, color: 'var(--text-muted)' }} />
           </div>
@@ -469,7 +469,7 @@ export default function KnowledgeBasePage() {
             const isRead = acks[item.id];
             const isExpanded = expandedId === item.id;
             return (
-              <div key={item.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${isRead ? 'var(--success)' : 'var(--warning)'}`, background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
+              <div key={item.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', borderLeft: `4px solid ${isRead ? 'var(--success)' : 'var(--warning)'}`, background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-start justify-content-between">
                     <div className="flex-grow-1">
@@ -543,17 +543,17 @@ export default function KnowledgeBasePage() {
                     <div className="d-flex align-items-center gap-2 flex-shrink-0 ms-3">
                       {isRead ? (
                         <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 px-2"
-                          style={{ fontSize: '0.7rem', borderRadius: 6, color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }} onClick={() => handleUnacknowledge(item.id)}>
+                          style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }} onClick={() => handleUnacknowledge(item.id)}>
                           <i className="bi bi-x" /> Undo
                         </button>
                       ) : (
                         <button className="btn btn-sm d-inline-flex align-items-center gap-1 px-2"
-                          style={{ fontSize: '0.7rem', borderRadius: 6, background: 'var(--success)', color: 'var(--text-inverse)', border: '1px solid var(--success)' }} onClick={() => handleAcknowledge(item.id)}>
+                          style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', background: 'var(--success)', color: 'var(--text-inverse)', border: '1px solid var(--success)' }} onClick={() => handleAcknowledge(item.id)}>
                           <i className="bi bi-check2" /> Mark as Read
                         </button>
                       )}
                       <button className="btn btn-sm btn-outline-secondary px-2"
-                        style={{ fontSize: '0.7rem', borderRadius: 6, color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }}
+                        style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)', background: 'transparent' }}
                         onClick={() => setExpandedId(isExpanded ? null : item.id)}>
                         <i className={`bi bi-chat-dots${isExpanded ? '-fill' : ''}`} />
                       </button>
@@ -574,7 +574,7 @@ export default function KnowledgeBasePage() {
       {proposeSuccess && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setProposeSuccess(false)} />
-          <div className="card border-0 shadow-lg text-center" style={{ position: 'relative', width: '100%', maxWidth: 400, zIndex: 1, borderRadius: 16, background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
+          <div className="card border-0 shadow-lg text-center" style={{ position: 'relative', width: '100%', maxWidth: 400, zIndex: 1, borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
             <div className="card-body p-4">
               <div className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
                 style={{ width: 56, height: 56, background: 'var(--success-soft)' }}>
@@ -585,7 +585,7 @@ export default function KnowledgeBasePage() {
                 Your document has been submitted successfully and will be reviewed by your Employer / Boss.
                 You'll be notified once it's approved.
               </p>
-              <button className="btn btn-sm px-4" style={{ borderRadius: 10, background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' }} onClick={() => setProposeSuccess(false)}>
+              <button className="btn btn-sm px-4" style={{ borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' }} onClick={() => setProposeSuccess(false)}>
                 Got it
               </button>
             </div>
@@ -634,7 +634,7 @@ function ProposeModal({ onClose, onSave, saving }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>

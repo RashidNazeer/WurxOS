@@ -110,7 +110,7 @@ export default function InputsTab({ config, onConfigChange }) {
 
 function Card({ title, help, children }) {
   return (
-    <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+    <div style={{ padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>{title}</div>
       {children}
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{help}</div>
