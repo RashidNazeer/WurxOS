@@ -299,8 +299,8 @@
   place-items: center;
   padding: var(--space-5);
   background: var(--backdrop);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-backdrop));
+  backdrop-filter: blur(var(--glass-blur-backdrop));
   animation: wx-enter-fade var(--dur-enter) var(--ease-out);
 }
 .ui-modal-backdrop.is-closing {
@@ -338,7 +338,9 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
+  /* Same inset as body and footer, so the three share one edge inside the ring. */
+  margin: 0 var(--glass-rim-w-lg);
+  padding: var(--space-4) max(0px, calc(var(--space-5) - var(--glass-rim-w-lg)));
   border-bottom: 1px solid var(--border-subtle);
 }
 .ui-modal__titles { min-width: 0; }
@@ -358,7 +360,7 @@
   height: var(--control-h-sm);
   border: 1px solid var(--border-subtle);
   border-radius: 50%;
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--t-colors), var(--t-press);
@@ -368,19 +370,23 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-5);
+  /* Text scrim behind the scrolling body. Inset by the rim so it stops at the
+     ring's inner edge; padding gives the same amount back, so text doesn't move. */
+  background: var(--glass-text-scrim, color-mix(in srgb, var(--surface-1) 45%, transparent));
+  margin: 0 var(--glass-rim-w-lg);
+  padding: var(--space-5) max(0px, calc(var(--space-5) - var(--glass-rim-w-lg)));
 }
 .ui-modal__foot {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   flex-wrap: wrap;
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) max(0px, calc(var(--space-5) - var(--glass-rim-w-lg)));
   border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-  /* The footer fill is opaque and spans the pane, so it would cover the
-     bottom of the rim ring. Inset it by the ring and give it the ring's inner
-     radius; at --glass-rim-w-lg: 0 this is the old full-bleed footer. */
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  /* A tint, not a slab: the pane stays one material. Inset by the ring and
+     given the ring's inner radius so it never covers the ring's bottom edge;
+     at --glass-rim-w-lg: 0 this is the old full-bleed footer. */
   margin: 0 var(--glass-rim-w-lg) var(--glass-rim-w-lg);
   border-radius: 0 0 calc(var(--radius-glass) - var(--glass-rim-w-lg))
                        calc(var(--radius-glass) - var(--glass-rim-w-lg));

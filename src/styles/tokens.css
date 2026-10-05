@@ -5,7 +5,7 @@
    avoid the dark/light mode inconsistencies from v1.
 
    Contrast notes give WCAG ratios against surface-0 / 1 / 2 / 3
-   (s0–s3). Text needs 4.5, large text and UI boundaries 3.
+   (s0â€“s3). Text needs 4.5, large text and UI boundaries 3.
    ============================================================ */
 
 /* Light: warm cream + chocolate, from the logo
@@ -18,14 +18,14 @@
   --surface-2: #f3ece2;        /* hover / secondary cards */
   --surface-3: #e9dfd1;        /* tertiary / wells */
 
-  /* Text — s0 / s1 / s2 / s3 */
+  /* Text â€” s0 / s1 / s2 / s3 */
   --text-primary:   #2b1d14;   /* 15.25 / 16.30 / 13.90 / 12.37 */
   --text-secondary: #5c4a3b;   /*  7.87 /  8.41 /  7.17 /  6.38 */
   --text-muted:     #725d4b;   /*  5.81 /  6.21 /  5.29 /  4.71 */
   --text-inverse:   #ffffff;
 
   /* Borders. subtle/default are decorative dividers; strong and
-     --input-border are control boundaries (>= 3:1 on s0–s2). */
+     --input-border are control boundaries (>= 3:1 on s0â€“s2). */
   --border-subtle:  #e6dccd;
   --border-default: #d6c9b8;
   --border-strong:  #8f857a;   /* 3.39 / 3.62 / 3.09 */
@@ -57,7 +57,7 @@
   --on-info:    #ffffff;
   --on-purple:  #ffffff;
 
-  /* Text-safe semantic colour — s0 / s1 / own -soft fill / s2 */
+  /* Text-safe semantic colour â€” s0 / s1 / own -soft fill / s2 */
   --success-text: #047857;     /* 5.13 / 5.48 / 5.21 / 4.68 */
   --danger-text:  #b91c1c;     /* 6.05 / 6.47 / 5.91 / 5.52 */
   --warning-text: #a1460a;     /* 5.79 / 6.18 / 5.96 / 5.27 */
@@ -78,19 +78,19 @@
   --input-bg:     #ffffff;
   --input-border: #8f857a;     /* 3.62 on #fff */
   --input-text:   #2b1d14;
-  --input-placeholder: #b5a494; /* 2.41 on #fff, 2.26 on cream (entered text is 16.3) — report
+  --input-placeholder: #b5a494; /* 2.41 on #fff, 2.26 on cream (entered text is 16.3) â€” report
                                    forms use real-looking example values ("55834.62"), so the gap
                                    to entered text has to be obvious at a glance, not measured. */
 
-  /* Elevation — chocolate-tinted */
+  /* Elevation â€” chocolate-tinted */
   --shadow-sm: 0 1px 2px 0 rgba(90, 58, 34, 0.06);
   --shadow-md: 0 4px 6px -1px rgba(90, 58, 34, 0.09), 0 2px 4px -2px rgba(90, 58, 34, 0.06);
   --shadow-lg: 0 10px 25px -5px rgba(90, 58, 34, 0.13), 0 8px 10px -6px rgba(90, 58, 34, 0.08);
   --shadow-xl: 0 25px 50px -12px rgba(90, 58, 34, 0.26);
 
-  --backdrop: rgba(43, 29, 20, 0.5);
+  --backdrop: rgba(43, 29, 20, 0.42);
 
-  /* Auth page decorative gradient (light) — warm peach + cream */
+  /* Auth page decorative gradient (light) â€” warm peach + cream */
   --auth-bg: radial-gradient(ellipse at top left,     #fde8d6 0%, transparent 55%),
              radial-gradient(ellipse at bottom right, #fef3e6 0%, transparent 55%),
              #faf7f2;
@@ -101,7 +101,7 @@
 
   --focus-ring: #94502f;       /* >= 4.62 on every surface */
 
-  /* Charts — categorical series are >= 3:1 on s0 and s1 */
+  /* Charts â€” categorical series are >= 3:1 on s0 and s1 */
   --chart-grid:       var(--border-subtle);
   --chart-axis:       var(--text-secondary);
   --chart-track:      var(--surface-2);
@@ -116,28 +116,39 @@
   --chart-7: #4d7c0f;   /* olive        4.67 / 4.99 */
   --chart-8: #5a3a22;   /* chocolate    9.53 / 10.18 */
 
-  /* Glass (chrome only). The pane alpha is the contrast floor and the only
-     thing that sets it — saturate() is luminance-preserving. With pure black
-     directly behind the pane: at 0.92 muted is 5.06, primary 13.3,
-     accent-text 4.98; at 0.88 muted is 4.62. 0.88 is the hard floor in
-     light — below it --text-muted drops under 4.5:1. */
-  --glass-pane-alpha:        0.92;
-  --glass-pane-alpha-strong: 0.96;
-  --glass-bg:        rgba(255, 252, 247, var(--glass-pane-alpha));
-  --glass-bg-strong: rgba(255, 252, 247, var(--glass-pane-alpha-strong));
-  --glass-border:    rgba(90, 58, 34, 0.12);
-  --glass-shadow:    0 12px 32px -12px rgba(90, 58, 34, 0.22);
-  --glass-brightness: 1.02;
-  --glass-saturate:  180%;
+  /* Glass (chrome only). The WHOLE pane is translucent; legibility comes from
+     the heavy blur (--glass-blur, in the shared block), which flattens the
+     backdrop into a smooth wash, not from opacity. Pane alpha still sets the
+     floor: against a blurred backdrop no darker than sRGB ~130 (the app's own
+     charts/banners after a 32px blur), muted is >= 4.4 at 0.68 and >= 4.9 at
+     0.78. Against pure black (adversarial, never real) muted falls to 2.8, so
+     text-dense regions should sit on --glass-text-scrim.
+     Why light glass used to be invisible: a cream tint (255,252,247) over a
+     cream page (#faf7f2) is the same colour, and its white highlights were
+     white-on-cream. So the tint is now pure white (a lifted sheet), the
+     brightness lift pushes the wash toward white, and the edge and shadow are
+     chocolate, which is the only thing that reads against a light page. */
+  --glass-pane-alpha:        0.68;
+  --glass-pane-alpha-strong: 0.78;
+  --glass-bg:        rgba(255, 255, 255, var(--glass-pane-alpha));
+  --glass-bg-strong: rgba(255, 255, 255, var(--glass-pane-alpha-strong));
+  --glass-border:    rgba(90, 58, 34, 0.22);
+  --glass-shadow:    0 18px 40px -14px rgba(90, 58, 34, 0.34),
+                     0 2px 6px -1px rgba(90, 58, 34, 0.12);
+  --glass-brightness: 1.08;
+  --glass-saturate:  200%;
+  /* Subtle local backing for a text block inside a glass pane (not the pane
+     itself). Plain background, no backdrop-filter. */
+  --glass-text-scrim: rgba(255, 255, 255, 0.50);
 
   /* Rim ring. The interior above is near-opaque on purpose, which is what
-     buys the text contrast — so it also leaves the refraction nothing to
+     buys the text contrast â€” so it also leaves the refraction nothing to
      bend. The ring is the fix: a low-alpha band at the pane edge where the
      backdrop really does show through and really does bend. Light mode can
      afford a fairly solid cream tint (0.30) because the backdrop is
      light-on-light and the bend still reads as a warm distortion. */
-  --glass-rim-alpha: 0.30;
-  --glass-rim-bg:    rgba(255, 252, 247, var(--glass-rim-alpha));
+  --glass-rim-alpha: 0.16;
+  --glass-rim-bg:    rgba(255, 255, 255, var(--glass-rim-alpha));
   /* The bright point where light would catch the curve: a soft core just
      above the top edge, biased left. It is painted UNDER the opaque interior
      (see the ring block in global.css), so only the part crossing the ring
@@ -149,9 +160,9 @@
   /* Lit outer edge. Must be an OUTER shadow: with a ring border in play, an
      inset shadow is clipped to the padding box and would land on the
      interior instead of the true rim. */
-  --glass-rim-lit: 0 0 0 1px rgba(255, 255, 255, 0.70),
+  --glass-rim-lit: 0 0 0 1px rgba(90, 58, 34, 0.16),
                    0 -1px 0 rgba(255, 255, 255, 0.95);
-  /* Specular on the interior edge — now the INNER wall of the ring, which is
+  /* Specular on the interior edge â€” now the INNER wall of the ring, which is
      what reads as glass thickness. All inset, so none of it re-rasterises. */
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95),
                      inset 0 0 0 1px rgba(255, 255, 255, 0.45),
@@ -161,13 +172,13 @@
 }
 
 [data-theme='dark'] {
-  /* Surfaces — v1's near-black for the WurxOS feel */
+  /* Surfaces â€” v1's near-black for the WurxOS feel */
   --surface-0: #000000;
   --surface-1: #0f0f0f;
   --surface-2: #181818;
   --surface-3: #222222;
 
-  /* Warm off-white text (v1: #faf7f2) — s0 / s1 / s2 / s3 */
+  /* Warm off-white text (v1: #faf7f2) â€” s0 / s1 / s2 / s3 */
   --text-primary:   #faf7f2;                    /* 19.65 / 17.94 / 16.62 / 14.89 */
   --text-secondary: rgba(250, 247, 242, 0.78);  /* 11.68 / 11.01 / 10.41 / 9.52 */
   --text-muted:     rgba(250, 247, 242, 0.55);  /* >= 5.46 (was 0.5: 4.77 on s3) */
@@ -191,7 +202,7 @@
   --danger-soft:  rgba(248, 113, 113, 0.14);
   --warning:      #fbbf24;
   --warning-soft: rgba(251, 191, 36, 0.14);
-  --insight-fg:   #fbe3b3;     /* warm light amber — readable on the dark insight callout */
+  --insight-fg:   #fbe3b3;     /* warm light amber â€” readable on the dark insight callout */
   --info:         #7bc7ed;
   --info-soft:    rgba(123, 199, 237, 0.14);
   --purple:       #c4b5fd;
@@ -213,7 +224,7 @@
   --info-text:    var(--info);
   --purple-text:  var(--purple);
 
-  /* Attendance spotlight — keep the peach accent in dark (it reads well). */
+  /* Attendance spotlight â€” keep the peach accent in dark (it reads well). */
   --att-spotlight-bg: var(--accent);
   --att-spotlight-fg: var(--on-accent);
   --spotlight-bg: #2a2119;               /* peach-tinted dark */
@@ -224,7 +235,7 @@
   --input-bg:     #1a1a1a;
   --input-border: rgba(245, 213, 168, 0.45);   /* 3.52 on input, 3.55 on s1 */
   --input-text:   #faf7f2;
-  --input-placeholder: rgba(250, 247, 242, 0.28); /* 2.45 on input (entered text is 16.3) — matches
+  --input-placeholder: rgba(250, 247, 242, 0.28); /* 2.45 on input (entered text is 16.3) â€” matches
                                                      the light theme's gap; see the note there. */
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
@@ -232,7 +243,7 @@
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.55);
   --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
 
-  --backdrop: rgba(0, 0, 0, 0.65);
+  --backdrop: rgba(0, 0, 0, 0.55);
 
   --auth-bg: radial-gradient(ellipse at top left,     rgba(245, 213, 168, 0.14) 0%, transparent 55%),
              radial-gradient(ellipse at bottom right, rgba(245, 190, 130, 0.10) 0%, transparent 55%),
@@ -249,7 +260,7 @@
   --chart-track:      var(--surface-3);
   --chart-tooltip-bg: #1c1612;
   --chart-tooltip-fg: var(--text-primary);
-  --chart-1: #f2a77a;   /* >= 6.5 on s0–s2 for every series */
+  --chart-1: #f2a77a;   /* >= 6.5 on s0â€“s2 for every series */
   --chart-2: #2dd4bf;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
@@ -258,11 +269,13 @@
   --chart-7: #a3e635;
   --chart-8: #a8a29e;
 
-  /* Peach-tinted near-black. With pure white directly behind the pane,
-     --text-muted is 5.18 at 0.90 and 4.77 at 0.86; 0.85 is the hard floor
-     in dark (0.82 measures 4.35, i.e. a fail). */
-  --glass-pane-alpha:        0.90;
-  --glass-pane-alpha-strong: 0.95;
+  /* Peach-tinted near-black, whole pane translucent (see the light block for
+     the blur-not-opacity reasoning). Dark chrome sits over dark content, so
+     the realistic backdrop is sRGB 0-120: muted is >= 4.35 at 0.60 and
+     >= 4.8 at 0.70. A bright backdrop (peach button, white logo plate) under
+     text drops muted to ~2.9 at 0.60: use --glass-text-scrim there. */
+  --glass-pane-alpha:        0.60;
+  --glass-pane-alpha-strong: 0.70;
   --glass-bg:        rgba(22, 17, 13, var(--glass-pane-alpha));
   --glass-bg-strong: rgba(22, 17, 13, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(245, 213, 168, 0.14);
@@ -270,16 +283,17 @@
   /* Dark lifts brightness a little above the old 0.92: the backdrop behind
      dark chrome is itself dark, and dimming it further left the ring with
      nothing to show. */
-  --glass-brightness: 1.04;
-  --glass-saturate:  190%;
+  --glass-brightness: 1.06;
+  --glass-saturate:  200%;
+  --glass-text-scrim: rgba(14, 10, 8, 0.50);
 
-  /* Rim ring — dark is the harder case and gets DIFFERENT numbers.
+  /* Rim ring â€” dark is the harder case and gets DIFFERENT numbers.
      A near-black rim over near-black content has almost no luminance
      difference to bend, so the tint goes much thinner than light's 0.30:
      0.16 lets 84% of the backdrop through, which is what lets a chart, a
      white table or a peach button visibly smear and split into the rim.
      Safe because no text ever sits over the ring. */
-  --glass-rim-alpha: 0.16;
+  --glass-rim-alpha: 0.08;
   --glass-rim-bg:    rgba(26, 19, 14, var(--glass-rim-alpha));
   /* Warm, not white, and weaker than light's: on a near-black pane a
      white core blows out into a neon outline. */
@@ -293,7 +307,7 @@
      than as a glowing border. */
   --glass-rim-lit: 0 0 0 1px rgba(245, 213, 168, 0.18),
                    0 -1px 0 rgba(255, 247, 235, 0.58);
-  /* Interior edge, brightened well past the old 0.26 — this hairline is the
+  /* Interior edge, brightened well past the old 0.26 â€” this hairline is the
      single strongest "it's glass" cue in dark mode. */
   --glass-highlight: inset 0 1px 0 rgba(255, 247, 235, 0.48),
                      inset 0 0 0 1px rgba(245, 213, 168, 0.11),
@@ -328,7 +342,7 @@
   --fw-semibold: 600;
   --fw-bold:     700;
 
-  /* Spacing — 4/8 grid */
+  /* Spacing â€” 4/8 grid */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -353,17 +367,17 @@
   --z-modal:    1050;
   --z-popover:  1100; /* user menu, search, notification panel */
   --z-flyout:   1150;
-  --z-dialog-top: 2100; /* ui/Modal + useConfirm: above legacy inline dialogs (1070–2000) */
+  --z-dialog-top: 2100; /* ui/Modal + useConfirm: above legacy inline dialogs (1070â€“2000) */
   --z-toast:    2200;
 
   /* Breakpoints (custom properties can't be used inside @media, so
      these are the agreed literals):
-       sm  576px  — phones: modals become full-screen sheets
-       md  860px  — shell: sidebar becomes the mobile drawer
-       lg 1200px  — wide desktop */
+       sm  576px  â€” phones: modals become full-screen sheets
+       md  860px  â€” shell: sidebar becomes the mobile drawer
+       lg 1200px  â€” wide desktop */
 
   /* Every family falls back to a system sans stack if Google Fonts
-     haven't loaded yet — UI never renders in Times New Roman. */
+     haven't loaded yet â€” UI never renders in Times New Roman. */
   --fallback-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                    'Helvetica Neue', Arial, sans-serif;
 
@@ -376,7 +390,7 @@
   --font-mono:     'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --font-code:     ui-monospace, 'SF Mono', Menlo, Consolas, monospace; /* never user-overridden */
 
-  /* --font-sans-ui: chrome (nav, buttons, tables, forms) — always a sans.
+  /* --font-sans-ui: chrome (nav, buttons, tables, forms) â€” always a sans.
      --font-content: reading surfaces (rich text, report bodies).
      --font-sans is kept as an alias of the UI font for existing CSS. */
   --font-sans-ui: var(--font-inter);
@@ -409,17 +423,22 @@
   --border:  var(--border-subtle);
   --primary: var(--accent);
 
-  --glass-blur:   14px;
+  /* The blur is what pays for the low pane alpha: at 32px a chart, table or
+     label behind the pane is a smooth colour wash, not edges. Sticky chrome
+     (topbar, tab bar) is one scale step down because its backdrop changes on
+     every scroll frame. Safe: 24-40px transient, 14-24px sticky. */
+  --glass-blur:   32px;
+  --glass-blur-sticky: 18px;
 
   /* Refraction / edge lensing. The SVG displacement filters are inlined in
-     index.html; this token picks which one (or none). Empty by default — the
+     index.html; this token picks which one (or none). Empty by default â€” the
      @supports gate near the bottom of this file fills it in on engines that
      actually render it. It stays a SEPARATE token from --glass-filter so the
      solid fallbacks can blank --glass-filter wholesale without a specificity
      fight. Available ids, by displacement scale (max offset = scale / 2):
-       #wx-glass-refract-soft       scale 20 → 10px  (sticky chrome)
-       #wx-glass-refract            scale 28 → 14px
-       #wx-glass-refract-strong     scale 36 → 18px
+       #wx-glass-refract-soft       scale 20 â†’ 10px  (sticky chrome)
+       #wx-glass-refract            scale 28 â†’ 14px
+       #wx-glass-refract-strong     scale 36 â†’ 18px
        #wx-glass-refract-ca         scale 28 + chromatic aberration (light)
        #wx-glass-refract-ca-strong  scale 36 + chromatic aberration (dark)
      The -ca pair is three displacement passes instead of one (~2x cost), so
@@ -434,10 +453,10 @@
   /* Always-on-screen chrome (topbar, mobile tab bar). Same stack, but its
      refraction is a separate dial: its backdrop changes on every scroll
      frame, so it re-runs the whole filter continuously. If low-end laptops
-     jank, empty --glass-refract-sticky-fn first — that leaves every
+     jank, empty --glass-refract-sticky-fn first â€” that leaves every
      transient surface (modals, menus, panels) refracting. */
   --glass-refract-sticky-fn: ;
-  --glass-filter-sticky: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+  --glass-filter-sticky: blur(var(--glass-blur-sticky)) saturate(var(--glass-saturate))
                          brightness(var(--glass-brightness))
                          var(--glass-refract-sticky-fn);
 
@@ -468,8 +487,12 @@
        --glass-rim-w-*     ring width.  0 = effect off entirely (today's pane).
                            safe 6-18px at -lg; past ~20 the ring starts to
                            read as a frame rather than an edge.
-       --glass-rim-alpha   ring opacity. safe 0.10-0.45. Higher = subtler,
-                           because less backdrop shows through to bend.
+       --glass-rim-alpha   ring opacity; keep it below --glass-pane-alpha so the
+                           rim stays the most transparent part. safe 0.06-0.25
+                           (dark 0.04-0.14). Higher = subtler.
+       --glass-pane-alpha  whole-pane opacity. safe 0.60-0.80 light, 0.55-0.72
+                           dark. Below that, text needs --glass-text-scrim.
+       --glass-blur        legibility dial. Lower alpha only with this >= 28px.
        --glass-refract-fn  bend + aberration. -soft < base < -ca < -strong <
                            -ca-strong, or empty for no bend at all.
        --glass-rim-spec    the bright point. `none` removes it.
@@ -479,9 +502,9 @@
   --glass-rim-w-sm: 0px;
   --glass-rim-w-xs: 0px;
 
-  /* Dialog scrim blur — much weaker than the pane blur; it only has to
+  /* Dialog scrim blur â€” much weaker than the pane blur; it only has to
      take the edge off the page behind a modal. */
-  --glass-blur-backdrop: 6px;
+  --glass-blur-backdrop: 2px;
 }
 
 /* Reduced motion: near-zero durations everywhere; entries keep a short
@@ -510,11 +533,11 @@
    then paint nothing, so @supports on the property alone reports a
    capability neither one has. The gate is therefore "parses url(), and is
    neither WebKit nor Gecko":
-     -webkit-named-image  is WebKit-only — this also correctly excludes
+     -webkit-named-image  is WebKit-only â€” this also correctly excludes
                           Chrome and Firefox on iOS, which are WebKit;
      -moz-appearance      is Gecko-only.
    A false positive is benign: an engine that ignores the url() still gets
-   a frosted pane, only at the lower alpha — and that alpha is itself at
+   a frosted pane, only at the lower alpha â€” and that alpha is itself at
    the 4.5:1 floor, so nothing becomes unreadable.
 
    Refraction is invisible through an opaque pane, so this is also where the
@@ -532,19 +555,19 @@
     --glass-rim-w-xs: 8px;
   }
   html[data-theme='light'] {
-    --glass-pane-alpha:        0.88;   /* muted 4.62 on pure black */
-    --glass-pane-alpha-strong: 0.91;
+    --glass-pane-alpha:        0.68;
+    --glass-pane-alpha-strong: 0.78;
     --glass-refract-fn:        url('#wx-glass-refract-ca');
   }
   html[data-theme='dark'] {
-    --glass-pane-alpha:        0.86;   /* muted 4.77 on pure white */
-    --glass-pane-alpha-strong: 0.90;
-    /* Dark needs the stronger bend AND the wider colour split — see the
+    --glass-pane-alpha:        0.60;
+    --glass-pane-alpha-strong: 0.70;
+    /* Dark needs the stronger bend AND the wider colour split â€” see the
        rim-ring comment in the dark theme block. */
     --glass-refract-fn:        url('#wx-glass-refract-ca-strong');
   }
 
-  /* WebKit and Gecko: no refraction, so no ring either — a translucent band
+  /* WebKit and Gecko: no refraction, so no ring either â€” a translucent band
      with only a blur behind it reads as a mushy border, not as glass. They
      keep exactly the frosted pane they have today. */
   @supports (background: -webkit-named-image(apple-pay-logo-black)) {
@@ -552,16 +575,16 @@
       --glass-refract-fn: ; --glass-refract-sticky-fn: ;
       --glass-rim-w-lg: 0px; --glass-rim-w-sm: 0px; --glass-rim-w-xs: 0px;
     }
-    html[data-theme='light'] { --glass-pane-alpha: 0.92; --glass-pane-alpha-strong: 0.96; }
-    html[data-theme='dark']  { --glass-pane-alpha: 0.90; --glass-pane-alpha-strong: 0.95; }
+    html[data-theme='light'] { --glass-pane-alpha: 0.72; --glass-pane-alpha-strong: 0.82; }
+    html[data-theme='dark']  { --glass-pane-alpha: 0.66; --glass-pane-alpha-strong: 0.76; }
   }
   @supports (-moz-appearance: none) {
     html[data-theme] {
       --glass-refract-fn: ; --glass-refract-sticky-fn: ;
       --glass-rim-w-lg: 0px; --glass-rim-w-sm: 0px; --glass-rim-w-xs: 0px;
     }
-    html[data-theme='light'] { --glass-pane-alpha: 0.92; --glass-pane-alpha-strong: 0.96; }
-    html[data-theme='dark']  { --glass-pane-alpha: 0.90; --glass-pane-alpha-strong: 0.95; }
+    html[data-theme='light'] { --glass-pane-alpha: 0.72; --glass-pane-alpha-strong: 0.82; }
+    html[data-theme='dark']  { --glass-pane-alpha: 0.66; --glass-pane-alpha-strong: 0.76; }
   }
 }
 
@@ -574,6 +597,7 @@
   html[data-theme] {
     --glass-bg: var(--surface-1);
     --glass-bg-strong: var(--surface-1);
+    --glass-text-scrim: transparent;
     --glass-filter: none;
     --glass-filter-sticky: none;
     --glass-highlight: inset 0 0 0 0 transparent;
@@ -590,6 +614,7 @@
   html[data-theme] {
     --glass-bg: var(--surface-1);
     --glass-bg-strong: var(--surface-1);
+    --glass-text-scrim: transparent;
     --glass-filter: none;
     --glass-filter-sticky: none;
     --glass-highlight: inset 0 0 0 0 transparent;
@@ -604,7 +629,7 @@
 }
 
 /* ------------------------------------------------------------
-   User font-family preference — applied to <html> from
+   User font-family preference â€” applied to <html> from
    ThemeContext. Sans choices drive the whole UI; Lora and
    JetBrains Mono apply to reading content only, so fixed-width
    chrome and dense tables stay legible.

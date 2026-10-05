@@ -9,14 +9,14 @@
   height: 40px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
+  background: var(--shell-fill);
   color: var(--text-secondary);
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
-.notif-bell:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.notif-bell:hover { color: var(--text-primary); border-color: var(--border-strong); background: var(--shell-fill-hover); }
 .notif-bell-badge {
   position: absolute;
   top: -3px;
@@ -57,10 +57,9 @@
   width: 420px;
   max-width: calc(100vw - 32px);
   max-height: min(560px, 75vh);
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  /* Pane, ring, border and shadow: shared rim-ring block in global.css (it
+     outranks anything set here, so a background on this rule would be dead). */
   border-radius: var(--radius-glass);
-  box-shadow: var(--shadow-xl);
   z-index: 1100;
   display: flex;
   flex-direction: column;
@@ -97,7 +96,7 @@
 .notif-panel-action {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
@@ -110,7 +109,7 @@
 }
 .notif-panel-action:hover {
   color: var(--accent);
-  background: var(--surface-2);
+  background: var(--shell-fill-hover);
 }
 
 /* Filter pills row */
@@ -129,7 +128,7 @@
 .notif-tab {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 11.5px;
   font-weight: 700;
   padding: 0 10px;
@@ -143,9 +142,9 @@
   /* Fixed height so the active state doesn't make the tab taller. */
   height: 26px;
 }
-.notif-tab:hover { color: var(--text-primary); background: var(--surface-2); }
+.notif-tab:hover { color: var(--text-primary); background: var(--shell-fill-hover); }
 .notif-tab.is-active {
-  background: var(--accent-soft);
+  background: var(--shell-fill-active);
   color: var(--accent);
 }
 .notif-tab-count {
@@ -173,6 +172,9 @@
   flex: 1;
   min-height: 0;
   padding: 4px 0 8px;
+  /* The item list is the panel's text-dense block: it sits on the scrim, the
+     header and tabs above stay on bare glass. */
+  background: var(--glass-text-scrim);
   /* Keep wheel events inside this scroll area instead of bubbling to the
      document (which would scroll the page underneath). */
   overscroll-behavior: contain;
@@ -183,19 +185,22 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   padding: 10px 16px 6px;
-  /* Stay pinned to the top of the scroll area as the user scrolls past. */
+  /* Stay pinned to the top of the scroll area as the user scrolls past. Items
+     slide under it, so it needs a firmer backing than the list scrim — still
+     translucent, not the old solid surface-1 strip. */
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--surface-1);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 .notif-panel-footer {
   padding: 10px 14px;
   border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
+  background: var(--shell-fill-hover);
   text-align: center;
 }
 
@@ -215,7 +220,7 @@
   position: relative;
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.notif-item:hover { background: var(--surface-2); }
+.notif-item:hover { background: var(--shell-fill-hover); }
 .notif-item-unread::before {
   content: '';
   position: absolute;
@@ -295,7 +300,7 @@
   gap: 6px;
   flex-shrink: 0;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 .notif-item-dot {
@@ -308,7 +313,7 @@
 .notif-empty {
   padding: 36px 20px 30px;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .notif-empty-illu {
   width: 56px;
@@ -490,22 +495,21 @@
   bottom: 0;
   height: 46px;
   border-radius: var(--radius-glass-sm);
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-md);
+  /* Background/border: html .notif-toast-ghost in shell.css. */
   z-index: 0;
 }
-.notif-toast-ghost-1 { transform: translateY(9px)  scaleX(0.95); opacity: 0.9; }
-.notif-toast-ghost-2 { transform: translateY(18px) scaleX(0.9);  opacity: 0.6; }
+/* The live card is translucent now, so a ghost sitting behind it would show
+   through as a band inside the card. Each ghost is clipped to the strip that
+   peeks out below the card (its own translateY, plus 1px of overlap). */
+.notif-toast-ghost-1 { transform: translateY(9px)  scaleX(0.95); opacity: 0.9; clip-path: inset(calc(100% - 10px) 0 0 0); }
+.notif-toast-ghost-2 { transform: translateY(18px) scaleX(0.9);  opacity: 0.6; clip-path: inset(calc(100% - 10px) 0 0 0); }
 
 /* The card itself */
 .notif-toast {
   position: relative;
   z-index: 1;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  /* Pane, ring, border and shadow: shared rim-ring block in global.css. */
   border-radius: var(--radius-glass-sm);
-  box-shadow: var(--shadow-xl);
   padding: 13px 14px 11px 18px;
   overflow: hidden;
   animation: notif-toast-in var(--dur-slow) var(--ease-out) both;
@@ -575,7 +579,7 @@
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .notif-toast-badge {
   font-size: 10px;
@@ -588,13 +592,13 @@
 .notif-toast-time {
   margin-left: auto;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 .notif-toast-x {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
   width: 24px;
   height: 24px;
@@ -604,7 +608,7 @@
   flex-shrink: 0;
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
-.notif-toast-x:hover { color: var(--text-primary); background: var(--surface-2); }
+.notif-toast-x:hover { color: var(--text-primary); background: var(--shell-fill-hover); }
 
 /* Body — the clickable area that opens the linked entity */
 .notif-toast-body {
@@ -659,7 +663,7 @@
 .notif-toast-markall {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -670,7 +674,7 @@
   border-radius: var(--radius-sm);
   transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
-.notif-toast-markall:hover { color: var(--accent); background: var(--surface-2); }
+.notif-toast-markall:hover { color: var(--accent); background: var(--shell-fill-hover); }
 
 @media (max-width: 560px) {
   .notif-toast-region {

@@ -1272,14 +1272,9 @@ html .notif-toast { --wx-rim: var(--glass-rim-w-sm); --wx-drop: var(--shadow-xl)
   --wx-pane: var(--glass-bg);
   --wx-filter: var(--glass-filter-sticky);
 }
-/* Nothing scrolls behind the desktop sidebar column, so there is no backdrop
-   to refract there and the ring would read as a flat tonal band. The mobile
-   drawer does have the page behind it, so it gets one — and a 9px ring clears
-   the nav's own 10px gutter, so no link's hover fill touches it. */
-.shell-sidebar::before { display: none; }
-@media (max-width: 860px) {
-  .shell-sidebar::before { display: block; --wx-rim: var(--glass-rim-w-sm); }
-}
+/* The desktop sidebar used to be excluded here: nothing scrolls behind it, so
+   a ring read as a flat tonal band. shell.css now gives it its own ambient
+   backdrop to refract, and sets the ring itself, so that exclusion is gone. */
 
 /* Hover-tooltip used beside metric labels on the Performance page.
    The tooltip lives inside .wx-metric-tip-wrap and is shown when the

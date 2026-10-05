@@ -46,7 +46,9 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 20px 22px 18px;
+  /* Same inset as body and footer, so the three share one edge inside the ring. */
+  margin: 0 var(--glass-rim-w-lg);
+  padding: 20px max(0px, calc(22px - var(--glass-rim-w-lg))) 18px;
   border-bottom: 1px solid var(--border-subtle);
   position: relative;
 }
@@ -71,7 +73,7 @@
 }
 .wx-m-head-sub {
   font-size: 12.5px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 2px;
   line-height: 1.35;
 }
@@ -106,7 +108,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 .wx-m-step-dot {
@@ -149,7 +151,10 @@
 
 /* ---- Body --------------------------------------------------- */
 .wx-m-body {
-  padding: 20px 22px;
+  /* Text scrim, inset by the rim (padding gives it back; text doesn't move). */
+  background: var(--glass-text-scrim, color-mix(in srgb, var(--surface-1) 45%, transparent));
+  margin: 0 var(--glass-rim-w-lg);
+  padding: 20px max(0px, calc(22px - var(--glass-rim-w-lg)));
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -478,10 +483,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 22px;
+  padding: 14px max(0px, calc(22px - var(--glass-rim-w-lg)));
   border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-  border-radius: 0 0 var(--radius-glass) var(--radius-glass);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  /* Same ring inset as .wx-modal-footer: a tint, not a slab, clear of the rim. */
+  margin: 0 var(--glass-rim-w-lg) var(--glass-rim-w-lg);
+  border-radius: 0 0 calc(var(--radius-glass) - var(--glass-rim-w-lg)) calc(var(--radius-glass) - var(--glass-rim-w-lg));
   flex: 0 0 auto;
 }
 .wx-m-kbd-hints {
@@ -489,7 +496,7 @@
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   flex-wrap: wrap;
 }
 .wx-m-kbd-hints kbd {
