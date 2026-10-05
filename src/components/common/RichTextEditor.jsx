@@ -287,7 +287,7 @@ export default function RichTextEditor({
         .rte-surface pre { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; font-family: var(--font-mono); font-size: 0.85em; overflow-x: auto; }
         .rte-surface code { font-family: var(--font-mono); }
         .rte-surface hr { border: none; border-top: 1px solid var(--border-default); margin: 0.8rem 0; }
-        .rte-surface p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--text-muted); float: left; height: 0; pointer-events: none; }
+        .rte-surface p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--input-placeholder); font-style: italic; float: left; height: 0; pointer-events: none; }
 
         /* Highlighter — identical to the report views (reports.css mark.rh) */
         .rte-surface mark.rh { padding: 0 1px; border-radius: 2px; color: #1f2937; }
