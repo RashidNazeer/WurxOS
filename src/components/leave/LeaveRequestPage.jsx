@@ -173,6 +173,12 @@ function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCan
     ? (LEAVE_TYPES.find(l => l.value === data.leaveType)?.label || 'Leave Request')
     : data.category === 'other' ? (data.otherTitle || 'Other') : catCfg.label;
   const { paidDays, unpaidDays, effectiveDays, allPaid, allUnpaid } = computePaidSplit(data, remainingQuota, actualDays);
+  // WFH over quota is a "do you still want to?" nudge, not a pay warning —
+  // the employee isn't being told it'll cost them, just that it's past the
+  // free allotment. Leave/half_leave/other keep the pay-impact framing
+  // since those genuinely go unpaid until Boss intervenes.
+  const isWfh = data.category === 'wfh';
+  const isOther = data.category === 'other';
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -184,12 +190,12 @@ function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCan
               <i className={`bi ${catCfg.icon}`} style={{ color: catCfg.color, fontSize: '1rem' }} />
             </div>
             <div>
-              <p className="fw-semibold mb-0 small">Confirm Submission</p>
+              <p className="fw-semibold mb-0 small">{isWfh ? 'Quota Used Up' : 'Confirm Submission'}</p>
               <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>{title} · {data.startDate} — {data.endDate}</p>
             </div>
           </div>
 
-          {data.category !== 'other' && remainingQuota && (
+          {!isOther && remainingQuota && (
             <>
               <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border-subtle)' }}>
                 <div className="d-flex justify-content-between align-items-center mb-1">
@@ -208,17 +214,18 @@ function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCan
                 )}
               </div>
               <div className="rounded-2 p-2 mb-3 d-flex align-items-center gap-2" style={{
-                background: allPaid ? 'var(--success-soft)' : allUnpaid ? 'var(--warning-soft)' : 'var(--warning-soft)',
-                border: `1px solid ${allPaid ? 'color-mix(in srgb, var(--success) 35%, transparent)' : allUnpaid ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--warning) 35%, transparent)'}`,
+                background: allPaid ? 'var(--success-soft)' : 'var(--warning-soft)',
+                border: `1px solid ${allPaid ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'color-mix(in srgb, var(--warning) 35%, transparent)'}`,
               }}>
-                <i className={`bi ${allPaid ? 'bi-check-circle-fill text-success' : 'bi-info-circle text-warning'}`} style={{ fontSize: '0.85rem' }} />
+                <i className={`bi ${allPaid ? 'bi-check-circle-fill text-success' : isWfh ? 'bi-question-circle-fill text-warning' : 'bi-info-circle text-warning'}`} style={{ fontSize: '0.85rem' }} />
                 <span className="small">
                   {allPaid && 'This will be fully paid time off.'}
-                  {!allPaid && allUnpaid && 'No paid quota remaining — entire request is unpaid time off.'}
-                  {!allPaid && !allUnpaid && `Quota covers ${paidDays} day${paidDays !== 1 ? 's' : ''}; the remaining ${unpaidDays} day${unpaidDays !== 1 ? 's' : ''} ${unpaidDays === 1 ? 'is' : 'are'} unpaid.`}
+                  {!allPaid && isWfh && 'You have used up your work-from-home quota — do you still want to make this request?'}
+                  {!allPaid && !isWfh && allUnpaid && 'Your leave will be unpaid until Boss changes it.'}
+                  {!allPaid && !isWfh && !allUnpaid && `Quota covers ${paidDays} day${paidDays !== 1 ? 's' : ''}; the remaining ${unpaidDays} day${unpaidDays !== 1 ? 's' : ''} ${unpaidDays === 1 ? 'is' : 'are'} unpaid.`}
                 </span>
               </div>
-              {!allPaid && (
+              {!allPaid && !isWfh && (
                 <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div className="d-flex align-items-center gap-2">
                     <i className="bi bi-shield-check" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }} />
@@ -229,7 +236,14 @@ function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCan
             </>
           )}
 
-          {!allPaid && paidOverrideCount > 0 && (
+          {isOther && (
+            <div className="rounded-2 p-2 mb-3 d-flex align-items-center gap-2" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
+              <i className="bi bi-info-circle text-warning" style={{ fontSize: '0.85rem' }} />
+              <span className="small">Your leave will be unpaid until Boss changes it.</span>
+            </div>
+          )}
+
+          {!allPaid && !isWfh && paidOverrideCount > 0 && (
             <div className="rounded-2 p-2 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
               <div className="d-flex align-items-center gap-2">
                 <i className="bi bi-info-circle text-primary" style={{ fontSize: '0.75rem' }} />
@@ -243,7 +257,7 @@ function ConfirmSubmitModal({ data, actualDays, remainingQuota, onConfirm, onCan
             <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
               style={{ background: allPaid ? catCfg.color : 'var(--warning)', color: allPaid ? catCfg.on : 'var(--on-warning)', border: 'none' }}
               onClick={() => onConfirm({ paidDays, unpaidDays })}>
-              <i className="bi bi-send" /> {allPaid ? 'Submit Request' : allUnpaid ? 'Submit as Unpaid' : 'Submit Request'}
+              <i className="bi bi-send" /> {allPaid ? 'Submit Request' : isWfh ? 'Yes, Submit Request' : allUnpaid ? 'Submit as Unpaid' : 'Submit Request'}
             </button>
           </div>
         </div>
@@ -410,7 +424,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                   )}
                   {remainingQuota && remainingQuota[leaveType] <= 0 && (
                     <div className="mt-1 d-flex align-items-center gap-1" style={{ fontSize: '0.72rem', color: 'var(--danger)' }}>
-                      <i className="bi bi-exclamation-triangle" /> No paid days remaining — this will be unpaid time off
+                      <i className="bi bi-exclamation-triangle" /> No paid days remaining — this will be unpaid until Boss changes it
                     </div>
                   )}
                 </div>
@@ -418,7 +432,7 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
 
               {category === 'wfh' && remainingQuota && remainingQuota.wfh <= 0 && (
                 <div className="alert alert-warning py-2 small mb-3 d-flex align-items-center gap-2">
-                  <i className="bi bi-exclamation-triangle" /> No paid WFH days remaining — this will be unpaid
+                  <i className="bi bi-exclamation-triangle" /> You've used up your work-from-home quota for this month — you can still submit, you'll just be asked to confirm.
                 </div>
               )}
 
@@ -427,6 +441,9 @@ function NewRequestModal({ onClose, onSubmit, saving, remainingQuota, paidOverri
                   <label className="form-label small fw-semibold">What do you need? <span className="text-danger">*</span></label>
                   <input type="text" className="form-control form-control-sm" placeholder="e.g. Early dismissal, Schedule change…"
                     value={otherTitle} onChange={e => setOtherTitle(e.target.value)} />
+                  <div className="mt-1 d-flex align-items-center gap-1" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <i className="bi bi-info-circle" /> This type doesn't draw from any quota — it will be unpaid until Boss changes it.
+                  </div>
                 </div>
               )}
 
