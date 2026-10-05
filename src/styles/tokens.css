@@ -128,14 +128,19 @@
      white-on-cream. So the tint is now pure white (a lifted sheet), the
      brightness lift pushes the wash toward white, and the edge and shadow are
      chocolate, which is the only thing that reads against a light page. */
-  --glass-pane-alpha:        0.56;
-  --glass-pane-alpha-strong: 0.68;
+  /* Light is the hard case: the pane tint is white and most of what sits
+     behind it is white cards on cream, so at a high alpha the pane's own white
+     dominates and the glass cannot show at all. The alpha has to be low enough
+     that the backdrop wins. Floor is set by dark content behind the pane (a
+     spotlight banner), where primary text is ~4.3 at this value. */
+  --glass-pane-alpha:        0.48;
+  --glass-pane-alpha-strong: 0.60;
   --glass-bg:        rgba(255, 255, 255, var(--glass-pane-alpha));
   /* Cards carry the reading content and sit on the flat page canvas, so they
      take the material at a higher alpha than chrome and WITHOUT a blur: there
      is nothing moving behind a card for a filter to reveal, and a filter per
      card would be dozens of passes on a dashboard. */
-  --glass-card-bg:   rgba(255, 255, 255, 0.72);
+  --glass-card-bg:   rgba(255, 255, 255, 0.62);
   --glass-bg-strong: rgba(255, 255, 255, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(90, 58, 34, 0.22);
   --glass-shadow:    0 18px 40px -14px rgba(90, 58, 34, 0.34),
@@ -568,8 +573,8 @@
     --glass-rim-w-xs: 0px;
   }
   html[data-theme='light'] {
-    --glass-pane-alpha:        0.56;
-    --glass-pane-alpha-strong: 0.68;
+    --glass-pane-alpha:        0.48;
+    --glass-pane-alpha-strong: 0.60;
     --glass-refract-fn:        url('#wx-glass-refract-ca');
   }
   html[data-theme='dark'] {
