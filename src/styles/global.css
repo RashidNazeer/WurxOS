@@ -25,6 +25,21 @@ optgroup {
   font-size: inherit;
 }
 
+/* Native <select> popups. color-scheme alone isn't enough: once a page styles
+   selects at all, Chrome renders the dropdown with author colours and anything
+   left unset falls back to the light UA default — which is how a dark app ends
+   up with a white popup and near-invisible <optgroup> labels. Set both colours
+   explicitly, on every select, in both themes. */
+select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+select optgroup {
+  background-color: var(--input-bg);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 /* Raw <button>s do NOT inherit text color — the UA default is a near-black
    (`ButtonText`), so button-based rows/toggles/cards (e.g. the Performance
    score-breakdown rows) render invisible on dark surfaces while looking fine

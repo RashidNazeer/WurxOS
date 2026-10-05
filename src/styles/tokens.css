@@ -14,7 +14,11 @@
 [data-theme='light'] {
   /* Surfaces (layered from base up) */
   --surface-0: #faf7f2;        /* page canvas (cream) */
-  --surface-1: #ffffff;        /* cards, modals */
+  /* --surface-1 means "cards, modals", so the material lives here rather than
+     in 261 per-element overrides. Anything that must stay opaque (a solid
+     fallback, a chart tooltip) uses --surface-1-solid. */
+  --surface-1: rgba(255, 255, 255, 0.62);
+  --surface-1-solid: #ffffff;
   --surface-2: #f3ece2;        /* hover / secondary cards */
   --surface-3: #e9dfd1;        /* tertiary / wells */
 
@@ -105,7 +109,7 @@
   --chart-grid:       var(--border-subtle);
   --chart-axis:       var(--text-secondary);
   --chart-track:      var(--surface-2);
-  --chart-tooltip-bg: var(--surface-1);
+  --chart-tooltip-bg: var(--surface-1-solid);
   --chart-tooltip-fg: var(--text-primary);
   --chart-1: #ad5f3e;   /* terracotta   4.38 / 4.68 */
   --chart-2: #0f766e;   /* teal         5.12 / 5.47 */
@@ -186,7 +190,8 @@
 [data-theme='dark'] {
   /* Surfaces â€” v1's near-black for the WurxOS feel */
   --surface-0: #000000;
-  --surface-1: #0f0f0f;
+  --surface-1: rgba(26, 20, 15, 0.68);
+  --surface-1-solid: #0f0f0f;
   --surface-2: #181818;
   --surface-3: #222222;
 
@@ -613,9 +618,9 @@
    zeroed instead. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-theme] {
-    --glass-bg: var(--surface-1);
-    --glass-card-bg: var(--surface-1);
-    --glass-bg-strong: var(--surface-1);
+    --glass-bg: var(--surface-1-solid);
+    --glass-card-bg: var(--surface-1-solid);
+    --glass-bg-strong: var(--surface-1-solid);
     --glass-text-scrim: transparent;
     --glass-filter: none;
     --glass-filter-sticky: none;
@@ -631,9 +636,9 @@
 }
 @media (prefers-reduced-transparency: reduce) {
   html[data-theme] {
-    --glass-bg: var(--surface-1);
-    --glass-card-bg: var(--surface-1);
-    --glass-bg-strong: var(--surface-1);
+    --glass-bg: var(--surface-1-solid);
+    --glass-card-bg: var(--surface-1-solid);
+    --glass-bg-strong: var(--surface-1-solid);
     --glass-text-scrim: transparent;
     --glass-filter: none;
     --glass-filter-sticky: none;

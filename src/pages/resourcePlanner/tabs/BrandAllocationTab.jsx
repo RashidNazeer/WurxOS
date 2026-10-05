@@ -139,12 +139,13 @@ const rotatedHead = {
   height: 120, verticalAlign: 'bottom', minWidth: 34, maxWidth: 34,
 };
 const stickyLeftCell = {
-  position: 'sticky', left: 0, zIndex: 1, background: 'var(--surface-1)',
+  // Solid: table data scrolls horizontally under these frozen cells.
+  position: 'sticky', left: 0, zIndex: 1, background: 'var(--surface-1-solid)',
   padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)',
   borderRight: '1px solid var(--border-subtle)', minWidth: 200,
 };
 const stickyRightCell = {
-  position: 'sticky', right: 0, zIndex: 1, background: 'var(--surface-1)',
+  position: 'sticky', right: 0, zIndex: 1, background: 'var(--surface-1-solid)',
   padding: '8px 12px', textAlign: 'right', borderBottom: '1px solid var(--border-subtle)',
   borderLeft: '1px solid var(--border-subtle)', minWidth: 70, fontWeight: 700,
 };
