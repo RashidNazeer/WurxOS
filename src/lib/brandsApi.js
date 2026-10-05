@@ -71,27 +71,24 @@ export async function listEukaStores() {
   return data || [];
 }
 
-export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null }) {
-  const { data: me } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from('brands')
-    .insert({
-      brand_name: brandName.trim(),
-      client_name: (clientName || '').trim(),
-      tier: tier?.trim() || null,
-      gmv: toNumberOrNull(gmv),
-      owner_id: ownerId,
-      logo_url: logoUrl || null,
-      status,
-      paid_collab_status: paidCollabStatus,
-      gmv_max_status: gmvMaxStatus,
-      currency: currency || 'USD',
-      euka_store_id: eukaStoreId || null,
-      euka_slug: eukaSlug || null,
-      created_by: me?.user?.id ?? null,
-    })
-    .select()
-    .single();
+// Brand row and initial assignments are written in one transaction (mig 412),
+// so a failure never leaves a half-created brand behind to be duplicated on retry.
+export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null, assigneeIds = [] }) {
+  const { data, error } = await supabase.rpc('brand_create_with_assignments', {
+    p_brand_name: brandName.trim(),
+    p_client_name: (clientName || '').trim(),
+    p_tier: tier?.trim() || null,
+    p_gmv: toNumberOrNull(gmv),
+    p_owner_id: ownerId,
+    p_logo_url: logoUrl || null,
+    p_status: status,
+    p_paid_collab_status: paidCollabStatus,
+    p_gmv_max_status: gmvMaxStatus,
+    p_currency: currency || 'USD',
+    p_euka_store_id: eukaStoreId || null,
+    p_euka_slug: eukaSlug || null,
+    p_assignee_ids: assigneeIds,
+  });
   if (error) throw new Error(error.message);
   return data;
 }
