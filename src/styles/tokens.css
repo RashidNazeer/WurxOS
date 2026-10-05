@@ -428,7 +428,7 @@
      (topbar, tab bar) is one scale step down because its backdrop changes on
      every scroll frame. Safe: 24-40px transient, 14-24px sticky. */
   --glass-blur:   40px;
-  --glass-blur-sticky: 22px;
+  --glass-blur-sticky: 14px;
 
   /* Refraction / edge lensing. The SVG displacement filters are inlined in
      index.html; this token picks which one (or none). Empty by default â€” the
@@ -547,7 +547,12 @@
 @supports (backdrop-filter: url('#wx-glass-refract')) or
           (-webkit-backdrop-filter: url('#wx-glass-refract')) {
   html[data-theme] {
-    --glass-refract-sticky-fn: url('#wx-glass-refract-soft');
+    /* Refraction stays OFF for always-on-screen chrome. An SVG displacement
+       filter on the topbar re-runs on every scroll frame across the full bar
+       width, which is the single biggest cause of scroll jank here. Transient
+       surfaces (modals, menus, panels) keep it: their backdrop is static while
+       they're open, so it rasterises once. */
+    --glass-refract-sticky-fn: ;
     /* Ring width 0: the pane is ONE uniform material edge to edge. The ring
        existed to reveal the bend back when the interior was ~88% opaque; now
        the whole pane is translucent, so the bend shows across all of it and a

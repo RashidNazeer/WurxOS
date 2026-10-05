@@ -122,7 +122,10 @@
   display: block;
   --wx-rim: var(--glass-rim-w-xs);
   --wx-pane: var(--glass-bg);
-  --wx-filter: var(--glass-filter-sticky);
+  /* No filter: the only thing behind the desktop sidebar is the static ambient
+     wash, and blurring something that never moves changes nothing on screen
+     while costing a full-height filter pass. The tint alone carries it. */
+  --wx-filter: none;
 }
 /* Height comes from --topbar-h and the vertical padding is zero, so this
    border and the topbar's bottom border land on the same y. Previously
