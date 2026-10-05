@@ -128,8 +128,8 @@
      white-on-cream. So the tint is now pure white (a lifted sheet), the
      brightness lift pushes the wash toward white, and the edge and shadow are
      chocolate, which is the only thing that reads against a light page. */
-  --glass-pane-alpha:        0.68;
-  --glass-pane-alpha-strong: 0.78;
+  --glass-pane-alpha:        0.56;
+  --glass-pane-alpha-strong: 0.68;
   --glass-bg:        rgba(255, 255, 255, var(--glass-pane-alpha));
   --glass-bg-strong: rgba(255, 255, 255, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(90, 58, 34, 0.22);
@@ -276,8 +276,8 @@
      the realistic backdrop is sRGB 0-120: muted is >= 4.35 at 0.60 and
      >= 4.8 at 0.70. A bright backdrop (peach button, white logo plate) under
      text drops muted to ~2.9 at 0.60: use --glass-text-scrim there. */
-  --glass-pane-alpha:        0.60;
-  --glass-pane-alpha-strong: 0.70;
+  --glass-pane-alpha:        0.52;
+  --glass-pane-alpha-strong: 0.62;
   --glass-bg:        rgba(22, 17, 13, var(--glass-pane-alpha));
   --glass-bg-strong: rgba(22, 17, 13, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(245, 213, 168, 0.14);
@@ -427,8 +427,8 @@
      label behind the pane is a smooth colour wash, not edges. Sticky chrome
      (topbar, tab bar) is one scale step down because its backdrop changes on
      every scroll frame. Safe: 24-40px transient, 14-24px sticky. */
-  --glass-blur:   32px;
-  --glass-blur-sticky: 18px;
+  --glass-blur:   40px;
+  --glass-blur-sticky: 22px;
 
   /* Refraction / edge lensing. The SVG displacement filters are inlined in
      index.html; this token picks which one (or none). Empty by default â€” the
@@ -557,13 +557,13 @@
     --glass-rim-w-xs: 0px;
   }
   html[data-theme='light'] {
-    --glass-pane-alpha:        0.68;
-    --glass-pane-alpha-strong: 0.78;
+    --glass-pane-alpha:        0.56;
+    --glass-pane-alpha-strong: 0.68;
     --glass-refract-fn:        url('#wx-glass-refract-ca');
   }
   html[data-theme='dark'] {
-    --glass-pane-alpha:        0.60;
-    --glass-pane-alpha-strong: 0.70;
+    --glass-pane-alpha:        0.52;
+    --glass-pane-alpha-strong: 0.62;
     /* Dark needs the stronger bend AND the wider colour split â€” see the
        rim-ring comment in the dark theme block. */
     --glass-refract-fn:        url('#wx-glass-refract-ca-strong');
@@ -577,16 +577,16 @@
       --glass-refract-fn: ; --glass-refract-sticky-fn: ;
       --glass-rim-w-lg: 0px; --glass-rim-w-sm: 0px; --glass-rim-w-xs: 0px;
     }
-    html[data-theme='light'] { --glass-pane-alpha: 0.72; --glass-pane-alpha-strong: 0.82; }
-    html[data-theme='dark']  { --glass-pane-alpha: 0.66; --glass-pane-alpha-strong: 0.76; }
+    html[data-theme='light'] { --glass-pane-alpha: 0.62; --glass-pane-alpha-strong: 0.74; }
+    html[data-theme='dark']  { --glass-pane-alpha: 0.58; --glass-pane-alpha-strong: 0.70; }
   }
   @supports (-moz-appearance: none) {
     html[data-theme] {
       --glass-refract-fn: ; --glass-refract-sticky-fn: ;
       --glass-rim-w-lg: 0px; --glass-rim-w-sm: 0px; --glass-rim-w-xs: 0px;
     }
-    html[data-theme='light'] { --glass-pane-alpha: 0.72; --glass-pane-alpha-strong: 0.82; }
-    html[data-theme='dark']  { --glass-pane-alpha: 0.66; --glass-pane-alpha-strong: 0.76; }
+    html[data-theme='light'] { --glass-pane-alpha: 0.62; --glass-pane-alpha-strong: 0.74; }
+    html[data-theme='dark']  { --glass-pane-alpha: 0.58; --glass-pane-alpha-strong: 0.70; }
   }
 }
 
