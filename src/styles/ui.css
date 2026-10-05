@@ -325,18 +325,8 @@
   outline: none;
   animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
 }
-.ui-modal::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-  box-shadow: var(--glass-highlight);
-  pointer-events: none;
-}
+/* The pane layer itself (background, filter, rim ring, specular) is in the
+   shared rim-ring block in global.css. */
 .ui-modal-backdrop.is-closing .ui-modal {
   animation: wx-exit-rise var(--dur-exit) var(--ease-in) forwards;
 }
@@ -388,7 +378,12 @@
   padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-2);
-  border-radius: 0 0 var(--radius-glass) var(--radius-glass);
+  /* The footer fill is opaque and spans the pane, so it would cover the
+     bottom of the rim ring. Inset it by the ring and give it the ring's inner
+     radius; at --glass-rim-w-lg: 0 this is the old full-bleed footer. */
+  margin: 0 var(--glass-rim-w-lg) var(--glass-rim-w-lg);
+  border-radius: 0 0 calc(var(--radius-glass) - var(--glass-rim-w-lg))
+                       calc(var(--radius-glass) - var(--glass-rim-w-lg));
 }
 .ui-confirm__text { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); line-height: var(--lh-base); }
 
@@ -434,15 +429,10 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
   overflow: hidden;
   pointer-events: auto;
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
+  /* Pane, rim ring and specular: shared rim-ring block in global.css. */
   border-radius: var(--radius-glass-sm);
-  box-shadow: var(--glass-shadow), var(--glass-highlight);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
   color: var(--text-primary);
   animation: wx-enter-up var(--dur-enter) var(--ease-emphasized);
 }

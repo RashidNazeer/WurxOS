@@ -240,9 +240,11 @@
   outline: none;
   min-width: 0;
 }
+/* Same hint token as every other input, so an example never reads as entered data. */
 .wx-m-input-shell > input::placeholder,
 .wx-m-input-shell > textarea::placeholder {
-  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+  color: var(--input-placeholder);
+  font-style: italic;
 }
 .wx-m-input-prefix {
   padding: 0 12px;
@@ -326,7 +328,8 @@
   font-family: inherit;
 }
 .wx-m-textarea-shell textarea::placeholder {
-  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+  color: var(--input-placeholder);
+  font-style: italic;
 }
 .wx-m-char-count {
   position: absolute;

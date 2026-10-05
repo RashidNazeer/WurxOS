@@ -373,14 +373,10 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 6px;
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
-  /* -sm: a 2-3 link group renders ~200x100, smaller than a toast. */
+  /* Pane, rim ring, specular and the 6px padding give-back: shared rim-ring
+     block in global.css.
+     -sm: a 2-3 link group renders ~200x100, smaller than a toast. */
   border-radius: var(--radius-glass-sm);
-  box-shadow: var(--glass-shadow), var(--glass-highlight);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
   transform-origin: left top;
   animation: wx-enter-pop-x var(--dur-enter) var(--ease-emphasized);
 }
@@ -581,16 +577,14 @@
      under the system area. env() is a no-op on devices without a
      safe-area-inset, so desktop is unaffected. */
   padding-top: max(12px, env(safe-area-inset-top));
-  /* Sticky glass: page content scrolls under it. Every topbar popup is
-     portaled to <body>, so the filter can't trap a fixed descendant.
-     --glass-filter-sticky, not --glass-filter: its backdrop changes every
-     scroll frame, so its refraction is dialled separately. */
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-filter-sticky);
-  backdrop-filter: var(--glass-filter-sticky);
+  /* Sticky glass: page content scrolls under it. The pane, its filter and the
+     rim ring all live on .shell-topbar::before (shared block in global.css) —
+     a 68px bar with 12px padding has no content box to give a ring border, and
+     keeping backdrop-filter off the element also keeps it from becoming the
+     containing block for any fixed descendant. It uses --glass-filter-sticky,
+     not --glass-filter: its backdrop changes every scroll frame, so its
+     refraction is dialled separately and never gets the aberration pass. */
   border-bottom: 1px solid var(--glass-border);
-  /* Full-bleed: square corners, but it still gets the specular edge. */
-  box-shadow: var(--glass-highlight);
   position: sticky;
   top: 0;
   z-index: var(--z-topbar);
@@ -674,13 +668,9 @@
 .shell-user-menu {
   position: fixed;
   min-width: 220px;
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
+  /* Pane, rim ring, specular and the 6px padding give-back: shared rim-ring
+     block in global.css. */
   border-radius: var(--radius-glass);
-  box-shadow: var(--glass-shadow), var(--glass-highlight);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-  padding: 6px;
   z-index: var(--z-popover);
   transform-origin: top right;
   animation: wx-enter-pop var(--dur-enter) var(--ease-emphasized);
@@ -791,13 +781,14 @@
     /* Closing uses the exit timing; visibility drops the closed drawer's
        links out of the tab order once it has slid away (Audit S9). */
     visibility: hidden;
-    background: var(--glass-bg-strong);
-    -webkit-backdrop-filter: var(--glass-filter);
-    backdrop-filter: var(--glass-filter);
+    /* Pane, filter and rim ring are on .shell-sidebar::before (shared block in
+       global.css): the drawer is a fixed 260px, so a ring BORDER would push
+       every nav link inward, while a pane layer costs no layout. */
+    background: transparent;
     transition: transform var(--dur-exit) var(--ease-in),
                 visibility 0s linear var(--dur-exit);
-    /* Edge-anchored: square outer edges, specular edge only. */
-    box-shadow: var(--shadow-xl), var(--glass-highlight);
+    /* Edge-anchored: square outer edges, drop shadow only. */
+    box-shadow: var(--shadow-xl);
     /* Respect iOS safe-area so the sidebar header (W logo + close
        button) sits below the notch / status bar instead of behind it. */
     padding-top: env(safe-area-inset-top);
@@ -924,12 +915,8 @@
   font-family: ui-monospace, monospace;
 }
 .global-search-panel {
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
+  /* Pane, rim ring and specular: shared rim-ring block in global.css. */
   border-radius: var(--radius-glass);
-  box-shadow: var(--shadow-xl), var(--glass-highlight);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
   max-height: 460px;
   display: flex;
   flex-direction: column;
@@ -998,17 +985,10 @@
 .global-search-item.is-active { box-shadow: inset 2px 0 0 var(--accent); }
 
 /* Glass for the notification panel + toasts (structure lives in
-   notifications.css). `html` prefix so these win regardless of the
-   order the two sheets land in the bundle. Toast ghosts get the tint
-   without a blur; they're decorative. */
-html .notif-panel,
-html .notif-toast {
-  background: var(--glass-bg-strong);
-  border-color: var(--glass-border);
-  box-shadow: var(--shadow-xl), var(--glass-highlight);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-}
+   notifications.css). The pane, rim ring and specular are in the shared
+   rim-ring block in global.css, which keeps the same `html` prefix so these
+   win regardless of the order the two sheets land in the bundle. Toast ghosts
+   get the tint without a blur; they're decorative. */
 html .notif-panel {
   transform-origin: top right;
   animation: wx-enter-pop var(--dur-enter) var(--ease-emphasized);
@@ -1075,10 +1055,9 @@ html .notif-toast-ghost {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     height: calc(56px + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
-    background: var(--glass-bg);
-    /* Always on screen while lists scroll under it — same dial as the topbar. */
-    -webkit-backdrop-filter: var(--glass-filter-sticky);
-    backdrop-filter: var(--glass-filter-sticky);
+    /* Pane, filter and rim ring are on .shell-bottom-bar::before (shared block
+       in global.css) — same sticky dial as the topbar, since this one is also
+       always on screen while lists scroll under it. */
     border-top: 1px solid var(--glass-border);
   }
   .shell-bottom-tab {

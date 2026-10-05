@@ -25,6 +25,8 @@ import RichTextEditor from '../shared/RichTextEditor';
 import ReportReturnNotice from './ReportReturnNotice';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
+import PasteParsePanel from './PasteParsePanel';
+import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionCard title it belongs to.
@@ -1153,6 +1155,13 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {sectEnabled.gmvMax && (
       <SectionCard icon="bi-rocket-takeoff-fill" color="var(--danger-text)" title="GMV Max Performance">
         {presets.bar('gmvMax', 'var(--danger)')}
+        <PasteParsePanel
+          noun="campaign"
+          accent="var(--danger)"
+          parse={parseGmvMaxText}
+          onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
+          hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this month</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV.</>}
+        />
         <ArraySection items={data.gmvMax}
           setItems={(items) => setData(d => ({ ...d, gmvMax: items }))}
           fields={[

@@ -27,6 +27,8 @@ import ReportReturnNotice from './ReportReturnNotice';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
+import PasteParsePanel from './PasteParsePanel';
+import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionHeader title it belongs to.
@@ -1189,6 +1191,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
         <div className="card-body p-3">
           {presets.bar('gmvMax', 'var(--danger)')}
+          <PasteParsePanel
+            noun="campaign"
+            accent="var(--danger)"
+            parse={parseGmvMaxText}
+            onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
+            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this report period</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
+          />
           <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
             addLabel="Add Campaign"
             fields={[
@@ -1219,6 +1228,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically.
           </p>
           {presets.bar('gmvMaxMtd', 'var(--danger)')}
+          <PasteParsePanel
+            noun="campaign"
+            accent="var(--danger)"
+            parse={parseGmvMaxText}
+            onApply={rows => setData(d => ({ ...d, gmvMaxMtd: mergeGmvMaxRows(d.gmvMaxMtd, rows) }))}
+            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the box above.</>}
+          />
           <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
             addLabel="Add MTD Campaign"
             fields={[

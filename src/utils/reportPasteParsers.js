@@ -240,6 +240,17 @@ function isGmvTailNoise(l) {
 const stripUsd = v => (v == null ? '' : String(v).replace(/[^\d.\-]/g, ''));
 
 /**
+ * Merge freshly parsed GMV Max rows into the form's existing rows: keep rows the
+ * user actually filled (campaign, GMV or spend), drop blank placeholder rows,
+ * append the parsed ones. Same semantics WeeklyReportForm applies inline.
+ */
+export function mergeGmvMaxRows(existing, rows) {
+  const isReal = g => (g.campaign && g.campaign.trim())
+    || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
+  return [...(existing || []).filter(isReal), ...rows];
+}
+
+/**
  * Parse the "GMV Max" campaign-list copy-paste (Product or LIVE GMV Max).
  *
  * TikTok's export dumps each campaign's columns top-to-bottom. Column meaning is
