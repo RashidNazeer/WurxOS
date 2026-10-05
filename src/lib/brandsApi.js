@@ -206,7 +206,7 @@ export async function reactivateBrand(id) {
 export async function setBrandAssignments(brandId, userIds, roles = null) {
   const { data: current, error: curErr } = await supabase
     .from('brand_assignments')
-    .select('user_id, profiles!inner(role)')
+    .select('user_id, profiles:user_id!inner(role)')
     .eq('brand_id', brandId);
   if (curErr) throw new Error(curErr.message);
 
