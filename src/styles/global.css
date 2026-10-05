@@ -112,11 +112,12 @@ a:hover { color: var(--accent-hover); }
 }
 .wx-input::placeholder { color: var(--input-placeholder); font-style: italic; }
 
-/* Report forms use example values as placeholders ("55834.62"), so they must
-   not read as entered data. An earlier pass darkened this to 6:1 and made
-   examples indistinguishable from real values. Now: ~4:1 (still > 3:1) against
-   entered text at ~16:1, plus italics as a non-colour cue. All inputs, both
-   themes, via the --input-placeholder token. */
+/* Report forms use real-looking example values as placeholders ("55834.62"), so
+   the difference from entered data has to be obvious at a glance. ~2.4:1 against
+   entered text at ~16:1 — roughly a 7x gap — plus italics, because colour alone
+   is a weak cue when the example is a plausible number. Deliberately below the
+   4.5:1 text minimum: these are hints, the field's own label carries the meaning.
+   All inputs, both themes, via the --input-placeholder token. */
 .form-control::placeholder,
 .form-control-sm::placeholder,
 .form-select::placeholder {

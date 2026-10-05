@@ -78,7 +78,9 @@
   --input-bg:     #ffffff;
   --input-border: #8f857a;     /* 3.62 on #fff */
   --input-text:   #2b1d14;
-  --input-placeholder: #8a7868; /* 4.23 on #fff (entered text is 16.3): reads as a hint, not data */
+  --input-placeholder: #b5a494; /* 2.41 on #fff, 2.26 on cream (entered text is 16.3) — report
+                                   forms use real-looking example values ("55834.62"), so the gap
+                                   to entered text has to be obvious at a glance, not measured. */
 
   /* Elevation — chocolate-tinted */
   --shadow-sm: 0 1px 2px 0 rgba(90, 58, 34, 0.06);
@@ -222,7 +224,8 @@
   --input-bg:     #1a1a1a;
   --input-border: rgba(245, 213, 168, 0.45);   /* 3.52 on input, 3.55 on s1 */
   --input-text:   #faf7f2;
-  --input-placeholder: rgba(250, 247, 242, 0.42); /* 3.89 on input (entered text is 16.3): reads as a hint, not data */
+  --input-placeholder: rgba(250, 247, 242, 0.28); /* 2.45 on input (entered text is 16.3) — matches
+                                                     the light theme's gap; see the note there. */
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.55), 0 2px 4px -2px rgba(0, 0, 0, 0.45);
