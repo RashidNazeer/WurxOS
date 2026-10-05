@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listAssignableApcs, switchBrandApc, assignBrandApc, listBrandsForUsers } from '../../lib/brandsApi';
+import { listAssignableApcs, switchBrandApc, assignBrandApc, temporarilyAssignBrand, listBrandsForUsers } from '../../lib/brandsApi';
 import { submitApcSwitchRequest } from '../../lib/brandSwitchApi';
 import {
   permanentSameRole, swapPartner, assignReplaced, assignKept,
@@ -11,20 +11,45 @@ import {
   XIcon, AlertIcon, CheckIcon, SearchIcon, RefreshIcon,
 } from '../common/Icon';
 
+// Temporary cover (mig 407) is its own thing, not a request-able mode: it has
+// no equivalent in brand_switch_requests, so it can only ever be applied
+// directly. Kept separate from SWITCH_ACTIONS (imported below) rather than
+// added to it, so that object's existing use as the request-mode's valid
+// values (assign/swap only) can't accidentally grow a third, unsupported one.
+const ACTIONS = {
+  ...SWITCH_ACTIONS,
+  temp: {
+    label: 'Temporary cover',
+    blurb: 'Hand it to someone else until a date you choose, then it returns automatically.',
+  },
+};
+
+function defaultEndDate() {
+  const d = new Date(); d.setDate(d.getDate() + 14);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /**
  * Modal for giving a brand to a different APC.
  *
  * Two independent choices:
  *
- *   ACTION — what moves (mig 360)
- *     * Assign only     → brand_assign_apc. This one brand moves; the new APC
- *                         keeps everything they already hold.
- *     * Swap portfolios → brand_switch_apc. Both APCs exchange their whole book.
+ *   ACTION — what moves (mig 360, mig 407)
+ *     * Assign only      → brand_assign_apc. This one brand moves; the new APC
+ *                          keeps everything they already hold.
+ *     * Swap portfolios  → brand_switch_apc. Both APCs exchange their whole book.
+ *     * Temporary cover  → brand_temp_assign. Same immediate effect as Assign,
+ *                          but a cron automatically gives the brand back to
+ *                          whoever holds it now once the chosen date arrives
+ *                          (e.g. covering someone's leave). Needs exactly one
+ *                          current holder to hand it back to — direct-apply only.
  *
  *   MODE — who applies it
  *     * Boss → always applies directly.
  *     * OL   → defaults to direct but can flip to "Request from Boss", which
- *              writes a pending row carrying the chosen action.
+ *              writes a pending row carrying the chosen action. Not offered
+ *              for Temporary cover (no request-table equivalent exists).
  *
  * Assign is the default. A swap moves two people's entire portfolios; picking
  * it by accident is far costlier than picking Assign by accident, which moves
@@ -37,6 +62,7 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
   const canRequest      = role === 'ol';        // OL is the only role that benefits from the toggle
   const [mode, setMode] = useState(canDirectSwitch ? 'direct' : 'request');
   const [action, setAction] = useState('assign');
+  const [endDate, setEndDate] = useState(defaultEndDate);
 
   const [q, setQ] = useState('');
   const [pickedId, setPickedId] = useState('');
@@ -95,17 +121,38 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
   });
 
   const thisBrand = { id: brand.id, brand_name: brand.brand_name };
+  // Temporary cover's immediate effect is identical to Assign (one brand
+  // moves, the target keeps the rest) — the only difference is what happens
+  // later, which this preview adds a line about below. No separate outcome
+  // math needed.
   const outcome = picked
-    ? (action === 'assign'
-      ? assignOutcome({ brand: thisBrand, picked, replaced, brandsByUser })
-      : swapOutcome({ brand: thisBrand, picked, partner, brandsByUser }))
+    ? (action === 'swap'
+      ? swapOutcome({ brand: thisBrand, picked, partner, brandsByUser })
+      : assignOutcome({ brand: thisBrand, picked, replaced, brandsByUser }))
     : null;
+
+  // Temporary cover needs exactly one current same-role holder to hand the
+  // brand back to on return day — brand_temp_assign refuses otherwise, and
+  // this says why before the user ever clicks Confirm.
+  const tempSeatIssue = action === 'temp' && picked
+    ? (replaced.length === 0
+        ? 'Nobody currently holds this brand — there would be no one to return it to. Use Assign instead.'
+        : replaced.length > 1
+          ? `This brand has ${replaced.length} current ${picked.role === 'ipc' ? 'IPCs' : 'APCs'} — temporary cover needs exactly one. Use Assign or Swap first.`
+          : '')
+    : '';
+  const endDateValid = !endDate || new Date(`${endDate}T00:00:00`) > new Date();
 
   async function confirm() {
     if (!pickedId) return setErr('Pick an APC to give the brand to.');
+    if (action === 'temp' && !endDate) return setErr('Pick the date this cover ends.');
+    if (action === 'temp' && !endDateValid) return setErr('The return date must be in the future.');
     setBusy(true); setErr('');
     try {
-      if (mode === 'request') {
+      if (action === 'temp') {
+        // Direct-apply only — see the component doc comment.
+        await temporarilyAssignBrand(brand.id, pickedId, `${endDate}T00:00:00`, note.trim() || null, notify);
+      } else if (mode === 'request') {
         await submitApcSwitchRequest({
           brandId: brand.id,
           toApcId: pickedId,
@@ -118,12 +165,12 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
       } else {
         await switchBrandApc(brand.id, pickedId, note.trim() || null, notify);
       }
-      onDone?.(mode);
+      onDone?.(action === 'temp' ? 'direct' : mode);
     } catch (e) { setErr(e.message); }
     finally { setBusy(false); }
   }
 
-  const verb = action === 'assign' ? 'assign' : 'swap';
+  const verb = action === 'assign' ? 'assign' : action === 'temp' ? 'temporary cover' : 'swap';
 
   return (
     <div className="wx-modal-backdrop" onClick={onClose}>
@@ -141,9 +188,11 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
             </div>
           )}
 
-          {/* Mode toggle — only OL sees a choice. Boss is always direct,
-              anyone else (shouldn't reach here) is always request. */}
-          {canDirectSwitch && canRequest && (
+          {/* Mode toggle — only OL sees a choice, and only when the action
+              supports being requested (Temporary cover never does). Boss is
+              always direct; anyone else (shouldn't reach here) is always
+              request. */}
+          {canDirectSwitch && canRequest && action !== 'temp' && (
             <div className="wx-seg" role="tablist" style={{ marginBottom: 12 }}>
               <button type="button" role="tab" aria-selected={mode === 'direct'}
                 className={`wx-seg-btn ${mode === 'direct' ? 'is-active' : ''}`}
@@ -161,12 +210,12 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
           {/* Action — what moves. Each option carries its one-line consequence
               so the difference is read before it is picked, not after. */}
           <div role="radiogroup" aria-label="What should happen"
-            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            {Object.entries(SWITCH_ACTIONS).map(([key, a]) => {
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+            {Object.entries(ACTIONS).map(([key, a]) => {
               const on = action === key;
               return (
                 <button key={key} type="button" role="radio" aria-checked={on}
-                  onClick={() => setAction(key)}
+                  onClick={() => { setAction(key); if (key === 'temp') setMode('direct'); }}
                   style={{
                     textAlign: 'left', padding: '10px 12px', cursor: 'pointer',
                     borderRadius: 'var(--radius-md)',
@@ -299,16 +348,16 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
                     <Portfolio who={outcome.target.user} before={outcome.target.before} after={outcome.target.after} highlight={brand.id} />
-                    {action === 'assign'
-                      ? outcome.losers.map((l) => (
-                          <Portfolio key={l.user.id} who={l.user} before={l.before} after={l.after} highlight={brand.id} />
-                        ))
-                      : outcome.partner && (
+                    {action === 'swap'
+                      ? outcome.partner && (
                           <Portfolio who={outcome.partner.user} before={outcome.partner.before} after={outcome.partner.after} highlight={brand.id} />
-                        )}
+                        )
+                      : outcome.losers.map((l) => (
+                          <Portfolio key={l.user.id} who={l.user} before={l.before} after={l.after} highlight={brand.id} />
+                        ))}
                   </div>
 
-                  {action === 'assign' && outcome.losers.length === 0 && (
+                  {action !== 'swap' && outcome.losers.length === 0 && (
                     <Hint>Nobody currently holds this brand in that role, so it is simply added to {picked.display_name}.</Hint>
                   )}
                   {action === 'swap' && outcome.degenerate && (
@@ -317,9 +366,18 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
                       with — this behaves exactly like <strong>Assign only</strong>.
                     </Hint>
                   )}
-                  {action === 'assign' && kept.length > 0 && (
+                  {action !== 'swap' && kept.length > 0 && (
                     <Hint>
                       Stays on the brand: {kept.map((u) => `${u.display_name} (${u.role}${u.expiresAt ? ', temporary' : ''})`).join(', ')}.
+                    </Hint>
+                  )}
+                  {action === 'temp' && tempSeatIssue && (
+                    <Hint><span style={{ color: 'var(--danger)', fontWeight: 600 }}>{tempSeatIssue}</span></Hint>
+                  )}
+                  {action === 'temp' && !tempSeatIssue && endDate && (
+                    <Hint>
+                      On <strong>{endDate}</strong>, this automatically reverses: <strong>{replaced[0]?.display_name}</strong>{' '}
+                      gets {brand.brand_name} back, and <strong>{picked.display_name}</strong> loses it — exactly undoing this.
                     </Hint>
                   )}
                 </>
@@ -330,16 +388,33 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
                 borderTop: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
                 fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5,
               }}>
-                {action === 'assign' ? (
-                  <>Only <strong>{brand.brand_name}</strong> moves. Its TL becomes {picked.display_name}&apos;s TL, and its
-                  open tasks, reports and resources move with it.</>
-                ) : (
+                {action === 'swap' ? (
                   <>Every moved brand retargets its TL, and its open tasks, reports and resources move with it.
                   Each moved brand is given to a single person, so <strong>anyone else assigned to those brands —
                   IPCs, temporary cover — is removed</strong>.</>
+                ) : action === 'temp' ? (
+                  <>Only <strong>{brand.brand_name}</strong> moves, and only until the return date above — its TL does
+                  <strong> not</strong> change. Open tasks, reports and resources move with it now, and move back
+                  automatically when it returns.</>
+                ) : (
+                  <>Only <strong>{brand.brand_name}</strong> moves. Its TL becomes {picked.display_name}&apos;s TL, and its
+                  open tasks, reports and resources move with it.</>
                 )}
                 {mode === 'request' && ' Nothing changes until Boss approves.'}
               </div>
+            </div>
+          )}
+
+          {/* End date — Temporary cover only. */}
+          {action === 'temp' && (
+            <div style={{ marginTop: 12 }}>
+              <label className="wx-label">Return this brand on</label>
+              <input type="date" className="wx-input" value={endDate}
+                min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                onChange={(e) => setEndDate(e.target.value)} disabled={busy} />
+              {!endDateValid && (
+                <div style={{ color: 'var(--danger)', fontSize: 11.5, marginTop: 4 }}>Pick a date in the future.</div>
+              )}
             </div>
           )}
 
@@ -379,12 +454,15 @@ export default function SwitchApcModal({ brand, onClose, onDone }) {
         </div>
         <div className="wx-modal-footer">
           <button type="button" className="wx-btn wx-btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="wx-btn wx-btn-primary" onClick={confirm} disabled={busy || !pickedId}>
+          <button type="button" className="wx-btn wx-btn-primary" onClick={confirm}
+            disabled={busy || !pickedId || (action === 'temp' && (!!tempSeatIssue || !endDate || !endDateValid))}>
             {busy
-              ? <><span className="wx-spinner" />{mode === 'request' ? ' Submitting…' : action === 'assign' ? ' Assigning…' : ' Swapping…'}</>
-              : mode === 'request'
-                ? <><CheckIcon width="14" height="14" /> Submit {verb} request</>
-                : <><CheckIcon width="14" height="14" /> Confirm {verb}</>}
+              ? <><span className="wx-spinner" />{action === 'temp' ? ' Setting up cover…' : mode === 'request' ? ' Submitting…' : action === 'assign' ? ' Assigning…' : ' Swapping…'}</>
+              : action === 'temp'
+                ? <><CheckIcon width="14" height="14" /> Confirm temporary cover</>
+                : mode === 'request'
+                  ? <><CheckIcon width="14" height="14" /> Submit {verb} request</>
+                  : <><CheckIcon width="14" height="14" /> Confirm {verb}</>}
           </button>
         </div>
       </div>
