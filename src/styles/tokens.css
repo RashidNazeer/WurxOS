@@ -131,6 +131,11 @@
   --glass-pane-alpha:        0.56;
   --glass-pane-alpha-strong: 0.68;
   --glass-bg:        rgba(255, 255, 255, var(--glass-pane-alpha));
+  /* Cards carry the reading content and sit on the flat page canvas, so they
+     take the material at a higher alpha than chrome and WITHOUT a blur: there
+     is nothing moving behind a card for a filter to reveal, and a filter per
+     card would be dozens of passes on a dashboard. */
+  --glass-card-bg:   rgba(255, 255, 255, 0.72);
   --glass-bg-strong: rgba(255, 255, 255, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(90, 58, 34, 0.22);
   --glass-shadow:    0 18px 40px -14px rgba(90, 58, 34, 0.34),
@@ -279,6 +284,7 @@
   --glass-pane-alpha:        0.52;
   --glass-pane-alpha-strong: 0.62;
   --glass-bg:        rgba(22, 17, 13, var(--glass-pane-alpha));
+  --glass-card-bg:   rgba(26, 20, 15, 0.68);
   --glass-bg-strong: rgba(22, 17, 13, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(245, 213, 168, 0.14);
   --glass-shadow:    0 16px 40px -12px rgba(0, 0, 0, 0.75);
@@ -603,6 +609,7 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html[data-theme] {
     --glass-bg: var(--surface-1);
+    --glass-card-bg: var(--surface-1);
     --glass-bg-strong: var(--surface-1);
     --glass-text-scrim: transparent;
     --glass-filter: none;
@@ -620,6 +627,7 @@
 @media (prefers-reduced-transparency: reduce) {
   html[data-theme] {
     --glass-bg: var(--surface-1);
+    --glass-card-bg: var(--surface-1);
     --glass-bg-strong: var(--surface-1);
     --glass-text-scrim: transparent;
     --glass-filter: none;

@@ -272,7 +272,10 @@ code, kbd, samp, pre { font-family: var(--font-code); }
   background-color: var(--surface-1) !important;
   color: var(--text-primary);
   border-color: var(--border-subtle);
-  --bs-card-bg: var(--surface-1);
+  --bs-card-bg: var(--glass-card-bg);
+  /* Bootstrap's default cap is rgba(0,0,0,.03) — an opaque wash that would sit
+     as a visible strip on a translucent card. The card is one material. */
+  --bs-card-cap-bg: transparent;
   --bs-card-color: var(--text-primary);
   --bs-card-border-color: var(--border-subtle);
 }
@@ -782,7 +785,7 @@ input[type="checkbox"] {
 
 /* ============ Card ============ */
 .wx-card {
-  background: var(--surface-1);
+  background: var(--glass-card-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
