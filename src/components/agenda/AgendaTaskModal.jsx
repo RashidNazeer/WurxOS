@@ -90,7 +90,7 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <p className="fw-semibold mb-3">
             {isApcSelf ? 'Add agenda task' : 'Assign agenda task'}
@@ -109,7 +109,7 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
           ) : (
             <div className="mb-3">
               <label className="form-label small fw-semibold">APC <span className="text-danger">*</span></label>
-              <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+              <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
                 <option value="">Select an APC…</option>
                 {apcs.map((a) => <option key={a.id} value={a.id}>{a.display_name || a.email}</option>)}
@@ -120,7 +120,7 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
           {/* Brand */}
           <div className="mb-3">
             <label className="form-label small fw-semibold">Brand</label>
-            <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+            <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
               value={brandId} onChange={(e) => setBrandId(e.target.value)}
               disabled={!assigneeId}>
               <option value="">{assigneeId ? 'No specific brand' : 'Select an APC first'}</option>
@@ -134,26 +134,26 @@ export default function AgendaTaskModal({ presetAssignee, onClose, onSaved }) {
           {/* Title */}
           <div className="mb-3">
             <label className="form-label small fw-semibold">Task title <span className="text-danger">*</span></label>
-            <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+            <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
               placeholder="What needs to be done" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
 
           {/* Details */}
           <div className="mb-3">
             <label className="form-label small fw-semibold">Details</label>
-            <textarea className="form-control form-control-sm" rows={2} style={{ borderRadius: 8 }}
+            <textarea className="form-control form-control-sm" rows={2} style={{ borderRadius: 'var(--radius-sm)' }}
               placeholder="Optional details…" value={details} onChange={(e) => setDetails(e.target.value)} />
           </div>
 
           <div className="row g-2 mb-3">
             <div className="col-6">
               <label className="form-label small fw-semibold">Due date</label>
-              <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+              <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             <div className="col-6">
               <label className="form-label small fw-semibold">Link <span className="text-muted fw-normal">(optional)</span></label>
-              <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+              <input type="url" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} />
             </div>
           </div>

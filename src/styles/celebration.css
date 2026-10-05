@@ -70,7 +70,7 @@
   position: relative;
   width: min(760px, 100%);
   margin: auto 0;
-  border-radius: 26px;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
   border: 1px solid var(--cel-line);
   color: var(--cel-ink);
@@ -142,7 +142,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border: 1px solid var(--cel-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--cel-panel);
   overflow: hidden;
   margin-bottom: 22px;
@@ -168,7 +168,7 @@
 .cel-messages {
   position: relative;
   border: 1px solid var(--cel-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--cel-panel);
   padding: 20px 22px 22px;
   text-align: center;
@@ -192,7 +192,7 @@
 
 .cel-btn {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 13px 34px;
   font-size: 0.92rem;
   font-weight: 800;
@@ -214,7 +214,7 @@
   position: absolute;
   top: -12%;
   width: 8px; height: 14px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   opacity: 0;
   animation: cel-fall linear forwards;
 }
@@ -232,7 +232,7 @@
 .cel-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 0.82rem;
   color: var(--text-primary);
   border: 1px solid color-mix(in srgb, var(--warning) 34%, transparent);

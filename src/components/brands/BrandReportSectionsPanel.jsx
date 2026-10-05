@@ -191,7 +191,7 @@ function KindBadge({ kind }) {
   return (
     <span style={{
       fontSize: 9.5, fontWeight: 800,
-      padding: '2px 7px', borderRadius: 999,
+      padding: '2px 7px', borderRadius: 'var(--radius-pill)',
       textTransform: 'uppercase', letterSpacing: '0.06em',
       background: isTable ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--surface-3, var(--surface-2))',
       color: isTable ? 'var(--accent)' : 'var(--text-muted)',
@@ -272,7 +272,7 @@ function KindOption({ active, title, subtitle, onClick }) {
       style={{
         flex: '1 1 220px', textAlign: 'left',
         background: active ? 'var(--surface-1)' : 'transparent',
-        border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
+        border: `${active ? '2px' : '1px'} solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
         borderRadius: 'var(--radius-md)',
         padding: '10px 12px', cursor: 'pointer',
       }}>

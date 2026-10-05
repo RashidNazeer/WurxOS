@@ -53,7 +53,7 @@ function DetailsModal({ record, items, onClose }) {
         className="rounded-3 p-3 mb-2"
         style={{
           background: isCompleted ? 'var(--success-soft)' : 'var(--surface-2)',
-          border: `1.5px solid ${isCompleted ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
+          border: `1px solid ${isCompleted ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
         }}
       >
         <div className="d-flex align-items-start justify-content-between gap-2 mb-1">
@@ -109,7 +109,7 @@ function DetailsModal({ record, items, onClose }) {
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div
         className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}
       >
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -172,7 +172,7 @@ function EditItemRow({ item, category, onChange, month }) {
       className="rounded-3 p-3 mb-2"
       style={{
         background: isCompleted ? 'var(--success-soft)' : 'var(--surface-2)',
-        border: `1.5px solid ${isCompleted ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
+        border: `1px solid ${isCompleted ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
       }}
     >
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
@@ -370,7 +370,7 @@ function EditModal({ record, items, onClose, onSaved }) {
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div
         className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}
       >
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -409,7 +409,7 @@ function EditModal({ record, items, onClose, onSaved }) {
           {apcProfile?.ownerId && (
             <div
               className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3"
-              style={{ background: notifyTL ? 'var(--warning-soft)' : 'var(--surface-2)', border: `1.5px solid ${notifyTL ? 'color-mix(in srgb, var(--warning) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
+              style={{ background: notifyTL ? 'var(--warning-soft)' : 'var(--surface-2)', border: `${notifyTL ? '2px' : '1px'} solid ${notifyTL ? 'color-mix(in srgb, var(--warning) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
               onClick={() => setNotifyTL(v => !v)}
             >
               <input
@@ -559,7 +559,7 @@ export default function ApcIncentivesPage() {
           />
         </StatGrid>
 
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           {/* Color bar */}
           <div style={{
             height: 4,
@@ -605,7 +605,7 @@ export default function ApcIncentivesPage() {
               </div>
               <div
                 className="d-flex justify-content-between fw-bold pt-2 mt-1"
-                style={{ borderTop: '1.5px solid var(--border-subtle)', fontSize: '0.9rem' }}
+                style={{ borderTop: '1px solid var(--border-subtle)', fontSize: '0.9rem' }}
               >
                 <span>Total Earned</span>
                 <span>{formatPKR(totalEarned)}</span>
@@ -646,7 +646,7 @@ export default function ApcIncentivesPage() {
             <div className="d-flex gap-2">
               <button
                 className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}
+                style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}
                 onClick={() => setShowDetails(true)}
               >
                 <i className="bi bi-eye" /> View Details
@@ -654,7 +654,7 @@ export default function ApcIncentivesPage() {
               {!record?.payoutCleared && (
                 <button
                   className="btn btn-sm btn-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                   onClick={() => setShowEdit(true)}
                 >
                   <i className="bi bi-pencil" /> Edit Progress

@@ -59,7 +59,7 @@ export default function HighlighterPicker({
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 8,
       background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-      borderRadius: 8, padding: compact ? '3px 8px' : '4px 10px',
+      borderRadius: 'var(--radius-sm)', padding: compact ? '3px 8px' : '4px 10px',
     }}>
       <span style={{ fontSize: compact ? 11 : 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
         {activeColor ? activeColor.label : 'Color'}
@@ -74,7 +74,7 @@ export default function HighlighterPicker({
               title={c.label}
               style={{
                 width: swatchSize, height: swatchSize,
-                borderRadius: 4,
+                borderRadius: 'var(--radius-xs)',
                 border: selected ? '2px solid var(--text-primary)' : '1px solid var(--border-default)',
                 outline: selected ? '2px solid var(--accent)' : 'none',
                 outlineOffset: 1,
@@ -91,7 +91,7 @@ export default function HighlighterPicker({
         onChange={(e) => onIntensityChange(e.target.value)}
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 6,
+          background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)',
           padding: '2px 6px', fontSize: compact ? 11 : 12.5,
           cursor: 'pointer', color: 'var(--text-primary)', height: compact ? 26 : 30,
           fontWeight: 600,

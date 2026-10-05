@@ -311,7 +311,7 @@ function Switch({ checked, onChange, disabled }) {
       style={{
         width: 42,
         height: 24,
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         background: checked ? 'var(--accent)' : 'var(--surface-3)',
         border: '1px solid',
         borderColor: checked ? 'var(--accent)' : 'var(--border-default)',

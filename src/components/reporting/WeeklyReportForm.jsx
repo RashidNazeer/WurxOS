@@ -96,7 +96,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, note, width
         className={`form-control form-control-sm${invalid ? ' is-invalid' : ''}`} placeholder={placeholder || label}
         aria-invalid={invalid || undefined}
         value={value} onChange={readOnly ? undefined : (e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value))}
-        style={{ borderRadius: 8, ...(readOnly ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : null) }} />
+        style={{ borderRadius: 'var(--radius-sm)', ...(readOnly ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : null) }} />
       {invalid && <div className="wri-field-error">Required</div>}
       {note && <div className="text-muted" style={{ fontSize: '0.6rem' }}>{note}</div>}
     </div>
@@ -122,7 +122,7 @@ function AutoGrowTextarea({ value, minRows = 3, placeholder, onChange, style }) 
       value={value}
       onChange={e => onChange(e.target.value)}
       onInput={resize}
-      style={{ borderRadius: 8, resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
+      style={{ borderRadius: 'var(--radius-sm)', resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
     />
   );
 }
@@ -145,7 +145,7 @@ function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
         <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Insights</label>
         {onGenerate && (
         <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
-          style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 8, fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
+          style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
           onClick={onGenerate} disabled={loading}>
           {loading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
             : <><i className="bi bi-stars" /> Generate with AI</>}
@@ -198,7 +198,7 @@ function FetchPreviousButton({ previousValue, currentValue, onPaste, sourceLabel
         background: disabled ? 'var(--surface-2)' : 'var(--surface-1)',
         border: '1px solid var(--border-subtle)',
         color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
-        borderRadius: 8,
+        borderRadius: 'var(--radius-sm)',
         fontSize: '0.68rem',
         padding: '3px 10px',
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -244,7 +244,7 @@ function ArraySection({ items, setItems, fields, addLabel }) {
         </div>
       ))}
       <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
-        style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={add}>
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={add}>
         <i className="bi bi-plus-circle" /> {addLabel || 'Add Row'}
       </button>
     </div>
@@ -1238,7 +1238,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         <div className="row g-3">
           {myBrands.map(b => (
             <div key={b.id} className="col-md-6 col-lg-4">
-              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 14, cursor: 'pointer' }}
+              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer' }}
                 onClick={() => handleBrandSelect(b)}>
                 <div className="card-body p-3 d-flex align-items-center gap-3">
                   <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
@@ -1288,7 +1288,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           This is the first weekly report for this brand. Pick the starting date and
           which week number you&apos;re on — all future reports follow from here.
         </p>
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 460 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', maxWidth: 460 }}>
           <div className="card-body p-4">
             <div className="row g-2">
               <div className="col-7">
@@ -1300,7 +1300,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                   className="form-control"
                   value={weekStartInput}
                   onChange={e => setWeekStartInput(e.target.value)}
-                  style={{ borderRadius: 8, fontSize: '0.85rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
                 />
               </div>
               <div className="col-5">
@@ -1313,7 +1313,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                   className="form-control"
                   value={startWeekNumInput}
                   onChange={e => setStartWeekNumInput(e.target.value)}
-                  style={{ borderRadius: 8, fontSize: '0.85rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
                 />
               </div>
             </div>
@@ -1336,7 +1336,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             )}
             <button
               className="btn btn-primary w-100"
-              style={{ borderRadius: 8, fontSize: '0.85rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
               onClick={handleSetWeeklyAnchor}
               disabled={!weekStartInput}
             >
@@ -1463,7 +1463,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               {/* Warning shown only when the stats window differs from the report's week */}
               {(eukaStart !== selectedWeek?.startDate || eukaEnd !== selectedWeek?.endDate) && (
                 <div className="alert d-flex align-items-start gap-2 mt-3 mb-0 py-2"
-                  style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+                  style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
                   <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
                   <div style={{ fontSize: 12 }}>
                     You're pulling stats for a <strong>different</strong> period than this report's week
@@ -1474,10 +1474,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }}
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-md)' }}
                   onClick={() => setEukaModal(null)}>Cancel</button>
                 <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                  style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 10 }}
+                  style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 'var(--radius-md)' }}
                   onClick={runEukaAutofill} disabled={!eukaStart || !eukaEnd}>
                   <i className="bi bi-lightning-charge-fill" /> Fetch &amp; auto-fill
                 </button>
@@ -1519,7 +1519,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn btn-sm" style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 10 }}
+                <button className="btn btn-sm" style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 'var(--radius-md)' }}
                   onClick={() => setEukaModal(null)}>Got it</button>
               </div>
             </div>
@@ -1538,13 +1538,13 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                 If it keeps failing, copy this and send it to the developer on Discord:
               </div>
-              <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 10, fontSize: 10.5, maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>{eukaError.copyText}</pre>
+              <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: 10, fontSize: 10.5, maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>{eukaError.copyText}</pre>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 16 }}>
-                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 10 }}
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-md)' }}
                   onClick={copyEukaError}><i className="bi bi-clipboard" /> Copy for Discord</button>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setEukaModal(null)}>Close</button>
-                  <button className="btn btn-sm" style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 10 }} onClick={openEukaAutofill}>Try again</button>
+                  <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-md)' }} onClick={() => setEukaModal(null)}>Close</button>
+                  <button className="btn btn-sm" style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 'var(--radius-md)' }} onClick={openEukaAutofill}>Try again</button>
                 </div>
               </div>
             </div>
@@ -1676,7 +1676,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           {/* ─── Duplicate week guard ─────────────────────────────────────── */}
           {duplicateForThisWeek && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--danger)' }}>
           <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
           <div className="flex-grow-1" style={{ fontSize: '0.78rem' }}>
             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>This week already has a report</div>
@@ -1695,7 +1695,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           style={{
             background: importToast.kind === 'success' ? 'var(--success-soft)' : importToast.kind === 'warn' ? 'var(--warning-soft)' : 'var(--danger-soft)',
             border: `1px solid ${importToast.kind === 'success' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : importToast.kind === 'warn' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}`,
-            borderRadius: 10,
+            borderRadius: 'var(--radius-md)',
             color: importToast.kind === 'success' ? 'var(--success)' : importToast.kind === 'warn' ? 'var(--warning)' : 'var(--danger)',
           }}>
           <i className={`bi ${importToast.kind === 'success' ? 'bi-check-circle-fill' : importToast.kind === 'warn' ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'} flex-shrink-0 mt-1`} />
@@ -1710,7 +1710,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedWeek.label}</div>
@@ -1720,7 +1720,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report not yet verified</div>
@@ -2022,7 +2022,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         />
       )}
       {selectedBrand?.id && (
-        <div id="sec-cs-add" className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed', scrollMarginTop: 12 }}>
+        <div id="sec-cs-add" className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)', borderStyle: 'dashed', scrollMarginTop: 12 }}>
           <div className="card-body p-3">
             <AddCustomSectionInline
               disabled={!selectedBrand?.id}
@@ -2041,7 +2041,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           field renders as its OWN section titled by the field name so edit
           mode matches the saved view exactly (no generic wrapper header). */}
       {customFieldDefs.map((field) => (
-        <div key={field.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div key={field.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div className="d-flex align-items-center gap-2">

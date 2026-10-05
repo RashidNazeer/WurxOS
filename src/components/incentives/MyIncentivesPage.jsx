@@ -75,7 +75,7 @@ function EditProgressRow({ item, cat, onChange, month }) {
   const done     = isComm ? !!item.completed
                           : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? 'var(--success-soft)' : (isAuto ? 'var(--info-soft)' : 'var(--surface-2)'), border: `1.5px solid ${done ? 'color-mix(in srgb, var(--success) 35%, transparent)' : (isAuto ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? 'var(--success-soft)' : (isAuto ? 'var(--info-soft)' : 'var(--surface-2)'), border: `1px solid ${done ? 'color-mix(in srgb, var(--success) 35%, transparent)' : (isAuto ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
@@ -202,7 +202,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
@@ -312,7 +312,7 @@ export default function IncentivesPage() {
           </div>
         ) : (
           <div style={{ maxWidth: 600 }}>
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ height: 4, background: myRec.verified ? 'var(--success)' : 'var(--warning)' }} />
               <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' }}>
                 <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
@@ -340,7 +340,7 @@ export default function IncentivesPage() {
                 <div className="d-flex flex-column gap-1 mb-3" style={{ fontSize: '0.82rem' }}>
                   <div className="d-flex justify-content-between"><span className="text-muted">Basic Salary</span><span className="fw-medium">{formatPKR(myBasic)}</span></div>
                   <div className="d-flex justify-content-between"><span className="text-muted">Earned ({myCompleted.length}/{myItems.length} items)</span><span className="fw-medium text-success">+{formatPKR(myEarned)}</span></div>
-                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1.5px solid var(--border-subtle)', fontSize: '0.9rem' }}>
+                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1px solid var(--border-subtle)', fontSize: '0.9rem' }}>
                     <span>Total Earned</span><span>{formatPKR((myBasic + myEarned))}</span>
                   </div>
                   <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>Potential: {formatPKR((myBasic + myPotential))}</div>
@@ -380,7 +380,7 @@ export default function IncentivesPage() {
                 {!myRec.payoutCleared && (
                   <div className="d-flex gap-2">
                     <button className="btn btn-sm btn-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                      style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={() => setShowEditProgress(true)}>
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }} onClick={() => setShowEditProgress(true)}>
                       <i className="bi bi-pencil" /> Edit Progress
                     </button>
                   </div>

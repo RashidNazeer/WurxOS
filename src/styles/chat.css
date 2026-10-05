@@ -50,7 +50,7 @@
   width: 30px; height: 30px;
   display: grid; place-items: center;
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   color: var(--text-secondary);
   cursor: pointer;
@@ -326,22 +326,22 @@
   background: var(--surface-2);
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  border-top-left-radius: 6px;
+  border-radius: var(--radius-lg);
+  border-top-left-radius: var(--radius-sm);
   font-size: 13.5px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 100%;
 }
-.chat-bubble + .chat-bubble { border-top-left-radius: 14px; }
+.chat-bubble + .chat-bubble { border-top-left-radius: var(--radius-lg); }
 .chat-cluster.is-mine .chat-bubble {
   background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  border-top-left-radius: 14px;
-  border-top-right-radius: 6px;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-sm);
 }
-.chat-cluster.is-mine .chat-bubble + .chat-bubble { border-top-right-radius: 14px; }
+.chat-cluster.is-mine .chat-bubble + .chat-bubble { border-top-right-radius: var(--radius-lg); }
 
 /* Hover row actions on each bubble */
 .chat-bubble-actions {
@@ -393,7 +393,7 @@
   background: var(--surface-2);
   color: var(--text-primary);
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font: inherit;
   font-size: 13.5px;
   line-height: 1.4;
@@ -464,7 +464,7 @@
 .chat-person-check {
   width: 22px; height: 22px;
   border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
+  border: 1px solid var(--border-strong);
   display: grid; place-items: center;
   color: transparent;
 }
@@ -481,7 +481,7 @@
   flex: none;
   width: 36px; height: 36px;
   margin-left: -6px;
-  border: 0; border-radius: 10px;
+  border: 0; border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
   place-items: center;

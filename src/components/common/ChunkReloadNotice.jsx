@@ -18,7 +18,7 @@ export default function ChunkReloadNotice() {
         flexWrap: 'wrap',
         background: 'var(--surface-2)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 10,
+        borderRadius: 'var(--radius-md)',
         fontSize: 13,
         color: 'var(--text-secondary)',
       }}
@@ -36,7 +36,7 @@ export default function ChunkReloadNotice() {
           background: 'var(--accent)',
           color: 'var(--on-accent)',
           border: 'none',
-          borderRadius: 8,
+          borderRadius: 'var(--radius-sm)',
           padding: '6px 12px',
           fontSize: 12.5,
           fontWeight: 700,

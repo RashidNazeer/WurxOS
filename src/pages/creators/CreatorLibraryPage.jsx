@@ -306,7 +306,7 @@ export default function CreatorLibraryPage() {
           )}
 
           {visibleBrandCards.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 14 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
               <i className="bi bi-people" style={{ fontSize: '2.4rem', color: 'var(--text-muted)', opacity: 0.4 }} />
               <p className="text-muted mt-3 mb-0">
                 {creators.length === 0
@@ -357,7 +357,7 @@ function BrandCard({ s, isIPC, onOpen, onRemind }) {
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ padding: 16, cursor: 'pointer', transition: 'box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out)', transform: hover ? 'translateY(-1px)' : 'none', boxShadow: hover ? 'var(--shadow-md)' : undefined }}>
       <div className="d-flex align-items-center gap-2 mb-3">
-        <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 'var(--radius-md)', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14 }}>
           {initials(brand.name)}
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -370,7 +370,7 @@ function BrandCard({ s, isIPC, onOpen, onRemind }) {
       </div>
 
       {/* Segmented pipeline bar: pending | awaiting-OL | approved | rejected */}
-      <div style={{ display: 'flex', height: 9, borderRadius: 999, overflow: 'hidden', background: 'var(--surface-2)', marginBottom: 10 }}>
+      <div style={{ display: 'flex', height: 9, borderRadius: 'var(--radius-pill)', overflow: 'hidden', background: 'var(--surface-2)', marginBottom: 10 }}>
         <div style={{ width: pct(pending), background: SEG.pending.fg }} title={`${pending} pending`} />
         <div style={{ width: pct(tl), background: SEG.tl.fg }} title={`${tl} awaiting OL`} />
         <div style={{ width: pct(ol), background: SEG.ol.fg }} title={`${ol} approved`} />
@@ -403,7 +403,7 @@ function BrandCard({ s, isIPC, onOpen, onRemind }) {
 function Legend({ color, label, value }) {
   return (
     <span className="d-inline-flex align-items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-      <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+      <span style={{ width: 8, height: 8, borderRadius: 'var(--radius-xs)', background: color, flexShrink: 0 }} />
       <strong style={{ color: 'var(--text-primary)' }}>{value}</strong> {label}
     </span>
   );
@@ -421,7 +421,7 @@ function BrandDetail({
         <button className="wx-btn wx-btn-ghost wx-btn-sm" onClick={onBack}>
           <i className="bi bi-arrow-left me-1" /> All brands
         </button>
-        <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
           {initials(brand.name)}
         </div>
         <div className="fw-bold" style={{ fontSize: '1.05rem' }}>{brand.name}</div>
@@ -458,7 +458,7 @@ function BrandDetail({
       </div>
 
       {rows.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 14 }}>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
           <i className="bi bi-people" style={{ fontSize: '2.2rem', color: 'var(--text-muted)', opacity: 0.4 }} />
           <p className="text-muted mt-3 mb-0">
             {allInBrand === 0
@@ -485,7 +485,7 @@ function CreatorRow({ c, canTL, canOL, viewer, busyKey, onDecide, onClear }) {
     <div className="wx-card d-flex align-items-start flex-wrap gap-3" style={{ padding: '12px 14px' }}>
       {/* Identity */}
       <div className="d-flex align-items-center gap-2" style={{ minWidth: 200, flex: '1 1 220px' }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--surface-1)))', color: 'var(--on-accent)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 12 }}>
           {initials(c.name, c.handle)}
         </div>
         <div style={{ minWidth: 0 }}>
@@ -570,7 +570,7 @@ function LevelBadge({ level, approvedBy, approvedOn, rejectedBy, rejectedOn, not
   if (rejectedOn) {
     return (
       <span className="d-inline-flex align-items-center gap-1" title={note ? `Note: ${note}` : undefined}
-        style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 999, padding: '3px 10px', fontSize: '0.66rem', fontWeight: 700 }}>
+        style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-pill)', padding: '3px 10px', fontSize: '0.66rem', fontWeight: 700 }}>
         <i className="bi bi-x-circle-fill" /> {level} rejected{rejectedBy ? ` · ${rejectedBy}` : ''}{note ? ' 📝' : ''}
       </span>
     );
@@ -579,7 +579,7 @@ function LevelBadge({ level, approvedBy, approvedOn, rejectedBy, rejectedOn, not
     const tone = level === 'Operation Lead' ? { bg: 'var(--success-soft)', fg: 'var(--success)', bd: 'var(--success)' } : { bg: '#e8f0fe', fg: '#1d4ed8', bd: '#bcd0fb' };
     return (
       <span className="d-inline-flex align-items-center gap-1" title={note ? `Note: ${note}` : undefined}
-        style={{ background: tone.bg, color: tone.fg, border: `1px solid ${tone.bd}`, borderRadius: 999, padding: '3px 10px', fontSize: '0.66rem', fontWeight: 700 }}>
+        style={{ background: tone.bg, color: tone.fg, border: `1px solid ${tone.bd}`, borderRadius: 'var(--radius-pill)', padding: '3px 10px', fontSize: '0.66rem', fontWeight: 700 }}>
         <i className="bi bi-patch-check-fill" /> {level}{approvedBy ? ` · ${approvedBy}` : ''}{note ? ' 📝' : ''}
       </span>
     );
@@ -646,7 +646,7 @@ function ContactChip({ icon, value }) {
     <button type="button" className="d-inline-flex align-items-center gap-1"
       onClick={() => { navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }).catch(() => {}); }}
       title={`${value} — click to copy`}
-      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '2px 9px', fontSize: '0.68rem', color: 'var(--text-secondary)', cursor: 'pointer', maxWidth: '100%' }}>
+      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', padding: '2px 9px', fontSize: '0.68rem', color: 'var(--text-secondary)', cursor: 'pointer', maxWidth: '100%' }}>
       <i className={`bi ${icon}`} />
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{copied ? 'Copied!' : value}</span>
     </button>

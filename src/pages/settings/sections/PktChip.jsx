@@ -10,7 +10,7 @@ export default function PktChip({ style }) {
       padding: '4px 10px', marginBottom: 12,
       background: 'var(--accent-soft)', color: 'var(--accent)',
       border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-      borderRadius: 999, fontSize: 11.5, fontWeight: 600,
+      borderRadius: 'var(--radius-pill)', fontSize: 11.5, fontWeight: 600,
       ...(style || {}),
     }}>
       <span aria-hidden>🇵🇰</span>

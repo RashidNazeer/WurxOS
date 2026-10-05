@@ -196,7 +196,7 @@ function BrandPaidCollabCard({ brand, weekStart, weekLabel, ready, unfinished, e
         <strong style={{ fontSize: 15 }}>{brand.brand_name}</strong>
         {brand.client_name && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>· {brand.client_name}</span>}
         <span style={{
-          marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+          marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-pill)',
           background: ready && filled ? 'var(--success-soft)' : 'var(--surface-2)', color: ready && filled ? 'var(--success)' : 'var(--text-muted)',
         }}>
           {status}

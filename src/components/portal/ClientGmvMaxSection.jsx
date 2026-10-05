@@ -48,14 +48,14 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
         ? (has ? `linear-gradient(135deg, rgba(245, 213, 168, 0.10) 0%, rgba(245, 213, 168, 0.03) 100%)` : 'rgba(245, 213, 168, 0.04)')
         : (has ? `linear-gradient(135deg, ${tint}10 0%, ${tint}03 100%)` : 'var(--surface-2)'),
       border: `1px solid ${dark ? WURX.borderSoft : (has ? tint + '22' : 'var(--border)')}`,
-      borderRadius: 14, padding: '14px 16px',
+      borderRadius: 'var(--radius-lg)', padding: '14px 16px',
       position: 'relative', overflow: 'hidden',
       backdropFilter: dark ? 'blur(10px) saturate(1.05)' : 'none',
       transition: 'transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 6,
+          width: 28, height: 28, borderRadius: 'var(--radius-sm)',
           background: dark ? 'rgba(245, 213, 168, 0.15)' : (has ? tint + '1f' : 'var(--surface-3, #e2e8f0)'),
           color: dark ? WURX.peach : (has ? tint : 'var(--text-muted)'),
           display: 'grid', placeItems: 'center', fontSize: 13,
@@ -66,7 +66,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
             fontSize: 9.5, fontWeight: 700,
             color: dark ? WURX.peach : (has ? tint : 'var(--text-muted)'),
             background: dark ? 'rgba(245, 213, 168, 0.12)' : (has ? tint + '15' : 'var(--surface-2)'),
-            padding: '2px 8px', borderRadius: 999,
+            padding: '2px 8px', borderRadius: 'var(--radius-pill)',
             letterSpacing: '0.06em', textTransform: 'uppercase',
           }}>{field.suffix}</span>
         )}
@@ -86,7 +86,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
       {delta && (
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8,
-          padding: '3px 10px', borderRadius: 999,
+          padding: '3px 10px', borderRadius: 'var(--radius-pill)',
           background: delta.up ? (dark ? 'rgba(34, 197, 94, 0.22)' : '#dcfce7') : (dark ? 'rgba(239, 68, 68, 0.22)' : '#fef2f2'),
           color: delta.up ? (dark ? '#86efac' : 'var(--success-text)') : (dark ? '#fca5a5' : 'var(--danger-text)'),
           fontSize: 10.5, fontWeight: 700,
@@ -109,7 +109,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
            radial-gradient(circle at 80% 100%, rgba(212, 165, 116, 0.12), transparent 55%),
            linear-gradient(135deg, ${WURX.bgDeep} 0%, ${WURX.bgRich} 50%, ${WURX.bgWarm} 100%)`
         : `linear-gradient(135deg, #ffffff 0%, ${WURX.lightTintBg} 100%)`,
-      borderRadius: 22, padding: 24, position: 'relative', overflow: 'hidden',
+      borderRadius: 'var(--radius-xl)', padding: 24, position: 'relative', overflow: 'hidden',
       boxShadow: isPrimary
         ? `0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px ${WURX.border}, inset 0 1px 0 rgba(245, 213, 168, 0.08)`
         : `0 6px 18px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)`,
@@ -131,7 +131,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
         </div>
         {prevReport && report && (
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 999, padding: '4px 10px',
+            display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 'var(--radius-pill)', padding: '4px 10px',
             background: isPrimary ? 'rgba(245, 213, 168, 0.15)' : '#fef3e2',
             color: isPrimary ? WURX.peach : 'var(--warning-text)',
             fontSize: 10, fontWeight: 700,
@@ -168,7 +168,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
 
       {report?.notes && (
         <div style={{
-          marginTop: 14, padding: 12, borderRadius: 12,
+          marginTop: 14, padding: 12, borderRadius: 'var(--radius-md)',
           background: isPrimary ? 'rgba(245, 213, 168, 0.06)' : `linear-gradient(135deg, #ffffff, ${WURX.lightTintBg})`,
           border: isPrimary ? `1px solid ${WURX.borderSoft}` : `1px solid ${WURX.lightTintBorder}`,
           backdropFilter: 'blur(8px)', position: 'relative',
@@ -187,7 +187,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
 function MetaPill({ label, value, dark }) {
   return (
     <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 999,
+      display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 'var(--radius-pill)',
       background: dark ? 'rgba(245, 213, 168, 0.10)' : '#fdf8f0',
       color: dark ? WURX.peach : WURX.peachDeep,
       border: dark ? `1px solid ${WURX.borderSoft}` : `1px solid ${WURX.lightTintBorder}`,
@@ -212,7 +212,7 @@ function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
            radial-gradient(circle at 75% 100%, rgba(212, 165, 116, 0.14), transparent 55%),
            linear-gradient(135deg, ${WURX.bgDeep} 0%, ${WURX.bgRich} 50%, ${WURX.bgWarm} 100%)`
         : `linear-gradient(135deg, #ffffff 0%, ${WURX.lightTintBg} 100%)`,
-      borderRadius: 22, padding: 24, position: 'relative', overflow: 'hidden',
+      borderRadius: 'var(--radius-xl)', padding: 24, position: 'relative', overflow: 'hidden',
       boxShadow: isActive
         ? `0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px ${WURX.border}, inset 0 1px 0 rgba(245, 213, 168, 0.08)`
         : `0 6px 18px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04)`,
@@ -237,7 +237,7 @@ function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
             </div>
           </div>
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999,
+            display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 'var(--radius-pill)',
             background: dark ? `linear-gradient(135deg, ${WURX.peach}, ${WURX.peachDeep})` : st.bg,
             color: dark ? '#1f1714' : st.color,
             padding: '6px 16px', fontSize: 11, fontWeight: 700,
@@ -269,7 +269,7 @@ function CampaignCard({ campaign, prevCampaign, currency = 'USD' }) {
 
       {campaign.notes && (
         <div style={{
-          marginTop: 14, padding: 12, borderRadius: 12,
+          marginTop: 14, padding: 12, borderRadius: 'var(--radius-md)',
           background: dark ? 'rgba(245, 213, 168, 0.06)' : `linear-gradient(135deg, #ffffff, ${WURX.lightTintBg})`,
           border: dark ? `1px solid ${WURX.borderSoft}` : `1px solid ${WURX.lightTintBorder}`,
         }}>
@@ -313,12 +313,12 @@ function BrandBlock({ brand, allReports, year, monthIdx, view }) {
     <div style={{ marginBottom: 36 }}>
       {/* Brand header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, padding: 14, borderRadius: 12,
+        display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, padding: 14, borderRadius: 'var(--radius-md)',
         background: `linear-gradient(135deg, ${WURX.lightTintBg}, #ffffff)`,
         border: `1px solid ${WURX.lightTintBorder}`,
       }}>
         <div style={{
-          width: 48, height: 48, borderRadius: 10,
+          width: 48, height: 48, borderRadius: 'var(--radius-md)',
           background: `linear-gradient(135deg, ${WURX.peach}, ${WURX.peachDeep})`,
           color: '#1f1714', display: 'grid', placeItems: 'center',
           fontSize: 14, fontWeight: 800,
@@ -350,7 +350,7 @@ function BrandBlock({ brand, allReports, year, monthIdx, view }) {
 
       {view === 'campaigns' && (
         sortedCampaigns.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '36px 16px', borderRadius: 14, background: 'var(--surface-2)', border: '2px dashed var(--border)' }}>
+          <div style={{ textAlign: 'center', padding: '36px 16px', borderRadius: 'var(--radius-lg)', background: 'var(--surface-2)', border: '2px dashed var(--border)' }}>
             <div style={{
               width: 56, height: 56, borderRadius: '50%',
               background: 'var(--surface-2)', color: 'var(--text-muted)',
@@ -411,7 +411,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
         background: `radial-gradient(circle at 15% 20%, rgba(245, 213, 168, 0.16), transparent 45%),
                      radial-gradient(circle at 85% 100%, rgba(212, 165, 116, 0.10), transparent 50%),
                      linear-gradient(135deg, ${WURX.bgDarkest} 0%, ${WURX.bgDeep} 50%, ${WURX.bgWarm} 100%)`,
-        borderRadius: 22, padding: '22px 26px', marginBottom: 22,
+        borderRadius: 'var(--radius-xl)', padding: '22px 26px', marginBottom: 22,
         position: 'relative', overflow: 'hidden',
         boxShadow: `0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px ${WURX.border}`,
       }}>
@@ -421,7 +421,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 52, height: 52, borderRadius: 14,
+              width: 52, height: 52, borderRadius: 'var(--radius-lg)',
               background: `linear-gradient(135deg, ${WURX.peach}, ${WURX.peachDeep})`,
               display: 'grid', placeItems: 'center', fontSize: 22,
               boxShadow: `0 6px 20px ${WURX.glow}, inset 0 1px 0 rgba(255,255,255,0.25)`,
@@ -435,7 +435,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
                     fontSize: 10, fontWeight: 700,
                     background: `linear-gradient(135deg, ${WURX.peach}, ${WURX.peachDeep})`,
                     color: '#1f1714',
-                    padding: '4px 12px', borderRadius: 999,
+                    padding: '4px 12px', borderRadius: 'var(--radius-pill)',
                     letterSpacing: '0.1em',
                     boxShadow: `0 4px 12px ${WURX.glow}`,
                   }}>LIVE</span>
@@ -463,7 +463,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
             {!isCurrent && (
               <button onClick={goToCurrent} style={{
                 background: `linear-gradient(135deg, ${WURX.peach}, ${WURX.peachDeep})`,
-                color: '#1f1714', border: 'none', borderRadius: 10,
+                color: '#1f1714', border: 'none', borderRadius: 'var(--radius-md)',
                 padding: '7px 16px', fontSize: 12, fontWeight: 700,
                 boxShadow: `0 4px 14px ${WURX.glow}`, cursor: 'pointer',
               }}>↺ Today</button>
@@ -475,7 +475,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
       {/* Tab toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <div style={{
-          display: 'flex', padding: 4, borderRadius: 12,
+          display: 'flex', padding: 4, borderRadius: 'var(--radius-md)',
           background: WURX.lightTintBg, border: `1px solid ${WURX.lightTintBorder}`,
           boxShadow: 'inset 0 1px 2px rgba(31, 23, 20, 0.04)',
         }}>
@@ -489,7 +489,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
                 style={{
                   background: isActive ? `linear-gradient(135deg, ${WURX.bgDeep}, ${WURX.bgWarm})` : 'transparent',
                   color: isActive ? WURX.peach : '#75584a',
-                  border: 'none', borderRadius: 10,
+                  border: 'none', borderRadius: 'var(--radius-md)',
                   padding: '8px 18px', fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em',
                   boxShadow: isActive ? `0 4px 14px rgba(0,0,0,0.25), 0 0 0 1px ${WURX.borderSoft}` : 'none',
                   transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)', cursor: 'pointer',
@@ -511,7 +511,7 @@ export default function ClientGmvMaxSection({ gmv = [], brands = [] }) {
           textAlign: 'center',
           background: `linear-gradient(135deg, #ffffff, ${WURX.lightTintBg})`,
           border: `2px dashed ${WURX.lightTintBorder}`,
-          borderRadius: 22, padding: '52px 24px',
+          borderRadius: 'var(--radius-xl)', padding: '52px 24px',
         }}>
           <div style={{
             width: 84, height: 84, borderRadius: '50%',
@@ -538,7 +538,7 @@ const navSelect = {
   background: 'rgba(245, 213, 168, 0.08)',
   color: WURX.cream,
   border: `1px solid ${WURX.borderSoft}`,
-  borderRadius: 10,
+  borderRadius: 'var(--radius-md)',
   padding: '7px 12px',
   fontSize: 13,
   fontWeight: 600,
@@ -549,7 +549,7 @@ function NavBtn({ onClick, children }) {
   return (
     <button onClick={onClick} style={{
       background: 'rgba(245, 213, 168, 0.08)', color: WURX.peach,
-      border: `1px solid ${WURX.borderSoft}`, borderRadius: 10,
+      border: `1px solid ${WURX.borderSoft}`, borderRadius: 'var(--radius-md)',
       width: 36, height: 36, display: 'grid', placeItems: 'center',
       cursor: 'pointer', fontSize: 16,
     }}>{children}</button>

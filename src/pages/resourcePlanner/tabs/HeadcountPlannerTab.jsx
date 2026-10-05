@@ -33,7 +33,7 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
   return (
     <>
       {/* Part A: Planning horizon control */}
-      <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', marginBottom: 14 }}>
+      <div style={{ padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', marginBottom: 14 }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Planning horizon</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
           You're planning for the next <strong>{horizonLabel}</strong>. Expected pipeline:{' '}
@@ -88,7 +88,7 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
       </div>
 
       {/* Part B: Required headcount by dept */}
-      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)', marginBottom: 14 }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)', marginBottom: 14 }}>
         <div style={{ padding: 14, borderBottom: '1px solid var(--border-subtle)' }}>
           <strong>Required headcount by department</strong>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
@@ -135,7 +135,7 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
       </div>
 
       {/* Part C: Monthly outlook */}
-      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
         <div style={{ padding: 14, borderBottom: '1px solid var(--border-subtle)' }}>
           <strong>Monthly outlook — next 12 months</strong>
         </div>
@@ -165,7 +165,7 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
                     <td>
                       <span style={{ fontWeight: 600 }}>M+{r.monthOffset}</span>{' '}
                       <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>· {r.monthLabel}</span>
-                      {isHorizon && <span style={{ marginLeft: 8, padding: '1px 8px', background: 'var(--info-soft)', color: 'var(--info-text)', borderRadius: 999, fontSize: 11, fontWeight: 600 }}>Horizon</span>}
+                      {isHorizon && <span style={{ marginLeft: 8, padding: '1px 8px', background: 'var(--info-soft)', color: 'var(--info-text)', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 600 }}>Horizon</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>{r.newBrandsCumulative}</td>
                     <td style={{ textAlign: 'right' }}>{r.projectedBrands}</td>
@@ -190,7 +190,7 @@ export default function HeadcountPlannerTab({ config, employees, brands, onConfi
 
 function Pill({ label, value, tone }) {
   return (
-    <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+    <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
       <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: tone || 'var(--text-primary)', marginTop: 2 }}>{value}</div>
     </div>
@@ -200,21 +200,21 @@ function Pill({ label, value, tone }) {
 function PriorityBadge({ priority, label }) {
   if (priority === 'urgent') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <AlertIcon width="12" height="12" /> {label}
       </span>
     );
   }
   if (priority === 'soon') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: 12, fontWeight: 600 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: 'var(--warning-soft)', color: 'var(--warning-text)', fontSize: 12, fontWeight: 600 }}>
         {label}
       </span>
     );
   }
   if (priority === 'ok') {
     return (
-      <span style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <CheckIcon width="12" height="12" /> {label}
       </span>
     );

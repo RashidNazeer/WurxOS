@@ -158,7 +158,7 @@ function makeConfetti() {
     transform: `rotate(${Math.random() * 360}deg)`,
     width: `${5 + Math.random() * 5}px`,
     height: `${9 + Math.random() * 8}px`,
-    borderRadius: Math.random() > 0.7 ? '50%' : '2px',
+    borderRadius: Math.random() > 0.7 ? '50%' : 'var(--radius-xs)',
   }));
 }
 

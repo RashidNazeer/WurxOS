@@ -108,7 +108,7 @@ export default class RouteErrorBoundary extends React.Component {
         background: 'var(--surface-1)',
         color: 'var(--text-primary)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-xl)',
         overflow: 'hidden',
       }}>
@@ -137,7 +137,7 @@ export default class RouteErrorBoundary extends React.Component {
           <div style={{
             background: 'var(--surface-2)',
             border: '1px solid var(--border-subtle)',
-            borderRadius: 10, padding: 10, fontSize: 12, marginBottom: 12,
+            borderRadius: 'var(--radius-md)', padding: 10, fontSize: 12, marginBottom: 12,
             maxHeight: 180, overflow: 'auto',
           }}>
             <div style={{ fontWeight: 700, color: 'var(--danger, var(--danger-text))' }}>
@@ -151,7 +151,7 @@ export default class RouteErrorBoundary extends React.Component {
               width: '100%', minHeight: 80, maxHeight: 140,
               fontSize: 11,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              padding: 8, borderRadius: 8,
+              padding: 8, borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)',
               background: 'var(--surface-2)',
               color: 'var(--text-primary)',
@@ -166,7 +166,7 @@ export default class RouteErrorBoundary extends React.Component {
                 flex: 1, minWidth: 140,
                 background: copied ? 'var(--success)' : 'var(--accent)',
                 color: copied ? 'var(--on-success)' : 'var(--on-accent)', border: 'none',
-                padding: '10px 14px', borderRadius: 10,
+                padding: '10px 14px', borderRadius: 'var(--radius-md)',
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 justifyContent: 'center', transition: 'background-color var(--dur-fast) var(--ease-out)',
@@ -181,7 +181,7 @@ export default class RouteErrorBoundary extends React.Component {
                 background: 'var(--surface-2)',
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border-subtle)',
-                padding: '10px 14px', borderRadius: 10,
+                padding: '10px 14px', borderRadius: 'var(--radius-md)',
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
               }}>
               Try again
@@ -193,7 +193,7 @@ export default class RouteErrorBoundary extends React.Component {
                 background: 'var(--surface-2)',
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border-subtle)',
-                padding: '10px 14px', borderRadius: 10,
+                padding: '10px 14px', borderRadius: 'var(--radius-md)',
                 fontWeight: 600, fontSize: 13, cursor: 'pointer',
               }}>
               Reload

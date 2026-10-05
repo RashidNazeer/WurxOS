@@ -19,7 +19,7 @@ export default function ToolbarSelect({ allLabel, value, onChange, options = [],
     <select className="form-select form-select-sm" value={value} title={title}
       onChange={(e) => onChange(e.target.value)}
       style={{
-        width: 'auto', minWidth: 128, borderRadius: 8, fontSize: '0.78rem', fontWeight: 500,
+        width: 'auto', minWidth: 128, borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: 500,
         border: `1px solid ${active ? 'var(--info)' : 'var(--border-default)'}`,
         background: active ? 'var(--info-soft)' : 'var(--surface-1)',
         color: active ? 'var(--info)' : 'var(--text-secondary)',

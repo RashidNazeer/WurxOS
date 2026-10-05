@@ -1,11 +1,11 @@
 /* ============================================================
-   App Shell — sidebar, topbar, content
+   App Shell â€” sidebar, topbar, content
    All colors reference tokens. Works cleanly in both themes.
    ============================================================ */
 
 .shell {
   display: grid;
-  /* minmax(0, …) — NOT a bare 1fr. A 1fr track = minmax(auto, 1fr), whose
+  /* minmax(0, â€¦) â€” NOT a bare 1fr. A 1fr track = minmax(auto, 1fr), whose
      `auto` minimum is the content's intrinsic width, so a wide child (e.g. the
      report period strip's card row) forces the whole content column past the
      viewport and scrolls the ENTIRE page sideways. Pinning the min to 0 lets
@@ -40,15 +40,71 @@
 }
 .shell[data-collapsed='true'] { --sidebar-w: 68px; }
 
+/* Fills for controls that sit ON glass (icon buttons, search field, hover and
+   active rows). A solid surface-1 button in a translucent bar is the "opaque
+   middle" that makes a pane read as a glass border around a flat card; these
+   keep the control legible but let the pane show through. Defined on :root
+   because the flyout and user menu are portaled outside .shell. Under the solid
+   fallbacks the pane is surface-1, so these resolve to ~the same flat colour. */
+:root {
+  --shell-fill:       color-mix(in srgb, var(--surface-1) 58%, transparent);
+  --shell-fill-hover: color-mix(in srgb, var(--surface-2) 78%, transparent);
+  --shell-fill-active: color-mix(in srgb, var(--accent-soft) 88%, transparent);
+}
+
+/* Ambient wash behind the chrome. The topbar has scrolling content to blur;
+   the sidebar column has NOTHING behind it, so a translucent pane there is a
+   tinted band over a flat canvas. These two fixed strips are the backdrop:
+   a soft accent glow confined to exactly the area under the sidebar and the
+   topbar, so it never tints page content or touches any text contrast. They
+   are static (no scroll or paint cost) and are removed with the solid
+   fallbacks. */
+.shell { isolation: isolate; }
+.shell::before,
+.shell::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.shell::before {
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-w, 240px);
+  background:
+    radial-gradient(140% 38% at 0% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%),
+    radial-gradient(140% 38% at 100% 100%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+  transition: width var(--dur-base) var(--ease-emphasized);
+}
+.shell::after {
+  left: var(--sidebar-w, 240px);
+  right: 0;
+  height: calc(var(--topbar-h) + 24px);
+  background:
+    radial-gradient(40% 120% at 12% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(34% 120% at 90% 100%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
+  transition: left var(--dur-base) var(--ease-emphasized);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .shell::before, .shell::after { display: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .shell::before, .shell::after { display: none; }
+}
+
 /* ---------- Sidebar ---------- */
-/* Glass tint only on desktop: nothing scrolls behind the sidebar column,
-   so a blur would cost GPU for no visible effect. The mobile drawer
-   (below) adds the blur because the page sits behind it. */
+/* Same construction as the topbar: the pane, filter and rim ring live on
+   .shell-sidebar::before (shared block in global.css; the host stays
+   transparent). It was a flat tint with no blur because nothing scrolls behind
+   the column; the ambient strip above is now its backdrop, so the blur has
+   something to work on and the sidebar reads as the same sheet of glass as the
+   topbar. Ring width is -xs, identical to the topbar, so the two share one
+   edge treatment along their common line. */
 .shell-sidebar {
   grid-area: sidebar;
-  background: var(--glass-bg);
+  background: transparent;
   border-right: 1px solid var(--glass-border);
-  box-shadow: var(--glass-highlight);
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -62,6 +118,15 @@
   overflow: hidden;
   z-index: var(--z-sticky);
 }
+.shell .shell-sidebar::before {
+  display: block;
+  --wx-rim: var(--glass-rim-w-xs);
+  --wx-pane: var(--glass-bg);
+  /* No filter: the only thing behind the desktop sidebar is the static ambient
+     wash, and blurring something that never moves changes nothing on screen
+     while costing a full-height filter pass. The tint alone carries it. */
+  --wx-filter: none;
+}
 /* Height comes from --topbar-h and the vertical padding is zero, so this
    border and the topbar's bottom border land on the same y. Previously
    18px padding + a 34px brand mark made it 70px against the topbar's 68. */
@@ -71,7 +136,9 @@
   gap: 10px;
   flex: 0 0 auto;
   padding: 0 var(--space-3) 0 var(--sidebar-pad);
-  border-bottom: 1px solid var(--border-subtle);
+  /* Same colour as the topbar's bottom border so the two read as one line
+     through the glass (border-subtle is a different tone). */
+  border-bottom: 1px solid var(--glass-border);
   height: var(--topbar-h);
 }
 .shell-sidebar-toggle {
@@ -83,13 +150,13 @@
   place-items: center;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  background: var(--surface-1);
+  background: var(--shell-fill);
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--t-colors), var(--t-press);
 }
 .shell-sidebar-toggle:hover {
-  background: var(--surface-2);
+  background: var(--shell-fill-hover);
   color: var(--text-primary);
   border-color: var(--border-strong);
 }
@@ -125,7 +192,7 @@
 }
 .shell-sidebar-header .brand-sub {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .shell-nav {
@@ -136,7 +203,7 @@
   flex-direction: column;
   gap: 2px;
   min-height: 0;
-  /* Hide the scrollbar — content still scrolls but no track shows. */
+  /* Hide the scrollbar â€” content still scrolls but no track shows. */
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -144,17 +211,17 @@
 
 /* ---------- Sidebar footer ----------
    Compact one-row strip pinned to the bottom of the sidebar:
-     [• WurxOS · v2]            [?]
-   No heavy divider or gradient — reads as a quiet status bar
+     [â€¢ WurxOS Â· v2]            [?]
+   No heavy divider or gradient â€” reads as a quiet status bar
    rather than a separate footer card. */
 .shell-sidebar-footer {
   margin-top: auto;
   flex-shrink: 0;
   padding: 10px 10px 12px;
-  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--glass-border) 60%, transparent);
 }
 
-/* Branded footer card — replaces the single-line status text with a
+/* Branded footer card â€” replaces the single-line status text with a
    small "made by Wurx Media" tile. Subtle accent gradient + logo
    thumbnail makes the bottom of the sidebar feel finished instead of
    trailing off into plain text. */
@@ -164,7 +231,7 @@
   gap: 10px;
   align-items: center;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background:
     linear-gradient(135deg,
       color-mix(in srgb, var(--accent) 9%, transparent),
@@ -175,7 +242,7 @@
 .shell-sidebar-footer-logo {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   display: grid;
@@ -199,7 +266,7 @@
   letter-spacing: -0.005em;
 }
 
-/* User mini card at the top of the footer — avatar + name + role.
+/* User mini card at the top of the footer â€” avatar + name + role.
    Subtle accent tint so it reads as a distinct "you" block without
    looking like a button. */
 .shell-sidebar-user {
@@ -208,8 +275,8 @@
   gap: 10px;
   align-items: center;
   padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  background: var(--shell-fill-hover);
 }
 .shell-sidebar-user-avatar {
   width: 34px; height: 34px;
@@ -236,7 +303,7 @@
 }
 .shell-sidebar-user-role {
   font-size: 10.5px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-top: 2px;
@@ -249,7 +316,7 @@
   place-items: center;
   border: 1px solid var(--border-subtle);
   background: var(--surface-1);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   border-radius: 50%;
   font-size: 12px;
   cursor: pointer;
@@ -268,7 +335,7 @@
   gap: 5px;
   font-size: 10.5px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   letter-spacing: 0.03em;
   margin-top: 2px;
   white-space: nowrap;
@@ -284,7 +351,7 @@
   flex: 0 0 auto;
 }
 
-/* Collapsed sidebar — show just the logo tile, hide text */
+/* Collapsed sidebar â€” show just the logo tile, hide text */
 .shell[data-collapsed='true'] .shell-sidebar-footer-card {
   grid-template-columns: 1fr;
   padding: 6px;
@@ -306,7 +373,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   padding: 14px 10px 6px;
 }
 
@@ -343,21 +410,21 @@
 }
 .shell-nav-link:hover,
 .shell-nav-toggle:hover {
-  background: var(--surface-2);
+  background: var(--shell-fill-hover);
   color: var(--text-primary);
 }
 .shell-nav-link.active {
-  background: var(--accent-soft);
+  background: var(--shell-fill-active);
   color: var(--accent-text);
   font-weight: 600;
 }
 /* Collapsed rail: the group whose child is the current page */
 .shell-nav-toggle.is-active {
-  background: var(--accent-soft);
+  background: var(--shell-fill-active);
   color: var(--accent-text);
 }
 .shell-nav-toggle.is-open {
-  background: var(--surface-2);
+  background: var(--shell-fill-hover);
   color: var(--text-primary);
 }
 
@@ -417,7 +484,7 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
   font-size: 11px;
@@ -478,7 +545,7 @@
   opacity: 0;
 }
 
-/* v1-parity menu search — sits between the brand header and the
+/* v1-parity menu search â€” sits between the brand header and the
    nav list. Hidden when the sidebar is collapsed. */
 .shell-sidebar-search {
   position: relative;
@@ -492,14 +559,14 @@
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   pointer-events: none;
 }
 .shell-sidebar-search-input {
   width: 100%;
   padding: 7px 28px 7px 30px;
   font-size: 12.5px;
-  background: var(--surface-2);
+  background: var(--shell-fill);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-primary);
@@ -513,7 +580,7 @@
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
 .shell-sidebar-search-input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .shell-sidebar-search-clear {
   position: absolute;
@@ -525,10 +592,10 @@
   justify-content: center;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .shell-sidebar-search-clear:hover {
   color: var(--text-primary);
@@ -538,7 +605,7 @@
 .shell-nav-empty {
   padding: 14px 12px;
   font-size: 12.5px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -558,7 +625,7 @@
 
 /* Collapsed rail: the brand mark is the only thing in the header, centred.
    The collapse control lives in the topbar (see .shell-collapse-btn), so the
-   header no longer has to stack two buttons and keeps the shared height —
+   header no longer has to stack two buttons and keeps the shared height â€”
    stacking them used to make it 96px against the topbar's 68. */
 .shell[data-collapsed='true'] .shell-sidebar-header {
   padding: 0;
@@ -578,7 +645,7 @@
      safe-area-inset, so desktop is unaffected. */
   padding-top: max(12px, env(safe-area-inset-top));
   /* Sticky glass: page content scrolls under it. The pane, its filter and the
-     rim ring all live on .shell-topbar::before (shared block in global.css) —
+     rim ring all live on .shell-topbar::before (shared block in global.css) â€”
      a 68px bar with 12px padding has no content box to give a ring border, and
      keeping backdrop-filter off the element also keeps it from becoming the
      containing block for any fixed descendant. It uses --glass-filter-sticky,
@@ -607,7 +674,7 @@
 }
 .shell-topbar-subtitle {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* Topbar controls (icon buttons, theme toggle, bell, search, user pill,
@@ -619,12 +686,13 @@
   place-items: center;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
+  background: var(--shell-fill);
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--t-colors), var(--t-press);
 }
 .shell-icon-btn:hover {
+  background: var(--shell-fill-hover);
   color: var(--text-primary);
   border-color: var(--border-strong);
 }
@@ -638,11 +706,11 @@
   padding: 0 10px 0 3px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
+  background: var(--shell-fill);
   cursor: pointer;
   transition: var(--t-colors), var(--t-press);
 }
-.shell-user-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.shell-user-btn:hover { border-color: var(--border-strong); background: var(--shell-fill-hover); }
 .shell-user-avatar {
   width: calc(var(--control-h) - 8px);
   height: calc(var(--control-h) - 8px);
@@ -659,11 +727,11 @@
 }
 .shell-user-meta { text-align: left; line-height: 1.15; }
 .shell-user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.shell-user-role { font-size: 11px; color: var(--text-muted); }
+.shell-user-role { font-size: 11px; color: var(--text-secondary); }
 
-/* User dropdown — portaled to <body> (Topbar.jsx) so it escapes the topbar's
+/* User dropdown â€” portaled to <body> (Topbar.jsx) so it escapes the topbar's
    stacking context and always paints above sticky page toolbars
-   (.ck-topbar, reports header, …). `top`/`right` are set inline from the
+   (.ck-topbar, reports header, â€¦). `top`/`right` are set inline from the
    trigger's measured rect; position is fixed to the viewport. */
 .shell-user-menu {
   position: fixed;
@@ -693,7 +761,7 @@
   width: 100%;
   text-align: left;
 }
-.shell-user-menu-item:hover { background: var(--surface-2); }
+.shell-user-menu-item:hover { background: var(--shell-fill-hover); }
 .shell-user-menu-item.danger { color: var(--danger-text); }
 .shell-user-menu-item.danger:hover { background: var(--danger-soft); }
 .shell-user-menu-divider {
@@ -705,19 +773,19 @@
 /* ---------- Content ---------- */
 .shell-content {
   grid-area: content;
-  /* Same gutter as the topbar — the page title sits directly under the
+  /* Same gutter as the topbar â€” the page title sits directly under the
      topbar title, not 4px to its right. */
   padding: 24px var(--shell-gutter) 48px;
-  /* `clip` (not `hidden`) — contains horizontal overflow WITHOUT
+  /* `clip` (not `hidden`) â€” contains horizontal overflow WITHOUT
      turning this element into a scroll container. `overflow-x:
      hidden` would coerce overflow-y to `auto`, which makes every
      `position: sticky` header inside the page stick relative to
-     this box instead of the viewport — so they'd scroll away. */
+     this box instead of the viewport â€” so they'd scroll away. */
   overflow-x: clip;
 }
 /* Programmatic focus target after flyout navigation (tabIndex=-1) */
 .shell-content:focus { outline: none; }
-/* Fill the available width — dashboards feel cramped with a 1200px
+/* Fill the available width â€” dashboards feel cramped with a 1200px
    cap on wide monitors. Pages can still self-constrain if they want. */
 .shell-content-inner { max-width: none; margin: 0; }
 
@@ -746,14 +814,14 @@
   justify-content: center;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--surface-1);
+  background: var(--shell-fill);
   color: var(--text-secondary);
   cursor: pointer;
   flex: 0 0 auto;
   transition: var(--t-colors), var(--t-press);
 }
 .shell-mobile-menu-btn:hover {
-  background: var(--surface-2);
+  background: var(--shell-fill-hover);
   color: var(--text-primary);
 }
 .shell-topbar-titles { min-width: 0; }
@@ -781,9 +849,7 @@
     /* Closing uses the exit timing; visibility drops the closed drawer's
        links out of the tab order once it has slid away (Audit S9). */
     visibility: hidden;
-    /* Pane, filter and rim ring are on .shell-sidebar::before (shared block in
-       global.css): the drawer is a fixed 260px, so a ring BORDER would push
-       every nav link inward, while a pane layer costs no layout. */
+    /* Pane, filter and rim ring: .shell-sidebar::before, as on desktop. */
     background: transparent;
     transition: transform var(--dur-exit) var(--ease-in),
                 visibility 0s linear var(--dur-exit);
@@ -801,7 +867,7 @@
     transition: transform var(--dur-enter) var(--ease-emphasized), visibility 0s;
   }
   /* Force the drawer to render in EXPANDED mode regardless of the
-     desktop `collapsed` preference — an icons-only rail makes no sense
+     desktop `collapsed` preference â€” an icons-only rail makes no sense
      for a slide-in drawer and was the source of the "menu broken when
      I tap it again" bug (the toggle button collapsed the drawer in
      place instead of closing it). */
@@ -842,9 +908,15 @@
     transition: opacity var(--dur-enter) var(--ease-out), visibility 0s;
   }
   .shell-content { padding: 20px var(--shell-gutter) 40px; }
+  /* The drawer floats over live page content, so its nav labels sit on the
+     text scrim (desktop doesn't: its backdrop is the ambient wash). The sidebar
+     column strip has no meaning here; the topbar strip spans the full width. */
+  .shell-nav { background: var(--glass-text-scrim); }
+  .shell::before { display: none; }
+  .shell::after { left: 0; }
 
   /* Show the hamburger; hide the desktop collapse control (no point on
-     mobile — the drawer is full-height, and its header carries a close X). */
+     mobile â€” the drawer is full-height, and its header carries a close X). */
   .shell-mobile-menu-btn { display: inline-flex; }
   .shell-collapse-btn { display: none; }
 
@@ -893,7 +965,7 @@
   padding: 0 10px 0 11px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
+  background: var(--shell-fill);
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--t-colors), var(--t-press);
@@ -901,17 +973,18 @@
   min-width: 180px;
 }
 .global-search-trigger:hover {
+  background: var(--shell-fill-hover);
   border-color: var(--border-strong);
   color: var(--text-primary);
 }
-.global-search-label { flex: 1; text-align: left; color: var(--text-muted); }
+.global-search-label { flex: 1; text-align: left; color: var(--text-secondary); }
 .global-search-kbd {
   font-size: 10.5px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   padding: 1px 6px;
-  border-radius: 4px;
-  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
   font-family: ui-monospace, monospace;
 }
 .global-search-panel {
@@ -943,16 +1016,18 @@
 .global-search-clear {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 4px;
   border-radius: var(--radius-sm);
 }
-.global-search-clear:hover { background: var(--surface-2); color: var(--text-primary); }
-.global-search-body { overflow-y: auto; padding: 6px; flex: 1; min-height: 0; }
+.global-search-clear:hover { background: var(--shell-fill-hover); color: var(--text-primary); }
+/* Results are the text-dense part of the panel, so they sit on the scrim; the
+   input row above stays on bare glass. */
+.global-search-body { overflow-y: auto; padding: 6px; flex: 1; min-height: 0; background: var(--glass-text-scrim); }
 .global-search-hint {
   padding: 22px 14px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 13px;
   text-align: center;
 }
@@ -966,7 +1041,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .global-search-item {
   display: block;
@@ -981,7 +1056,7 @@
   transition: background-color var(--dur-fast) var(--ease-out);
 }
 .global-search-item:hover,
-.global-search-item.is-active { background: var(--surface-2); }
+.global-search-item.is-active { background: var(--shell-fill-hover); }
 .global-search-item.is-active { box-shadow: inset 2px 0 0 var(--accent); }
 
 /* Glass for the notification panel + toasts (structure lives in
@@ -1040,7 +1115,7 @@ html .notif-toast-ghost {
 }
 
 /* ---------- Mobile bottom tab bar (F5) ----------
-   4 role tabs + More, ≤860px only. BottomTabBar toggles html.has-bottom-bar
+   4 role tabs + More, â‰¤860px only. BottomTabBar toggles html.has-bottom-bar
    while it's shown; other fixed UI lifts by --bottom-bar-h. */
 .shell-bottom-bar { display: none; }
 @media (max-width: 860px) {
@@ -1056,7 +1131,7 @@ html .notif-toast-ghost {
     height: calc(56px + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
     /* Pane, filter and rim ring are on .shell-bottom-bar::before (shared block
-       in global.css) — same sticky dial as the topbar, since this one is also
+       in global.css) â€” same sticky dial as the topbar, since this one is also
        always on screen while lists scroll under it. */
     border-top: 1px solid var(--glass-border);
   }
@@ -1070,7 +1145,7 @@ html .notif-toast-ghost {
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 11px;
     font-weight: 600;
     text-decoration: none;

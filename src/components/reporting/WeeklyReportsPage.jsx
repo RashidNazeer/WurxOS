@@ -357,21 +357,21 @@ export default function WeeklyReportsPage() {
             <StatusBadge status={rStatus} />
             {canEdit && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                 onClick={() => handleEdit(detailReport.id)}>
                 <i className="bi bi-pencil" /> Edit
               </button>
             )}
             {canVerify && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerify(detailReport)}>
                 <i className="bi bi-patch-check-fill" /> Verify
               </button>
             )}
             {canReject && (
               <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                 onClick={() => handleRejectToAPC(detailReport)}>
                 <i className="bi bi-arrow-counterclockwise" /> Return to APC
               </button>
@@ -388,7 +388,7 @@ export default function WeeklyReportsPage() {
         />
         {detailReport.rejectionNote && rStatus === 'draft' && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -438,13 +438,13 @@ export default function WeeklyReportsPage() {
             </div>
           </div>
           <button className="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10 }} onClick={() => setView('new')}>
+            style={{ borderRadius: 'var(--radius-md)' }} onClick={() => setView('new')}>
             <i className="bi bi-plus-circle" /> New Report
           </button>
         </div>
 
         {/* Month picker */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-2">
               <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={prevMonth} style={{ width: 32, height: 32, padding: 0 }}>
@@ -456,23 +456,23 @@ export default function WeeklyReportsPage() {
               <button className="btn btn-sm btn-outline-secondary border-0 rounded-circle" onClick={nextMonth} style={{ width: 32, height: 32, padding: 0 }}>
                 <i className="bi bi-chevron-right" style={{ fontSize: '0.8rem' }} />
               </button>
-              <button className="btn btn-sm btn-outline-secondary ms-1" style={{ borderRadius: 8, fontSize: '0.72rem' }}
+              <button className="btn btn-sm btn-outline-secondary ms-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                 onClick={() => { setCalYear(now.getFullYear()); setCalMonth(now.getMonth()); setFilterWeek(''); }}>Today</button>
             </div>
             <div className="d-flex align-items-center gap-2">
               <select className="form-select form-select-sm" value={brandSortBy} onChange={e => setBrandSortBy(e.target.value)}
-                style={{ width: 150, borderRadius: 8 }} title="Sort reports">
+                style={{ width: 150, borderRadius: 'var(--radius-sm)' }} title="Sort reports">
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
                 <option value="gmv_desc">GMV: high → low</option>
                 <option value="gmv_asc">GMV: low → high</option>
               </select>
-              <select className="form-select form-select-sm" value={filterWeek} onChange={e => setFilterWeek(e.target.value)} style={{ width: 160, borderRadius: 8 }}>
+              <select className="form-select form-select-sm" value={filterWeek} onChange={e => setFilterWeek(e.target.value)} style={{ width: 160, borderRadius: 'var(--radius-sm)' }}>
                 <option value="">All Weeks ({filteredReports.length})</option>
                 {calWeeks.map(w => <option key={w.week} value={String(w.week)}>Week {w.week}</option>)}
               </select>
               {filterWeek && (
-                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={() => setFilterWeek('')}>
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={() => setFilterWeek('')}>
                   <i className="bi bi-x-circle" /> Clear
                 </button>
               )}
@@ -481,7 +481,7 @@ export default function WeeklyReportsPage() {
         </div>
 
         {/* Calendar week grid */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14 }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)' }}>
           <div className="card-body p-3">
             <div className="row g-2">
               {calWeeks.map(w => {
@@ -544,7 +544,7 @@ export default function WeeklyReportsPage() {
                 : changeDir > 0 ? 'var(--success)' : changeDir < 0 ? 'var(--danger)' : 'var(--text-secondary)';
               return (
                 <div key={r.id} className="col-12 col-md-6 col-lg-4">
-                  <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
+                  <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                     onClick={() => handleViewReport(r)}
                     onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                     onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -620,7 +620,7 @@ export default function WeeklyReportsPage() {
           <p className="text-muted small mb-0">Overview of your brands and report submission status</p>
         </div>
         <button className="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 10 }} onClick={() => setView('new')}>
+          style={{ borderRadius: 'var(--radius-md)' }} onClick={() => setView('new')}>
           <i className="bi bi-plus-circle" /> New Report
         </button>
       </div>
@@ -628,7 +628,7 @@ export default function WeeklyReportsPage() {
       {/* Stats cards */}
       <div className="row g-3 mb-4">
         <div className="col-6 col-lg-3">
-          <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+          <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--info-soft)' }}>
                 <i className="bi bi-shop" style={{ color: 'var(--info)' }} />
@@ -641,7 +641,7 @@ export default function WeeklyReportsPage() {
           </div>
         </div>
         <div className="col-6 col-lg-3">
-          <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+          <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--success-soft)' }}>
                 <i className="bi bi-check-circle-fill" style={{ color: 'var(--success)' }} />
@@ -654,7 +654,7 @@ export default function WeeklyReportsPage() {
           </div>
         </div>
         <div className="col-6 col-lg-3">
-          <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+          <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
             <div className="card-body p-3 d-flex align-items-center gap-2">
               <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--warning-soft)' }}>
                 <i className="bi bi-clock-fill" style={{ color: 'var(--warning)' }} />
@@ -668,7 +668,7 @@ export default function WeeklyReportsPage() {
         </div>
         {userRole === 'tl' ? (
           <div className="col-6 col-lg-3">
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer' }}
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
               onClick={() => setOverviewFilter(f => f === 'needs_review' ? '' : 'needs_review')}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'color-mix(in srgb, var(--purple) 18%, transparent)' }}>
@@ -683,7 +683,7 @@ export default function WeeklyReportsPage() {
           </div>
         ) : (
           <div className="col-6 col-lg-3">
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
               <div className="card-body p-3 d-flex align-items-center gap-2">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 36, height: 36, background: 'var(--danger-soft)' }}>
                   <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--danger)' }} />
@@ -699,14 +699,14 @@ export default function WeeklyReportsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3 d-flex flex-wrap gap-2 align-items-center">
           <div className="position-relative" style={{ flex: '1 1 200px', minWidth: 160 }}>
             <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search brands…"
-              style={{ paddingLeft: 28, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+              style={{ paddingLeft: 28, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select className="form-select form-select-sm" value={overviewFilter} onChange={e => setOverviewFilter(e.target.value)} style={{ width: 220, borderRadius: 8 }}>
+          <select className="form-select form-select-sm" value={overviewFilter} onChange={e => setOverviewFilter(e.target.value)} style={{ width: 220, borderRadius: 'var(--radius-sm)' }}>
             <option value="">All Brands</option>
             <option value="submitted">Submitted This Week</option>
             <option value="pending">Pending / Draft</option>
@@ -715,7 +715,7 @@ export default function WeeklyReportsPage() {
           {clientOptions.length > 0 && (
             <select className="form-select form-select-sm" value={filterClient}
               onChange={(e) => setFilterClient(e.target.value)}
-              style={{ width: 200, borderRadius: 8 }}
+              style={{ width: 200, borderRadius: 'var(--radius-sm)' }}
               title="Filter brands by client">
               <option value="">All Clients</option>
               {clientOptions.map((c) => (
@@ -741,7 +741,7 @@ export default function WeeklyReportsPage() {
             const latestPerf = s.latest?.overallPerformance || {};
             return (
               <div key={b.id} className="col-12 col-md-6 col-lg-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, cursor: 'pointer', overflow: 'hidden', transition: 'transform var(--dur-fast) var(--ease-out)' }}
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer', overflow: 'hidden', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                   onClick={() => openBrand(b.id)}
                   onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                   onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -802,7 +802,7 @@ export default function WeeklyReportsPage() {
                     )}
 
                     <button className="btn btn-sm btn-outline-dark w-100 d-inline-flex align-items-center justify-content-center gap-1"
-                      style={{ borderRadius: 8, fontSize: '0.72rem' }}>
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}>
                       <i className="bi bi-bar-chart-line" /> View Reports
                     </button>
                   </div>

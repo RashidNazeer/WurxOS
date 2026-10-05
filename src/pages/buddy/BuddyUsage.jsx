@@ -151,11 +151,11 @@ function DailyChart({ days }) {
           <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => fmtUsd(v)} />
           <Tooltip
             cursor={{ fill: 'var(--accent-soft)' }}
-            contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--border-default)', borderRadius: 8, fontSize: 12, color: 'var(--chart-tooltip-fg)' }}
+            contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--chart-tooltip-fg)' }}
             labelFormatter={(_l, p) => p?.[0]?.payload?.date || ''}
             formatter={(v, _n, p) => [`${fmtUsd(v)} · ${fmtCount(p?.payload?.questions)} questions`, 'Cost']}
           />
-          <Bar dataKey="cost" fill="var(--accent)" radius={[3, 3, 0, 0]} maxBarSize={22}
+          <Bar dataKey="cost" fill="var(--accent)" radius={[4, 4, 0, 0]} maxBarSize={22}
             animationDuration={400} animationEasing="ease-out"
             isAnimationActive={!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches} />
         </BarChart>

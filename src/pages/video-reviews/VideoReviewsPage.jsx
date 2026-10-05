@@ -67,7 +67,7 @@ function Step({ n, title, hint, children }) {
 
 const SHELL_CSS = `
   .vrx-shell { display: grid; grid-template-columns: minmax(330px, 400px) 1fr; min-height: calc(100vh - 150px);
-    border: 1px solid var(--border-subtle); border-radius: 18px; overflow: hidden; background: var(--surface-1); }
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); overflow: hidden; background: var(--surface-1); }
   .vrx-rail { border-right: 1px solid var(--border-subtle); padding: 30px 28px; display: flex; flex-direction: column; gap: 26px; }
   .vrx-output { padding: 40px 44px; background: radial-gradient(130% 90% at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent); }
   .vrx-cta { transition: filter var(--dur-fast) var(--ease-out), transform var(--dur-instant) var(--ease-out); }
@@ -222,7 +222,7 @@ function EukaMode() {
         <aside className="vrx-rail">
           {/* brand mark */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #000))' }}>
               <i className="bi bi-camera-video-fill" style={{ color: 'var(--on-accent)', fontSize: '1.05rem' }} />
             </div>
@@ -246,7 +246,7 @@ function EukaMode() {
               </select>
             ) : (
               <div style={{ height: 46, padding: '0 14px', display: 'flex', alignItems: 'center', fontSize: 15, fontWeight: 700,
-                color: 'var(--text-primary)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 11 }}>
+                color: 'var(--text-primary)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
                 {brandLabel}
               </div>
             )}
@@ -257,7 +257,7 @@ function EukaMode() {
             <input type="date" className="wx-input" value={targetDate} max={maxDate} disabled={running}
               onChange={(e) => setTargetDate(e.target.value)} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-              <span style={{ padding: '3px 8px', borderRadius: 6, fontFamily: MONO, fontSize: 11, fontWeight: 700,
+              <span style={{ padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontFamily: MONO, fontSize: 11, fontWeight: 700,
                 background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
                 {prettyDate(targetDate)}
               </span>
@@ -297,7 +297,7 @@ function EukaMode() {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600,
-                  color: 'var(--text-secondary)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '5px 12px' }}>
+                  color: 'var(--text-secondary)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', padding: '5px 12px' }}>
                   <i className="bi bi-funnel" style={{ color: 'var(--accent)' }} />
                   {excludeSet.size} to exclude
                   {excludeName ? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· {excludeName}</span> : null}
@@ -323,7 +323,7 @@ function EukaMode() {
           {/* CTA */}
           <button className="vrx-cta" onClick={generate} disabled={running || !targetDate || !brandId}
             style={{ marginTop: 'auto', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 13, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, color: 'var(--on-accent)', border: 'none', borderRadius: 'var(--radius-lg)', cursor: 'pointer',
               background: 'linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
               boxShadow: '0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent)' }}>
             <i className="bi bi-lightning-charge-fill" /> Generate review files
@@ -343,7 +343,7 @@ function EukaMode() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 640 }}>
               {/* status header */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', padding: '5px 11px', borderRadius: 999,
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', padding: '5px 11px', borderRadius: 'var(--radius-pill)',
                   background: 'var(--success-soft)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)' }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
                   <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: 'var(--success)', letterSpacing: '0.04em' }}>READY · DOWNLOADED</span>
@@ -371,7 +371,7 @@ function EukaMode() {
                 {FILE_DEFS.map((def) => {
                   const count = applyExclude(result[def.key] || []).length;
                   return (
-                    <div key={def.key} style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: '16px 16px 14px' }}>
+                    <div key={def.key} style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '16px 16px 14px' }}>
                       <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
                         color: count > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{count}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{def.ord} message</div>
@@ -386,8 +386,8 @@ function EukaMode() {
                   const count = applyExclude(result[def.key] || []).length;
                   return (
                     <div key={def.key} className="vrx-filerow" style={{ display: 'flex', alignItems: 'center', gap: 15, padding: '14px 16px',
-                      background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: 'color-mix(in srgb, var(--accent) 14%, transparent)' }}>
                         <i className="bi bi-filetype-csv" style={{ color: 'var(--accent)', fontSize: '1.05rem' }} />
                       </div>
@@ -415,7 +415,7 @@ function EukaMode() {
                 const manual = (result.needsManual || []).filter((m) => !excludeSet.has(normHandle(m.handle)));
                 if (manual.length === 0) return null;
                 return (
-                  <div style={{ padding: '12px 14px', border: '1px dashed var(--warning)', borderRadius: 12, background: 'var(--warning-soft)' }}>
+                  <div style={{ padding: '12px 14px', border: '1px dashed var(--warning)', borderRadius: 'var(--radius-md)', background: 'var(--warning-soft)' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
                       <i className="bi bi-flag me-1" /> Needs manual check ({manual.length})
                     </div>
@@ -433,7 +433,7 @@ function EukaMode() {
           ) : (
             // Empty state
             <div style={{ minHeight: '58vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, textAlign: 'center' }}>
-              <div style={{ width: 68, height: 68, borderRadius: 18, border: '1.5px dashed var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 68, height: 68, borderRadius: 'var(--radius-xl)', border: '1px dashed var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <i className="bi bi-file-earmark-text" style={{ fontSize: 28, color: 'var(--text-muted)', opacity: 0.6 }} />
               </div>
               <div>
@@ -484,13 +484,13 @@ export default function VideoReviewsPage() {
     <>
       <style>{SHELL_CSS}</style>
       <div style={{ padding: '4px 2px 2px' }}>
-        <div style={{ display: 'inline-flex', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: 4, gap: 4 }}>
+        <div style={{ display: 'inline-flex', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: 4, gap: 4 }}>
           {MODES.map((m) => {
             const active = mode === m.key;
             return (
               <button key={m.key} onClick={() => setMode(m.key)}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  padding: '7px 16px', borderRadius: 9, border: 'none',
+                  padding: '7px 16px', borderRadius: 'var(--radius-md)', border: 'none',
                   background: active ? 'var(--surface-1)' : 'transparent',
                   color: active ? 'var(--text-primary)' : 'var(--text-muted)',
                   boxShadow: active ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)' }}>

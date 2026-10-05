@@ -117,7 +117,7 @@ export default function AssignBrandModal({ brand, onClose, onDone }) {
               const on = pickedId === c.id;
               return (
                 <button key={c.id} type="button" onClick={() => setPickedId(c.id)}
-                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr auto', gap: 10, alignItems: 'center', padding: '8px 10px', background: on ? 'var(--accent-soft)' : 'transparent', border: `1px solid ${on ? 'var(--accent)' : 'transparent'}`, borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left' }}>
+                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr auto', gap: 10, alignItems: 'center', padding: '8px 10px', background: on ? 'var(--accent-soft)' : 'transparent', border: `1px solid ${on ? 'var(--accent)' : 'transparent'}`, borderRadius: 'var(--radius-sm)', cursor: 'pointer', textAlign: 'left' }}>
                   <Avatar user={c} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13 }}>{c.display_name}</div>

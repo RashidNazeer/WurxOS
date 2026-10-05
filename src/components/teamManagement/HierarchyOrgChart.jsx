@@ -237,7 +237,7 @@ function TeamCard({ nodeRef, tl, onClickTl, onClickMember, onClickBrand }) {
 
   return (
     <div ref={nodeRef} className="node-pop card border-0 shadow-sm h-100"
-      style={{ borderRadius: 14, overflow: 'hidden' }}>
+      style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       {/* Header */}
       <button type="button" onClick={onClickTl}
         className="d-flex align-items-center gap-2 p-3 text-start border-0 w-100"

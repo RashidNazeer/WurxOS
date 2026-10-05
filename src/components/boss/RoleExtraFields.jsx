@@ -220,7 +220,7 @@ function MiniSwitch({ checked, disabled }) {
       style={{
         width: 36,
         height: 20,
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         background: checked ? 'var(--accent)' : 'var(--surface-3)',
         border: '1px solid',
         borderColor: checked ? 'var(--accent)' : 'var(--border-default)',

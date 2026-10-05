@@ -76,7 +76,7 @@ function RatingRow({ label, hint, value, note, onSave, readOnly = false, withNot
       {/* Editable note (the rater) */}
       {withNote && !readOnly && (
         <textarea className="form-control form-control-sm mt-2" rows={2}
-          style={{ borderRadius: 8, fontSize: '0.78rem' }}
+          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
           placeholder={notePlaceholder}
           value={noteText}
           onChange={(e) => setNoteText(e.target.value)}

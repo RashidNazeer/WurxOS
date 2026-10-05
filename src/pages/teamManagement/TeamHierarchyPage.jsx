@@ -212,7 +212,7 @@ export default function TeamHierarchyPage() {
       </div>
 
       {/* ── Control bar ───────────────────────────────────────────────── */}
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-3 d-flex flex-wrap align-items-center gap-2">
           <div className="input-group input-group-sm" style={{ maxWidth: 260 }}>
             <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}>
@@ -314,7 +314,7 @@ function StatCard({ label, value, sub, dot, dark }) {
   return (
     <div className="col-12 col-md-6 col-xl">
       <div className="card border-0 shadow-sm h-100" style={{
-        borderRadius: 14, overflow: 'hidden',
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
         background: dark ? 'var(--att-spotlight-bg)' : 'var(--surface-1)',
         color: dark ? 'var(--att-spotlight-fg)' : 'var(--text-primary)',
       }}>
@@ -354,7 +354,7 @@ function ViewToggle({ value, onChange }) {
             style={{
               background: active ? 'var(--accent)' : 'transparent',
               color: active ? 'var(--on-accent)' : 'var(--text-secondary)',
-              border: 'none', borderRadius: 8,
+              border: 'none', borderRadius: 'var(--radius-sm)',
               padding: '5px 12px', fontSize: '0.74rem', fontWeight: 700,
               boxShadow: active ? 'var(--shadow-sm)' : 'none',
               transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
@@ -378,7 +378,7 @@ function Legend({ color, label }) {
 
 function MatrixPlaceholder() {
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
       <div className="card-body p-5 text-center text-muted">
         <i className="bi bi-grid-3x3-gap" style={{ fontSize: '2rem', color: 'var(--text-muted)' }} />
         <div className="mt-2" style={{ fontSize: '0.92rem', fontWeight: 600 }}>Matrix view — coming soon</div>

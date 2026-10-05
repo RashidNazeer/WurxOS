@@ -27,7 +27,7 @@ export default function HierarchyTree({ boss, ols, tls, allReportsCount, allBran
   function isOpen(key) { return expanded.has(key); }
 
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
       <div className="card-body p-3">
         {boss && (
           <BossNode

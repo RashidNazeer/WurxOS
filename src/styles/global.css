@@ -25,6 +25,21 @@ optgroup {
   font-size: inherit;
 }
 
+/* Native <select> popups. color-scheme alone isn't enough: once a page styles
+   selects at all, Chrome renders the dropdown with author colours and anything
+   left unset falls back to the light UA default — which is how a dark app ends
+   up with a white popup and near-invisible <optgroup> labels. Set both colours
+   explicitly, on every select, in both themes. */
+select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+select optgroup {
+  background-color: var(--input-bg);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 /* Raw <button>s do NOT inherit text color — the UA default is a near-black
    (`ButtonText`), so button-based rows/toggles/cards (e.g. the Performance
    score-breakdown rows) render invisible on dark surfaces while looking fine
@@ -272,7 +287,10 @@ code, kbd, samp, pre { font-family: var(--font-code); }
   background-color: var(--surface-1) !important;
   color: var(--text-primary);
   border-color: var(--border-subtle);
-  --bs-card-bg: var(--surface-1);
+  --bs-card-bg: var(--glass-card-bg);
+  /* Bootstrap's default cap is rgba(0,0,0,.03) — an opaque wash that would sit
+     as a visible strip on a translucent card. The card is one material. */
+  --bs-card-cap-bg: transparent;
   --bs-card-color: var(--text-primary);
   --bs-card-border-color: var(--border-subtle);
 }
@@ -402,7 +420,7 @@ code, kbd, samp, pre { font-family: var(--font-code); }
   color: var(--accent);
   background-color: var(--surface-2);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 /* Bootstrap modal classes — used heavily by v1-port pages
@@ -782,7 +800,7 @@ input[type="checkbox"] {
 
 /* ============ Card ============ */
 .wx-card {
-  background: var(--surface-1);
+  background: var(--glass-card-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -1272,14 +1290,9 @@ html .notif-toast { --wx-rim: var(--glass-rim-w-sm); --wx-drop: var(--shadow-xl)
   --wx-pane: var(--glass-bg);
   --wx-filter: var(--glass-filter-sticky);
 }
-/* Nothing scrolls behind the desktop sidebar column, so there is no backdrop
-   to refract there and the ring would read as a flat tonal band. The mobile
-   drawer does have the page behind it, so it gets one — and a 9px ring clears
-   the nav's own 10px gutter, so no link's hover fill touches it. */
-.shell-sidebar::before { display: none; }
-@media (max-width: 860px) {
-  .shell-sidebar::before { display: block; --wx-rim: var(--glass-rim-w-sm); }
-}
+/* The desktop sidebar used to be excluded here: nothing scrolls behind it, so
+   a ring read as a flat tonal band. shell.css now gives it its own ambient
+   backdrop to refract, and sets the ring itself, so that exclusion is gone. */
 
 /* Hover-tooltip used beside metric labels on the Performance page.
    The tooltip lives inside .wx-metric-tip-wrap and is shown when the

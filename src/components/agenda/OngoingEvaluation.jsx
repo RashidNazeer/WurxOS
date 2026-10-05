@@ -60,7 +60,7 @@ function TaskReviewModal({ task, review, onClose, onSave }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 540, maxHeight: '85vh', zIndex: 1, borderRadius: 14, display: 'flex', flexDirection: 'column' }}>
+        style={{ position: 'relative', width: '100%', maxWidth: 540, maxHeight: '85vh', zIndex: 1, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column' }}>
         {/* header */}
         <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <span className="fw-semibold small d-flex align-items-center gap-2">
@@ -94,7 +94,7 @@ function TaskReviewModal({ task, review, onClose, onSave }) {
           <div className="text-muted mb-1 mt-3" style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
             Remarks / notes
           </div>
-          <textarea className="form-control form-control-sm" rows={4} style={{ borderRadius: 8, fontSize: '0.82rem' }}
+          <textarea className="form-control form-control-sm" rows={4} style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}
             placeholder="Notes and comments for this task…"
             value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
@@ -186,7 +186,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
         <div className="col-12 col-xl-8">
           {!activePresentation ? (
             <div className="d-flex flex-column align-items-center justify-content-center py-5"
-              style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+              style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
               <div className="rounded-circle d-flex align-items-center justify-content-center mb-3"
                 style={{ width: 60, height: 60, background: 'var(--surface-2)' }}>
                 <i className="bi bi-easel text-muted" style={{ fontSize: '1.5rem', opacity: 0.4 }} />
@@ -218,7 +218,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                     const rv = reviews[t.id] || { rating: '', notes: '' };
                     const rm = ratingMeta(rv.rating);
                     return (
-                      <div key={t.id} className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+                      <div key={t.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
                         <div className="card-body p-3">
                           <div className="d-flex align-items-start justify-content-between gap-2">
                             <div className="min-w-0">
@@ -238,7 +238,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                             </div>
                             <button className="btn btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
                               style={{
-                                borderRadius: 8, fontSize: '0.7rem', fontWeight: 600,
+                                borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', fontWeight: 600,
                                 background: rm ? 'var(--accent-soft)' : 'var(--accent)',
                                 color: rm ? 'var(--accent)' : 'var(--on-accent)',
                                 border: rm ? '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' : 'none',
@@ -274,7 +274,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
         <div className="col-12 col-xl-4">
           <div className="d-flex flex-column gap-3">
             {/* Team Lead remarks — permanent */}
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: '4px solid var(--success)' }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--success)' }}>
               <div className="card-body p-3">
                 <div className="fw-semibold mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.84rem' }}>
                   <i className="bi bi-person-badge text-success" />
@@ -288,7 +288,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                 </div>
                 <RatingPicker value={tlRating}
                   onPick={(v) => { setTlRating(v); saveTl({ rating: v, remark: tlRemark }); }} />
-                <textarea className="form-control form-control-sm mt-2" rows={4} style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                <textarea className="form-control form-control-sm mt-2" rows={4} style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
                   placeholder="Remarks on team management, coordination, presentation flow…"
                   value={tlRemark}
                   onChange={(e) => setTlRemark(e.target.value)}
@@ -303,7 +303,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
 
             {/* APC overall summary — swaps with the presenter */}
             {activePresentation && (
-              <div className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: '4px solid var(--accent)' }}>
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--accent)' }}>
                 <div className="card-body p-3">
                   <div className="fw-semibold mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.84rem' }}>
                     <i className="bi bi-clipboard-check text-primary" />
@@ -314,7 +314,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
                   </p>
                   <RatingPicker value={overall.rating}
                     onPick={(v) => { const n = { ...overall, rating: v }; setOverall(n); saveOverall(n); }} />
-                  <textarea className="form-control form-control-sm mt-2" rows={4} style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                  <textarea className="form-control form-control-sm mt-2" rows={4} style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
                     placeholder="Overall performance notes for this APC's presentation…"
                     value={overall.summary}
                     onChange={(e) => setOverall((o) => ({ ...o, summary: e.target.value }))}
@@ -325,7 +325,7 @@ export default function OngoingEvaluation({ meeting, activePresentation }) {
 
             {/* Weekly performance rating — the 5 metrics scored per week for this APC */}
             {activePresentation && apcId && (
-              <div className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: '4px solid var(--info)' }}>
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--info)' }}>
                 <div className="card-body p-3">
                   <div className="fw-semibold mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.84rem' }}>
                     <i className="bi bi-bar-chart-fill" style={{ color: 'var(--info, var(--info-text))' }} />

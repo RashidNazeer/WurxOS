@@ -43,7 +43,7 @@ export default function TeamManagementPage() {
               style={{
                 background: isActive ? 'var(--surface-1)' : 'transparent',
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                border: 'none', borderRadius: 10,
+                border: 'none', borderRadius: 'var(--radius-md)',
                 padding: '8px 18px', fontSize: '0.82rem', fontWeight: 700,
                 letterSpacing: '-0.01em',
                 boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
@@ -57,7 +57,7 @@ export default function TeamManagementPage() {
       </div>
 
       {/* Tab body */}
-      <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+      <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-3 p-md-4">
           {tab === 'switcher' && <BrandSwitcherPage />}
           {tab === 'apc' && <ReassignApcLeadTab />}

@@ -63,7 +63,7 @@ export default function CurrentTeamTab({ employees }) {
         </select>
       </div>
 
-      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="wx-table" style={{ minWidth: 720 }}>
             <thead>
@@ -83,7 +83,7 @@ export default function CurrentTeamTab({ employees }) {
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.email}</div>
                   </td>
                   <td>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: 'var(--info-soft)', color: 'var(--purple-text)', fontSize: 12, fontWeight: 500 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--info-soft)', color: 'var(--purple-text)', fontSize: 12, fontWeight: 500 }}>
                       {ROLE_LABELS[r.role] || r.role}
                     </span>
                   </td>
@@ -123,7 +123,7 @@ function UtilPill({ value }) {
   else if (value > 85)   { bg = 'var(--warning-soft)'; fg = 'var(--warning-text)'; }
   else if (value > 50)   { bg = 'var(--info-soft)'; fg = 'var(--info-text)'; }
   return (
-    <span style={{ padding: '2px 10px', borderRadius: 999, background: bg, color: fg, fontWeight: 600, fontSize: 12 }}>
+    <span style={{ padding: '2px 10px', borderRadius: 'var(--radius-pill)', background: bg, color: fg, fontWeight: 600, fontSize: 12 }}>
       {value}%
     </span>
   );

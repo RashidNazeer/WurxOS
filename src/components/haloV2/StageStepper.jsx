@@ -43,7 +43,7 @@ export default function StageStepper({ statuses }) {
                 flex: '1 1 150px',
                 minWidth: 140,
                 padding: '8px 10px',
-                borderRadius: 8,
+                borderRadius: 'var(--radius-sm)',
                 background: t.bg,
                 border: `1px solid ${t.bd}`,
                 cursor: 'help',

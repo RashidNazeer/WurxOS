@@ -583,7 +583,7 @@ function ApcGroup({ label, hint, apcs, assignedIds, onToggle, disabled, tone }) 
                 ? `Currently on ${a.brand_count} brand${a.brand_count === 1 ? '' : 's'}`
                 : 'Not assigned to any brand yet'}
               style={{
-                borderRadius: 999,
+                borderRadius: 'var(--radius-pill)',
                 padding: '5px 12px',
                 fontSize: 12.5,
                 fontWeight: 600,
@@ -599,7 +599,7 @@ function ApcGroup({ label, hint, apcs, assignedIds, onToggle, disabled, tone }) 
               {a.brand_count > 0 && (
                 <span style={{
                   fontSize: 10.5, fontWeight: 800,
-                  padding: '1px 6px', borderRadius: 999,
+                  padding: '1px 6px', borderRadius: 'var(--radius-pill)',
                   background: on
                     ? 'color-mix(in srgb, var(--on-accent) 25%, transparent)'
                     : 'var(--surface-2)',

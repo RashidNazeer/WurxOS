@@ -167,7 +167,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
         </span>
         <select
           className="form-select form-select-sm"
-          style={{ width: 'auto', minWidth: 210, fontSize: '0.72rem', borderRadius: 6,
+          style={{ width: 'auto', minWidth: 210, fontSize: '0.72rem', borderRadius: 'var(--radius-sm)',
             ...(isAuto ? { borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 } : {}) }}
           value={source}
           onChange={e => applySource(e.target.value)}
@@ -424,7 +424,7 @@ function PlanSection({ title, color, icon, items, setItems, brands, noun, commAl
   const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
   return (
-    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
       <div className="card-body p-3">
         <div className="d-flex align-items-center justify-content-between mb-3">
           <div className="d-flex align-items-center gap-2">
@@ -831,7 +831,7 @@ export default function IncentiveForm() {
 
       {!existingDocId && carryoverInfo && (
         <div className="alert d-flex align-items-start gap-2 py-2 mb-3"
-          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', borderRadius: 10, color: 'var(--info-text)', fontSize: '0.78rem' }}>
+          style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--info-text)', fontSize: '0.78rem' }}>
           <i className="bi bi-arrow-down-circle-fill flex-shrink-0 mt-1" />
           <div>
             {carryoverInfo.source === 'prior'
@@ -843,7 +843,7 @@ export default function IncentiveForm() {
 
       {!existingDocId && !carryoverInfo && hasTemplate && (
         <div className="alert d-flex align-items-center justify-content-between gap-2 py-2 mb-3"
-          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 10, fontSize: '0.78rem' }}>
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
           <div className="d-flex align-items-center gap-2">
             <i className="bi bi-file-earmark-text" />
             <span>No prior plan for this user — load your default template to get started?</span>
@@ -860,7 +860,7 @@ export default function IncentiveForm() {
             The value rendered here is whatever the editor last loaded
             (carried over from prior month's plan) — it remains the
             per-month snapshot the incentive math reads from. */}
-        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-3">
               <div
@@ -927,7 +927,7 @@ export default function IncentiveForm() {
         />
 
         {/* Summary */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, background: 'var(--surface-2)' }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)', background: 'var(--surface-2)' }}>
           <div className="card-body p-3">
             <p className="text-muted small fw-semibold mb-2 text-uppercase" style={{ letterSpacing: '0.05em', fontSize: '0.65rem' }}>
               Summary
@@ -947,7 +947,7 @@ export default function IncentiveForm() {
               </div>
               <div
                 className="d-flex justify-content-between fw-bold pt-2 mt-1"
-                style={{ borderTop: '1.5px solid var(--border-subtle)', fontSize: '0.95rem' }}
+                style={{ borderTop: '1px solid var(--border-subtle)', fontSize: '0.95rem' }}
               >
                 <span>Total Salary</span>
                 <span>{formatPKR(grandTotal)}</span>

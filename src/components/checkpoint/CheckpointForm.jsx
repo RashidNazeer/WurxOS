@@ -512,7 +512,7 @@ function PaidCollabReadOnly({
     return clean ? sym + Number(clean).toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v);
   };
   const stat = (label, val, money) => (
-    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 10px' }}>
+    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' }}>
       <div className="text-muted" style={{ fontSize: '0.68rem', fontWeight: 600 }}>{label}</div>
       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(val, money)}</div>
     </div>

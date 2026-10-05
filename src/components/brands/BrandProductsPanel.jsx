@@ -137,7 +137,7 @@ function SampleGoalModeCard({ brandId, unlimited, canEdit, onChanged }) {
   return (
     <div className="wx-card" style={{ padding: '12px 14px', marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center',
+        <div style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', flexShrink: 0, display: 'grid', placeItems: 'center',
           background: 'color-mix(in srgb, var(--success) 14%, transparent)', color: 'var(--success)' }}>
           <i className="bi bi-infinity" style={{ fontSize: '0.95rem' }} />
         </div>
@@ -149,7 +149,7 @@ function SampleGoalModeCard({ brandId, unlimited, canEdit, onChanged }) {
               : 'Each product carries its own monthly target; the brand’s goal is their sum.'}
           </div>
         </div>
-        <div style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 999,
+        <div style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 'var(--radius-pill)',
           background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
           {OPTIONS.map((o) => {
             const active = unlimited === o.value;
@@ -160,7 +160,7 @@ function SampleGoalModeCard({ brandId, unlimited, canEdit, onChanged }) {
                 disabled={!canEdit || busy}
                 title={canEdit ? undefined : 'Only this brand’s team can change the sample-goal mode'}
                 style={{
-                  border: 0, borderRadius: 999, padding: '5px 13px', fontSize: 12, fontWeight: 700,
+                  border: 0, borderRadius: 'var(--radius-pill)', padding: '5px 13px', fontSize: 12, fontWeight: 700,
                   whiteSpace: 'nowrap',
                   cursor: (!canEdit || busy) ? 'not-allowed' : 'pointer',
                   opacity: (!canEdit || busy) ? 0.6 : 1,
@@ -222,7 +222,7 @@ function ProductCard({ row, canEdit, onEdit, onDelete }) {
 
 function Mini({ label, value }) {
   return (
-    <div style={{ padding: 8, background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+    <div style={{ padding: 8, background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
       <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{value}</div>
     </div>
