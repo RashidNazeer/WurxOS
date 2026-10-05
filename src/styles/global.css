@@ -110,17 +110,18 @@ a:hover { color: var(--accent-hover); }
               box-shadow var(--dur-fast) var(--ease-out),
               background-color var(--dur-fast) var(--ease-out);
 }
-.wx-input::placeholder { color: var(--input-placeholder); }
+.wx-input::placeholder { color: var(--input-placeholder); font-style: italic; }
 
-/* Bootstrap's default `.form-control::placeholder` color (around #6c757d)
-   is too close to entered-text grey, making example-value placeholders
-   on report forms look like real data. Use the wx-* placeholder token:
-   it reads as clearly lighter than entered text (6.2 vs 16.3 in light)
-   while still passing 4.5:1, so no extra opacity. */
+/* Report forms use example values as placeholders ("55834.62"), so they must
+   not read as entered data. An earlier pass darkened this to 6:1 and made
+   examples indistinguishable from real values. Now: ~4:1 (still > 3:1) against
+   entered text at ~16:1, plus italics as a non-colour cue. All inputs, both
+   themes, via the --input-placeholder token. */
 .form-control::placeholder,
 .form-control-sm::placeholder,
 .form-select::placeholder {
   color: var(--input-placeholder) !important;
+  font-style: italic;
   opacity: 1;
 }
 
