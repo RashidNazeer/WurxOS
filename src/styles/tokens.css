@@ -127,14 +127,34 @@
   --glass-shadow:    0 12px 32px -12px rgba(90, 58, 34, 0.22);
   --glass-brightness: 1.02;
   --glass-saturate:  180%;
-  /* Specular rim: a bright hairline on the very edge, a soft bleed under it,
-     a faint full ring so the light wraps the corners, and a weaker bounce
-     from below — light caught on a refracting rim rather than a flat bevel.
-     All inset box-shadows, so none of it re-rasterises. */
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.98),
-                     inset 0 0 0 1px rgba(255, 255, 255, 0.42),
-                     inset 0 3px 8px -5px rgba(255, 255, 255, 0.90),
-                     inset 0 -2px 6px -5px rgba(255, 255, 255, 0.55),
+
+  /* Rim ring. The interior above is near-opaque on purpose, which is what
+     buys the text contrast — so it also leaves the refraction nothing to
+     bend. The ring is the fix: a low-alpha band at the pane edge where the
+     backdrop really does show through and really does bend. Light mode can
+     afford a fairly solid cream tint (0.30) because the backdrop is
+     light-on-light and the bend still reads as a warm distortion. */
+  --glass-rim-alpha: 0.30;
+  --glass-rim-bg:    rgba(255, 252, 247, var(--glass-rim-alpha));
+  /* The bright point where light would catch the curve: a soft core just
+     above the top edge, biased left. It is painted UNDER the opaque interior
+     (see the ring block in global.css), so only the part crossing the ring
+     is ever visible and it cannot lift the pane behind text. */
+  --glass-rim-spec: radial-gradient(70% 180% at 22% -40%,
+                      rgba(255, 255, 255, 0.95) 0%,
+                      rgba(255, 255, 255, 0.45) 38%,
+                      rgba(255, 255, 255, 0) 70%);
+  /* Lit outer edge. Must be an OUTER shadow: with a ring border in play, an
+     inset shadow is clipped to the padding box and would land on the
+     interior instead of the true rim. */
+  --glass-rim-lit: 0 0 0 1px rgba(255, 255, 255, 0.70),
+                   0 -1px 0 rgba(255, 255, 255, 0.95);
+  /* Specular on the interior edge — now the INNER wall of the ring, which is
+     what reads as glass thickness. All inset, so none of it re-rasterises. */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                     inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+                     inset 0 6px 12px -8px rgba(255, 255, 255, 0.85),
+                     inset 0 -2px 7px -6px rgba(255, 255, 255, 0.55),
                      inset 0 -1px 0 rgba(90, 58, 34, 0.12);
 }
 
@@ -244,13 +264,39 @@
   --glass-bg-strong: rgba(22, 17, 13, var(--glass-pane-alpha-strong));
   --glass-border:    rgba(245, 213, 168, 0.14);
   --glass-shadow:    0 16px 40px -12px rgba(0, 0, 0, 0.75);
-  --glass-brightness: 0.92;
-  --glass-saturate:  180%;
-  --glass-highlight: inset 0 1px 0 rgba(255, 241, 219, 0.26),
-                     inset 0 0 0 1px rgba(245, 213, 168, 0.08),
-                     inset 0 3px 8px -5px rgba(245, 213, 168, 0.22),
-                     inset 0 -2px 6px -5px rgba(245, 213, 168, 0.14),
-                     inset 0 -1px 0 rgba(0, 0, 0, 0.50);
+  /* Dark lifts brightness a little above the old 0.92: the backdrop behind
+     dark chrome is itself dark, and dimming it further left the ring with
+     nothing to show. */
+  --glass-brightness: 1.04;
+  --glass-saturate:  190%;
+
+  /* Rim ring — dark is the harder case and gets DIFFERENT numbers.
+     A near-black rim over near-black content has almost no luminance
+     difference to bend, so the tint goes much thinner than light's 0.30:
+     0.16 lets 84% of the backdrop through, which is what lets a chart, a
+     white table or a peach button visibly smear and split into the rim.
+     Safe because no text ever sits over the ring. */
+  --glass-rim-alpha: 0.16;
+  --glass-rim-bg:    rgba(26, 19, 14, var(--glass-rim-alpha));
+  /* Warm, not white, and weaker than light's: on a near-black pane a
+     white core blows out into a neon outline. */
+  --glass-rim-spec: radial-gradient(70% 180% at 22% -40%,
+                      rgba(255, 246, 232, 0.52) 0%,
+                      rgba(255, 238, 214, 0.22) 38%,
+                      rgba(255, 238, 214, 0) 70%);
+  /* On a dark UI the LIT EDGE does the work the refraction can't: a defined
+     1px warm edge at the top, and a deliberately faint full-perimeter wrap
+     (0.18) so it reads as light catching one edge of a dark material rather
+     than as a glowing border. */
+  --glass-rim-lit: 0 0 0 1px rgba(245, 213, 168, 0.18),
+                   0 -1px 0 rgba(255, 247, 235, 0.58);
+  /* Interior edge, brightened well past the old 0.26 — this hairline is the
+     single strongest "it's glass" cue in dark mode. */
+  --glass-highlight: inset 0 1px 0 rgba(255, 247, 235, 0.48),
+                     inset 0 0 0 1px rgba(245, 213, 168, 0.11),
+                     inset 0 6px 14px -9px rgba(255, 241, 219, 0.34),
+                     inset 0 -2px 8px -6px rgba(245, 213, 168, 0.20),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.55);
 }
 
 /* Shared non-color tokens */
@@ -368,11 +414,13 @@
      actually render it. It stays a SEPARATE token from --glass-filter so the
      solid fallbacks can blank --glass-filter wholesale without a specificity
      fight. Available ids, by displacement scale (max offset = scale / 2):
-       #wx-glass-refract-soft    scale  9  → 4.5px
-       #wx-glass-refract         scale 14  → 7px    (default)
-       #wx-glass-refract-strong  scale 22  → 11px
-       #wx-glass-refract-ca      scale 14 + per-channel chromatic aberration
-                                 (three displacement passes — ~2x the cost) */
+       #wx-glass-refract-soft       scale 20 → 10px  (sticky chrome)
+       #wx-glass-refract            scale 28 → 14px
+       #wx-glass-refract-strong     scale 36 → 18px
+       #wx-glass-refract-ca         scale 28 + chromatic aberration (light)
+       #wx-glass-refract-ca-strong  scale 36 + chromatic aberration (dark)
+     The -ca pair is three displacement passes instead of one (~2x cost), so
+     it is only ever on the transient surfaces. */
   --glass-refract-fn: ;
   /* saturate() lets a pane pick up the colour of what's behind it. The
      matrix is luminance-preserving, so the text-contrast floor is set by
@@ -395,6 +443,38 @@
      menu doesn't take a modal's corner. */
   --radius-glass:    var(--radius-xl);
   --radius-glass-sm: var(--radius-lg);
+
+  /* Rim-ring width, in three sizes. 0 by default: the ring is only turned on
+     inside the refraction @supports gate below, so Safari, Firefox,
+     reduced-transparency and no-backdrop-filter all keep exactly today's
+     flat/frosted pane with no layout change at all.
+
+     Width is deliberately NOT per-theme. On the surfaces that carry the ring
+     as a real border, the width is layout, and a per-theme width would make
+     popovers change size when the theme is toggled. Dark gets its extra
+     visibility from a thinner rim tint, a stronger bend and a brighter lit
+     edge instead.
+
+       -lg  large panes: modals, drawer, notification + search panels
+       -sm  small transient surfaces: menus, dropdowns, popovers, toasts
+       -xs  always-on-screen chrome: topbar, mobile tab bar (least room,
+            cheapest filter)
+
+     THE DIALS, if this ends up being too much. Each one turns down on its own,
+     in tokens.css only, with no rule changes:
+       --glass-rim-w-*     ring width.  0 = effect off entirely (today's pane).
+                           safe 6-18px at -lg; past ~20 the ring starts to
+                           read as a frame rather than an edge.
+       --glass-rim-alpha   ring opacity. safe 0.10-0.45. Higher = subtler,
+                           because less backdrop shows through to bend.
+       --glass-refract-fn  bend + aberration. -soft < base < -ca < -strong <
+                           -ca-strong, or empty for no bend at all.
+       --glass-rim-spec    the bright point. `none` removes it.
+       --glass-rim-lit     the outer lit edge.
+       --glass-highlight   the inner lit edge (the thickness cue). */
+  --glass-rim-w-lg: 0px;
+  --glass-rim-w-sm: 0px;
+  --glass-rim-w-xs: 0px;
 
   /* Dialog scrim blur — much weaker than the pane blur; it only has to
      take the edge off the page behind a modal. */
@@ -441,25 +521,42 @@
 @supports (backdrop-filter: url('#wx-glass-refract')) or
           (-webkit-backdrop-filter: url('#wx-glass-refract')) {
   html[data-theme] {
-    --glass-refract-fn:        url('#wx-glass-refract');
     --glass-refract-sticky-fn: url('#wx-glass-refract-soft');
+    /* The ring. This is the dial that decides whether the effect is visible
+       at all: at 0px the pane is uniform and the bend has nothing to show. */
+    --glass-rim-w-lg: 14px;
+    --glass-rim-w-sm: 9px;
+    --glass-rim-w-xs: 8px;
   }
   html[data-theme='light'] {
     --glass-pane-alpha:        0.88;   /* muted 4.62 on pure black */
     --glass-pane-alpha-strong: 0.91;
+    --glass-refract-fn:        url('#wx-glass-refract-ca');
   }
   html[data-theme='dark'] {
     --glass-pane-alpha:        0.86;   /* muted 4.77 on pure white */
     --glass-pane-alpha-strong: 0.90;
+    /* Dark needs the stronger bend AND the wider colour split — see the
+       rim-ring comment in the dark theme block. */
+    --glass-refract-fn:        url('#wx-glass-refract-ca-strong');
   }
 
+  /* WebKit and Gecko: no refraction, so no ring either — a translucent band
+     with only a blur behind it reads as a mushy border, not as glass. They
+     keep exactly the frosted pane they have today. */
   @supports (background: -webkit-named-image(apple-pay-logo-black)) {
-    html[data-theme] { --glass-refract-fn: ; --glass-refract-sticky-fn: ; }
+    html[data-theme] {
+      --glass-refract-fn: ; --glass-refract-sticky-fn: ;
+      --glass-rim-w-lg: 0px; --glass-rim-w-sm: 0px; --glass-rim-w-xs: 0px;
+    }
     html[data-theme='light'] { --glass-pane-alpha: 0.92; --glass-pane-alpha-strong: 0.96; }
     html[data-theme='dark']  { --glass-pane-alpha: 0.90; --glass-pane-alpha-strong: 0.95; }
   }
   @supports (-moz-appearance: none) {
-    html[data-theme] { --glass-refract-fn: ; --glass-refract-sticky-fn: ; }
+    html[data-theme] {
+      --glass-refract-fn: ; --glass-refract-sticky-fn: ;
+      --glass-rim-w-lg: 0px; --glass-rim-w-sm: 0px; --glass-rim-w-xs: 0px;
+    }
     html[data-theme='light'] { --glass-pane-alpha: 0.92; --glass-pane-alpha-strong: 0.96; }
     html[data-theme='dark']  { --glass-pane-alpha: 0.90; --glass-pane-alpha-strong: 0.95; }
   }
@@ -478,6 +575,12 @@
     --glass-filter-sticky: none;
     --glass-highlight: inset 0 0 0 0 transparent;
     --glass-blur-backdrop: 0px;
+    --glass-rim-w-lg: 0px;
+    --glass-rim-w-sm: 0px;
+    --glass-rim-w-xs: 0px;
+    --glass-rim-bg: transparent;
+    --glass-rim-spec: none;
+    --glass-rim-lit: 0 0 0 0 transparent;
   }
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -488,6 +591,12 @@
     --glass-filter-sticky: none;
     --glass-highlight: inset 0 0 0 0 transparent;
     --glass-blur-backdrop: 0px;
+    --glass-rim-w-lg: 0px;
+    --glass-rim-w-sm: 0px;
+    --glass-rim-w-xs: 0px;
+    --glass-rim-bg: transparent;
+    --glass-rim-spec: none;
+    --glass-rim-lit: 0 0 0 0 transparent;
   }
 }
 

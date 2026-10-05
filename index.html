@@ -94,6 +94,24 @@
          every pane size and both corner radii: a wider element gets a wider,
          softer ramp, but the displacement magnitude stays capped by `scale`.
 
+         The displacement only reads where the pane is actually transparent,
+         and the pane interior is deliberately near-opaque so text stays
+         readable. So the visible effect lives in the rim ring that
+         --glass-rim-w opens up (see tokens.css): the scales below are picked
+         so max offset (scale/2) is about one ring width — bend the ring can
+         show, with nothing wasted under the opaque interior.
+
+         Scale ladder (max offset = scale / 2):
+           -soft   20 → 10px   sticky chrome (topbar, mobile tab bar)
+                               no aberration: its backdrop re-rasterises on
+                               every scroll frame
+            base   28 → 14px   plain bend, light theme reference
+           -strong 36 → 18px   plain bend, dark theme reference
+           -ca     28 → 14px   base + chromatic aberration (light default)
+           -ca-strong 36       strong + aberration (dark default)
+         Past ~48 the rim samples further than it can gather and reads as a
+         smear rather than glass; that is the ceiling.
+
          Chromium only — Safari and Firefox parse the url() and render
          nothing. tokens.css gates it. -->
     <svg aria-hidden="true" focusable="false"
@@ -107,7 +125,7 @@
                  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
         <feComposite in="mx" in2="my" operator="arithmetic"
                      k1="0" k2="1" k3="1" k4="0" result="map" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="14"
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="28"
                            xChannelSelector="R" yChannelSelector="G" />
       </filter>
 
@@ -120,7 +138,7 @@
                  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
         <feComposite in="mx" in2="my" operator="arithmetic"
                      k1="0" k2="1" k3="1" k4="0" result="map" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="9"
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="20"
                            xChannelSelector="R" yChannelSelector="G" />
       </filter>
 
@@ -133,15 +151,15 @@
                  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
         <feComposite in="mx" in2="my" operator="arithmetic"
                      k1="0" k2="1" k3="1" k4="0" result="map" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="22"
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="36"
                            xChannelSelector="R" yChannelSelector="G" />
       </filter>
 
       <!-- Chromatic aberration: R/G/B displaced at slightly different scales,
-           which is how real glass splits colour at the rim. NOT wired up by
-           default — it is three displacement passes instead of one, so it
-           roughly doubles the filter cost. Swap --glass-refract-fn to this id
-           to try it. -->
+           which is how real glass splits colour at the rim. Three displacement
+           passes instead of one, so ~2x the filter cost — which is why it is
+           used only on the transient surfaces (modals, menus, panels, toasts),
+           whose backdrop is static for as long as they are open. -->
       <filter id="wx-glass-refract-ca" x="0%" y="0%" width="100%" height="100%"
               color-interpolation-filters="sRGB">
         <feImage preserveAspectRatio="none" result="mx"
@@ -150,11 +168,42 @@
                  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
         <feComposite in="mx" in2="my" operator="arithmetic"
                      k1="0" k2="1" k3="1" k4="0" result="map" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="11"
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="23"
                            xChannelSelector="R" yChannelSelector="G" result="dr" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="14"
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="28"
                            xChannelSelector="R" yChannelSelector="G" result="dg" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="17"
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="33"
+                           xChannelSelector="R" yChannelSelector="G" result="db" />
+        <feColorMatrix in="dr" result="cr" type="matrix"
+                       values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" />
+        <feColorMatrix in="dg" result="cg" type="matrix"
+                       values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" />
+        <feColorMatrix in="db" result="cb" type="matrix"
+                       values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" />
+        <feComposite in="cr" in2="cg" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="crg" />
+        <feComposite in="crg" in2="cb" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" />
+      </filter>
+
+      <!-- Chromatic aberration at the dark theme's stronger scale. Dark needs
+           more bend AND more colour split: the pane is near-black, so a
+           displaced near-black backdrop reveals almost nothing — what reads is
+           bright content (a chart, a white table, a peach button) smearing and
+           splitting into the rim. -->
+      <filter id="wx-glass-refract-ca-strong" x="0%" y="0%" width="100%" height="100%"
+              color-interpolation-filters="sRGB">
+        <feImage preserveAspectRatio="none" result="mx"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23ff0000'/%3E%3Cstop offset='.012' stop-color='%23db0000'/%3E%3Cstop offset='.028' stop-color='%23ad0000'/%3E%3Cstop offset='.046' stop-color='%238e0000'/%3E%3Cstop offset='.062' stop-color='%23800000'/%3E%3Cstop offset='.938' stop-color='%23800000'/%3E%3Cstop offset='.954' stop-color='%23720000'/%3E%3Cstop offset='.972' stop-color='%23520000'/%3E%3Cstop offset='.988' stop-color='%23240000'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feImage preserveAspectRatio="none" result="my"
+                 href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2300ff00'/%3E%3Cstop offset='.012' stop-color='%2300db00'/%3E%3Cstop offset='.028' stop-color='%2300ad00'/%3E%3Cstop offset='.046' stop-color='%23008e00'/%3E%3Cstop offset='.062' stop-color='%23008000'/%3E%3Cstop offset='.938' stop-color='%23008000'/%3E%3Cstop offset='.954' stop-color='%23007200'/%3E%3Cstop offset='.972' stop-color='%23005200'/%3E%3Cstop offset='.988' stop-color='%23002400'/%3E%3Cstop offset='1' stop-color='%23000000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E" />
+        <feComposite in="mx" in2="my" operator="arithmetic"
+                     k1="0" k2="1" k3="1" k4="0" result="map" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="30"
+                           xChannelSelector="R" yChannelSelector="G" result="dr" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="36"
+                           xChannelSelector="R" yChannelSelector="G" result="dg" />
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="42"
                            xChannelSelector="R" yChannelSelector="G" result="db" />
         <feColorMatrix in="dr" result="cr" type="matrix"
                        values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" />

@@ -1103,13 +1103,14 @@ input[type='range']:focus-visible,
    Tokens fall back to solid panes without backdrop-filter support or
    under prefers-reduced-transparency (tokens.css). */
 .dropdown-menu {
-  --bs-dropdown-bg: var(--glass-bg-strong);
+  --bs-dropdown-bg: transparent;
+  --bs-dropdown-border-width: 0;
   --bs-dropdown-border-radius: var(--radius-glass-sm);
   --bs-dropdown-inner-border-radius: var(--radius-glass-sm);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-  box-shadow: var(--glass-shadow), var(--glass-highlight);
 }
+/* No rim ring here: Bootstrap offsets .popover-arrow by
+   --bs-popover-border-width, so a ring-width border would leave the arrow
+   floating clear of the pane. Popovers keep the frosted pane. */
 .popover {
   --bs-popover-bg: var(--glass-bg-strong);
   --bs-popover-border-color: var(--glass-border);
@@ -1132,17 +1133,151 @@ input[type='range']:focus-visible,
   isolation: isolate;
   box-shadow: var(--glass-shadow);
 }
-.modal-content::before {
+
+/* ============ Liquid glass: the rim ring ============
+   The pane interior has to stay near-opaque to hold text at 4.5:1, which
+   leaves the refraction almost nothing to bend — that is why the effect read
+   as "very minimal". The ring is the fix: a low-alpha band at the pane edge,
+   the one place the backdrop genuinely shows through, and therefore the one
+   place the bend, the colour split and the lit edge can read. Nothing else
+   about the pane changes, so the contrast floor is untouched.
+
+   Two mechanisms, one look:
+
+   (a) BORDER RING — on surfaces whose glass is the element's own background.
+       `border: <rim> solid transparent`, interior background clipped to
+       padding-box and the rim tint to border-box, so the BROWSER computes the
+       inner radius. The border also RESERVES the ring: children are laid out
+       in the content box and physically cannot paint into it, which is what
+       guarantees no text ever lands on the ring, even in a 3-item menu or a
+       one-line toast. Each surface's own padding is reduced by the same
+       amount (--wx-pad-*) so the inner metrics don't move.
+
+   (b) PSEUDO RING — on surfaces that cannot give up content box (the 68px
+       topbar, the 56px mobile tab bar, the fixed-width drawer) or whose glass
+       already lives on a ::before (the three modals). Same border trick on an
+       absolutely positioned inset:0 layer, so it costs NO layout at all;
+       clearance comes from the surface's existing padding instead.
+
+   Both read as: lit outer edge -> refracting translucent ring -> lit inner
+   edge -> opaque interior under the text. --glass-rim-w-* is 0px outside
+   Chromium (tokens.css), and at 0 both mechanisms collapse to exactly the
+   pane that shipped before. */
+
+.shell-user-menu,
+.shell-nav-flyout,
+.dropdown-menu,
+.ui-toast,
+.global-search-panel,
+html .notif-panel,
+html .notif-toast,
+.ui-modal::before,
+.wx-modal::before,
+.modal-content::before,
+.shell-topbar::before,
+.shell-bottom-bar::before,
+.shell-sidebar::before {
+  /* Always a fallback: an unset custom property in var() without one is
+     invalid at computed-value time, and border-width would land on its
+     3px initial. */
+  border-width: var(--wx-rim, 0px);
+  border-style: solid;
+  border-color: transparent;
+  background-color: transparent;
+  /* Layer order is top-first: the opaque interior covers the specular core,
+     so the bright point only ever shows where it crosses the ring and can
+     never lift the pane sitting behind text. */
+  background-image:
+    linear-gradient(var(--wx-pane, var(--glass-bg-strong)),
+                    var(--wx-pane, var(--glass-bg-strong))),
+    var(--glass-rim-spec),
+    linear-gradient(var(--glass-rim-bg), var(--glass-rim-bg));
+  background-origin: padding-box, border-box, border-box;
+  background-clip:   padding-box, border-box, border-box;
+  background-repeat: no-repeat;
+  box-shadow: var(--glass-rim-lit),
+              var(--wx-drop, var(--glass-shadow)),
+              var(--glass-highlight);
+  -webkit-backdrop-filter: var(--wx-filter, var(--glass-filter));
+  backdrop-filter: var(--wx-filter, var(--glass-filter));
+}
+
+/* The pseudo-ring layers. inset:0 + z-index:-1 puts them above the host's own
+   background and below every child, so the ring is painted without entering
+   the layout. */
+.ui-modal::before,
+.wx-modal::before,
+.modal-content::before,
+.shell-topbar::before,
+.shell-bottom-bar::before,
+.shell-sidebar::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
-  box-shadow: var(--glass-highlight);
   pointer-events: none;
+  --wx-drop: 0 0 0 0 transparent;
+}
+
+/* Per-surface ring size and padding give-back. All of it lives here rather
+   than next to each surface so the ring can be read, and tuned, in one place.
+   --wx-pad-* is the surface's ORIGINAL padding; the ring is taken out of it,
+   and max(0px, ...) means a surface whose padding is thinner than the ring
+   grows by the difference instead of going negative. */
+.shell-user-menu,
+.shell-nav-flyout,
+.dropdown-menu,
+.ui-toast,
+.global-search-panel,
+html .notif-panel,
+html .notif-toast {
+  padding: max(0px, calc(var(--wx-pad-y, 0px) - var(--wx-rim, 0px)))
+           max(0px, calc(var(--wx-pad-x, 0px) - var(--wx-rim, 0px)));
+  /* These surfaces used to carry the pane's 1px hairline as their border, and
+     the ring has taken the border over. An outline restores it: it follows
+     border-radius, it doesn't enter layout, and it is the only edge left on
+     the engines where the ring and the lit edge are both switched off. None of
+     these surfaces is focusable, so it can't collide with a focus ring. */
+  outline: 1px solid var(--glass-border);
+  outline-offset: -1px;
+}
+.shell-user-menu,
+.shell-nav-flyout { --wx-rim: var(--glass-rim-w-sm); --wx-pad-x: 6px; --wx-pad-y: 6px; }
+.dropdown-menu    { --wx-rim: var(--glass-rim-w-sm); --wx-pad-x: 0px; --wx-pad-y: 8px; }
+.ui-toast         { --wx-rim: var(--glass-rim-w-sm);
+                    --wx-pad-x: var(--space-3); --wx-pad-y: var(--space-3);
+                    /* Asymmetric: the accent rail lives in the extra left
+                       padding, so that side is given back separately. */
+                    padding-left: max(0px, calc(var(--space-5) - var(--wx-rim, 0px))); }
+/* Panel and toast padding live on their children in notifications.css, which
+   this sheet doesn't own — so these two take the narrow ring and keep their
+   own padding. Their inner gutters grow by the ring width. */
+html .notif-panel { --wx-rim: var(--glass-rim-w-sm); }
+html .notif-toast { --wx-rim: var(--glass-rim-w-sm); --wx-drop: var(--shadow-xl); }
+.global-search-panel { --wx-rim: var(--glass-rim-w-sm); --wx-drop: var(--shadow-xl); }
+
+/* Pseudo-ring surfaces. The modals clear the ring with their own --space-4/5
+   padding; the topbar and tab bar clear it because their controls are
+   --control-h tall and vertically centred in a taller bar. */
+.ui-modal::before,
+.wx-modal::before,
+.modal-content::before { --wx-rim: var(--glass-rim-w-lg); }
+/* Always-on-screen chrome: narrowest ring, the soft (non-aberrated) filter,
+   and the weaker --glass-bg pane, because this one re-rasterises on scroll. */
+.shell-topbar::before,
+.shell-bottom-bar::before {
+  --wx-rim: var(--glass-rim-w-xs);
+  --wx-pane: var(--glass-bg);
+  --wx-filter: var(--glass-filter-sticky);
+}
+/* Nothing scrolls behind the desktop sidebar column, so there is no backdrop
+   to refract there and the ring would read as a flat tonal band. The mobile
+   drawer does have the page behind it, so it gets one — and a 9px ring clears
+   the nav's own 10px gutter, so no link's hover fill touches it. */
+.shell-sidebar::before { display: none; }
+@media (max-width: 860px) {
+  .shell-sidebar::before { display: block; --wx-rim: var(--glass-rim-w-sm); }
 }
 
 /* Hover-tooltip used beside metric labels on the Performance page.
