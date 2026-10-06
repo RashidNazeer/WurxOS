@@ -4,9 +4,10 @@
 // Decisions reuse the existing mutations unchanged; the server stays
 // authoritative (a "not authorized" comes back as an error and the row is restored).
 import { useMemo } from 'react';
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui';
+import { supabase } from './supabase';
 import { listLeavesForApproval, _normLeave, teamApproveLeave, teamRejectLeave } from './leaveApi';
 import {
   getPendingApprovals, getPendingEditClockOutRequests, listPendingEditRequests,
@@ -148,7 +149,18 @@ export function approvalsPrefetchers(role, uid) {
   return kindsFor(role).map((k) => [approvalsKey(k, uid), () => FETCHERS[k](uid, role)]);
 }
 
+const itemKey = (x) => `${x.kind}:${x.id}`;
+export const readsKey = (uid) => ['approvals', 'reads', uid];
+const isActionable = (x) => x.canAct || x.openOnly;
+
+async function fetchReadKeys(uid) {
+  const { data, error } = await supabase.from('approval_reads').select('item_key').eq('user_id', uid);
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => r.item_key);
+}
+
 // All sources for the signed-in user. Polls at 60 s while the tab is visible.
+// `count` is the unread actionable total: what the sidebar and bottom tab show.
 export function useApprovals() {
   const { user, profile } = useAuth();
   const uid = user?.id;
@@ -164,19 +176,68 @@ export function useApprovals() {
       staleTime: 30_000,
     })),
   });
+  const readsQuery = useQuery({
+    queryKey: readsKey(uid),
+    queryFn: () => fetchReadKeys(uid),
+    enabled: !!uid && kinds.length > 0,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
+  });
   return useMemo(() => {
+    const readSet = new Set(readsQuery.data || []);
     const sources = {};
     let items = [];
     kinds.forEach((k, i) => {
       const r = results[i];
-      sources[k] = { loading: r.isPending, error: r.error, refetch: r.refetch, count: (r.data || []).filter((x) => x.canAct || x.openOnly).length };
-      items = items.concat(r.data || []);
+      const rows = (r.data || []).map((x) => ({ ...x, read: readSet.has(itemKey(x)) }));
+      const actionable = rows.filter(isActionable);
+      sources[k] = {
+        loading: r.isPending, error: r.error, refetch: r.refetch,
+        count: actionable.filter((x) => !x.read).length,
+        total: actionable.length,
+      };
+      items = items.concat(rows);
     });
     items.sort((a, b) => (b.canAct - a.canAct) || ((a.at?.getTime() || 0) - (b.at?.getTime() || 0)));
-    const actionable = items.filter((x) => x.canAct || x.openOnly).length;
-    return { kinds, sources, items, count: actionable, loading: results.some((r) => r.isPending) };
+    const actionable = items.filter(isActionable);
+    return {
+      kinds, sources, items, loading: results.some((r) => r.isPending),
+      count: actionable.filter((x) => !x.read).length,
+      pendingTotal: actionable.length,
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, ...results.map((r) => r.dataUpdatedAt), ...results.map((r) => r.status)]);
+  }, [role, readsQuery.dataUpdatedAt, ...results.map((r) => r.dataUpdatedAt), ...results.map((r) => r.status)]);
+}
+
+// Marks the given inbox items read for this user. Optimistic: the badge drops
+// before the write lands, and rolls back if it fails.
+export function useMarkApprovalsRead() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { user } = useAuth();
+  const uid = user?.id;
+  return useMutation({
+    mutationFn: async (items) => {
+      const rows = items.filter(isActionable).map((x) => ({ user_id: uid, item_key: itemKey(x) }));
+      if (!rows.length) return;
+      const { error } = await supabase.from('approval_reads').upsert(rows, { onConflict: 'user_id,item_key', ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+    },
+    onMutate: async (items) => {
+      const key = readsKey(uid);
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData(key);
+      const added = items.filter(isActionable).map(itemKey);
+      qc.setQueryData(key, (old) => [...new Set([...(old || []), ...added])]);
+      return { prev };
+    },
+    onError: (err, _items, ctx) => {
+      qc.setQueryData(readsKey(uid), ctx?.prev);
+      toast.error(err.message);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: readsKey(uid) }),
+  });
 }
 
 // Badge count (bottom tab bar / menu). Shares the same cache as the inbox.
