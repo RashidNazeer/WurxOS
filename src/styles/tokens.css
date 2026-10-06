@@ -443,7 +443,9 @@
      label behind the pane is a smooth colour wash, not edges. Sticky chrome
      (topbar, tab bar) is one scale step down because its backdrop changes on
      every scroll frame. Safe: 24-40px transient, 14-24px sticky. */
-  --glass-blur:   40px;
+  /* 24, not 40: blur cost rises with radius and every dropdown and modal open
+     re-runs it. 24 still reads as glass and stops the open/close stutter. */
+  --glass-blur:   24px;
   --glass-blur-sticky: 14px;
 
   /* Refraction / edge lensing. The SVG displacement filters are inlined in
@@ -580,14 +582,17 @@
   html[data-theme='light'] {
     --glass-pane-alpha:        0.48;
     --glass-pane-alpha-strong: 0.60;
-    --glass-refract-fn:        url('#wx-glass-refract-ca');
+    /* Plain refraction, not the -ca variant: chromatic aberration is three
+       displacement gathers instead of one, for a colour fringe most people
+       never consciously see. Not worth 3x the filter cost on every menu. */
+    --glass-refract-fn:        url('#wx-glass-refract');
   }
   html[data-theme='dark'] {
     --glass-pane-alpha:        0.52;
     --glass-pane-alpha-strong: 0.62;
     /* Dark needs the stronger bend AND the wider colour split â€” see the
        rim-ring comment in the dark theme block. */
-    --glass-refract-fn:        url('#wx-glass-refract-ca-strong');
+    --glass-refract-fn:        url('#wx-glass-refract-strong');
   }
 
   /* WebKit and Gecko: no refraction, so no ring either â€” a translucent band
