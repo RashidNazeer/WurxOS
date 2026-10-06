@@ -39,7 +39,7 @@
 }
 .settings-panel-nav::-webkit-scrollbar       { width: 6px; }
 .settings-panel-nav::-webkit-scrollbar-track { background: transparent; }
-.settings-panel-nav::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 999px; }
+.settings-panel-nav::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: var(--radius-pill); }
 .settings-panel-nav::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
 /* Sub-tabs of a section (Settings › Wurx Buddy › Models …). */
@@ -60,7 +60,7 @@
   height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
@@ -84,7 +84,7 @@
   width: 100%;
   padding: 10px 12px 10px 36px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--surface-1);
   font-size: 13px;
   color: var(--text-primary);
@@ -133,7 +133,7 @@
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
   transition: var(--t-colors);
@@ -165,7 +165,7 @@
   top: 10px;
   bottom: 10px;
   width: 3px;
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
   background: var(--accent);
 }
 .settings-nav-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
@@ -185,7 +185,7 @@
   font-size: 9px;
   font-weight: 700;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-3, #e2e8f0);
   color: var(--text-muted);
   text-transform: uppercase;
@@ -222,7 +222,7 @@
 .settings-card {
   background: var(--surface-1);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -241,7 +241,7 @@
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text-secondary);
   display: grid;

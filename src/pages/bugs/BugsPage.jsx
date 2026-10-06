@@ -138,7 +138,7 @@ export default function BugsPage() {
           <span className="wx-spinner" /> Loading…
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: 10, background: 'var(--surface-1)' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--surface-1)' }}>
           <BugIcon width="28" height="28" />
           <div style={{ marginTop: 8, fontWeight: 600, color: 'var(--text-secondary)' }}>No bugs match.</div>
           <div style={{ marginTop: 2, fontSize: 13 }}>Report one with the button above.</div>
@@ -184,7 +184,7 @@ function BugCard({ bug, onOpen }) {
       style={{
         all: 'unset', cursor: 'pointer',
         display: 'grid', gridTemplateColumns: '1fr auto', gap: 12,
-        padding: 14, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)',
+        padding: 14, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)',
       }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
@@ -192,7 +192,7 @@ function BugCard({ bug, onOpen }) {
             <BugIcon width="15" height="15" />
           </span>
           <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{bug.title}</strong>
-          <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: t.color + '22', color: t.color }}>
+          <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 600, background: t.color + '22', color: t.color }}>
             {t.label}
           </span>
         </div>
@@ -212,7 +212,7 @@ function BugCard({ bug, onOpen }) {
 
 function Pill({ label, fg, bg }) {
   return (
-    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: bg, color: fg, whiteSpace: 'nowrap' }}>
+    <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700, background: bg, color: fg, whiteSpace: 'nowrap' }}>
       {label}
     </span>
   );
@@ -220,7 +220,7 @@ function Pill({ label, fg, bg }) {
 
 function StatCard({ label, value, tone }) {
   return (
-    <div style={{ padding: 12, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+    <div style={{ padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
       <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: tone, marginTop: 2 }}>{value}</div>
     </div>
@@ -360,7 +360,7 @@ function BugDetail({ bug: initial, canEdit, canDelete, onClose, onChanged }) {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
             <Pill {...s} />
             <Pill {...p} />
-            <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: t.color + '22', color: t.color }}>{t.label}</span>
+            <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700, background: t.color + '22', color: t.color }}>{t.label}</span>
           </div>
 
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
@@ -370,14 +370,14 @@ function BugDetail({ bug: initial, canEdit, canDelete, onClose, onChanged }) {
           </div>
 
           <div className="wx-label">Description</div>
-          <div style={{ padding: 12, background: 'var(--surface-0)', borderRadius: 8, whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13 }}>
+          <div style={{ padding: 12, background: 'var(--surface-0)', borderRadius: 'var(--radius-sm)', whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13 }}>
             {bug.description}
           </div>
 
           {bug.dev_notes && !editing && (
             <>
               <div className="wx-label">Dev notes</div>
-              <div style={{ padding: 12, background: 'var(--info-soft)', borderRadius: 8, whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13, color: 'var(--info)' }}>
+              <div style={{ padding: 12, background: 'var(--info-soft)', borderRadius: 'var(--radius-sm)', whiteSpace: 'pre-wrap', marginBottom: 12, fontSize: 13, color: 'var(--info)' }}>
                 {bug.dev_notes}
               </div>
             </>
@@ -389,7 +389,7 @@ function BugDetail({ bug: initial, canEdit, canDelete, onClose, onChanged }) {
             </button>
           )}
           {editing && (
-            <div style={{ padding: 12, border: '1px dashed color-mix(in srgb, var(--info) 35%, transparent)', background: 'var(--info-soft)', borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ padding: 12, border: '1px dashed color-mix(in srgb, var(--info) 35%, transparent)', background: 'var(--info-soft)', borderRadius: 'var(--radius-sm)', marginBottom: 12 }}>
               <div className="wx-label">Status</div>
               <select className="wx-input" value={status} onChange={(e) => setStatus(e.target.value)} style={{ marginBottom: 10 }}>
                 {BUG_STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -449,7 +449,7 @@ function Thread({ bugId }) {
       <div className="wx-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <MessageIcon width="14" height="14" /> Discussion
       </div>
-      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, maxHeight: 260, overflowY: 'auto', padding: 10, background: 'var(--surface-1)' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', maxHeight: 260, overflowY: 'auto', padding: 10, background: 'var(--surface-1)' }}>
         {messages.length === 0 && !isFetching && (
           <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
             No messages yet.
@@ -461,7 +461,7 @@ function Thread({ bugId }) {
             <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
               <div style={{
                 maxWidth: '82%',
-                padding: '6px 10px', borderRadius: 10,
+                padding: '6px 10px', borderRadius: 'var(--radius-md)',
                 background: mine ? 'var(--accent)' : 'var(--surface-2)',
                 color: mine ? 'var(--on-accent)' : 'var(--text-primary)',
                 fontSize: 13,

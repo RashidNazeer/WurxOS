@@ -53,7 +53,7 @@ function DaysLeftBadge({ ts, status }) {
       days <= 7 ? ['rgba(234,179,8,0.18)',  'var(--warning)'] :
                   ['rgba(34,197,94,0.18)',  'var(--success)'];
     return (
-      <span style={{ display:'inline-block', borderRadius:9999, padding:'1px 8px', fontSize:'0.72rem', fontWeight:600, background:bg, color }}>
+      <span style={{ display:'inline-block', borderRadius: 'var(--radius-pill)', padding:'1px 8px', fontSize:'0.72rem', fontWeight:600, background:bg, color }}>
         {days <= 0 ? 'Today' : `${days}d`}
       </span>
     );

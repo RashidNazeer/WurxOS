@@ -47,7 +47,7 @@ function OlBrandPanel({ status, olItem, paid }) {
   const met = hasItem && (paid ? !!olItem.completed : (total > 0 && p >= target));
 
   return (
-    <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 14, overflow: 'hidden' }}>
+    <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div className="p-3 d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <div>
           <div className="fw-bold" style={{ fontSize: '0.9rem' }}><i className="bi bi-bullseye me-1" style={{ color: 'var(--accent)' }} />Incentive brands</div>
@@ -269,7 +269,7 @@ function EditRow({ item, cat, onChange, lockTarget = false, month }) {
       : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   const lock     = { background: 'var(--surface-2)', cursor: 'not-allowed' };
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? 'var(--success-soft)' : ((isDerived || isComm) ? 'var(--info-soft)' : 'var(--surface-2)'), border: `1.5px solid ${done ? 'color-mix(in srgb, var(--success) 35%, transparent)' : ((isDerived || isComm) ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? 'var(--success-soft)' : ((isDerived || isComm) ? 'var(--info-soft)' : 'var(--surface-2)'), border: `1px solid ${done ? 'color-mix(in srgb, var(--success) 35%, transparent)' : ((isDerived || isComm) ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
@@ -386,7 +386,7 @@ function EditOwnModal({ record, items, onClose, onSaved }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
@@ -548,7 +548,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -566,7 +566,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
             <div className="d-flex align-items-center gap-1">
               {!readOnly && !rec.verified && !editMode && (
                 <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.72rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                   onClick={() => setEditMode(true)}
                   title="Edit Target/Achieved values">
                   <i className="bi bi-pencil" /> Edit
@@ -589,7 +589,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
               <span className="text-muted">Bonuses Earned</span>
               <span className="fw-medium text-info">+{formatPKR(bonAchieved)} / {formatPKR(bonTotal)}</span>
             </div>
-            <div className="d-flex justify-content-between fw-bold pt-2 mt-2" style={{ borderTop: '1.5px solid var(--border-subtle)' }}>
+            <div className="d-flex justify-content-between fw-bold pt-2 mt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
               <span>Total Earned</span>
               <span>{formatPKR((basic + incAchieved + bonAchieved))}</span>
             </div>
@@ -597,7 +597,7 @@ function UserDetailsModal({ rec, user, readOnly = false, canVerify = !readOnly, 
 
           {editMode && (
             <div className="alert d-flex align-items-start gap-2 py-2 mb-3"
-              style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 10, color: 'var(--warning-text)', fontSize: '0.78rem' }}>
+              style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning-text)', fontSize: '0.78rem' }}>
               <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" />
               <div>Edit Target / Achieved values below. Saving will verify the record and notify {user?.userName || user?.displayName} of the changes.</div>
             </div>
@@ -1009,7 +1009,7 @@ export default function OLIncentivesPage() {
         </div>
         <input type="month" className="form-control form-control-sm"
           value={month} onChange={e => setMonth(e.target.value)}
-          style={{ width: 160, fontSize: '0.8rem', borderRadius: 8 }} />
+          style={{ width: 160, fontSize: '0.8rem', borderRadius: 'var(--radius-sm)' }} />
       </div>
 
       {/* Combined payout snapshot — cumulative for the active management tab */}
@@ -1030,7 +1030,7 @@ export default function OLIncentivesPage() {
           <button key={t.key} onClick={() => setTab(t.key)}
             className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
             style={{
-              borderRadius: '8px 8px 0 0', fontWeight: 600, fontSize: '0.78rem',
+              borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', fontWeight: 600, fontSize: '0.78rem',
               background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
               color: tab === t.key ? 'var(--accent-text)' : 'var(--text-muted)',
               border: 'none', marginBottom: -2,
@@ -1057,7 +1057,7 @@ export default function OLIncentivesPage() {
           </div>
         ) : (
           <div style={{ maxWidth: 600 }}>
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ height: 4, background: myRecord.verified ? 'var(--success)' : 'var(--warning)' }} />
               <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' }}>
                 <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
@@ -1078,7 +1078,7 @@ export default function OLIncentivesPage() {
                 <div className="d-flex flex-column gap-1 mb-3" style={{ fontSize: '0.82rem' }}>
                   <div className="d-flex justify-content-between"><span className="text-muted">Basic Salary</span><span className="fw-medium">{formatPKR(myBasic)}</span></div>
                   <div className="d-flex justify-content-between"><span className="text-muted">Earned ({myCompleted.length}/{myAllItems.length} items)</span><span className="fw-medium text-success">+{formatPKR(myEarned)}</span></div>
-                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1.5px solid var(--border-subtle)', fontSize: '0.9rem' }}>
+                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1px solid var(--border-subtle)', fontSize: '0.9rem' }}>
                     <span>Total Earned</span><span>{formatPKR(myTotalEarned)}</span>
                   </div>
                   <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>Potential: {formatPKR((myBasic + myPotential))}</div>
@@ -1092,7 +1092,7 @@ export default function OLIncentivesPage() {
                 </div>
                 {!myRecord.payoutCleared && (
                   <button className="btn btn-sm btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={() => setShowEditOwn(true)}>
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }} onClick={() => setShowEditOwn(true)}>
                     <i className="bi bi-pencil" /> Edit Progress
                   </button>
                 )}
@@ -1135,12 +1135,12 @@ export default function OLIncentivesPage() {
                   style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
                 <input type="text" className="form-control form-control-sm"
                   placeholder={`Search ${tabNoun}…`}
-                  style={{ paddingLeft: 28, borderRadius: 8 }}
+                  style={{ paddingLeft: 28, borderRadius: 'var(--radius-sm)' }}
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               <select className="form-select form-select-sm"
                 value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                style={{ width: 160, borderRadius: 8 }}>
+                style={{ width: 160, borderRadius: 'var(--radius-sm)' }}>
                 <option value="">All Statuses</option>
                 <option value="no_plan">No Plan</option>
                 <option value="has_plan">With Plan</option>
@@ -1150,7 +1150,7 @@ export default function OLIncentivesPage() {
               {!readOnly && teamOptions.length > 0 && (
                 <select className="form-select form-select-sm"
                   value={filterTeam} onChange={e => setFilterTeam(e.target.value)}
-                  style={{ width: 180, borderRadius: 8 }}>
+                  style={{ width: 180, borderRadius: 'var(--radius-sm)' }}>
                   <option value="">All Teams</option>
                   {teamOptions.map(t => (
                     <option key={t.id} value={t.id}>Team {t.name}</option>
@@ -1159,7 +1159,7 @@ export default function OLIncentivesPage() {
               )}
               {hasFilters && (
                 <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={clearFilters}>
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={clearFilters}>
                   <i className="bi bi-x-circle" /> Clear
                 </button>
               )}
@@ -1170,7 +1170,7 @@ export default function OLIncentivesPage() {
           )}
 
           {list.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
               <i className="bi bi-people text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">
                 {hasFilters
@@ -1192,7 +1192,7 @@ export default function OLIncentivesPage() {
                 const breakdown = hasData ? calcBreakdown(rec) : null;
                 return (
                   <div key={user.id} className="col-md-6 col-xl-4">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
+                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                       <div style={{ height: 4, background: hasData ? (rec.verified ? 'var(--success)' : 'var(--warning)') : 'var(--surface-3)' }} />
                       <div className="card-body p-3">
                         <div className="d-flex align-items-center gap-2 mb-2">
@@ -1238,13 +1238,13 @@ export default function OLIncentivesPage() {
                             </div>
                             <div className="d-flex gap-1">
                               <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.7rem' }}
+                                style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.7rem' }}
                                 onClick={() => setDetailsTarget({ user, rec })}>
                                 <i className="bi bi-eye" /> Details
                               </button>
                               {!readOnly && (
                                 <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 btn-primary"
-                                  style={{ borderRadius: 8, fontSize: '0.7rem' }}>
+                                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}>
                                   <i className="bi bi-pencil" /> Edit Plan
                                 </Link>
                               )}
@@ -1256,7 +1256,7 @@ export default function OLIncentivesPage() {
                           </div>
                         ) : (
                           <Link to={`/incentives/edit/${user.id}?month=${encodeURIComponent(month)}`} className="btn btn-sm btn-outline-dark w-100 d-inline-flex align-items-center justify-content-center gap-1"
-                            style={{ borderRadius: 8, fontSize: '0.72rem' }}>
+                            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}>
                             <i className="bi bi-plus-lg" /> Create Plan
                           </Link>
                         )}

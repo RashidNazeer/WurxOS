@@ -26,7 +26,7 @@ export function IssueList({ section }) {
   return (
     <ul role="alert" className="mb-3"
       style={{
-        listStyle: 'none', padding: '10px 12px', borderRadius: 10,
+        listStyle: 'none', padding: '10px 12px', borderRadius: 'var(--radius-md)',
         background: 'var(--danger-soft)', color: 'var(--danger-text)',
         border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
         fontSize: '0.78rem', fontWeight: 600, display: 'grid', gap: 4,

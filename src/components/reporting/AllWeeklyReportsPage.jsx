@@ -54,7 +54,7 @@ function Sparkbars({ values = [], color = 'var(--text-muted)', muted = 'var(--bo
         return (
           <div key={i} style={{
             flex: 1, minWidth: 4, height: `${Math.max(8, v)}%`,
-            background: isLast ? color : muted, borderRadius: 2,
+            background: isLast ? color : muted, borderRadius: 'var(--radius-xs)',
           }} />
         );
       })}
@@ -638,14 +638,14 @@ export default function AllWeeklyReportsPage() {
             <StatusBadge status={rStatus} />
             {canEdit && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                 onClick={() => setEditReportId(viewReport.id)}>
                 <i className="bi bi-pencil" /> Edit
               </button>
             )}
             {canEditDates && (
               <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                 onClick={() => setEditDatesReport(viewReport)}
                 title="Change just this report's start/end dates without touching siblings">
                 <i className="bi bi-calendar-event" /> Edit Dates
@@ -653,7 +653,7 @@ export default function AllWeeklyReportsPage() {
             )}
             {canVerifyAsTl && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', background: 'var(--purple)', color: 'var(--on-purple)', border: 'none' }}
                 onClick={() => handleVerifyAsTl(viewReport)}
                 title="Verify this submitted report (acting on behalf of the TL)">
                 <i className="bi bi-patch-check-fill" /> Verify as TL
@@ -661,14 +661,14 @@ export default function AllWeeklyReportsPage() {
             )}
             {canApprove && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem', background: 'var(--success)', color: 'var(--on-success)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', background: 'var(--success)', color: 'var(--on-success)', border: 'none' }}
                 onClick={() => handleApprove(viewReport)}>
                 <i className="bi bi-shield-check-fill" /> Approve
               </button>
             )}
             {canReject && (
               <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                 onClick={() => handleRejectToTL(viewReport)}>
                 <i className="bi bi-arrow-counterclockwise" /> Return to TL
               </button>
@@ -676,19 +676,19 @@ export default function AllWeeklyReportsPage() {
             {canReopen && (
               <>
                 <button className="btn btn-sm btn-outline-warning d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                   onClick={() => handleReopenForEdit(viewReport)}
                   title="Move back to verified so you can edit and re-approve">
                   <i className="bi bi-pencil-square" /> Reopen to Edit
                 </button>
                 <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                   onClick={() => handleReopenToTL(viewReport)}
                   title="Send back to Team Lead for revision">
                   <i className="bi bi-arrow-counterclockwise" /> Send Back to TL
                 </button>
                 <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                   onClick={() => handleReopenToAPC(viewReport)}
                   title="Send back to APC for revision">
                   <i className="bi bi-arrow-counterclockwise" /> Send Back to APC
@@ -699,13 +699,13 @@ export default function AllWeeklyReportsPage() {
             {reportActions && (
               <>
                 <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
-                  style={{ borderRadius: 8, fontSize: '0.9rem', color: reportActions.highlighterActive ? 'var(--warning)' : undefined, borderColor: reportActions.highlighterActive ? 'var(--warning)' : undefined }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', color: reportActions.highlighterActive ? 'var(--warning)' : undefined, borderColor: reportActions.highlighterActive ? 'var(--warning)' : undefined }}
                   onClick={reportActions.onToggleHighlighter}
                   title={reportActions.highlighterActive ? 'Highlighter on — click to stop' : 'Highlighter'}>
                   <i className="bi bi-highlighter" />
                 </button>
                 <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
-                  style={{ borderRadius: 8, fontSize: '0.9rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.9rem' }}
                   onClick={reportActions.onExportPdf} disabled={reportActions.pdfBusy}
                   title={reportActions.pdfBusy ? 'Exporting PDF…' : 'Export PDF'}>
                   <i className={`bi ${reportActions.pdfBusy ? 'bi-hourglass-split' : 'bi-file-earmark-pdf'}`} />
@@ -730,7 +730,7 @@ export default function AllWeeklyReportsPage() {
         />
         {viewReport.rejectionNote && (rStatus === 'submitted' || rStatus === 'draft') && (
           <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
+            style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--danger)' }}>
             <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
             <div>
               <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Returned for revision</div>
@@ -835,7 +835,7 @@ export default function AllWeeklyReportsPage() {
         <div className="col-6 col-xl">
           <div className="rounded-3 h-100 p-3" role="button" tabIndex={0}
             style={{ background: 'var(--surface-1)', cursor: 'pointer', position: 'relative',
-                     border: filterStatus === 'draft' ? '1.5px solid var(--text-secondary)' : '1px solid var(--border-subtle)' }}
+                     border: filterStatus === 'draft' ? '2px solid var(--text-secondary)' : '1px solid var(--border-subtle)' }}
             onClick={() => setFilterStatus(filterStatus === 'draft' ? '' : 'draft')}
             onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setFilterStatus(filterStatus === 'draft' ? '' : 'draft'); } }}
             title="Click to show only draft reports">
@@ -868,7 +868,7 @@ export default function AllWeeklyReportsPage() {
         <div className="col-6 col-xl">
           <div className="rounded-3 h-100 p-3" role="button" tabIndex={0}
             style={{ background: 'var(--surface-1)', cursor: 'pointer', position: 'relative',
-                     border: filterStatus === 'submitted' ? '1.5px solid var(--info)' : '1px solid var(--border-subtle)' }}
+                     border: filterStatus === 'submitted' ? '2px solid var(--info)' : '1px solid var(--border-subtle)' }}
             onClick={() => setFilterStatus(filterStatus === 'submitted' ? '' : 'submitted')}
             onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setFilterStatus(filterStatus === 'submitted' ? '' : 'submitted'); } }}
             title="Click to show only submitted reports">
@@ -903,7 +903,7 @@ export default function AllWeeklyReportsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilterStatus(filterStatus === 'approved' ? '' : 'approved')}
             title="Click to filter approved reports">
-            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'approved' ? '1.5px solid var(--success)' : '1px solid var(--border-subtle)' }}>
+            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'approved' ? '2px solid var(--success)' : '1px solid var(--border-subtle)' }}>
               <div className="d-flex align-items-start justify-content-between mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
                   style={{ width: 30, height: 30, background: 'var(--success-soft)' }}>
@@ -929,7 +929,7 @@ export default function AllWeeklyReportsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilterStatus(filterStatus === 'verified' ? '' : 'verified')}
             title="Click to filter pending approval">
-            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'verified' ? '1.5px solid var(--warning)' : '1px solid var(--border-subtle)' }}>
+            <div className="rounded-3 h-100 p-3" style={{ background: 'var(--surface-1)', border: filterStatus === 'verified' ? '2px solid var(--warning)' : '1px solid var(--border-subtle)' }}>
               <div className="d-flex align-items-start justify-content-between mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
                   style={{ width: 30, height: 30, background: 'var(--warning-soft)' }}>
@@ -978,7 +978,7 @@ export default function AllWeeklyReportsPage() {
           <div className="position-relative" style={{ flex: '1 1 240px', minWidth: 200, maxWidth: 360 }}>
             <i className="bi bi-search position-absolute text-muted" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', pointerEvents: 'none' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search brand…"
-              style={{ paddingLeft: 32, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}
+              style={{ paddingLeft: 32, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}
               value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
           </div>
 
@@ -1004,7 +1004,7 @@ export default function AllWeeklyReportsPage() {
               <i className="bi bi-sort-down me-1" />Sort
             </label>
             <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}
-              style={{ width: 158, borderRadius: 8, fontSize: '0.78rem' }}>
+              style={{ width: 158, borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}>
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
               <option value="gmv_desc">GMV: high → low</option>
@@ -1019,17 +1019,17 @@ export default function AllWeeklyReportsPage() {
       {/* Bulk action bar */}
       {canBulkDelete && selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 'var(--topbar-h, 0px)', zIndex: 'var(--z-sticky)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          style={{ position: 'sticky', top: 'var(--topbar-h, 0px)', zIndex: 'var(--z-sticky)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)' }}>
           <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.82rem' }}>
             <i className="bi bi-check2-square me-1" />
             {selected.size} selected
           </span>
-          <button className="btn btn-sm btn-outline-secondary ms-auto" style={{ borderRadius: 8, fontSize: '0.75rem' }}
+          <button className="btn btn-sm btn-outline-secondary ms-auto" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}
             onClick={clearSelected} disabled={bulkBusy}>
             Clear
           </button>
           <button className="btn btn-sm btn-danger d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
             onClick={handleBulkDelete} disabled={bulkBusy}>
             {bulkBusy ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-trash3" />}
             Delete {selected.size}
@@ -1133,8 +1133,8 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             style={{
               top: 8, left: 8, width: 24, height: 24,
               background: isSelected ? 'var(--danger)' : 'var(--surface-1)',
-              border: `1.5px solid ${isSelected ? 'var(--danger)' : 'var(--border-default)'}`,
-              borderRadius: 6, cursor: 'pointer', zIndex: 2,
+              border: `${isSelected ? '2px' : '1px'} solid ${isSelected ? 'var(--danger)' : 'var(--border-default)'}`,
+              borderRadius: 'var(--radius-sm)', cursor: 'pointer', zIndex: 2,
               boxShadow: 'var(--shadow-sm)',
             }}
             onClick={(e) => { e.stopPropagation(); onToggleSelect && onToggleSelect(); }}
@@ -1197,7 +1197,7 @@ function ReportCard({ r, brandReports, clientName, onClick, selectable = false, 
             exists, including growth/drop from $0 (capped to ±100%+). */}
         {gmvChange != null && seriesBars.length > 1 && (
           <div className="d-flex align-items-center gap-2 px-3 py-2"
-            style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-0)', borderRadius: '0 0 12px 12px' }}>
+            style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-0)', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}>
             <span className="text-muted" style={{ fontSize: '0.7rem' }}>vs prev week</span>
             <div className="flex-grow-1">
               <Sparkbars values={seriesBars} highlightLast color={changeColor} muted="var(--border-subtle)" />

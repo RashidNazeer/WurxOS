@@ -141,7 +141,7 @@ function AchievementCard({ type, month, record, onChanged }) {
   return (
     <div className="wx-card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center',
+        <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'grid', placeItems: 'center',
           background: 'color-mix(in srgb, var(--warning) 15%, transparent)', color: 'var(--warning)' }}>
           <StarIcon width="17" height="17" />
         </div>
@@ -292,7 +292,7 @@ function StatusPill({ record }) {
   return (
     <span style={{
       fontSize: 10.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-      padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap',
+      padding: '4px 10px', borderRadius: 'var(--radius-pill)', whiteSpace: 'nowrap',
       color: s.c,
       background: `color-mix(in srgb, ${s.c} 12%, transparent)`,
       border: `1px solid color-mix(in srgb, ${s.c} 30%, transparent)`,

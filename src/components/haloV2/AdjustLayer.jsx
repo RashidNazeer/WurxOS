@@ -144,7 +144,7 @@ export default function AdjustLayer({
               <span style={{ color: 'var(--text-secondary)' }}>Share of the combined figure that is same-{unit} movement</span>
               <strong style={{ color: sharePct >= 60 ? 'var(--warning)' : 'var(--text-primary)' }}>{sharePct}%</strong>
             </div>
-            <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden', display: 'flex' }}>
+            <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--surface-3)', overflow: 'hidden', display: 'flex' }}>
               <div style={{ width: `${Math.min(100, Math.max(0, sharePct))}%`, background: 'var(--warning)' }} />
               <div style={{ flex: 1, background: 'var(--accent)' }} />
             </div>

@@ -123,7 +123,7 @@ function GuestTeamCard({ team, people, busy, pickerOpen, pick, onPick, onOpenPic
   }, [people, roleMembers, explicitMembers]);
 
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
       <div className="card-body p-3">
         <div className="d-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap">
           <div>
@@ -136,7 +136,7 @@ function GuestTeamCard({ team, people, busy, pickerOpen, pick, onPick, onOpenPic
             </div>
           </div>
           <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.74rem' }}
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
             onClick={onOpenPicker}>
             <i className={`bi ${pickerOpen ? 'bi-x-lg' : 'bi-person-plus'}`} />
             {pickerOpen ? 'Cancel' : 'Add person'}
@@ -146,7 +146,7 @@ function GuestTeamCard({ team, people, busy, pickerOpen, pick, onPick, onOpenPic
         {pickerOpen && (
           <div className="rounded-2 p-2 mb-2" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <label className="form-label small fw-semibold mb-1">Add someone to {team.label}</label>
-            <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+            <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
               value={pick}
               disabled={busy === `add-${team.slug}`}
               onChange={(e) => { onPick(e.target.value); onAdd(team.slug, e.target.value); }}>
@@ -188,7 +188,7 @@ function GuestTeamCard({ team, people, busy, pickerOpen, pick, onPick, onOpenPic
                 <span className="text-muted" style={{ fontSize: '0.66rem' }}>{ROLE_LABEL[p.role] || p.role}</span>
                 <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center"
                   title="Remove from this guest team"
-                  style={{ fontSize: '0.6rem', borderRadius: 5, background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid var(--danger)' }}
+                  style={{ fontSize: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid var(--danger)' }}
                   disabled={busy === `rm-${team.slug}-${p.id}`}
                   onClick={() => onRemove(team.slug, p.id, p.display_name || p.email)}>
                   {busy === `rm-${team.slug}-${p.id}`

@@ -2,7 +2,7 @@
    Shared table / list layout
    ============================================================ */
 
-/* Segmented control — polished iOS-style two-button toggle used for
+/* Segmented control â€” polished iOS-style two-button toggle used for
    "Grid / List" view switchers and similar pairs. The selected
    button gets an inset accent pill that animates between positions. */
 .wx-segmented {
@@ -12,7 +12,7 @@
   gap: 2px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   height: 36px;
 }
 .wx-segmented-btn {
@@ -24,7 +24,7 @@
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 12.5px;
   font-weight: 600;
@@ -43,7 +43,7 @@
 /* HTML <table> styled as a clean data grid. Used by the Resource
    Planner Role Capacity tab and any other place that needs a
    semantic table. Cell padding here is what makes labels breathe
-   away from the left edge — without it cells render flush. */
+   away from the left edge â€” without it cells render flush. */
 .wx-table {
   width: 100%;
   border-collapse: separate;
@@ -215,7 +215,7 @@
   .wx-list-row > :nth-child(3) { display: none; }
   .wx-list-header { display: none; }
 
-  /* Resources table — mobile stacks rows vertically as cards. The
+  /* Resources table â€” mobile stacks rows vertically as cards. The
      6-column desktop grid is overridden so each cell becomes a row
      and labels self-explain inline rather than via a header strip. */
   .resource-table .resource-table-row {
@@ -249,8 +249,8 @@
   /* ---------- Leave (employee view) ----------
      7 cols on desktop: Type | Dates | Reason | Days | Paid/Unpaid | Status | Cancel
      Mobile: switch to flex column. The cells render top-to-bottom in
-     DOM order, which gives: Type → Dates → Reason → Days → Paid/Unpaid
-     → Status → Cancel. Each row is a card. */
+     DOM order, which gives: Type â†’ Dates â†’ Reason â†’ Days â†’ Paid/Unpaid
+     â†’ Status â†’ Cancel. Each row is a card. */
   .leave-table .leave-row,
   .leave-approvals-table .leave-approvals-row {
     display: flex !important;
@@ -271,7 +271,7 @@
   .leave-approvals-table .leave-approvals-row > * {
     width: 100%;
   }
-  /* Action buttons in approvals — left-align on mobile so they don't
+  /* Action buttons in approvals â€” left-align on mobile so they don't
      squish to the right edge. */
   .leave-approvals-table .leave-approvals-row > :last-child {
     justify-content: flex-start !important;
@@ -298,7 +298,7 @@
   position: fixed;
   inset: 0;
   background: var(--backdrop);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(var(--glass-blur-backdrop));
   z-index: var(--z-modal);
   display: grid;
   place-items: center;
@@ -339,7 +339,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
+  /* Same inset as body and footer, so the three share one edge inside the ring. */
+  margin: 0 var(--glass-rim-w-lg);
+  padding: 18px max(0px, calc(22px - var(--glass-rim-w-lg)));
   border-bottom: 1px solid var(--border-subtle);
   flex: 0 0 auto;
 }
@@ -349,7 +351,10 @@
   color: var(--text-primary);
 }
 .wx-modal-body {
-  padding: 20px 22px;
+  /* Text scrim, inset by the rim (padding gives it back; text doesn't move). */
+  background: var(--glass-text-scrim, color-mix(in srgb, var(--surface-1) 45%, transparent));
+  margin: 0 var(--glass-rim-w-lg);
+  padding: 20px max(0px, calc(22px - var(--glass-rim-w-lg)));
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
@@ -358,7 +363,7 @@
 .wx-modal-body::-webkit-scrollbar { width: 6px; }
 .wx-modal-body::-webkit-scrollbar-thumb {
   background: var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--surface-1);
 }
 .wx-modal-footer {
@@ -366,11 +371,11 @@
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding: 16px 22px;
+  padding: 16px max(0px, calc(22px - var(--glass-rim-w-lg)));
   border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-  /* Opaque and full-bleed, so it would cover the bottom of the rim ring —
-     inset it by the ring and take the ring's inner radius. */
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  /* A tint, not a slab. Inset by the ring and take the ring's inner radius so
+     it never covers the ring's bottom edge. */
   margin: 0 var(--glass-rim-w-lg) var(--glass-rim-w-lg);
   border-radius: 0 0 calc(var(--radius-glass) - var(--glass-rim-w-lg))
                        calc(var(--radius-glass) - var(--glass-rim-w-lg));

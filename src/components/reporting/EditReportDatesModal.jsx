@@ -67,12 +67,12 @@ function RangeEditor({ report, type, siblings, onSaved, onClose }) {
       <div className="row g-2 mb-3">
         <div className="col-6">
           <label className="form-label small fw-semibold">Start date</label>
-          <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+          <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
             value={startDate} onChange={e => setStartDate(e.target.value)} />
         </div>
         <div className="col-6">
           <label className="form-label small fw-semibold">End date</label>
-          <input type="date" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+          <input type="date" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
             value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
       </div>
@@ -140,14 +140,14 @@ function MonthlyEditor({ report, siblings, onSaved, onClose }) {
       <div className="row g-2 mb-3">
         <div className="col-6">
           <label className="form-label small fw-semibold">Month</label>
-          <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+          <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
             value={month} onChange={e => setMonth(Number(e.target.value))}>
             {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
         </div>
         <div className="col-6">
           <label className="form-label small fw-semibold">Year</label>
-          <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+          <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
             value={year} onChange={e => setYear(Number(e.target.value))}>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
@@ -179,7 +179,7 @@ function Shell({ title, subtitle, onClose, children }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14, overflow: 'hidden' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start justify-content-between mb-3">
             <div>
@@ -205,7 +205,7 @@ function Footer({ saving, disabled, onSave, onClose }) {
     <div className="d-flex justify-content-end gap-2">
       <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
       <button className="btn btn-sm btn-primary px-4 d-inline-flex align-items-center gap-1"
-        style={{ borderRadius: 8 }} onClick={onSave} disabled={saving || disabled}>
+        style={{ borderRadius: 'var(--radius-sm)' }} onClick={onSave} disabled={saving || disabled}>
         {saving ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Saving…</> : <><i className="bi bi-check-lg" /> Save dates</>}
       </button>
     </div>

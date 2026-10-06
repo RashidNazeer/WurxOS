@@ -128,7 +128,7 @@ export default function BrandSwitcherPage() {
         <button type="button" className={`wx-seg-btn ${tab === 'pending' ? 'is-active' : ''}`}
           onClick={() => setTab('pending')}>
           Pending {pending.length > 0 && <span style={{
-            marginLeft: 6, padding: '1px 7px', borderRadius: 999,
+            marginLeft: 6, padding: '1px 7px', borderRadius: 'var(--radius-pill)',
             background: 'color-mix(in srgb, var(--accent) 22%, transparent)',
             color: 'var(--accent)', fontSize: 10.5,
           }}>{pending.length}</span>}
@@ -136,7 +136,7 @@ export default function BrandSwitcherPage() {
         <button type="button" className={`wx-seg-btn ${tab === 'covering' ? 'is-active' : ''}`}
           onClick={() => setTab('covering')}>
           <ClockIcon width="13" height="13" /> Covering {covering.length > 0 && <span style={{
-            marginLeft: 6, padding: '1px 7px', borderRadius: 999,
+            marginLeft: 6, padding: '1px 7px', borderRadius: 'var(--radius-pill)',
             background: 'color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent)',
             color: 'var(--warning, #b45309)', fontSize: 10.5,
           }}>{covering.length}</span>}
@@ -316,7 +316,7 @@ function RequestRow({ row, isBoss, currentUserId, onDecide, onCancel }) {
 
   return (
     <div className={`bsw-req ${pending ? 'is-pending' : ''}`}>
-      <BrandAvatar brand={row.brand} size={36} radius={8} />
+      <BrandAvatar brand={row.brand} size={36} radius={6} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>{row.brand?.brand_name || '—'}</div>
         <div className="bsw-req-meta">
@@ -389,7 +389,7 @@ function CoveringRow({ row, onEndNow }) {
   const daysLeft = Math.max(0, Math.ceil((new Date(row.ends_at) - Date.now()) / 86400000));
   return (
     <div className="bsw-req">
-      <BrandAvatar brand={row.brand} size={36} radius={8} />
+      <BrandAvatar brand={row.brand} size={36} radius={6} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>{row.brand?.brand_name || '—'}</div>
         <div className="bsw-req-meta">
@@ -452,7 +452,7 @@ function ActionChip({ action }) {
         ? 'Swap: both APCs exchange their whole brand portfolios.'
         : 'Assign: only this brand moves; the new APC keeps their own.'}
       style={{
-        padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+        padding: '1px 7px', borderRadius: 'var(--radius-pill)', fontSize: 10, fontWeight: 800,
         letterSpacing: '0.04em', textTransform: 'uppercase',
         background: swap
           ? 'color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent)'

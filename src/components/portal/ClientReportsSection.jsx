@@ -275,7 +275,7 @@ export default function ClientReportsSection({
     <div>
       {/* Hero header — matches v1's dark gradient + "{type} Reports" title */}
       <div className="card border-0 shadow-sm mb-4" style={{
-        borderRadius: 14, background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
+        borderRadius: 'var(--radius-lg)', background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
       }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center gap-3">
@@ -303,7 +303,7 @@ export default function ClientReportsSection({
               <button
                 className={`nav-link ${activeType === t ? 'active' : ''}`}
                 style={{
-                  fontSize: '0.82rem', borderRadius: 8, fontWeight: 600,
+                  fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', fontWeight: 600,
                   background: activeType === t ? 'var(--accent)' : 'var(--surface-1)',
                   color: activeType === t ? 'var(--on-accent)' : 'var(--text-primary)',
                   border: '1px solid var(--border-subtle)',
@@ -321,13 +321,13 @@ export default function ClientReportsSection({
           recent commit (515cf30) removed the date filter; clients see
           every approved report. */}
       {brandOptions.length > 1 && (
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <span className="text-muted small">
               {filtered.length} approved report{filtered.length !== 1 ? 's' : ''}
             </span>
             <select className="form-select form-select-sm" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}
-              style={{ width: 200, borderRadius: 8 }}>
+              style={{ width: 200, borderRadius: 'var(--radius-sm)' }}>
               <option value="">All Brands</option>
               {brandOptions.map(b => <option key={b}>{b}</option>)}
             </select>
@@ -368,7 +368,7 @@ export default function ClientReportsSection({
                 return (
                   <div key={r.id} className="col-md-6 col-lg-4">
                     <div className="card border-0 shadow-sm h-100"
-                      style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
+                      style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                       onClick={() => setViewReport(r)}
                       onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -416,7 +416,7 @@ export default function ClientReportsSection({
                         <button
                           type="button"
                           className="btn btn-sm w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                          style={{ borderRadius: 9, fontSize: '0.72rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+                          style={{ borderRadius: 'var(--radius-md)', fontSize: '0.72rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
                           onClick={(e) => { e.stopPropagation(); handleCardExport(r, brandReports); }}
                           disabled={!!pendingExport}
                           title="Download this report as a single-page PDF">

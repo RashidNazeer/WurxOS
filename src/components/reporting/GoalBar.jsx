@@ -19,7 +19,7 @@ export function UnlimitedGoalNote({ approved, label = 'Sample goal', note = 'No 
       </span>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <span style={{
-          padding: '2px 9px', borderRadius: 999, fontWeight: 700, letterSpacing: '0.02em',
+          padding: '2px 9px', borderRadius: 'var(--radius-pill)', fontWeight: 700, letterSpacing: '0.02em',
           color: 'var(--success)',
           background: 'color-mix(in srgb, var(--success) 12%, transparent)',
           border: '1px solid color-mix(in srgb, var(--success) 32%, transparent)',
@@ -58,8 +58,8 @@ export default function GoalBar({ approved, goal, label, compact = false }) {
             : <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>· {pending.toLocaleString()} pending</span>}
         </span>
       </div>
-      <div style={{ height: compact ? 6 : 8, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
+      <div style={{ height: compact ? 6 : 8, background: 'var(--surface-2)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: 'var(--radius-pill)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );

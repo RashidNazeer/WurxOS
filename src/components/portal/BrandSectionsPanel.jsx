@@ -166,7 +166,7 @@ export default function BrandSectionsPanel({
   if (readOnly && sections.length === 0) return null;
 
   return (
-    <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: 14 }}>
+    <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: 'var(--radius-lg)' }}>
       <div className="card-body p-3">
         <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
           <div>
@@ -184,7 +184,7 @@ export default function BrandSectionsPanel({
           </div>
           {!readOnly && !adding && (
             <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8, fontSize: '0.74rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
               onClick={() => { setAdding(true); setNewName(''); setError(''); }}>
               <i className="bi bi-plus-lg" /> Add Section
             </button>
@@ -203,7 +203,7 @@ export default function BrandSectionsPanel({
             <input type="text" className="form-control form-control-sm" autoFocus
               value={newName} onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g. Client Notes, Action Items, Feedback"
-              style={{ borderRadius: 8 }}
+              style={{ borderRadius: 'var(--radius-sm)' }}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }} />
             <div className="d-flex justify-content-end gap-2 mt-2">
               <button className="btn btn-sm btn-outline-secondary"

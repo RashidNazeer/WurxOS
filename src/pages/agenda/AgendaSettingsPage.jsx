@@ -33,7 +33,7 @@ export default function AgendaSettingsPage() {
             style={{
               background: tab === t.key ? 'var(--accent)' : 'transparent',
               color: tab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)',
-              border: 'none', borderRadius: 8, padding: '6px 14px',
+              border: 'none', borderRadius: 'var(--radius-sm)', padding: '6px 14px',
               fontSize: '0.78rem', fontWeight: 700,
             }}
             onClick={() => setTab(t.key)}>
@@ -90,14 +90,14 @@ function GeneralTab() {
   return (
     <>
       {error && <div className="alert alert-danger py-2 small">{error}</div>}
-      <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+      <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="mb-4">
             <label className="form-label small fw-semibold d-flex align-items-center gap-2">
               <i className="bi bi-camera-video text-primary" />
               Permanent Google Meet Link
             </label>
-            <input type="url" className="form-control" style={{ borderRadius: 8 }}
+            <input type="url" className="form-control" style={{ borderRadius: 'var(--radius-sm)' }}
               placeholder="https://meet.google.com/abc-defg-hij"
               value={meetLink} onChange={(e) => setMeetLink(e.target.value)} />
             <div className="text-muted mt-1" style={{ fontSize: '0.74rem' }}>
@@ -111,7 +111,7 @@ function GeneralTab() {
           </div>
 
           <div className="d-flex align-items-center gap-2">
-            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)' }}
               onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save settings</>}
             </button>

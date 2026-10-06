@@ -52,7 +52,7 @@ function LinkCard({ link, accent }) {
       style={{
         background: 'var(--surface-1)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 12,
+        borderRadius: 'var(--radius-md)',
         padding: '14px 16px',
         color: 'var(--text-primary)',
         transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
@@ -69,7 +69,7 @@ function LinkCard({ link, accent }) {
       }}
       title={link.url}>
       <div style={{
-        width: 42, height: 42, borderRadius: 10,
+        width: 42, height: 42, borderRadius: 'var(--radius-md)',
         background: kind.bg, color: kind.tint,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
@@ -81,7 +81,7 @@ function LinkCard({ link, accent }) {
           <span style={{
             fontSize: '0.62rem', fontWeight: 600,
             background: kind.bg, color: kind.tint,
-            padding: '1px 7px', borderRadius: 999,
+            padding: '1px 7px', borderRadius: 'var(--radius-pill)',
             letterSpacing: '0.02em',
           }}>{kind.label}</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -135,12 +135,12 @@ function StandaloneSection({ section, accent }) {
     <div className="mt-3" style={{
       background: 'var(--surface-1)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: 14,
+      borderRadius: 'var(--radius-lg)',
       padding: '20px 22px',
     }}>
       <div className="d-flex align-items-center gap-3 mb-3">
         <div style={{
-          width: 38, height: 38, borderRadius: 10,
+          width: 38, height: 38, borderRadius: 'var(--radius-md)',
           background: mix(accent, 8), color: accent,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>

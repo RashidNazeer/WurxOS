@@ -91,7 +91,7 @@ export default function AppearanceSection() {
                 border:     on ? 'none' : '1px solid var(--border-subtle)',
                 fontWeight: 600,
                 padding: '8px 14px',
-                borderRadius: 10,
+                borderRadius: 'var(--radius-md)',
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}
             >
@@ -108,7 +108,7 @@ export default function AppearanceSection() {
 // Mini mock-up rendered with the real theme tokens: nesting data-theme
 // re-scopes every token inside, so the preview always matches the theme.
 function ThemePreview({ theme }) {
-  const bar = (bg, width, height = 5) => <div style={{ background: bg, width, height, borderRadius: 3 }} />;
+  const bar = (bg, width, height = 5) => <div style={{ background: bg, width, height, borderRadius: 'var(--radius-xs)' }} />;
   return (
     <div data-theme={theme} data-bs-theme={theme} style={{
       height: '100%',
@@ -122,7 +122,7 @@ function ThemePreview({ theme }) {
       <div style={{ flex: 1 }} />
       <div style={{ display: 'flex', gap: 4 }}>
         {bar('var(--accent)', 28, 12)}
-        <div style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', width: 36, height: 12, borderRadius: 3 }} />
+        <div style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', width: 36, height: 12, borderRadius: 'var(--radius-xs)' }} />
       </div>
     </div>
   );

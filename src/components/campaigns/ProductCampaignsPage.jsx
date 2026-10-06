@@ -282,8 +282,8 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 14, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0', flexShrink: 0 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', flexShrink: 0 }}>
           <div>
             <h6 className="fw-bold mb-0">{isEdit ? 'Edit Campaign' : 'Add Campaign'}</h6>
             <p className="text-muted small mb-0">{brandName}</p>
@@ -478,7 +478,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
                                 <div className="d-flex align-items-center gap-1" style={{ flex: '0 0 auto' }}>
                                   <span className="text-muted" style={{ fontSize: '0.62rem' }}>−$</span>
                                   <input type="number" step="0.01" className="form-control form-control-sm"
-                                    style={{ width: 90, fontSize: '0.78rem', borderRadius: 6 }}
+                                    style={{ width: 90, fontSize: '0.78rem', borderRadius: 'var(--radius-sm)' }}
                                     value={overrideVal != null ? overrideVal : ''}
                                     placeholder={String(pr.discount || 0)}
                                     onChange={e => setSkuPromoDiscount(idx, pr.id, e.target.value)} />
@@ -667,26 +667,26 @@ export default function ProductCampaignsPage() {
 
       {/* Filters */}
       {products.length > 0 && (
-        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             <div className="d-flex flex-wrap gap-2 align-items-center">
               <div className="position-relative" style={{ flex: '1 1 180px', minWidth: 160 }}>
                 <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
                 <input type="text" className="form-control form-control-sm" placeholder="Search products..."
-                  style={{ paddingLeft: 30, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+                  style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 140 }}
+              <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 140 }}
                 value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                 <option value="">All Brands</option>
                 {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 120 }}
+              <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 120 }}
                 value={filterType} onChange={e => setFilterType(e.target.value)}>
                 <option value="">All Types</option>
                 <option value="focus">Focus</option>
                 <option value="non-focus">Non-Focus</option>
               </select>
-              <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 130 }}
+              <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 130 }}
                 value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                 <option value="">All Status</option>
                 <option value="active">Active Promos</option>
@@ -694,7 +694,7 @@ export default function ProductCampaignsPage() {
                 <option value="expired">All Expired</option>
               </select>
               {(search || filterBrand || filterType || filterStatus) && (
-                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.75rem' }}
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}
                   onClick={() => { setSearch(''); setFilterBrand(''); setFilterType(''); setFilterStatus(''); }}>
                   <i className="bi bi-x-circle me-1" /> Clear
                 </button>
@@ -710,7 +710,7 @@ export default function ProductCampaignsPage() {
           <span className="spinner-border spinner-border-sm" /> Loading...
         </div>
       ) : products.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 12 }}>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-md)' }}>
           <i className="bi bi-megaphone" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }} />
           <p className="fw-semibold mt-3 mb-1" style={{ color: 'var(--text-primary)' }}>No campaigns yet</p>
           <p className="small mb-3" style={{ color: 'var(--text-muted)' }}>Add your first product campaign to track promotions and expiry dates.</p>
@@ -730,7 +730,7 @@ export default function ProductCampaignsPage() {
 
             return (
               <div key={`${p._brandId}-${p.id}`} className="col-md-6 col-lg-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div style={{ height: 4, background: urgent ? 'var(--danger)' : activePromos.length > 0 ? 'var(--success)' : 'var(--text-muted)' }} />
                   <div className="card-body p-4">
                     {/* Header */}
@@ -908,8 +908,8 @@ function BrandPickerModal({ brands, onPick, onClose }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 380, zIndex: 1, borderRadius: 14, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: '14px 14px 0 0', flexShrink: 0 }}>
+        style={{ position: 'relative', width: '100%', maxWidth: 380, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', flexShrink: 0 }}>
           <h6 className="fw-bold mb-0">Select Brand</h6>
           <button className="btn btn-sm btn-light border-0 px-2" onClick={onClose}><i className="bi bi-x-lg" /></button>
         </div>
@@ -917,7 +917,7 @@ function BrandPickerModal({ brands, onPick, onClose }) {
           <div className="position-relative">
             <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search brands…"
-              style={{ paddingLeft: 30, borderRadius: 8 }}
+              style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }}
               value={q} onChange={e => setQ(e.target.value)} autoFocus />
           </div>
         </div>

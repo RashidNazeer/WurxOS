@@ -85,7 +85,7 @@ function RejectModal({ request, onConfirm, onCancel, saving }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--danger-soft)' }}>
@@ -124,7 +124,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--success-soft)' }}>
@@ -238,7 +238,7 @@ function ExportModal({ defaultMonth, onConfirm, onCancel }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onCancel} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--surface-2)' }}>
@@ -256,7 +256,7 @@ function ExportModal({ defaultMonth, onConfirm, onCancel }) {
               <span className="small fw-semibold">A specific month</span>
             </label>
             <input type="month" className="form-control form-control-sm"
-              style={{ borderRadius: 8 }} value={month}
+              style={{ borderRadius: 'var(--radius-sm)' }} value={month}
               onChange={e => { setMonth(e.target.value); setScope('month'); }} />
           </div>
           <label className="d-flex align-items-center gap-2 mb-3" style={{ cursor: 'pointer' }}>
@@ -523,7 +523,7 @@ export default function BossLeaveRequestsPage() {
           </h5>
           <p className="text-muted small mb-0">Review, approve, and track all employee requests · Quotas reset monthly</p>
         </div>
-        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={() => setExportOpen(true)} disabled={requests.length === 0}>
+        <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }} onClick={() => setExportOpen(true)} disabled={requests.length === 0}>
           <i className="bi bi-download" style={{ fontSize: '0.72rem' }} /> Export CSV
         </button>
       </div>
@@ -561,7 +561,7 @@ export default function BossLeaveRequestsPage() {
       </div>
 
       {activeTab === 'unpaid' && isBossOnly && (
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12, borderLeft: '4px solid var(--warning)' }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--warning)' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-2">
               <i className="bi bi-exclamation-triangle text-warning" />
@@ -598,19 +598,19 @@ export default function BossLeaveRequestsPage() {
       )}
 
       {activeTab !== 'unpaid' && (
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             <div className="d-flex flex-wrap gap-2 align-items-center">
               <div className="position-relative" style={{ flex: '1 1 200px', minWidth: 180 }}>
                 <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
-                <input type="text" className="form-control form-control-sm" placeholder="Search by name, email, reason…" style={{ paddingLeft: 30, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+                <input type="text" className="form-control form-control-sm" placeholder="Search by name, email, reason…" style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 160 }} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+              <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 160 }} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
                 <option value="">All Categories</option>
                 {REQUEST_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
               {(search || filterCategory) && (
-                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.75rem' }} onClick={() => { setSearch(''); setFilterCategory(''); }}>
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }} onClick={() => { setSearch(''); setFilterCategory(''); }}>
                   <i className="bi bi-x-circle" /> Clear
                 </button>
               )}
@@ -622,7 +622,7 @@ export default function BossLeaveRequestsPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : filtered.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-file-earmark-text text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
@@ -637,7 +637,7 @@ export default function BossLeaveRequestsPage() {
             const title = getRequestTitle(r);
 
             return (
-              <div key={r.id} className="card border-0 shadow-sm" style={{ borderRadius: 12, borderLeft: `4px solid ${catCfg.color}` }}>
+              <div key={r.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', borderLeft: `4px solid ${catCfg.color}` }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-start justify-content-between">
                     <div className="d-flex gap-3 flex-grow-1">
@@ -726,11 +726,11 @@ export default function BossLeaveRequestsPage() {
                       {r.status === 'pending_boss' && (
                         <div className="d-flex gap-1">
                           <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2"
-                            style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => openApproveModal(r)}>
+                            style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }} onClick={() => openApproveModal(r)}>
                             <i className="bi bi-check" /> Approve
                           </button>
                           <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 px-2"
-                            style={{ fontSize: '0.7rem', borderRadius: 6 }} onClick={() => setRejectTarget(r)}>
+                            style={{ fontSize: '0.7rem', borderRadius: 'var(--radius-sm)' }} onClick={() => setRejectTarget(r)}>
                             <i className="bi bi-x" /> Reject
                           </button>
                         </div>

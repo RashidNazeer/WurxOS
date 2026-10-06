@@ -42,7 +42,7 @@ export default function RateApcModal({
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, maxHeight: '88vh', zIndex: 1, borderRadius: 14, display: 'flex', flexDirection: 'column' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, maxHeight: '88vh', zIndex: 1, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column' }}>
         {/* header */}
         <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="min-w-0">
@@ -73,7 +73,7 @@ export default function RateApcModal({
                     They forgot to click Present or were away. You can still score their week — mark them as presented so it’s on record everywhere.
                   </div>
                   <button className="btn btn-sm mt-2 d-inline-flex align-items-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.72rem', fontWeight: 700, background: 'var(--warning)', color: 'var(--on-warning)', border: 'none' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', fontWeight: 700, background: 'var(--warning)', color: 'var(--on-warning)', border: 'none' }}
                     disabled={marking} onClick={doMarkPresented}>
                     {marking
                       ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Marking…</>

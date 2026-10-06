@@ -259,7 +259,7 @@ export default function PaidCollabDashboardPage() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <span style={{
-                  width: 28, height: 28, borderRadius: 6,
+                  width: 28, height: 28, borderRadius: 'var(--radius-sm)',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                   fontSize: 10, fontWeight: 700, color: 'var(--text-inverse)',
@@ -322,7 +322,7 @@ function StatCard({ icon, label, value, tone, sub }) {
   return (
     <div className="wx-card" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 12,
+        width: 44, height: 44, borderRadius: 'var(--radius-md)',
         background: `color-mix(in srgb, ${tone} 9%, transparent)`, color: tone,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
@@ -348,8 +348,8 @@ function StatusBar({ label, done, total, color }) {
         <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
         <span style={{ color: 'var(--text-muted)' }}>{done}/{total} ({pct}%)</span>
       </div>
-      <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
+      <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 'var(--radius-pill)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );
@@ -369,7 +369,7 @@ function Pill({ status, kind }) {
   const meta = map[status] || { bg: '#f3f4f6', fg: '#475569', label: '—' };
   return (
     <span style={{
-      padding: '2px 8px', borderRadius: 999,
+      padding: '2px 8px', borderRadius: 'var(--radius-pill)',
       fontSize: 10, fontWeight: 700,
       background: meta.bg, color: meta.fg,
       whiteSpace: 'nowrap',

@@ -147,7 +147,7 @@ export default function CreatorLibrarySection() {
               <li><strong>Deploy → New deployment → Web app</strong>. Execute as <strong>Me</strong>, Who has access <strong>Anyone</strong>. Authorize.</li>
               <li>Copy the <strong>/exec</strong> URL into “Web App URL” above and <strong>Save</strong>.</li>
             </ol>
-            <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 10, fontSize: 11, overflowX: 'auto', maxHeight: 260 }}>{script}</pre>
+            <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: 10, fontSize: 11, overflowX: 'auto', maxHeight: 260 }}>{script}</pre>
           </>
         )}
       </div>

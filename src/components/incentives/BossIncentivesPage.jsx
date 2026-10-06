@@ -107,7 +107,7 @@ function DetailsModal({ rec, userName, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -164,7 +164,7 @@ function ResetModal({ defaultSource, defaultTarget, recordCount, onConfirm, onCl
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
@@ -229,7 +229,7 @@ function ClearPayoutConfirmModal({ userName, roleTab, onConfirm, onClose, cleari
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
@@ -428,7 +428,7 @@ export default function BossIncentivesPage() {
       {/* History banner */}
       {!isCurrentMonth && (
         <div className="alert py-2 d-flex align-items-center gap-2 mb-3"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 10, fontSize: '0.78rem', color: 'var(--warning-text)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', color: 'var(--warning-text)' }}>
           <i className="bi bi-clock-history" />
           Viewing history for <strong>{getMonthLabel(month)}</strong>
           <button className="btn btn-sm btn-link text-decoration-none p-0 ms-auto" style={{ color: 'var(--warning-text)', fontSize: '0.75rem' }}
@@ -450,7 +450,7 @@ export default function BossIncentivesPage() {
             onClick={() => { setTab(t.key); setSearch(''); setStatusFilter('all'); }}
             className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
             style={{
-              borderRadius: '8px 8px 0 0', fontWeight: 600, fontSize: '0.78rem',
+              borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', fontWeight: 600, fontSize: '0.78rem',
               background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
               color: tab === t.key ? 'var(--accent-text)' : 'var(--text-muted)',
               border: 'none', marginBottom: -2,
@@ -502,7 +502,7 @@ export default function BossIncentivesPage() {
           <span className="spinner-border spinner-border-sm" /> Loading…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
           <i className="bi bi-inbox text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
           <p className="text-muted mt-3 mb-0">
             {search || statusFilter !== 'all' ? 'No matching results.' : `No ${TABS.find(t => t.key === tab)?.label} found.`}
@@ -527,7 +527,7 @@ export default function BossIncentivesPage() {
 
             return (
               <div key={u.id} className="col-sm-6 col-lg-4">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
+                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div style={{ height: 4, background: barColor }} />
                   <div className="card-body p-3 d-flex flex-column">
 
@@ -621,7 +621,7 @@ export default function BossIncentivesPage() {
                           style={{
                             background: hasData ? 'var(--accent)' : 'transparent',
                             color: hasData ? 'var(--on-accent)' : 'var(--accent-text)',
-                            border: '1.5px solid var(--accent)', borderRadius: 8, fontSize: '0.75rem',
+                            border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem',
                           }}
                           onClick={() => navigate(`/incentives/edit/${u.id}`)}>
                           <i className={`bi ${hasData ? 'bi-pencil' : 'bi-plus-lg'}`} /> {hasData ? 'Edit' : 'Add'}
@@ -629,7 +629,7 @@ export default function BossIncentivesPage() {
                         {hasData && (
                           <button
                             className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                            style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}
+                            style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.75rem' }}
                             onClick={() => setShowDetails({ rec, name: u.name })}>
                             <i className="bi bi-eye" /> Details
                           </button>
@@ -643,13 +643,13 @@ export default function BossIncentivesPage() {
                             !rec.verified ? (
                               <button
                                 className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', border: '1.5px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
+                                style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', border: '1px solid color-mix(in srgb, var(--warning) 40%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}
                                 onClick={() => handleVerify(u.id)} disabled={verifying === u.id}>
                                 {verifying === u.id ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-patch-check" /> Verify</>}
                               </button>
                             ) : (
                               <div className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1.5px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem', cursor: 'default' }}>
+                                style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'default' }}>
                                 <i className="bi bi-patch-check-fill" /> Verified
                               </div>
                             )
@@ -659,14 +659,14 @@ export default function BossIncentivesPage() {
                           {!rec.payoutCleared ? (
                             <button
                               className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: 'var(--info-soft)', color: 'var(--info-text)', border: '1.5px solid color-mix(in srgb, var(--info) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
+                              style={{ background: 'var(--info-soft)', color: 'var(--info-text)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}
                               onClick={() => rec.verified ? handleClearPayout(u.id) : setConfirmClear({ userId: u.id, userName: u.name })}
                               disabled={clearing === u.id}>
                               {clearing === u.id ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-cash-stack" /> Clear Payout</>}
                             </button>
                           ) : (
                             <div className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1.5px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem', cursor: 'default' }}>
+                              style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'default' }}>
                               <i className="bi bi-check-circle-fill" /> Cleared
                             </div>
                           )}

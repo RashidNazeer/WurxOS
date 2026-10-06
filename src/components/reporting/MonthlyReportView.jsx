@@ -144,7 +144,7 @@ function DeltaPill({ pct, size = 'sm' }) {
         fontSize, fontWeight: 600,
         color: up ? C.green : C.red,
         background: up ? C.greenSoft : C.redSoft,
-        padding: '2px 8px', borderRadius: 999, lineHeight: 1.2,
+        padding: '2px 8px', borderRadius: 'var(--radius-pill)', lineHeight: 1.2,
       }}>
       {up ? '▲' : '▼'} {formatPctChange(pct, { withSign: false })}
     </span>
@@ -169,7 +169,7 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
   const pct = hasPrev ? pctChange(current !== undefined ? current : value, prevValue) : null;
 
   const baseStyle = {
-    borderRadius: 14,
+    borderRadius: 'var(--radius-lg)',
     padding: '18px 18px 16px',
     height: '100%',
     border: `1px solid ${C.line}`,
@@ -236,14 +236,14 @@ function ContentSection({ icon, color = C.amber, title, eyebrow, children }) {
     <div className="mt-3" style={{
       background: C.surface,
       border: `1px solid ${C.line}`,
-      borderRadius: 14,
+      borderRadius: 'var(--radius-lg)',
       padding: '20px 22px',
       position: 'relative',
       overflow: 'hidden',
     }}>
       <div className="d-flex align-items-center gap-3 mb-3">
         <div style={{
-          width: 38, height: 38, borderRadius: 10,
+          width: 38, height: 38, borderRadius: 'var(--radius-md)',
           background: color + '15', color,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
@@ -267,7 +267,7 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
   return (
     <div className="d-flex align-items-center gap-3 px-3 py-3" style={{ borderTop: `1px solid ${C.line}` }}>
       <div style={{
-        width: 22, height: 22, borderRadius: 5,
+        width: 22, height: 22, borderRadius: 'var(--radius-sm)',
         background: rank === 1 ? 'color-mix(in srgb, var(--warning) 35%, var(--surface-1))' : rank === 2 ? 'var(--surface-3)' : rank === 3 ? 'color-mix(in srgb, var(--warning) 18%, var(--surface-1))' : 'var(--surface-2)',
         color: C.ink, fontSize: '0.72rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -283,8 +283,8 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
         <div style={{ fontSize: '0.7rem', color: C.muted }}>Share of top-creator GMV {sharePct.toFixed(1)}%</div>
       </div>
       <div style={{ width: 140 }}>
-        <div style={{ height: 6, background: C.line, borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${Math.min(100, sharePct)}%`, background: C.amber, borderRadius: 999 }} />
+        <div style={{ height: 6, background: C.line, borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${Math.min(100, sharePct)}%`, background: C.amber, borderRadius: 'var(--radius-pill)' }} />
         </div>
       </div>
       <div style={{ width: 90, textAlign: 'center', fontSize: '0.86rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
@@ -322,7 +322,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
       rel={linkOk ? 'noopener noreferrer' : undefined}
       style={{
         display: 'block', textDecoration: 'none', color: 'inherit',
-        borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.line}`,
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: `1px solid ${C.line}`,
         background: C.surface, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
       onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; } }}
@@ -337,7 +337,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
           position: 'absolute', top: 10, right: 10,
           // Pill is fixed-white in both themes (video thumbnail
           // background), so the rank text stays dark in both themes.
-          background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)', color: 'var(--text-primary)', borderRadius: 4,
+          background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)', color: 'var(--text-primary)', borderRadius: 'var(--radius-xs)',
           fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', minWidth: 22, textAlign: 'center',
         }}>{rank}</div>
         <div style={{
@@ -381,7 +381,7 @@ function ProductRow({ product, rank, gmvShare, currency = DEFAULT_CURRENCY, goal
     <div className="d-flex align-items-center gap-3 px-3 py-3"
       style={{ borderTop: rank === 1 ? 'none' : `1px solid ${C.line}` }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 6,
+        width: 44, height: 44, borderRadius: 'var(--radius-sm)',
         background: C.surfaceAlt, border: `1px solid ${C.line}`,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         color: C.muted,
@@ -457,7 +457,7 @@ function DonutChart({ slices, total, currencySym = '$', size = 180, thickness = 
           const pct = (v / total) * 100;
           return (
             <div key={i} className="d-flex align-items-center gap-2 mb-2">
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+              <span style={{ width: 10, height: 10, borderRadius: 'var(--radius-xs)', background: s.color, flexShrink: 0 }} />
               <span style={{ fontSize: '0.78rem', color: C.ink, flex: 1 }}>{s.label}</span>
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>
                 {currencySym}{v.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -483,21 +483,21 @@ function ComparisonRow({ label, current, previous, fmt }) {
   const max = Math.max(num(current), num(previous), 0.0001);
   const pct = pctChange(current, previous);
   return (
-    <div className="d-flex flex-column gap-1" style={{ background: C.surfaceAlt, padding: '14px 16px', borderRadius: 10 }}>
+    <div className="d-flex flex-column gap-1" style={{ background: C.surfaceAlt, padding: '14px 16px', borderRadius: 'var(--radius-md)' }}>
       <div className="d-flex align-items-center justify-content-between" style={{ fontSize: '0.7rem', fontWeight: 600, color: C.inkDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         <span>{label}</span>
         <DeltaPill pct={pct} />
       </div>
       <div className="d-flex align-items-center gap-2 mt-1">
         <span style={{ width: 70, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>This mo</span>
-        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${(num(current) / max) * 100}%`, background: C.amber, transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
         <span style={{ minWidth: 88, textAlign: 'right', fontSize: '0.78rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt(current)}</span>
       </div>
       <div className="d-flex align-items-center gap-2">
         <span style={{ width: 70, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last mo</span>
-        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
         <span style={{ minWidth: 88, textAlign: 'right', fontSize: '0.78rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmt(previous)}</span>
@@ -563,14 +563,14 @@ function TrendTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
-      background: 'var(--chart-tooltip-bg)', color: 'var(--chart-tooltip-fg)', border: `1px solid ${C.line}`, borderRadius: 10,
+      background: 'var(--chart-tooltip-bg)', color: 'var(--chart-tooltip-fg)', border: `1px solid ${C.line}`, borderRadius: 'var(--radius-md)',
       padding: '8px 12px', boxShadow: 'var(--shadow-md)',
       fontSize: '0.74rem',
     }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
       {payload.map(p => (
         <div key={p.dataKey} className="d-flex align-items-center gap-2" style={{ color: 'color-mix(in srgb, var(--chart-tooltip-fg) 75%, transparent)' }}>
-          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: p.color }} />
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 'var(--radius-xs)', background: p.color }} />
           <span style={{ flex: 1 }}>{p.name}</span>
           <strong style={{ color: 'var(--chart-tooltip-fg)', fontVariantNumeric: 'tabular-nums' }}>{p.value}</strong>
         </div>
@@ -592,12 +592,12 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
       color={C.amber}
       title="Trends over time"
       eyebrow={eyebrow}>
-      <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: '14px 14px 8px' }}>
+      <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-md)', padding: '14px 14px 8px' }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.muted }}>GMV & Orders</div>
           <div className="d-flex gap-3" style={{ fontSize: '0.7rem', color: C.inkDim }}>
-            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.amber, borderRadius: 2 }} />GMV</span>
-            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.green, borderRadius: 2 }} />Orders</span>
+            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.amber, borderRadius: 'var(--radius-xs)' }} />GMV</span>
+            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.green, borderRadius: 'var(--radius-xs)' }} />Orders</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={220}>
@@ -622,7 +622,7 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
       </div>
       <div className="row g-3 mt-1">
         <div className="col-12 col-md-6">
-          <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: '14px' }}>
+          <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-md)', padding: '14px' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.muted }}>Affiliate GMV</div>
               <div style={{ fontSize: '0.7rem', color: C.inkDim }}>Per month</div>
@@ -646,7 +646,7 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
           </div>
         </div>
         <div className="col-12 col-md-6">
-          <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: '14px' }}>
+          <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-md)', padding: '14px' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.muted }}>New videos posted</div>
               <div style={{ fontSize: '0.7rem', color: C.inkDim }}>Per month</div>
@@ -710,7 +710,7 @@ function MetricTile({ label, value, prevValue, formatter, accent = C.amber, subT
   return (
     <div style={{
       background: C.surface, border: `1px solid ${C.line}`,
-      borderRadius: 12, padding: '14px 14px 12px',
+      borderRadius: 'var(--radius-md)', padding: '14px 14px 12px',
       boxShadow: 'var(--shadow-sm)', height: '100%',
     }}>
       <div style={{
@@ -732,7 +732,7 @@ function MetricTile({ label, value, prevValue, formatter, accent = C.amber, subT
       {subText && (
         <div style={{ fontSize: '0.66rem', color: C.muted, marginTop: 4 }}>{subText}</div>
       )}
-      <div style={{ height: 2, background: accent, borderRadius: 999, marginTop: 10, opacity: 0.65 }} />
+      <div style={{ height: 2, background: accent, borderRadius: 'var(--radius-pill)', marginTop: 10, opacity: 0.65 }} />
     </div>
   );
 }
@@ -780,7 +780,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
       <div className="row g-2">
         {cells.map(c => (
           <div className="col-4 col-md" key={c.label}>
-            <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+            <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-sm)', padding: '10px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
             </div>
@@ -793,7 +793,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
             <span>Cost efficiency</span>
             <span>{sym}1 → {sym}{(gmv / spend).toFixed(2)}</span>
           </div>
-          <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
+          <div className="d-flex" style={{ height: 14, borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
             <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.min(85, Math.max(15, ratio * 100))}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
               {ms(spend)} in
             </div>
@@ -1023,7 +1023,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             type="button"
             onClick={() => setHighlighterActive(v => !v)}
             className={`btn btn-sm d-inline-flex align-items-center gap-2 ${highlighterActive ? 'btn-warning' : 'btn-outline-warning'}`}
-            style={{ borderRadius: 10, fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}
             title={highlighterActive
               ? 'Highlighter is ON — drag across text to highlight, drag across an existing highlight to remove it. Click to turn off.'
               : 'Turn on highlighter — then drag across any text to highlight it for everyone viewing this report.'}>
@@ -1032,7 +1032,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           </button>
           {(userRole === 'tl' || userRole === 'pctl') && (
             <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 10, fontSize: '0.78rem',
+              style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem',
                 background: copyState === 'done' ? 'var(--success)' : 'var(--accent)',
                 color: 'var(--on-accent)', border: 'none' }}
               onClick={handleCopyInsights}
@@ -1042,7 +1042,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             </button>
           )}
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+            style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
             onClick={handleExport} disabled={pdfBusy}
             title="Download the report as a single-page PDF">
             {pdfBusy
@@ -1056,7 +1056,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       {clientView && (
         <div className="d-flex justify-content-end mb-3">
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+            style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
             onClick={handleExport} disabled={pdfBusy}
             title="Download this report as a single-page PDF">
             {pdfBusy
@@ -1078,7 +1078,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       )}
 
       {/* ─── Canvas (printable) ─────────────────────────────────────── */}
-      <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 18, border: `1px solid ${C.line}` }}>
+      <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 'var(--radius-xl)', border: `1px solid ${C.line}` }}>
 
         {/* Brand chip + breadcrumb — sticky so the OL always knows which report
             they're reading while scrolling a long report. Pins flush under the
@@ -1090,7 +1090,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             borderBottom: `1px solid ${C.line}` }}>
           <div className="d-flex align-items-center gap-3">
             <div style={{
-              width: 42, height: 42, borderRadius: 10, background: C.amber,
+              width: 42, height: 42, borderRadius: 'var(--radius-md)', background: C.amber,
               color: 'var(--on-warning)', fontSize: '1.05rem', fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}>{(report.brandName || '?').charAt(0).toUpperCase()}</div>
@@ -1211,7 +1211,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           <div className="row g-3 mt-1">
             {sectEnabled.topCreators && sortedCreators.length > 0 && (
               <div className="col-12 col-lg-7">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div className="px-3 py-3">
                     <SectionHead
                       title="Top creators this month"
@@ -1227,7 +1227,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             )}
             {sectEnabled.productAnalytics && sortedProducts.length > 0 && (
               <div className="col-12 col-lg-5">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div className="px-3 py-3">
                     <SectionHead
                       title="Products driving GMV"
@@ -1278,7 +1278,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
 
         {/* ─── Top Videos (poster cards) ────────────────────────────── */}
         {sectEnabled.topVideos && sortedVideos.length > 0 && (
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px 18px 20px', marginTop: 12 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 'var(--radius-lg)', padding: '18px 18px 20px', marginTop: 12 }}>
             <SectionHead
               title="Top videos"
               eyebrow="Best performers by GMV this month · click any card to open the TikTok video"
