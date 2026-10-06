@@ -30,7 +30,7 @@ import {
 import { loadDraft, saveDraft, clearDraft, hydrate, purgeLegacyDrafts } from '../../lib/checkpointDraft';
 import { runCheckpointAutofill, applyAutofillPatch, mirrorDuplicates } from '../../lib/checkpointAutofill';
 import { deductPromptApcCheckpoint } from '../../lib/apcReportingApi';
-import { listManagedBrandIds, getPaidCollabEntry, getLatestPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
+import { listManagedBrandIds, subscribePaidCollabBrands, getPaidCollabEntry, getLatestPaidCollabEntry, remindPaidCollab, emptyPaidCollab } from '../../lib/paidCollabCheckpointApi';
 import PaidCollabCheckpointDashboard from './PaidCollabCheckpointDashboard';
 import { exportCheckpointToPdf, SLIDE_H } from '../../utils/exportCheckpointPdf';
 import CheckpointForm from '../../components/checkpoint/CheckpointForm';
@@ -180,8 +180,9 @@ function ApcCheckpointPage() {
   // Paid Collab §09: whether THIS brand is on the shared team list (→ read-only §09
   // + reminder in the APC form; hidden if not), and the team's entry for the week.
   const { data: pcManagedIds = [] } = useQuery({
-    queryKey: ['checkpoint', 'pc-managed'], queryFn: listManagedBrandIds,
+    queryKey: ['checkpoint', 'pc-managed'], queryFn: listManagedBrandIds, refetchOnMount: 'always',
   });
+  useEffect(() => subscribePaidCollabBrands(() => qc.invalidateQueries({ queryKey: ['checkpoint', 'pc-managed'] })), [qc]);
   const isPaidCollabManaged = pcManagedIds.includes(brandId);
   const pcEntryQuery = useQuery({
     queryKey: ['checkpoint', 'pc-entry', brandId, weekStart],
