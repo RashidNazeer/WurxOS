@@ -15,6 +15,7 @@ import {
   modelLabel, modelOptions, optionKey, parseOptionKey, allOptions, filterOptions, slotLabel,
   chainEntryStatus, vectorsByModel, ingestProgress, ingestRing, quietHours, hhmm, freeSourcesValue, toggleInList, fmtCount,
   ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups,
+  WEB_MAX_RESULTS_RANGE, webProviderLabel, normalizeWebConfig, webProviderRows, webProviderToggle, validateSearxngUrl, webConfigError,
 } from '../../lib/buddyLogic';
 import { LoadError } from '../../components/buddy/BuddyThread';
 
@@ -50,6 +51,7 @@ export default function BuddySettings({ canEdit, tab = 'models' }) {
           <KnowledgeCard readOnly={readOnly} />
         </>
       )}
+      {tab === 'web' && <WebSearchCard readOnly={readOnly} />}
       {tab === 'personality' && <BehaviourCard readOnly={readOnly} />}
       {tab === 'usage' && (
         <Suspense fallback={<div className="bd-card"><SkeletonLines n={4} /></div>}>
@@ -910,6 +912,174 @@ function RoleModelsCard({ readOnly }) {
             {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save models by role'}
           </button>
           {dirty && <button type="button" className="btn btn-sm btn-link" onClick={() => setDraft(saved)}>Undo</button>}
+        </div>
+      )}
+      {msg && <div className="small mt-2" role="status">{msg}</div>}
+    </Card>
+  );
+}
+
+// ── web search ──────────────────────────────────────────────────────
+function WebSearchCard({ readOnly }) {
+  const [saved, setSaved] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [missing, setMissing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = () => {
+    setLoadErr(false);
+    getAiConfig().then((c) => {
+      if (!c || !('web_search_enabled' in c)) { setMissing(true); return; }
+      const d = normalizeWebConfig(c);
+      setSaved(d); setDraft(d);
+    }).catch(() => setLoadErr(true));
+  };
+  useEffect(load, []);
+
+  if (missing) return <Card icon="bi-globe2" title="Web search"><div className="bd-card-sub">Web search is not available on this database yet.</div></Card>;
+  if (!draft) {
+    return (
+      <Card icon="bi-globe2" title="Web search">
+        {loadErr ? <LoadError what="the web search settings" onRetry={load} compact /> : <SkeletonLines n={5} />}
+      </Card>
+    );
+  }
+
+  const set = (patch) => setDraft({ ...draft, ...patch });
+  const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
+  const rows = webProviderRows(draft.web_providers);
+  const enabledIds = rows.filter((r) => r.on).map((r) => r.id);
+  const move = (id, dir) => {
+    const i = enabledIds.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= enabledIds.length) return;
+    const next = enabledIds.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    set({ web_providers: next });
+  };
+  const urlCheck = draft.searxng_url ? validateSearxngUrl(draft.searxng_url, draft.searxng_allow_http) : null;
+  const searxOn = enabledIds.includes('searxng');
+  const urlBad = !!urlCheck && !urlCheck.ok;
+  const everyone = draft.web_allowed_roles === null;
+  const blocker = webConfigError(draft);
+
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try {
+      const out = normalizeWebConfig(draft);
+      await updateAiConfig(out);
+      setSaved(out); setDraft(out);
+      setMsg('Saved. New questions use this from now on.');
+    } catch (e) { setMsg(`Not saved: ${e.message}`); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Card icon="bi-globe2" title="Web search" sub="Lets Buddy look things up on the internet when the answer is not in WurxOS. Off by default.">
+      <fieldset disabled={readOnly || saving} className="bd-fieldset">
+        <legend className="visually-hidden">Web search</legend>
+        <div className="form-check form-switch mb-1">
+          <input className="form-check-input" type="checkbox" role="switch" id="bd-web-on" checked={draft.web_search_enabled}
+            onChange={(e) => set({ web_search_enabled: e.target.checked })} />
+          <label className="form-check-label small fw-semibold" htmlFor="bd-web-on">Web search enabled</label>
+        </div>
+
+        <div className="bd-banner is-warn mt-2" role="note">
+          <i className="bi bi-exclamation-triangle" aria-hidden="true" />
+          <div>
+            <strong>SearXNG setup:</strong> SearXNG only answers <code>format=json</code> if the instance administrator has added <code>json</code> to <code>search.formats</code> in its <code>settings.yml</code>. Without that it returns HTTP 403 and Buddy gets no results. This is the most common setup problem.
+          </div>
+        </div>
+
+        <div className="bd-subhead">Providers</div>
+        <ol className="bd-chain my-1" aria-label="Search providers in order">
+          {rows.map((r) => {
+            const i = enabledIds.indexOf(r.id);
+            return (
+              <li key={r.id} className={`bd-row-line ${r.on ? '' : 'is-off'}`}>
+                {r.on ? <span className="bd-chain-n" aria-hidden="true">{i + 1}</span> : <span className="bd-chain-n" aria-hidden="true">–</span>}
+                <span className="text-truncate">{webProviderLabel(r.id)}</span>
+                {!r.on && <span className="bd-badge-chip">Off</span>}
+                <div className="form-check form-switch m-0">
+                  <input className="form-check-input" type="checkbox" role="switch" id={`bd-web-p-${r.id}`} checked={r.on}
+                    aria-label={`Use ${webProviderLabel(r.id)}`}
+                    onChange={(e) => set({ web_providers: webProviderToggle(draft.web_providers, r.id, e.target.checked) })} />
+                </div>
+                {!readOnly && r.on && (
+                  <>
+                    <button type="button" className="bd-act" disabled={i === 0} onClick={() => move(r.id, -1)} aria-label={`Move ${webProviderLabel(r.id)} up`}><i className="bi bi-arrow-up" aria-hidden="true" /></button>
+                    <button type="button" className="bd-act" disabled={i === enabledIds.length - 1} onClick={() => move(r.id, 1)} aria-label={`Move ${webProviderLabel(r.id)} down`}><i className="bi bi-arrow-down" aria-hidden="true" /></button>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        <div className="mt-2">
+          <div className="form-check">
+            <input className="form-check-input" type="radio" name="bd-web-merge" id="bd-web-merge-first" checked={!draft.web_merge} onChange={() => set({ web_merge: false })} />
+            <label className="form-check-label small" htmlFor="bd-web-merge-first">Use the first provider that works</label>
+          </div>
+          <div className="form-check">
+            <input className="form-check-input" type="radio" name="bd-web-merge" id="bd-web-merge-all" checked={draft.web_merge} onChange={() => set({ web_merge: true })} />
+            <label className="form-check-label small" htmlFor="bd-web-merge-all">Ask every enabled provider and merge the results</label>
+          </div>
+        </div>
+
+        <div className="bd-subhead">SearXNG instance</div>
+        <label className="form-label small fw-semibold mb-1" htmlFor="bd-web-url">Instance URL</label>
+        <input id="bd-web-url" type="url" inputMode="url" autoComplete="off" spellCheck={false} placeholder="https://search.example.com"
+          className={`form-control form-control-sm bd-model-select ${urlBad ? 'is-invalid' : ''}`} value={draft.searxng_url || ''}
+          aria-invalid={urlBad} aria-describedby="bd-web-url-help" onChange={(e) => set({ searxng_url: e.target.value || null })} />
+        <div id="bd-web-url-help" className={urlBad ? 'small mt-1 text-danger' : 'bd-card-sub mt-1'} role={urlBad ? 'alert' : undefined}>
+          {urlBad ? urlCheck.error : searxOn && !draft.searxng_url ? 'Required while SearXNG is turned on.' : 'The address of a SearXNG instance you run or trust, with no username or password.'}
+        </div>
+        <div className="form-check form-switch mt-2 mb-1">
+          <input className="form-check-input" type="checkbox" role="switch" id="bd-web-http" checked={draft.searxng_allow_http}
+            onChange={(e) => set({ searxng_allow_http: e.target.checked })} />
+          <label className="form-check-label small" htmlFor="bd-web-http">Allow plain http (private network)</label>
+        </div>
+        <div className="bd-card-sub">Off by default. Turn on only for an instance on your own network. localhost is never allowed.</div>
+
+        <div className="bd-subhead">Results</div>
+        <label className="form-label small fw-semibold mb-1" htmlFor="bd-web-max">Max results per search</label>
+        <input id="bd-web-max" type="number" min={WEB_MAX_RESULTS_RANGE[0]} max={WEB_MAX_RESULTS_RANGE[1]} step={1} inputMode="numeric"
+          className="form-control form-control-sm" style={{ maxWidth: 120 }} value={draft.web_max_results}
+          onChange={(e) => set({ web_max_results: e.target.value === '' ? '' : Number(e.target.value) })}
+          onBlur={() => set(normalizeWebConfig({ ...draft, web_max_results: draft.web_max_results === '' ? null : draft.web_max_results }))} />
+        <div className="bd-card-sub mt-1">{WEB_MAX_RESULTS_RANGE[0]} to {WEB_MAX_RESULTS_RANGE[1]}. More results cost more to read.</div>
+
+        <div className="bd-subhead">Who can use web search</div>
+        <div className="form-check">
+          <input className="form-check-input" type="radio" name="bd-web-who" id="bd-web-who-all" checked={everyone}
+            onChange={() => set({ web_allowed_roles: null })} />
+          <label className="form-check-label small" htmlFor="bd-web-who-all">Everyone who can use Buddy</label>
+        </div>
+        <div className="form-check">
+          <input className="form-check-input" type="radio" name="bd-web-who" id="bd-web-who-some" checked={!everyone}
+            onChange={() => set({ web_allowed_roles: nextAllowedRoles(draft.web_allowed_roles || [], 'boss', true) })} />
+          <label className="form-check-label small" htmlFor="bd-web-who-some">Only these roles</label>
+        </div>
+        {!everyone && (
+          <div className="bd-roles mt-1" role="group" aria-label="Roles allowed to use web search">
+            {ALL_ROLES.map(([r, label]) => (
+              <div key={r} className="form-check">
+                <input className="form-check-input" type="checkbox" id={`bd-web-role-${r}`} checked={draft.web_allowed_roles.includes(r)}
+                  disabled={ALWAYS_ROLES.includes(r)} onChange={(e) => set({ web_allowed_roles: nextAllowedRoles(draft.web_allowed_roles, r, e.target.checked) })} />
+                <label className="form-check-label small" htmlFor={`bd-web-role-${r}`}>{label}{ALWAYS_ROLES.includes(r) ? ' (always)' : ''}</label>
+              </div>
+            ))}
+          </div>
+        )}
+      </fieldset>
+      {!readOnly && (
+        <div className="d-flex align-items-center gap-2 flex-wrap mt-3">
+          <button type="button" className="btn btn-sm btn-primary" disabled={!dirty || saving || !!blocker} onClick={save}>
+            {saving ? <span className="spinner-border spinner-border-sm" /> : 'Save web search'}
+          </button>
+          {dirty && <button type="button" className="btn btn-sm btn-link" onClick={() => setDraft(saved)}>Undo</button>}
+          {dirty && blocker && <span className="small text-muted">{blocker}</span>}
         </div>
       )}
       {msg && <div className="small mt-2" role="status">{msg}</div>}

@@ -5,7 +5,24 @@
 > algorithm and failure mode. It is the reference we build against. When the
 > build deviates from it, update this file in the same commit.
 
-**Status:** design, v1.0 (2026-09-26). Not pushed.
+**Status:** design, v1.0 (2026-09-26), **partly superseded by what shipped.**
+
+> **Read this first (2026-10-06).** This document is the original design. The
+> build has moved past it in several places, and where they disagree, the code
+> in `supabase/functions/_shared/ai/` and `supabase/migrations/` is the truth:
+>
+> | Designed here | What actually shipped |
+> |---|---|
+> | §12.1 one OpenAI/Gemini adapter, failover "off by default" | six key slots (`primary`, `fallback`, `groq`, `gemini`, `nvidia`, `nvidia2`) across two APIs, a Boss-configured model chain, an automatic safety net over the whole `ai_model_catalog`, per-model cooldowns, learned unsupported-parameter and token-budget handling (migs 397, 401, 405) |
+> | §13 `ai_assistant_config.engine` v1/v2 switch | dropped at cutover; `assistant` replaced `ai-chat` outright |
+> | §7 one embedding space | two: `embedding` (OpenAI) + `embedding_alt` (NVIDIA/Gemini); `vector_pending` means no vector in **either** (migs 406, 408) |
+> | — | per-role models (mig 404). The budget-saver/economy tier was built and then **removed** on Owner instruction 2026-10-02 |
+> | — | ingestion quiet hours, 18:00–02:00 PKT (migs 407, 409) |
+> | — | **web search and browsing** (mig 415) — see §24 below |
+> | §11.1 tool catalog | as built: 5 search tools + 15 data tools, plus the 2 web tools |
+>
+> Also note `wurx-buddy/supabase/` is a **stale copy** of the shipped
+> `supabase/`, not a live mirror. Do not read it as current.
 
 ---
 
@@ -35,6 +52,7 @@
 21. [Runbooks](#21-runbooks)
 22. [Risks & open questions](#22-risks--open-questions)
 23. [Glossary](#23-glossary)
+24. [Web search and browsing](#24-web-search-and-browsing-mig-415-2026-10-06)
 
 ---
 
@@ -1508,3 +1526,127 @@ Open: D1–D6 in `plan.md` §2.
 | **ACL** | access-control rule deciding who may read a document |
 | **Agentic RAG** | the model decides when and what to retrieve, via tools, instead of a fixed retrieve-then-answer step |
 | **Reconciler** | periodic job that compares source vs index and fixes drift |
+
+---
+
+## 24. Web search and browsing (mig 415, 2026-10-06)
+
+Buddy can search the open internet and read a public page. Added on Owner
+request; **off by default** and off until a provider is configured.
+
+### 24.1 Why it is deliberately hard to trigger
+
+The risk is not that Buddy cannot search — it is that it searches when the
+honest answer was "our own systems do not have this", and then presents a
+stranger's blog post as company process. So the gate is three-fold, and all
+three must pass before the tools even exist for a turn:
+
+1. `ai_assistant_config.web_search_enabled` is true;
+2. the caller's role is in `web_allowed_roles` (null = anyone who may use Buddy);
+3. at least one provider is usable (SearXNG has a URL, or Tavily has a key).
+
+If any fails, `toolDefsFor(false)` is used and the model never sees a web tool,
+and `WEB_RULES` is left out of the prompt so it never offers to look online.
+
+On top of that the prompt (`agent/prompt.ts` `WEB_RULES`) restricts use to
+three cases — the person asked; the person gave a link or named a public page;
+or the question is about the outside world and no Wurx tool could answer it —
+and forbids the web outright for our processes, SOPs, KB, reports, brands,
+people, attendance, leave, performance, incentives and pay.
+
+### 24.2 Providers
+
+| | SearXNG | Tavily |
+|---|---|---|
+| What | the company's own meta-search instance | commercial search + extraction API |
+| Config | `searxng_url` (no default, on purpose) | `TAVILY_API_KEY` function secret |
+| Cost | none | credits, logged per call |
+| Note | **`format=json` returns HTTP 403 until the instance admin adds `json` to `search.formats` in settings.yml** | REST API, not the CLI — Tavily's own guidance is never to use the CLI as a runtime |
+
+Default order is SearXNG then Tavily, so the free, private, self-hosted option
+is tried first and Tavily credits are spent only when it is unconfigured, down
+or empty. `web_merge` switches from first-that-works to querying all enabled
+providers and merging. There is deliberately **no default `searxng_url`**:
+pointing Buddy at a stranger's public instance would leak every question the
+company asks into third-party logs.
+
+### 24.3 Files
+
+| File | Responsibility |
+|---|---|
+| `web/guard.ts` | the SSRF guard: scheme, credentials, port denylist, IPv4/IPv6 private ranges, wildcard-DNS domains, embedded private IPs, DNS resolution, and `safeFetch` which re-checks every redirect hop by hand |
+| `web/searxng.ts` | SearXNG POST `/search` with `format=json` |
+| `web/tavily.ts` | Tavily `POST /search` and `POST /extract` |
+| `web/html.ts` | HTML → readable text for the fallback page read (linear scanners, not backtracking regexes) |
+| `web/index.ts` | config parsing, provider orchestration, dedupe/merge, `webFetchPage` |
+| `agent/tools.ts` | `search_the_web`, `open_web_page`, the `W#` citation kind, `runWeb` |
+
+### 24.4 Security
+
+`open_web_page` fetches a URL chosen by the **model**, which may have read it
+out of an untrusted web page. That is attacker-influenced input to a server
+holding the service-role key, so:
+
+- only `https` (plain `http` only for an admin-configured LAN SearXNG), no
+  credentials in the URL, no non-web ports;
+- private and reserved IPv4 and IPv6 are refused, including the transition
+  formats that smuggle an IPv4 inside an IPv6 (`::ffff:`, `::`, `64:ff9b::/96`
+  NAT64, `2002::/16` 6to4) — these were a real hole found in QA;
+- the wildcard-DNS services (`nip.io`, `sslip.io`, `xip.io`, `localtest.me`, …)
+  are blocked, and any hostname spelling a private IPv4 in dots or dashes is
+  refused;
+- the host is resolved (`Deno.resolveDns`) and refused if any A/AAAA answer is
+  private;
+- **redirects are followed by hand**, re-checked and re-resolved at every hop —
+  automatic redirect following would walk straight into `169.254.169.254`;
+- loopback, link-local/metadata, multicast and reserved are refused **even for
+  an admin-typed URL**, because assistant settings are writable by every active
+  developer, so "an admin typed it" is not enough to allow the cloud metadata
+  service;
+- bodies are streamed and capped; HTML parsing uses linear scanners because the
+  obvious lazy regexes are quadratic on an unclosed tag and would pin the edge
+  CPU on a hostile page;
+- results are wrapped as `<web>` / `<result>` DATA, with the wrapper
+  neutralised, and the prompt states web content is never an instruction.
+
+**Accepted residual risk — generic DNS rebinding.** `resolvesPublic` resolves
+the host, then `fetch` resolves it *again* to connect, so a record with TTL 0
+can answer public to our lookup and `169.254.169.254` to the connection. The
+known no-setup routes (`nip.io`, `sslip.io`, `localtest.me`, and any hostname
+spelling a private IPv4) are refused by string, but an attacker-controlled
+domain is not. Closing it properly means connecting to the already-vetted IP
+(`Deno.createHttpClient` with a custom dial), which is not wired up; until then
+the runtime's egress rules are the backstop. `resolvesPublic` also skips
+resolution entirely where `Deno.resolveDns` is absent (the Node test runner),
+which is why it takes an injectable resolver.
+
+`allowPrivate` is granted **only to the first hop** — the URL an admin typed.
+A LAN SearXNG that redirects onward gets no such trust, or one compromised
+instance could walk Buddy around the whole internal network.
+
+**Test coverage:** `wurx-buddy/supabase/functions/_shared/ai/__tests__/web.test.ts`
+— 126 tests, every fetch stubbed, DNS via an injected resolver. Four of these
+assertions exist because QA found the bug they now guard: the IPv6 transition
+formats, the v4-mapped spelling under `allowPrivate`, `open_web_page` handing an
+unvalidated URL to Tavily, and the quadratic HTML regexes (50 KB of `<`
+characters took 6.2 s before the linear tokeniser; it is 7 ms now).
+
+### 24.5 Citations and cost
+
+Web sources get `W1..Wn`, beside `S#` (passages) and `D#` (data). A `[W#]`
+counts as grounding for a figure, so a number quoted from a page the model
+actually read is attributed — but `WEB_RULES` forbids presenting a web number
+as a Wurx number. The UI labels them "Web" / "Web page" so a reader can see at
+a glance the fact did not come from our systems.
+
+Tavily credits land in `ai_usage_log` as kinds `web_search` / `web_extract`,
+with the credit count in `tokens_in` and `est_cost_usd` left at 0 and
+`unpriced` true: the Boss sees how much was used without Buddy inventing a
+dollar rate for a plan it cannot see. SearXNG is free by definition.
+
+### 24.6 Still to do
+
+- Deploy `assistant` and set the `TAVILY_API_KEY` function secret.
+- Stand up a SearXNG instance with `json` in `search.formats`, and put its URL
+  in Settings › Wurx Buddy › Web.
+- Decide `web_allowed_roles` before switching it on for everyone.

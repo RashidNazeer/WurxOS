@@ -556,6 +556,8 @@
   border-radius: var(--radius-md); background: var(--danger-soft); color: var(--text-primary); font-size: 13px;
 }
 .bd-banner > i { color: var(--danger); margin-top: 2px; }
+.bd-banner.is-warn { background: var(--warning-soft); }
+.bd-banner.is-warn > i { color: var(--warning); }
 .bd-model-select { width: 100%; max-width: 520px; }
 .bd-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .bd-badge-chip {

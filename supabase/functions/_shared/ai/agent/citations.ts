@@ -4,7 +4,8 @@
 //   • emoji are stripped on serious topics (persona.md §5);
 //   • numbers without a [D#] in the same sentence are flagged for the log.
 
-const CITE_GROUP = /^\[((?:[SD]\d{1,3})(?:\s*[,;]\s*[SD]\d{1,3})*)\]$/;
+// S = retrieved passage, D = data tool, W = a page from the open internet.
+const CITE_GROUP = /^\[((?:[SDW]\d{1,3})(?:\s*[,;]\s*[SDW]\d{1,3})*)\]$/;
 const EMOJI = /(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:️|‍(?:\p{Extended_Pictographic}))*️?/gu;
 
 // One [..] group → the same group with only the known ids, or '' if none is known.
@@ -71,7 +72,7 @@ export const stripEmoji = (s: string) => s.replace(EMOJI, '');
 
 export function citedIds(text: string): string[] {
   const ids = new Set<string>();
-  for (const m of String(text).matchAll(/\[((?:[SD]\d{1,3})(?:\s*[,;]\s*[SD]\d{1,3})*)\]/g)) {
+  for (const m of String(text).matchAll(/\[((?:[SDW]\d{1,3})(?:\s*[,;]\s*[SDW]\d{1,3})*)\]/g)) {
     for (const id of m[1].split(/[,;]/)) ids.add(id.trim());
   }
   return [...ids];
@@ -83,14 +84,16 @@ export function citedIds(text: string): string[] {
 const FIGURE = /(?:[$£€]\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?%|\b\d+(?:\.\d+)?x\b|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d{4,}(?:\.\d+)?\b)/i;
 const DATE_LIKE = /\b(?:19|20)\d{2}\b(?!\s?%)|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\bweeks?\s+\d+/gi;
 
-// Sentences (or bullet lines) that state a figure but carry no [D#].
+// Sentences (or bullet lines) that state a figure but carry no [D#] or [W#].
+// A [W#] counts as grounded: a figure quoted from a web page the model actually
+// read is attributed, even though it did not come out of our own database.
 export function numbersWithoutData(text: string): string[] {
   const out: string[] = [];
   for (const line of String(text).split(/\n+/)) {
     for (const sentence of line.split(/(?<=[.!?])\s+(?=[A-Z*"(])/)) {
       const probe = sentence.replace(DATE_LIKE, ' ').replace(/https?:\/\/\S+/g, ' ');
       if (!FIGURE.test(probe)) continue;
-      if (/\[(?:[SD]\d+\s*[,;]\s*)*D\d+/.test(sentence)) continue;
+      if (/\[(?:[SDW]\d+\s*[,;]\s*)*[DW]\d+/.test(sentence)) continue;
       out.push(sentence.trim().slice(0, 200));
     }
   }

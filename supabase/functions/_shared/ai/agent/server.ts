@@ -82,6 +82,7 @@ export type ServerEnv = {
   geminiKey?: string | null;             // GEMINI_API_KEY: the 'gemini' key slot (optional, free tier)
   nvidiaKey?: string | null;             // NVIDIA_API_KEY: the 'nvidia' key slot (optional; free, dev/test only)
   nvidia2Key?: string | null;            // NVIDIA_API_KEY_2: the 'nvidia2' key slot
+  tavilyKey?: string | null;             // TAVILY_API_KEY: web search + page extraction (mig 415)
   altProvider?: AltProvider;             // which provider filled embedding_alt (mig 408; default nvidia)
   modelKeySlot?: KeySlot;                // with modelOverride: that key (serve-assistant --key-slot)
   noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
@@ -158,6 +159,8 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     geminiKey: env.geminiKey ?? null,
     nvidiaKey: env.nvidiaKey ?? null,
     nvidia2Key: env.nvidia2Key ?? null,
+    tavilyKey: env.tavilyKey ?? null,
+    ...(env.fetchImpl ? { fetchImpl: env.fetchImpl } : {}),
     ...(env.noRateLimit ? { rateLimitExempt: true } : {}),
     embed: emb.embed,
     ...(emb.alt ? { embedAlt: emb.alt } : {}),
