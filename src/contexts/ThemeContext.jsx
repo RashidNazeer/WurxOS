@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
-import { flushSync } from 'react-dom';
 
 const ThemeContext = createContext(null);
 
@@ -92,7 +91,6 @@ export function ThemeProvider({ children }) {
   // never goes through here, so nothing animates on boot.
   const themeRef = useRef(theme);
   themeRef.current = theme;
-  const fadeTimer = useRef(null);
   const switchTheme = useCallback((next) => {
     if (next !== 'light' && next !== 'dark') return;
     if (next === themeRef.current) return;
@@ -101,25 +99,15 @@ export function ThemeProvider({ children }) {
       root.setAttribute('data-theme', next);
       root.setAttribute('data-bs-theme', next);
       themeRef.current = next;
-      flushSync(() => setThemeState(next));
+      setThemeState(next);
     };
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) { commit(); return; }
-    if (typeof document.startViewTransition === 'function') {
-      try {
-        const vt = document.startViewTransition(commit);
-        vt.ready?.catch(() => {});
-        vt.finished?.catch(() => {});
-        return;
-      } catch { /* fall through */ }
-      if (root.getAttribute('data-theme') === next) return;
-    }
-    root.classList.add('theme-transition');
+    // Switch instantly. A View Transition snapshots the whole page, and with
+    // backdrop-filters on the chrome that snapshot is slow enough to show as a
+    // glitch and a lag before the theme flips. The class-based fallback was no
+    // better: it put a transition on every element in the document at once.
+    // An instant flip is both faster and cleaner than a janky cross-fade.
     commit();
-    clearTimeout(fadeTimer.current);
-    fadeTimer.current = setTimeout(() => root.classList.remove('theme-transition'), 300);
   }, []);
-  useEffect(() => () => clearTimeout(fadeTimer.current), []);
 
   const setTheme      = useCallback((t) => switchTheme(t), [switchTheme]);
   const toggleTheme   = useCallback(

@@ -498,11 +498,15 @@
   /* Background/border: html .notif-toast-ghost in shell.css. */
   z-index: 0;
 }
-/* The live card is translucent now, so a ghost sitting behind it would show
-   through as a band inside the card. Each ghost is clipped to the strip that
-   peeks out below the card (its own translateY, plus 1px of overlap). */
-.notif-toast-ghost-1 { transform: translateY(9px)  scaleX(0.95); opacity: 0.9; clip-path: inset(calc(100% - 10px) 0 0 0); }
-.notif-toast-ghost-2 { transform: translateY(18px) scaleX(0.9);  opacity: 0.6; clip-path: inset(calc(100% - 10px) 0 0 0); }
+/* Stacked-card hint: each ghost is inset from the sides and nudged down, so
+   only a sliver shows under the live card.
+   Inset rather than scaleX — scaling a rounded box squashes its corner radius
+   with it, which is what made the stack look distorted. Insetting keeps every
+   corner identical to the card's. No clip-path either: the ghosts sit fully
+   behind a translucent card, so they are simply kept short enough not to
+   reach up into it. */
+.notif-toast-ghost-1 { left: 7px;  right: 7px;  transform: translateY(8px);  height: 18px; opacity: 0.85; }
+.notif-toast-ghost-2 { left: 14px; right: 14px; transform: translateY(15px); height: 18px; opacity: 0.55; }
 
 /* The card itself */
 .notif-toast {
