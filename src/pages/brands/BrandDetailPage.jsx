@@ -468,7 +468,7 @@ function TierSaleCard({ brand, canManage, onSaved }) {
 
       <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
         <span style={{
-          fontSize: 11.5, fontWeight: 800, padding: '4px 11px', borderRadius: 999,
+          fontSize: 11.5, fontWeight: 800, padding: '4px 11px', borderRadius: 'var(--radius-pill)',
           background: badge.bg, color: badge.fg,
         }}>{badge.text}</span>
         {info && (
@@ -604,7 +604,7 @@ function OverviewPanel({
                 </div>
                 <span style={{
                   fontSize: 10.5, fontWeight: 800, padding: '2px 8px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   background: 'var(--accent-soft)', color: 'var(--accent)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>TL</span>
@@ -624,7 +624,7 @@ function OverviewPanel({
                 </div>
                 <span style={{
                   fontSize: 10.5, fontWeight: 700, padding: '2px 8px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   background: 'var(--surface-2)', color: 'var(--text-muted)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>{u.role || '—'}</span>

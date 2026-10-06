@@ -20,6 +20,16 @@ function initials(name) {
     .toUpperCase();
 }
 
+// Callers pass px numbers; snap them onto the shared radius scale.
+function snapRadius(r) {
+  if (typeof r !== 'number') return r;
+  if (r <= 4) return 'var(--radius-xs)';
+  if (r <= 8) return 'var(--radius-sm)';
+  if (r <= 12) return 'var(--radius-md)';
+  if (r <= 16) return 'var(--radius-lg)';
+  return 'var(--radius-xl)';
+}
+
 export default function BrandAvatar({ brand, size = 42, radius = 10 }) {
   const name = brand?.brand_name || brand?.brandName || '';
   const logo = brand?.logo_url || brand?.logoUrl;
@@ -29,7 +39,7 @@ export default function BrandAvatar({ brand, size = 42, radius = 10 }) {
     width: size,
     height: size,
     flex: `0 0 ${size}px`,
-    borderRadius: radius,
+    borderRadius: snapRadius(radius),
     overflow: 'hidden',
     display: 'grid',
     placeItems: 'center',

@@ -141,7 +141,7 @@ function BossChangeThread({ changeId, changeDocId, participants }) {
               <div key={m.id} className={`d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
                 <div className="rounded-3 px-3 py-2" style={{
                   maxWidth: '80%', background: isMe ? 'var(--accent)' : 'var(--surface-2)',
-                  color: isMe ? 'var(--on-accent)' : 'var(--text-primary)', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  color: isMe ? 'var(--on-accent)' : 'var(--text-primary)', borderRadius: isMe ? 'var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg)' : 'var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-xs)',
                 }}>
                   {!isMe && (
                     <div className="d-flex align-items-center gap-1 mb-1">
@@ -157,12 +157,12 @@ function BossChangeThread({ changeId, changeDocId, participants }) {
         </div>
       )}
       <div className="d-flex gap-2">
-        <input type="text" className="form-control form-control-sm" style={{ borderRadius: 10 }}
+        <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-md)' }}
           placeholder="Type a message…" value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
         <button className="btn btn-sm btn-dark flex-shrink-0 d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 10 }} onClick={handleSend} disabled={sending || !text.trim()}>
+          style={{ borderRadius: 'var(--radius-md)' }} onClick={handleSend} disabled={sending || !text.trim()}>
           <i className="bi bi-send" style={{ fontSize: '0.7rem' }} />
         </button>
       </div>
@@ -263,7 +263,7 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 640, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 640, zIndex: 1, borderRadius: 'var(--radius-xl)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
@@ -472,7 +472,7 @@ function ChangeLogView() {
 
   if (loading) return <div className="text-center py-4"><div className="spinner-border" style={{ color: 'var(--accent)' }} /></div>;
   if (rows.length === 0) return (
-    <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16 }}>
+    <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)' }}>
       <i className="bi bi-journal-text text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
       <p className="text-muted mt-3 mb-0">No log entries yet.</p>
     </div>
@@ -510,14 +510,14 @@ function ChangeLogView() {
           {search && <button className="btn btn-sm btn-outline-secondary border-0" onClick={() => setSearch('')}><i className="bi bi-x" /></button>}
         </div>
         {Object.entries(columnOptions).slice(0, 4).map(([ci, vals]) => (
-          <select key={ci} className="form-select form-select-sm" style={{ maxWidth: 160, borderRadius: 8 }}
+          <select key={ci} className="form-select form-select-sm" style={{ maxWidth: 160, borderRadius: 'var(--radius-sm)' }}
             value={columnFilters[ci] || ''} onChange={e => setColumnFilters(prev => ({ ...prev, [ci]: e.target.value }))}>
             <option value="">{headers[ci] || `Col ${Number(ci) + 1}`} (All)</option>
             {vals.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         ))}
         {Object.values(columnFilters).some(Boolean) && (
-          <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.72rem' }}
+          <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
             onClick={() => setColumnFilters({})}>
             <i className="bi bi-x-circle" /> Clear
           </button>
@@ -525,7 +525,7 @@ function ChangeLogView() {
         <div className="ms-auto d-flex gap-1">
           {['cards', 'table'].map(m => (
             <button key={m} className={`btn btn-sm ${viewMode === m ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: 8, padding: '4px 10px' }} onClick={() => setViewMode(m)}>
+              style={{ borderRadius: 'var(--radius-sm)', padding: '4px 10px' }} onClick={() => setViewMode(m)}>
               <i className={`bi ${m === 'cards' ? 'bi-grid' : 'bi-table'}`} style={{ fontSize: '0.78rem' }} />
             </button>
           ))}
@@ -545,7 +545,7 @@ function ChangeLogView() {
             const title = r[0] || '—';
             const subtitle = headers.length > 1 ? r[1] || '' : '';
             return (
-              <div key={ri} className="card border-0 shadow-sm" style={{ borderRadius: 12, cursor: 'pointer', borderLeft: '4px solid var(--info)' }}
+              <div key={ri} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', cursor: 'pointer', borderLeft: '4px solid var(--info)' }}
                 onClick={() => setExpandedRow(isExpanded ? null : ri)}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-center justify-content-between">
@@ -584,7 +584,7 @@ function ChangeLogView() {
           })}
         </div>
       ) : (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <div className="table-responsive">
             <table className="table table-hover table-sm mb-0" style={{ fontSize: '0.75rem' }}>
               <thead>
@@ -669,7 +669,7 @@ export default function BossChangeManagementPage() {
         <div className="d-flex gap-2">
           {['requests', 'log'].map(t => (
             <button key={t} className={`btn btn-sm px-3 ${tab === t ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: 8, fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setTab(t)}>
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setTab(t)}>
               {t === 'requests' ? 'Requests' : 'Change Log'}
               {t === 'requests' && (pendingCount + completedCount) > 0 && <span className="badge rounded-pill ms-1" style={{ background: 'var(--danger)', color: 'var(--on-danger)', fontSize: '0.55rem' }}>{pendingCount + completedCount}</span>}
             </button>
@@ -700,7 +700,7 @@ export default function BossChangeManagementPage() {
           {loading ? (
             <div className="text-center py-4"><div className="spinner-border" style={{ color: 'var(--accent)' }} /></div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)' }}>
               <i className="bi bi-inbox text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">No change requests.</p>
             </div>
@@ -711,7 +711,7 @@ export default function BossChangeManagementPage() {
                 const sop = SOP_TYPES.find(s => s.key === c.sopType);
                 const pr = PRIORITIES.find(p => p.key === c.priority);
                 return (
-                  <div key={c.id} className="card border-0 shadow-sm" style={{ borderRadius: 14, cursor: 'pointer', borderLeft: `4px solid ${st.color}` }}
+                  <div key={c.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer', borderLeft: `4px solid ${st.color}` }}
                     onClick={() => setReviewTarget(c)}>
                     <div className="card-body p-3 d-flex align-items-center gap-3">
                       <div className="flex-grow-1" style={{ minWidth: 0 }}>

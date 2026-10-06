@@ -181,7 +181,7 @@
 /* New rows / requests fade in instead of popping into the list. */
 .bsw-row, .bsw-req { animation: wx-fade var(--dur-enter) var(--ease-out); }
 .bsw-req.is-pending {
-  border-left: 3px solid var(--accent);
+  border-left: 2px solid var(--accent);
 }
 .bsw-req-meta {
   font-size: 11.5px;

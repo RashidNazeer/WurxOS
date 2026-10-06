@@ -71,27 +71,24 @@ export async function listEukaStores() {
   return data || [];
 }
 
-export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null }) {
-  const { data: me } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from('brands')
-    .insert({
-      brand_name: brandName.trim(),
-      client_name: (clientName || '').trim(),
-      tier: tier?.trim() || null,
-      gmv: toNumberOrNull(gmv),
-      owner_id: ownerId,
-      logo_url: logoUrl || null,
-      status,
-      paid_collab_status: paidCollabStatus,
-      gmv_max_status: gmvMaxStatus,
-      currency: currency || 'USD',
-      euka_store_id: eukaStoreId || null,
-      euka_slug: eukaSlug || null,
-      created_by: me?.user?.id ?? null,
-    })
-    .select()
-    .single();
+// Brand row and initial assignments are written in one transaction (mig 412),
+// so a failure never leaves a half-created brand behind to be duplicated on retry.
+export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null, assigneeIds = [] }) {
+  const { data, error } = await supabase.rpc('brand_create_with_assignments', {
+    p_brand_name: brandName.trim(),
+    p_client_name: (clientName || '').trim(),
+    p_tier: tier?.trim() || null,
+    p_gmv: toNumberOrNull(gmv),
+    p_owner_id: ownerId,
+    p_logo_url: logoUrl || null,
+    p_status: status,
+    p_paid_collab_status: paidCollabStatus,
+    p_gmv_max_status: gmvMaxStatus,
+    p_currency: currency || 'USD',
+    p_euka_store_id: eukaStoreId || null,
+    p_euka_slug: eukaSlug || null,
+    p_assignee_ids: assigneeIds,
+  });
   if (error) throw new Error(error.message);
   return data;
 }
@@ -206,7 +203,7 @@ export async function reactivateBrand(id) {
 export async function setBrandAssignments(brandId, userIds, roles = null) {
   const { data: current, error: curErr } = await supabase
     .from('brand_assignments')
-    .select('user_id, profiles!inner(role)')
+    .select('user_id, profiles:user_id!inner(role)')
     .eq('brand_id', brandId);
   if (curErr) throw new Error(curErr.message);
 
@@ -300,6 +297,48 @@ export async function assignBrandApc(brandId, newApcId, note = null, notify = fa
     p_brand: brandId, p_new_apc: newApcId, p_note: note, p_notify: notify,
   });
   if (error) throw new Error(error.message);
+}
+
+// --------------------------------------------------------------
+// Temporary cover WITH automatic return (Boss / OL / Developer, mig 407).
+//
+// Unlike assignBrandApc/switchBrandApc (permanent) or the plain time-boxed
+// `brand_assignments.expires_at` cover (mig 210, purely additive — nothing
+// is ever taken away, so there is nothing to give back), this actually hands
+// the brand to the covering APC and remembers who to return it to. A cron
+// reverts it automatically at `endsAt`; endTempAssignmentEarly can also end
+// it sooner (the employee came back early).
+// --------------------------------------------------------------
+export async function temporarilyAssignBrand(brandId, coveringApcId, endsAt, note = null, notify = false) {
+  const { data, error } = await supabase.rpc('brand_temp_assign', {
+    p_brand: brandId, p_covering: coveringApcId, p_ends_at: endsAt, p_note: note, p_notify: notify,
+  });
+  if (error) throw new Error(error.message);
+  return data; // the new brand_temp_assignments.id
+}
+
+// Boss/OL only — give the brand back before its scheduled return date.
+export async function endTempAssignmentEarly(id) {
+  const { error } = await supabase.rpc('brand_temp_revert_one', { p_id: id, p_early: true });
+  if (error) throw new Error(error.message);
+}
+
+// Every brand currently under temporary cover, for the Brand Switcher's
+// "Covering" tab.
+export async function listActiveTempAssignments() {
+  const { data, error } = await supabase
+    .from('brand_temp_assignments')
+    .select(`
+      *,
+      brand:brand_id(id, brand_name, logo_url),
+      original:original_apc_id(id, display_name, role, avatar_url),
+      covering:covering_apc_id(id, display_name, role, avatar_url),
+      creator:created_by(id, display_name)
+    `)
+    .eq('status', 'active')
+    .order('ends_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
 }
 
 // Returns the current brand list for each of the two users — used

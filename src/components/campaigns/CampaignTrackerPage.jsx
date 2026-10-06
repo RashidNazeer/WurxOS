@@ -42,7 +42,7 @@ const STYLES = `
     padding: 3px 6px !important;
     font-size: 0.78rem !important;
     width: 100%;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
   }
   .ct-paste-table input:focus, .ct-paste-table select:focus {
     background: var(--input-bg) !important;
@@ -50,7 +50,7 @@ const STYLES = `
     outline: none;
     box-shadow: 0 0 0 2px rgba(59,130,246,0.15) !important;
   }
-  .ct-days-badge { display: inline-block; border-radius: 9999px; padding: 1px 8px; font-size: 0.72rem; font-weight: 600; }
+  .ct-days-badge { display: inline-block; border-radius: var(--radius-pill); padding: 1px 8px; font-size: 0.72rem; font-weight: 600; }
   .ct-modal-tab-btn {
     border: none; background: none; padding: 8px 16px;
     font-size: 0.83rem; font-weight: 500; color: var(--text-muted);
@@ -626,13 +626,13 @@ export default function CampaignTrackerPage() {
       {/* ── Bulk action bar ── */}
       {selected.size > 0 && (
         <div className="d-flex align-items-center gap-3 px-3 py-2 mb-3"
-          style={{ position: 'sticky', top: 'var(--topbar-h, 0px)', zIndex: 'var(--z-sticky)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10 }}>
+          style={{ position: 'sticky', top: 'var(--topbar-h, 0px)', zIndex: 'var(--z-sticky)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)' }}>
           <span className="fw-bold" style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>
             <i className="bi bi-check2-square me-1" />{selected.size} selected
           </span>
-          <button className="btn btn-sm btn-outline-secondary ms-auto" style={{ borderRadius: 8, fontSize: '0.78rem' }}
+          <button className="btn btn-sm btn-outline-secondary ms-auto" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
             onClick={clearSelected} disabled={bulkBusy}>Clear</button>
-          <button className="btn btn-sm btn-danger d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.78rem' }}
+          <button className="btn btn-sm btn-danger d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
             onClick={handleBulkDelete} disabled={bulkBusy}>
             {bulkBusy ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-trash" />}
             Delete {selected.size}

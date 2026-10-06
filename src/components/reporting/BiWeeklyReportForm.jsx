@@ -27,6 +27,8 @@ import ReportReturnNotice from './ReportReturnNotice';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
+import PasteParsePanel from './PasteParsePanel';
+import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionHeader title it belongs to.
@@ -103,7 +105,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, note, width
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
         className="form-control form-control-sm" placeholder={placeholder || label}
-        value={value} onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} style={{ borderRadius: 8 }} />
+        value={value} onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} style={{ borderRadius: 'var(--radius-sm)' }} />
       {note && <div className="text-muted" style={{ fontSize: '0.6rem' }}>{note}</div>}
     </div>
   );
@@ -128,7 +130,7 @@ function AutoGrowTextarea({ value, minRows = 3, placeholder, onChange, style }) 
       value={value}
       onChange={e => onChange(e.target.value)}
       onInput={resize}
-      style={{ borderRadius: 8, resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
+      style={{ borderRadius: 'var(--radius-sm)', resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
     />
   );
 }
@@ -150,7 +152,7 @@ function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
       <div className="d-flex align-items-center justify-content-between mb-1">
         <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Insights</label>
         <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
-          style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 8, fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
+          style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
           onClick={onGenerate} disabled={loading}>
           {loading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
             : <><i className="bi bi-stars" /> Generate with AI</>}
@@ -202,7 +204,7 @@ function FetchPreviousButton({ previousValue, currentValue, onPaste, sourceLabel
         background: disabled ? 'var(--surface-2)' : 'var(--surface-1)',
         border: '1px solid var(--border-subtle)',
         color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
-        borderRadius: 8,
+        borderRadius: 'var(--radius-sm)',
         fontSize: '0.68rem',
         padding: '3px 10px',
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -248,7 +250,7 @@ function ArraySection({ items, setItems, fields, addLabel }) {
         </div>
       ))}
       <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
-        style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={add}>
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={add}>
         <i className="bi bi-plus-circle" /> {addLabel || 'Add Row'}
       </button>
     </div>
@@ -891,7 +893,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
         <div className="row g-3">
           {myBrands.map(b => (
             <div key={b.id} className="col-md-6 col-lg-4">
-              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 14, cursor: 'pointer' }}
+              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer' }}
                 onClick={() => handleBrandSelect(b)}>
                 <div className="card-body p-3 d-flex align-items-center gap-3">
                   <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
@@ -944,7 +946,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           This is the first bi-weekly report for this brand. Select the start date of the first 2-week period.
           All future bi-weekly periods will automatically follow from this date.
         </p>
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 420 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', maxWidth: 420 }}>
           <div className="card-body p-4">
             <label className="form-label fw-semibold" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
               <i className="bi bi-calendar2-range me-1 text-primary" /> Starting Date of Period 1
@@ -954,7 +956,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
               className="form-control mb-3"
               value={anchorStartInput}
               onChange={e => setAnchorStartInput(e.target.value)}
-              style={{ borderRadius: 8, fontSize: '0.85rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
             />
             {anchorStartInput && (
               <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
@@ -971,7 +973,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             )}
             <button
               className="btn btn-primary w-100"
-              style={{ borderRadius: 8, fontSize: '0.85rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
               onClick={handleSetAnchor}
               disabled={!anchorStartInput || saving}
             >
@@ -1018,7 +1020,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             <span style={{ overflowWrap: 'anywhere' }}>{brandLabel} — {selectedPeriod?.label}</span>
             {editReportId && (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 6, fontSize: '0.65rem', padding: '1px 8px' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.65rem', padding: '1px 8px' }}
                 onClick={handleChangePeriod} title="Move this report to a different period">
                 <i className="bi bi-calendar-event" /> Change Period
               </button>
@@ -1028,7 +1030,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
         <div className="d-flex gap-2 flex-wrap align-items-center">
           <SaveStatus saving={saving} dirty={dirty} savedAt={lastSavedAt} />
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 10, fontSize: '0.78rem', border: 'none' }}
+            style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', border: 'none' }}
             onClick={handleGenerateAll} disabled={!!aiLoading.all} title="AI generates insights for all 6 sections">
             {aiLoading.all ? <><span className="spinner-border spinner-border-sm" /> Generating All…</>
               : <><i className="bi bi-stars" /> Generate All Insights</>}
@@ -1036,11 +1038,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           {(reportStatus === 'draft' || !editReportId) ? (
             <>
               <button className="btn btn-outline-secondary btn-sm px-3 d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 10 }} onClick={handleSaveDraft} disabled={saving}>
+                style={{ borderRadius: 'var(--radius-md)' }} onClick={handleSaveDraft} disabled={saving}>
                 {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-floppy" />} Save Draft
               </button>
               <button className="btn btn-sm px-4 d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 10, background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-md)', background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
                 onClick={handleSubmitReport} disabled={saving || !!submitBlock}
                 title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this period' : submitBlock?.kind === 'pendingPrior' ? 'The previous report must be verified by the Team Lead first' : ''}>
                 {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-send-fill" /> Submit Report</>}
@@ -1048,7 +1050,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             </>
           ) : (
             <button className="btn btn-primary btn-sm px-4 d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 10 }} onClick={handleSaveChanges} disabled={saving}>
+              style={{ borderRadius: 'var(--radius-md)' }} onClick={handleSaveChanges} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save Changes</>}
             </button>
           )}
@@ -1058,7 +1060,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedPeriod.label}</div>
@@ -1068,7 +1070,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report not yet verified</div>
@@ -1090,7 +1092,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
         <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           Report currency:
         </label>
-        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 8 }}
+        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 'var(--radius-sm)' }}
           value={data.currency || DEFAULT_CURRENCY}
           onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
           {CURRENCIES.map(c => (
@@ -1108,7 +1110,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-graph-up-arrow" title="Overall Performance" color="var(--info-text)" required
         enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')} />
       {sectEnabled.overallPerformance && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           <div className="d-flex flex-wrap gap-2 mb-2">
             <Field label={`GMV (${curSym})`} value={data.overallPerformance.gmv} onChange={v => setPerf('gmv', v)} type="number" placeholder="55834.62" />
@@ -1138,7 +1140,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-star-fill" title="Top Creators" color="var(--warning-text)" required
         enabled={sectEnabled.topCreators} onToggle={toggleSection('topCreators')} />
       {sectEnabled.topCreators && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('topCreators', 'var(--warning)')}
           <ArraySection items={data.topCreators} setItems={v => setData(d => ({ ...d, topCreators: v }))}
@@ -1161,7 +1163,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-play-circle-fill" title="Top Videos" color="var(--purple-text)" required
         enabled={sectEnabled.topVideos} onToggle={toggleSection('topVideos')} />
       {sectEnabled.topVideos && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('topVideos', 'var(--purple)')}
           <ArraySection items={data.topVideos} setItems={v => setData(d => ({ ...d, topVideos: v }))}
@@ -1186,9 +1188,16 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-rocket-takeoff-fill" title="GMV Max Performance" color="var(--danger-text)" required
         enabled={sectEnabled.gmvMax} onToggle={toggleSection('gmvMax')} />
       {sectEnabled.gmvMax && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('gmvMax', 'var(--danger)')}
+          <PasteParsePanel
+            noun="campaign"
+            accent="var(--danger)"
+            parse={parseGmvMaxText}
+            onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
+            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this report period</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
+          />
           <ArraySection items={data.gmvMax} setItems={v => setData(d => ({ ...d, gmvMax: v }))}
             addLabel="Add Campaign"
             fields={[
@@ -1209,7 +1218,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
 
       {/* ─── Month-to-Date GMV Max (auto-calcs MTD overall) ──────────────── */}
       {sectEnabled.gmvMax && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           <div className="d-flex align-items-center gap-2 mb-2">
             <i className="bi bi-calendar-range-fill" style={{ color: 'var(--danger-text)' }} />
@@ -1219,6 +1228,13 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically.
           </p>
           {presets.bar('gmvMaxMtd', 'var(--danger)')}
+          <PasteParsePanel
+            noun="campaign"
+            accent="var(--danger)"
+            parse={parseGmvMaxText}
+            onApply={rows => setData(d => ({ ...d, gmvMaxMtd: mergeGmvMaxRows(d.gmvMaxMtd, rows) }))}
+            hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the box above.</>}
+          />
           <ArraySection items={data.gmvMaxMtd || []} setItems={v => setData(d => ({ ...d, gmvMaxMtd: v }))}
             addLabel="Add MTD Campaign"
             fields={[
@@ -1238,7 +1254,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-box-seam-fill" title="Product Highlights" color="var(--info-text)" required
         enabled={sectEnabled.productHighlights} onToggle={toggleSection('productHighlights')} />
       {sectEnabled.productHighlights && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('productHighlights', 'var(--info)')}
           <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
@@ -1265,7 +1281,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-globe2" title="Offsite Performance" color="var(--success-text)"
         enabled={sectEnabled.offsitePerformance} onToggle={toggleSection('offsitePerformance')} />
       {sectEnabled.offsitePerformance && (
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {/* The week's own offsite figures are often not published yet, so the APC
               reports an older window. Naming that window is the honest fix: the
@@ -1316,7 +1332,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" color="var(--danger-text)" required
         enabled={sectEnabled.upcomingCampaigns} onToggle={toggleSection('upcomingCampaigns')} />
       {sectEnabled.upcomingCampaigns && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('upcomingCampaigns', 'var(--chart-5)')}
           <div className="d-flex justify-content-end mb-2">
@@ -1338,7 +1354,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-gear-fill" title="Operational Updates" color="var(--purple-text)" required
         enabled={sectEnabled.operationalUpdates} onToggle={toggleSection('operationalUpdates')} />
       {sectEnabled.operationalUpdates && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('operationalUpdates', 'var(--chart-6)')}
           <div className="d-flex justify-content-end mb-2">
@@ -1360,7 +1376,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <SectionHeader icon="bi-lightbulb-fill" title="Recommendations & Action Items" color="var(--warning-text)"
         enabled={sectEnabled.recommendations} onToggle={toggleSection('recommendations')} />
       {sectEnabled.recommendations && (
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('recommendations', 'var(--warning)')}
           <div className="d-flex justify-content-end mb-2">
@@ -1390,19 +1406,19 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           </h6>
         </div>
         <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={addCustomField}>
+          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={addCustomField}>
           <i className="bi bi-plus-circle" /> Add Custom Field
         </button>
       </div>
       {customFieldDefs.length === 0 ? (
-        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3 text-center text-muted" style={{ fontSize: '0.78rem' }}>
             No custom fields yet. Click <strong>+ Add Custom Field</strong> to create your own sections.
             These fields are just for you — other users won't see them.
           </div>
         </div>
       ) : (
-        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             {customFieldDefs.map((field, i) => (
               <div key={field.id} className={i > 0 ? 'mt-3 pt-3' : ''}
@@ -1465,11 +1481,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
         {(reportStatus === 'draft' || !editReportId) ? (
           <>
             <button className="btn btn-outline-secondary btn-sm px-4 d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 10 }} onClick={handleSaveDraft} disabled={saving}>
+              style={{ borderRadius: 'var(--radius-md)' }} onClick={handleSaveDraft} disabled={saving}>
               {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-floppy" />} Save Draft
             </button>
             <button className="btn btn-sm px-5 d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 10, background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
+              style={{ borderRadius: 'var(--radius-md)', background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
               onClick={handleSubmitReport} disabled={saving || !!submitBlock}
               title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this period' : submitBlock?.kind === 'pendingPrior' ? 'The previous report must be verified by the Team Lead first' : ''}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-send-fill" /> Submit Report</>}
@@ -1477,7 +1493,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
           </>
         ) : (
           <button className="btn btn-primary btn-sm px-5 d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10 }} onClick={handleSaveChanges} disabled={saving}>
+            style={{ borderRadius: 'var(--radius-md)' }} onClick={handleSaveChanges} disabled={saving}>
             {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save Changes</>}
           </button>
         )}

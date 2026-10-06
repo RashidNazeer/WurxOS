@@ -180,7 +180,7 @@
   bottom: 10px;
   width: 3px;
   background: var(--accent);
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
 }
 .bd-menu-count {
   background: var(--surface-2);
@@ -188,7 +188,7 @@
   font-size: 10.5px;
   font-weight: 800;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   min-width: 22px;
   text-align: center;
 }
@@ -412,7 +412,7 @@
   font-size: 10.5px;
   font-weight: 800;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   min-width: 20px;
   text-align: center;
   line-height: 1.4;
@@ -450,7 +450,7 @@
 .bd2-kpi-icon {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: grid;
   place-items: center;
   font-size: 14px;

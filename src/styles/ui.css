@@ -201,7 +201,7 @@
   bottom: 0;
   width: 1px;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--accent);
   transform-origin: left center;
   transform: translateX(var(--ui-tab-x, 0px)) scaleX(var(--ui-tab-w, 0));
@@ -299,30 +299,34 @@
   place-items: center;
   padding: var(--space-5);
   background: var(--backdrop);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(var(--glass-blur-backdrop));
+  backdrop-filter: blur(var(--glass-blur-backdrop));
   animation: wx-enter-fade var(--dur-enter) var(--ease-out);
 }
 .ui-modal-backdrop.is-closing {
   pointer-events: none;
   animation: wx-exit-fade var(--dur-exit) var(--ease-in) forwards;
 }
-/* Glass pane without its own filter (the backdrop already blurs; a filter
-   here would trap position:fixed menus inside the dialog). */
+/* Glass pane. The filter lives on a pseudo-element, never on .ui-modal
+   itself: backdrop-filter there would become the containing block for
+   position:fixed menus inside the dialog and misplace them. */
 .ui-modal {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   width: 100%;
   max-height: 90vh;
   max-height: 90dvh;
-  background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl), var(--glass-highlight);
+  border-radius: var(--radius-glass);
+  box-shadow: var(--shadow-xl);
   color: var(--text-primary);
   outline: none;
   animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
 }
+/* The pane layer itself (background, filter, rim ring, specular) is in the
+   shared rim-ring block in global.css. */
 .ui-modal-backdrop.is-closing .ui-modal {
   animation: wx-exit-rise var(--dur-exit) var(--ease-in) forwards;
 }
@@ -334,7 +338,9 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
+  /* Same inset as body and footer, so the three share one edge inside the ring. */
+  margin: 0 var(--glass-rim-w-lg);
+  padding: var(--space-4) max(0px, calc(var(--space-5) - var(--glass-rim-w-lg)));
   border-bottom: 1px solid var(--border-subtle);
 }
 .ui-modal__titles { min-width: 0; }
@@ -354,7 +360,7 @@
   height: var(--control-h-sm);
   border: 1px solid var(--border-subtle);
   border-radius: 50%;
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--t-colors), var(--t-press);
@@ -364,17 +370,26 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-5);
+  /* Text scrim behind the scrolling body. Inset by the rim so it stops at the
+     ring's inner edge; padding gives the same amount back, so text doesn't move. */
+  background: var(--glass-text-scrim, color-mix(in srgb, var(--surface-1) 45%, transparent));
+  margin: 0 var(--glass-rim-w-lg);
+  padding: var(--space-5) max(0px, calc(var(--space-5) - var(--glass-rim-w-lg)));
 }
 .ui-modal__foot {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   flex-wrap: wrap;
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) max(0px, calc(var(--space-5) - var(--glass-rim-w-lg)));
   border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+  /* A tint, not a slab: the pane stays one material. Inset by the ring and
+     given the ring's inner radius so it never covers the ring's bottom edge;
+     at --glass-rim-w-lg: 0 this is the old full-bleed footer. */
+  margin: 0 var(--glass-rim-w-lg) var(--glass-rim-w-lg);
+  border-radius: 0 0 calc(var(--radius-glass) - var(--glass-rim-w-lg))
+                       calc(var(--radius-glass) - var(--glass-rim-w-lg));
 }
 .ui-confirm__text { margin: 0; font-size: var(--fs-base); color: var(--text-secondary); line-height: var(--lh-base); }
 
@@ -420,15 +435,10 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
   overflow: hidden;
   pointer-events: auto;
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow), var(--glass-highlight);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
+  /* Pane, rim ring and specular: shared rim-ring block in global.css. */
+  border-radius: var(--radius-glass-sm);
   color: var(--text-primary);
   animation: wx-enter-up var(--dur-enter) var(--ease-emphasized);
 }

@@ -210,7 +210,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 820, zIndex: 1, borderRadius: 14, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 820, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="px-4 pt-4 pb-3 d-flex align-items-start justify-content-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div>
             <h6 className="fw-bold mb-0 d-flex align-items-center gap-2">
@@ -230,7 +230,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
           <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div className="fw-semibold small">CSV format</div>
-              <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={downloadTemplate}>
+              <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={downloadTemplate}>
                 <i className="bi bi-download" /> Download template
               </button>
             </div>
@@ -269,13 +269,13 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
 
           <div className="d-flex gap-2 mb-3">
             <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8, fontSize: '0.78rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
               onClick={handleParse} disabled={!csvText.trim()}>
               <i className="bi bi-search" /> Parse & validate
             </button>
             {parsed && parsed.validCount > 0 && (
               <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                 onClick={handleImport} disabled={saving}>
                 {saving ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> Importing…</>
                   : <><i className="bi bi-cloud-upload" /> Import {parsed.validCount} {parsed.validCount === 1 ? 'row' : 'rows'}</>}
@@ -300,7 +300,7 @@ export default function BulkImportKnowledgeBaseModal({ allUsers, currentUser, ex
                 )}
               </div>
 
-              <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+              <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
                 <table className="table table-sm mb-0" style={{ fontSize: '0.72rem' }}>
                   <thead style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
                     <tr>

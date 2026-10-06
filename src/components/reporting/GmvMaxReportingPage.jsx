@@ -44,7 +44,7 @@ export default function GmvMaxReportingPage() {
       <div className="row g-3">
         {/* Brand picker */}
         <div className="col-lg-4">
-          <div className="card border-0 shadow-sm" style={{ borderRadius: 14, position: 'sticky', top: 'calc(var(--topbar-h, 0px) + 16px)' }}>
+          <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', position: 'sticky', top: 'calc(var(--topbar-h, 0px) + 16px)' }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <h6 className="fw-bold mb-0" style={{ fontSize: '0.85rem' }}>
@@ -72,7 +72,7 @@ export default function GmvMaxReportingPage() {
                       <button key={b.id} type="button"
                         className="btn text-start d-flex align-items-center gap-2"
                         style={{
-                          borderRadius: 10,
+                          borderRadius: 'var(--radius-md)',
                           padding: '8px 10px',
                           background: isSel ? 'color-mix(in srgb, var(--info) 18%, transparent)' : 'var(--surface-1)',
                           border: `1px solid ${isSel ? 'var(--info)' : 'var(--border-subtle)'}`,
@@ -98,13 +98,13 @@ export default function GmvMaxReportingPage() {
         {/* Selected brand → GMV Max entry UI */}
         <div className="col-lg-8">
           {selected ? (
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
               <div className="card-body p-3 p-md-4">
                 <GmvMaxTab brand={selected} />
               </div>
             </div>
           ) : (
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
               <div className="card-body p-5 text-center">
                 <i className="bi bi-arrow-left-circle" style={{ fontSize: '2rem', color: 'var(--text-muted)' }} />
                 <h6 className="fw-bold mt-3 mb-1">Pick a brand to start</h6>

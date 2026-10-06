@@ -1,7 +1,7 @@
 /* ============================================================
    Wurx Buddy: floating button, quick panel, Buddy tab, settings.
    Tokens only (tokens.css), so light and dark both work.
-   Stacking: above sticky page chrome (≤1000), below every modal
+   Stacking: above sticky page chrome (â‰¤1000), below every modal
    (Bootstrap 1050+, inline overlays 1080), so a dialog always wins.
    ============================================================ */
 
@@ -11,13 +11,14 @@
 .bd-fab {
   position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1045; width: 56px; height: 56px; padding: 2px; border: 0; border-radius: 50%;
-  background: var(--surface-1);
-  box-shadow: 0 0 0 2px var(--accent-ring), var(--shadow-lg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter-sticky); backdrop-filter: var(--glass-filter-sticky);
+  box-shadow: 0 0 0 2px var(--accent-ring), var(--shadow-lg), var(--glass-highlight);
   display: grid; place-items: center; cursor: pointer;
   transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 .bd-fab:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow-xl); }
-.bd-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.bd-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .bd-fab.is-thinking { animation: bd-ring 1.6s var(--ease-in-out) infinite; }
 .bd-fab.is-open { box-shadow: 0 0 0 3px var(--accent), var(--shadow-lg); }
 .bd-fab.is-bounce { animation: bd-bounce 0.9s var(--ease-out) 1; }
@@ -48,19 +49,42 @@
   position: fixed; right: 20px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1046;
   width: 400px; height: 600px; max-height: calc(100dvh - 112px);
   display: flex; flex-direction: column; overflow: hidden;
-  background: var(--surface-1); color: var(--text-primary);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl);
+  /* Glass pane. Same recipe as the global.css rim-ring block (.ui-modal::before):
+     the filter lives on the pseudo-layer, not on the panel, so the panel never
+     becomes a containing block for fixed descendants. The panel itself carries no
+     background; header, thread and composer sit on the translucent layer.
+     Padding = the rim width, so content clears the ring (0 outside Chromium). */
+  isolation: isolate; color: var(--text-primary);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-glass); box-shadow: var(--shadow-xl);
+  padding: var(--glass-rim-w-lg);
   animation: bd-pop var(--dur-base) var(--ease-out);
+}
+.bd-panel::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  border: var(--glass-rim-w-lg) solid transparent;
+  background-image:
+    linear-gradient(var(--glass-bg), var(--glass-bg)),
+    var(--glass-rim-spec),
+    linear-gradient(var(--glass-rim-bg), var(--glass-rim-bg));
+  background-origin: padding-box, border-box, border-box;
+  background-clip: padding-box, border-box, border-box;
+  background-repeat: no-repeat;
+  box-shadow: var(--glass-rim-lit), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+}
+/* Text-dense regions of Buddy sit on the shared text scrim (tokens.css). */
+.bd-panel, .bd-main, .bd-history, .bd-sources-panel, .bd-modal {
+  --bd-scrim: var(--glass-text-scrim, color-mix(in srgb, var(--surface-1) 45%, transparent));
 }
 .bd-panel[hidden] { display: none; }
 @keyframes bd-pop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
 .bd-panel-head {
   display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 12px;
-  border-bottom: 1px solid var(--border-subtle); background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--surface-2) 40%, transparent);
 }
 .bd-panel-title { flex: 1; min-width: 0; line-height: 1.2; }
 .bd-panel-name { font-weight: 800; font-size: 14px; }
-.bd-panel-sub { font-size: 11.5px; color: var(--text-muted); }
+.bd-panel-sub { font-size: 11.5px; color: var(--text-secondary); }
 .bd-icon-btn {
   width: 32px; height: 32px; flex-shrink: 0; border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-secondary); display: inline-grid; place-items: center; cursor: pointer;
@@ -93,7 +117,7 @@
 .ai-md ul:has(> li > input[type='checkbox']) { list-style: none; padding-left: 0.3rem; }
 .ai-md li > input[type='checkbox'] { margin-right: 6px; vertical-align: -1px; accent-color: var(--accent); }
 .ai-md blockquote {
-  margin: 0.4rem 0 0.6rem; padding: 0.35rem 0.75rem; border-left: 3px solid var(--accent);
+  margin: 0.4rem 0 0.6rem; padding: 0.35rem 0.75rem; border-left: 2px solid var(--accent);
   background: var(--accent-soft); color: var(--text-secondary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .ai-md blockquote > :last-child { margin-bottom: 0; }
@@ -101,7 +125,7 @@
 .ai-md del { color: var(--text-muted); }
 .ai-md a:not([href]) { color: inherit; }
 .ai-md :not(pre) > code {
-  font-family: var(--font-mono); font-size: 0.82em; padding: 0.08rem 0.35rem; border-radius: 5px;
+  font-family: var(--font-mono); font-size: 0.82em; padding: 0.08rem 0.35rem; border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary);
 }
 
@@ -139,7 +163,7 @@
 .bd-jump {
   position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 2;
   display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-default);
-  background: var(--surface-1); color: var(--text-primary); box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--surface-1) 85%, transparent); color: var(--text-primary); box-shadow: var(--shadow-md);
   font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer;
 }
 .bd-jump:hover { border-color: var(--accent); color: var(--accent-text); }
@@ -154,21 +178,21 @@
 .bd-inline-clip { display: inline-block; vertical-align: middle; margin-right: 6px; }
 .bd-msg { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .bd-bubble {
-  padding: 10px 14px; border-radius: 16px; font-size: 0.88rem; line-height: 1.6;
+  padding: 10px 14px; border-radius: var(--radius-lg); font-size: 0.88rem; line-height: 1.6;
   word-break: break-word; max-width: 100%;
 }
 .bd-bubble.is-user {
   background: var(--accent); color: var(--on-accent); white-space: pre-wrap;
-  border-bottom-right-radius: 5px; max-width: 85%;
+  border-bottom-right-radius: var(--radius-sm); max-width: 85%;
 }
 .bd-bubble.is-bot {
-  background: var(--surface-2); color: var(--text-primary);
-  border: 1px solid var(--border-subtle); border-bottom-left-radius: 5px;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-bottom-left-radius: var(--radius-sm);
 }
 .bd-row.is-active .bd-bubble.is-bot { border-color: var(--accent); }
 .bd-status {
   display: inline-flex; align-items: center; font-size: 0.85rem; color: var(--text-secondary);
-  padding: 8px 12px; border-radius: 14px; background: var(--accent-soft);
+  padding: 8px 12px; border-radius: var(--radius-lg); background: var(--accent-soft);
 }
 .bd-status.is-inline { background: transparent; padding: 6px 0 0; font-size: 0.78rem; color: var(--text-muted); }
 .bd-error {
@@ -177,7 +201,7 @@
   border-radius: var(--radius-md); padding: 6px 10px;
 }
 .bd-error-inline { font-size: 0.75rem; color: var(--danger); }
-.bd-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-muted); }
+.bd-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-secondary); }
 
 /* Citations: [S1] markers become numbered buttons. */
 .bd-cite {
@@ -192,7 +216,7 @@
 .bd-chip {
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0;
   padding: 4px 10px 4px 4px; border-radius: var(--radius-pill);
-  border: 1px solid var(--border-subtle); background: var(--surface-1); color: var(--text-secondary);
+  border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text-secondary);
   font-size: 11.5px; text-decoration: none; cursor: pointer; text-align: left;
 }
 .bd-chip:hover { border-color: var(--accent); color: var(--text-primary); }
@@ -209,7 +233,7 @@
 
 .bd-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
 .bd-act {
-  border: 0; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 600;
+  border: 0; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 600;
   padding: 4px 7px; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
 }
 .bd-act:hover { background: var(--surface-2); color: var(--text-primary); }
@@ -230,7 +254,7 @@
 }
 .bd-input-wrap {
   display: flex; align-items: flex-end; gap: 8px; max-width: 760px; margin: 0 auto;
-  background: var(--input-bg); border: 1.5px solid var(--input-border); border-radius: 22px; padding: 5px 5px 5px 14px;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent); border: 1px solid var(--input-border); border-radius: var(--radius-xl); padding: 5px 5px 5px 14px;
 }
 .bd-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .bd-input {
@@ -244,12 +268,12 @@
 }
 .bd-send:disabled { opacity: 0.45; cursor: default; }
 .bd-send.is-stop { background: var(--text-primary); color: var(--text-inverse); }
-.bd-hint { font-size: 10.5px; color: var(--text-muted); text-align: center; margin-top: 6px; }
+.bd-hint { font-size: 10.5px; color: var(--text-secondary); text-align: center; margin-top: 6px; }
 
 /* ---------- Quick empty state ---------- */
 .bd-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 38px; }
 .bd-suggest {
-  border: 1px solid var(--border-default); background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border-default); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text-primary);
   font-size: 12.5px; padding: 6px 12px; border-radius: var(--radius-pill); cursor: pointer; text-align: left;
 }
 .bd-suggest:hover { border-color: var(--accent); background: var(--accent-soft); }
@@ -308,9 +332,15 @@
 }
 .bd-rail-new:hover { background: var(--accent-hover); }
 .bd-rail-new:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Page panels: glass, same family as the quick panel. They have no fixed
+   descendants, so the filter sits on the element; the soft filter is used since
+   these are large and their backdrop moves while the page scrolls. */
 .bd-history, .bd-main, .bd-sources-panel {
-  min-height: 0; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  min-height: 0; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-glass-sm);
+  box-shadow: var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter-sticky); backdrop-filter: var(--glass-filter-sticky);
 }
+.bd-history-list { background: var(--bd-scrim); border-radius: var(--radius-md); }
 .bd-history { display: flex; flex-direction: column; padding: 12px 8px 8px; }
 .bd-history-top { display: flex; align-items: center; gap: 6px; padding: 0 4px 10px; }
 .bd-new {
@@ -329,7 +359,7 @@
 .bd-group { margin-bottom: 8px; }
 .bd-group-label {
   font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted); padding: 6px 10px 4px;
+  color: var(--text-secondary); padding: 6px 10px 4px;
 }
 .bd-conv { position: relative; display: flex; align-items: center; border-radius: var(--radius-md); }
 .bd-conv:hover, .bd-conv:focus-within { background: var(--surface-2); }
@@ -342,7 +372,7 @@
 .bd-conv-acts { display: none; gap: 1px; padding-right: 4px; }
 .bd-conv:hover .bd-conv-acts, .bd-conv:focus-within .bd-conv-acts { display: flex; }
 .bd-conv-acts button {
-  border: 0; background: transparent; color: var(--text-muted); padding: 3px 5px; border-radius: 6px; font-size: 12px;
+  border: 0; background: transparent; color: var(--text-muted); padding: 3px 5px; border-radius: var(--radius-sm); font-size: 12px;
 }
 .bd-conv-acts button:hover { color: var(--text-primary); background: var(--surface-3); }
 .bd-conv-acts button.is-danger:hover { color: var(--danger); background: var(--danger-soft); }
@@ -375,7 +405,7 @@
 
 .bd-sources-panel { width: 300px; display: flex; flex-direction: column; padding: 10px; overflow-y: auto; }
 .bd-side-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 13px; padding: 0 2px 8px; }
-.bd-side-empty { font-size: 12.5px; color: var(--text-muted); padding: 10px; }
+.bd-side-empty { font-size: 12.5px; color: var(--text-secondary); padding: 10px; }
 .bd-side-source { margin-bottom: 6px; border-radius: var(--radius-md); }
 .bd-side-source.is-active .bd-chip { border-color: var(--accent); background: var(--accent-soft); }
 .bd-scrim { display: none; }
@@ -426,11 +456,11 @@
   .bd-ring-fill { transition: none; }
 }
 
-/* Settings › Wurx Buddy: category pills, only on phones (the Settings nav has
+/* Settings â€º Wurx Buddy: category pills, only on phones (the Settings nav has
    the sub-tabs on wider screens; it becomes a plain list at 900 px). */
 .bd-subtabs { display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 @media (max-width: 900px) { .bd-subtabs { display: flex; } }
-/* Inside Settings › Wurx Buddy: flows with the Settings page, no inner scroll box. */
+/* Inside Settings â€º Wurx Buddy: flows with the Settings page, no inner scroll box. */
 .bd-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .bd-card { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; background: var(--surface-1); }
 .bd-card-head { display: flex; gap: 10px; margin-bottom: 12px; }
@@ -451,8 +481,26 @@
 .bd-link { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bd-link.is-off { color: var(--text-muted); }
 .bd-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); }
-.bd-modal-backdrop { position: fixed; inset: 0; /* buddy: no token fits; above --z-modal, below --z-popover */ z-index: 1080; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--surface-0) 55%, transparent); backdrop-filter: blur(4px); }
-.bd-modal { width: 600px; max-width: 100%; background: var(--surface-1); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-xl); }
+.bd-modal-backdrop { position: fixed; inset: 0; /* buddy: no token fits; above --z-modal, below --z-popover */ z-index: 1080; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--surface-0) 55%, transparent); backdrop-filter: blur(var(--glass-blur-backdrop)); }
+/* Same pseudo-layer recipe as .bd-panel; padding = rim so content clears the ring. */
+.bd-modal {
+  position: relative; isolation: isolate;
+  width: 600px; max-width: 100%; border: 1px solid var(--glass-border); border-radius: var(--radius-glass);
+  padding: max(20px, var(--glass-rim-w-lg)); box-shadow: var(--shadow-xl);
+}
+.bd-modal::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  border: var(--glass-rim-w-lg) solid transparent;
+  background-image:
+    linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)),
+    var(--glass-rim-spec),
+    linear-gradient(var(--glass-rim-bg), var(--glass-rim-bg));
+  background-origin: padding-box, border-box, border-box;
+  background-clip: padding-box, border-box, border-box;
+  background-repeat: no-repeat;
+  box-shadow: var(--glass-rim-lit), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+}
 
 /* ---------- Usage (Boss) ---------- */
 .bd-usage-range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -584,8 +632,9 @@
   /* Full-screen sheet on phones. */
   .bd-panel {
     inset: 0; width: auto; height: auto; max-height: none; border-radius: 0; border: 0;
-    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
   }
+  .bd-panel::before { border-width: 0; }
   .bd-starters { grid-template-columns: 1fr; }
   .bd-chips { padding-left: 0; }
   /* 360 px: nothing wider than the screen. */

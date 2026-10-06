@@ -31,7 +31,7 @@ export function Delta({ pct, invert = false }) {
 export function Section({ title, eyebrow, icon, color = 'var(--accent)', right, children, span = 12 }) {
   return (
     <div className={`col-12 col-xl-${span}`}>
-      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: '18px 20px', height: '100%' }}>
+      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '18px 20px', height: '100%' }}>
         <div className="d-flex align-items-center gap-2 mb-3">
           {icon && (
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -54,7 +54,7 @@ export function Section({ title, eyebrow, icon, color = 'var(--accent)', right, 
 export function Kpi({ label, value, delta, invertDelta = false, sub }) {
   return (
     <div className="col-6 col-md-4 col-xl-3">
-      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 12, padding: '14px 16px', height: '100%' }}>
+      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '14px 16px', height: '100%' }}>
         <div className="text-muted" style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</div>
         <div className="fw-bold" style={{ fontSize: '1.35rem', color: 'var(--text-primary)', lineHeight: 1.1, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
         <div className="d-flex align-items-center gap-2 mt-1" style={{ minHeight: 16 }}>
@@ -107,7 +107,7 @@ export function LineChart({ series = [], height = 220, yFmt = fmtCompact }) {
       <div className="d-flex flex-wrap gap-3 mt-1 justify-content-center">
         {series.map((s, i) => (
           <span key={i} className="d-inline-flex align-items-center gap-1" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-            <span style={{ width: 10, height: 3, borderRadius: 2, background: s.color, display: 'inline-block' }} /> {s.label}
+            <span style={{ width: 10, height: 3, borderRadius: 'var(--radius-xs)', background: s.color, display: 'inline-block' }} /> {s.label}
           </span>
         ))}
       </div>
@@ -130,8 +130,8 @@ export function FunnelBars({ rows = [], color = 'var(--accent)', valueFmt = fmtN
               {valueFmt(r.value)}{r.sub != null && <span className="text-muted fw-normal"> · {r.sub}</span>}
             </span>
           </div>
-          <div style={{ height: 12, borderRadius: 6, background: 'var(--surface-2)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.max(2, ((Number(r.value) || 0) / max) * 100)}%`, background: color, borderRadius: 6 }} />
+          <div style={{ height: 12, borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.max(2, ((Number(r.value) || 0) / max) * 100)}%`, background: color, borderRadius: 'var(--radius-sm)' }} />
           </div>
         </div>
       ))}

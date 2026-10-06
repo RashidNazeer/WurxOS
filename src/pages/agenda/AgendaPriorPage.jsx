@@ -101,7 +101,7 @@ export default function AgendaPriorPage() {
         </div>
         <div className="d-flex align-items-center gap-2 flex-wrap">
           <select className="form-select form-select-sm" value={sortDir} onChange={(e) => setSortDir(e.target.value)}
-            style={{ width: 150, borderRadius: 8, fontSize: '0.8rem' }} title="Sort meetings">
+            style={{ width: 150, borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }} title="Sort meetings">
             <option value="desc">Newest first</option>
             <option value="asc">Oldest first</option>
           </select>
@@ -118,7 +118,7 @@ export default function AgendaPriorPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : weeks.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-clock-history text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
@@ -141,7 +141,7 @@ export default function AgendaPriorPage() {
                     <button type="button"
                       onClick={() => setSelected({ meeting: m, weekIndex: w.index })}
                       className="card border-0 shadow-sm w-100 text-start h-100"
-                      style={{ borderRadius: 12, cursor: 'pointer' }}>
+                      style={{ borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
                       <div className="card-body p-3">
                         <div className="d-flex align-items-center justify-content-between mb-1">
                           <span className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>

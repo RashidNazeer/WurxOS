@@ -25,6 +25,8 @@ import RichTextEditor from '../shared/RichTextEditor';
 import ReportReturnNotice from './ReportReturnNotice';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
+import PasteParsePanel from './PasteParsePanel';
+import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionCard title it belongs to.
@@ -53,7 +55,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, width = '10
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
         className="form-control form-control-sm"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 'var(--radius-sm)' }}
         placeholder={placeholder} value={value || ''}
         onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} />
     </div>
@@ -78,7 +80,7 @@ function AutoGrowTextarea({ value, minRows = 6, placeholder, onChange }) {
       value={value || ''}
       onChange={e => onChange(e.target.value)}
       onInput={resize}
-      style={{ borderRadius: 8, resize: 'vertical', overflow: 'hidden' }} />
+      style={{ borderRadius: 'var(--radius-sm)', resize: 'vertical', overflow: 'hidden' }} />
   );
 }
 
@@ -117,7 +119,7 @@ function ArraySection({ items, setItems, fields, addLabel, minRows = 1 }) {
         </div>
       ))}
       <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
-        style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={add}>
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={add}>
         <i className="bi bi-plus-circle" /> {addLabel || 'Add Row'}
       </button>
     </div>
@@ -152,7 +154,7 @@ function ComparisonChip({ thisVal, lastVal, format = 'num', sym = '$' }) {
 function SectionCard({ icon, title, children, color = 'var(--info-text)', actions }) {
   return (
     <div className="card mb-3" data-issue-section={title} style={{
-      borderRadius: 12,
+      borderRadius: 'var(--radius-md)',
       border: '1px solid var(--border-subtle)',
       boxShadow: 'var(--shadow-sm)',
     }}>
@@ -723,7 +725,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         <div className="row g-3">
           {myBrands.map(b => (
             <div key={b.id} className="col-md-6 col-lg-4">
-              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 14, cursor: 'pointer' }}
+              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer' }}
                 onClick={() => handleBrandSelect(b)}>
                 <div className="card-body p-3 d-flex align-items-center gap-3">
                   <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
@@ -764,7 +766,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           {opts.map(m => (
             <div key={m.monthKey} className="col-md-4 col-sm-6">
               <button className="btn btn-outline-secondary w-100 text-start"
-                style={{ borderRadius: 10, fontSize: '0.84rem' }}
+                style={{ borderRadius: 'var(--radius-md)', fontSize: '0.84rem' }}
                 onClick={() => handleFirstMonthPick(m)}>
                 <i className="bi bi-calendar3 me-2" />{m.label}
               </button>
@@ -827,7 +829,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
             onChange={e => handleImportPdf(e.target.files?.[0])} />
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.78rem' }}
+            style={{ background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
             onClick={() => pdfInputRef.current?.click()} disabled={importing}
             title="Upload a Monthly report PDF (Google Doc export) to auto-fill this form">
             {importing ? <><span className="spinner-border spinner-border-sm" /> Reading PDF…</>
@@ -836,12 +838,12 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           {(reportStatus === 'draft' || !isEditMode) ? (
             <>
               <button className="btn btn-outline-secondary btn-sm px-3 d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8 }} onClick={handleSaveDraft} disabled={saving}>
+                style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleSaveDraft} disabled={saving}>
                 {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-save" />}
                 Save Draft
               </button>
               <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
                 onClick={handleSubmitReport} disabled={saving || !!submitBlock}
                 title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this month' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
                 <i className="bi bi-send-fill" /> Submit
@@ -849,7 +851,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
             </>
           ) : (
             <button className="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8 }} onClick={handleSaveChanges} disabled={saving}>
+              style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleSaveChanges} disabled={saving}>
               {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-save" />}
               Save Changes
             </button>
@@ -862,7 +864,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           style={{
             background: importToast.kind === 'success' ? 'var(--success-soft)' : importToast.kind === 'warn' ? 'var(--warning-soft)' : 'var(--danger-soft)',
             border: `1px solid ${importToast.kind === 'success' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : importToast.kind === 'warn' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}`,
-            borderRadius: 10,
+            borderRadius: 'var(--radius-md)',
             color: importToast.kind === 'success' ? 'var(--success)' : importToast.kind === 'warn' ? 'var(--warning)' : 'var(--danger)',
           }}>
           <i className={`bi ${importToast.kind === 'success' ? 'bi-check-circle-fill' : importToast.kind === 'warn' ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'} flex-shrink-0 mt-1`} />
@@ -877,7 +879,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedMonth?.label}</div>
@@ -887,7 +889,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report awaiting OL approval</div>
@@ -906,7 +908,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           Report currency:
         </label>
-        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 8 }}
+        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 'var(--radius-sm)' }}
           value={data.currency || DEFAULT_CURRENCY}
           onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
           {CURRENCIES.map(c => (
@@ -926,7 +928,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         const enabledCount = MONTHLY_SECTIONS.filter(s => enabled[s.key]).length;
         return (
           <div className="card mb-3" style={{
-            borderRadius: 12, border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
             background: 'var(--surface-0)', boxShadow: 'var(--shadow-sm)',
           }}>
             <div className="card-body p-3">
@@ -1153,6 +1155,13 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {sectEnabled.gmvMax && (
       <SectionCard icon="bi-rocket-takeoff-fill" color="var(--danger-text)" title="GMV Max Performance">
         {presets.bar('gmvMax', 'var(--danger)')}
+        <PasteParsePanel
+          noun="campaign"
+          accent="var(--danger)"
+          parse={parseGmvMaxText}
+          onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
+          hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this month</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV.</>}
+        />
         <ArraySection items={data.gmvMax}
           setItems={(items) => setData(d => ({ ...d, gmvMax: items }))}
           fields={[
@@ -1194,7 +1203,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       <SectionCard icon="bi-trophy-fill" color="var(--warning-text)" title="Key Wins / Insights"
         actions={
           <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 8, fontSize: '0.7rem', padding: '4px 10px', border: 'none' }}
+            style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', padding: '4px 10px', border: 'none' }}
             onClick={runKeyWinsAi} disabled={aiLoading}>
             {aiLoading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
               : <><i className="bi bi-stars" /> Generate with AI</>}
@@ -1245,7 +1254,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               renderPreset={presets.custom} />
           )}
           {selectedBrand?.id && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed' }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)', borderStyle: 'dashed' }}>
               <div className="card-body p-3">
                 <AddCustomSectionInline
                   disabled={!selectedBrand?.id}

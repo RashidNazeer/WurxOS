@@ -237,7 +237,7 @@ export default function AgendaUpcomingPage() {
         </div>
         {isOL && (
           <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.8rem' }}
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
             title="Notify every configured team for this week"
             onClick={handleNotify} disabled={notifying || notifyingTl || configuredCount === 0}>
             {notifying
@@ -319,7 +319,7 @@ function GuestEditModal({ meeting, teams, tlName, onClose, onSave }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--accent-soft)' }}>
@@ -427,7 +427,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
 
   return (
     <div className="card h-100" style={{
-      borderRadius: 14,
+      borderRadius: 'var(--radius-lg)',
       border: live ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
       boxShadow: live ? '0 8px 28px var(--accent-ring)' : 'var(--shadow-sm)',
       background: 'var(--surface-1)',
@@ -517,7 +517,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                     {olCurrent && (
                       <button className="btn btn-sm p-0 px-1 ms-auto d-inline-flex align-items-center"
                         title="Change guests for this week only"
-                        style={{ fontSize: '0.58rem', fontWeight: 700, borderRadius: 5, background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+                        style={{ fontSize: '0.58rem', fontWeight: 700, borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
                         onClick={() => onEditGuests(r.meeting)}>
                         <i className="bi bi-pencil" />
                       </button>
@@ -526,7 +526,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                 )}
                 {canStart && (
                   <button className="btn btn-sm btn-success w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}
                     disabled={meetingBusy}
                     onClick={() => onStart(r.meeting.id)}>
                     {meetingBusy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-play-fill" /> Start Meeting</>}
@@ -539,14 +539,14 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                 )}
                 {canOpenRoom && mStatus === 'ongoing' && (
                   <button className="btn btn-sm btn-outline-danger w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}
                     onClick={() => onOpen(r.meeting.id)}>
                     <i className="bi bi-box-arrow-in-right" /> Open room
                   </button>
                 )}
                 {olCurrent && mStatus === 'paused' && (
                   <button className="btn btn-sm btn-primary w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}
                     disabled={meetingBusy}
                     onClick={() => onStart(r.meeting.id)}>
                     {meetingBusy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-play-fill" /> Resume</>}
@@ -554,7 +554,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                 )}
                 {olCurrent && mStatus === 'completed' && (
                   <button className="btn btn-sm btn-outline-dark w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}
                     disabled={meetingBusy}
                     onClick={async () => { if (await ask('Reopen this completed meeting and continue it?')) onStart(r.meeting.id); }}>
                     {meetingBusy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-arrow-counterclockwise" /> Reopen</>}
@@ -562,7 +562,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                 )}
                 {card.isCurrent && isOL && mStatus === 'not_notified' && (
                   <button className="btn btn-sm btn-outline-dark w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 6, fontSize: '0.7rem' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.7rem' }}
                     disabled={notifying || !!notifyingTl}
                     title={`Notify ${r.tlName} for this week`}
                     onClick={() => onNotifyTeam(r.tlId, r.tlName)}>
@@ -576,7 +576,7 @@ function WeekCard({ card, isOL, isGuest, myGuestSlugs, guestLabels, myTeamTlId, 
                     ongoing / paused / completed — no point re-notifying then. */}
                 {olCurrent && mStatus === 'upcoming' && (
                   <button className="btn btn-sm w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 6, fontSize: '0.68rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
                     disabled={notifying || !!notifyingTl}
                     title={`Re-notify ${r.tlName} that their meeting is coming up`}
                     onClick={() => onNotifyTeam(r.tlId, r.tlName)}>

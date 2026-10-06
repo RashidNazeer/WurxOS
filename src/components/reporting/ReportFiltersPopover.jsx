@@ -35,7 +35,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
       <button ref={anchorRef} type="button"
         className="btn btn-sm d-inline-flex align-items-center gap-1"
         style={{
-          borderRadius: 8,
+          borderRadius: 'var(--radius-sm)',
           fontSize: '0.78rem',
           border: `1px solid ${activeCount ? 'var(--info)' : 'var(--border-default)'}`,
           background: activeCount ? 'var(--info-soft)' : 'var(--surface-1)',
@@ -69,7 +69,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
               width: 320,
               background: 'var(--surface-1)',
               border: '1px solid var(--border-default)',
-              borderRadius: 14,
+              borderRadius: 'var(--radius-lg)',
               padding: 0,
               boxShadow: 'var(--shadow-xl)',
               overflow: 'hidden',
@@ -99,7 +99,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
                       {f.label}
                     </label>
                     <select className="form-select form-select-sm"
-                      style={{ borderRadius: 8, fontSize: '0.82rem' }}
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}
                       value={f.value} onChange={e => f.setValue(e.target.value)}>
                       <option value="">All {f.label}s</option>
                       {f.options.map(o => (
@@ -111,7 +111,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
               </div>
               <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                 <button type="button" className="btn btn-sm btn-primary px-3"
-                  style={{ borderRadius: 8, fontSize: '0.76rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.76rem' }}
                   onClick={() => setOpen(false)}>
                   Done
                 </button>

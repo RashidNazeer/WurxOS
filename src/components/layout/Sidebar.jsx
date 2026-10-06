@@ -5,12 +5,12 @@ import { getMenuForRole, applyMenuLayout } from './menu';
 import { withApprovals, sectionMenu } from './navStructure';
 import { useApprovalsCount } from '../../lib/approvalsBadge';
 import { preloadPath } from '../../routes/pages';
-import { ChevronRightIcon, MenuIcon, SearchIcon, XIcon } from '../common/Icon';
+import { ChevronRightIcon, SearchIcon, XIcon } from '../common/Icon';
 import UnreadDot from './UnreadDot';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { useBuddy } from '../../contexts/BuddyContext';
 
-export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileOpen, onMobileClose }) {
+export default function Sidebar({ role, menuLayout, collapsed, mobileOpen, onMobileClose }) {
   // Role menu + the user's saved order/pins (Settings → Menu Layout). Pinned
   // entries are tagged `_pinned` and floated to the top by applyMenuLayout.
   const buddy = !!useBuddy()?.allowed;
@@ -70,12 +70,11 @@ export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileO
           <div className="brand-name">WurxOS</div>
           <div className="brand-sub">by Wurx Media</div>
         </div>
-        {/* On mobile (drawer open), this button is a CLOSE button — the
-            drawer slides shut. On desktop, it toggles the collapsed rail.
-            Mixing the two in one button confused users who tapped here
-            expecting the drawer to close and instead collapsed it into
-            an icons-only rail. */}
-        {mobileOpen ? (
+        {/* Drawer close only. The desktop collapse control lives in the
+            topbar so it has one position in both states — mixing the two
+            in one button here also confused users who tapped expecting the
+            drawer to close and instead got an icons-only rail. */}
+        {mobileOpen && (
           <button
             type="button"
             className="shell-sidebar-toggle"
@@ -84,16 +83,6 @@ export default function Sidebar({ role, menuLayout, collapsed, onToggle, mobileO
             title="Close menu"
           >
             <XIcon width="14" height="14" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="shell-sidebar-toggle"
-            onClick={onToggle}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <MenuIcon width="16" height="16" />
           </button>
         )}
       </div>

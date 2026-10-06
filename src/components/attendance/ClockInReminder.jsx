@@ -112,7 +112,7 @@ export default function ClockInReminder() {
         onClick={softHide}
       />
       <div className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 16,
+        style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 'var(--radius-lg)',
                  background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
         <div className="card-body p-4 text-center">
           <div className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
@@ -126,7 +126,7 @@ export default function ClockInReminder() {
           </p>
           <div className="d-flex flex-column gap-2">
             <button className="btn btn-success w-100 d-inline-flex align-items-center justify-content-center gap-2"
-              style={{ borderRadius: 12, fontWeight: 700, padding: '11px 16px' }}
+              style={{ borderRadius: 'var(--radius-md)', fontWeight: 700, padding: '11px 16px' }}
               onClick={goClockIn}>
               <i className="bi bi-box-arrow-in-right" style={{ fontSize: '1.1rem' }} />
               Clock in now

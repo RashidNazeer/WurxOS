@@ -139,12 +139,12 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
         </div>
         <div className="d-flex flex-column gap-2 mt-3">
           <button type="button" className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2"
-            style={{ borderRadius: 10 }} disabled={saving} onClick={onLeave}>
+            style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={onLeave}>
             {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-box-arrow-right" />}
             Save &amp; leave
           </button>
           <button type="button" className="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-2"
-            style={{ borderRadius: 10 }} disabled={saving} onClick={onStay}>
+            style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={onStay}>
             <i className="bi bi-arrow-counterclockwise" /> Save &amp; stay here
           </button>
           {/* Escape hatch: drop the edits and leave. Confirms first because
@@ -152,7 +152,7 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
           {!confirmDiscard ? (
             <button type="button"
               className="btn btn-link d-inline-flex align-items-center justify-content-center gap-2 text-decoration-none"
-              style={{ borderRadius: 10, color: 'var(--danger)', fontSize: '0.85rem' }}
+              style={{ borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.85rem' }}
               disabled={saving} onClick={() => setConfirmDiscard(true)}>
               <i className="bi bi-trash3" /> Exit without saving
             </button>
@@ -164,11 +164,11 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
               </div>
               <div className="d-flex gap-2">
                 <button type="button" className="btn btn-danger flex-fill d-inline-flex align-items-center justify-content-center gap-2"
-                  style={{ borderRadius: 10 }} disabled={saving} onClick={onDiscard}>
+                  style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={onDiscard}>
                   <i className="bi bi-trash3" /> Yes, discard
                 </button>
                 <button type="button" className="btn btn-outline-secondary flex-fill"
-                  style={{ borderRadius: 10 }} disabled={saving} onClick={() => setConfirmDiscard(false)}>
+                  style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={() => setConfirmDiscard(false)}>
                   Cancel
                 </button>
               </div>

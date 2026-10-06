@@ -58,13 +58,13 @@ export default function CheckpointReturnNotice({ checkpointId, status }) {
   return (
     <div style={{ marginBottom: 14 }}>
       {active && (
-        <div style={{ borderRadius: 12, padding: 14, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 40%, transparent)' }}>
+        <div style={{ borderRadius: 'var(--radius-md)', padding: 14, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 40%, transparent)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
             <i className="bi bi-arrow-counterclockwise" style={{ color: 'var(--danger)', fontSize: '1.05rem', marginTop: 1 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 800, color: 'var(--danger)', fontSize: '0.92rem' }}>Checkpoint Returned</span>
-                <span style={{ borderRadius: 999, padding: '2px 9px', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.62rem', fontWeight: 700, border: '1px solid var(--border-subtle)' }}>
+                <span style={{ borderRadius: 'var(--radius-pill)', padding: '2px 9px', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.62rem', fontWeight: 700, border: '1px solid var(--border-subtle)' }}>
                   Now: {STATUS_LABEL[status] || status}
                 </span>
               </div>
@@ -74,7 +74,7 @@ export default function CheckpointReturnNotice({ checkpointId, status }) {
                 <strong style={{ color: 'var(--text-primary)' }}>{recipientLabel(latest.to_status, parties, viewerId, viewerRole)}</strong>
                 {' · '}{fmtPktStamp(latest.returned_at)} PKT
               </div>
-              <div style={{ borderRadius: 8, marginTop: 8, padding: '8px 12px', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ borderRadius: 'var(--radius-sm)', marginTop: 8, padding: '8px 12px', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontWeight: 700, marginBottom: 3, fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>Reason</div>
                 <div style={{ fontSize: '0.86rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                   {latest.note ? latest.note : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No reason was provided.</span>}
@@ -95,7 +95,7 @@ export default function CheckpointReturnNotice({ checkpointId, status }) {
           {showHistory && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
               {ordered.map((r, i) => (
-                <div key={r.id} style={{ borderRadius: 8, padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+                <div key={r.id} style={{ borderRadius: 'var(--radius-sm)', padding: '8px 12px', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-primary)' }}>
                       Return #{i + 1}

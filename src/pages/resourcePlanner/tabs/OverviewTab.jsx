@@ -28,7 +28,7 @@ export default function OverviewTab({ config, employees, brands, deptSummary, he
 
       {/* Urgent hire alert */}
       {urgentDepts.length > 0 && (
-        <div style={{ padding: 14, borderRadius: 10, background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', marginBottom: 14 }}>
+        <div style={{ padding: 14, borderRadius: 'var(--radius-md)', background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <AlertIcon width="18" height="18" color="var(--danger-text)" />
             <strong style={{ color: 'var(--danger-text)' }}>Urgent hiring needed</strong>
@@ -42,7 +42,7 @@ export default function OverviewTab({ config, employees, brands, deptSummary, he
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {urgentDepts.map((d) => (
-              <span key={d.department} style={{ padding: '4px 10px', background: 'var(--danger-soft)', color: 'var(--danger-text)', borderRadius: 999, fontSize: 13, fontWeight: 500 }}>
+              <span key={d.department} style={{ padding: '4px 10px', background: 'var(--danger-soft)', color: 'var(--danger-text)', borderRadius: 'var(--radius-pill)', fontSize: 13, fontWeight: 500 }}>
                 {d.department}: need {d.hcNeeded} (have {d.hcAvailable})
               </span>
             ))}
@@ -52,7 +52,7 @@ export default function OverviewTab({ config, employees, brands, deptSummary, he
 
       {/* Over-capacity alert */}
       {overDepts.length > 0 && (
-        <div style={{ padding: 14, borderRadius: 10, background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', marginBottom: 14 }}>
+        <div style={{ padding: 14, borderRadius: 'var(--radius-md)', background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <AlertIcon width="18" height="18" color="var(--warning-text)" />
             <strong style={{ color: 'var(--warning-text)' }}>Over capacity</strong>
@@ -66,7 +66,7 @@ export default function OverviewTab({ config, employees, brands, deptSummary, he
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {overDepts.map((d) => (
-              <span key={d.department} style={{ padding: '4px 10px', background: 'var(--warning-soft)', color: 'var(--warning-text)', borderRadius: 999, fontSize: 13, fontWeight: 500 }}>
+              <span key={d.department} style={{ padding: '4px 10px', background: 'var(--warning-soft)', color: 'var(--warning-text)', borderRadius: 'var(--radius-pill)', fontSize: 13, fontWeight: 500 }}>
                 {d.department}: {d.avgUtilization}%
               </span>
             ))}
@@ -75,7 +75,7 @@ export default function OverviewTab({ config, employees, brands, deptSummary, he
       )}
 
       {/* Planning snapshot */}
-      <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+      <div style={{ padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <strong>Planning snapshot</strong>
           <button className="wx-btn wx-btn-ghost" onClick={() => onNavigateTab('inputs')} style={{ fontSize: 13 }}>
@@ -98,7 +98,7 @@ export default function OverviewTab({ config, employees, brands, deptSummary, he
 
 function KpiCard({ icon: Icon, tone, label, value, sub }) {
   return (
-    <div style={{ padding: 16, borderRadius: 10, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+    <div style={{ padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: tone, marginBottom: 6 }}>
         <Icon width="18" height="18" /> <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</span>
       </div>

@@ -14,7 +14,7 @@ export default function MonthNavigator({ label, isCurrent, onPrev, onNext, onRes
       <button
         type="button"
         className="btn btn-sm btn-outline-secondary px-2"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 'var(--radius-sm)' }}
         onClick={onPrev}
         title="Previous month"
       >
@@ -30,7 +30,7 @@ export default function MonthNavigator({ label, isCurrent, onPrev, onNext, onRes
       <button
         type="button"
         className="btn btn-sm btn-outline-secondary px-2"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 'var(--radius-sm)' }}
         onClick={onNext}
         disabled={isCurrent}
         title={isCurrent ? 'Already at the current month' : 'Next month'}
@@ -41,7 +41,7 @@ export default function MonthNavigator({ label, isCurrent, onPrev, onNext, onRes
         <button
           type="button"
           className="btn btn-sm btn-outline-primary px-2"
-          style={{ borderRadius: 8, fontSize: '0.74rem' }}
+          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
           onClick={onReset}
           title="Jump back to the current month"
         >

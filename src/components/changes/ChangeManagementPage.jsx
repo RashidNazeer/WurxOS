@@ -127,7 +127,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 600, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 600, zIndex: 1, borderRadius: 'var(--radius-xl)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <h6 className="fw-bold mb-1">Submit Change Request</h6>
           <p className="text-muted small mb-0">Request a change to an SOP</p>
@@ -145,7 +145,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
             <div className="d-flex gap-2">
               {SOP_TYPES.map(s => (
                 <button key={s.key} type="button" className="btn btn-sm flex-fill d-flex align-items-center justify-content-center gap-1"
-                  style={{ borderRadius: 10, fontSize: '0.78rem', fontWeight: 600, padding: '8px 12px', background: form.sopType === s.key ? s.color : 'var(--surface-2)', color: form.sopType === s.key ? s.on : ink(s.color), border: `2px solid ${form.sopType === s.key ? s.color : 'var(--border-subtle)'}` }}
+                  style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 600, padding: '8px 12px', background: form.sopType === s.key ? s.color : 'var(--surface-2)', color: form.sopType === s.key ? s.on : ink(s.color), border: `2px solid ${form.sopType === s.key ? s.color : 'var(--border-subtle)'}` }}
                   onClick={() => f('sopType', s.key)}>
                   <i className={`bi ${s.icon}`} />{s.label}
                 </button>
@@ -222,7 +222,7 @@ function SubmitModal({ onClose, onSubmitted, allUsers, sopVersions, sopDocs }) {
             <div className="d-flex gap-2">
               {PRIORITIES.map(p => (
                 <button key={p.key} type="button" className="btn btn-sm px-3"
-                  style={{ borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, background: form.priority === p.key ? p.color : p.bg, color: form.priority === p.key ? p.on : ink(p.color), border: `1.5px solid ${tint(p.color, 25)}` }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600, background: form.priority === p.key ? p.color : p.bg, color: form.priority === p.key ? p.on : ink(p.color), border: `1px solid ${tint(p.color, 25)}` }}
                   onClick={() => f('priority', form.priority === p.key ? '' : p.key)}>{p.label}</button>
               ))}
             </div>
@@ -309,7 +309,7 @@ function ChangeThread({ changeId, changeDocId, participants }) {
               <div key={m.id} className={`d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
                 <div className="rounded-3 px-3 py-2" style={{
                   maxWidth: '80%', background: isMe ? 'var(--accent)' : 'var(--surface-2)',
-                  color: isMe ? 'var(--on-accent)' : 'var(--text-primary)', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  color: isMe ? 'var(--on-accent)' : 'var(--text-primary)', borderRadius: isMe ? 'var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg)' : 'var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-xs)',
                 }}>
                   {!isMe && (
                     <div className="d-flex align-items-center gap-1 mb-1">
@@ -327,12 +327,12 @@ function ChangeThread({ changeId, changeDocId, participants }) {
 
       {/* Input */}
       <div className="d-flex gap-2">
-        <input type="text" className="form-control form-control-sm" style={{ borderRadius: 10 }}
+        <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-md)' }}
           placeholder="Type a message…" value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
         <button className="btn btn-sm btn-dark flex-shrink-0 d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 10 }} onClick={handleSend} disabled={sending || !text.trim()}>
+          style={{ borderRadius: 'var(--radius-md)' }} onClick={handleSend} disabled={sending || !text.trim()}>
           <i className="bi bi-send" style={{ fontSize: '0.7rem' }} />
         </button>
       </div>
@@ -373,7 +373,7 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 620, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 620, zIndex: 1, borderRadius: 'var(--radius-xl)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div>
@@ -455,7 +455,7 @@ function DetailModal({ change, onStatusUpdate, isOwner, isBoss, isSubmitter, all
               <div className="d-flex gap-2 flex-wrap">
                 {OWNER_STATUSES.filter(s => s.key !== change.status).map(s => (
                   <button key={s.key} className="btn btn-sm d-inline-flex align-items-center gap-1 px-3"
-                    style={{ borderRadius: 8, fontSize: '0.75rem', fontWeight: 600, background: s.color, color: s.on, border: 'none', opacity: updating ? 0.6 : 1 }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600, background: s.color, color: s.on, border: 'none', opacity: updating ? 0.6 : 1 }}
                     onClick={() => handleOwnerStatus(s.key)} disabled={updating}>
                     {updating ? <span className="spinner-border spinner-border-sm" /> : <i className={`bi ${s.icon}`} />}
                     {s.label}
@@ -556,7 +556,7 @@ export default function ChangeManagementPage() {
         <div className="d-flex gap-2">
           {['my', 'assigned'].map(t => (
             <button key={t} className={`btn btn-sm px-3 ${viewTab === t ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: 8, fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setViewTab(t)}>
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', fontWeight: 600 }} onClick={() => setViewTab(t)}>
               {t === 'my' ? 'My Requests' : 'Assigned to Me'}
               {t === 'assigned' && assignedChanges.length > 0 && (
                 <span className="badge rounded-pill ms-1" style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.55rem' }}>{assignedChanges.length}</span>
@@ -601,7 +601,7 @@ export default function ChangeManagementPage() {
       {loading ? (
         <div className="text-center py-4"><div className="spinner-border" style={{ color: 'var(--accent)' }} /></div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}>
+        <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <i className="bi bi-file-earmark-diff text-muted" style={{ fontSize: '2.5rem', opacity: 0.55 }} />
           <p className="mt-3 mb-0" style={{ color: 'var(--text-muted)' }}>{changes.length === 0 ? 'No change requests yet.' : 'No matching results.'}</p>
         </div>
@@ -611,7 +611,7 @@ export default function ChangeManagementPage() {
             const st = STATUS_MAP[c.status] || STATUS_MAP.pending;
             const sop = SOP_TYPES.find(s => s.key === c.sopType);
             return (
-              <div key={c.id} className="card border-0 shadow-sm" style={{ borderRadius: 14, cursor: 'pointer' }} onClick={() => setViewChange(c)}>
+              <div key={c.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer' }} onClick={() => setViewChange(c)}>
                 <div className="card-body p-3 d-flex align-items-center gap-3">
                   <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 38, height: 38, background: st.bg }}>
                     <i className={`bi ${st.icon}`} style={{ color: st.color, fontSize: '1rem' }} />

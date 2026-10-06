@@ -255,7 +255,7 @@ export default function RoleDashboard() {
                   justifySelf: 'end',
                   display: 'inline-block',
                   fontSize: 10.5, fontWeight: 700, textTransform: 'capitalize',
-                  padding: '3px 10px', borderRadius: 999, lineHeight: 1.4,
+                  padding: '3px 10px', borderRadius: 'var(--radius-pill)', lineHeight: 1.4,
                   background: statusTone(r.status).bg,
                   color: statusTone(r.status).fg,
                 }}>{r.status}</span>

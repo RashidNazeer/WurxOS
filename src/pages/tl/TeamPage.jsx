@@ -131,7 +131,7 @@ function ApcCard({ apc }) {
             {apc.display_name}
           </span>
           <span style={{
-            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
+            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
             background: 'var(--accent-soft)', color: 'var(--accent)',
             textTransform: 'uppercase', letterSpacing: '0.06em',
           }}>APC</span>
@@ -147,7 +147,7 @@ function ApcCard({ apc }) {
           display: 'inline-flex', alignItems: 'center', gap: 5,
           marginTop: 8,
           padding: '3px 9px',
-          borderRadius: 999,
+          borderRadius: 'var(--radius-pill)',
           fontSize: 11.5, fontWeight: 700,
           background: hasBrands
             ? 'color-mix(in srgb, var(--warning) 14%, transparent)'

@@ -93,12 +93,12 @@ export default function ClientSummarySheet({
         )}
 
         <div style={{
-          marginTop: 14, padding: 12, borderRadius: 8,
+          marginTop: 14, padding: 12, borderRadius: 'var(--radius-sm)',
           background: 'var(--warning-soft)', border: '1px solid var(--warning)',
         }}>
           <div style={{
             display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '.06em',
-            padding: '3px 8px', borderRadius: 4, marginBottom: 6,
+            padding: '3px 8px', borderRadius: 'var(--radius-xs)', marginBottom: 6,
             background: 'var(--surface-1)', color: 'var(--warning)', border: '1px solid var(--warning)',
           }}>
             MODELLED · NOT INCREMENTAL
@@ -164,7 +164,7 @@ export default function ClientSummarySheet({
                 Base scenario{planning?.periodLabel ? ` for ${planning.periodLabel}` : ''}
               </SectionLabel>
               <span style={{
-                fontSize: 9.5, fontWeight: 800, letterSpacing: '.06em', padding: '2px 6px', borderRadius: 4,
+                fontSize: 9.5, fontWeight: 800, letterSpacing: '.06em', padding: '2px 6px', borderRadius: 'var(--radius-xs)',
                 background: assumed ? 'var(--warning-soft)' : 'var(--surface-2)',
                 color: assumed ? 'var(--warning)' : 'var(--text-secondary)',
                 border: `1px solid ${assumed ? 'var(--warning)' : 'var(--border-default)'}`,
@@ -236,7 +236,7 @@ const SectionLabel = ({ children }) => (
 function Figure({ label, value, sub, primary = false }) {
   return (
     <div style={{
-      padding: '10px 12px', borderRadius: 8,
+      padding: '10px 12px', borderRadius: 'var(--radius-sm)',
       background: primary ? 'var(--accent-soft)' : 'var(--surface-2)',
       border: `1px solid ${primary ? 'var(--accent)' : 'var(--border-subtle)'}`,
     }}>

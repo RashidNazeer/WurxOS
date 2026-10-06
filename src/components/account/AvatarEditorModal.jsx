@@ -179,7 +179,7 @@ export default function AvatarEditorModal({ file, onCancel, onSave, saving = fal
               position: 'relative',
               width: FRAME, height: FRAME,
               margin: '0 auto 14px',
-              borderRadius: 12,
+              borderRadius: 'var(--radius-md)',
               overflow: 'hidden',
               background: '#0f172a',
               cursor: imgUrl ? (dragRef.current ? 'grabbing' : 'grab') : 'default',

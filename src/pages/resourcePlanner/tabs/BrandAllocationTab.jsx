@@ -49,15 +49,15 @@ export default function BrandAllocationTab({ employees, brands }) {
         ))}
         <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 12, background: 'var(--success)', borderRadius: 2 }} /> Assigned
+            <span style={{ width: 12, height: 12, background: 'var(--success)', borderRadius: 'var(--radius-xs)' }} /> Assigned
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 12, height: 12, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 2 }} /> Not assigned
+            <span style={{ width: 12, height: 12, background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)' }} /> Not assigned
           </span>
         </div>
       </div>
 
-      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
         <div style={{ overflow: 'auto', maxHeight: '70vh' }}>
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
             <thead>
@@ -139,12 +139,13 @@ const rotatedHead = {
   height: 120, verticalAlign: 'bottom', minWidth: 34, maxWidth: 34,
 };
 const stickyLeftCell = {
-  position: 'sticky', left: 0, zIndex: 1, background: 'var(--surface-1)',
+  // Solid: table data scrolls horizontally under these frozen cells.
+  position: 'sticky', left: 0, zIndex: 1, background: 'var(--surface-1-solid)',
   padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)',
   borderRight: '1px solid var(--border-subtle)', minWidth: 200,
 };
 const stickyRightCell = {
-  position: 'sticky', right: 0, zIndex: 1, background: 'var(--surface-1)',
+  position: 'sticky', right: 0, zIndex: 1, background: 'var(--surface-1-solid)',
   padding: '8px 12px', textAlign: 'right', borderBottom: '1px solid var(--border-subtle)',
   borderLeft: '1px solid var(--border-subtle)', minWidth: 70, fontWeight: 700,
 };

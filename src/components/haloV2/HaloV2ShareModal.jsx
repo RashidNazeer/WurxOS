@@ -105,7 +105,7 @@ export default function HaloV2ShareModal({ brands = [], onClose }) {
               ) : filteredBrands.map((b) => {
                 const sel = brandIds.includes(b.id);
                 return (
-                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6, background: sel ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer', fontSize: 12.5 }}>
+                  <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 'var(--radius-sm)', background: sel ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer', fontSize: 12.5 }}>
                     <input type="checkbox" checked={sel} onChange={() => toggleBrand(b.id)} />
                     <span style={{ color: 'var(--text-primary)' }}>{b.brand_name}</span>
                   </label>

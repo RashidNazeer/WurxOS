@@ -128,7 +128,7 @@ function UploadSlot({ granularity, meta, brand, dataset, dailyDataset, onDone, o
   const rowsWord = granularity === 'day' ? 'days' : granularity === 'week' ? 'weeks' : 'months';
 
   return (
-    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md, 8px)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <strong style={{ fontSize: 12.5 }}>{meta.label}</strong>
         {dataset ? (
