@@ -17,10 +17,10 @@
 import fs from 'node:fs';
 import pg from 'pg';
 import { devDbUrl, SSL } from './dev-env.mjs';
-import { chunkDocument } from '../supabase/functions/_shared/ai/chunker.ts';
-import { chunkParamsFor } from '../supabase/functions/_shared/ai/config.ts';
-import { extractors } from '../supabase/functions/_shared/ai/extractors/index.ts';
-import { detectLayout } from '../supabase/functions/_shared/ai/extractors/report.ts';
+import { chunkDocument } from '../../supabase/functions/_shared/ai/chunker.ts';
+import { chunkParamsFor } from '../../supabase/functions/_shared/ai/config.ts';
+import { extractors } from '../../supabase/functions/_shared/ai/extractors/index.ts';
+import { detectLayout } from '../../supabase/functions/_shared/ai/extractors/report.ts';
 
 const PRICE_PER_M = 0.02;
 const args = process.argv.slice(2);

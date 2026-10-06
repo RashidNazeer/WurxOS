@@ -19,10 +19,10 @@
 > | — | per-role models (mig 404). The budget-saver/economy tier was built and then **removed** on Owner instruction 2026-10-02 |
 > | — | ingestion quiet hours, 18:00–02:00 PKT (migs 407, 409) |
 > | — | **web search and browsing** (mig 415) — see §24 below |
-> | §11.1 tool catalog | as built: 5 search tools + 15 data tools, plus the 2 web tools |
+> | §11.1 tool catalog | as built: 5 search tools + 16 data tools = 21, plus the 2 web tools when web search is on (23) |
 >
-> Also note `wurx-buddy/supabase/` is a **stale copy** of the shipped
-> `supabase/`, not a live mirror. Do not read it as current.
+> The duplicate `wurx-buddy/supabase/` has been removed; the tests now live beside the shipped code in
+> `supabase/functions/_shared/ai/__tests__/`.
 
 ---
 
@@ -1556,19 +1556,30 @@ people, attendance, leave, performance, incentives and pay.
 
 ### 24.2 Providers
 
-| | SearXNG | Tavily |
-|---|---|---|
-| What | the company's own meta-search instance | commercial search + extraction API |
-| Config | `searxng_url` (no default, on purpose) | `TAVILY_API_KEY` function secret |
-| Cost | none | credits, logged per call |
-| Note | **`format=json` returns HTTP 403 until the instance admin adds `json` to `search.formats` in settings.yml** | REST API, not the CLI — Tavily's own guidance is never to use the CLI as a runtime |
+| | SearXNG | Brave Search | Tavily |
+|---|---|---|---|
+| What | the company's own meta-search instance | an independent crawler and index | commercial search + page extraction |
+| Config | `searxng_url` (no default, on purpose) | `BRAVE_API_KEY` function secret | `TAVILY_API_KEY` function secret |
+| Auth | none | `X-Subscription-Token` header (**not** a bearer token) | `Authorization: Bearer` |
+| Cost | none | free tier, billed per request | credits, logged per call |
+| Note | **`format=json` returns HTTP 403 until the instance admin adds `json` to `search.formats` in settings.yml** | free tier allows ~1 request/second (429 otherwise); machinery added 2026-10-06 (mig 416) **before** the key, so it lies dormant | REST API, not the CLI — Tavily's own guidance is never to use the CLI as a runtime |
 
-Default order is SearXNG then Tavily, so the free, private, self-hosted option
-is tried first and Tavily credits are spent only when it is unconfigured, down
-or empty. `web_merge` switches from first-that-works to querying all enabled
-providers and merging. There is deliberately **no default `searxng_url`**:
-pointing Buddy at a stranger's public instance would leak every question the
-company asks into third-party logs.
+Default order is **SearXNG → Brave → Tavily**: the company's own instance
+first (free, and it leaks no questions to a third party), then Brave's free
+tier, then the one that bills credits. `web_merge` switches from
+first-that-works to querying every enabled provider and merging. There is
+deliberately **no default `searxng_url`**: pointing Buddy at a stranger's
+public instance would leak every question the company asks into third-party
+logs.
+
+Brave is worth having beside the others because it runs its own crawler rather
+than reselling Google or Bing, so when it disagrees it is a real second opinion
+rather than the same answer twice.
+
+**A provider with no key or URL is simply skipped** (`usableProviders`), with no
+error and no empty result set. That is what lets Brave be listed, ordered and
+toggled in the settings screen before its key exists, and it is why adding the
+key later needs no code change — only the function secret.
 
 ### 24.3 Files
 
@@ -1576,6 +1587,7 @@ company asks into third-party logs.
 |---|---|
 | `web/guard.ts` | the SSRF guard: scheme, credentials, port denylist, IPv4/IPv6 private ranges, wildcard-DNS domains, embedded private IPs, DNS resolution, and `safeFetch` which re-checks every redirect hop by hand |
 | `web/searxng.ts` | SearXNG POST `/search` with `format=json` |
+| `web/brave.ts` | Brave `GET /res/v1/web/search` |
 | `web/tavily.ts` | Tavily `POST /search` and `POST /extract` |
 | `web/html.ts` | HTML → readable text for the fallback page read (linear scanners, not backtracking regexes) |
 | `web/index.ts` | config parsing, provider orchestration, dedupe/merge, `webFetchPage` |
@@ -1624,7 +1636,7 @@ which is why it takes an injectable resolver.
 A LAN SearXNG that redirects onward gets no such trust, or one compromised
 instance could walk Buddy around the whole internal network.
 
-**Test coverage:** `wurx-buddy/supabase/functions/_shared/ai/__tests__/web.test.ts`
+**Test coverage:** `supabase/functions/_shared/ai/__tests__/web.test.ts`
 — 126 tests, every fetch stubbed, DNS via an injected resolver. Four of these
 assertions exist because QA found the bug they now guard: the IPv6 transition
 formats, the v4-mapped spelling under `allowPrivate`, `open_web_page` handing an
@@ -1647,6 +1659,9 @@ dollar rate for a plan it cannot see. SearXNG is free by definition.
 ### 24.6 Still to do
 
 - Deploy `assistant` and set the `TAVILY_API_KEY` function secret.
+- Set `BRAVE_API_KEY` when the Owner has it. No code change is needed; Brave is
+  already listed, ordered and toggleable, and starts working the moment the
+  secret exists.
 - Stand up a SearXNG instance with `json` in `search.formats`, and put its URL
   in Settings › Wurx Buddy › Web.
 - Decide `web_allowed_roles` before switching it on for everyone.

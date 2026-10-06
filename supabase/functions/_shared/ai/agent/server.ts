@@ -83,6 +83,7 @@ export type ServerEnv = {
   nvidiaKey?: string | null;             // NVIDIA_API_KEY: the 'nvidia' key slot (optional; free, dev/test only)
   nvidia2Key?: string | null;            // NVIDIA_API_KEY_2: the 'nvidia2' key slot
   tavilyKey?: string | null;             // TAVILY_API_KEY: web search + page extraction (mig 415)
+  braveKey?: string | null;              // BRAVE_API_KEY: web search (mig 416)
   altProvider?: AltProvider;             // which provider filled embedding_alt (mig 408; default nvidia)
   modelKeySlot?: KeySlot;                // with modelOverride: that key (serve-assistant --key-slot)
   noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
@@ -160,6 +161,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     nvidiaKey: env.nvidiaKey ?? null,
     nvidia2Key: env.nvidia2Key ?? null,
     tavilyKey: env.tavilyKey ?? null,
+    braveKey: env.braveKey ?? null,
     ...(env.fetchImpl ? { fetchImpl: env.fetchImpl } : {}),
     ...(env.noRateLimit ? { rateLimitExempt: true } : {}),
     embed: emb.embed,

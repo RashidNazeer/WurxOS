@@ -38,7 +38,7 @@ const client = new pg.Client({ connectionString: url, ssl: SSL });
 await client.connect();
 client.on('notice', (n) => console.log(`  notice: ${n.message}`));
 
-const migDir = path.join(ASSISTANT, 'supabase', 'migrations');
+const migDir = path.join(ASSISTANT, '..', 'supabase', 'migrations');
 const fileFor = (v) => {
   const f = fs.readdirSync(migDir).find((n) => n.startsWith(`${v}_`) && n.endsWith('.sql'));
   if (!f) throw new Error(`no migration file for ${v}`);

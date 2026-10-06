@@ -15,13 +15,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
 import { ASSISTANT, devDbUrl, SSL, stripBom } from './dev-env.mjs';
-import { DEFAULT_CONFIG } from '../supabase/functions/_shared/ai/config.ts';
-import { pgRpc } from '../supabase/functions/_shared/ai/ingest/db.ts';
-import { runWorker } from '../supabase/functions/_shared/ai/ingest/worker.ts';
+import { DEFAULT_CONFIG } from '../../supabase/functions/_shared/ai/config.ts';
+import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
+import { runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ ok: !!ok, name, detail: String(detail).slice(0, 200) }); };
-const mig = (n) => stripBom(fs.readFileSync(path.join(ASSISTANT, 'supabase/migrations', fs.readdirSync(path.join(ASSISTANT, 'supabase/migrations')).find((f) => f.startsWith(`${n}_`))), 'utf8'));
+const mig = (n) => stripBom(fs.readFileSync(path.join(ASSISTANT, '..', 'supabase/migrations', fs.readdirSync(path.join(ASSISTANT, '..', 'supabase/migrations')).find((f) => f.startsWith(`${n}_`))), 'utf8'));
 const J = JSON.stringify;
 const TESTING_DOC = '833b9bda-8282-41dc-a8da-8ff3f032354d';   // excluded by mig 380
 

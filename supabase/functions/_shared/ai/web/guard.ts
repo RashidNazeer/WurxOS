@@ -263,6 +263,17 @@ export async function resolvesPublic(host: string, resolver?: (h: string, t: 'A'
 
 export const MAX_REDIRECTS = 4;
 
+// Headers that authenticate us and must never cross an origin boundary.
+const CREDENTIAL_HEADERS = new Set(['authorization', 'x-subscription-token', 'x-api-key', 'api-key', 'cookie', 'proxy-authorization']);
+
+export function stripCredentialHeaders(h: HeadersInit | undefined): HeadersInit | undefined {
+  if (!h) return h;
+  const entries: [string, string][] = h instanceof Headers ? [...h.entries()]
+    : Array.isArray(h) ? h.map(([k, v]) => [String(k), String(v)] as [string, string])
+      : Object.entries(h as Record<string, string>).map(([k, v]) => [k, String(v)] as [string, string]);
+  return entries.filter(([k]) => !CREDENTIAL_HEADERS.has(k.toLowerCase()));
+}
+
 // fetch with every redirect hop re-checked against checkUrl AND re-resolved.
 export async function safeFetch(raw: string, init: RequestInit & {
   fetchImpl?: typeof fetch; allowHttp?: boolean; allowPrivate?: boolean;
@@ -272,6 +283,8 @@ export async function safeFetch(raw: string, init: RequestInit & {
   let target = raw;
   let method = (rest as RequestInit).method ?? 'GET';
   let body = (rest as RequestInit).body;
+  let headers = (rest as RequestInit).headers;
+  let origin: string | null = null;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     // allowPrivate covers ONLY the URL an admin configured — the first hop.
     // A LAN SearXNG that redirects onward gets no such trust, or one
@@ -280,11 +293,17 @@ export async function safeFetch(raw: string, init: RequestInit & {
     const trusted = allowPrivate && hop === 0;
     const g = checkUrl(target, { allowHttp, allowPrivate: trusted });
     if (!g.ok) throw new Error(`refused to fetch ${hop ? 'a redirect' : 'that URL'}: ${g.reason}`);
+    // A credential belongs to ONE origin. If a redirect crosses origins, the
+    // api keys come off before we follow it, or a provider that redirected
+    // (today none do, but the endpoint is not ours to guarantee) would hand
+    // Brave's X-Subscription-Token or Tavily's bearer token to another host.
+    if (origin && origin !== g.url.origin) headers = stripCredentialHeaders(headers);
+    origin = g.url.origin;
     if (!trusted) {
       const dns = await resolvesPublic(g.url.hostname, resolver);
       if (!dns.ok) throw new Error(`refused to fetch ${hop ? 'a redirect' : 'that URL'}: ${dns.reason}`);
     }
-    const res = await fetchImpl(g.url.toString(), { ...rest, method, body, redirect: 'manual' });
+    const res = await fetchImpl(g.url.toString(), { ...rest, headers, method, body, redirect: 'manual' });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get('location');
       if (!loc) return { res, url: g.url.toString() };

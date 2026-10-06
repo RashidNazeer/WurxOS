@@ -18,7 +18,7 @@ own small git repository: branch `main`, **no remote**.
 
 ```
 plan.md  architecture.md ("A§n")  phases.md  inventory.md  TEAM.md  PROGRESS.md
-supabase/migrations/   supabase/functions/   (same layout the app repo uses, for shipping later)
+(shipped `supabase/` is in the repo root, one level up; its unit tests sit in `supabase/functions/_shared/ai/__tests__/`)
 scripts/  tests/  qa/  notebook/  data/ (gitignored)  backups/ (exports gitignored)
 package.json + node_modules  (pg, supabase-js; run npm scripts from the project home)
 ```
@@ -153,7 +153,7 @@ DECISIONS NEEDED: <question + options + your recommendation; "none" if none>
   `C:\Users\UMARIL~1\AppData\Local\Temp\claude\c--Users-Umar-Ilyas-WurxOS\ffc534e4-953a-40ad-9c7e-056a88ad0cc6\scratchpad`,
   or more generally `$env:TEMP\claude\...` in PowerShell. **Never `C:\UMARIL~1\...`**: dropping the
   `Users\` part creates a stray folder at the root of the C: drive (it has happened twice).
-- Run commands from the project home: `npm test` (unit tests), `npm run db:status`,
+- Run commands from the project home: `npm run db:status`,
   `npm run sql:acl` (and `sql:queue`, `sql:grants`, `sql:search`, `sql:v1compat`),
   `npm run preview`.
 - Dev DB: Postgres 17, pgvector 0.8.2 (`extensions` schema), pg_cron, pg_net;

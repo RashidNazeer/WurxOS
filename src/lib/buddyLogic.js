@@ -813,7 +813,12 @@ export const setRoleBackups = (rm, role, chain) => setRoleField(rm, role, (e) =>
 // ai_assistant_config: web_search_enabled, web_providers (ordered, enabled
 // ones only), web_merge, searxng_url, searxng_allow_http, web_max_results
 // (1..20), web_allowed_roles (null = every role that may use Buddy).
-export const WEB_PROVIDERS = [['searxng', 'SearXNG'], ['tavily', 'Tavily']];
+// Order here is the default order, and it is deliberate: SearXNG is the
+// company's own instance (free, and it leaks no questions to anyone else),
+// Brave has its own independent index and a free tier, and Tavily bills
+// credits per call, so it goes last. A provider with no key or URL is skipped
+// by the server, so Brave sits out until BRAVE_API_KEY is set.
+export const WEB_PROVIDERS = [['searxng', 'SearXNG'], ['brave', 'Brave Search'], ['tavily', 'Tavily']];
 export const WEB_MAX_RESULTS_RANGE = [1, 20];
 export const WEB_MAX_RESULTS_DEFAULT = 6;
 const WEB_PROVIDER_IDS = WEB_PROVIDERS.map(([id]) => id);

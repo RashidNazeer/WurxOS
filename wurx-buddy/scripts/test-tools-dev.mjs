@@ -20,8 +20,8 @@ const env = readEnv();
   }
 }
 const admin = createClient(env.VITE_SUPABASE_URL, env.WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const T = await import('../supabase/functions/_shared/ai/tools/index.ts');
-const R = await import('../supabase/functions/_shared/ai/tools/reports.ts');
+const T = await import('../../supabase/functions/_shared/ai/tools/index.ts');
+const R = await import('../../supabase/functions/_shared/ai/tools/reports.ts');
 
 const { data: boss } = await admin.from('profiles').select('id').eq('role', 'boss').eq('is_active', true).is('deleted_at', null).limit(1);
 const ctx = { userId: boss[0].id, role: 'boss' };

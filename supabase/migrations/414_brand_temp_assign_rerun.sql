@@ -13,8 +13,12 @@
 -- re-runnable (create table if not exists / create or replace function /
 -- drop policy if exists before create policy / enable RLS is a no-op when
 -- already enabled), so applying it where it HAS somehow run changes nothing.
--- 407_brand_temp_assign.sql is kept in place so already-migrated databases
--- keep matching their history.
+--
+-- 407_brand_temp_assign.sql has been DELETED rather than left beside
+-- 407_ai_ingest_quiet_hours.sql. Leaving both would keep the collision alive
+-- in the folder: a fresh clone pushing to a new database would see version 407
+-- twice and apply whichever sorts first, non-deterministically. One file per
+-- number, and this one carries the brand-temp content from here on.
 -- ============================================================
 -- WurxOS v2 â€” Migration 407: temporary brand cover with automatic return.
 --

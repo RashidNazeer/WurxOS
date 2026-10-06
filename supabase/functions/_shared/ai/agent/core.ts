@@ -87,6 +87,7 @@ export type CoreDeps = {
   nvidiaKey?: string | null;         // NVIDIA_API_KEY (the 'nvidia' slot; free, dev/test only)
   nvidia2Key?: string | null;        // NVIDIA_API_KEY_2 (the 'nvidia2' slot)
   tavilyKey?: string | null;         // TAVILY_API_KEY (web search / page extraction, mig 415)
+  braveKey?: string | null;          // BRAVE_API_KEY (web search, mig 416; unset until the Owner adds it)
   fetchImpl?: typeof fetch;          // test seam for the web tools
   catalog?: CatalogRow[];            // tests; otherwise read from ai_model_catalog
   rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
@@ -319,7 +320,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // allowed AND a provider is actually usable. All three have to hold, or the
   // tools are not offered and the prompt never mentions the web.
   const webCfg = webConfig(row);
-  const webKeys: WebKeys = { tavily: deps.tavilyKey ?? null };
+  const webKeys: WebKeys = { tavily: deps.tavilyKey ?? null, brave: deps.braveKey ?? null };
   const webEnv: WebEnv | null = (() => {
     if (!webAllowedForRole(webCfg, req.role)) return null;
     const env: WebEnv = { config: webCfg, keys: webKeys, ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}) };

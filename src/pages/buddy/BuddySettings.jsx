@@ -920,6 +920,14 @@ function RoleModelsCard({ readOnly }) {
 }
 
 // ── web search ──────────────────────────────────────────────────────
+// Where each provider's credentials live. SearXNG is configured right here;
+// Brave and Tavily read a function secret, which is why they can be listed and
+// ordered before their key exists — the server skips a provider with no key.
+const WEB_KEY_NOTE = {
+  brave: 'needs BRAVE_API_KEY',
+  tavily: 'needs TAVILY_API_KEY',
+};
+
 function WebSearchCard({ readOnly }) {
   const [saved, setSaved] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -1001,6 +1009,11 @@ function WebSearchCard({ readOnly }) {
                 {r.on ? <span className="bd-chain-n" aria-hidden="true">{i + 1}</span> : <span className="bd-chain-n" aria-hidden="true">–</span>}
                 <span className="text-truncate">{webProviderLabel(r.id)}</span>
                 {!r.on && <span className="bd-badge-chip">Off</span>}
+                {/* Where each provider's credentials come from. Brave and
+                    Tavily are function secrets, not settings: a provider with
+                    no key is skipped silently, which is how Brave can be
+                    listed here before its key exists. */}
+                {r.on && WEB_KEY_NOTE[r.id] && <span className="bd-hint-inline">{WEB_KEY_NOTE[r.id]}</span>}
                 <div className="form-check form-switch m-0">
                   <input className="form-check-input" type="checkbox" role="switch" id={`bd-web-p-${r.id}`} checked={r.on}
                     aria-label={`Use ${webProviderLabel(r.id)}`}

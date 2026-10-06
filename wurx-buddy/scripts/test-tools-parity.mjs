@@ -52,7 +52,7 @@ export function extractV1(src) {
 }
 const v1src = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'ai-chat', 'index.ts'), 'utf8');
 const v1 = await import(`data:text/javascript;base64,${Buffer.from(extractV1(v1src)).toString('base64')}`);
-const v2 = await import('../supabase/functions/_shared/ai/tools/index.ts');
+const v2 = await import('../../supabase/functions/_shared/ai/tools/index.ts');
 
 // v1 with reports narrowed to approved rows: the expected v2 body.
 const approvedOnly = new Proxy(admin, {

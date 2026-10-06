@@ -30,17 +30,17 @@ pg_cron runs in **GMT** on dev (`show cron.timezone`). PKT = GMT+5.
 |---|---|
 | (a) | `npx supabase projects list` must work and show the dev project. |
 | (b) | Sets the function secrets `OPEN_AI_API_KEY` and `AI_INGEST_SECRET` on dev. The values come from `..\.env.dev` through a temporary env file, never the command line. If `AI_INGEST_SECRET` is missing, a random 32-byte hex secret is generated and appended to `..\.env.dev`. It is never printed. |
-| (c) | `supabase functions deploy ai-ingest` and `tts-crawl`, each with `--no-verify-jwt --use-api --project-ref <dev> --workdir <Assistant>`. |
+| (c) | `supabase functions deploy ai-ingest` and `tts-crawl`, each with `--no-verify-jwt --use-api --project-ref <dev> --workdir <repo root>`. |
 | (d) | `node scripts/db-dev.mjs apply 379 380 374 375 381`. It stops at the first failure, which is rolled back; the migrations before it stay applied. |
 | (e) | `node scripts/deploy-dev-config.mjs` sets `app_config.ai_ingest_url`, `ai_crawl_url` and `ai_ingest_secret`. `--check` shows them without the secret. |
 | (f) | Smoke check: each function must answer our own `401 Unauthorized` when called without the secret, which shows it is live and JWT checking is off. Then it prints the checklist below. |
 
-Refusals: the script stops before doing anything if any command-line argument, environment variable, `..\.env.dev` value or `supabase\.temp\project-ref` / `linked-project.json` (in Assistant or the app repo) names another project. The same happens if `WURXOS_DEV_PROJECT_REF` is not the dev ref. Skip steps with `-SkipSecrets`, `-SkipFunctions`, `-SkipMigrations` or `-SkipConfig`.
+Refusals: the script stops before doing anything if any command-line argument, environment variable, `..\.env.dev` value or `supabase\.temp\project-ref` / `linked-project.json` (in the repo root) names another project. The same happens if `WURXOS_DEV_PROJECT_REF` is not the dev ref. Skip steps with `-SkipSecrets`, `-SkipFunctions`, `-SkipMigrations` or `-SkipConfig`.
 
-**No `config.toml` needed.** `--workdir <Assistant>` makes the CLI use `Assistant\supabase\functions\...` as given, with no upward search. On 2026-09-29 the CLI (2.118.0) listed dev's functions and secrets fine from this folder without a `config.toml`. `--no-verify-jwt` is passed on each deploy. The CLI caches `supabase\.temp\` here; it is gitignored and holds the dev ref only.
+**No `config.toml` needed.** `--workdir <repo root>` makes the CLI use `supabase\functions\...` as given, with no upward search. On 2026-09-29 the CLI (2.118.0) listed dev's functions and secrets fine from this folder without a `config.toml`. `--no-verify-jwt` is passed on each deploy. The CLI caches `supabase\.temp\` here; it is gitignored and holds the dev ref only.
 
 **Checklist after the deploy:**
-1. `npx supabase functions list --project-ref vyvkwbvreeycmmnikqbz --workdir .` shows both functions ACTIVE with verify_jwt false.
+1. `npx supabase functions list --project-ref vyvkwbvreeycmmnikqbz --workdir ..` shows both functions ACTIVE with verify_jwt false.
 2. `node scripts/db-dev.mjs status` lists 374, 375, 379, 380 and 381.
 3. `select jobname, schedule from cron.job where jobname like 'ai-%';` returns five jobs.
 4. `node scripts/deploy-dev-config.mjs --check` shows both URLs set and the secret matching `.env.dev`.

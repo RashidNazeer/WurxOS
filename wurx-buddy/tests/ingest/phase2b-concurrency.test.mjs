@@ -13,9 +13,9 @@
 import crypto from 'node:crypto';
 import pg from 'pg';
 import { devDbUrl, SSL } from '../../scripts/dev-env.mjs';
-import { DEFAULT_CONFIG } from '../../supabase/functions/_shared/ai/config.ts';
-import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
-import { runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
+import { DEFAULT_CONFIG } from '../../../supabase/functions/_shared/ai/config.ts';
+import { pgRpc } from '../../../supabase/functions/_shared/ai/ingest/db.ts';
+import { runWorker } from '../../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const N = 60;
 const results = [];

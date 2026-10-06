@@ -1,11 +1,12 @@
 // Buddy's window on the open internet: search across the configured providers,
 // and read one page.
 //
-// Provider order is config (ai_assistant_config.web_providers, mig 415); the
-// default is SearXNG first, then Tavily. Rationale: SearXNG is the company's
-// own instance, so it costs nothing and leaks nothing, and Tavily's credits are
-// spent only when SearXNG is unconfigured, down, or came back empty. Both can
-// run and have their results merged (`merge: true`).
+// Provider order is config (ai_assistant_config.web_providers, migs 415/416);
+// the default is DEFAULT_PROVIDER_ORDER — SearXNG, then Brave, then Tavily.
+// Rationale: SearXNG is the company's own instance, so it costs nothing and
+// leaks nothing; Brave's tier is free; Tavily bills credits per call, so it is
+// last and is reached only when the others are unconfigured, down or empty.
+// Any or all can run and have their results merged (`merge: true`).
 //
 // Nothing here decides WHETHER to go to the web. That is the model's call under
 // the prompt rules, gated by web_search_enabled and web_allowed_roles.
@@ -13,15 +14,21 @@
 import { checkUrl, safeFetch } from './guard.ts';
 import { searxngSearch, SearxngError } from './searxng.ts';
 import { tavilyExtract, tavilySearch, TavilyError } from './tavily.ts';
+import { braveSearch, BraveError } from './brave.ts';
 import { htmlToText } from './html.ts';
 import type { WebHit, WebPage, WebSearchOutcome, WebUsage } from './types.ts';
 
 export * from './types.ts';
 export { checkUrl, safeFetch } from './guard.ts';
 
-export type WebProvider = 'searxng' | 'tavily';
-export const WEB_PROVIDERS: WebProvider[] = ['searxng', 'tavily'];
+export type WebProvider = 'searxng' | 'tavily' | 'brave';
+export const WEB_PROVIDERS: WebProvider[] = ['searxng', 'tavily', 'brave'];
 export const isWebProvider = (s: unknown): s is WebProvider => WEB_PROVIDERS.includes(s as WebProvider);
+
+// Default order, and why: SearXNG is the company's own instance, so it is free
+// and leaks nothing; Brave has its own independent index and a free tier;
+// Tavily costs credits per call, so it goes last.
+export const DEFAULT_PROVIDER_ORDER: WebProvider[] = ['searxng', 'brave', 'tavily'];
 
 export type WebConfig = {
   enabled: boolean;
@@ -84,7 +91,7 @@ export function webConfig(row: Record<string, unknown> | null | undefined): WebC
   const n = Number(r.web_max_results);
   return {
     enabled: r.web_search_enabled === true,
-    providers: rawProviders?.length ? rawProviders : ['searxng', 'tavily'],
+    providers: rawProviders?.length ? rawProviders : [...DEFAULT_PROVIDER_ORDER],
     merge: (r as any).web_merge === true,
     searxngUrl: url,
     searxngAllowHttp: (r as any).searxng_allow_http === true,
@@ -97,7 +104,7 @@ export function webConfig(row: Record<string, unknown> | null | undefined): WebC
 export const webAllowedForRole = (cfg: WebConfig, role: string): boolean =>
   cfg.enabled && (!cfg.allowedRoles || cfg.allowedRoles.includes(String(role).toLowerCase()));
 
-export type WebKeys = { tavily?: string | null };
+export type WebKeys = { tavily?: string | null; brave?: string | null };
 
 export type WebEnv = {
   config: WebConfig;
@@ -145,9 +152,17 @@ export function mergeHits(lists: WebHit[][], max: number): WebHit[] {
   return [...seen.values()];
 }
 
-// Which providers can actually run right now, in the configured order.
+// Which providers can actually run right now, in the configured order. A
+// provider with no key (or no URL) is not usable, so Brave simply sits out
+// until BRAVE_API_KEY is set — no error, no empty results.
+export function providerReady(env: WebEnv, p: WebProvider): boolean {
+  if (p === 'searxng') return !!env.config.searxngUrl;
+  if (p === 'tavily') return !!env.keys.tavily;
+  if (p === 'brave') return !!env.keys.brave;
+  return false;
+}
 export function usableProviders(env: WebEnv): WebProvider[] {
-  return env.config.providers.filter((p) => (p === 'searxng' ? !!env.config.searxngUrl : !!env.keys.tavily));
+  return env.config.providers.filter((p) => providerReady(env, p));
 }
 
 export async function webSearch(env: WebEnv, a: {
@@ -179,6 +194,15 @@ export async function webSearch(env: WebEnv, a: {
       usage.push({ provider: 'searxng', calls: 1, credits: 0 });
       return r.hits;
     }
+    if (p === 'brave') {
+      const r = await braveSearch({
+        query: a.query, maxResults: max, timeRange: a.timeRange ?? null,
+      }, { apiKey: env.keys.brave!, fetchImpl: env.fetchImpl, timeoutMs: WEB_DEFAULTS.SEARCH_TIMEOUT_MS });
+      // Brave's free tier bills by request, not by credit, so there is no
+      // per-call credit figure to report — the call count is the usage.
+      usage.push({ provider: 'brave', calls: 1, credits: 0 });
+      return r.hits;
+    }
     const r = await tavilySearch({
       query: a.query, maxResults: max, topic: a.topic ?? 'general',
       timeRange: a.timeRange ?? null, includeDomains: a.includeDomains, excludeDomains: a.excludeDomains,
@@ -203,6 +227,12 @@ export async function webSearch(env: WebEnv, a: {
 
 export function describeProviderError(e: unknown): string {
   if (e instanceof SearxngError) return [e.message, e.hint].filter(Boolean).join(' ');
+  if (e instanceof BraveError) {
+    if (e.status === 401 || e.status === 403) return 'Brave refused the API key.';
+    if (e.status === 422) return `Brave rejected the query: ${e.message}`;
+    if (e.status === 429) return 'Brave is rate-limiting us (the free tier allows one request per second).';
+    return `Brave error: ${e.message}`;
+  }
   if (e instanceof TavilyError) {
     if (e.status === 401 || e.status === 403) return 'Tavily refused the API key.';
     if (e.status === 432 || e.status === 433 || /credit|quota|plan/i.test(e.message)) return 'The Tavily plan is out of credits.';

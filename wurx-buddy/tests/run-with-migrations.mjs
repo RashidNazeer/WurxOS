@@ -25,7 +25,7 @@ for (const f of files) {
   const bad = findTxControl(fs.readFileSync(path.resolve(f), 'utf8'));
   if (bad.length) { console.error(`Refusing: ${f} contains transaction control (${bad.slice(0, 3).join('; ')}).`); process.exit(1); }
 }
-const migDir = path.join(ASSISTANT, 'supabase', 'migrations');
+const migDir = path.join(ASSISTANT, '..', 'supabase', 'migrations');
 const migFile = (v) => {
   const f = fs.readdirSync(migDir).find((n) => n.startsWith(`${v}_`) && n.endsWith('.sql'));
   if (!f) throw new Error(`no migration file for ${v}`);

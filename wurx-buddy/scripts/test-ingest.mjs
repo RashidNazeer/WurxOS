@@ -30,10 +30,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
 import { ASSISTANT, devDbUrl, readEnv, SSL, stripBom } from './dev-env.mjs';
-import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../supabase/functions/_shared/ai/config.ts';
-import { pgRpc } from '../supabase/functions/_shared/ai/ingest/db.ts';
-import { importArticles } from '../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { openAiEmbedder, runWorker } from '../supabase/functions/_shared/ai/ingest/worker.ts';
+import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../../supabase/functions/_shared/ai/config.ts';
+import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
+import { importArticles } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
+import { openAiEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const MODEL = DEFAULT_CONFIG.EMBED_MODEL;
 const REAL = !process.argv.includes('--no-real');
@@ -84,7 +84,7 @@ try {
 
   // 373 / 376 / 377 are applied on dev (re-running them would add a second
   // ai_search beside mig 378's); 379 (the sweep, M1) is not yet.
-  await c.query(stripBom(fs.readFileSync(path.join(ASSISTANT, 'supabase/migrations', '379_ai_ingest_sweep.sql'), 'utf8')));
+  await c.query(stripBom(fs.readFileSync(path.join(ASSISTANT, '..', 'supabase/migrations', '379_ai_ingest_sweep.sql'), 'utf8')));
 
   // ---------------------------------------------------------- people, brand
   const ppl = await one(`
