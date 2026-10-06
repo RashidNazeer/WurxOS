@@ -302,6 +302,48 @@ export async function assignBrandApc(brandId, newApcId, note = null, notify = fa
   if (error) throw new Error(error.message);
 }
 
+// --------------------------------------------------------------
+// Temporary cover WITH automatic return (Boss / OL / Developer, mig 407).
+//
+// Unlike assignBrandApc/switchBrandApc (permanent) or the plain time-boxed
+// `brand_assignments.expires_at` cover (mig 210, purely additive — nothing
+// is ever taken away, so there is nothing to give back), this actually hands
+// the brand to the covering APC and remembers who to return it to. A cron
+// reverts it automatically at `endsAt`; endTempAssignmentEarly can also end
+// it sooner (the employee came back early).
+// --------------------------------------------------------------
+export async function temporarilyAssignBrand(brandId, coveringApcId, endsAt, note = null, notify = false) {
+  const { data, error } = await supabase.rpc('brand_temp_assign', {
+    p_brand: brandId, p_covering: coveringApcId, p_ends_at: endsAt, p_note: note, p_notify: notify,
+  });
+  if (error) throw new Error(error.message);
+  return data; // the new brand_temp_assignments.id
+}
+
+// Boss/OL only — give the brand back before its scheduled return date.
+export async function endTempAssignmentEarly(id) {
+  const { error } = await supabase.rpc('brand_temp_revert_one', { p_id: id, p_early: true });
+  if (error) throw new Error(error.message);
+}
+
+// Every brand currently under temporary cover, for the Brand Switcher's
+// "Covering" tab.
+export async function listActiveTempAssignments() {
+  const { data, error } = await supabase
+    .from('brand_temp_assignments')
+    .select(`
+      *,
+      brand:brand_id(id, brand_name, logo_url),
+      original:original_apc_id(id, display_name, role, avatar_url),
+      covering:covering_apc_id(id, display_name, role, avatar_url),
+      creator:created_by(id, display_name)
+    `)
+    .eq('status', 'active')
+    .order('ends_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 // Returns the current brand list for each of the two users — used
 // by the Switch APC preview so the caller can see exactly which
 // brands will move in each direction of the swap.
