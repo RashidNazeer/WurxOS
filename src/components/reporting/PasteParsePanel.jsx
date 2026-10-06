@@ -44,8 +44,8 @@ export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, ac
       <button type="button" onClick={() => { setOpen(o => !o); setStatus(null); }}
         className="btn btn-sm d-inline-flex align-items-center gap-1"
         style={{
-          borderRadius: 8, fontSize: '0.72rem', fontWeight: 600,
-          color: open ? '#fff' : accent,
+          borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', fontWeight: 600,
+          color: open ? 'var(--text-inverse)' : accent,
           background: open ? accent : 'transparent',
           border: `1px solid ${accent}`,
         }}>
@@ -66,7 +66,7 @@ export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, ac
             placeholder="Paste the copied table here…"
             spellCheck={false}
             style={{
-              width: '100%', borderRadius: 8, padding: '10px 12px',
+              width: '100%', borderRadius: 'var(--radius-sm)', padding: '10px 12px',
               fontSize: '0.74rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
               background: 'var(--surface-1)', color: 'var(--text-primary)',
               border: '1px solid var(--border-default)', resize: 'vertical', outline: 'none',
@@ -75,11 +75,11 @@ export default function PasteParsePanel({ noun = 'row', parse, onApply, hint, ac
           <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
             <button type="button" onClick={handleParse} disabled={!text.trim()}
               className="btn btn-sm d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8, fontSize: '0.74rem', fontWeight: 600, color: '#fff', background: accent, border: 'none', opacity: text.trim() ? 1 : 0.5 }}>
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-inverse)', background: accent, border: 'none', opacity: text.trim() ? 1 : 0.5 }}>
               <i className="bi bi-magic" /> Parse &amp; Fill
             </button>
             <button type="button" onClick={reset} disabled={!text && !status}
-              className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.74rem' }}>
+              className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}>
               Clear
             </button>
             {status && (

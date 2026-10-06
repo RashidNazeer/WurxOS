@@ -216,7 +216,7 @@ export default function RichTextEditor({
           border: 1px solid var(--border-default);
           border-radius: var(--radius-md);
           background: var(--surface-1);
-          transition: border-color 130ms ease, box-shadow 130ms ease;
+          transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
         }
         .rte-container:focus-within {
           border-color: var(--accent);
@@ -226,8 +226,9 @@ export default function RichTextEditor({
         .rte-toolbar {
           /* Sticky offset is configurable so the toolbar can pin BELOW any
              sticky page chrome above it (e.g. the report header) instead of
-             colliding with it. Defaults to 0 — unchanged everywhere else. */
-          position: sticky; top: var(--rte-toolbar-top, 0); z-index: 3;
+             colliding with it. Defaults to the app topbar height (0 outside the
+             shell, e.g. portals); scroll containers like drawers reset it to 0. */
+          position: sticky; top: var(--rte-toolbar-top, var(--topbar-h, 0px)); z-index: 3;
           display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
           padding: 8px 10px;
           background: color-mix(in srgb, var(--surface-2) 88%, transparent);
@@ -239,12 +240,12 @@ export default function RichTextEditor({
         .rte-sep { width: 1px; height: 22px; background: var(--border-subtle); margin: 0 5px; flex: 0 0 auto; }
 
         .rte-btn {
-          background: transparent; border: 1px solid transparent; border-radius: 7px;
+          background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
           height: 32px; min-width: 32px; padding: 0 7px;
           display: inline-flex; align-items: center; justify-content: center;
           cursor: pointer; color: var(--text-secondary);
           font-size: 15px; line-height: 1; font-family: inherit;
-          transition: background 110ms ease, color 110ms ease, border-color 110ms ease, transform 60ms ease;
+          transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-instant) var(--ease-out);
         }
         .rte-btn i { font-size: 15px; line-height: 1; }
         .rte-btn:hover { background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary); }
@@ -258,11 +259,11 @@ export default function RichTextEditor({
         .rte-select-wrap { position: relative; display: inline-flex; align-items: center; }
         .rte-select {
           appearance: none; -webkit-appearance: none; -moz-appearance: none;
-          background: var(--surface-1); border: 1px solid var(--border-default); border-radius: 7px;
+          background: var(--surface-1); border: 1px solid var(--border-default); border-radius: var(--radius-sm);
           height: 32px; padding: 0 26px 0 10px; width: 100%;
           font-size: 12.5px; font-weight: 600; color: var(--text-primary);
           cursor: pointer; font-family: inherit;
-          transition: border-color 110ms ease, background 110ms ease;
+          transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
         }
         .rte-select:hover { border-color: var(--border-strong); background: var(--surface-2); }
         .rte-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
@@ -282,14 +283,14 @@ export default function RichTextEditor({
         .rte-surface ul[data-type='taskList'] li > label { margin-top: 0.2rem; }
         .rte-surface ul[data-type='taskList'] input[type='checkbox'] { accent-color: var(--accent); }
         .rte-surface a { color: var(--accent); text-decoration: underline; cursor: pointer; }
-        .rte-surface blockquote { border-left: 3px solid var(--border-strong); padding-left: 0.9rem; color: var(--text-secondary); }
-        .rte-surface pre { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; font-family: var(--font-mono); font-size: 0.85em; overflow-x: auto; }
+        .rte-surface blockquote { border-left: 2px solid var(--border-strong); padding-left: 0.9rem; color: var(--text-secondary); }
+        .rte-surface pre { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px 12px; font-family: var(--font-mono); font-size: 0.85em; overflow-x: auto; }
         .rte-surface code { font-family: var(--font-mono); }
         .rte-surface hr { border: none; border-top: 1px solid var(--border-default); margin: 0.8rem 0; }
-        .rte-surface p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--text-muted); float: left; height: 0; pointer-events: none; }
+        .rte-surface p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--input-placeholder); font-style: italic; float: left; height: 0; pointer-events: none; }
 
         /* Highlighter — identical to the report views (reports.css mark.rh) */
-        .rte-surface mark.rh { padding: 0 1px; border-radius: 2px; color: #1f2937; }
+        .rte-surface mark.rh { padding: 0 1px; border-radius: var(--radius-xs); color: #1f2937; }
         .rte-surface mark.rh[data-color='yellow'][data-intensity='light']  { background: #fef9c3; }
         .rte-surface mark.rh[data-color='yellow'][data-intensity='medium'] { background: #fef08a; }
         .rte-surface mark.rh[data-color='yellow'][data-intensity='dark']   { background: #fde047; }

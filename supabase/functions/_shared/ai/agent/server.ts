@@ -6,14 +6,20 @@ import { supabaseRpc } from '../ingest/db.ts';
 import { cachedEmbedder, openAiQueryEmbedder, openAiReranker } from '../retrieval/rerank.ts';
 import { RETRIEVAL_DEFAULTS } from '../retrieval/config.ts';
 import { DEFAULT_CONFIG } from '../config.ts';
-import { UsageMeter } from '../prices.ts';
+import { pricesFrom, UsageMeter } from '../prices.ts';
+import { providerAccountIssue } from '../providerErrors.ts';
+import { altEmbedOptions, altKeysFor, embedWithKeys, type AltProvider } from '../embedder.ts';
+import { isSlot, refreshModels, type KeySlot } from './models.ts';
 import { cleanPageContext, cleanSurface, requestCancel, type CoreDeps } from './core.ts';
 import { json, turnResponse, type TurnHttp } from './http.ts';
 
 // Who may use the assistant: ai_assistant_config.allowed_roles (mig 385),
 // Boss-only by default. Widening it is a config change, made by the Lead only
 // after the role safeguards (ui-design §8) pass QA. No row / no column → boss.
-export const DEFAULT_ALLOWED_ROLES = ['boss'];
+export const DEFAULT_ALLOWED_ROLES = ['boss', 'developer'];
+// Owner 2026-10-01: Buddy is ALWAYS available to the Boss and to active
+// developers, whatever allowed_roles says (the DB trigger keeps them listed too).
+export const ALWAYS_ALLOWED_ROLES = ['boss', 'developer'];
 
 export async function allowedRoles(admin: any): Promise<string[]> {
   try {
@@ -64,11 +70,70 @@ export async function checkProfile(admin: any, userId: string, token: string | n
   if (!p || p.is_active === false || p.deleted_at) return json({ error: 'forbidden' }, 403);
   const role = String(p.role || '').toLowerCase();
   if (internal && role !== 'boss') return json({ error: 'internal calls may only answer as a boss' }, 403);
-  if (!internal && !(await allowedRoles(admin)).includes(role)) return json({ error: 'The assistant is currently in limited testing and not available for your role yet.' }, 403);
+  if (!internal && !ALWAYS_ALLOWED_ROLES.includes(role) && !(await allowedRoles(admin)).includes(role)) return json({ error: 'The assistant is currently in limited testing and not available for your role yet.' }, 403);
   return { userId, role, displayName: p.display_name ?? null, token, internal };
 }
 
-export type ServerEnv = { url: string; serviceKey: string; anonKey: string; openAiKey: string; createClient: CreateClient; fetchImpl?: typeof fetch };
+export type ServerEnv = {
+  url: string; serviceKey: string; anonKey: string; createClient: CreateClient; fetchImpl?: typeof fetch; modelOverride?: string;
+  openAiKey: string;                     // OPEN_AI_API_KEY: the 'primary' key slot
+  openAiKeyFallback?: string | null;     // OPEN_AI_API_KEY_FALLBACK: the 'fallback' key slot (optional)
+  groqKey?: string | null;               // GROQ_API_KEY: the 'groq' key slot (optional, free tier)
+  geminiKey?: string | null;             // GEMINI_API_KEY: the 'gemini' key slot (optional, free tier)
+  nvidiaKey?: string | null;             // NVIDIA_API_KEY: the 'nvidia' key slot (optional; free, dev/test only)
+  nvidia2Key?: string | null;            // NVIDIA_API_KEY_2: the 'nvidia2' key slot
+  altProvider?: AltProvider;             // which provider filled embedding_alt (mig 408; default nvidia)
+  modelKeySlot?: KeySlot;                // with modelOverride: that key (serve-assistant --key-slot)
+  noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
+};
+
+// Query embeddings: the primary key, then the fallback key. When every key
+// refuses for an account reason (no credits, key refused), embeddings count as
+// down for 10 minutes in this worker (no more calls) and search runs on
+// keywords only.
+export const EMBED_DOWN_MS = 600_000;
+let embedDownUntil = 0;
+export const _resetEmbedDown = () => { embedDownUntil = 0; };   // tests
+// The second vector space (mig 406): an NVIDIA query vector for `embedding_alt`
+// (keys nvidia, then nvidia2; input_type 'query'). searchIndex asks for it only
+// when the OpenAI embed gave none. Down for 10 minutes on an account problem too.
+let altDownUntil = 0;
+export function altQueryEmbedder(env: ServerEnv): ((t: string) => Promise<number[] | null>) | undefined {
+  // Must be the provider that FILLED embedding_alt
+  // (ai_assistant_config.embed_alt_provider, mig 408; default nvidia).
+  const provider = env.altProvider ?? 'nvidia';
+  const keys = altKeysFor(provider, { nvidia: env.nvidiaKey, nvidia2: env.nvidia2Key, gemini: env.geminiKey }).filter(Boolean) as string[];
+  if (!keys.length) return undefined;
+  const one = async (text: string): Promise<number[]> => {
+    if (Date.now() < altDownUntil) throw new Error('alt query embeddings unavailable');
+    try { return (await embedWithKeys([text], keys, altEmbedOptions(provider, 'query', { fetchImpl: env.fetchImpl, maxRetries: 1, timeoutMs: 8000 }))).vectors[0]; }
+    catch (e) { if (providerAccountIssue(e)) altDownUntil = Date.now() + EMBED_DOWN_MS; throw e; }
+  };
+  return cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS);
+}
+
+// `down` feeds the keyword-only prompt note in core.ts: true only when no query
+// vector can be made at all (neither OpenAI nor the NVIDIA alt space).
+export function chainEmbedder(env: ServerEnv, meter: UsageMeter):
+  { embed: (t: string) => Promise<number[]>; alt?: (t: string) => Promise<number[] | null>; down: () => boolean } {
+  const slots = ([['primary', env.openAiKey], ['fallback', env.openAiKeyFallback]] as const).filter(([, k]) => !!k);
+  const one = async (text: string): Promise<number[]> => {
+    if (Date.now() < embedDownUntil) throw new Error('query embeddings unavailable: no OpenAI key can embed right now');
+    let last: unknown = null;
+    for (const [slot, key] of slots) {
+      try { return await openAiQueryEmbedder(key as string, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL, slot))(text); }
+      catch (e) { last = e; if (!providerAccountIssue(e)) throw e; }
+    }
+    embedDownUntil = Date.now() + EMBED_DOWN_MS;
+    throw last;
+  };
+  const alt = altQueryEmbedder(env);
+  return {
+    embed: cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
+    alt,
+    down: () => Date.now() < embedDownUntil && (!alt || Date.now() < altDownUntil),
+  };
+}
 
 // Search runs with the caller's JWT so the database ACL applies; without one
 // (Slack relay, local --as-user) it runs as the service role with p_as_user.
@@ -77,6 +142,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     ? env.createClient(env.url, env.anonKey, { global: { headers: { Authorization: `Bearer ${caller.token}` } }, auth: { persistSession: false, autoRefreshToken: false } })
     : null;
   const meter = new UsageMeter();
+  const emb = chainEmbedder(env, meter);
   return {
     admin,
     searchRpc: supabaseRpc(userClient ?? admin),
@@ -86,7 +152,16 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     // local --as-user) there is none, and non-Boss people tools refuse.
     ...(userClient ? { userClient } : {}),
     apiKey: env.openAiKey,
-    embed: cachedEmbedder(openAiQueryEmbedder(env.openAiKey, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL)), DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
+    ...(env.modelOverride ? { model: env.modelOverride, ...(env.modelKeySlot ? { modelKeySlot: env.modelKeySlot } : {}) } : {}),
+    fallbackKey: env.openAiKeyFallback ?? null,
+    groqKey: env.groqKey ?? null,
+    geminiKey: env.geminiKey ?? null,
+    nvidiaKey: env.nvidiaKey ?? null,
+    nvidia2Key: env.nvidia2Key ?? null,
+    ...(env.noRateLimit ? { rateLimitExempt: true } : {}),
+    embed: emb.embed,
+    ...(emb.alt ? { embedAlt: emb.alt } : {}),
+    embedDown: emb.down,
     rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl, onUsage: meter.onRerank(RETRIEVAL_DEFAULTS.RERANK_MODEL) }),
     meter,
   };
@@ -99,6 +174,22 @@ export async function handleAsk(env: ServerEnv, admin: any, caller: Caller, body
   if (body?.cancel !== undefined) {
     const r = await requestCancel(admin, caller.userId, String(body.cancel));
     return { response: json(r.body, r.status), done: Promise.resolve() };
+  }
+  // The model list: probe what each key can use and store it (mig 397, 401).
+  // A read-style check, so the Boss and active developers may run it (Owner
+  // 2026-10-01: both see all of Buddy's settings). {slots: [...]} limits it.
+  if (body?.refresh_models === true) {
+    if (caller.internal || !['boss', 'developer'].includes(caller.role)) return { response: json({ error: 'only the Boss or a developer can refresh the model list' }, 403), done: Promise.resolve() };
+    const slots = Array.isArray(body?.slots) ? body.slots.filter(isSlot) : undefined;
+    const { data: cfg } = await admin.from('ai_assistant_config').select('prices').eq('id', 1).maybeSingle();
+    try {
+      const r = await refreshModels({ keys: { primary: env.openAiKey, fallback: env.openAiKeyFallback ?? null, groq: env.groqKey ?? null, gemini: env.geminiKey ?? null,
+        nvidia: env.nvidiaKey ?? null, nvidia2: env.nvidia2Key ?? null },
+        admin, prices: pricesFrom(cfg?.prices), fetchImpl: env.fetchImpl, ...(slots?.length ? { slots } : {}) });
+      return { response: json(r), done: Promise.resolve() };
+    } catch (e) {
+      return { response: json({ error: String((e as Error)?.message ?? e).slice(0, 300) }, 500), done: Promise.resolve() };
+    }
   }
   const deps = makeDeps(env, admin, caller);
   const conversationId = typeof body?.conversationId === 'string' && UUID.test(body.conversationId) ? body.conversationId : null;

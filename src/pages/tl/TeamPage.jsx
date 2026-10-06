@@ -119,7 +119,7 @@ function ApcCard({ apc }) {
       background: 'var(--surface-1)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-lg)',
-      transition: 'border-color var(--dur-fast), box-shadow var(--dur-fast)',
+      transition: 'border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
     }}>
       <Avatar user={apc} />
       <div style={{ minWidth: 0 }}>
@@ -131,7 +131,7 @@ function ApcCard({ apc }) {
             {apc.display_name}
           </span>
           <span style={{
-            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 999,
+            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
             background: 'var(--accent-soft)', color: 'var(--accent)',
             textTransform: 'uppercase', letterSpacing: '0.06em',
           }}>APC</span>
@@ -147,7 +147,7 @@ function ApcCard({ apc }) {
           display: 'inline-flex', alignItems: 'center', gap: 5,
           marginTop: 8,
           padding: '3px 9px',
-          borderRadius: 999,
+          borderRadius: 'var(--radius-pill)',
           fontSize: 11.5, fontWeight: 700,
           background: hasBrands
             ? 'color-mix(in srgb, var(--warning) 14%, transparent)'

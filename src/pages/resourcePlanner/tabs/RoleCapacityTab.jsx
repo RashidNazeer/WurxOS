@@ -28,10 +28,10 @@ export default function RoleCapacityTab({ config, onConfigChange }) {
   };
 
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
-      <div style={{ padding: 14, borderBottom: '1px solid #e5e7eb' }}>
+    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
+      <div style={{ padding: 14, borderBottom: '1px solid var(--border-subtle)' }}>
         <strong>Role Capacity</strong>
-        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
           If APC Max Brands = 5 and an APC has 6 assigned brands, utilization reads 120%.
         </div>
       </div>
@@ -54,7 +54,7 @@ export default function RoleCapacityTab({ config, onConfigChange }) {
                 <tr key={role}>
                   <td style={{ fontWeight: 600 }}>{ROLE_LABELS[role]}</td>
                   <td>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: '#f1f5f9', color: '#475569', fontSize: 12, fontWeight: 500 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 500 }}>
                       {dept}
                     </span>
                   </td>

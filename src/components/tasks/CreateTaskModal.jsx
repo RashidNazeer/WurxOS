@@ -230,13 +230,13 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                   padding: '14px 16px',
                   width: '100%',
                   background: isPersonal ? 'var(--accent-soft)' : 'var(--surface-2)',
-                  border: `1.5px solid ${isPersonal ? 'var(--accent)' : 'var(--border-subtle)'}`,
+                  border: `${isPersonal ? '2px' : '1px'} solid ${isPersonal ? 'var(--accent)' : 'var(--border-subtle)'}`,
                   borderRadius: 'var(--radius-md)',
                   cursor: saving ? 'not-allowed' : 'pointer',
                   marginBottom: 14,
                   textAlign: 'left',
                   color: 'inherit',
-                  transition: 'all var(--dur-fast)',
+                  transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                 }}
               >
                 <span
@@ -250,7 +250,7 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                     display: 'grid',
                     placeItems: 'center',
                     border: `1px solid ${isPersonal ? 'var(--accent)' : 'var(--border-subtle)'}`,
-                    transition: 'all var(--dur-fast)',
+                    transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                   }}
                 >
                   <UserIcon width="18" height="18" />
@@ -586,7 +586,7 @@ export default function CreateTaskModal({ task, onClose, onSaved, defaultBrandId
                   borderRadius: 'var(--radius-md)',
                   background: notify ? 'var(--accent-soft)' : 'var(--surface-1)',
                   cursor: 'pointer',
-                  transition: 'background var(--dur-fast)',
+                  transition: 'background-color var(--dur-fast) var(--ease-out)',
                 }}>
                   <input type="checkbox" checked={notify}
                     onChange={(e) => setNotify(e.target.checked)}
@@ -649,11 +649,11 @@ function MiniToggle({ checked }) {
         width: 36,
         height: 22,
         flex: '0 0 36px',
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         background: checked ? 'var(--accent)' : 'var(--surface-3)',
         border: `1px solid ${checked ? 'var(--accent)' : 'var(--border-default)'}`,
         position: 'relative',
-        transition: 'all var(--dur-fast)',
+        transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
       }}
     >
       <span
@@ -666,8 +666,8 @@ function MiniToggle({ checked }) {
           width: 16,
           height: 16,
           borderRadius: '50%',
-          background: '#fff',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+          background: 'var(--surface-1)',
+          boxShadow: 'var(--shadow-sm)',
           transition: 'left var(--dur-fast) var(--ease-out)',
         }}
       />

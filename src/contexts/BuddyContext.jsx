@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import {
-  buddyRoles, TMP_PREFIX, isTmpKey, buddyReducer, initialBuddyState, deriveMood, unreadCount,
+  ALWAYS_ROLES, buddyRoles, TMP_PREFIX, isTmpKey, buddyReducer, initialBuddyState, deriveMood, unreadCount,
   unreadTitle, friendlyError, findReply, watchReply, isStuck, STUCK_MS, greetingText, firstName, serverUnread,
   clockSkew, questionBefore, canRegenerateMsg,
 } from '../lib/buddyLogic';
 import {
-  BuddyHttpError, streamAssistant, listConversations, getMessages, findGenerating, subscribeMessages,
+  BuddyHttpError, streamAssistant, listConversations, getMessages, getMessageById, findGenerating, subscribeMessages,
   subscribeConversations, markConversationRead, renameConversation, pinConversation, deleteConversation,
   sendFeedback, getBuddyConfig, cancelReply,
 } from '../lib/buddyApi';
@@ -33,9 +33,12 @@ export function BuddyProvider({ children }) {
     getBuddyConfig().then((c) => { if (!cancelled) setCfg(c); });
     return () => { cancelled = true; };
   }, [uid]);
-  const gateReady = !!uid && cfg !== undefined;
-  // The UI gate mirrors the function's allowed_roles; BUDDY_ROLES (boss) if the read failed.
-  const allowed = gateReady && buddyRoles(cfg.allowedRoles).includes(role);
+  // The UI gate mirrors the function: the Boss and developers always (no need
+  // to wait for the config), everyone else by allowed_roles; if that read
+  // failed, only the always-roles.
+  const always = !!uid && ALWAYS_ROLES.includes(role);
+  const gateReady = always || (!!uid && cfg !== undefined);
+  const allowed = always || (gateReady && buddyRoles(cfg?.allowedRoles).includes(role));
 
   const [state, dispatch] = useReducer(buddyReducer, initialBuddyState);
   const stateRef = useRef(state);
@@ -229,6 +232,15 @@ export function BuddyProvider({ children }) {
         dispatch({ type: 'DONE', key: k, requestId, messageId, status: doneStatus, error: streamErr, cancelled, viewed });
         if (viewed && !isTmpKey(k)) markRead(k);
         settled = true;
+        // {done} doesn't say which model answered; the saved row does (mig 397).
+        if (messageId) {
+          const doneKey = k;
+          getMessageById(messageId)
+            .then((row) => {
+              if (row) dispatch({ type: 'MSG_META', key: doneKey, id: messageId, meta: { model: row.model, keySlot: row.keySlot, fallbackUsed: row.fallbackUsed, modelSource: row.modelSource } });
+            })
+            .catch(() => { /* only a label */ });
+        }
       }
     } catch (e) {
       // 'stop' = the user's Stop; 'reset' = signed out / provider unmounted.

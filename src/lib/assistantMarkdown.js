@@ -1,66 +1,41 @@
-// Renders the AI assistant's reply (lightweight markdown) to SAFE HTML.
+// Renders the AI assistant's reply (Markdown) to SAFE HTML.
 //
-// The assistant emits markdown — bold, italic, inline code, headings,
-// numbered/bulleted lists, and links. Crucially it links to in-app paths
-// like [Leave](/leave); those are marked with data-nav so the chat can
-// intercept the click and navigate via React Router (SPA, no reload).
-// External http(s) links open in a new tab. Everything is escaped first,
-// then run through DOMPurify — the reply is model output, so we never
-// trust it as raw HTML.
+// markdownToHtml (markdownCore.js) does the GFM rendering with `marked`:
+// tables, fenced code with a Copy button, task lists, links (in-app /path →
+// data-nav for React Router; http(s) → new tab; anything else → text).
+// DOMPurify then sanitises with a tight allow-list: the reply is model
+// output, so it is never trusted as raw HTML (raw HTML is already escaped
+// by the renderer; this is the second net).
 import DOMPurify from 'dompurify';
+import { markdownToHtml } from './markdownCore';
 
-const escapeHtml = (s) =>
-  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const ALLOWED_TAGS = [
+  'a', 'strong', 'em', 'del', 'code', 'pre', 'p', 'br', 'hr', 'blockquote', 'div', 'span',
+  'ul', 'ol', 'li', 'input', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'button',
+];
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'data-nav', 'type', 'aria-label', 'align', 'checked', 'disabled', 'start'];
 
-// Inline spans within a single line. Order matters: links → bold → italic →
-// code (bold before italic so ** isn't eaten by the single-* rule).
-function inline(text) {
-  let t = escapeHtml(text);
+// Task-list checkboxes are the only <input> we keep, and they stay read-only.
+DOMPurify.addHook?.('afterSanitizeAttributes', (node) => {
+  if (node.nodeName === 'INPUT') {
+    if (node.getAttribute('type') !== 'checkbox') { node.remove(); return; }
+    node.setAttribute('disabled', '');
+  }
+  if (node.nodeName === 'BUTTON' && !node.classList.contains('ai-code-copy')) node.remove();
+});
 
-  // [label](url) — internal (/path) navigates in-app; http(s) opens external;
-  // anything else keeps just the label (no link).
-  t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) => {
-    // '//host' is protocol-relative, i.e. another site: not an in-app link.
-    if (url.startsWith('/') && !url.startsWith('//')) return `<a href="${url}" data-nav="${url}" class="ai-link">${label}</a>`;
-    if (/^https?:\/\//i.test(url)) return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ai-link">${label}</a>`;
-    return label;
-  });
-
-  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  t = t.replace(/(^|[^*\w])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  t = t.replace(/(^|[^_\w])_([^_\n]+)_/g, '$1<em>$2</em>');
-  t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
-  return t;
-}
+// While a reply streams, every message re-renders on each delta; caching by
+// text means only the growing one is parsed again (no flicker or CPU storm).
+const cache = new Map();
+const CACHE_MAX = 300;
 
 export function renderAssistantHtml(raw) {
-  const lines = String(raw || '').replace(/\r\n/g, '\n').split('\n');
-  const out = [];
-  let listType = null; // 'ul' | 'ol'
-  const closeList = () => { if (listType) { out.push(`</${listType}>`); listType = null; } };
-
-  for (const line of lines) {
-    const heading = line.match(/^\s*#{1,6}\s+(.*)$/);
-    const ordered = line.match(/^\s*\d+[.)]\s+(.*)$/);
-    const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
-
-    if (heading) { closeList(); out.push(`<div class="ai-h">${inline(heading[1])}</div>`); continue; }
-    if (ordered) {
-      if (listType !== 'ol') { closeList(); out.push('<ol>'); listType = 'ol'; }
-      out.push(`<li>${inline(ordered[1])}</li>`); continue;
-    }
-    if (bullet) {
-      if (listType !== 'ul') { closeList(); out.push('<ul>'); listType = 'ul'; }
-      out.push(`<li>${inline(bullet[1])}</li>`); continue;
-    }
-    closeList();
-    if (line.trim() === '') { out.push('<div class="ai-sp"></div>'); continue; }
-    out.push(`<div>${inline(line)}</div>`);
-  }
-  closeList();
-
-  return DOMPurify.sanitize(out.join(''), {
-    ALLOWED_TAGS: ['a', 'strong', 'em', 'code', 'ul', 'ol', 'li', 'div', 'span', 'br', 'p'],
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'data-nav'],
-  });
+  const key = String(raw ?? '');
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const html = DOMPurify.sanitize(markdownToHtml(key), { ALLOWED_TAGS, ALLOWED_ATTR });
+  if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+  cache.set(key, html);
+  return html;
 }

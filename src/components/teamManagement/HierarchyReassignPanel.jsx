@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { moveApcToTl, moveIpcToPctl, moveBrand } from '../../lib/teamApi';
+import { updateUserProfile } from '../../lib/adminApi';
+import { Button } from '../ui';
 
 /**
  * Side panel for reassignment actions on the Team Hierarchy page.
@@ -23,16 +25,16 @@ export default function HierarchyReassignPanel({
   const actor = { uid: user?.id, name: profile?.display_name || user?.email || 'Manager' };
 
   return (
-    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px, 100vw)', zIndex: 1500, background: '#fff', boxShadow: '-8px 0 24px rgba(15,23,42,0.12)', display: 'flex', flexDirection: 'column' }}>
-      <div className="d-flex align-items-center justify-content-between p-3 border-bottom" style={{ background: '#f8fafc' }}>
+    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px, 100vw)', zIndex: 1500, background: 'var(--surface-1)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column' }}>
+      <div className="d-flex align-items-center justify-content-between p-3 border-bottom" style={{ background: 'var(--surface-2)' }}>
         <h6 className="fw-bold mb-0">
-          {selection.type === 'tl' && <><i className="bi bi-person-badge me-2 text-success" />Team Lead</>}
-          {selection.type === 'member' && <><i className="bi bi-person-circle me-2 text-primary" />Team Member</>}
-          {selection.type === 'brand' && <><i className="bi bi-shop me-2 text-warning" />Brand</>}
+          {selection.type === 'tl' && <><i className="bi bi-person-badge me-2" style={{ color: 'var(--success-text)' }} />Team Lead</>}
+          {selection.type === 'member' && <><i className="bi bi-person-circle me-2" style={{ color: 'var(--info)' }} />Team Member</>}
+          {selection.type === 'brand' && <><i className="bi bi-shop me-2" style={{ color: 'var(--warning-text)' }} />Brand</>}
         </h6>
-        <button className="btn btn-sm btn-light rounded-circle" onClick={onClose} style={{ width: 32, height: 32 }}>
+        <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}>
           <i className="bi bi-x-lg" />
-        </button>
+        </Button>
       </div>
 
       <div className="flex-grow-1 overflow-auto p-3">
@@ -66,20 +68,23 @@ export default function HierarchyReassignPanel({
 // ── TL summary ─────────────────────────────────────────────────────────────
 
 function TlPanel({ tl }) {
+  const isDeveloper = tl.role === 'developer';
   return (
     <>
       <div className="mb-3">
-        <div className="fw-bold" style={{ fontSize: '1rem', color: '#0f172a' }}>{tl.displayName || tl.email}</div>
+        <div className="fw-bold" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{tl.displayName || tl.email}</div>
         <div className="text-muted small">
           {tl.role === 'pctl' ? 'Paid Collab Team Lead' : 'Team Lead'} · {tl.email}
         </div>
       </div>
 
-      <div className="rounded-3 p-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-        <div className="d-flex justify-content-between mb-2 small">
-          <span className="text-muted">Brands owned</span>
-          <strong>{tl.brands.length}</strong>
-        </div>
+      <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+        {!isDeveloper && (
+          <div className="d-flex justify-content-between mb-2 small">
+            <span className="text-muted">Brands owned</span>
+            <strong>{tl.brands.length}</strong>
+          </div>
+        )}
         <div className="d-flex justify-content-between small">
           <span className="text-muted">Team members</span>
           <strong>{tl.members.length}</strong>
@@ -101,22 +106,31 @@ function MemberPanel({ member, currentTl, tls, actor: _actor, isBoss, isOL, onSa
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const canEdit = isBoss || isOL;
-  const isApc = (member.userType || 'apc') === 'apc';
+  const memberRole = member.userType || 'apc';
+  const isApc = memberRole === 'apc';
+  const isDeveloper = memberRole === 'developer';
+  // Developer moves are Boss-only — there's no OL-equivalent oversight role
+  // for engineering the way there is for brand teams.
+  const canEdit = isDeveloper ? isBoss : (isBoss || isOL);
 
-  // PCTL can only own IPCs; TL can only own APCs. Filter dropdown so we
-  // never end up with an APC under a PCTL or vice-versa. Same rule as v1.
+  // PCTL can only own IPCs, TL can only own APCs, a developer lead can only
+  // lead other developers. Filter dropdown so a member never ends up under
+  // a mismatched lead. Same rule as v1 for APC/IPC; developer is new.
   const eligibleTls = useMemo(() => {
     return tls.filter((t) => t.id !== currentTl.id && (
-      isApc ? t.role === 'tl' : t.role === 'pctl'
+      isDeveloper ? t.role === 'developer' : (isApc ? t.role === 'tl' : t.role === 'pctl')
     ));
-  }, [tls, currentTl.id, isApc]);
+  }, [tls, currentTl.id, isApc, isDeveloper]);
 
   async function handleSave() {
     if (!newTlId) return;
     setError(''); setSaving(true);
     try {
-      if (isApc) {
+      if (isDeveloper) {
+        // No brand/task/attendance cascade applies here — this is just the
+        // org-chart edge (mig 398), so a plain profile update is enough.
+        await updateUserProfile(member.id, { reports_to: newTlId });
+      } else if (isApc) {
         await moveApcToTl(member.id, newTlId);
       } else {
         await moveIpcToPctl(member.id, newTlId);
@@ -131,40 +145,48 @@ function MemberPanel({ member, currentTl, tls, actor: _actor, isBoss, isOL, onSa
   return (
     <>
       <div className="mb-3">
-        <div className="fw-bold" style={{ fontSize: '1rem', color: '#0f172a' }}>
+        <div className="fw-bold" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
           {member.userName || member.email}
         </div>
         <div className="text-muted small">
-          {(member.userType || 'apc').toUpperCase()} · currently under <strong>{currentTl.displayName || currentTl.email}</strong>
+          {isDeveloper ? 'JUNIOR DEVELOPER' : memberRole.toUpperCase()} · currently under <strong>{currentTl.displayName || currentTl.email}</strong>
         </div>
       </div>
 
-      <div className="rounded-3 p-3 mb-3" style={{ background: '#fefce8', border: '1px solid #fde68a', fontSize: '0.78rem', color: '#92400e' }}>
+      <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.78rem', color: 'var(--warning-text)' }}>
         <i className="bi bi-info-circle me-1" />
-        Reassigning will move this {isApc ? 'APC' : 'IPC'} to a different team lead. <strong>{(member.assignedBrands || []).length} brand{(member.assignedBrands || []).length === 1 ? '' : 's'}</strong> currently with them will follow to the new TL. Tasks and attendance ownership update automatically. The APC, old TL, and new TL all get notified.
+        {isDeveloper
+          ? 'Reassigning changes which developer this person reports to. There are no brands, tasks or attendance to move — this only updates the org chart.'
+          : <>Reassigning will move this {isApc ? 'APC' : 'IPC'} to a different team lead. <strong>{(member.assignedBrands || []).length} brand{(member.assignedBrands || []).length === 1 ? '' : 's'}</strong> currently with them will follow to the new TL. Tasks and attendance ownership update automatically. The APC, old TL, and new TL all get notified.</>}
       </div>
 
       {!canEdit ? (
-        <div className="alert alert-secondary py-2 small">You don't have permission to reassign team members.</div>
+        <div className="alert alert-secondary py-2 small">
+          {isDeveloper ? 'Only the Boss can reassign developers.' : "You don't have permission to reassign team members."}
+        </div>
       ) : (
         <>
           <label className="small text-muted d-block mb-1" style={{ fontSize: '0.7rem', fontWeight: 600 }}>
-            Move to {isApc ? 'Team Lead' : 'Paid Collab TL'}
+            Move to {isDeveloper ? 'Team Lead' : (isApc ? 'Team Lead' : 'Paid Collab TL')}
           </label>
-          <select className="form-select form-select-sm mb-3" value={newTlId} onChange={(e) => setNewTlId(e.target.value)} disabled={saving}>
-            <option value="">— Select new lead —</option>
-            {eligibleTls.map((t) => (
-              <option key={t.id} value={t.id}>{t.displayName || t.email} {t.role === 'pctl' ? '(PCTL)' : ''}</option>
-            ))}
-          </select>
+          {eligibleTls.length === 0 ? (
+            <div className="text-muted small mb-3" style={{ fontStyle: 'italic' }}>
+              No other {isDeveloper ? 'developer leads' : 'eligible leads'} exist yet.
+            </div>
+          ) : (
+            <select className="form-select form-select-sm mb-3" value={newTlId} onChange={(e) => setNewTlId(e.target.value)} disabled={saving}>
+              <option value="">— Select new lead —</option>
+              {eligibleTls.map((t) => (
+                <option key={t.id} value={t.id}>{t.displayName || t.email} {t.role === 'pctl' ? '(PCTL)' : ''}</option>
+              ))}
+            </select>
+          )}
 
           {error && <div className="alert alert-danger py-2 small">{error}</div>}
 
-          <button className="btn btn-sm btn-dark w-100"
-            onClick={handleSave}
-            disabled={saving || !newTlId}>
-            {saving ? <><span className="spinner-border spinner-border-sm me-2" />Reassigning…</> : 'Reassign'}
-          </button>
+          <Button size="sm" block onClick={handleSave} disabled={!newTlId} loading={saving}>
+            {saving ? 'Reassigning…' : 'Reassign'}
+          </Button>
         </>
       )}
     </>
@@ -221,7 +243,7 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
   return (
     <>
       <div className="mb-3">
-        <div className="fw-bold" style={{ fontSize: '1rem', color: '#0f172a' }}>{brand.brandName}</div>
+        <div className="fw-bold" style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{brand.brandName}</div>
         <div className="text-muted small">
           Owner: <strong>{brand.ownerName || currentTl?.displayName || '—'}</strong>
           {currentApcIds.length > 0 && (
@@ -231,16 +253,16 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
       </div>
 
       {/* Mode toggle */}
-      <div className="d-flex p-1 rounded-3 mb-3" style={{ background: '#f1f5f9', width: '100%' }}>
+      <div className="d-flex p-1 rounded-3 mb-3" style={{ background: 'var(--surface-2)', width: '100%' }}>
         <button type="button"
           onClick={() => setMode('tl')}
           className="btn btn-sm flex-grow-1"
           style={{
-            background: mode === 'tl' ? '#fff' : 'transparent',
-            color: mode === 'tl' ? '#0f172a' : '#64748b',
-            border: 'none', borderRadius: 8,
+            background: mode === 'tl' ? 'var(--surface-1)' : 'transparent',
+            color: mode === 'tl' ? 'var(--text-primary)' : 'var(--text-secondary)',
+            border: 'none', borderRadius: 'var(--radius-sm)',
             fontWeight: 600, fontSize: '0.78rem',
-            boxShadow: mode === 'tl' ? '0 1px 3px rgba(15,23,42,0.08)' : 'none',
+            boxShadow: mode === 'tl' ? 'var(--shadow-sm)' : 'none',
           }}>
           <i className="bi bi-person-badge me-1" />Move to TL
         </button>
@@ -248,11 +270,11 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
           onClick={() => setMode('apc')}
           className="btn btn-sm flex-grow-1"
           style={{
-            background: mode === 'apc' ? '#fff' : 'transparent',
-            color: mode === 'apc' ? '#0f172a' : '#64748b',
-            border: 'none', borderRadius: 8,
+            background: mode === 'apc' ? 'var(--surface-1)' : 'transparent',
+            color: mode === 'apc' ? 'var(--text-primary)' : 'var(--text-secondary)',
+            border: 'none', borderRadius: 'var(--radius-sm)',
             fontWeight: 600, fontSize: '0.78rem',
-            boxShadow: mode === 'apc' ? '0 1px 3px rgba(15,23,42,0.08)' : 'none',
+            boxShadow: mode === 'apc' ? 'var(--shadow-sm)' : 'none',
           }}>
           <i className="bi bi-person-circle me-1" />Reassign APC
         </button>
@@ -260,7 +282,7 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
 
       {mode === 'tl' && (
         <>
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#fefce8', border: '1px solid #fde68a', fontSize: '0.78rem', color: '#92400e' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.78rem', color: 'var(--warning-text)' }}>
             <i className="bi bi-info-circle me-1" />
             Brand owner moves from <strong>{brand.ownerName || currentTl?.displayName || '—'}</strong> to the new TL. Tasks and resources stay on the brand. Both TLs get notified.
           </div>
@@ -276,7 +298,7 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
 
       {mode === 'apc' && (
         <>
-          <div className="rounded-3 p-3 mb-3" style={{ background: '#fefce8', border: '1px solid #fde68a', fontSize: '0.78rem', color: '#92400e' }}>
+          <div className="rounded-3 p-3 mb-3" style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.78rem', color: 'var(--warning-text)' }}>
             <i className="bi bi-info-circle me-1" />
             Reassigns the brand from one APC to another. The brand's tasks transfer to the new APC, and brand ownership shifts to the new APC's TL. The new APC and their TL get notified.
           </div>
@@ -294,11 +316,9 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
 
       {error && <div className="alert alert-danger py-2 small">{error}</div>}
 
-      <button className="btn btn-sm btn-dark w-100"
-        onClick={handleSave}
-        disabled={saving || (mode === 'tl' ? !newTlId : !newApcId)}>
-        {saving ? <><span className="spinner-border spinner-border-sm me-2" />Saving…</> : 'Apply'}
-      </button>
+      <Button size="sm" block onClick={handleSave} disabled={mode === 'tl' ? !newTlId : !newApcId} loading={saving}>
+        {saving ? 'Saving…' : 'Apply'}
+      </Button>
     </>
   );
 }

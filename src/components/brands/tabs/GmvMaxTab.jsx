@@ -31,11 +31,11 @@ function MetricTile({ field, value, currency = 'USD' }) {
       flex: '1 1 calc(20% - 10px)', minWidth: 140,
       background: has ? `linear-gradient(135deg, ${tint}10, ${tint}03)` : 'var(--surface-2)',
       border: `1px solid ${has ? tint + '22' : 'var(--border)'}`,
-      borderRadius: 12, padding: '12px 14px',
+      borderRadius: 'var(--radius-md)', padding: '12px 14px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{
-          width: 24, height: 24, borderRadius: 6,
+          width: 24, height: 24, borderRadius: 'var(--radius-sm)',
           background: has ? tint + '1f' : 'var(--surface-3, #e2e8f0)',
           color: has ? tint : 'var(--text-muted)',
           display: 'grid', placeItems: 'center', fontSize: 11,
@@ -45,7 +45,7 @@ function MetricTile({ field, value, currency = 'USD' }) {
             fontSize: 8.5, fontWeight: 700,
             color: has ? tint : 'var(--text-muted)',
             background: has ? tint + '15' : 'var(--surface-2)',
-            padding: '2px 7px', borderRadius: 999,
+            padding: '2px 7px', borderRadius: 'var(--radius-pill)',
             letterSpacing: '0.06em', textTransform: 'uppercase',
           }}>{field.suffix}</span>
         )}
@@ -72,9 +72,9 @@ function ModalShell({ onClose, title, subtitle, children }) {
       position: 'fixed', inset: 0, zIndex: 1070,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
       <div className="wx-card" style={{
-        position: 'relative', width: '100%', maxWidth: 720, zIndex: 1, borderRadius: 18,
+        position: 'relative', width: '100%', maxWidth: 720, zIndex: 1, borderRadius: 'var(--radius-xl)',
         maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0,
         overflow: 'hidden',
       }}>
@@ -93,10 +93,10 @@ function ModalShell({ onClose, title, subtitle, children }) {
             type="button" onClick={onClose} aria-label="Close" title="Close"
             style={{
               width: 32, height: 32, flexShrink: 0,
-              borderRadius: 8, border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
               background: 'var(--surface-1)', color: 'var(--text-secondary)',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 0, transition: 'background 120ms ease, color 120ms ease',
+              cursor: 'pointer', padding: 0, transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-1)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
@@ -135,7 +135,7 @@ function SectionHeading({ emoji, title, tint }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, marginTop: 14 }}>
       <div style={{
-        width: 28, height: 28, borderRadius: 6, background: tint + '1f', color: tint,
+        width: 28, height: 28, borderRadius: 'var(--radius-sm)', background: tint + '1f', color: tint,
         display: 'grid', placeItems: 'center', fontSize: 13,
       }}>{emoji}</div>
       <h6 style={{ fontWeight: 800, margin: 0, fontSize: 13, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{title}</h6>
@@ -190,7 +190,7 @@ function OverviewEditModal({ brand, defaultValues, onClose, onSaved }) {
       title={`${defaultValues ? 'Edit' : 'Add'} Monthly Overview — ${brand.brand_name}`}
       subtitle="Paste the 5 metrics shown in TikTok Ads Manager / Seller Center.">
       {!defaultValues && (
-        <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+        <div style={{ marginBottom: 14, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
             <label style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>Month</label>
             <select className="wx-input" style={{ width: 'auto', padding: '4px 8px', fontSize: 12.5 }}
@@ -212,8 +212,8 @@ function OverviewEditModal({ brand, defaultValues, onClose, onSaved }) {
         </div>
       )}
       {defaultValues && (
-        <div style={{ marginBottom: 14, padding: 8, borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af' }}>{periodLabel}</div>
+        <div style={{ marginBottom: 14, padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--info-text)' }}>{periodLabel}</div>
           <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{periodStart} → {periodEnd}</div>
         </div>
       )}
@@ -310,7 +310,7 @@ function CampaignEditModal({ brand, monthlyDoc, defaultValues, onClose, onSaved 
           <div key={f.key} style={{ gridColumn: f.key === 'campaignName' ? '1 / -1' : 'auto' }}>
             <label style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
               {f.label}
-              {f.required && <span style={{ color: '#dc2626', marginLeft: 3 }}>*</span>}
+              {f.required && <span style={{ color: 'var(--danger-text)', marginLeft: 3 }}>*</span>}
               {f.suffix && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> ({f.suffix})</span>}
             </label>
             <input type={f.type} step={f.type === 'number' ? 'any' : undefined}
@@ -327,10 +327,10 @@ function CampaignEditModal({ brand, monthlyDoc, defaultValues, onClose, onSaved 
                 <button key={s.key} type="button"
                   onClick={() => upd('status', s.key)}
                   style={{
-                    borderRadius: 999, padding: '5px 14px',
+                    borderRadius: 'var(--radius-pill)', padding: '5px 14px',
                     background: active ? s.color : s.bg,
                     color: active ? '#fff' : s.color,
-                    border: `1.5px solid ${active ? s.color : s.color + '40'}`,
+                    border: `${active ? '2px' : '1px'} solid ${active ? s.color : s.color + '40'}`,
                     fontSize: 12, fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer',
                   }}>
@@ -367,7 +367,7 @@ function CampaignEditModal({ brand, monthlyDoc, defaultValues, onClose, onSaved 
         <span style={{ color: 'var(--text-muted)' }}>Status preview:</span>
         <span style={{
           background: stCfg.bg, color: stCfg.color, fontSize: 11, padding: '4px 10px',
-          borderRadius: 999, fontWeight: 700,
+          borderRadius: 'var(--radius-pill)', fontWeight: 700,
         }}>{stCfg.label}</span>
       </div>
 
@@ -386,7 +386,7 @@ function CampaignEditModal({ brand, monthlyDoc, defaultValues, onClose, onSaved 
 function MetaPill({ label, value, tint = '#64748b' }) {
   return (
     <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 999,
+      display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 'var(--radius-pill)',
       background: tint + '14', color: tint,
       padding: '3px 10px', fontSize: 11, fontWeight: 600,
     }}>
@@ -407,9 +407,9 @@ function CampaignCard({ campaign, onEdit, onRemove, currency = 'USD' }) {
   const st = statusCfg(campaign.status);
   return (
     <div style={{
-      background: 'var(--surface-1, #fff)',
-      borderRadius: 14, border: '1px solid var(--border)',
-      padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+      background: 'var(--surface-1)',
+      borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
+      padding: 16, boxShadow: 'var(--shadow-sm)',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <div style={{ minWidth: 0, flex: '1 1 auto' }}>
@@ -419,7 +419,7 @@ function CampaignCard({ campaign, onEdit, onRemove, currency = 'USD' }) {
             </h6>
             <span style={{
               background: st.bg, color: st.color, fontSize: 10, padding: '4px 10px', fontWeight: 700,
-              borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 4,
+              borderRadius: 'var(--radius-pill)', display: 'inline-flex', alignItems: 'center', gap: 4,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.color }} />
               {st.label}
@@ -453,7 +453,7 @@ function CampaignCard({ campaign, onEdit, onRemove, currency = 'USD' }) {
       </div>
 
       {campaign.notes && (
-        <div style={{ marginTop: 12, padding: 8, borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+        <div style={{ marginTop: 12, padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
           <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{campaign.notes}</div>
         </div>
       )}
@@ -492,8 +492,8 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
       {/* Month header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <div style={{
-          width: 44, height: 44, borderRadius: 10,
-          background: 'linear-gradient(135deg, #0ea5e9, #0369a1)', color: '#fff',
+          width: 44, height: 44, borderRadius: 'var(--radius-md)',
+          background: 'var(--info)', color: 'var(--on-info)',
           display: 'grid', placeItems: 'center', fontSize: 18,
           boxShadow: '0 4px 12px rgba(14,165,233,0.4)',
         }}>📅</div>
@@ -514,13 +514,13 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
 
       {/* Overview card */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--surface-1, #fff), var(--surface-2))',
-        borderRadius: 16, border: '1px solid var(--border)',
-        padding: 18, boxShadow: '0 4px 14px rgba(15,23,42,0.04)', marginBottom: 12,
+        background: 'linear-gradient(135deg, var(--surface-1), var(--surface-2))',
+        borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
+        padding: 18, boxShadow: 'var(--shadow-md)', marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 6, background: '#0ea5e91f', color: '#0ea5e9', display: 'grid', placeItems: 'center', fontSize: 14 }}>📊</div>
+            <div style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', background: 'color-mix(in srgb, var(--info) 12%, transparent)', color: 'var(--info-text)', display: 'grid', placeItems: 'center', fontSize: 14 }}>📊</div>
             <div>
               <h6 style={{ margin: 0, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em' }}>Monthly Overview</h6>
               <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Aggregate GMV Max metrics across all campaigns this month.</div>
@@ -539,13 +539,13 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
             {GMV_MAX_FIELDS.map(f => <MetricTile key={f.key} field={f} value={monthlyDoc[f.key]} currency={currency} />)}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: 14, borderRadius: 10, background: 'var(--surface-2)', border: '1px dashed var(--border)' }}>
+          <div style={{ textAlign: 'center', padding: 14, borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', border: '1px dashed var(--border)' }}>
             <div style={{ color: 'var(--text-muted)', fontSize: 12.5 }}>No overview metrics yet — click "Add Overview" to enter the 5 main GMV Max numbers.</div>
           </div>
         )}
 
         {monthlyDoc.notes && (
-          <div style={{ marginTop: 12, padding: 8, borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <div style={{ marginTop: 12, padding: 8, borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{monthlyDoc.notes}</div>
           </div>
         )}
@@ -553,18 +553,18 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
 
       {/* Campaigns card */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--surface-1, #fff), var(--surface-2))',
-        borderRadius: 16, border: '1px solid var(--border)',
-        padding: 18, boxShadow: '0 4px 14px rgba(15,23,42,0.04)',
+        background: 'linear-gradient(135deg, var(--surface-1), var(--surface-2))',
+        borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
+        padding: 18, boxShadow: 'var(--shadow-md)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 6, background: '#16a34a1f', color: '#16a34a', display: 'grid', placeItems: 'center', fontSize: 14 }}>📣</div>
+            <div style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', background: 'color-mix(in srgb, var(--success) 12%, transparent)', color: 'var(--success-text)', display: 'grid', placeItems: 'center', fontSize: 14 }}>📣</div>
             <div>
               <h6 style={{ margin: 0, fontWeight: 800, fontSize: 14, letterSpacing: '-0.01em', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 Campaigns
                 {campaigns.length > 0 && (
-                  <span style={{ background: '#16a34a15', color: '#16a34a', fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999 }}>
+                  <span style={{ background: 'color-mix(in srgb, var(--success) 8%, transparent)', color: 'var(--success-text)', fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 'var(--radius-pill)' }}>
                     {campaigns.length}
                   </span>
                 )}
@@ -581,7 +581,7 @@ function MonthlyBlock({ brand, monthlyDoc, onChange, onDelete, canEdit }) {
         </div>
 
         {campaigns.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 22, borderRadius: 10, background: 'var(--surface-2)', border: '1px dashed var(--border)' }}>
+          <div style={{ textAlign: 'center', padding: 22, borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', border: '1px dashed var(--border)' }}>
             <div style={{ fontSize: 22, opacity: 0.4 }}>📣</div>
             <div style={{ marginTop: 6, fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)' }}>No campaigns added yet</div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>Click "Add Campaign" to enter campaign-level data for this month.</div>
@@ -656,7 +656,7 @@ export default function GmvMaxTab({ brand, canCreate = true }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h5 style={{ fontWeight: 800, margin: '0 0 4px', color: 'var(--text-primary)', letterSpacing: '-0.02em', fontSize: 16, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#0ea5e9' }}>📊</span>
+            <span style={{ color: 'var(--info-text)' }}>📊</span>
             GMV Max Reporting
           </h5>
           <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: 0 }}>
@@ -673,7 +673,7 @@ export default function GmvMaxTab({ brand, canCreate = true }) {
       {loading ? (
         <div className="wx-empty"><span className="wx-spinner" /> Loading…</div>
       ) : reports.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 36, border: '2px dashed var(--border)', borderRadius: 16, background: 'var(--surface-2)' }}>
+        <div style={{ textAlign: 'center', padding: 36, border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-2)' }}>
           <div style={{ fontSize: 38, opacity: 0.4 }}>📊</div>
           <h6 style={{ fontWeight: 800, marginTop: 14, marginBottom: 4, color: 'var(--text-secondary)' }}>No GMV Max data yet</h6>
           <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: 0 }}>
@@ -697,16 +697,16 @@ export default function GmvMaxTab({ brand, canCreate = true }) {
 
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)' }} onClick={() => setDeleteTarget(null)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={() => setDeleteTarget(null)} />
           <div className="wx-card" style={{ position: 'relative', maxWidth: 420, padding: 22, textAlign: 'center' }}>
-            <div style={{ fontSize: 30, color: '#dc2626' }}>⚠️</div>
+            <div style={{ fontSize: 30, color: 'var(--danger-text)' }}>⚠️</div>
             <h6 style={{ fontWeight: 800, marginTop: 8, marginBottom: 6 }}>Delete this month?</h6>
             <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: '0 0 14px' }}>
               {deleteTarget.periodLabel} — overview and {(deleteTarget.campaigns || []).length} campaign{(deleteTarget.campaigns || []).length !== 1 ? 's' : ''} will be permanently removed.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="wx-btn wx-btn-ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button className="wx-btn wx-btn-primary" style={{ background: '#dc2626' }} onClick={() => handleDeleteMonth(deleteTarget)}>Delete</button>
+              <button className="wx-btn wx-btn-primary" style={{ background: 'var(--danger)' }} onClick={() => handleDeleteMonth(deleteTarget)}>Delete</button>
             </div>
           </div>
         </div>

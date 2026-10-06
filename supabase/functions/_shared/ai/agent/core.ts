@@ -10,11 +10,16 @@
 import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
-import { pickModel, respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
+import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
+import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, monthSpend, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, saverOn, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chatRespond } from '../llm/chat.ts';
+import { stripToolMarkup } from '../llm/textTools.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
+import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIssue } from '../providerErrors.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
-import { buildInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
+import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
+import { budgetFor, budgetFromError, estimate, fitRequest, learnBudget } from './compact.ts';
 import { ALL_TOOL_DEFS, CiteRegistry, runTool, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
 
 export type Emit = (ev: Record<string, unknown>) => void;
@@ -74,31 +79,51 @@ export type CoreDeps = {
   searchRpc: Rpc;                    // search RPCs as the caller (JWT) or service role + asUser
   asUser: string | null;
   userClient?: any;                  // supabase-js client with the caller's JWT (data tools, RLS); absent = none
-  apiKey: string;
+  apiKey: string;                    // OPEN_AI_API_KEY (the 'primary' slot)
+  fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot)
+  groqKey?: string | null;           // GROQ_API_KEY (the 'groq' slot, Chat Completions)
+  geminiKey?: string | null;         // GEMINI_API_KEY (the 'gemini' slot, Chat Completions)
+  nvidiaKey?: string | null;         // NVIDIA_API_KEY (the 'nvidia' slot; free, dev/test only)
+  nvidia2Key?: string | null;        // NVIDIA_API_KEY_2 (the 'nvidia2' slot)
+  catalog?: CatalogRow[];            // tests; otherwise read from ai_model_catalog
+  rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
+  embedDown?: () => boolean;         // query embeddings known to be failing on every key
   embed: (text: string) => Promise<number[] | null>;
+  embedAlt?: (text: string) => Promise<number[] | null>;   // NVIDIA query vector (mig 406)
   rerank?: Reranker;
+  model?: string;                    // local override (serve-assistant --model); still allow-listed
+  monthSpend?: () => Promise<number | null>;   // test seam: month-to-date spend (budget saver)
+  modelKeySlot?: KeySlot;            // with `model`: that key, taken as given (serve-assistant --key-slot)
   meter?: UsageMeter;                // rerank + query-embedding usage of this question (→ ai_usage_log)
   now?: () => Date;
-  llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam
+  llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam (also used for chat slots unless chatLlm is set)
+  chatLlm?: (r: LlmRequest) => Promise<LlmResult>;
   requestId?: string;
 };
 
 export type TurnResult = { requestId: string; conversationId: string | null; messageId?: string; answer: string; sources: unknown[]; error?: string; httpStatus?: number; cancelled?: boolean };
 
 const ZERO: Usage = { input: 0, cached: 0, output: 0, reasoning: 0 };
+// Failover bounds: at most this many model calls in a turn, and no
+// switch when less time than this is left (the answer needs room too).
+export const MAX_MODEL_ATTEMPTS = 8;
+export const SWITCH_MIN_LEFT_MS = 15_000;
 const add = (a: Usage, b: Usage): Usage => ({ input: a.input + b.input, cached: a.cached + b.cached, output: a.output + b.output, reasoning: a.reasoning + b.reasoning });
 
 async function loadConfig(admin: any) {
-  const { data } = await admin.from('ai_assistant_config').select('persona, model, enabled, retrieval, prices').eq('id', 1).maybeSingle();
+  const cols = 'persona, model, enabled, retrieval, prices, model_key_slot, fallback_models, fallback_enabled';
+  const { data, error } = await admin.from('ai_assistant_config').select(`${cols}, auto_failover, role_models, budget_saver_pct, monthly_budget_usd`).eq('id', 1).maybeSingle();
+  // Before mig 401 / 404 there are no auto_failover / role_models columns: read the rest.
+  if (error) return (await admin.from('ai_assistant_config').select(cols).eq('id', 1).maybeSingle()).data ?? {};
   return data ?? {};
 }
 
 // Rate limit (QA m2): counted and recorded atomically when the turn STARTS
 // (ai_turn_begin, mig 386), so parallel sends can't slip past the cap. Without
 // that function (older DB) it falls back to counting finished turns.
-async function beginTurn(admin: any, cfg: AgentConfig, userId: string, requestId: string, question: string, model: string, now: Date):
+async function beginTurn(admin: any, cfg: AgentConfig, userId: string, requestId: string, question: string, model: string, now: Date, forceExempt = false):
   Promise<{ limited: boolean; logged: boolean }> {
-  const exempt = cfg.RATE_LIMIT_EXEMPT_USERS.includes(userId);
+  const exempt = forceExempt || cfg.RATE_LIMIT_EXEMPT_USERS.includes(userId);
   const { data, error } = await admin.rpc('ai_turn_begin', {
     p_request_id: requestId, p_user_id: userId, p_question: question, p_model: model, p_limit: exempt ? null : cfg.RATE_LIMIT_PER_USER_PER_HOUR,
   });
@@ -127,15 +152,19 @@ class Stop extends Error {}
 // The spend of a question outside the chat model, as ai_usage_log rows.
 export function usageRows(meter: UsageMeter | undefined, prices: Prices, who: { user_id: string; request_id: string }) {
   const rows: Record<string, unknown>[] = [];
+  // Every column, in every row: a bulk insert sends null for a key some rows
+  // lack, which a column default does not catch (QA 2026-10-01 F2).
   if (meter?.rerank.calls) {
     const r = meter.rerank;
-    rows.push({ ...who, kind: 'rerank', model: r.model, calls: r.calls, tokens_in: r.input, tokens_cached: r.cached, tokens_out: r.output,
-      est_cost_usd: Number(costUsd(prices, r.model, { input: r.input, cached: r.cached, output: r.output }).usd.toFixed(6)) });
+    const c = costUsd(prices, r.model, { input: r.input, cached: r.cached, output: r.output });
+    rows.push({ ...who, kind: 'rerank', model: r.model, key_slot: 'primary', calls: r.calls, tokens_in: r.input, tokens_cached: r.cached, tokens_out: r.output,
+      est_cost_usd: Number(c.usd.toFixed(6)), unpriced: !c.priced });
   }
   if (meter?.embed.calls) {
     const m = meter.embed;
-    rows.push({ ...who, kind: 'embed_query', model: m.model, calls: m.calls, tokens_in: m.input,
-      est_cost_usd: Number(costUsd(prices, m.model, { input: m.input }).usd.toFixed(6)) });
+    const c = costUsd(prices, m.model, { input: m.input });
+    rows.push({ ...who, kind: 'embed_query', model: m.model, key_slot: m.keySlot ?? 'primary', calls: m.calls, tokens_in: m.input, tokens_cached: 0, tokens_out: 0,
+      est_cost_usd: Number(c.usd.toFixed(6)), unpriced: !c.priced });
   }
   return rows;
 }
@@ -156,7 +185,25 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   ]);
   const agent = agentConfig(row.retrieval);
   const retrieval = retrievalConfig(row.retrieval).config;
-  const model = pickModel(row.model);
+  // The model chain (mig 397): the configured model on its key, then the
+  // fallbacks. `target` moves down it on an account error (no credits, key refused).
+  let catalog: CatalogRow[] = deps.catalog ?? [];
+  if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
+  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
+    nvidia: deps.nvidiaKey ?? null, nvidia2: deps.nvidia2Key ?? null };
+  const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
+  // Per-role models (mig 404); the budget saver switches roles with an economy model.
+  const hasEconomy = Object.values((row.role_models ?? {}) as Record<string, any>).some((v) => v?.economy?.model);
+  const economyOn = hasEconomy && Number(row.budget_saver_pct) > 0 && saverOn(row, await (deps.monthSpend ?? (() => monthSpend(admin)))());
+  const resolved = resolveRoleConfig(row, req.role, economyOn);
+  const chain = chooseTargets(resolved, catalog, keys, override);
+  // Buddy must never go down (Owner 2026-10-01): after the Boss's chain, every
+  // other usable model in the catalog, unless auto_failover is switched off.
+  const targets = row.auto_failover === false ? chain : [...chain, ...safetyNet(catalog, keys, chain)];
+  let ti = 0;
+  let target = targets[0];
+  let model = target.model;
+  const prices = pricesFrom(row.prices);
   const fail = (error: string, httpStatus: number): TurnResult => ({ requestId, conversationId: req.conversationId ?? null, answer: '', sources: [], error, httpStatus });
   if (row.enabled === false) return fail('The assistant is currently turned off by an admin.', 503);
 
@@ -179,7 +226,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     const { data: conv } = await admin.from('ai_conversations').select('id, user_id').eq('id', conversationId).maybeSingle();
     if (!conv || conv.user_id !== req.userId) return fail('conversation not found', 404);
   }
-  const begun = await beginTurn(admin, agent, req.userId, requestId, message, model, now);
+  const begun = await beginTurn(admin, agent, req.userId, requestId, message, model, now, deps.rateLimitExempt === true);
   if (begun.limited) return fail(`You've reached ${agent.RATE_LIMIT_PER_USER_PER_HOUR} questions this hour. Please try again a little later.`, 429);
   if (!conversationId) {
     const { data: created, error } = await admin.from('ai_conversations').insert({ user_id: req.userId, title: message.slice(0, 60) }).select('id').single();
@@ -248,12 +295,20 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const notes = [
     ...(surface === 'quick' ? ['SURFACE: the quick-chat panel. Keep the answer short: at most ~120 words or 5 bullets, the key facts with their citations, and offer the full version ("Open in Buddy ↗" shows more).'] : []),
     ...[await pageContextNote(admin, req.userId, req.pageContext ?? null)].filter((x): x is string => !!x),
+    ...(deps.embedDown?.() ? ['SEARCH is in keyword-only mode right now (no semantic search): search with the exact words a document would use, and if you cannot find something, say so plainly.'] : []),
   ];
   const { instructions } = buildInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now, notes });
+  const compactBase = compactInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now });
+  const compactTried = new Set<string>();
 
+  // Search without embeddings (no credits on any key): the keyword arm only.
+  let embedFailed = false;
+  const embedWatched = async (text: string) => {
+    try { const v = await deps.embed(text); if (!v) embedFailed = true; return v; } catch (e) { embedFailed = true; throw e; }
+  };
   const reg = new CiteRegistry();
   const env: ToolEnv = {
-    admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: deps.embed, rerank: deps.rerank,
+    admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: embedWatched, embedAlt: deps.embedAlt, rerank: deps.rerank,
     // userClient: the caller's own JWT client, so people & pay tools read under
     // that user's RLS (Engineer 2, ui-design §8). None on the internal (Boss) path.
     retrieval, agent, ctx: { userId: req.userId, role: req.role, ...(deps.userClient ? { userClient: deps.userClient } : {}) }, now,
@@ -263,29 +318,131 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   let firstTokenMs: number | null = null;
   const onDelta = (d: string) => {
     if (cancelled) return;
-    const safe = cstream.push(d);
+    // Some models cite with fullwidth brackets (gpt-oss on NVIDIA, live 2026-10-01: 【S1】).
+    const safe = cstream.push(d.replace(/【/g, '[').replace(/】/g, ']'));
     if (!safe) return;
     if (firstTokenMs == null) firstTokenMs = Date.now() - t0;
     answer += safe;
     emit({ delta: safe });
   };
-  const ask = (o: Partial<LlmRequest>) => llm({
-    apiKey: deps.apiKey, model, instructions, input, promptCacheKey: `wurx-buddy-${req.role}`,
-    timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta, ...o,
-  });
+  let costSum = 0;
+  let unpriced = false;
+  // Every account problem met on the way down the chain, for the final message.
+  const chainIssues: ChainIssue[] = [];
+  // Each model call (success or not), for diagnosing a failed turn.
+  const attempts: { target: string; ms: number; error?: string }[] = [];
+  const chatLlm = deps.chatLlm ?? deps.llm ?? chatRespond;
+  const tag = (t: Target) => `${t.keySlot}:${t.model}`;
+  // The SAME turn moves to the next model. Encrypted reasoning belongs to the
+  // model (and key) that made it, so it is dropped.
+  let switchedNotice = false;
+  const moveOn = (reason: string) => {
+    target = targets[++ti];
+    model = target.model;
+    flags.fallback_used = { from: tag(targets[0]), to: tag(target), reason };
+    for (let i = input.length - 1; i >= 0; i--) if ((input[i] as any)?.type === 'reasoning') input.splice(i, 1);
+    if (!switchedNotice) { switchedNotice = true; emit({ status: 'Switching to a backup model…' }); }
+  };
+  // One model call on the current target. A field the model rejects is dropped
+  // and remembered. Any other failure before text reached the user hands the
+  // turn to the next model, within MAX_MODEL_ATTEMPTS and the deadline.
+  const ask = async (o: Partial<LlmRequest>): Promise<LlmResult> => {
+    for (let paramTries = 0; ;) {
+      // A model that just failed for quota / limit / a refused key is skipped
+      // (the last one left is always tried).
+      for (let c = coolingDown(target); c && ti + 1 < targets.length; c = coolingDown(target)) {
+        ((flags.skipped_cooling ??= []) as string[]).push(tag(target));
+        if (c.issue !== 'busy') chainIssues.push({ issue: c.issue, model: target.model, slot: target.keySlot, waitMs: c.waitMs });
+        moveOn(`cooling down (${c.issue})`);
+      }
+      const omit = omitFor(catalog, target);
+      const chat = SLOTS[target.keySlot].api === 'openai-chat';
+      // Compact mode: a model with a small token budget gets a trimmed request
+      // (agent/compact.ts); the shared history is left as it is.
+      let call: Partial<LlmRequest> = { instructions, input, ...o };
+      // Model extras (NVIDIA Nemotron's thinking switch); a thinking model gets
+      // output room for its reasoning and the answer.
+      const extra = chat ? extraFor(catalog, target) : null;
+      if (extra) call = { ...call, extra, ...(isThinking(extra) ? { maxOutputTokens: Math.max(call.maxOutputTokens ?? 0, THINKING_MIN_OUTPUT) } : {}) };
+      const budget = budgetFor(catalog, target);
+      if (budget) {
+        const reqI = call.instructions ?? instructions;
+        const extra = reqI.startsWith(instructions) ? reqI.slice(instructions.length) : '';   // e.g. the SERIOUS note
+        const f = fitRequest({ instructions: reqI, compactInstructions: compactBase + extra, input, tools: call.tools, maxOutputTokens: call.maxOutputTokens }, budget);
+        if (f.steps.length) {
+          ((flags.compact ??= []) as unknown[]).push({ target: tag(target), budget, steps: f.steps, estimate: f.estimate });
+          call = { ...call, instructions: f.instructions, input: f.input, tools: f.tools, maxOutputTokens: f.maxOutputTokens };
+        }
+      }
+      const ta = Date.now();
+      try {
+        const res = await (chat ? chatLlm : llm)({
+          apiKey: keyFor(keys, target.keySlot)!, model: target.model, instructions, input,
+          promptCacheKey: `wurx-buddy-${req.role}`, timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta,
+          ...(chat ? { endpoint: endpointFor(target.keySlot) } : {}),
+          ...(omit.length ? { omit } : {}), ...call,
+        });
+        attempts.push({ target: tag(target), ms: Date.now() - ta });
+        // Free tiers (Groq, Gemini) cost nothing, whatever the model's name.
+        const c = SLOTS[target.keySlot].free ? { usd: 0, priced: true } : costUsd(prices, target.model, res.usage);
+        if (SLOTS[target.keySlot].free) flags.free_tier = true;
+        costSum += c.usd;
+        if (!c.priced) unpriced = true;
+        return res;
+      } catch (e) {
+        attempts.push({ target: tag(target), ms: Date.now() - ta, error: String((e as any)?.code ?? (e as any)?.status ?? (e as Error)?.name ?? 'error') });
+        if (cancelCtrl.signal.aborted || (e as any)?.cancelled) throw e;
+        const p = unsupportedParam(e);
+        if (p && !omit.includes(p) && paramTries < 3) {
+          paramTries++;
+          ((flags.params_dropped ??= []) as string[]).push(`${tag(target)}:${p}`);
+          await rememberOmit(admin, target, [...omit, p], catalog);
+          continue;
+        }
+        const issue = providerAccountIssue(e);
+        // Too large for this model: learn its budget and try it once more, compacted.
+        if (issue === 'too_large' && !compactTried.has(tag(target)) && left() > SWITCH_MIN_LEFT_MS) {
+          compactTried.add(tag(target));
+          // In our estimate's units: the provider's limit scaled by how it counted this request.
+          const sent = estimate(call.instructions ?? instructions, call.input ?? input, call.tools, call.maxOutputTokens);
+          const got = budgetFromError(String((e as Error)?.message ?? ''));
+          const b = got?.requested ? Math.floor(got.limit * sent / got.requested) : got ? got.limit : Math.floor(sent * 0.7);
+          learnBudget(target, b);
+          await rememberParams(admin, target, { token_budget: b }, catalog);
+          continue;
+        }
+        if (issue) chainIssues.push({ issue, model: target.model, slot: target.keySlot, waitMs: (e as any)?.retryAfterMs ?? null });
+        if (!(e as any)?.streamed) coolDown(target, e);
+        const status = Number((e as any)?.status);
+        const why = issue ?? ((e as any)?.code === 'bad_tool_format' ? 'bad_tool_format'
+          : status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');
+        // Text already shown cannot be taken back: only a clean failure moves on.
+        if (!(e as any)?.streamed && ti + 1 < targets.length && attempts.length < MAX_MODEL_ATTEMPTS && left() > SWITCH_MIN_LEFT_MS) {
+          moveOn(why);
+          continue;
+        }
+        throw e;
+      }
+    }
+  };
 
   const toolLogs: ToolLog[] = [];
   const flags: Record<string, unknown> = { persona: persona.source };
   let usage = { ...ZERO };
   let rounds = 0;
   let error: string | null = null;
+  let userError = '';
   const llmMs: number[] = [];         // per model call, for the latency picture
   flags.llm_ms = llmMs;
+  flags.model_attempts = attempts;
+  flags.model_source = override ? 'override' : resolved.model_source;
   const input: InputItem[] = [...history, { role: 'user', content: message }];
+  let step = 'start';
 
   emit({ status: 'On it…' });
   try {
     for (let round = 0; ; round++) {
+      step = `model round ${round}`;
       if (await checkCancel()) throw new Stop();
       const spent = usage.input + usage.output;
       // A tool round needs room for the tools and an answer after them.
@@ -302,6 +459,13 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       });
       usage = add(usage, res.usage);
       llmMs.push(Date.now() - tl);
+      // Tool calls written as text, not as tool_calls: remembered for this model.
+      if (res.textToolCalls) {
+        flags.text_tool_calls = true;
+        if (!(catalog.find((c) => c.key_slot === target.keySlot && c.model === target.model)?.params as any)?.text_tool_calls) {
+          await rememberParams(admin, target, { text_tool_calls: true }, catalog);
+        }
+      }
       if (!res.toolCalls.length) break;
       rounds++;
       input.push(...res.output);
@@ -312,6 +476,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       serious = serious || isSeriousTopic('', toolsCalled);
       emit({ status: TOOL_STATUS[calls[0].name] ?? 'Looking that up…' });
       // Tools may use what is left, minus room for the answer.
+      step = `tools round ${round}`;
       const toolBudget = Math.max(3000, left() - agent.ANSWER_RESERVE_MS);
       env.agent = { ...agent, SEARCH_TIMEOUT_MS: Math.min(agent.SEARCH_TIMEOUT_MS, toolBudget), DATA_TOOL_TIMEOUT_MS: Math.min(agent.DATA_TOOL_TIMEOUT_MS, toolBudget) };
       const outs = await Promise.all(calls.map((c) => runTool(env, reg, c.name, c.arguments)));
@@ -323,7 +488,9 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     const held = cstream.flush();
     if (held && !cancelled) { answer += held; emit({ delta: held }); }
     // Reasoning can eat the whole output budget: retry once, bigger, without tools.
+    step = 'answer';
     if (!answer.trim() && !cancelled && left() > agent.ANSWER_RESERVE_MS) {
+      step = 'empty-answer retry';
       flags.empty_retry = true;
       emit({ status: 'Composing a detailed answer…' });
       const res = await ask({ effort: agent.EFFORT_ANSWER as any, maxOutputTokens: agent.ANSWER_RETRY_MAX_OUTPUT_TOKENS });
@@ -332,6 +499,11 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (await checkCancel()) throw new Stop();
     const tail = cstream.flush();
     if (tail) { answer += tail; emit({ delta: tail }); }
+    // Last safety net: tool-call markup is never part of an answer.
+    if (/<tool_call|<function=|<\/parameter>|<\|tool_call\|>/.test(answer)) {
+      flags.stripped_tool_markup = true;
+      answer = stripToolMarkup(answer).trim();
+    }
     if (!answer.trim()) {
       const sorry = "Sorry, I couldn't put an answer together this time. Could you try asking again, maybe a little more specifically?";
       answer = sorry;
@@ -342,12 +514,29 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       cancelled = true;
       emit({ cancelled: true });
     } else {
-      error = String((e as Error)?.message ?? e).slice(0, 500);
-      if (/deadline|timed out/i.test(error)) flags.deadline_hit = true;
+      error = scrubSecrets(String((e as Error)?.message ?? e)).slice(0, 500);
+      const status = Number((e as any)?.status) || null;
+      // No credits / a refused key / a used-up allowance: say who can fix it (QA 2026-10-01 F3).
+      const account = providerAccountIssue(e);
+      if (account || chainIssues.length) { flags.provider_quota = true; flags.provider_issue = account ?? chainIssues[chainIssues.length - 1].issue; }
+      if (!account && /deadline|timed out/i.test(error)) flags.deadline_hit = true;
+      // The real exception, for whoever reads the log: never the key, never the prompt.
+      flags.error_detail = {
+        step, class: (e as Error)?.name ?? typeof e, status, code: (e as any)?.code ?? null, message: error.slice(0, 300),
+        target: `${target.keySlot}:${target.model}`, retry_after_s: (e as any)?.retryAfterMs != null ? Math.round((e as any).retryAfterMs / 1000) : null,
+      };
+      console.error(`assistant turn ${requestId} failed at ${step}:`, JSON.stringify(flags.error_detail));
       const tail = cstream.flush();
       if (tail) { answer += tail; emit({ delta: tail }); }
-      emit({ error: /HTTP 429/.test(error) ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
-        : flags.deadline_hit ? 'That took too long, so I stopped. Please try again, maybe a narrower question.' : 'Something went wrong while answering. Please try again.' });
+      // Nothing worked. Account problems met anywhere in the chain are named;
+      // models that were only busy or silent get one line after them.
+      const busy = !account && !flags.deadline_hit && (status === 429 || (status ?? 0) >= 500 || (e as any)?.code === 'first_byte_timeout');
+      userError = account ? providerIssueMessage(account, req.role, chainIssues)
+        : chainIssues.length && busy ? `${providerIssueMessage(chainIssues[chainIssues.length - 1].issue, req.role, chainIssues)} The other models were busy or did not answer: please try again in a minute.`
+        : busy ? 'The assistant is busy right now (rate limit). Please wait a moment and try again.'
+        : flags.deadline_hit ? 'That took too long, so I stopped. Please try again, maybe a narrower question.' : 'Something went wrong while answering. Please try again.';
+      if (!account && !busy && !flags.deadline_hit) flags.error_unclassified = true;
+      emit({ error: userError });
     }
   } finally {
     clearInterval(poller);
@@ -366,18 +555,19 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   if (serious) flags.serious = true;
   if (cancelled) flags.cancelled = true;
   const retrieved = reg.retrieved.map((r) => ({ ...r, cited: cited.has(r.cite) }));
-  const prices = pricesFrom(row.prices);
-  const est = costUsd(prices, model, usage).usd;
+  const est = costSum;
+  if (unpriced) flags.unpriced = true;
+  if (embedFailed || deps.embedDown?.()) flags.search_mode = 'keyword_only';
 
   // Finish the reply row (the thing the UI trusts), then log. A failure here
   // must not lose the answer already streamed: the row is retried once.
   // A stopped reply is kept (partial) as 'error' + cancelled, and does not
   // move last_reply_at: no unread badge for an answer the user stopped.
   const meta = {
-    requestId, model, engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
+    requestId, model, key_slot: target.keySlot, model_source: flags.model_source, ...(flags.fallback_used ? { fallback_used: flags.fallback_used } : {}), engine: 'v2', surface, ...(regen ? { supersedes: regen.oldId } : {}),
     sources: sources.filter((s) => s.cited),
     tools: toolLogs.map((t) => ({ name: t.name, args: t.args, ms: t.ms, cites: t.cites })),
-    ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.deadline_hit ? 'The reply took too long and was stopped.' : 'Something went wrong while answering.' } : {}),
+    ...(cancelled ? { cancelled: true, error: 'Stopped.' } : error ? { error: flags.deadline_hit ? 'The reply took too long and was stopped.' : flags.error_unclassified ? 'Something went wrong while answering.' : userError } : {}),
   };
   const status = cancelled || error ? 'error' : 'done';     // a partial answer is kept, marked error
   const finishedAt = new Date().toISOString();
@@ -393,6 +583,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     }
   }
   const logRow = {
+    model, key_slot: target.keySlot,
     conversation_id: conversationId, surface, rounds, tools: toolLogs, retrieved,
     tokens_in: usage.input, tokens_cached: usage.cached, tokens_out: usage.output, est_cost_usd: Number(est.toFixed(5)),
     latency_ms: Date.now() - t0, first_token_ms: firstTokenMs, error, flags,
@@ -400,7 +591,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   try {
     const { error: e } = begun.logged
       ? await admin.from('ai_request_log').update(logRow).eq('id', requestId)
-      : await admin.from('ai_request_log').insert({ id: requestId, user_id: req.userId, engine: 'v2', provider: 'openai', model, question: message, ...logRow });
+      : await admin.from('ai_request_log').insert({ id: requestId, user_id: req.userId, engine: 'v2', provider: 'openai', question: message, ...logRow });
     if (e) throw e;
   } catch (e) {
     console.error('ai_request_log write failed', (e as Error)?.message ?? e);

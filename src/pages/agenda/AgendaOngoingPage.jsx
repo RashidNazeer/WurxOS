@@ -10,6 +10,7 @@ import {
 } from '../../lib/agendaApi';
 import OngoingEvaluation from '../../components/agenda/OngoingEvaluation';
 import { useNow } from '../../hooks/useNow';
+import { useDialogs } from '../../components/common/useDialogs';
 
 // Weekly Agenda Meetings — Ongoing (the live meeting room).
 // Realtime: attendance, presenter state and meeting status all sync
@@ -37,6 +38,7 @@ function fmtTime(t) {
 }
 
 export default function AgendaOngoingPage() {
+  const { ask, notify } = useDialogs();
   const { user, profile } = useAuth();
   const role = profile?.role || '';
   const isOL  = role === 'ol' || role === 'boss' || role === 'developer';
@@ -214,13 +216,13 @@ export default function AgendaOngoingPage() {
   async function handleMark(apcId, status) {
     setBusy(`att-${apcId}`);
     try { await markAttendance(meeting.id, apcId, status); await refresh(); }
-    catch (e) { alert('Failed: ' + (e.message || 'unknown')); }
+    catch (e) { notify.error('Failed: ' + (e.message || 'unknown')); }
     finally { setBusy(''); }
   }
   async function handleStart() {
     setBusy('present');
     try { await startPresenting(meeting.id); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to start presenting'); }
+    catch (e) { notify.error(e.message || 'Failed to start presenting'); }
     finally { setBusy(''); }
   }
   // TL/OL starts a presentation FOR an APC who forgot to click (mig 324).
@@ -229,13 +231,13 @@ export default function AgendaOngoingPage() {
   async function handleStartFor(apcId) {
     setBusy(`startfor-${apcId}`);
     try { await startPresenting(meeting.id, apcId); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to start presenting for that APC'); }
+    catch (e) { notify.error(e.message || 'Failed to start presenting for that APC'); }
     finally { setBusy(''); }
   }
   async function handleStop(apcId) {
     setBusy('present');
     try { await stopPresenting(meeting.id, apcId); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to stop presenting'); }
+    catch (e) { notify.error(e.message || 'Failed to stop presenting'); }
     finally { setBusy(''); }
   }
   // OL ends someone else's turn: presenting -> presented.
@@ -252,55 +254,55 @@ export default function AgendaOngoingPage() {
   // The APC stays selected in the evaluation panel afterwards, so the OL can
   // finish their overall summary and weekly score while the next APC starts.
   async function handleStopFor(apcId, name) {
-    if (!window.confirm(`Mark ${name || 'this APC'} as presented? This ends their turn and frees the floor for the next APC.`)) return;
+    if (!(await ask(`Mark ${name || 'this APC'} as presented? This ends their turn and frees the floor for the next APC.`))) return;
     setBusy(`stop-${apcId}`);
     try {
       await stopPresenting(meeting.id, apcId);
       setReviewTargetId(apcId);
       await refresh();
-    } catch (e) { alert(e.message || 'Failed to end the presentation'); }
+    } catch (e) { notify.error(e.message || 'Failed to end the presentation'); }
     finally { setBusy(''); }
   }
   // OL reopens a done APC: they're marked NOT presented and can present again.
   async function handleReopen(apcId) {
-    if (!window.confirm('Reopen this APC’s session? They will be marked as NOT presented and can present again.')) return;
+    if (!(await ask('Reopen this APC’s session? They will be marked as NOT presented and can present again.'))) return;
     setBusy(`reopen-${apcId}`);
     try {
       await reopenPresentation(meeting.id, apcId);
       if (reviewTargetId === apcId) setReviewTargetId(null);
       await refresh();
-    } catch (e) { alert(e.message || 'Failed to reopen the session'); }
+    } catch (e) { notify.error(e.message || 'Failed to reopen the session'); }
     finally { setBusy(''); }
   }
-  function handleFinishClick() {
+  async function handleFinishClick() {
     // If any present APC never presented, confirm via the modal first.
     if (pendingPresent.length > 0) { setFinishModalOpen(true); return; }
-    if (!window.confirm('Finish this meeting? This ends the session for everyone.')) return;
+    if (!(await ask('Finish this meeting? This ends the session for everyone.'))) return;
     doFinish();
   }
   async function doFinish() {
     setFinishModalOpen(false);
     setBusy('finish');
     try { await finishMeeting(meeting.id); setJustFinished(true); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to finish meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to finish meeting'); }
     finally { setBusy(''); }
   }
   async function handleStartMeeting(meetingId) {
     setBusy(`start-${meetingId}`);
     try { setJustFinished(false); selectedRef.current = meetingId; setSelectedMeetingId(meetingId); await startMeeting(meetingId); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to start meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to start meeting'); }
     finally { setBusy(''); }
   }
   async function handlePause() {
     setBusy('pause');
     try { await pauseMeeting(meeting.id); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to pause meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to pause meeting'); }
     finally { setBusy(''); }
   }
   async function handleResume() {
     setBusy('resume');
     try { await startMeeting(meeting.id); await refresh(); }
-    catch (e) { alert(e.message || 'Failed to resume meeting'); }
+    catch (e) { notify.error(e.message || 'Failed to resume meeting'); }
     finally { setBusy(''); }
   }
 
@@ -325,7 +327,7 @@ export default function AgendaOngoingPage() {
       ? weekUpcoming.filter((m) => isGuestOf(m.guest_teams, myGuestSlugs))
       : [];
     return (
-      <div style={{ padding: '32px 32px 48px' }}>
+      <div style={{ paddingBottom: 48 }}>
         <div className="mb-4">
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <i className="bi bi-broadcast" style={{ fontSize: '1.15rem' }} />
@@ -362,11 +364,11 @@ export default function AgendaOngoingPage() {
         )}
 
         {!hasActive && !showNextUp && (
-          <div className="d-flex flex-column align-items-center justify-content-center py-5 px-3 text-center" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+          <div className="d-flex flex-column align-items-center justify-content-center py-5 px-3 text-center" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
             <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
               <i className="bi bi-broadcast text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
             </div>
-            <p className="fw-semibold text-dark mb-1">No meeting in progress</p>
+            <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No meeting in progress</p>
             {isGuest && !isOL ? (
               myGuestUpcoming.length > 0 ? (
                 <>
@@ -398,7 +400,7 @@ export default function AgendaOngoingPage() {
                 {isOL ? 'No active or scheduled meetings for this week.' : 'You’ll see your team’s meeting here the moment it starts.'}
               </p>
             )}
-            {canSeeRooms && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 8 }}>Go to Upcoming Meetings</Link>}
+            {canSeeRooms && <Link to="/agenda/upcoming" className="btn btn-sm btn-outline-dark" style={{ borderRadius: 'var(--radius-sm)' }}>Go to Upcoming Meetings</Link>}
           </div>
         )}
       </div>
@@ -423,7 +425,7 @@ export default function AgendaOngoingPage() {
     .map((s) => guestTeamLabels[s] || s);
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       {/* Back to the rooms list — anyone who picks from one (OL or guest) */}
       {canSeeRooms && (
         <button type="button" onClick={() => openRoom(null)}
@@ -458,7 +460,7 @@ export default function AgendaOngoingPage() {
           <div className="d-flex gap-2 flex-wrap">
             {paused ? (
               <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
                 onClick={handleResume} disabled={busy === 'resume'}>
                 {busy === 'resume'
                   ? <><span className="spinner-border spinner-border-sm" /> Resuming…</>
@@ -466,7 +468,7 @@ export default function AgendaOngoingPage() {
               </button>
             ) : (
               <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, fontSize: '0.8rem' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
                 onClick={handlePause} disabled={busy === 'pause'}>
                 {busy === 'pause'
                   ? <><span className="spinner-border spinner-border-sm" /> Pausing…</>
@@ -474,7 +476,7 @@ export default function AgendaOngoingPage() {
               </button>
             )}
             <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8, fontSize: '0.8rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
               onClick={handleFinishClick} disabled={busy === 'finish'}>
               {busy === 'finish'
                 ? <><span className="spinner-border spinner-border-sm" /> Finishing…</>
@@ -498,7 +500,7 @@ export default function AgendaOngoingPage() {
         {joinLink ? (
           <a href={joinLink} target="_blank" rel="noreferrer"
             className="btn btn-success w-100 d-inline-flex align-items-center justify-content-center gap-2"
-            style={{ borderRadius: 12, fontWeight: 700, fontSize: '0.95rem', padding: '12px 16px' }}>
+            style={{ borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.95rem', padding: '12px 16px' }}>
             <i className="bi bi-camera-video-fill" style={{ fontSize: '1.1rem' }} />
             Join Meeting Now
             <span className="rounded-pill px-2 d-inline-flex align-items-center gap-1"
@@ -517,7 +519,7 @@ export default function AgendaOngoingPage() {
       </div>
 
       {/* Attendance strip */}
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           <div className="d-flex align-items-center justify-content-between mb-2">
             <span className="fw-semibold small d-flex align-items-center gap-2">
@@ -551,13 +553,13 @@ export default function AgendaOngoingPage() {
                     {isMyTeam && (
                       <span className="d-inline-flex gap-1">
                         <button className="btn btn-sm p-0 px-1" title="Present"
-                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'present' ? 'var(--success)' : 'var(--surface-1)', color: st === 'present' ? 'var(--surface-1)' : 'var(--success)', border: '1px solid var(--success)' }}
+                          style={{ fontSize: '0.62rem', borderRadius: 'var(--radius-sm)', background: st === 'present' ? 'var(--success)' : 'var(--surface-1)', color: st === 'present' ? 'var(--surface-1)' : 'var(--success)', border: '1px solid var(--success)' }}
                           disabled={busy === `att-${a.id}`}
                           onClick={() => handleMark(a.id, 'present')}>
                           <i className="bi bi-check-lg" />
                         </button>
                         <button className="btn btn-sm p-0 px-1" title="Absent"
-                          style={{ fontSize: '0.62rem', borderRadius: 5, background: st === 'absent' ? 'var(--danger)' : 'var(--surface-1)', color: st === 'absent' ? 'var(--surface-1)' : 'var(--danger)', border: '1px solid var(--danger)' }}
+                          style={{ fontSize: '0.62rem', borderRadius: 'var(--radius-sm)', background: st === 'absent' ? 'var(--danger)' : 'var(--surface-1)', color: st === 'absent' ? 'var(--surface-1)' : 'var(--danger)', border: '1px solid var(--danger)' }}
                           disabled={busy === `att-${a.id}`}
                           onClick={() => handleMark(a.id, 'absent')}>
                           <i className="bi bi-x-lg" />
@@ -604,7 +606,7 @@ export default function AgendaOngoingPage() {
             {isOL && (
               <button className="btn btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
                 title={`Mark ${activePresentation.apc?.display_name || 'this APC'} as presented and free the floor for the next APC`}
-                style={{ borderRadius: 8, fontSize: '0.74rem', fontWeight: 600, background: 'var(--surface-1)', color: 'var(--accent)', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem', fontWeight: 600, background: 'var(--surface-1)', color: 'var(--accent)', border: 'none' }}
                 disabled={busy === `stop-${activePresentation.apc_id}`}
                 onClick={() => handleStopFor(activePresentation.apc_id, activePresentation.apc?.display_name)}>
                 {busy === `stop-${activePresentation.apc_id}`
@@ -664,11 +666,11 @@ export default function AgendaOngoingPage() {
                 Reviews save without changing their status.
               </span>
               <div className="d-flex gap-2">
-                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
                   onClick={() => setReviewTargetId(null)}>
                   <i className="bi bi-x-lg me-1" />{activePresentation ? 'Back to live presenter' : 'Close'}
                 </button>
-                <button className="btn btn-sm btn-outline-danger" style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                <button className="btn btn-sm btn-outline-danger" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
                   disabled={busy === `reopen-${reviewTarget.apc_id}`}
                   onClick={() => handleReopen(reviewTarget.apc_id)}>
                   <i className="bi bi-arrow-counterclockwise me-1" />Reopen so they present again
@@ -682,7 +684,7 @@ export default function AgendaOngoingPage() {
 
       {/* TL of THIS team — presenter / OL actions overview */}
       {isMyTeam && (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3 text-muted small">
             <i className="bi bi-info-circle me-1" />
             Mark attendance above. The OL is running the presentation review.
@@ -692,7 +694,7 @@ export default function AgendaOngoingPage() {
 
       {/* Guest sitting in on another team's room — observer only */}
       {hereAsGuest && (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3 text-muted small">
             <i className="bi bi-eye me-1" />
             You’re attending {teamName}’s meeting
@@ -705,8 +707,8 @@ export default function AgendaOngoingPage() {
       {/* Finish-meeting guard — present APCs who never presented */}
       {finishModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
-          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--warning-soft)' }}>
@@ -765,7 +767,7 @@ function ActiveRoomsList({ meetings, teamsById, onOpen }) {
           return (
             <div key={m.id} className="col-12 col-md-6 col-xl-4">
               <div className="card border-0 shadow-sm h-100"
-                style={{ borderRadius: 14, border: `1px solid ${isPaused ? 'color-mix(in srgb, var(--warning) 45%, transparent)' : 'color-mix(in srgb, var(--danger) 45%, transparent)'}` }}>
+                style={{ borderRadius: 'var(--radius-lg)', border: `1px solid ${isPaused ? 'color-mix(in srgb, var(--warning) 45%, transparent)' : 'color-mix(in srgb, var(--danger) 45%, transparent)'}` }}>
                 <div className="card-body p-3 d-flex flex-column">
                   <span className="rounded-pill px-2 py-1 mb-2 align-self-start d-inline-flex align-items-center gap-1"
                     style={{ fontSize: '0.6rem', fontWeight: 800,
@@ -782,8 +784,8 @@ function ActiveRoomsList({ meetings, teamsById, onOpen }) {
                     {' · '}<i className="bi bi-clock me-1" />{fmtTime(m.meeting_time)} PKT
                   </div>
                   <div style={{ flexGrow: 1 }} />
-                  <button className="btn btn-sm btn-dark w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                  <button className="btn btn-sm btn-primary w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
                     onClick={() => onOpen(m.id)}>
                     <i className="bi bi-box-arrow-in-right" /> {isPaused ? 'Open / Resume' : 'Open room'}
                   </button>
@@ -837,7 +839,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
           return (
             <div key={m.id} className="col-12 col-md-6 col-xl-4">
               <div className="card border-0 shadow-sm h-100"
-                style={{ borderRadius: 14, border: isNext ? '2px solid var(--accent)' : '1px solid var(--border-subtle)' }}>
+                style={{ borderRadius: 'var(--radius-lg)', border: isNext ? '2px solid var(--accent)' : '1px solid var(--border-subtle)' }}>
                 <div className="card-body p-3 d-flex flex-column">
                   {isNext && (
                     <span className="rounded-pill px-2 py-1 mb-2 align-self-start"
@@ -860,7 +862,7 @@ function NextUpPanel({ meetings, teamsById, busy, onStart }) {
                   )}
                   <div style={{ flexGrow: 1 }} />
                   <button className="btn btn-sm btn-success w-100 mt-3 d-inline-flex align-items-center justify-content-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.74rem' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.74rem' }}
                     disabled={busy === `start-${m.id}`}
                     onClick={() => onStart(m.id)}>
                     {busy === `start-${m.id}`
@@ -899,7 +901,7 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, 
   const pendingCount = apcs.filter((a) => statusOf(a) === 'pending').length;
 
   return (
-    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
       <div className="card-body p-3">
         <div className="d-flex align-items-center justify-content-between mb-2">
           <span className="fw-semibold small d-flex align-items-center gap-2">
@@ -932,7 +934,7 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, 
                     title={someonePresenting
                       ? 'Someone else is presenting right now'
                       : `Start presenting for ${a.display_name} — use when they forgot to click`}
-                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 'var(--radius-sm)',
                       background: 'var(--surface-1)', color: 'var(--accent)', border: '1px solid var(--accent)' }}
                     disabled={busy === `startfor-${a.id}` || someonePresenting}
                     onClick={() => onStartFor(a.id)}>
@@ -947,7 +949,7 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, 
                 {st === 'presenting' && onStopFor && (
                   <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1"
                     title={`Mark ${a.display_name} as presented and free the floor for the next APC`}
-                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 'var(--radius-sm)',
                       background: 'var(--surface-1)', color: 'var(--success)', border: '1px solid var(--success)' }}
                     disabled={busy === `stop-${a.id}`}
                     onClick={() => onStopFor(a.id, a.display_name)}>
@@ -958,7 +960,7 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, 
                 )}
                 {isDone && onRemarks && (
                   <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1" title="Add remarks / review their tasks — no status change"
-                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5,
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 'var(--radius-sm)',
                       background: selected ? 'var(--accent)' : 'var(--surface-1)',
                       color: selected ? 'var(--surface-1)' : 'var(--accent)', border: '1px solid var(--accent)' }}
                     onClick={() => onRemarks(a.id)}>
@@ -967,7 +969,7 @@ function PresentationProgress({ apcs, presMap, onReopen, onRemarks, onStartFor, 
                 )}
                 {isDone && onReopen && (
                   <button className="btn btn-sm p-0 px-1 d-inline-flex align-items-center gap-1" title="Reopen — mark not presented so they can present again"
-                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 5, background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid var(--danger)' }}
+                    style={{ fontSize: '0.6rem', fontWeight: 700, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid var(--danger)' }}
                     disabled={busy === `reopen-${a.id}`}
                     onClick={() => onReopen(a.id)}>
                     {busy === `reopen-${a.id}`
@@ -992,7 +994,7 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, paused,
 
   return (
     <>
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3 d-flex align-items-center justify-content-between gap-3 flex-wrap">
           <div>
             <div className="fw-semibold" style={{ fontSize: '0.86rem' }}>Your presentation</div>
@@ -1006,17 +1008,17 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, paused,
           </div>
           {iAmPresenting ? (
             <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8 }} disabled={busy} onClick={onStop}>
+              style={{ borderRadius: 'var(--radius-sm)' }} disabled={busy} onClick={onStop}>
               {busy ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-stop-fill" /> Stop Presenting</>}
             </button>
           ) : done ? (
             <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8 }} disabled>
+              style={{ borderRadius: 'var(--radius-sm)' }} disabled>
               <i className="bi bi-check2-circle" /> Presented
             </button>
           ) : (
-            <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8 }} disabled={busy || someoneElse || paused} onClick={onStart}>
+            <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 'var(--radius-sm)' }} disabled={busy || someoneElse || paused} onClick={onStart}>
               {paused ? <><i className="bi bi-pause-fill" /> Paused</>
                 : someoneElse ? <><i className="bi bi-lock-fill" /> Locked</>
                 : busy ? <span className="spinner-border spinner-border-sm" />
@@ -1027,7 +1029,7 @@ function APCControls({ meeting, uid, myPresentation, activePresentation, paused,
       </div>
 
       {myTasks.length > 0 && (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             <div className="fw-semibold small mb-2"><i className="bi bi-list-check me-1 text-primary" />Your agenda tasks</div>
             <div className="d-flex flex-column gap-2">

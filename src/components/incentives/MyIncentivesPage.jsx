@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatPKR } from '../../lib/format';
+import { roleLabel } from '../../lib/roles';
+import { Button, EmptyState, PageHeader, ProgressBar } from '../ui';
 import {
   getIncentives, updateIncentivesProgress, autoComplete, fmtUnitValue,
 } from '../../lib/incentivesApi';
@@ -33,7 +36,7 @@ function itemSuffix(item) {
 function AttendanceBadge() {
   return (
     <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
-      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      style={{ fontSize: '0.55rem', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 }}>
       <i className="bi bi-calendar-check me-1" />Auto
     </span>
   );
@@ -72,57 +75,57 @@ function EditProgressRow({ item, cat, onChange, month }) {
   const done     = isComm ? !!item.completed
                           : autoComplete({ ...item, achievedValue: achieved, targetValue: target });
   return (
-    <div className="rounded-3 p-3 mb-2" style={{ background: done ? '#f0fdf4' : (isAuto ? '#eff6ff' : '#fafafa'), border: `1.5px solid ${done ? '#b7dfc4' : (isAuto ? '#bfdbfe' : '#e9ecef')}` }}>
+    <div className="rounded-3 p-3 mb-2" style={{ background: done ? 'var(--success-soft)' : (isAuto ? 'var(--info-soft)' : 'var(--surface-2)'), border: `1px solid ${done ? 'color-mix(in srgb, var(--success) 35%, transparent)' : (isAuto ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)')}` }}>
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
           {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
-          <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</div>
+          <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{formatPKR((Number(item.amount) || 0))}</div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
           {isAtt && <AttendanceBadge />}
-          <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? '#e6f4ea' : '#fff3e0', color: done ? '#198754' : '#fd7e14' }}>
+          <span className="badge rounded-pill" style={{ fontSize: '0.6rem', background: done ? 'var(--success-soft)' : 'var(--warning-soft)', color: done ? 'var(--success-text)' : 'var(--warning-text)' }}>
             {done ? '✓ Completed' : `${p}%`}
           </span>
         </div>
       </div>
       <div className="row g-2">
         <div className="col-6">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             Target <span className="text-muted" style={{ fontSize: '0.6rem' }}>(set by Boss · read-only)</span>
           </label>
           <div className="input-group input-group-sm">
             <input type="text" className="form-control"
               value={target !== '' ? fmtUnitValue(target, sfx) : '—'}
-              readOnly disabled style={{ background: '#f1f5f9', cursor: 'not-allowed' }} />
-            <span className="input-group-text" style={{ fontSize: '0.7rem', background: '#f1f5f9' }}>
-              <i className="bi bi-lock-fill" style={{ fontSize: '0.7rem', color: '#94a3b8' }} />
+              readOnly disabled style={{ background: 'var(--surface-2)', cursor: 'not-allowed' }} />
+            <span className="input-group-text" style={{ fontSize: '0.7rem', background: 'var(--surface-2)' }}>
+              <i className="bi bi-lock-fill" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }} />
             </span>
           </div>
         </div>
         <div className="col-6">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Achieved{isAuto && <span className="text-muted"> (auto{isGmvMax ? ' · Brand Analytics' : isComm ? ' · set by your Operations Lead' : ''})</span>}</label>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Achieved{isAuto && <span className="text-muted"> (auto{isGmvMax ? ' · Brand Analytics' : isComm ? ' · set by your Operations Lead' : ''})</span>}</label>
           <div className="input-group input-group-sm">
             <input type="number" className="form-control" min="0" value={achieved}
               onChange={e => onChange(cat, item.id, 'achievedValue', e.target.value)}
-              readOnly={isAuto} disabled={isAuto} style={isAuto ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined} />
+              readOnly={isAuto} disabled={isAuto} style={isAuto ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined} />
             {sfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{sfx}</span>}
           </div>
         </div>
       </div>
       {isAtt && (
-        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: 'var(--info-text)' }}>
           <i className="bi bi-calendar-check me-1" />Filled automatically from this month's attendance %.
         </div>
       )}
       {isGmvMax && (
-        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#1e40af' }}>
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: 'var(--info-text)' }}>
           <i className="bi bi-graph-up-arrow me-1" />
           Achieved comes from this brand's GMV in Brand Analytics — no need to type it.
         </div>
       )}
       {isComm && (
-        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#166534' }}>
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: 'var(--success-text)' }}>
           <i className="bi bi-percent me-1" />
           <CommissionNote item={item} month={month} />
         </div>
@@ -198,18 +201,15 @@ function EditProgressModal({ record, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
               <h6 className="fw-bold mb-0">Edit My Progress</h6>
               <p className="text-muted small mb-0">Update your achieved values — targets are set by the Boss</p>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
           {items.incentives.length > 0 && (
             <div className="mb-3">
@@ -222,7 +222,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
           {items.bonuses.length > 0 && (
             <div className="mb-3">
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-trophy me-1 text-primary" />Bonuses
+                <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
               {items.bonuses.map(b => <EditProgressRow key={b.id} item={b} cat="bonuses" onChange={handleChange} month={record?.month} />)}
             </div>
@@ -230,7 +230,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
           {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save Progress</>}
             </button>
           </div>
@@ -285,11 +285,7 @@ export default function IncentivesPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="mb-4">
-        <h5 className="fw-bold mb-0">My Incentives & Bonuses</h5>
-        <p className="text-muted small mb-0">{getMonthLabel(currentMonth)}</p>
-      </div>
+      <PageHeader title="My Incentives & Bonuses" subtitle={getMonthLabel(myMonth)} />
 
       {loading ? (
         <div className="text-muted small d-flex align-items-center gap-2">
@@ -307,35 +303,34 @@ export default function IncentivesPage() {
           )}
         </div>
         {!myRec ? (
-          <div className="text-center py-5 rounded-4" style={{ border: '2px dashed var(--border-subtle)', background: 'var(--surface-1)' }}>
-            <div className="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
-              <i className="bi bi-trophy text-muted" style={{ fontSize: '1.8rem', opacity: 0.55 }} />
-            </div>
-            <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No incentive plan yet</p>
-            <p className="text-muted small mb-0">No plan has been set for {getMonthLabel(myMonth)}.</p>
-            <p className="text-muted small mb-0">The boss will set up your incentives.</p>
+          <div className="wx-card" style={{ maxWidth: 600 }}>
+            <EmptyState
+              icon={<i className="bi bi-trophy" style={{ fontSize: '1.4rem' }} />}
+              title="No incentive plan yet"
+              description={`No plan has been set for ${getMonthLabel(myMonth)}. The boss will set up your incentives.`}
+            />
           </div>
         ) : (
           <div style={{ maxWidth: 600 }}>
-            <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ height: 4, background: myRec.verified ? 'linear-gradient(90deg,#198754,#51cf66)' : 'linear-gradient(90deg,#fd7e14,#ffa94d)' }} />
-              <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' }}>
+            <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              <div style={{ height: 4, background: myRec.verified ? 'var(--success)' : 'var(--warning)' }} />
+              <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' }}>
                 <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                  style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.15)', fontSize: '0.85rem' }}>
+                  style={{ width: 42, height: 42, background: 'color-mix(in srgb, var(--spotlight-fg) 15%, transparent)', fontSize: '0.85rem' }}>
                   {(currentUser?.displayName || '?').slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-grow-1">
                   <div className="fw-bold">{currentUser?.displayName || fromName}</div>
-                  <div style={{ fontSize: '0.72rem', opacity: 0.7 }}>{getMonthLabel(myMonth)} · Team Lead</div>
+                  <div style={{ fontSize: '0.72rem', opacity: 0.7 }}>{getMonthLabel(myMonth)} · {profile?.role ? roleLabel(profile.role) : 'Team Lead'}</div>
                 </div>
                 <div className="d-flex flex-column align-items-end gap-1">
                   {myRec.verified && (
-                    <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem' }}>
+                    <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.62rem' }}>
                       <i className="bi bi-patch-check-fill me-1" />{myRec.verifiedByName ? `Verified by ${myRec.verifiedByName}` : 'Verified'}
                     </span>
                   )}
                   {myRec.payoutCleared && (
-                    <span className="badge rounded-pill" style={{ background: '#d1e7dd', color: '#0f5132', fontSize: '0.62rem' }}>
+                    <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.62rem' }}>
                       <i className="bi bi-cash-stack me-1" />Payout Cleared
                     </span>
                   )}
@@ -343,29 +338,49 @@ export default function IncentivesPage() {
               </div>
               <div className="card-body p-3">
                 <div className="d-flex flex-column gap-1 mb-3" style={{ fontSize: '0.82rem' }}>
-                  <div className="d-flex justify-content-between"><span className="text-muted">Basic Salary</span><span className="fw-medium">{myBasic.toLocaleString()} PKR</span></div>
-                  <div className="d-flex justify-content-between"><span className="text-muted">Earned ({myCompleted.length}/{myItems.length} items)</span><span className="fw-medium text-success">+{myEarned.toLocaleString()} PKR</span></div>
-                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1.5px solid #dee2e6', fontSize: '0.9rem' }}>
-                    <span>Total Earned</span><span>{(myBasic + myEarned).toLocaleString()} PKR</span>
+                  <div className="d-flex justify-content-between"><span className="text-muted">Basic Salary</span><span className="fw-medium">{formatPKR(myBasic)}</span></div>
+                  <div className="d-flex justify-content-between"><span className="text-muted">Earned ({myCompleted.length}/{myItems.length} items)</span><span className="fw-medium text-success">+{formatPKR(myEarned)}</span></div>
+                  <div className="d-flex justify-content-between fw-bold pt-2 mt-1" style={{ borderTop: '1px solid var(--border-subtle)', fontSize: '0.9rem' }}>
+                    <span>Total Earned</span><span>{formatPKR((myBasic + myEarned))}</span>
                   </div>
-                  <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>Potential: {(myBasic + myPotential).toLocaleString()} PKR</div>
+                  <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>Potential: {formatPKR((myBasic + myPotential))}</div>
                 </div>
                 <div className="mb-3">
                   <div className="d-flex justify-content-between mb-1" style={{ fontSize: '0.7rem' }}>
                     <span className="text-muted">Completion</span>
                     <span className="fw-semibold">{myCompleted.length}/{myItems.length} ({myCompletionPct}%)</span>
                   </div>
-                  <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-                    <div className="h-100 rounded-pill" style={{ width: `${myCompletionPct}%`, background: myCompletionPct === 100 ? '#198754' : '#0d6efd', transition: 'width 0.4s' }} />
-                  </div>
+                  <ProgressBar size="md" value={myCompletionPct} tone={myCompletionPct === 100 ? 'success' : 'info'} />
                 </div>
+                {/* Each item with its own progress, visible without opening Edit. */}
+                {myItems.length > 0 && (
+                  <div className="mb-3 d-flex flex-column gap-2">
+                    {myItems.map((it) => {
+                      const ip = pct(it.achievedValue, it.targetValue);
+                      const done = !!it.completed;
+                      return (
+                        <div key={it.id} className="rounded-3 p-2" style={{ background: 'var(--surface-2)' }}>
+                          <div className="d-flex justify-content-between align-items-start gap-2 mb-1" style={{ fontSize: '0.78rem' }}>
+                            <span className="fw-semibold" style={{ minWidth: 0 }}>{it.text || '—'}</span>
+                            <span className="flex-shrink-0 fw-semibold" style={{ color: done ? 'var(--success-text)' : 'var(--text-secondary)' }}>
+                              {done ? 'Completed' : `${ip}%`} · +{formatPKR(it.amount)}
+                            </span>
+                          </div>
+                          {Number(it.targetValue) > 0 && (
+                            <ProgressBar size="sm" value={ip} tone={done ? 'success' : ip >= 60 ? 'warning' : 'info'} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>
                   * Most items auto-complete at ≥90% progress. A Commission Based Tier line is the exception — it pays a percentage of whatever the brand earns above its benchmark, and nothing at or below it. Final salary is verified by the boss.
                 </p>
                 {!myRec.payoutCleared && (
                   <div className="d-flex gap-2">
-                    <button className="btn btn-sm btn-dark flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                      style={{ borderRadius: 8, fontSize: '0.78rem' }} onClick={() => setShowEditProgress(true)}>
+                    <button className="btn btn-sm btn-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }} onClick={() => setShowEditProgress(true)}>
                       <i className="bi bi-pencil" /> Edit Progress
                     </button>
                   </div>

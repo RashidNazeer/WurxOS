@@ -211,7 +211,7 @@ export default function AgendaSchedulesTab() {
             // A guest-team member with no APCs attends meetings, doesn't host one.
             const isGuestHost = guestHostIds.has(tl.id) && apcs.length === 0;
             return (
-              <div key={tl.id} className="card border-0 shadow-sm" style={{ borderRadius: 10, opacity: isGuestHost ? 0.7 : 1 }}>
+              <div key={tl.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)', opacity: isGuestHost ? 0.7 : 1 }}>
                 <div className="card-body p-3 d-flex align-items-center gap-3 flex-wrap">
                   <div className="flex-grow-1 min-w-0" style={{ minWidth: 180 }}>
                     <div className="fw-semibold d-flex align-items-center gap-2" style={{ fontSize: '0.86rem' }}>
@@ -236,16 +236,16 @@ export default function AgendaSchedulesTab() {
                     </div>
                   ) : (
                     <>
-                      <select className="form-select form-select-sm" style={{ borderRadius: 8, width: 'auto', minWidth: 150 }}
+                      <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 150 }}
                         value={d.day} onChange={(e) => set(tl.id, { day: e.target.value })}>
                         {DAYS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
-                      <input type="time" className="form-control form-control-sm" style={{ borderRadius: 8, width: 'auto' }}
+                      <input type="time" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)', width: 'auto' }}
                         value={d.time} disabled={!d.day}
                         onChange={(e) => set(tl.id, { time: e.target.value })} />
                       <div className="d-flex align-items-center gap-2" style={{ flexBasis: '100%', minWidth: 0 }}>
                         <i className="bi bi-camera-video text-muted flex-shrink-0" style={{ fontSize: '0.85rem' }} title="This team’s Google Meet link" />
-                        <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                        <input type="url" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                           placeholder={d.day ? 'Team Google Meet link — https://meet.google.com/abc-defg-hij' : 'Pick a meeting day first to add this team’s link'}
                           value={d.link || ''} disabled={!d.day}
                           onChange={(e) => set(tl.id, { link: e.target.value })} />
@@ -296,7 +296,7 @@ export default function AgendaSchedulesTab() {
       )}
 
       <div className="d-flex align-items-center gap-2 mt-3">
-        <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 8 }}
+        <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)' }}
           onClick={handleSaveClick} disabled={saving || !dirty}>
           {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save schedules</>}
         </button>
@@ -305,8 +305,8 @@ export default function AgendaSchedulesTab() {
 
       {askApply && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={() => setAskApply(false)} />
-          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 14 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setAskApply(false)} />
+          <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">
                 <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--accent-soft)' }}>
@@ -325,7 +325,7 @@ export default function AgendaSchedulesTab() {
                 <button className="btn btn-sm btn-outline-primary px-3" onClick={() => doSave(false)} disabled={saving}>
                   Only upcoming weeks
                 </button>
-                <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={() => doSave(true)} disabled={saving}>
+                <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={() => doSave(true)} disabled={saving}>
                   <i className="bi bi-check-lg" /> Apply to this week too
                 </button>
               </div>

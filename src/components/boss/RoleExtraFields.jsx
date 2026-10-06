@@ -14,6 +14,9 @@ import { AlertIcon, XIcon, PlusIcon } from '../common/Icon';
  *   permissions   — current permissions object { key: bool }
  *   onPermissions — (obj) => void
  *   disabled      — boolean
+ *   excludeUserId — id to drop from the parent list (self-referencing roles
+ *                   only, e.g. developer→developer, so editing someone never
+ *                   offers them as their own manager)
  */
 export default function RoleExtraFields({
   role,
@@ -24,6 +27,7 @@ export default function RoleExtraFields({
   responsibilities = [],
   onResponsibilities,
   disabled,
+  excludeUserId = null,
   // When set, the reports-to relationship is fixed server-side — we
   // hide the picker, skip the parents fetch, and don't offer the
   // permissions panel (those are Boss-granted, not self-granted).
@@ -44,12 +48,12 @@ export default function RoleExtraFields({
     }
     setLoadingParents(true);
     setParentsErr('');
-    listActiveParentsOfRole(extras.reportsToRole)
+    listActiveParentsOfRole(extras.reportsToRole, excludeUserId)
       .then((list) => { if (!cancelled) setParents(list); })
       .catch((err) => { if (!cancelled) setParentsErr(err.message); })
       .finally(() => { if (!cancelled) setLoadingParents(false); });
     return () => { cancelled = true; };
-  }, [extras.reportsToRole, lockedReportsTo]);
+  }, [extras.reportsToRole, lockedReportsTo, excludeUserId]);
 
   const togglePerm = (key) => {
     onPermissions({ ...(permissions || {}), [key]: !(permissions || {})[key] });
@@ -57,11 +61,16 @@ export default function RoleExtraFields({
 
   return (
     <>
-      {/* Reports-to dropdown (APC → TL, IPC → PCTL). Hidden when locked. */}
+      {/* Reports-to dropdown (APC → TL, IPC → PCTL, and self-referencing
+          roles like developer → developer). Hidden when locked. */}
       {extras.reportsToRole && !lockedReportsTo && (
         <div style={{ marginBottom: 14 }}>
           <label className="wx-label">
-            Reports to ({roleLabel(extras.reportsToRole)}) <span style={{ color: 'var(--danger)' }}>*</span>
+            Reports to ({roleLabel(extras.reportsToRole)})
+            {!extras.optional && <span style={{ color: 'var(--danger)' }}> *</span>}
+            {extras.optional && (
+              <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}> (optional — leave blank for a lead)</span>
+            )}
           </label>
           {parentsErr && (
             <div className="wx-alert wx-alert-danger" style={{ marginBottom: 8 }}>
@@ -73,7 +82,7 @@ export default function RoleExtraFields({
               <span className="wx-spinner" style={{ color: 'var(--accent)' }} />{' '}
               Loading {roleLabel(extras.reportsToRole)}s…
             </div>
-          ) : parents.length === 0 ? (
+          ) : parents.length === 0 && !extras.optional ? (
             <div
               style={{
                 border: '1px dashed var(--border-default)',
@@ -93,7 +102,9 @@ export default function RoleExtraFields({
               onChange={(e) => onReportsTo(e.target.value || null)}
               disabled={disabled}
             >
-              <option value="">— Select a {roleLabel(extras.reportsToRole)} —</option>
+              <option value="">
+                {extras.optional ? `— No manager (this ${roleLabel(role)} is a lead) —` : `— Select a ${roleLabel(extras.reportsToRole)} —`}
+              </option>
               {parents.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.display_name} · {p.email}
@@ -130,7 +141,7 @@ export default function RoleExtraFields({
                     borderTop: i === 0 ? 'none' : '1px solid var(--border-subtle)',
                     cursor: disabled ? 'not-allowed' : 'pointer',
                     background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
-                    transition: 'background var(--dur-fast) var(--ease-out)',
+                    transition: 'background-color var(--dur-fast) var(--ease-out)',
                   }}
                 >
                   <div style={{ minWidth: 0, marginRight: 12 }}>
@@ -209,14 +220,14 @@ function MiniSwitch({ checked, disabled }) {
       style={{
         width: 36,
         height: 20,
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         background: checked ? 'var(--accent)' : 'var(--surface-3)',
         border: '1px solid',
         borderColor: checked ? 'var(--accent)' : 'var(--border-default)',
         position: 'relative',
         flex: '0 0 auto',
         opacity: disabled ? 0.5 : 1,
-        transition: 'background var(--dur-fast)',
+        transition: 'background-color var(--dur-fast) var(--ease-out)',
       }}
     >
       <span
@@ -229,8 +240,8 @@ function MiniSwitch({ checked, disabled }) {
           width: 16,
           height: 16,
           borderRadius: '50%',
-          background: '#fff',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+          background: 'var(--switch-knob)',
+          boxShadow: 'var(--shadow-sm)',
           transition: 'left var(--dur-fast) var(--ease-out)',
         }}
       />

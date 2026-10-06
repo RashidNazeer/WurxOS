@@ -41,7 +41,7 @@
 .wri-brandmark {
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   flex: none;
   display: grid;
   place-items: center;
@@ -89,12 +89,12 @@
   padding: 9px 11px;
   border: 0;
   background: transparent;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
   color: var(--text-primary);
   margin-bottom: 2px;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
   font-family: inherit;
 }
 .wri-navitem:hover { background: var(--surface-2); }
@@ -106,27 +106,27 @@
   top: 9px;
   bottom: 9px;
   width: 3px;
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
   background: var(--hue);
 }
 .wri-chip {
   grid-row: 1 / 3;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--hue) 16%, transparent);
   color: var(--hue);
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-.wri-navitem.active .wri-chip { background: var(--hue); color: #fff; }
+.wri-navitem.active .wri-chip { background: var(--hue); color: var(--text-inverse); }
 .wri-chip i { font-size: 0.95rem; }
 .wri-nm { font-weight: 600; font-size: 0.81rem; letter-spacing: -0.005em; }
 .wri-track {
   grid-column: 2 / 3;
   height: 3px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--surface-3);
   margin-top: 5px;
   overflow: hidden;
@@ -135,7 +135,7 @@
   display: block;
   height: 100%;
   width: 0;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--hue);
   transition: width var(--dur-slow) var(--ease-out);
 }
@@ -168,7 +168,7 @@
   justify-content: center;
   gap: 7px;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--surface-1);
   color: var(--text-primary);
@@ -177,16 +177,16 @@
   font-size: 0.76rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
 }
 .wri-btn:hover:not(:disabled) { background: var(--surface-2); }
 .wri-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .wri-btn i { font-size: 0.9rem; }
 .wri-btn-euka {
-  border-color: color-mix(in srgb, #0d9488 45%, var(--border-default));
-  color: #0d9488;
+  border-color: color-mix(in srgb, var(--chart-2) 45%, var(--border-default));
+  color: var(--chart-2);
 }
-.wri-btn-euka:hover:not(:disabled) { background: color-mix(in srgb, #0d9488 12%, transparent); }
+.wri-btn-euka:hover:not(:disabled) { background: color-mix(in srgb, var(--chart-2) 12%, transparent); }
 .wri-btn-primary {
   border-color: var(--accent);
   background: var(--accent);
@@ -224,7 +224,7 @@
   font-weight: 600;
   font-size: 0.76rem;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .wri-back:hover { background: var(--surface-2); color: var(--text-primary); }
@@ -245,7 +245,7 @@
   border: 1px solid var(--border-default);
   background: var(--surface-1);
   color: var(--text-secondary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.64rem;
   padding: 1px 7px;
   cursor: pointer;
@@ -268,7 +268,7 @@
 .wri-obar {
   width: 110px;
   height: 6px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   overflow: hidden;
 }
@@ -276,8 +276,8 @@
   display: block;
   height: 100%;
   width: 0;
-  border-radius: 99px;
-  background: linear-gradient(90deg, #4f46e5, #0d9488);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--chart-6), var(--chart-2));
   transition: width var(--dur-slow) var(--ease-out);
 }
 .wri-overall .pct {
@@ -294,7 +294,7 @@
   gap: 7px;
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   padding: 4px 9px;
 }
 .wri-curr i { color: var(--text-muted); font-size: 0.85rem; }
@@ -320,7 +320,8 @@
 }
 
 /* ── Panels ────────────────────────────────────────────────── */
-.wri-panel { animation: wri-enter 0.34s var(--ease-out); }
+/* Kept module-local: a plain 8px rise without wx-rise's scale, which reads oddly on full-width panels. */
+.wri-panel { animation: wri-enter var(--dur-slow) var(--ease-out); }
 @keyframes wri-enter {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
@@ -335,7 +336,7 @@
 .wri-picon {
   width: 38px;
   height: 38px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--hue) 15%, transparent);
@@ -358,14 +359,14 @@
 .wri-meter .t {
   width: 90px;
   height: 6px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   overflow: hidden;
 }
 .wri-meter .t > i {
   display: block;
   height: 100%;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--hue);
   transition: width var(--dur-slow) var(--ease-out);
 }
@@ -382,14 +383,62 @@
 
 /* ── Responsive: collapse rail on narrow viewports ─────────── */
 @media (max-width: 720px) {
-  .wri-rail { width: 210px; }
-  .wri-scroll { padding: 16px 16px 90px 14px; }
+  /* Phones: the 258px rail would leave ~120px for the form. Stack instead —
+     the section nav becomes a horizontal chip strip on top and the save /
+     submit actions a bar pinned to the bottom of the screen. */
+  .wri-root { flex-direction: column; }
+  .wri-rail {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .wri-railtop { display: none; }
+  .wri-navscroll {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 10px;
+    scrollbar-width: none;
+  }
+  .wri-navscroll::-webkit-scrollbar { display: none; }
+  .wri-navgroup { flex: none; }
+  .wri-navrow { display: block; }
+  .wri-navitem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    padding: 6px 10px 6px 6px;
+    margin: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill);
+  }
+  .wri-navitem.active::before { display: none; }
+  .wri-navitem.active { border-color: var(--hue); }
+  .wri-chip { width: 26px; height: 26px; border-radius: 50%; }
+  .wri-chip i { font-size: 0.8rem; }
+  .wri-track, .wri-arrow, .wri-submenu { display: none; }
+  .wri-actions {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 3;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    box-shadow: var(--shadow-lg);
+  }
+  .wri-actions > .wri-btn { flex: 1 1 auto; width: auto; }
+  .wri-actions .wri-actrow { flex: 1 1 100%; }
+  .wri-topstrip { height: auto; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .wri-topright { margin-left: 0; width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .wri-overall .lbl { display: none; }
+  .wri-obar { width: 80px; }
+  .wri-curr select { max-width: 140px; }
+  .wri-scroll { padding: 14px 12px 150px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .wri-panel { animation: none; }
-  .wri-track > i, .wri-obar > i, .wri-meter .t > i { transition: none; }
-}
 
 /* ════════════════════════════════════════════════════════════════
    Redesign: collapsible nav submenus, group dividers, and the
@@ -406,7 +455,7 @@
   height: 34px;
   border: 0;
   background: transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
   display: grid;
@@ -432,11 +481,11 @@
   font-weight: 500;
   color: var(--text-secondary);
   padding: 5px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   gap: 9px;
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .wri-subitem::before {
   content: "";
@@ -444,7 +493,7 @@
   border-radius: 50%;
   background: var(--border-default);
   flex: none;
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 .wri-subitem:hover { background: var(--surface-2); color: var(--text-primary); }
 .wri-subitem.active { color: var(--hue); font-weight: 700; }
@@ -462,12 +511,12 @@
 .wri-groupdiv:first-of-type { margin-top: 4px; }
 .wri-gd-icon {
   width: 30px; height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   flex: none;
   display: grid;
   place-items: center;
   background: var(--hue);
-  color: #fff;
+  color: var(--text-inverse);
   box-shadow: var(--shadow-sm);
 }
 .wri-gd-icon i { font-size: 0.9rem; }
@@ -481,19 +530,19 @@
 .wri-gd-rule {
   flex: 1;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 45%, transparent), transparent);
 }
 .wri-gd-meter { display: flex; align-items: center; gap: 9px; flex: none; }
 .wri-gd-meter .t {
   width: 84px; height: 6px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   overflow: hidden;
 }
 .wri-gd-meter .t > i {
   display: block; height: 100%;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   background: var(--hue);
   transition: width var(--dur-slow) var(--ease-out);
 }
@@ -509,7 +558,7 @@
 .wri-section {
   --hue: var(--accent);
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   margin-bottom: 14px;
   /* light hue-tinted gradient over the base surface — comfortable, not dense */
   background:
@@ -531,7 +580,7 @@
 }
 .wri-sec-icon {
   width: 34px; height: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   flex: none;
   display: grid;
   place-items: center;
@@ -555,7 +604,7 @@
   letter-spacing: 0.04em;
   color: var(--text-muted);
   background: var(--surface-2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 2px 7px;
 }
 .wri-sec-opts {
@@ -570,7 +619,7 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 4px 7px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   line-height: 1;
 }
@@ -604,7 +653,7 @@
   border: 1px solid var(--border-default);
   background: var(--surface-1);
   color: var(--text-secondary);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   font-size: 0.74rem;
   font-weight: 600;
   padding: 6px 12px;
@@ -612,7 +661,7 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .wri-addfield:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent); color: var(--text-primary); }
 .wri-addfield:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -621,3 +670,17 @@
   .wri-gd-title { font-size: 1.02rem; }
   .wri-sec-body { padding: 13px; }
 }
+
+/* ── Submit validation (shown after a blocked Submit, updates live) ── */
+.wri-section.has-issues { box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 55%, transparent); }
+.wri-sec-issues {
+  list-style: none; margin: 12px 0 0; padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  font-size: 12.5px; font-weight: 600;
+  display: grid; gap: 4px;
+}
+.wri-sec-issues i { margin-right: 4px; }
+.wri-field-error { margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--danger-text); }
+.wri-root .form-control.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 22%, transparent); }

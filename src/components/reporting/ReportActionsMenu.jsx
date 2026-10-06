@@ -41,7 +41,7 @@ export default function ReportActionsMenu({ actions, extraItems = [], hidePrimar
     display: 'flex', alignItems: 'center', gap: 9, width: '100%',
     padding: '8px 10px', border: 0, background: 'transparent',
     color: 'var(--text-primary)', fontSize: '0.8rem', cursor: 'pointer',
-    textAlign: 'left', borderRadius: 8, lineHeight: 1.3,
+    textAlign: 'left', borderRadius: 'var(--radius-sm)', lineHeight: 1.3,
   };
 
   function run(fn) {
@@ -54,7 +54,7 @@ export default function ReportActionsMenu({ actions, extraItems = [], hidePrimar
       <button
         type="button"
         className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-        style={{ borderRadius: 8, fontSize: '0.78rem' }}
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
         onClick={() => setOpen((o) => !o)}
         title="More report actions">
         <i className="bi bi-three-dots" /> Other options
@@ -63,7 +63,7 @@ export default function ReportActionsMenu({ actions, extraItems = [], hidePrimar
         <div style={{
           position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 30,
           minWidth: 224, background: 'var(--surface-1)',
-          border: '1px solid var(--border-subtle)', borderRadius: 10,
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg, 0 12px 32px rgba(0,0,0,0.2))', padding: 6,
         }}>
           {items.map((it) => (

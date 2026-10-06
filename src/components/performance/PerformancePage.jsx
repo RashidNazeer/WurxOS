@@ -27,6 +27,9 @@ import {
 import WeeklyBreakdownModal from './WeeklyBreakdownModal';
 import TlPerfBreakdownModal from './TlPerfBreakdownModal';
 import { karachiMonth } from '../../lib/serverTime';
+import { Avatar, Button, useConfirm, useToast } from '../ui';
+import { formatPKR } from '../../lib/format';
+import { useDialogs } from '../common/useDialogs';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,13 +76,13 @@ function MetricInfoTip({ text }) {
         style={{
           position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
           background: 'var(--accent)', color: 'var(--on-accent)',
-          padding: '8px 10px', borderRadius: 8,
+          padding: '8px 10px', borderRadius: 'var(--radius-sm)',
           fontSize: '0.72rem', lineHeight: 1.45, fontWeight: 400,
           width: 'max-content', maxWidth: 'min(320px, calc(100vw - 32px))',
           textAlign: 'left',
-          boxShadow: '0 8px 24px rgba(15,23,42,0.25)',
+          boxShadow: 'var(--shadow-lg)',
           opacity: 0, visibility: 'hidden',
-          transition: 'opacity 0.12s ease',
+          transition: 'opacity var(--dur-fast) var(--ease-out)',
           pointerEvents: 'none', zIndex: 1080,
           whiteSpace: 'normal',
         }}>
@@ -90,26 +93,32 @@ function MetricInfoTip({ text }) {
 }
 
 const PILLARS = [
-  { key: 'performance', label: 'Performance Tracking', icon: 'bi-bar-chart-fill', color: '#0d6efd' },
-  { key: 'incentives',  label: 'Bonus & Incentives',   icon: 'bi-award-fill',     color: '#198754' },
-  { key: 'attendance',  label: 'Attendance',            icon: 'bi-calendar-check', color: '#fd7e14' },
-  { key: 'flags',       label: 'Monthly Flags',         icon: 'bi-flag-fill',      color: '#7b1fa2' },
+  { key: 'performance', label: 'Performance Tracking', icon: 'bi-bar-chart-fill', color: 'var(--info-text)' },
+  { key: 'incentives',  label: 'Bonus & Incentives',   icon: 'bi-award-fill',     color: 'var(--success-text)' },
+  { key: 'attendance',  label: 'Attendance',            icon: 'bi-calendar-check', color: 'var(--warning-text)' },
+  { key: 'flags',       label: 'Monthly Flags',         icon: 'bi-flag-fill',      color: 'var(--purple-text)' },
 ];
 
 const DEFAULT_WEIGHTS = { performance: 40, incentives: 25, attendance: 20, flags: 15 };
 
 const WEIGHTAGES = [
-  { key: 'low',      label: 'Low',      color: 'var(--text-secondary)', bg: 'var(--surface-2)', pts: 3 },
-  { key: 'medium',   label: 'Medium',   color: 'var(--warning)', bg: 'var(--warning-soft)', pts: 5 },
-  { key: 'high',     label: 'High',     color: 'var(--danger)', bg: 'var(--danger-soft)', pts: 8 },
-  { key: 'critical', label: 'Critical', color: 'var(--text-secondary)', bg: 'var(--surface-2)', pts: 12 },
+  { key: 'low',      label: 'Low',      color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)', pts: 3 },
+  { key: 'medium',   label: 'Medium',   color: 'var(--warning)', on: 'var(--on-warning)', bg: 'var(--warning-soft)', pts: 5 },
+  { key: 'high',     label: 'High',     color: 'var(--danger)', on: 'var(--on-danger)', bg: 'var(--danger-soft)', pts: 8 },
+  { key: 'critical', label: 'Critical', color: 'var(--text-secondary)', on: 'var(--surface-1)', bg: 'var(--surface-2)', pts: 12 },
 ];
 
 function getLevel(score) {
-  if (score >= 90) return { label: 'Promotion',   color: 'var(--success)', bg: 'var(--success-soft)', icon: 'bi-trophy-fill' };
-  if (score >= 70) return { label: 'Good',         color: 'var(--info)', bg: 'var(--info-soft)', icon: 'bi-hand-thumbs-up-fill' };
-  if (score >= 50) return { label: 'Warning',      color: 'var(--warning)', bg: 'var(--warning-soft)', icon: 'bi-exclamation-triangle' };
-  return              { label: 'Termination',   color: 'var(--danger)', bg: 'var(--danger-soft)', icon: 'bi-x-octagon-fill' };
+  if (score >= 90) return { label: 'Promotion',   color: 'var(--success-text)', bg: 'var(--success-soft)', icon: 'bi-trophy-fill' };
+  if (score >= 70) return { label: 'Good',         color: 'var(--info-text)', bg: 'var(--info-soft)', icon: 'bi-hand-thumbs-up-fill' };
+  if (score >= 50) return { label: 'Warning',      color: 'var(--warning-text)', bg: 'var(--warning-soft)', icon: 'bi-exclamation-triangle' };
+  return              { label: 'Termination',   color: 'var(--danger-text)', bg: 'var(--danger-soft)', icon: 'bi-x-octagon-fill' };
+}
+
+// An employee's OWN view says "At risk" instead of the HR term; manager
+// views (team cards, the level filter) keep "Termination". Copy only.
+function selfLevel(level) {
+  return level?.label === 'Termination' ? { ...level, label: 'At risk' } : level;
 }
 
 function calcMetricsAvg(metrics) {
@@ -238,18 +247,15 @@ function RateModal({ user, existing, month, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
               <h6 className="fw-bold mb-0">Rate Performance — {user.displayName || user.userName}</h6>
               <p className="text-muted small mb-0">{getMonthLabel(month)}</p>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
 
           <div className="d-flex flex-column gap-3 mb-4">
@@ -274,7 +280,7 @@ function RateModal({ user, existing, month, onClose, onSaved }) {
             })}
           </div>
 
-          <div className="rounded-3 p-3 mb-3 text-center" style={{ background: level.bg, border: `1.5px solid color-mix(in srgb, ${level.color} 19%, transparent)` }}>
+          <div className="rounded-3 p-3 mb-3 text-center" style={{ background: level.bg, border: `1px solid color-mix(in srgb, ${level.color} 19%, transparent)` }}>
             <div className="fw-bold" style={{ fontSize: '2rem', color: level.color }}>{overall}</div>
             <div className="d-flex align-items-center justify-content-center gap-1">
               <i className={`bi ${level.icon}`} style={{ color: level.color, fontSize: '0.8rem' }} />
@@ -284,7 +290,7 @@ function RateModal({ user, existing, month, onClose, onSaved }) {
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save</>}
             </button>
           </div>
@@ -302,6 +308,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const isGreen = flagType === 'green';
   const color = isGreen ? 'var(--success)' : 'var(--danger)';
+  const onColor = isGreen ? 'var(--on-success)' : 'var(--on-danger)';
 
   async function handleSave() {
     if (!description.trim()) return;
@@ -319,8 +326,8 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center gap-2 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
@@ -342,7 +349,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
             <div className="d-flex gap-2 flex-wrap">
               {WEIGHTAGES.map(w => (
                 <button key={w.key} type="button" className="btn btn-sm px-3"
-                  style={{ background: weightage === w.key ? w.color : w.bg, color: weightage === w.key ? '#fff' : w.color, border: `1.5px solid color-mix(in srgb, ${w.color} 25%, transparent)`, borderRadius: 8, fontSize: '0.75rem', fontWeight: 600 }}
+                  style={{ background: weightage === w.key ? w.color : w.bg, color: weightage === w.key ? w.on : w.color, border: `1px solid color-mix(in srgb, ${w.color} 25%, transparent)`, borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', fontWeight: 600 }}
                   onClick={() => setWeightage(w.key)}>{w.label}</button>
               ))}
             </div>
@@ -356,7 +363,7 @@ function AddFlagModal({ user, flagType, onClose, onSaved }) {
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
             <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
-              style={{ background: color, color: '#fff', border: 'none', borderRadius: 8 }}
+              style={{ background: color, color: onColor, border: 'none', borderRadius: 'var(--radius-sm)' }}
               onClick={handleSave} disabled={saving || !description.trim()}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-flag-fill" /> Add Flag</>}
             </button>
@@ -373,6 +380,9 @@ function ViewFlagsModal({
   user, flags, onClose, canManage, onAddFlag,
   currentUserId, currentUserRole, pendingRemovals = {}, onFlagsChanged,
 }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { askText } = useDialogs();
   const [tab, setTab] = useState('green');
   const [busy, setBusy] = useState({}); // flagId → bool (per-flag spinner)
   const filtered = flags.filter(f => f.type === tab);
@@ -405,35 +415,36 @@ function ViewFlagsModal({
   const canBossRemove = (f) => isBoss;
 
   async function handleRequestRemoval(flag) {
-    const reason = window.prompt(
+    const reason = await askText(
       'Why should this flag be removed? Boss will see your reason.\n\n(Short explanation, e.g. "Was a misunderstanding — the campaign was completed on time.")',
-      ''
+      '',
+      { title: 'Request flag removal', confirmLabel: 'Send request' },
     );
     if (!reason || !reason.trim()) return;
     if (reason.trim().length < 3) {
-      alert('Please give a longer reason (3+ characters).');
+      toast.error('Please give a longer reason (3+ characters).');
       return;
     }
     setBusy((b) => ({ ...b, [flag.id]: true }));
     try {
       await requestFlagRemoval(flag.id, reason.trim());
       onFlagsChanged?.({ kind: 'request', flag });
-      alert('Removal request sent to Boss for approval.');
+      toast.success('Removal request sent to Boss for approval.');
     } catch (err) {
-      alert('Failed to send request: ' + (err.message || 'unknown error'));
+      toast.error('Failed to send request: ' + (err.message || 'unknown error'));
     } finally {
       setBusy((b) => ({ ...b, [flag.id]: false }));
     }
   }
 
   async function handleBossRemove(flag) {
-    if (!window.confirm('Remove this flag immediately? This cannot be undone.')) return;
+    if (!(await confirm({ title: 'Remove this flag?', message: 'Remove this flag immediately? This cannot be undone.', confirmLabel: 'Remove flag', tone: 'danger' }))) return;
     setBusy((b) => ({ ...b, [flag.id]: true }));
     try {
       await removeFlagDirect(flag.id);
       onFlagsChanged?.({ kind: 'removed', flag });
     } catch (err) {
-      alert('Failed to remove flag: ' + (err.message || 'unknown error'));
+      toast.error('Failed to remove flag: ' + (err.message || 'unknown error'));
     } finally {
       setBusy((b) => ({ ...b, [flag.id]: false }));
     }
@@ -441,22 +452,19 @@ function ViewFlagsModal({
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <h6 className="fw-bold mb-0">{user.displayName || user.userName} — Flags</h6>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
           {/* Help banner so users understand the month-scope rule —
               a flag only affects the performance score of the month
               it was created in. It still shows in history forever. */}
           <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2"
-            style={{ background: 'var(--info-soft, #eff6ff)', border: '1px solid var(--info, #93c5fd)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-            <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: 'var(--info, #2563eb)' }} />
+            style={{ background: 'var(--info-soft)', border: '1px solid var(--info)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+            <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: 'var(--info)' }} />
             <span>
               Each flag affects the performance score of <strong>only the month it was created in</strong>.
               The flag itself stays visible in history below.
@@ -468,7 +476,7 @@ function ViewFlagsModal({
               const g = t === 'green';
               return (
                 <button key={t} onClick={() => setTab(t)} className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem', fontWeight: 600, background: tab === t ? (g ? 'var(--success)' : 'var(--danger)') : 'var(--surface-2)', color: tab === t ? '#fff' : 'var(--text-secondary)', border: 'none' }}>
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem', fontWeight: 600, background: tab === t ? (g ? 'var(--success)' : 'var(--danger)') : 'var(--surface-2)', color: tab === t ? (g ? 'var(--on-success)' : 'var(--on-danger)') : 'var(--text-secondary)', border: 'none' }}>
                   <i className="bi bi-flag-fill" /> {g ? 'Green' : 'Red'} ({count})
                 </button>
               );
@@ -512,7 +520,7 @@ function ViewFlagsModal({
                         can see this flag so the state is unambiguous. */}
                     {pending && (
                       <div className="mt-2 rounded-2 px-2 py-1 d-flex align-items-center gap-2"
-                        style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.66rem', color: 'var(--warning)' }}>
+                        style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.66rem', color: 'var(--warning-text)' }}>
                         <i className="bi bi-hourglass-split" />
                         <span>
                           Removal pending Boss approval
@@ -529,7 +537,7 @@ function ViewFlagsModal({
                             className="btn btn-sm d-inline-flex align-items-center gap-1"
                             style={{
                               background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger)',
-                              borderRadius: 6, fontSize: '0.7rem', padding: '3px 10px',
+                              borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', padding: '3px 10px',
                             }}
                             disabled={isBusy}
                             onClick={() => handleBossRemove(f)}>
@@ -540,7 +548,7 @@ function ViewFlagsModal({
                             className="btn btn-sm d-inline-flex align-items-center gap-1"
                             style={{
                               background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', color: 'var(--info)',
-                              borderRadius: 6, fontSize: '0.7rem', padding: '3px 10px',
+                              borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', padding: '3px 10px',
                             }}
                             disabled={isBusy}
                             onClick={() => handleRequestRemoval(f)}>
@@ -556,9 +564,9 @@ function ViewFlagsModal({
           )}
           {canManage && (
             <div className="d-flex gap-2">
-              <button className="btn btn-sm flex-grow-1" style={{ background: 'var(--success-soft)', color: 'var(--success)', border: '1.5px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
+              <button className="btn btn-sm flex-grow-1" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}
                 onClick={() => onAddFlag('green')}><i className="bi bi-plus-lg me-1" />Green Flag</button>
-              <button className="btn btn-sm flex-grow-1" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1.5px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.75rem' }}
+              <button className="btn btn-sm flex-grow-1" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}
                 onClick={() => onAddFlag('red')}><i className="bi bi-plus-lg me-1" />Red Flag</button>
             </div>
           )}
@@ -575,28 +583,31 @@ function ViewFlagsModal({
 // recalculates that month's score automatically (handled server-side).
 
 function FlagRemovalRequestsPanel({ requests, onChanged }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const { askText } = useDialogs();
   const [busy, setBusy] = useState({}); // requestId → bool
 
   async function handleDecide(req, action) {
     let note = null;
     if (action === 'reject') {
-      note = window.prompt(
+      note = await askText(
         'Optional note for the OL on why you rejected this:',
-        ''
+        '',
+        { title: 'Reject removal request', confirmLabel: 'Continue' },
       );
       if (note === null) return; // cancelled
     }
-    if (!window.confirm(
-      action === 'approve'
-        ? 'Approve removal? The flag will be deleted and the month\'s score will recalculate. The OL and the flagged user will be notified.'
-        : 'Reject this removal request? The flag stays in place. The OL will be notified.'
-    )) return;
+    const ok = await confirm(action === 'approve'
+      ? { title: 'Approve removal?', message: 'The flag will be deleted and the month\'s score will recalculate. The OL and the flagged user will be notified.', confirmLabel: 'Approve removal', tone: 'danger' }
+      : { title: 'Reject this removal request?', message: 'The flag stays in place. The OL will be notified.', confirmLabel: 'Reject request' });
+    if (!ok) return;
     setBusy((b) => ({ ...b, [req.id]: true }));
     try {
       await decideFlagRemoval(req.id, action, note);
       onChanged?.();
     } catch (err) {
-      alert('Failed to decide request: ' + (err.message || 'unknown error'));
+      toast.error('Failed to decide request: ' + (err.message || 'unknown error'));
     } finally {
       setBusy((b) => ({ ...b, [req.id]: false }));
     }
@@ -634,14 +645,14 @@ function FlagRemovalRequestsPanel({ requests, onChanged }) {
                 <div className="d-flex gap-1 flex-shrink-0">
                   <button
                     className="btn btn-sm d-inline-flex align-items-center gap-1"
-                    style={{ background: 'var(--success-soft)', color: 'var(--success)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 6, fontSize: '0.72rem' }}
+                    style={{ background: 'var(--success-soft)', color: 'var(--success-text)', border: '1px solid color-mix(in srgb, var(--success) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                     disabled={isBusy}
                     onClick={() => handleDecide(r, 'approve')}>
                     <i className="bi bi-check-lg" /> Approve
                   </button>
                   <button
                     className="btn btn-sm d-inline-flex align-items-center gap-1"
-                    style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 6, fontSize: '0.72rem' }}
+                    style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                     disabled={isBusy}
                     onClick={() => handleDecide(r, 'reject')}>
                     <i className="bi bi-x-lg" /> Reject
@@ -692,8 +703,8 @@ function WeightsModal({ weights, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 14 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-gear me-2" />Configure Performance</h6>
 
@@ -725,12 +736,12 @@ function WeightsModal({ weights, onClose, onSaved }) {
             ))}
           </div>
           <div className={`rounded-2 p-2 text-center small fw-bold mb-3 ${total === 100 ? 'text-success' : 'text-danger'}`}
-            style={{ background: total === 100 ? 'var(--success-soft)' : 'var(--danger-soft)', borderRadius: 8 }}>
+            style={{ background: total === 100 ? 'var(--success-soft)' : 'var(--danger-soft)', borderRadius: 'var(--radius-sm)' }}>
             Total: {total}% {total === 100 ? '✓' : `(must be 100%)`}
           </div>
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3" onClick={handleSave} disabled={saving || total !== 100}>
+            <button className="btn btn-sm btn-primary px-3" onClick={handleSave} disabled={saving || total !== 100}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -758,8 +769,8 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
   const next = warningCount + 1;
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
             <div className="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: 40, height: 40, background: 'var(--danger-soft)' }}>
@@ -771,7 +782,7 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
             </div>
           </div>
           {next >= 3 && (
-            <div className="alert py-2 small mb-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, color: 'var(--danger)' }}>
+            <div className="alert py-2 small mb-3" style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-sm)', color: 'var(--danger-text)' }}>
               <i className="bi bi-exclamation-octagon-fill me-1" />Warning #{next} — 3 warnings may lead to termination.
             </div>
           )}
@@ -782,7 +793,7 @@ function WarnModal({ user, warningCount, onClose, onSaved }) {
           </div>
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm px-3" style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8 }}
+            <button className="btn btn-sm px-3" style={{ background: 'var(--danger)', color: 'var(--on-danger)', border: 'none', borderRadius: 'var(--radius-sm)' }}
               onClick={handleWarn} disabled={saving || !reason.trim()}>
               {saving ? 'Issuing…' : 'Issue Warning'}
             </button>
@@ -831,7 +842,7 @@ function PillarBar({ pillar, score, weight, detail }) {
           </div>
         </div>
         <div className="rounded-pill overflow-hidden" style={{ height: 6, background: 'var(--surface-2)' }}>
-          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || 'var(--border-default)', transition: 'width 0.4s' }} />
+          <div className="h-100 rounded-pill" style={{ width: `${score || 0}%`, background: level?.color || 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
       </button>
       {hasDetail && open && (
@@ -972,7 +983,7 @@ function PillarDetail({ pillarKey, ctx }) {
               <div className="d-flex flex-wrap align-items-center gap-2 text-muted"
                 style={{ fontSize: '0.68rem', marginTop: 2 }}>
                 {it.amount != null && it.amount !== '' && (
-                  <span>{Number(it.amount).toLocaleString('en-US')} PKR</span>
+                  <span>{formatPKR(it.amount)}</span>
                 )}
                 {(Number(it.targetValue) > 0 || Number(it.achievedValue) > 0) && (
                   <span>
@@ -1104,6 +1115,8 @@ function PillarDetail({ pillarKey, ctx }) {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PerformancePage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   // v2 auth shape shim — v1 read { currentUser, userRole, apcProfile }.
   const { user, profile } = useAuth();
   const currentUser = user ? {
@@ -1544,7 +1557,7 @@ export default function PerformancePage() {
   const myFlagScore = calcFlagsScore(myFlags, month);
   const myPillarScores = { performance: myPerfScore, incentives: myIncScore, attendance: myAttScore, flags: myFlagScore };
   const myComposite = calcComposite(myPillarScores, weights);
-  const myLevel = getLevel(myComposite);
+  const myLevel = selfLevel(getLevel(myComposite));
 
   // Stats
   const tabUsers = teamUsers.filter(u => u._tab === teamSubTab);
@@ -1568,32 +1581,34 @@ export default function PerformancePage() {
   }
   async function toggleWeeklySwitch(next) {
     if (!isBoss || switchBusy) return;
-    if (next && !window.confirm(
-      'Go LIVE with weekly APC ratings?\n\n'
-      + 'The average of each APC’s weekly scores becomes their OFFICIAL monthly performance score '
-      + '(this feeds the composite used for salary). You can switch back to Trial any time.'
-    )) return;
+    if (next && !(await confirm({
+      title: 'Go LIVE with weekly APC ratings?',
+      message: 'The average of each APC’s weekly scores becomes their OFFICIAL monthly performance score '
+        + '(this feeds the composite used for salary). You can switch back to Trial any time.',
+      confirmLabel: 'Go live',
+    }))) return;
     setSwitchBusy(true);
     try {
       await setWeeklyRatingsEnabled(next);
       setWeeklyCfg((c) => ({ ...c, enabled: next }));
       setAttReloadKey((k) => k + 1); // going Live backfills official scores — reload the grid so it isn't stale
-    } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
+    } catch (e) { toast.error(`Couldn't change the mode: ${e?.message || e}`); }
     finally { setSwitchBusy(false); }
   }
   async function toggleTlSwitch(next) {
     if (!isBoss || tlSwitchBusy) return;
-    if (next && !window.confirm( // eslint-disable-line no-alert
-      'Go LIVE with the Team-Lead performance method?\n\n'
-      + 'Each TL’s performance pillar becomes 0.6 × their team’s score + 0.4 × reporting '
-      + '(this feeds the composite used for salary). You can switch back to Trial any time.'
-    )) return;
+    if (next && !(await confirm({
+      title: 'Go LIVE with the Team-Lead performance method?',
+      message: 'Each TL’s performance pillar becomes 0.6 × their team’s score + 0.4 × reporting '
+        + '(this feeds the composite used for salary). You can switch back to Trial any time.',
+      confirmLabel: 'Go live',
+    }))) return;
     setTlSwitchBusy(true);
     try {
       await setTlPerfEnabled(next);
       setTlCfg((c) => ({ ...c, enabled: next }));
       setAttReloadKey((k) => k + 1); // on-read TL blend flips immediately — reload the grid so it isn't stale
-    } catch (e) { alert(`Couldn't change the mode: ${e?.message || e}`); } // eslint-disable-line no-alert
+    } catch (e) { toast.error(`Couldn't change the mode: ${e?.message || e}`); }
     finally { setTlSwitchBusy(false); }
   }
   async function handleFlagAdded() {
@@ -1626,7 +1641,7 @@ export default function PerformancePage() {
           {isBoss && (
             <button className="btn btn-sm d-inline-flex align-items-center gap-1"
               style={{
-                borderRadius: 8, fontSize: '0.74rem', fontWeight: 700,
+                borderRadius: 'var(--radius-sm)', fontSize: '0.74rem', fontWeight: 700,
                 background: weeklyCfg.enabled ? 'var(--success-soft)' : 'var(--warning-soft)',
                 color: weeklyCfg.enabled ? 'var(--success)' : 'var(--warning)',
                 border: `1px solid color-mix(in srgb, ${weeklyCfg.enabled ? 'var(--success)' : 'var(--warning)'} 35%, transparent)`,
@@ -1643,7 +1658,7 @@ export default function PerformancePage() {
           {isBoss && (
             <button className="btn btn-sm d-inline-flex align-items-center gap-1"
               style={{
-                borderRadius: 8, fontSize: '0.74rem', fontWeight: 700,
+                borderRadius: 'var(--radius-sm)', fontSize: '0.74rem', fontWeight: 700,
                 background: tlCfg.enabled ? 'var(--success-soft)' : 'var(--warning-soft)',
                 color: tlCfg.enabled ? 'var(--success)' : 'var(--warning)',
                 border: `1px solid color-mix(in srgb, ${tlCfg.enabled ? 'var(--success)' : 'var(--warning)'} 35%, transparent)`,
@@ -1694,7 +1709,7 @@ export default function PerformancePage() {
           <div className="d-flex flex-wrap gap-2">
             {pendingRatings.slice(0, 15).map((p) => (
               <button key={`${p.meeting_id}-${p.apc_id}`} className="btn btn-sm d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 999, fontSize: '0.72rem', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+                style={{ borderRadius: 'var(--radius-pill)', fontSize: '0.72rem', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
                 onClick={() => { setWeeklyInitMeeting(p.meeting_id); setWeeklyTarget({ id: p.apc_id, displayName: p.apc_name, reportsTo: p.tl_id, role: 'apc' }); }}>
                 <i className="bi bi-person" />{p.apc_name}
                 <span className="text-muted">· {new Date(p.meeting_date).toLocaleDateString()}</span>
@@ -1711,7 +1726,7 @@ export default function PerformancePage() {
       <div className="d-flex gap-2 flex-wrap mb-3">
         {PILLARS.map(p => (
           <span key={p.key} className="badge rounded-pill px-2 py-1 d-inline-flex align-items-center gap-1"
-            style={{ background: `${p.color}15`, color: p.color, border: `1px solid ${p.color}30`, fontSize: '0.65rem' }}>
+            style={{ background: `color-mix(in srgb, ${p.color} 9%, transparent)`, color: p.color, border: `1px solid color-mix(in srgb, ${p.color} 20%, transparent)`, fontSize: '0.65rem' }}>
             <i className={`bi ${p.icon}`} style={{ fontSize: '0.7rem' }} />
             {p.label}: {weights[p.key]}%
           </span>
@@ -1728,7 +1743,7 @@ export default function PerformancePage() {
             <button key={t.key} onClick={() => setMainTab(t.key)}
               className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
               style={{
-                borderRadius: '8px 8px 0 0', fontWeight: 600, fontSize: '0.78rem',
+                borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', fontWeight: 600, fontSize: '0.78rem',
                 background: mainTab === t.key ? 'var(--accent)' : 'transparent',
                 color: mainTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)',
                 border: 'none', marginBottom: -2,
@@ -1767,11 +1782,11 @@ export default function PerformancePage() {
               (incentives/attendance/flags) would otherwise produce a
               misleading partial composite at the start of the month. */}
           {!compositeOk || myPerfScore === null || myIncPending ? (
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ height: 4, background: 'linear-gradient(90deg,var(--border-strong),var(--border-default))' }} />
               <div className="card-body p-4 text-center">
                 <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
-                  style={{ width: 100, height: 100, background: 'var(--surface-2)', border: '3px solid var(--border-default)' }}>
+                  style={{ width: 100, height: 100, background: 'var(--surface-2)', border: '2px solid var(--border-default)' }}>
                   <i className={`bi ${myPerfScore !== null && compositeOk && myIncPending ? 'bi-shield-check' : 'bi-hourglass-split'}`} style={{ fontSize: '1.8rem', color: 'var(--text-secondary)' }} />
                 </div>
                 <div className="d-flex align-items-center justify-content-center gap-1 mb-1">
@@ -1789,11 +1804,11 @@ export default function PerformancePage() {
               </div>
             </div>
           ) : (
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, overflow: 'hidden' }}>
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ height: 4, background: `linear-gradient(90deg,${myLevel.color},color-mix(in srgb, ${myLevel.color} 53%, transparent))` }} />
               <div className="card-body p-4 text-center">
                 <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-2"
-                  style={{ width: 100, height: 100, background: myLevel.bg, border: `3px solid ${myLevel.color}` }}>
+                  style={{ width: 100, height: 100, background: myLevel.bg, border: `2px solid ${myLevel.color}` }}>
                   <span className="fw-bold" style={{ fontSize: '2.2rem', color: myLevel.color }}>{myComposite}</span>
                 </div>
                 <div className="d-flex align-items-center justify-content-center gap-1 mb-1">
@@ -1810,7 +1825,7 @@ export default function PerformancePage() {
               simulate reaching a goal. Read-only; never touches real data. */}
           <Link to="/performance/simulator"
             className="d-flex align-items-center justify-content-center gap-2 mb-4 text-decoration-none"
-            style={{ borderRadius: 12, fontWeight: 700, fontSize: '0.82rem', background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', padding: '11px 14px' }}>
+            style={{ borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: '0.82rem', background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)', padding: '11px 14px' }}>
             <i className="bi bi-sliders" /> Simulate my performance
             <span style={{ fontWeight: 500, fontSize: '0.7rem', opacity: 0.85 }}>· what would reach my goal?</span>
           </Link>
@@ -1848,8 +1863,8 @@ export default function PerformancePage() {
                   flags only affect the score of the month they were
                   created in. The flag itself stays visible in history. */}
               <div className="rounded-3 p-2 mb-3 d-flex align-items-start gap-2"
-                style={{ background: 'var(--info-soft, #eff6ff)', border: '1px solid var(--info, #93c5fd)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: 'var(--info, #2563eb)' }} />
+                style={{ background: 'var(--info-soft)', border: '1px solid var(--info)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                <i className="bi bi-info-circle-fill flex-shrink-0 mt-1" style={{ color: 'var(--info)' }} />
                 <span>
                   Each flag affects the performance score of <strong>only the month it was created in</strong>.
                   The flag itself stays visible in history below.
@@ -1929,9 +1944,9 @@ export default function PerformancePage() {
               {teamSubTabs.map(t => (
                 <button key={t.key} onClick={() => { setTeamSubTab(t.key); setSearch(''); setLevelFilter('all'); }}
                   className="btn btn-sm px-3 py-2 d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8, fontWeight: 600, fontSize: '0.75rem', background: teamSubTab === t.key ? 'var(--accent)' : 'var(--surface-2)', color: teamSubTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)', border: 'none' }}>
+                  style={{ borderRadius: 'var(--radius-sm)', fontWeight: 600, fontSize: '0.75rem', background: teamSubTab === t.key ? 'var(--accent)' : 'var(--surface-2)', color: teamSubTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)', border: 'none' }}>
                   <i className={`bi ${t.icon}`} /> {t.label}
-                  <span className="badge ms-1" style={{ background: teamSubTab === t.key ? 'rgba(255,255,255,0.2)' : 'var(--surface-3)', color: teamSubTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)', fontSize: '0.55rem' }}>
+                  <span className="badge ms-1" style={{ background: teamSubTab === t.key ? 'color-mix(in srgb, var(--on-accent) 20%, transparent)' : 'var(--surface-3)', color: teamSubTab === t.key ? 'var(--on-accent)' : 'var(--text-secondary)', fontSize: '0.55rem' }}>
                     {teamUsers.filter(u => u._tab === t.key).length}
                   </span>
                 </button>
@@ -1956,7 +1971,7 @@ export default function PerformancePage() {
 
           {/* Cards */}
           {filteredTeam.length === 0 ? (
-            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 12 }}>
+            <div className="text-center py-5" style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
               <i className="bi bi-bar-chart text-muted" style={{ fontSize: '2.5rem', opacity: 0.3 }} />
               <p className="text-muted mt-3 mb-0">{search || levelFilter !== 'all' ? 'No matching results.' : 'No users found.'}</p>
             </div>
@@ -1977,16 +1992,13 @@ export default function PerformancePage() {
                   : 'linear-gradient(90deg,var(--border-default),var(--border-subtle))';
                 return (
                   <div key={u.id} className="col-sm-6 col-lg-4">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 14, overflow: 'hidden' }}>
+                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                       <div style={{ height: 4, background: stripe }} />
                       <div className="card-body p-3 d-flex flex-column">
 
                         {/* Identity */}
                         <div className="d-flex align-items-center gap-2 mb-3">
-                          <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                            style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#1a1a2e,#0f3460)', fontSize: '0.7rem' }}>
-                            {u.name.slice(0, 2).toUpperCase()}
-                          </div>
+                          <Avatar name={u.name} toneKey={u.id || u.name} size={36} />
                           <div className="flex-grow-1" style={{ minWidth: 0 }}>
                             <div className="fw-semibold small text-truncate">{u.name}</div>
                             <div className="text-muted" style={{ fontSize: '0.65rem' }}>{ROLE_LABEL[u.role || u.userRole || 'apc']}</div>
@@ -2045,7 +2057,7 @@ export default function PerformancePage() {
                                   <span className="fw-semibold" style={{ color: lv?.color || 'var(--text-muted)' }}>{s !== null ? s : '—'}</span>
                                 </div>
                                 <div className="rounded-pill overflow-hidden" style={{ height: 4, background: 'var(--surface-2)' }}>
-                                  <div className="h-100 rounded-pill" style={{ width: `${s || 0}%`, background: lv?.color || 'var(--surface-2)', transition: 'width 0.4s' }} />
+                                  <div className="h-100 rounded-pill" style={{ width: `${s || 0}%`, background: lv?.color || 'var(--surface-2)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
                                 </div>
                               </div>
                             );
@@ -2054,14 +2066,14 @@ export default function PerformancePage() {
 
                         {/* Flags + warnings strip */}
                         <div className="d-flex gap-1 mb-2 flex-wrap">
-                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success)', fontSize: '0.55rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.55rem' }}>
                             <i className="bi bi-flag-fill me-1" />{u.gCount} green
                           </span>
-                          <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.55rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: '0.55rem' }}>
                             <i className="bi bi-flag-fill me-1" />{u.rCount} red
                           </span>
                           {u.wCount > 0 && (
-                            <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', fontSize: '0.55rem' }}>
+                            <span className="badge rounded-pill" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: '0.55rem' }}>
                               <i className="bi bi-exclamation-triangle me-1" />{u.wCount} warn
                             </span>
                           )}
@@ -2073,7 +2085,7 @@ export default function PerformancePage() {
                             // APCs are rated WEEKLY in the agenda meeting — open the weekly
                             // breakdown (view + late/corrective rating) instead of the monthly modal.
                             <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
+                              style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                               onClick={() => { setWeeklyInitMeeting(null); setWeeklyTarget(u); }}
                               title="Weekly performance ratings">
                               <i className="bi bi-bar-chart-fill" /> Weekly
@@ -2084,13 +2096,13 @@ export default function PerformancePage() {
                             <>
                               {!tlLive && u.canEdit && (
                                 <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
+                                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                                   onClick={() => setRateTarget(u)}>
                                   <i className="bi bi-pencil" /> Rate
                                 </button>
                               )}
                               <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                                style={{ background: tlLive ? 'var(--accent)' : 'var(--surface-1)', color: tlLive ? 'var(--on-accent)' : 'var(--text-secondary)', border: tlLive ? 'none' : '1.5px solid var(--border-subtle)', borderRadius: 8, fontSize: '0.72rem' }}
+                                style={{ background: tlLive ? 'var(--accent)' : 'var(--surface-1)', color: tlLive ? 'var(--on-accent)' : 'var(--text-secondary)', border: tlLive ? 'none' : '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                                 onClick={() => setTlTarget(u)}
                                 title="Team + reporting performance breakdown">
                                 <i className="bi bi-diagram-3" /> {tlLive ? 'Performance' : 'Preview'}
@@ -2098,19 +2110,19 @@ export default function PerformancePage() {
                             </>
                           ) : u.canEdit ? (
                             <button className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 8, fontSize: '0.72rem' }}
+                              style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                               onClick={() => setRateTarget(u)}>
                               <i className="bi bi-pencil" /> Rate
                             </button>
                           ) : null}
                           <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                            style={{ border: '1.5px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.72rem' }}
+                            style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.72rem' }}
                             onClick={() => setFlagsTarget(u)}>
                             <i className="bi bi-flag" /> Flags
                           </button>
                           {isBoss && isRated && u.composite < 50 && (
                             <button className="btn btn-sm d-inline-flex align-items-center justify-content-center gap-1"
-                              style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1.5px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.72rem' }}
+                              style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }}
                               onClick={() => setWarnTarget(u)}>
                               <i className="bi bi-exclamation-triangle" />
                             </button>

@@ -1,7 +1,7 @@
 /* ============================================================
    Wurx Buddy: floating button, quick panel, Buddy tab, settings.
    Tokens only (tokens.css), so light and dark both work.
-   Stacking: above sticky page chrome (≤1000), below every modal
+   Stacking: above sticky page chrome (â‰¤1000), below every modal
    (Bootstrap 1050+, inline overlays 1080), so a dialog always wins.
    ============================================================ */
 
@@ -10,15 +10,16 @@
 /* ---------- Floating Buddy ---------- */
 .bd-fab {
   position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  z-index: 1045; width: 56px; height: 56px; padding: 2px; border: 0; border-radius: 50%;
-  background: var(--surface-1);
-  box-shadow: 0 0 0 2px var(--accent-ring), var(--shadow-lg);
+  /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1045; width: 56px; height: 56px; padding: 2px; border: 0; border-radius: 50%;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-filter-sticky); backdrop-filter: var(--glass-filter-sticky);
+  box-shadow: 0 0 0 2px var(--accent-ring), var(--shadow-lg), var(--glass-highlight);
   display: grid; place-items: center; cursor: pointer;
-  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 .bd-fab:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow-xl); }
-.bd-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-.bd-fab.is-thinking { animation: bd-ring 1.6s ease-in-out infinite; }
+.bd-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.bd-fab.is-thinking { animation: bd-ring 1.6s var(--ease-in-out) infinite; }
 .bd-fab.is-open { box-shadow: 0 0 0 3px var(--accent), var(--shadow-lg); }
 .bd-fab.is-bounce { animation: bd-bounce 0.9s var(--ease-out) 1; }
 .bd-fab[data-tip]:hover::after {
@@ -45,22 +46,45 @@
 
 /* ---------- Quick panel ---------- */
 .bd-panel {
-  position: fixed; right: 20px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 1046;
+  position: fixed; right: 20px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1046;
   width: 400px; height: 600px; max-height: calc(100dvh - 112px);
   display: flex; flex-direction: column; overflow: hidden;
-  background: var(--surface-1); color: var(--text-primary);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl);
+  /* Glass pane. Same recipe as the global.css rim-ring block (.ui-modal::before):
+     the filter lives on the pseudo-layer, not on the panel, so the panel never
+     becomes a containing block for fixed descendants. The panel itself carries no
+     background; header, thread and composer sit on the translucent layer.
+     Padding = the rim width, so content clears the ring (0 outside Chromium). */
+  isolation: isolate; color: var(--text-primary);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-glass); box-shadow: var(--shadow-xl);
+  padding: var(--glass-rim-w-lg);
   animation: bd-pop var(--dur-base) var(--ease-out);
+}
+.bd-panel::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  border: var(--glass-rim-w-lg) solid transparent;
+  background-image:
+    linear-gradient(var(--glass-bg), var(--glass-bg)),
+    var(--glass-rim-spec),
+    linear-gradient(var(--glass-rim-bg), var(--glass-rim-bg));
+  background-origin: padding-box, border-box, border-box;
+  background-clip: padding-box, border-box, border-box;
+  background-repeat: no-repeat;
+  box-shadow: var(--glass-rim-lit), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+}
+/* Text-dense regions of Buddy sit on the shared text scrim (tokens.css). */
+.bd-panel, .bd-main, .bd-history, .bd-sources-panel, .bd-modal {
+  --bd-scrim: var(--glass-text-scrim, color-mix(in srgb, var(--surface-1) 45%, transparent));
 }
 .bd-panel[hidden] { display: none; }
 @keyframes bd-pop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
 .bd-panel-head {
   display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 12px;
-  border-bottom: 1px solid var(--border-subtle); background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--surface-2) 40%, transparent);
 }
 .bd-panel-title { flex: 1; min-width: 0; line-height: 1.2; }
 .bd-panel-name { font-weight: 800; font-size: 14px; }
-.bd-panel-sub { font-size: 11.5px; color: var(--text-muted); }
+.bd-panel-sub { font-size: 11.5px; color: var(--text-secondary); }
 .bd-icon-btn {
   width: 32px; height: 32px; flex-shrink: 0; border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-secondary); display: inline-grid; place-items: center; cursor: pointer;
@@ -71,8 +95,79 @@
 .bd-send:focus-visible, .bd-cite:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Thread ---------- */
-.bd-thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.bd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px 6px; }
+.bd-thread { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Only the message list scrolls; the composer below stays pinned. */
+.bd-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 16px 14px 6px; }
+/* Long code / tables / links scroll inside the bubble, never the page. */
+.bd-bubble.is-bot { min-width: 0; max-width: 100%; }
+.bd-bubble .ai-md { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+
+/* Markdown (markdownCore.js, GFM). Sized for chat. */
+.ai-md > :first-child { margin-top: 0; }
+.ai-md > :last-child { margin-bottom: 0; }
+.ai-md p { margin: 0 0 0.55rem; }
+.ai-md h1, .ai-md h2, .ai-md h3, .ai-md h4, .ai-md h5, .ai-md h6 { font-weight: 800; line-height: 1.3; margin: 0.8rem 0 0.35rem; color: var(--text-primary); }
+.ai-md h1 { font-size: 1.08rem; }
+.ai-md h2 { font-size: 1rem; }
+.ai-md h3, .ai-md h4, .ai-md h5, .ai-md h6 { font-size: 0.93rem; }
+.ai-md ul, .ai-md ol { margin: 0.25rem 0 0.6rem; padding-left: 1.3rem; }
+.ai-md li { margin: 0.15rem 0; }
+.ai-md li > ul, .ai-md li > ol { margin: 0.15rem 0 0.2rem; }
+.ai-md li > p { margin: 0 0 0.25rem; }
+.ai-md ul:has(> li > input[type='checkbox']) { list-style: none; padding-left: 0.3rem; }
+.ai-md li > input[type='checkbox'] { margin-right: 6px; vertical-align: -1px; accent-color: var(--accent); }
+.ai-md blockquote {
+  margin: 0.4rem 0 0.6rem; padding: 0.35rem 0.75rem; border-left: 2px solid var(--accent);
+  background: var(--accent-soft); color: var(--text-secondary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.ai-md blockquote > :last-child { margin-bottom: 0; }
+.ai-md hr { border: 0; border-top: 1px solid var(--border-default); margin: 0.75rem 0; opacity: 1; }
+.ai-md del { color: var(--text-muted); }
+.ai-md a:not([href]) { color: inherit; }
+.ai-md :not(pre) > code {
+  font-family: var(--font-mono); font-size: 0.82em; padding: 0.08rem 0.35rem; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: var(--text-primary);
+}
+
+/* Code blocks: monospace box, scrolls sideways, a Copy button. */
+.ai-md .ai-code {
+  position: relative; margin: 0.4rem 0 0.7rem; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); background: var(--surface-0); max-width: 100%;
+}
+.ai-md .ai-code pre { margin: 0; padding: 0.75rem 0.85rem; overflow-x: auto; max-width: 100%; }
+.ai-md .ai-code code {
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; white-space: pre;
+  color: var(--text-primary); background: transparent; padding: 0; overflow-wrap: normal;
+}
+.ai-md .ai-code-copy {
+  position: absolute; top: 6px; right: 6px; z-index: 1; border: 1px solid var(--border-default);
+  background: var(--surface-1); color: var(--text-secondary); font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: var(--radius-sm); cursor: pointer; opacity: 0.85;
+}
+.ai-md .ai-code-copy:hover { opacity: 1; color: var(--accent); border-color: var(--accent); }
+.ai-md .ai-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
+
+/* Tables: scroll sideways inside the bubble, never wider than it. */
+.ai-md .ai-table {
+  max-width: 100%; overflow-x: auto; margin: 0.4rem 0 0.7rem;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.ai-md .ai-table table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 0.82rem; line-height: 1.4; }
+.ai-md .ai-table th, .ai-md .ai-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
+.ai-md .ai-table th + th, .ai-md .ai-table td + td { border-left: 1px solid var(--border-subtle); }
+.ai-md .ai-table thead th { background: var(--surface-3); color: var(--text-primary); font-weight: 800; white-space: nowrap; }
+.ai-md .ai-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--text-primary) 3.5%, transparent); }
+.ai-md .ai-table tbody tr:last-child td { border-bottom: 0; }
+.ai-md .ai-table td.is-num, .ai-md .ai-table [align='right'] { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ai-md .ai-table [align='center'] { text-align: center; }
+.bd-jump {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 2;
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--surface-1) 85%, transparent); color: var(--text-primary); box-shadow: var(--shadow-md);
+  font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer;
+}
+.bd-jump:hover { border-color: var(--accent); color: var(--accent-text); }
+.bd-jump:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bd-col { max-width: 760px; margin: 0 auto; }
 .bd-center { display: grid; place-items: center; min-height: 160px; }
 
@@ -83,21 +178,21 @@
 .bd-inline-clip { display: inline-block; vertical-align: middle; margin-right: 6px; }
 .bd-msg { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .bd-bubble {
-  padding: 10px 14px; border-radius: 16px; font-size: 0.88rem; line-height: 1.6;
+  padding: 10px 14px; border-radius: var(--radius-lg); font-size: 0.88rem; line-height: 1.6;
   word-break: break-word; max-width: 100%;
 }
 .bd-bubble.is-user {
   background: var(--accent); color: var(--on-accent); white-space: pre-wrap;
-  border-bottom-right-radius: 5px; max-width: 85%;
+  border-bottom-right-radius: var(--radius-sm); max-width: 85%;
 }
 .bd-bubble.is-bot {
-  background: var(--surface-2); color: var(--text-primary);
-  border: 1px solid var(--border-subtle); border-bottom-left-radius: 5px;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-bottom-left-radius: var(--radius-sm);
 }
 .bd-row.is-active .bd-bubble.is-bot { border-color: var(--accent); }
 .bd-status {
   display: inline-flex; align-items: center; font-size: 0.85rem; color: var(--text-secondary);
-  padding: 8px 12px; border-radius: 14px; background: var(--accent-soft);
+  padding: 8px 12px; border-radius: var(--radius-lg); background: var(--accent-soft);
 }
 .bd-status.is-inline { background: transparent; padding: 6px 0 0; font-size: 0.78rem; color: var(--text-muted); }
 .bd-error {
@@ -106,14 +201,14 @@
   border-radius: var(--radius-md); padding: 6px 10px;
 }
 .bd-error-inline { font-size: 0.75rem; color: var(--danger); }
-.bd-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-muted); }
+.bd-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-secondary); }
 
 /* Citations: [S1] markers become numbered buttons. */
 .bd-cite {
   display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; margin: 0 1px;
   vertical-align: super; font-size: 10px; font-weight: 800; line-height: 1;
   border: 0; border-radius: var(--radius-pill); cursor: pointer;
-  background: var(--accent-soft); color: var(--accent);
+  background: var(--accent-soft); color: var(--accent-text);
 }
 .bd-cite:hover { background: var(--accent); color: var(--on-accent); }
 
@@ -121,7 +216,7 @@
 .bd-chip {
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0;
   padding: 4px 10px 4px 4px; border-radius: var(--radius-pill);
-  border: 1px solid var(--border-subtle); background: var(--surface-1); color: var(--text-secondary);
+  border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text-secondary);
   font-size: 11.5px; text-decoration: none; cursor: pointer; text-align: left;
 }
 .bd-chip:hover { border-color: var(--accent); color: var(--text-primary); }
@@ -130,7 +225,7 @@
 .bd-chip.is-block { display: flex; width: 100%; border-radius: var(--radius-md); padding: 8px 10px 8px 8px; }
 .bd-chip-n {
   width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center;
-  background: var(--accent-soft); color: var(--accent); font-weight: 800; font-size: 10px;
+  background: var(--accent-soft); color: var(--accent-text); font-weight: 800; font-size: 10px;
 }
 .bd-chip-type { font-weight: 700; color: var(--text-primary); white-space: nowrap; }
 .bd-chip-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -138,12 +233,12 @@
 
 .bd-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
 .bd-act {
-  border: 0; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 600;
+  border: 0; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 600;
   padding: 4px 7px; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
 }
 .bd-act:hover { background: var(--surface-2); color: var(--text-primary); }
-.bd-act.is-on { color: var(--accent); }
-.bd-act.is-primary { color: var(--accent); }
+.bd-act.is-on { color: var(--accent-text); }
+.bd-act.is-primary { color: var(--accent-text); }
 .bd-act.is-danger:hover { color: var(--danger); background: var(--danger-soft); }
 .bd-note-form { display: flex; align-items: center; gap: 4px; width: 100%; margin-top: 4px; }
 .bd-note-input {
@@ -159,7 +254,7 @@
 }
 .bd-input-wrap {
   display: flex; align-items: flex-end; gap: 8px; max-width: 760px; margin: 0 auto;
-  background: var(--input-bg); border: 1.5px solid var(--input-border); border-radius: 22px; padding: 5px 5px 5px 14px;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent); border: 1px solid var(--input-border); border-radius: var(--radius-xl); padding: 5px 5px 5px 14px;
 }
 .bd-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .bd-input {
@@ -173,12 +268,12 @@
 }
 .bd-send:disabled { opacity: 0.45; cursor: default; }
 .bd-send.is-stop { background: var(--text-primary); color: var(--text-inverse); }
-.bd-hint { font-size: 10.5px; color: var(--text-muted); text-align: center; margin-top: 6px; }
+.bd-hint { font-size: 10.5px; color: var(--text-secondary); text-align: center; margin-top: 6px; }
 
 /* ---------- Quick empty state ---------- */
 .bd-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 38px; }
 .bd-suggest {
-  border: 1px solid var(--border-default); background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border-default); background: color-mix(in srgb, var(--surface-1) 80%, transparent); color: var(--text-primary);
   font-size: 12.5px; padding: 6px 12px; border-radius: var(--radius-pill); cursor: pointer; text-align: left;
 }
 .bd-suggest:hover { border-color: var(--accent); background: var(--accent-soft); }
@@ -191,13 +286,61 @@
 .bd-coming-sub { font-size: 0.85rem; color: var(--text-secondary); max-width: 340px; }
 
 /* ---------- Buddy tab ---------- */
+/* Fills the shell's content area (AppShell sets data-fill on /buddy, shell.css
+   makes that a flex column); no viewport calc, so it can never be taller than
+   the screen. Only the history list, the thread and the sources panel scroll. */
 .bd-page {
-  display: grid; grid-template-columns: 260px minmax(0, 1fr) auto; gap: 16px;
-  height: calc(100dvh - var(--topbar-h, 68px) - 72px); min-height: 480px;
+  position: relative;
+  display: grid; grid-template-columns: 260px minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr); gap: 16px;
+  flex: 1 1 auto; min-height: 0; height: 100%; overflow: hidden;
 }
+/* Auto history (desktop, not pinned): the column is the 56 px rail; opened, the
+   panel overlays the chat (absolute) so the conversation never jumps. Explicit
+   columns keep the chat and sources in place while the history is absolute. */
+.bd-page.is-history-auto { grid-template-columns: 56px minmax(0, 1fr) auto; }
+.bd-page.is-history-auto > .bd-main { grid-column: 2; grid-row: 1; }
+.bd-page.is-history-auto > .bd-sources-panel { grid-column: 3; grid-row: 1; }
+.bd-history.is-overlay {
+  position: absolute; top: 0; bottom: 0; left: 0; /* buddy: local stacking inside the Buddy page, no token */ z-index: 20; width: 260px;
+  box-shadow: var(--shadow-xl); animation: bd-unfold var(--dur-enter) var(--ease-out);
+}
+@keyframes bd-unfold { from { width: 56px; opacity: 0.6; } to { width: 260px; opacity: 1; } }
+.bd-history.is-rail { align-items: center; gap: 8px; padding: 10px 6px; overflow: hidden; }
+.bd-rail-recent { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 6px; min-height: 0; overflow: hidden; }
+.bd-rail-chat {
+  position: relative; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; font-weight: 800; font-size: 13px;
+  border: 1px solid var(--border-subtle); background: var(--surface-2); color: var(--text-secondary);
+}
+.bd-rail-chat:hover { border-color: var(--accent); color: var(--text-primary); }
+
+/* Ingestion progress (queue drain, AI-vector coverage). */
+.bd-progress-top { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.bd-progress-track { height: 6px; border-radius: var(--radius-pill); background: var(--surface-3); overflow: hidden; }
+.bd-progress-fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); transition: width var(--dur-base) var(--ease-out); }
+.bd-rail-chat.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-text); }
+.bd-rail-chat:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bd-rail-chat .bd-dot { position: absolute; top: -1px; right: -1px; box-shadow: 0 0 0 2px var(--surface-1); }
+.bd-rail-foot { margin-top: auto; }
+.bd-icon-btn.is-on { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) {
+  .bd-history.is-overlay { animation: none; }
+}
+.bd-rail-new {
+  width: 36px; height: 36px; border: 0; border-radius: var(--radius-md); display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.bd-rail-new:hover { background: var(--accent-hover); }
+.bd-rail-new:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Page panels: glass, same family as the quick panel. They have no fixed
+   descendants, so the filter sits on the element; the soft filter is used since
+   these are large and their backdrop moves while the page scrolls. */
 .bd-history, .bd-main, .bd-sources-panel {
-  min-height: 0; background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  min-height: 0; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-glass-sm);
+  box-shadow: var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter-sticky); backdrop-filter: var(--glass-filter-sticky);
 }
+.bd-history-list { background: var(--bd-scrim); border-radius: var(--radius-md); }
 .bd-history { display: flex; flex-direction: column; padding: 12px 8px 8px; }
 .bd-history-top { display: flex; align-items: center; gap: 6px; padding: 0 4px 10px; }
 .bd-new {
@@ -216,7 +359,7 @@
 .bd-group { margin-bottom: 8px; }
 .bd-group-label {
   font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted); padding: 6px 10px 4px;
+  color: var(--text-secondary); padding: 6px 10px 4px;
 }
 .bd-conv { position: relative; display: flex; align-items: center; border-radius: var(--radius-md); }
 .bd-conv:hover, .bd-conv:focus-within { background: var(--surface-2); }
@@ -229,26 +372,26 @@
 .bd-conv-acts { display: none; gap: 1px; padding-right: 4px; }
 .bd-conv:hover .bd-conv-acts, .bd-conv:focus-within .bd-conv-acts { display: flex; }
 .bd-conv-acts button {
-  border: 0; background: transparent; color: var(--text-muted); padding: 3px 5px; border-radius: 6px; font-size: 12px;
+  border: 0; background: transparent; color: var(--text-muted); padding: 3px 5px; border-radius: var(--radius-sm); font-size: 12px;
 }
 .bd-conv-acts button:hover { color: var(--text-primary); background: var(--surface-3); }
 .bd-conv-acts button.is-danger:hover { color: var(--danger); background: var(--danger-soft); }
 .bd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .bd-spin {
   width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%;
-  border: 2px solid var(--accent-ring); border-top-color: var(--accent); animation: bd-spin 0.8s linear infinite;
+  border: 2px solid var(--accent-ring); border-top-color: var(--accent); animation: wx-spin 0.8s linear infinite;
 }
-@keyframes bd-spin { to { transform: rotate(360deg); } }
 .bd-rename { display: flex; align-items: center; gap: 4px; padding: 3px 4px; }
 .bd-rename input {
   flex: 1; min-width: 0; font-size: 13px; padding: 5px 8px; border-radius: var(--radius-sm);
   border: 1px solid var(--accent); background: var(--input-bg); color: var(--input-text);
 }
 .bd-settings-btn {
-  margin-top: 6px; border: 0; border-top: 1px solid var(--border-subtle); background: transparent;
-  color: var(--text-secondary); font-size: 13px; font-weight: 600; padding: 10px; text-align: left; border-radius: 0 0 var(--radius-md) var(--radius-md);
+  display: block; margin-top: 6px; border: 0; border-top: 1px solid var(--border-subtle); background: transparent;
+  color: var(--text-secondary); font-size: 12.5px; font-weight: 600; padding: 10px; text-align: left; text-decoration: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
-.bd-settings-btn:hover, .bd-settings-btn.is-active { color: var(--accent); background: var(--surface-2); }
+.bd-settings-btn:hover, .bd-settings-btn.is-active { color: var(--accent-text); background: var(--surface-2); }
 
 .bd-main { display: flex; flex-direction: column; overflow: hidden; }
 .bd-main-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); }
@@ -258,11 +401,11 @@
   background: var(--surface-1); color: var(--text-secondary); font-size: 12.5px; font-weight: 600;
   padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer;
 }
-.bd-pill:hover, .bd-pill.is-on { color: var(--accent); border-color: var(--accent); }
+.bd-pill:hover, .bd-pill.is-on { color: var(--accent-text); border-color: var(--accent); }
 
 .bd-sources-panel { width: 300px; display: flex; flex-direction: column; padding: 10px; overflow-y: auto; }
 .bd-side-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 13px; padding: 0 2px 8px; }
-.bd-side-empty { font-size: 12.5px; color: var(--text-muted); padding: 10px; }
+.bd-side-empty { font-size: 12.5px; color: var(--text-secondary); padding: 10px; }
 .bd-side-source { margin-bottom: 6px; border-radius: var(--radius-md); }
 .bd-side-source.is-active .bd-chip { border-color: var(--accent); background: var(--accent-soft); }
 .bd-scrim { display: none; }
@@ -279,8 +422,46 @@
 .bd-starter i { color: var(--accent); }
 .bd-starter:hover { border-color: var(--accent); background: var(--accent-soft); }
 
+/* Buddy tab only (the quick panel keeps its compact column): use wide screens.
+   Thread and composer share one centred column up to 1100 px; it shrinks with
+   the Sources panel open (minmax(0, 1fr) grid track). Answers may span it, so
+   tables and code breathe; plain prose stays readable at ~85ch. */
+.bd-main .bd-scroll { padding: 20px clamp(14px, 2.4vw, 32px) 8px; }
+.bd-main .bd-col { max-width: min(1100px, 100%); }
+.bd-main .bd-composer { padding-left: clamp(12px, 2.4vw, 32px); padding-right: clamp(12px, 2.4vw, 32px); }
+.bd-main .bd-input-wrap { max-width: min(1100px, 100%); }
+.bd-main .bd-bubble.is-user { max-width: 75%; }
+.bd-main .ai-md > p, .bd-main .ai-md > ul, .bd-main .ai-md > ol,
+.bd-main .ai-md > blockquote, .bd-main .ai-md > h1, .bd-main .ai-md > h2, .bd-main .ai-md > h3,
+.bd-main .ai-md > h4 { max-width: 85ch; }
+.bd-main .bd-starters { max-width: 980px; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+.bd-main .bd-empty-sub { max-width: 620px; }
+
 /* ---------- Settings ---------- */
-.bd-settings { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+/* Ingestion ring: how much of the queue is read, while a run works. */
+.bd-ring-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
+.bd-ring { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.bd-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.bd-ring circle { fill: none; stroke-width: 6; }
+.bd-ring-track { stroke: var(--surface-3); }
+.bd-ring-fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray var(--dur-slow) var(--ease-out); }
+.bd-ring-pct {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.bd-ring.is-indeterminate svg { animation: bd-ring-spin 1.1s linear infinite; }
+@keyframes bd-ring-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .bd-ring.is-indeterminate svg { animation: none; }
+  .bd-ring-fill { transition: none; }
+}
+
+/* Settings â€º Wurx Buddy: category pills, only on phones (the Settings nav has
+   the sub-tabs on wider screens; it becomes a plain list at 900 px). */
+.bd-subtabs { display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+@media (max-width: 900px) { .bd-subtabs { display: flex; } }
+/* Inside Settings â€º Wurx Buddy: flows with the Settings page, no inner scroll box. */
+.bd-settings { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .bd-card { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; background: var(--surface-1); }
 .bd-card-head { display: flex; gap: 10px; margin-bottom: 12px; }
 .bd-card-head > i { color: var(--accent); font-size: 1.05rem; margin-top: 1px; }
@@ -300,8 +481,26 @@
 .bd-link { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bd-link.is-off { color: var(--text-muted); }
 .bd-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--text-muted); }
-.bd-modal-backdrop { position: fixed; inset: 0; z-index: 1080; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--surface-0) 55%, transparent); backdrop-filter: blur(4px); }
-.bd-modal { width: 600px; max-width: 100%; background: var(--surface-1); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-xl); }
+.bd-modal-backdrop { position: fixed; inset: 0; /* buddy: no token fits; above --z-modal, below --z-popover */ z-index: 1080; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--surface-0) 55%, transparent); backdrop-filter: blur(var(--glass-blur-backdrop)); }
+/* Same pseudo-layer recipe as .bd-panel; padding = rim so content clears the ring. */
+.bd-modal {
+  position: relative; isolation: isolate;
+  width: 600px; max-width: 100%; border: 1px solid var(--glass-border); border-radius: var(--radius-glass);
+  padding: max(20px, var(--glass-rim-w-lg)); box-shadow: var(--shadow-xl);
+}
+.bd-modal::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  border: var(--glass-rim-w-lg) solid transparent;
+  background-image:
+    linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)),
+    var(--glass-rim-spec),
+    linear-gradient(var(--glass-rim-bg), var(--glass-rim-bg));
+  background-origin: padding-box, border-box, border-box;
+  background-clip: padding-box, border-box, border-box;
+  background-repeat: no-repeat;
+  box-shadow: var(--glass-rim-lit), var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+}
 
 /* ---------- Usage (Boss) ---------- */
 .bd-usage-range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -321,11 +520,11 @@
 .bd-usage-table td, .bd-usage-prices td { border-color: var(--border-subtle); max-width: 180px; font-variant-numeric: tabular-nums; }
 .bd-usage-budget { border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-bottom: 10px; }
 .bd-usage-prices summary { cursor: pointer; margin-bottom: 6px; }
-.bd-usage-prices a { color: var(--accent); }
+.bd-usage-prices a { color: var(--accent-text); }
 
 /* ---------- Regenerate, load errors, skeletons, roles ---------- */
 /* The old answer stays readable but clearly on its way out. */
-.bd-bubble.is-fading { opacity: 0.5; transition: opacity var(--dur-base); }
+.bd-bubble.is-fading { opacity: 0.5; transition: opacity var(--dur-base) var(--ease-out); }
 .bd-previous { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 100%; }
 .bd-load-error {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -338,7 +537,7 @@
 .bd-skel {
   border-radius: var(--radius-sm);
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
-  background-size: 200% 100%; animation: bd-shimmer 1.3s ease-in-out infinite;
+  background-size: 200% 100%; animation: bd-shimmer 1.3s var(--ease-in-out) infinite;
 }
 .bd-skel.is-row { height: 14px; }
 .bd-skel.is-label { height: 9px; width: 40%; margin-bottom: 6px; }
@@ -351,15 +550,59 @@
   .bd-conv-acts { display: flex; }
 }
 
+/* ---------- Models (Boss) ---------- */
+.bd-banner {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; padding: 10px 12px;
+  border-radius: var(--radius-md); background: var(--danger-soft); color: var(--text-primary); font-size: 13px;
+}
+.bd-banner > i { color: var(--danger); margin-top: 2px; }
+.bd-model-select { width: 100%; max-width: 520px; }
+.bd-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.bd-badge-chip {
+  display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: var(--radius-pill);
+  background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.bd-badge-chip.is-warn { background: var(--warning-soft); color: var(--text-primary); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+.bd-subhead { font-size: 13px; font-weight: 800; margin: 16px 0 6px; }
+.bd-chain { list-style: none; padding: 0; margin: 6px 0; }
+.bd-row-line.is-off { opacity: 0.55; }
+.bd-chain-n {
+  width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 10px; font-weight: 800;
+}
+.bd-chain-add { display: flex; gap: 6px; max-width: 520px; }
+.bd-chain-add select { min-width: 0; }
+.bd-model-line { font-size: 11px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; }
+.bd-model-search { margin: 0 0 8px; max-width: 520px; }
+
+/* Models by role: a 4-column grid on wide screens, one card per role on phones. */
+.bd-role-models { display: flex; flex-direction: column; gap: 6px; }
+.bd-role-head, .bd-role-row { display: grid; grid-template-columns: 120px repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.bd-role-head { font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); padding: 0 8px; }
+.bd-role-row { padding: 8px; border-radius: var(--radius-md); background: var(--surface-2); }
+.bd-role-name { font-weight: 700; font-size: 13px; padding-top: 5px; }
+.bd-role-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.bd-saver { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 991px) {
+  .bd-role-head { display: none; }
+  .bd-role-row { grid-template-columns: 1fr; }
+  .bd-role-label { position: static; width: auto; height: auto; clip: auto; font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px; }
+}
+
+/* Settings sections are plain fieldsets (no browser border). */
+.bd-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.bd-fieldset:disabled .form-check-label, .bd-fieldset:disabled .form-label { opacity: 0.85; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1199px) {
   .bd-page { grid-template-columns: 240px minmax(0, 1fr) auto; }
   .bd-sources-panel { width: 260px; }
 }
 @media (max-width: 991px) {
-  .bd-page { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - var(--topbar-h, 60px) - 60px); }
+  .bd-page, .bd-page.is-history-auto { grid-template-columns: minmax(0, 1fr); }
+  .bd-page.is-history-auto > .bd-main { grid-column: 1; }
   .bd-history {
-    position: fixed; top: 0; bottom: 0; left: 0; z-index: 1047; width: min(300px, 86vw);
+    position: fixed; top: 0; bottom: 0; left: 0; /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1047; width: min(300px, 86vw);
     border-radius: 0; transform: translateX(-100%); box-shadow: var(--shadow-xl);
     padding-top: calc(12px + env(safe-area-inset-top, 0px));
     /* Closed = hidden from Tab and screen readers too, after the slide-out. */
@@ -367,9 +610,9 @@
     transition: transform var(--dur-slow) var(--ease-out), visibility 0s linear var(--dur-slow);
   }
   .bd-history.is-open { transform: none; visibility: visible; transition: transform var(--dur-slow) var(--ease-out); }
-  .bd-scrim { display: block; position: fixed; inset: 0; z-index: 1046; background: color-mix(in srgb, var(--surface-0) 50%, transparent); }
+  .bd-scrim { display: block; position: fixed; inset: 0; /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1046; background: color-mix(in srgb, var(--surface-0) 50%, transparent); }
   .bd-sources-panel {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1047; width: auto; max-height: 60dvh;
+    position: fixed; left: 0; right: 0; bottom: 0; /* buddy: no --z-* token fits; keeps its slot above page chrome, below --z-modal */ z-index: 1047; width: auto; max-height: 60dvh;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0; box-shadow: var(--shadow-xl);
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     animation: bd-sheet var(--dur-base) var(--ease-out);
@@ -389,8 +632,9 @@
   /* Full-screen sheet on phones. */
   .bd-panel {
     inset: 0; width: auto; height: auto; max-height: none; border-radius: 0; border: 0;
-    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
   }
+  .bd-panel::before { border-width: 0; }
   .bd-starters { grid-template-columns: 1fr; }
   .bd-chips { padding-left: 0; }
   /* 360 px: nothing wider than the screen. */
@@ -401,3 +645,6 @@
   .bd-card { padding: 12px; }
   .bd-sources-panel { max-height: 75dvh; }
 }
+
+/* Lifted above the mobile bottom tab bar when it's shown (shell.css). */
+.bd-fab { bottom: calc(20px + var(--bottom-bar-h, 0px) + env(safe-area-inset-bottom, 0px)); }

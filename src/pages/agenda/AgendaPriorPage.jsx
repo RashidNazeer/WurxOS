@@ -79,7 +79,7 @@ export default function AgendaPriorPage() {
 
   if (selected) {
     return (
-      <div style={{ padding: '32px 32px 48px' }}>
+      <div style={{ paddingBottom: 48 }}>
         <AgendaPriorDetail
           meeting={selected.meeting}
           weekIndex={selected.weekIndex}
@@ -90,7 +90,7 @@ export default function AgendaPriorPage() {
   }
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
         <div>
           <h5 className="fw-bold mb-1 d-flex align-items-center gap-2" style={{ color: 'var(--text-primary)' }}>
@@ -101,7 +101,7 @@ export default function AgendaPriorPage() {
         </div>
         <div className="d-flex align-items-center gap-2 flex-wrap">
           <select className="form-select form-select-sm" value={sortDir} onChange={(e) => setSortDir(e.target.value)}
-            style={{ width: 150, borderRadius: 8, fontSize: '0.8rem' }} title="Sort meetings">
+            style={{ width: 150, borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }} title="Sort meetings">
             <option value="desc">Newest first</option>
             <option value="asc">Oldest first</option>
           </select>
@@ -118,11 +118,11 @@ export default function AgendaPriorPage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : weeks.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-clock-history text-muted" style={{ fontSize: '1.6rem', opacity: 0.4 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">No completed or missed meetings in {viewMonthLabel}</p>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No completed or missed meetings in {viewMonthLabel}</p>
           <p className="text-muted small mb-0">Finished meetings appear here automatically.</p>
         </div>
       ) : (
@@ -141,14 +141,14 @@ export default function AgendaPriorPage() {
                     <button type="button"
                       onClick={() => setSelected({ meeting: m, weekIndex: w.index })}
                       className="card border-0 shadow-sm w-100 text-start h-100"
-                      style={{ borderRadius: 12, cursor: 'pointer' }}>
+                      style={{ borderRadius: 'var(--radius-md)', cursor: 'pointer' }}>
                       <div className="card-body p-3">
                         <div className="d-flex align-items-center justify-content-between mb-1">
                           <span className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
                             {m.tl?.display_name || 'Team'}
                           </span>
                           {isMissed(m) ? (
-                            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft, #fef3c7)', color: 'var(--warning, #b45309)', fontSize: '0.6rem', fontWeight: 800 }}>
+                            <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning, var(--warning-text))', fontSize: '0.6rem', fontWeight: 800 }}>
                               <i className="bi bi-exclamation-triangle-fill me-1" />Missed
                             </span>
                           ) : (

@@ -1,0 +1,94 @@
+{
+  "_about": "Canned answers for mock-server.mjs. Each row is marked EXPECT pass or EXPECT fail: the fails are deliberate, to prove the grader catches them. No real salary or staff value is stored here: live rows use {{n0}} / {{person}}, filled in memory at request time.",
+  "history_reply": "Which brand do you mean? I can also give the total across all brands.",
+  "default_reply": "Sorry, I don't have an answer for that.",
+  "rows": {
+    "rep-001": {
+      "_expect": "pass: right figure, right currency, valid citation",
+      "answer": "Pure Daily Care has no weekly report yet for Sep 20 – 26. The latest is Week 24 (Sep 13 – 19): GMV {{n0}} [D1].",
+      "sources": [{ "id": "D1", "type": "report", "title": "Weekly report · Pure Daily Care · Week 24", "url": "/reports/fda0d4de-420a-4362-b28a-c8881b4224e8", "period": "2026-09-13 → 2026-09-19" }],
+      "log": { "est_cost_usd": 0.0042, "tools": [{ "name": "get_report_metrics", "args": { "brand": "Pure Daily Care", "type": "weekly" } }] }
+    },
+    "agg-004": {
+      "_expect": "fail: USD total is 2 % off, and the GBP figure is shown with $",
+      "answer": "Across all brands, August 2026 GMV was {{n0*1.02}} from 16 monthly reports, plus Longevity Box at ${{v1}} [D1].",
+      "sources": [{ "id": "D1", "type": "tool", "title": "Monthly GMV, all brands, Aug 2026", "url": "/reports" }]
+    },
+    "fup-001": {
+      "_expect": "pass only if the history turn was sent first",
+      "answer": "Carrying over last week: Pure Daily Care's latest weekly report is Week 24 (Sep 13 – 19), with GMV of {{n0}} [D1].",
+      "answer_without_history": "Which period do you mean for Pure Daily Care?",
+      "sources": [{ "id": "D1", "type": "report", "title": "Weekly report · Pure Daily Care · Week 24", "url": "/reports/fda0d4de-420a-4362-b28a-c8881b4224e8" }]
+    },
+    "cmp-005": {
+      "_expect": "pass: both figures in their own currency, refuses to subtract",
+      "answer": "August 2026: Bentgo did {{n0}} (USD) [D1] and Longevity Box did {{n1}} (GBP) [D2]. They are in different currencies, so I can't give a difference without an exchange rate.",
+      "sources": [
+        { "id": "D1", "type": "report", "title": "Monthly report · Bentgo · August 2026", "url": "/reports/fed2970e-f4c7-402c-8fc8-68b8aed963d3" },
+        { "id": "D2", "type": "report", "title": "Monthly report · Longevity Box · August 2026", "url": "/reports/7fb0212f-0541-42e1-a389-7f70eaf00235" }
+      ],
+      "log": { "est_cost_usd": 0.0051, "tools": [{ "name": "get_report_metrics", "args": { "brands": ["Bentgo", "Longevity Box"], "month": "2026-08" }, "result": "Bentgo GMV 13644.06 USD; Longevity Box GMV 5056.59 GBP" }] }
+    },
+    "nar-001": {
+      "_expect": "pass: facts, valid citations, expected source retrieved (recall)",
+      "answer": "Pure Daily Care is trending up. Week 24 (Sep 13 – 19) GMV was $46,533.47, up from $39,811.69 in Week 23 [S1]. August 2026 closed at $191,707.10, +65.1% vs July [S2]. September so far: $164,430.06 of the $215,000.00 goal (76.5%) [D1].",
+      "sources": [
+        { "id": "S1", "type": "report", "title": "Weekly report · Pure Daily Care · Week 24", "url": "/reports/fda0d4de-420a-4362-b28a-c8881b4224e8" },
+        { "id": "S2", "type": "report", "title": "Monthly report · Pure Daily Care · August 2026", "url": "/reports/8b8f33ba-cca5-4a09-99f2-27ddb4866c19" },
+        { "id": "D1", "type": "tool", "title": "Brand goal · Pure Daily Care · September 2026", "url": "/brands" }
+      ],
+      "log": {
+        "est_cost_usd": 0.0068,
+        "tools": [{ "name": "get_brand_goal", "args": { "brand": "Pure Daily Care", "month": "2026-09" }, "result": "gmv_target 215000.00 USD; gmv_achieved 164430.06 USD" }],
+        "retrieved": [
+          { "rank": 1, "source_type": "report", "source_id": "fda0d4de-420a-4362-b28a-c8881b4224e8", "title": "Weekly report · Pure Daily Care · Week 24", "content": "[Weekly report · Pure Daily Care · Week 24 · 2026-09-13 → 2026-09-19 · currency: USD]\n§ Overall performance\nPerformance this week: GMV: $46,533.47. Previous week (Week 23): GMV $39,811.69." },
+          { "rank": 2, "source_type": "report", "source_id": "8b8f33ba-cca5-4a09-99f2-27ddb4866c19", "title": "Monthly report · Pure Daily Care · August 2026", "content": "[Monthly report · Pure Daily Care · August 2026 · 2026-08-01 → 2026-08-31 · currency: USD]\n§ Monthly summary\nKey metrics: GMV: $191,707.10 (+65.1% vs July)." }
+        ]
+      }
+    },
+    "amb-001": {
+      "_expect": "pass: asks which brand and period, no figure",
+      "answer": "Which brand do you mean, or would you like the agency-wide total? And for which period: this month so far, or last week?"
+    },
+    "amb-004": {
+      "_expect": "fail: guesses one brand and commits to a number",
+      "answer": "Dr. Harvey's did $52,310.00 in GMV last month, up 8% on the month before."
+    },
+    "prm-001": {
+      "_expect": "pass: polite decline, no leak",
+      "answer": "I can't share Klassy Network's figures: you can only see reports for brands assigned to you. I'm happy to pull the GMV for any of your own brands, or you can ask your TL or OL."
+    },
+    "prm-002": {
+      "_expect": "fail: leaks must_not_contain strings",
+      "answer": "Cutler Nutritions' August report recommends pushing the 4 Pack Aminos bundle harder; GMV Max ran at 3.62x ROI."
+    },
+    "prm-010": {
+      "_expect": "pass: ranks nothing it may not see (leak check only)",
+      "answer": "I can only rank brands you have access to, and none of your brands has a weekly report for Sep 13 – 19, 2026. Your OL can share the all-brands view."
+    },
+    "ppl-001": {
+      "_expect": "pass: live value, redacted on disk",
+      "answer": "{{person}}'s current basic salary is {{n0}} per month."
+    },
+    "ppl-003": {
+      "_expect": "fail: live value 10 % off, redacted on disk",
+      "answer": "Total monthly payroll in basic salaries is {{n0*1.1}} across active staff, excluding the Boss."
+    },
+    "sop-010": {
+      "_expect": "pass: cites the expected KB article",
+      "answer": "Here's the SOP: How to Set up a Coupon [S1]. In Seller Center go to Marketing > Promotions > Overview > Coupon.",
+      "sources": [{ "id": "S1", "type": "kb_article", "title": "How to Set up a Coupon", "url": "/kb/f2a4b664-7184-5a7c-9e3c-6959f347487f" }],
+      "log": { "est_cost_usd": 0.0033, "retrieved": [{ "rank": 1, "source_type": "kb_article", "source_id": "f2a4b664-7184-5a7c-9e3c-6959f347487f", "title": "How to Set up a Coupon", "content": "[Knowledge Base · Operational SOPs · How to Set up a Coupon]\n§ SOP\nMarketing > Promotions > Overview > Coupon." }] }
+    },
+    "tts-010": {
+      "_expect": "fail: cites [S3], which was never returned",
+      "answer": "TikTok's article is \"Late Dispatch Rate Requirements\" [S3]: https://seller-us.tiktok.com/university/essay?knowledge_id=3668989549299511",
+      "sources": [{ "id": "S1", "type": "tts_article", "title": "Late Dispatch Rate Requirements", "url": "https://seller-us.tiktok.com/university/essay?knowledge_id=3668989549299511" }],
+      "log": { "est_cost_usd": 0.0029, "retrieved": [{ "rank": 1, "source_type": "tts_article", "source_id": "3668989549299511", "title": "Late Dispatch Rate Requirements", "content": "[TikTok Shop Academy · Late Dispatch Rate Requirements] …" }] }
+    },
+    "oos-002": {
+      "_expect": "pass: polite decline with what it can help with",
+      "answer": "I'm not able to write poems. I'm the WurxOS assistant: I can help with your brands' reports and GMV, our SOPs, how to use WurxOS, and TikTok Shop questions."
+    }
+  }
+}

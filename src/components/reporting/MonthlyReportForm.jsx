@@ -19,11 +19,27 @@ import {
 import { findPreviousMonthlyReport } from '../../lib/reportsApi';
 import { generateMonthlyKeyWinsInsight } from '../../utils/aiInsights';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
-import { parseMonthlyPdfToReport } from '../../utils/pdfReportParser';
 import { CURRENCIES, currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import { formatPctChange } from '../../utils/formatPctChange';
 import RichTextEditor from '../shared/RichTextEditor';
 import ReportReturnNotice from './ReportReturnNotice';
+import { useDialogs } from '../common/useDialogs';
+import SaveStatus from './SaveStatus';
+import PasteParsePanel from './PasteParsePanel';
+import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
+import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
+
+// validate() message -> the SectionCard title it belongs to.
+function issueSection(m) {
+  if (m.startsWith('Total Sales')) return 'Total Sales';
+  if (m.startsWith('Key Metrics')) return 'Key Metrics';
+  if (m.startsWith('KPI')) return "KPI's";
+  if (m.startsWith('Top Creators')) return 'Top Creators';
+  if (m.startsWith('Top Videos')) return 'Top Videos';
+  if (m.startsWith('Product Analytics')) return 'Product Analytics';
+  if (m.startsWith('GMV Max')) return 'GMV Max Performance';
+  return 'Total Sales';
+}
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
 
@@ -39,7 +55,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, width = '10
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
         className="form-control form-control-sm"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 'var(--radius-sm)' }}
         placeholder={placeholder} value={value || ''}
         onChange={e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value)} />
     </div>
@@ -64,7 +80,7 @@ function AutoGrowTextarea({ value, minRows = 6, placeholder, onChange }) {
       value={value || ''}
       onChange={e => onChange(e.target.value)}
       onInput={resize}
-      style={{ borderRadius: 8, resize: 'vertical', overflow: 'hidden' }} />
+      style={{ borderRadius: 'var(--radius-sm)', resize: 'vertical', overflow: 'hidden' }} />
   );
 }
 
@@ -103,7 +119,7 @@ function ArraySection({ items, setItems, fields, addLabel, minRows = 1 }) {
         </div>
       ))}
       <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
-        style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={add}>
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={add}>
         <i className="bi bi-plus-circle" /> {addLabel || 'Add Row'}
       </button>
     </div>
@@ -121,7 +137,7 @@ function ComparisonChip({ thisVal, lastVal, format = 'num', sym = '$' }) {
     : Number(v).toLocaleString();
   let pct = null;
   if (p !== 0) pct = ((c - p) / Math.abs(p)) * 100;
-  const color = pct == null ? '#64748b' : pct >= 0 ? '#16a34a' : '#dc2626';
+  const color = pct == null ? 'var(--text-muted)' : pct >= 0 ? 'var(--success-text)' : 'var(--danger-text)';
   return (
     <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', marginTop: 2 }}>
       Last: <strong>{fmt(p)}</strong>
@@ -135,24 +151,25 @@ function ComparisonChip({ thisVal, lastVal, format = 'num', sym = '$' }) {
 }
 
 /* ── Section header helper ────────────────────────────────────────────────── */
-function SectionCard({ icon, title, children, color = '#3b82f6', actions }) {
+function SectionCard({ icon, title, children, color = 'var(--info-text)', actions }) {
   return (
-    <div className="card mb-3" style={{
-      borderRadius: 12,
+    <div className="card mb-3" data-issue-section={title} style={{
+      borderRadius: 'var(--radius-md)',
       border: '1px solid var(--border-subtle)',
-      boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+      boxShadow: 'var(--shadow-sm)',
     }}>
       <div className="card-body p-3">
         <div className="d-flex align-items-center justify-content-between mb-3">
           <div className="d-flex align-items-center gap-2">
             <div className="rounded-2 d-flex align-items-center justify-content-center"
-              style={{ width: 28, height: 28, background: `${color}15` }}>
+              style={{ width: 28, height: 28, background: `color-mix(in srgb, ${color} 8%, transparent)` }}>
               <i className={`bi ${icon}`} style={{ color, fontSize: '0.85rem' }} />
             </div>
             <h6 className="fw-bold mb-0" style={{ fontSize: '0.92rem' }}>{title}</h6>
           </div>
           {actions}
         </div>
+        <IssueList section={title} />
         {children}
       </div>
     </div>
@@ -162,6 +179,7 @@ function SectionCard({ icon, title, children, color = '#3b82f6', actions }) {
 /* ── Main Form ────────────────────────────────────────────────────────────── */
 
 export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -177,6 +195,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const [loading, setLoading] = useState(!!editReportId);
   // Unsaved-changes guard — see WeeklyReportForm for the rationale.
   const [dirty, setDirty] = useState(false);
+  // Set on the first blocked Submit; from then on missing fields are listed live.
+  const [showIssues, setShowIssues] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null); // for the save indicator only
   useUnsavedGuard(dirty);
   // P5 — reference-equality dirty tracking. See WeeklyReportForm for
   // the full comment. Captures `data` once loading completes and
@@ -381,6 +402,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     setImporting(true);
     setImportToast(null);
     try {
+      // pdf.js is large; load the parser only when someone imports a PDF.
+      const { parseMonthlyPdfToReport } = await import('../../utils/pdfReportParser');
       const parsed = await parseMonthlyPdfToReport(file);
       const diag = parsed.__diagnostics || {};
       delete parsed.__diagnostics;
@@ -448,8 +471,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     catch (e) { console.error('saveUserCustomFields failed:', e); }
   };
 
-  const addCustomField = () => {
-    const name = window.prompt('Name for new custom field:', 'Notes');
+  const addCustomField = async () => {
+    const name = await askText('Name for new custom field:', 'Notes');
     if (!name || !name.trim()) return;
     const trimmedName = name.trim();
     const newField = { id: nextFieldId(), name: trimmedName };
@@ -461,9 +484,9 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     });
   };
 
-  const renameCustomField = (fieldId) => {
+  const renameCustomField = async (fieldId) => {
     const current = customFieldDefs.find((f) => f.id === fieldId);
-    const name = window.prompt('Rename field:', current?.name || '');
+    const name = await askText('Rename field:', current?.name || '');
     if (!name || !name.trim()) return;
     setCustomFieldDefs((prev) => {
       const next = prev.map((f) => (f.id === fieldId ? { ...f, name: name.trim() } : f));
@@ -472,8 +495,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     });
   };
 
-  const deleteCustomField = (fieldId) => {
-    if (!window.confirm('Remove this custom field from all future reports? (Existing reports keep their data)')) return;
+  const deleteCustomField = async (fieldId) => {
+    if (!(await ask('Remove this custom field from all future reports? (Existing reports keep their data)', { danger: true, confirmLabel: 'Remove' }))) return;
     setCustomFieldDefs((prev) => {
       const next = prev.filter((f) => f.id !== fieldId);
       persistDefs(next);
@@ -503,7 +526,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       const text = await generateMonthlyKeyWinsInsight(data, previousReport, brandName, selectedMonth?.label || '');
       setData(d => ({ ...d, keyWinsInsights: text }));
     } catch (err) {
-      alert('AI generation failed: ' + err.message);
+      notify.error('AI generation failed: ' + err.message);
     } finally {
       setAiLoading(false);
     }
@@ -539,18 +562,20 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     return missing;
   };
 
+  const issuesBySection = showIssues ? groupIssues(validate(), issueSection) : {};
+
   const handleChangeMonth = async () => {
     if (!editReportId || !selectedBrand) return;
-    const input = window.prompt(
+    const input = await askText(
       `Enter the new month for this report (YYYY-MM, e.g. 2026-03).\n\nCurrent: ${selectedMonth?.label}`,
       selectedMonth?.monthKey || ''
     );
     if (!input) return;
     const m = input.match(/^(\d{4})-(\d{2})$/);
-    if (!m) { alert('Invalid format. Use YYYY-MM.'); return; }
+    if (!m) { notify.error('Invalid format. Use YYYY-MM.'); return; }
     const newMonth = makeMonthInfo(Number(m[1]), Number(m[2]) - 1);
     if (newMonth.monthKey === selectedMonth?.monthKey) return;
-    if (!window.confirm(`Change month to ${newMonth.label}? The report will be re-saved under the new month.`)) return;
+    if (!(await ask(`Change month to ${newMonth.label}? The report will be re-saved under the new month.`))) return;
     try {
       const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
       const newId = await changeMonthlyReportMonth(editReportId, newMonth, {
@@ -561,10 +586,10 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         createdByName: userName,
         status: reportStatus,
       });
-      alert('Month changed. Report list will refresh.');
+      notify.success('Month changed. Report list will refresh.');
       if (onSaved) onSaved({ id: newId, brandId: selectedBrand.id });
     } catch (err) {
-      alert('Failed to change month: ' + err.message);
+      notify.error('Failed to change month: ' + err.message);
     }
   };
 
@@ -591,6 +616,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         extraFields: extra,
       });
       setDirty(false); // changes are persisted — release the guard
+      setLastSavedAt(Date.now());
       clearLocalDraft();  // discard the localStorage safety-net for this report
       setReportStatus(status); // mirror the saved status into the pill so it
                                // doesn't show the stale loaded value (e.g.
@@ -612,7 +638,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       });
       return savedId;
     } catch (err) {
-      alert('Failed to save report: ' + err.message);
+      notify.error('Failed to save report: ' + err.message);
       return false;
     } finally {
       setSaving(false);
@@ -641,20 +667,22 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
   const handleSubmitReport = async () => {
     if (!selectedBrand || !selectedMonth) return;
     if (submitBlock?.kind === 'duplicate') {
-      alert(`You've already submitted a report for ${selectedMonth.label}. You can't submit another one for the same month.`);
+      notify.warning(`You've already submitted a report for ${selectedMonth.label}. You can't submit another one for the same month.`);
       return;
     }
     if (submitBlock?.kind === 'pendingPrior') {
       const prev = submitBlock.report;
-      alert(`Your previous report (${prev.monthLabel}) is still waiting for OL approval. It needs to be approved before you can submit a new one.`);
+      notify.warning(`Your previous report (${prev.monthLabel}) is still waiting for OL approval. It needs to be approved before you can submit a new one.`);
       return;
     }
     const missing = validate();
     if (missing.length > 0) {
-      alert('Please fill in all required fields:\n\n• ' + missing.join('\n• '));
+      setShowIssues(true);
+      notify.warning(`${missing.length} required field${missing.length === 1 ? '' : 's'} still need${missing.length === 1 ? 's' : ''} attention — listed in red under each section.`);
+      scrollToIssue(issueSection(missing[0]));
       return;
     }
-    if (!window.confirm('Submit this monthly report for review?\n\nOnce submitted you cannot edit unless it is sent back.')) return;
+    if (!(await ask('Submit this monthly report for review?\n\nOnce submitted you cannot edit unless it is sent back.'))) return;
     const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
     await _doSave('submitted', {
       rejectionNote: null,
@@ -697,11 +725,11 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         <div className="row g-3">
           {myBrands.map(b => (
             <div key={b.id} className="col-md-6 col-lg-4">
-              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 14, cursor: 'pointer' }}
+              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer' }}
                 onClick={() => handleBrandSelect(b)}>
                 <div className="card-body p-3 d-flex align-items-center gap-3">
-                  <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                    style={{ width: 42, height: 42, fontSize: '0.7rem', background: '#3b82f6' }}>
+                  <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                    style={{ width: 42, height: 42, fontSize: '0.7rem', background: 'var(--info)', color: 'var(--on-info)' }}>
                     {(b.name || b.brandName || '??').slice(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -738,7 +766,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           {opts.map(m => (
             <div key={m.monthKey} className="col-md-4 col-sm-6">
               <button className="btn btn-outline-secondary w-100 text-start"
-                style={{ borderRadius: 10, fontSize: '0.84rem' }}
+                style={{ borderRadius: 'var(--radius-md)', fontSize: '0.84rem' }}
                 onClick={() => handleFirstMonthPick(m)}>
                 <i className="bi bi-calendar3 me-2" />{m.label}
               </button>
@@ -758,6 +786,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
     // Pin each rich-text toolbar BELOW this sticky header (topbar + measured
     // header height) so it doesn't collide with the header when a text section
     // scrolls up. Report header is z-index 4 > toolbar's 3, so it always wins.
+    <ReportIssuesContext.Provider value={issuesBySection}>
     <div onInput={() => setDirty(true)} style={rteTopStyle}>
       {guardModal}
       <div ref={headerRef} className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2"
@@ -795,11 +824,12 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
             )}
           </div>
         </div>
-        <div className="d-flex gap-2 flex-wrap">
+        <div className="d-flex gap-2 flex-wrap align-items-center">
+          <SaveStatus saving={saving} dirty={dirty} savedAt={lastSavedAt} />
           <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
             onChange={e => handleImportPdf(e.target.files?.[0])} />
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 8, fontSize: '0.78rem' }}
+            style={{ background: 'var(--surface-1)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
             onClick={() => pdfInputRef.current?.click()} disabled={importing}
             title="Upload a Monthly report PDF (Google Doc export) to auto-fill this form">
             {importing ? <><span className="spinner-border spinner-border-sm" /> Reading PDF…</>
@@ -808,20 +838,20 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           {(reportStatus === 'draft' || !isEditMode) ? (
             <>
               <button className="btn btn-outline-secondary btn-sm px-3 d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8 }} onClick={handleSaveDraft} disabled={saving}>
+                style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleSaveDraft} disabled={saving}>
                 {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-save" />}
                 Save Draft
               </button>
               <button className="btn btn-sm px-3 d-inline-flex align-items-center gap-1"
-                style={{ borderRadius: 8, background: submitBlock ? '#94a3b8' : '#0f172a', color: 'white', border: 'none' }}
+                style={{ borderRadius: 'var(--radius-sm)', background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
                 onClick={handleSubmitReport} disabled={saving || !!submitBlock}
                 title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this month' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
                 <i className="bi bi-send-fill" /> Submit
               </button>
             </>
           ) : (
-            <button className="btn btn-dark btn-sm px-3 d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 8 }} onClick={handleSaveChanges} disabled={saving}>
+            <button className="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1"
+              style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleSaveChanges} disabled={saving}>
               {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-save" />}
               Save Changes
             </button>
@@ -834,7 +864,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           style={{
             background: importToast.kind === 'success' ? 'var(--success-soft)' : importToast.kind === 'warn' ? 'var(--warning-soft)' : 'var(--danger-soft)',
             border: `1px solid ${importToast.kind === 'success' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : importToast.kind === 'warn' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}`,
-            borderRadius: 10,
+            borderRadius: 'var(--radius-md)',
             color: importToast.kind === 'success' ? 'var(--success)' : importToast.kind === 'warn' ? 'var(--warning)' : 'var(--danger)',
           }}>
           <i className={`bi ${importToast.kind === 'success' ? 'bi-check-circle-fill' : importToast.kind === 'warn' ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'} flex-shrink-0 mt-1`} />
@@ -849,7 +879,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedMonth?.label}</div>
@@ -859,7 +889,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report awaiting OL approval</div>
@@ -878,7 +908,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         <label className="fw-semibold mb-0" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           Report currency:
         </label>
-        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 8 }}
+        <select className="form-select form-select-sm" style={{ width: 200, borderRadius: 'var(--radius-sm)' }}
           value={data.currency || DEFAULT_CURRENCY}
           onChange={e => setData(d => ({ ...d, currency: e.target.value }))}>
           {CURRENCIES.map(c => (
@@ -898,8 +928,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         const enabledCount = MONTHLY_SECTIONS.filter(s => enabled[s.key]).length;
         return (
           <div className="card mb-3" style={{
-            borderRadius: 12, border: '1px solid var(--border-subtle)',
-            background: 'var(--surface-0)', boxShadow: '0 1px 2px rgba(15,23,42,0.03)',
+            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+            background: 'var(--surface-0)', boxShadow: 'var(--shadow-sm)',
           }}>
             <div className="card-body p-3">
               <div className="d-flex align-items-center gap-2 mb-2">
@@ -943,7 +973,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 1: Total Sales ─────────────────────────────────────── */}
       {sectEnabled.totalSales && (
-      <SectionCard icon="bi-currency-dollar" color="#16a34a" title="Total Sales">
+      <SectionCard icon="bi-currency-dollar" color="var(--success-text)" title="Total Sales">
         <div className="d-flex flex-wrap gap-3">
           <div style={{ width: 220 }}>
             <Field label={`Month GMV (${curSym})`} type="number" placeholder="357869.19"
@@ -962,7 +992,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 2: Key Metrics ──────────────────────────────────────── */}
       {sectEnabled.keyMetrics && (
-      <SectionCard icon="bi-graph-up" color="#3b82f6" title="Key Metrics">
+      <SectionCard icon="bi-graph-up" color="var(--info-text)" title="Key Metrics">
         <div className="d-flex flex-wrap gap-3">
           {[
             { key: 'gmv', label: `GMV (${curSym})`, placeholder: '357869.19', format: 'usd' },
@@ -983,7 +1013,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 3: KPIs ─────────────────────────────────────────────── */}
       {sectEnabled.kpis && (
-      <SectionCard icon="bi-bar-chart-fill" color="#7c3aed" title="KPI's">
+      <SectionCard icon="bi-bar-chart-fill" color="var(--purple-text)" title="KPI's">
         <div className="d-flex flex-wrap gap-3">
           {[
             { key: 'completedCollabs', label: 'Completed Collabs', placeholder: '7846' },
@@ -1004,7 +1034,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 4: GMV Breakdown ────────────────────────────────────── */}
       {sectEnabled.gmvBreakdown && (
-      <SectionCard icon="bi-pie-chart-fill" color="#0891b2" title="GMV Breakdown">
+      <SectionCard icon="bi-pie-chart-fill" color="var(--info-text)" title="GMV Breakdown">
         <div className="d-flex flex-wrap gap-3">
           {[
             { key: 'affiliateGmv', label: `Affiliate GMV (${curSym})`, placeholder: '321179.79' },
@@ -1026,8 +1056,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 5: Top Creators ─────────────────────────────────────── */}
       {sectEnabled.topCreators && (
-      <SectionCard icon="bi-people-fill" color="#ec4899" title="Top Creators">
-        {presets.bar('topCreators', '#ec4899')}
+      <SectionCard icon="bi-people-fill" color="var(--danger-text)" title="Top Creators">
+        {presets.bar('topCreators', 'var(--chart-5)')}
         <ArraySection items={data.topCreators}
           setItems={(items) => setData(d => ({ ...d, topCreators: items }))}
           fields={[
@@ -1040,8 +1070,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 6: Top Videos ───────────────────────────────────────── */}
       {sectEnabled.topVideos && (
-      <SectionCard icon="bi-play-circle-fill" color="#f59e0b" title="Top Videos">
-        {presets.bar('topVideos', '#f59e0b')}
+      <SectionCard icon="bi-play-circle-fill" color="var(--warning-text)" title="Top Videos">
+        {presets.bar('topVideos', 'var(--warning)')}
         <ArraySection items={data.topVideos}
           setItems={(items) => setData(d => ({ ...d, topVideos: items }))}
           fields={[
@@ -1054,7 +1084,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 7: Video Performance ────────────────────────────────── */}
       {sectEnabled.videoPerformance && (
-      <SectionCard icon="bi-camera-reels-fill" color="#6366f1" title="Video Performance">
+      <SectionCard icon="bi-camera-reels-fill" color="var(--purple-text)" title="Video Performance">
         <div className="d-flex flex-wrap gap-3">
           {[
             { key: 'productImpressions', label: 'Product Impressions', placeholder: '14.30M' },
@@ -1084,7 +1114,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 8: Creators' Performance ────────────────────────────── */}
       {sectEnabled.creatorsPerformance && (
-      <SectionCard icon="bi-person-video3" color="#a855f7" title="Creators' Performance">
+      <SectionCard icon="bi-person-video3" color="var(--purple-text)" title="Creators' Performance">
         <div className="d-flex flex-wrap gap-3">
           {[
             { key: 'creators1Plus', label: 'Posted 1+ Videos', placeholder: '1589' },
@@ -1106,8 +1136,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 9: Product Analytics ────────────────────────────────── */}
       {sectEnabled.productAnalytics && (
-      <SectionCard icon="bi-box-seam" color="#0d9488" title="Product Analytics">
-        {presets.bar('productAnalytics', '#0d9488')}
+      <SectionCard icon="bi-box-seam" color="var(--success-text)" title="Product Analytics">
+        {presets.bar('productAnalytics', 'var(--chart-2)')}
         <ArraySection items={data.productAnalytics}
           setItems={(items) => setData(d => ({ ...d, productAnalytics: items }))}
           fields={[
@@ -1123,8 +1153,15 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 10: GMV Max Performance ─────────────────────────────── */}
       {sectEnabled.gmvMax && (
-      <SectionCard icon="bi-rocket-takeoff-fill" color="#ef4444" title="GMV Max Performance">
-        {presets.bar('gmvMax', '#ef4444')}
+      <SectionCard icon="bi-rocket-takeoff-fill" color="var(--danger-text)" title="GMV Max Performance">
+        {presets.bar('gmvMax', 'var(--danger)')}
+        <PasteParsePanel
+          noun="campaign"
+          accent="var(--danger)"
+          parse={parseGmvMaxText}
+          onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
+          hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this month</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV.</>}
+        />
         <ArraySection items={data.gmvMax}
           setItems={(items) => setData(d => ({ ...d, gmvMax: items }))}
           fields={[
@@ -1141,7 +1178,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 11: Customers ───────────────────────────────────────── */}
       {sectEnabled.customers && (
-      <SectionCard icon="bi-people" color="#0ea5e9" title="Customers">
+      <SectionCard icon="bi-people" color="var(--info-text)" title="Customers">
         <div className="d-flex flex-wrap gap-3">
           {[
             { key: 'awareCustomers', label: 'Aware Customers', placeholder: '513250' },
@@ -1163,16 +1200,16 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 12: Key Wins (narrative + AI) ───────────────────────── */}
       {sectEnabled.keyWinsInsights && (
-      <SectionCard icon="bi-trophy-fill" color="#eab308" title="Key Wins / Insights"
+      <SectionCard icon="bi-trophy-fill" color="var(--warning-text)" title="Key Wins / Insights"
         actions={
           <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 8, fontSize: '0.7rem', padding: '4px 10px', border: 'none' }}
+            style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', padding: '4px 10px', border: 'none' }}
             onClick={runKeyWinsAi} disabled={aiLoading}>
             {aiLoading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
               : <><i className="bi bi-stars" /> Generate with AI</>}
           </button>
         }>
-        {presets.bar('keyWinsInsights', '#eab308')}
+        {presets.bar('keyWinsInsights', 'var(--warning)')}
         <RichTextEditor value={data.keyWinsInsights || ''}
           minHeight={220}
           placeholder="Write the narrative summary of this month — key wins, milestones, MoM movements. Or click ✨ to auto-generate from your data."
@@ -1182,8 +1219,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 13: Campaigns (free text) ───────────────────────────── */}
       {sectEnabled.campaignsText && (
-      <SectionCard icon="bi-megaphone-fill" color="#f97316" title="Campaigns">
-        {presets.bar('campaignsText', '#f97316')}
+      <SectionCard icon="bi-megaphone-fill" color="var(--warning-text)" title="Campaigns">
+        {presets.bar('campaignsText', 'var(--chart-1)')}
         <RichTextEditor value={data.campaignsText || ''}
           minHeight={140}
           placeholder="Notes about active and upcoming campaigns, eligibility, registration, discount ranges, etc."
@@ -1193,8 +1230,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
       {/* ── Section 14: Recommendations & Action Items ──────────────────── */}
       {sectEnabled.recommendations && (
-      <SectionCard icon="bi-lightbulb-fill" color="#f59e0b" title="Recommendations & Action Items">
-        {presets.bar('recommendations', '#f59e0b')}
+      <SectionCard icon="bi-lightbulb-fill" color="var(--warning-text)" title="Recommendations & Action Items">
+        {presets.bar('recommendations', 'var(--warning)')}
         <RichTextEditor value={data.recommendations || ''}
           minHeight={160}
           placeholder="Share your recommendations and action items for next month."
@@ -1217,7 +1254,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               renderPreset={presets.custom} />
           )}
           {selectedBrand?.id && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed' }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)', borderStyle: 'dashed' }}>
               <div className="card-body p-3">
                 <AddCustomSectionInline
                   disabled={!selectedBrand?.id}
@@ -1244,14 +1281,14 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
         // field's name — so edit mode matches exactly what the saved view
         // shows (the view uses the field name as the section header). No more
         // generic "My Custom Fields (legacy)" wrapper that didn't match.
-        <SectionCard key={field.id} icon="bi-sliders" color="#8b5cf6" title={field.name}
+        <SectionCard key={field.id} icon="bi-sliders" color="var(--purple-text)" title={field.name}
           actions={
             <div className="d-flex gap-1">
-              <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+              <button className="btn btn-sm btn-outline-secondary border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
                 onClick={() => renameCustomField(field.id)} title="Rename">
                 <i className="bi bi-pencil" />
               </button>
-              <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+              <button className="btn btn-sm btn-outline-secondary border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
                 onClick={() => deleteCustomField(field.id)} title="Delete from my template">
                 <i className="bi bi-trash3" />
               </button>
@@ -1278,19 +1315,20 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
               Save Draft
             </button>
             <button className="btn px-4"
-              style={{ background: submitBlock ? '#94a3b8' : '#0f172a', color: 'white', border: 'none' }}
+              style={{ background: submitBlock ? 'var(--surface-3)' : 'var(--accent)', color: submitBlock ? 'var(--text-muted)' : 'var(--on-accent)', border: 'none' }}
               onClick={handleSubmitReport} disabled={saving || !!submitBlock}
               title={submitBlock?.kind === 'duplicate' ? 'Already submitted for this month' : submitBlock?.kind === 'pendingPrior' ? 'Waiting for OL approval on the previous report' : ''}>
               <i className="bi bi-send-fill me-1" /> Submit Report
             </button>
           </>
         ) : (
-          <button className="btn btn-dark px-3" onClick={handleSaveChanges} disabled={saving}>
+          <button className="btn btn-primary px-3" onClick={handleSaveChanges} disabled={saving}>
             {saving ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-save me-1" />}
             Save Changes
           </button>
         )}
       </div>
     </div>
+    </ReportIssuesContext.Provider>
   );
 }

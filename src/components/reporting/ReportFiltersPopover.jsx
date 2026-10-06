@@ -35,7 +35,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
       <button ref={anchorRef} type="button"
         className="btn btn-sm d-inline-flex align-items-center gap-1"
         style={{
-          borderRadius: 8,
+          borderRadius: 'var(--radius-sm)',
           fontSize: '0.78rem',
           border: `1px solid ${activeCount ? 'var(--info)' : 'var(--border-default)'}`,
           background: activeCount ? 'var(--info-soft)' : 'var(--surface-1)',
@@ -46,7 +46,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
         <i className="bi bi-sliders" />
         <span>Filters</span>
         {activeCount > 0 && (
-          <span className="badge rounded-pill" style={{ background: '#3b82f6', color: 'white', fontSize: '0.6rem' }}>
+          <span className="badge rounded-pill" style={{ background: 'var(--info)', color: 'var(--on-info)', fontSize: '0.6rem' }}>
             {activeCount}
           </span>
         )}
@@ -57,7 +57,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
           {/* Backdrop that dims the page behind the popover */}
           <div style={{
             position: 'fixed', inset: 0, zIndex: 999,
-            background: 'rgba(15, 23, 42, 0.25)', backdropFilter: 'blur(2px)',
+            background: 'color-mix(in srgb, var(--backdrop) 50%, transparent)', backdropFilter: 'blur(2px)',
           }} onClick={() => setOpen(false)} />
 
           <div ref={popRef}
@@ -69,9 +69,9 @@ export default function ReportFiltersPopover({ filters, onClear }) {
               width: 320,
               background: 'var(--surface-1)',
               border: '1px solid var(--border-default)',
-              borderRadius: 14,
+              borderRadius: 'var(--radius-lg)',
               padding: 0,
-              boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.35), 0 8px 16px -6px rgba(15, 23, 42, 0.15)',
+              boxShadow: 'var(--shadow-xl)',
               overflow: 'hidden',
             }}>
             <div className="d-flex align-items-center justify-content-between"
@@ -99,7 +99,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
                       {f.label}
                     </label>
                     <select className="form-select form-select-sm"
-                      style={{ borderRadius: 8, fontSize: '0.82rem' }}
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}
                       value={f.value} onChange={e => f.setValue(e.target.value)}>
                       <option value="">All {f.label}s</option>
                       {f.options.map(o => (
@@ -110,8 +110,8 @@ export default function ReportFiltersPopover({ filters, onClear }) {
                 ))}
               </div>
               <div className="d-flex justify-content-end mt-3 pt-2" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <button type="button" className="btn btn-sm btn-dark px-3"
-                  style={{ borderRadius: 8, fontSize: '0.76rem' }}
+                <button type="button" className="btn btn-sm btn-primary px-3"
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.76rem' }}
                   onClick={() => setOpen(false)}>
                   Done
                 </button>

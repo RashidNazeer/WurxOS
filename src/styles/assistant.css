@@ -7,7 +7,7 @@
 .ai-md li { margin: 0.12rem 0; }
 .ai-md code {
   background: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  padding: 0.05rem 0.32rem; border-radius: 5px; font-size: 0.85em;
+  padding: 0.05rem 0.32rem; border-radius: var(--radius-sm); font-size: 0.85em;
 }
 .ai-md a.ai-link { color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
 .ai-md a.ai-link:hover { text-decoration: underline; }
@@ -28,14 +28,14 @@
   border: 1px solid var(--border-subtle); background: var(--surface-1);
   color: var(--accent); font-weight: 600; font-size: 0.74rem;
   padding: 4px 10px; border-radius: var(--radius-pill, 999px); cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .wxai-newchat:hover { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 
 .wxai-convo {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: 10px; margin-bottom: 2px; cursor: pointer;
-  color: var(--text-secondary); transition: background 0.12s;
+  padding: 8px 10px; border-radius: var(--radius-md); margin-bottom: 2px; cursor: pointer;
+  color: var(--text-secondary); transition: background-color var(--dur-fast) var(--ease-out);
 }
 .wxai-convo:hover { background: var(--surface-2); }
 .wxai-convo.is-active { background: var(--accent-soft); color: var(--text-primary); }
@@ -44,8 +44,8 @@
 .wxai-convo-icon { font-size: 0.8rem; color: var(--text-muted); flex-shrink: 0; }
 .wxai-convo-del {
   border: 0; background: transparent; color: var(--text-muted);
-  font-size: 0.72rem; padding: 2px 4px; border-radius: 6px; opacity: 0;
-  transition: opacity 0.12s, color 0.12s, background 0.12s;
+  font-size: 0.72rem; padding: 2px 4px; border-radius: var(--radius-sm); opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 .wxai-convo:hover .wxai-convo-del { opacity: 1; }
 .wxai-convo-del:hover { color: var(--danger); background: var(--danger-soft); }
@@ -53,7 +53,7 @@
 /* Thread card */
 .wxai-thread {
   min-width: 0; background: var(--surface-1);
-  border: 1px solid var(--border-subtle); border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden;
 }
 .wxai-scroll { flex: 1; overflow-y: auto; padding: 22px 22px 8px; }
 
@@ -76,16 +76,16 @@
 .wxai-row.is-user .wxai-bubble-wrap { align-items: flex-end; }
 
 .wxai-bubble {
-  padding: 11px 15px; border-radius: 16px; font-size: 0.88rem; line-height: 1.6;
+  padding: 11px 15px; border-radius: var(--radius-lg); font-size: 0.88rem; line-height: 1.6;
   word-break: break-word; box-shadow: var(--shadow-sm);
 }
 .wxai-bubble.is-user {
   background: var(--accent); color: var(--on-accent, #fff);
-  white-space: pre-wrap; border-bottom-right-radius: 5px;
+  white-space: pre-wrap; border-bottom-right-radius: var(--radius-sm);
 }
 .wxai-bubble.is-bot {
   background: var(--surface-2); color: var(--text-primary);
-  border: 1px solid var(--border-subtle); border-bottom-left-radius: 5px;
+  border: 1px solid var(--border-subtle); border-bottom-left-radius: var(--radius-sm);
 }
 .wxai-time {
   font-size: 0.66rem; color: var(--text-muted); margin-top: 4px; padding: 0 4px;
@@ -95,9 +95,9 @@
 .wxai-composer { padding: 14px 16px 16px; border-top: 1px solid var(--border-subtle); }
 .wxai-input-wrap {
   display: flex; align-items: flex-end; gap: 8px;
-  background: var(--surface-0, var(--surface-2)); border: 1.5px solid var(--border-subtle);
-  border-radius: 22px; padding: 6px 6px 6px 16px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  background: var(--surface-0, var(--surface-2)); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl); padding: 6px 6px 6px 16px;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .wxai-input-wrap:focus-within {
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
@@ -113,7 +113,7 @@
   flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; border: 0;
   background: var(--accent); color: var(--on-accent, #fff);
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 1rem; cursor: pointer; transition: transform 0.1s, background 0.15s, opacity 0.15s;
+  font-size: 1rem; cursor: pointer; transition: transform var(--dur-instant) var(--ease-out), background-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
 .wxai-send:hover:not(:disabled) { transform: scale(1.06); }
 .wxai-send:active:not(:disabled) { transform: scale(0.96); }
@@ -129,7 +129,7 @@
 .wxai-status-dot {
   width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
   display: inline-block; margin-right: 7px; flex-shrink: 0;
-  animation: wxai-pulse 1s ease-in-out infinite;
+  animation: wxai-pulse 1s var(--ease-in-out) infinite;
 }
 @keyframes wxai-pulse { 0%,100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
 .ai-dots::after {

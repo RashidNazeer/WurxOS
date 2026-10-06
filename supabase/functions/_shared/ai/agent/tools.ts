@@ -153,6 +153,7 @@ export type ToolEnv = {
   searchRpc: Rpc;                   // search RPCs as the caller (ACL applies)
   asUser: string | null;            // set when searchRpc runs as the service role
   embed: (text: string) => Promise<number[] | null>;
+  embedAlt?: (text: string) => Promise<number[] | null>;   // NVIDIA query vector (mig 406), when `embed` has none
   rerank?: Reranker;
   retrieval: RetrievalConfig;
   agent: AgentConfig;
@@ -242,7 +243,7 @@ async function reportFilters(env: ToolEnv, args: any): Promise<Resolved> {
 async function runSearch(env: ToolEnv, reg: CiteRegistry, name: string, args: any): Promise<{ text: string; cites: string[] }> {
   const q = String(args?.query ?? '').trim();
   if (!q) return { text: 'Give a search query.', cites: [] };
-  const deps = { rpc: env.searchRpc, embed: env.embed, asUser: env.asUser, config: env.retrieval, now: env.now, rerank: env.rerank };
+  const deps = { rpc: env.searchRpc, embed: env.embed, embedAlt: env.embedAlt, asUser: env.asUser, config: env.retrieval, now: env.now, rerank: env.rerank };
   if (name === 'search_everything') {
     const rf = args.brand || args.period ? await reportFilters(env, args) : { filters: {}, notes: [] as string[] };
     if (rf.stop) return { text: rf.stop, cites: [] };

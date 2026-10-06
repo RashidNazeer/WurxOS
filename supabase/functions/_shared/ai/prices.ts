@@ -9,6 +9,10 @@ export type Prices = Record<string, Price>;
 export const DEFAULT_PRICES: Readonly<Prices> = Object.freeze({
   'gpt-5.4-mini': { in: 0.75, cached: 0.075, out: 4.5 },
   'gpt-5.5': { in: 5, cached: 0.5, out: 30 },
+  // ASSUMED, not a verified list price (2026-09-30): check OpenAI's price page.
+  'gpt-5.4-nano': { in: 0.2, cached: 0.02, out: 1.25 },
+  // Answers free on the fallback key (Lead's probe, 2026-10-01).
+  'gpt-6-luna': { in: 0, cached: 0, out: 0 },
   'text-embedding-3-small': { in: 0.02, cached: 0.02, out: 0 },
 });
 
@@ -38,7 +42,7 @@ export function costUsd(prices: Prices, model: string, u: TokenUsage): { usd: nu
 // Per-question spend outside the chat model: reranks and query embeddings.
 export class UsageMeter {
   rerank = { calls: 0, input: 0, cached: 0, output: 0, model: '' };
-  embed = { calls: 0, input: 0, model: '' };
+  embed = { calls: 0, input: 0, model: '', keySlot: 'primary' as 'primary' | 'fallback' };
   onRerank = (model: string) => (u: { input_tokens: number; output_tokens: number; cached_tokens?: number }) => {
     this.rerank.calls++;
     this.rerank.input += u.input_tokens ?? 0;
@@ -46,9 +50,10 @@ export class UsageMeter {
     this.rerank.output += u.output_tokens ?? 0;
     this.rerank.model = model;
   };
-  onEmbed = (model: string) => (tokens: number) => {
+  onEmbed = (model: string, keySlot: 'primary' | 'fallback' = 'primary') => (tokens: number) => {
     this.embed.calls++;
     this.embed.input += tokens ?? 0;
     this.embed.model = model;
+    this.embed.keySlot = keySlot;
   };
 }

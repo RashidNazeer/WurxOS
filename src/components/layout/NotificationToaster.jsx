@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { useNotifications } from '../../contexts/NotificationsContext';
 import { formatRelTime } from '../../lib/notificationsApi';
+import { resolveNotificationLink } from '../../lib/notificationLinks';
 import {
   XIcon, CheckIcon, ChecklistIcon, ReportIcon, StoreIcon,
   MegaphoneIcon, HomeIcon, BookmarkIcon, StarIcon, MessageIcon, UsersIcon,
@@ -28,7 +29,7 @@ const CATEGORY_META = {
   system:      { label: 'System',      icon: MessageIcon,   cat: 'system' },
 };
 
-const LEAVE_MS = 240;   // keep in sync with the .is-leaving animation duration
+const LEAVE_MS = 160;   // keep in sync with the .is-leaving animation duration (--dur-exit)
 
 export default function NotificationToaster() {
   const { toasts, dismissToast, clearToasts, markRead, markAllRead } = useNotifications();
@@ -40,7 +41,8 @@ export default function NotificationToaster() {
 
   function open(n) {
     markRead(n.id);
-    if (n.link) { const go = () => navigate(n.link); if (!maybeGuardLeave(go)) go(); }
+    const to = resolveNotificationLink(n);
+    if (to) { const go = () => navigate(to); if (!maybeGuardLeave(go)) go(); }
     dismissToast(n.id);
   }
 
@@ -112,7 +114,7 @@ function ToastCard({ n, remaining, onClose, onOpen, onMarkAll }) {
         </button>
 
         <div className="notif-toast-foot">
-          {n.link
+          {resolveNotificationLink(n)
             ? <button type="button" className="notif-toast-open" onClick={() => close(onOpen)}>View details</button>
             : <span />}
           <button type="button" className="notif-toast-markall" onClick={() => close(onMarkAll)}>

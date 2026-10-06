@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { listBrands } from '../../lib/brandsApi';
+import { listBrands, listActiveTempAssignments, endTempAssignmentEarly } from '../../lib/brandsApi';
 import { listBrandSwitchRequests, decideBrandSwitch, cancelBrandSwitch } from '../../lib/brandSwitchApi';
 import { useAuth } from '../../contexts/AuthContext';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import SwitchApcModal from '../../components/brands/SwitchApcModal';
 import {
   RefreshIcon, CheckIcon, XIcon, AlertIcon, SearchIcon, UsersIcon,
-  ChecklistIcon, StoreIcon,
+  ChecklistIcon, StoreIcon, ClockIcon,
 } from '../../components/common/Icon';
 import '../../styles/brandSwitcher.css';
 
@@ -35,6 +35,11 @@ export default function BrandSwitcherPage() {
   const { data: requests = [], isLoading: reqLoading } = useQuery({
     queryKey: ['brand-switch-requests'],
     queryFn: () => listBrandSwitchRequests(),
+  });
+
+  const { data: covering = [], isLoading: coveringLoading } = useQuery({
+    queryKey: ['brand-temp-assignments'],
+    queryFn: () => listActiveTempAssignments(),
   });
 
   const pending = useMemo(() => requests.filter((r) => r.status === 'pending'), [requests]);
@@ -81,6 +86,15 @@ export default function BrandSwitcherPage() {
     } catch (e) { setLocalErr(e.message); }
   }
 
+  async function endCoverNow(row) {
+    if (!confirm(`End this cover now? "${row.brand?.brand_name}" will go straight back to ${row.original?.display_name}.`)) return;
+    try {
+      await endTempAssignmentEarly(row.id);
+      qc.invalidateQueries({ queryKey: ['brand-temp-assignments'] });
+      qc.invalidateQueries({ queryKey: ['brands'] });
+    } catch (e) { setLocalErr(e.message); }
+  }
+
   const err = localErr;
 
   return (
@@ -114,10 +128,18 @@ export default function BrandSwitcherPage() {
         <button type="button" className={`wx-seg-btn ${tab === 'pending' ? 'is-active' : ''}`}
           onClick={() => setTab('pending')}>
           Pending {pending.length > 0 && <span style={{
-            marginLeft: 6, padding: '1px 7px', borderRadius: 999,
+            marginLeft: 6, padding: '1px 7px', borderRadius: 'var(--radius-pill)',
             background: 'color-mix(in srgb, var(--accent) 22%, transparent)',
             color: 'var(--accent)', fontSize: 10.5,
           }}>{pending.length}</span>}
+        </button>
+        <button type="button" className={`wx-seg-btn ${tab === 'covering' ? 'is-active' : ''}`}
+          onClick={() => setTab('covering')}>
+          <ClockIcon width="13" height="13" /> Covering {covering.length > 0 && <span style={{
+            marginLeft: 6, padding: '1px 7px', borderRadius: 'var(--radius-pill)',
+            background: 'color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent)',
+            color: 'var(--warning, #b45309)', fontSize: 10.5,
+          }}>{covering.length}</span>}
         </button>
         <button type="button" className={`wx-seg-btn ${tab === 'history' ? 'is-active' : ''}`}
           onClick={() => setTab('history')}>
@@ -176,6 +198,11 @@ export default function BrandSwitcherPage() {
           onCancel={cancelRow} />
       )}
 
+      {/* Covering tab — active temporary covers, with an early-return action */}
+      {tab === 'covering' && (
+        <CoveringList rows={covering} loading={coveringLoading} onEndNow={endCoverNow} />
+      )}
+
       {/* History tab */}
       {tab === 'history' && (
         <RequestList
@@ -197,6 +224,7 @@ export default function BrandSwitcherPage() {
             setSwitchBrand(null);
             qc.invalidateQueries({ queryKey: ['brands'] });
             qc.invalidateQueries({ queryKey: ['brand-switch-requests'] });
+            qc.invalidateQueries({ queryKey: ['brand-temp-assignments'] });
             if (mode === 'request') setTab('pending');
           }} />
       )}
@@ -288,7 +316,7 @@ function RequestRow({ row, isBoss, currentUserId, onDecide, onCancel }) {
 
   return (
     <div className={`bsw-req ${pending ? 'is-pending' : ''}`}>
-      <BrandAvatar brand={row.brand} size={36} radius={8} />
+      <BrandAvatar brand={row.brand} size={36} radius={6} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>{row.brand?.brand_name || '—'}</div>
         <div className="bsw-req-meta">
@@ -340,6 +368,61 @@ function RequestRow({ row, isBoss, currentUserId, onDecide, onCancel }) {
 }
 
 // ============================================================
+function CoveringList({ rows, loading, onEndNow }) {
+  if (loading) return <div className="bsw-empty"><span className="wx-spinner" /> Loading…</div>;
+  if (rows.length === 0) {
+    return (
+      <div className="bsw-empty">
+        <div className="bsw-empty-title">Nothing being covered right now</div>
+        <div>Pick "Temporary cover" from a brand's Reassign APC action to cover someone's leave.</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      {rows.map((r) => <CoveringRow key={r.id} row={r} onEndNow={() => onEndNow(r)} />)}
+    </div>
+  );
+}
+
+function CoveringRow({ row, onEndNow }) {
+  const daysLeft = Math.max(0, Math.ceil((new Date(row.ends_at) - Date.now()) / 86400000));
+  return (
+    <div className="bsw-req">
+      <BrandAvatar brand={row.brand} size={36} radius={6} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 13.5 }}>{row.brand?.brand_name || '—'}</div>
+        <div className="bsw-req-meta">
+          set up by <strong style={{ color: 'var(--text-secondary)' }}>{row.creator?.display_name || '—'}</strong>
+        </div>
+      </div>
+      <div className="bsw-req-to">
+        <div className="bsw-row-chip">
+          <Avatar user={row.covering} size={22} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 12.5 }}>{row.covering?.display_name}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.05em' }}>
+              COVERING FOR {(row.original?.display_name || '—').toUpperCase()}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="bsw-req-reason">
+        Returns to <strong style={{ color: 'var(--text-secondary)' }}>{row.original?.display_name}</strong> on{' '}
+        {new Date(row.ends_at).toLocaleDateString()} ({daysLeft === 0 ? 'today' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`})
+        {row.note && <em>"{row.note}"</em>}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+        <button className="wx-btn wx-btn-ghost" onClick={onEndNow}
+          style={{ padding: '5px 10px', fontSize: 12 }}>
+          <CheckIcon width="12" height="12" /> Return now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 function Avatar({ user, size = 28 }) {
   const style = {
     width: size, height: size, borderRadius: '50%', overflow: 'hidden',
@@ -369,7 +452,7 @@ function ActionChip({ action }) {
         ? 'Swap: both APCs exchange their whole brand portfolios.'
         : 'Assign: only this brand moves; the new APC keeps their own.'}
       style={{
-        padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+        padding: '1px 7px', borderRadius: 'var(--radius-pill)', fontSize: 10, fontWeight: 800,
         letterSpacing: '0.04em', textTransform: 'uppercase',
         background: swap
           ? 'color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent)'

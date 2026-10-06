@@ -5,16 +5,19 @@ import { maybeGuardLeave } from '../../lib/reportLeaveGuard';
 import { useAuth } from '../../contexts/AuthContext';
 import { roleLabel } from '../../lib/roles';
 import ThemeToggle from '../common/ThemeToggle';
+import { useTheme } from '../../contexts/ThemeContext';
+import { clearVisits } from '../../lib/recentVisits';
 import NotificationBell from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
-import { ChevronDownIcon, LogoutIcon, UserIcon, SettingsIcon, InstallIcon, MenuIcon } from '../common/Icon';
+import { ChevronDownIcon, LogoutIcon, UserIcon, SettingsIcon, InstallIcon, MenuIcon, SunIcon, MoonIcon } from '../common/Icon';
 import { canInstall, onInstallAvailable, promptInstall, isStandalone } from '../../lib/pwa';
 // Dialogs on Settings, Chat, Incentives and Creator Library use .wx-modal from
 // this sheet without importing it; the top bar is on every page, so it loads it.
 import '../../styles/table.css';
 
-export default function Topbar({ title, subtitle, onMobileMenu }) {
+export default function Topbar({ title, subtitle, onMobileMenu, sidebarCollapsed, onToggleSidebar }) {
   const { user, profile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [installable, setInstallable] = useState(canInstall());
@@ -35,8 +38,8 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
   }, []);
 
   // Anchor the portaled menu under the trigger; the profile dropdown is portaled
-  // (like NotificationBell/GlobalSearch) so it escapes the topbar's z-index:5
-  // stacking context and never renders under sticky page toolbars (.ck-topbar etc.).
+  // (like NotificationBell/GlobalSearch) so it escapes the topbar's stacking
+  // context (z-index: var(--z-topbar)) and layers at --z-popover above everything.
   useLayoutEffect(() => {
     if (!menuOpen) return undefined;
     const place = () => {
@@ -78,6 +81,18 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
             <MenuIcon width="20" height="20" />
           </button>
         )}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            className="shell-icon-btn shell-collapse-btn"
+            onClick={onToggleSidebar}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <MenuIcon width="17" height="17" />
+          </button>
+        )}
         <div className="shell-topbar-titles">
           <div className="shell-topbar-title">{title}</div>
           {subtitle && <div className="shell-topbar-subtitle">{subtitle}</div>}
@@ -86,12 +101,15 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
       <div className="shell-topbar-right">
         <GlobalSearch />
         <NotificationBell />
-        <ThemeToggle />
+        <ThemeToggle className="shell-theme-toggle" />
         <div style={{ position: 'relative' }} ref={ref}>
           <button
             type="button"
             className="shell-user-btn"
             onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Account menu"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
           >
             <div className="shell-user-avatar">
               {profile?.avatar_url
@@ -135,8 +153,16 @@ export default function Topbar({ title, subtitle, onMobileMenu }) {
                   </button>
                 </>
               )}
+              {/* Phones: the topbar drops its theme button, so it lives here. */}
+              <button
+                className="shell-user-menu-item shell-user-menu-theme"
+                onClick={() => { setMenuOpen(false); toggleTheme(); }}
+              >
+                {theme === 'dark' ? <SunIcon width="16" height="16" /> : <MoonIcon width="16" height="16" />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </button>
               <div className="shell-user-menu-divider" />
-              <button className="shell-user-menu-item danger" onClick={signOut}>
+              <button className="shell-user-menu-item danger" onClick={() => { clearVisits(); signOut(); }}>
                 <LogoutIcon width="16" height="16" />
                 Sign out
               </button>

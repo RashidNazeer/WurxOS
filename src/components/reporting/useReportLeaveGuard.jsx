@@ -116,11 +116,11 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1080,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 16, background: 'rgba(15,23,42,0.55)',
+      padding: 16, background: 'var(--backdrop)',
     }}>
       <div className="rounded-3" style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        boxShadow: '0 24px 64px rgba(2,6,23,0.45)', maxWidth: 440, width: '100%',
+        boxShadow: 'var(--shadow-xl)', maxWidth: 440, width: '100%',
         padding: '22px 22px 18px',
       }}>
         <div className="d-flex align-items-start gap-3 mb-2">
@@ -139,12 +139,12 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
         </div>
         <div className="d-flex flex-column gap-2 mt-3">
           <button type="button" className="btn btn-primary d-inline-flex align-items-center justify-content-center gap-2"
-            style={{ borderRadius: 10 }} disabled={saving} onClick={onLeave}>
+            style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={onLeave}>
             {saving ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-box-arrow-right" />}
             Save &amp; leave
           </button>
           <button type="button" className="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-2"
-            style={{ borderRadius: 10 }} disabled={saving} onClick={onStay}>
+            style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={onStay}>
             <i className="bi bi-arrow-counterclockwise" /> Save &amp; stay here
           </button>
           {/* Escape hatch: drop the edits and leave. Confirms first because
@@ -152,7 +152,7 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
           {!confirmDiscard ? (
             <button type="button"
               className="btn btn-link d-inline-flex align-items-center justify-content-center gap-2 text-decoration-none"
-              style={{ borderRadius: 10, color: 'var(--danger)', fontSize: '0.85rem' }}
+              style={{ borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.85rem' }}
               disabled={saving} onClick={() => setConfirmDiscard(true)}>
               <i className="bi bi-trash3" /> Exit without saving
             </button>
@@ -164,11 +164,11 @@ function LeaveReportModal({ saving, onLeave, onStay, onDiscard, noun = 'report' 
               </div>
               <div className="d-flex gap-2">
                 <button type="button" className="btn btn-danger flex-fill d-inline-flex align-items-center justify-content-center gap-2"
-                  style={{ borderRadius: 10 }} disabled={saving} onClick={onDiscard}>
+                  style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={onDiscard}>
                   <i className="bi bi-trash3" /> Yes, discard
                 </button>
                 <button type="button" className="btn btn-outline-secondary flex-fill"
-                  style={{ borderRadius: 10 }} disabled={saving} onClick={() => setConfirmDiscard(false)}>
+                  style={{ borderRadius: 'var(--radius-md)' }} disabled={saving} onClick={() => setConfirmDiscard(false)}>
                   Cancel
                 </button>
               </div>

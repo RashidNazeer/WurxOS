@@ -120,7 +120,7 @@ export default function OlIncentiveBrandsSection() {
                     const on = selected.has(b.id);
                     return (
                       <label key={b.id} className="d-flex align-items-center gap-2"
-                        style={{ padding: '7px 10px', borderRadius: 8, cursor: 'pointer',
+                        style={{ padding: '7px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                           background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
                           border: `1px solid ${on ? 'var(--accent)' : 'var(--border-subtle)'}` }}>
                         <input type="checkbox" className="form-check-input mt-0" checked={on} onChange={() => toggle(b.id)} />

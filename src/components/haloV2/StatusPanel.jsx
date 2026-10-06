@@ -42,12 +42,12 @@ export default function StatusPanel({
       className="wx-card"
       style={{
         padding: 18,
-        borderLeft: '3px solid var(--warning, #f59e0b)',
+        borderLeft: '2px solid var(--warning)',
         background: 'linear-gradient(to right, rgba(245,158,11,.05), transparent 60%)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-        <i className="bi bi-signpost-split" style={{ color: 'var(--warning, #f59e0b)' }} />
+        <i className="bi bi-signpost-split" style={{ color: 'var(--warning, var(--warning-text))' }} />
         <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0 }}>
           Not enough history for {what} at {assessment.label} yet
         </h3>

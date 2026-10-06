@@ -37,7 +37,7 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
     e.preventDefault();
     setError('');
     if (!displayName.trim()) return setError('Name is required.');
-    if (!isTargetBoss && !isSelf && extras.reportsToRole && !reportsTo) {
+    if (!isTargetBoss && !isSelf && extras.reportsToRole && !extras.optional && !reportsTo) {
       return setError(`Please select a ${roleLabel(extras.reportsToRole)}.`);
     }
 
@@ -173,6 +173,7 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
                     permissions={permissions}
                     onPermissions={setPermissions}
                     disabled={saving}
+                    excludeUserId={user.id}
                   />
                 </div>
               </>
@@ -272,7 +273,7 @@ export default function EditUserModal({ user, onClose, onUpdated }) {
                   className="wx-btn"
                   style={{
                     background: 'var(--danger)',
-                    color: '#fff',
+                    color: 'var(--on-danger)',
                     border: 0,
                     fontWeight: 600,
                     width: '100%',
@@ -310,13 +311,13 @@ function Switch({ checked, onChange, disabled }) {
       style={{
         width: 42,
         height: 24,
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         background: checked ? 'var(--accent)' : 'var(--surface-3)',
         border: '1px solid',
         borderColor: checked ? 'var(--accent)' : 'var(--border-default)',
         position: 'relative',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'all var(--dur-fast) var(--ease-out)',
+        transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
         padding: 0,
         flex: '0 0 auto',
       }}
@@ -331,8 +332,8 @@ function Switch({ checked, onChange, disabled }) {
           width: 18,
           height: 18,
           borderRadius: '50%',
-          background: '#fff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          background: 'var(--switch-knob)',
+          boxShadow: 'var(--shadow-sm)',
           transition: 'left var(--dur-fast) var(--ease-out)',
         }}
       />

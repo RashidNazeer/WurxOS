@@ -75,12 +75,12 @@ export default function EukaReportPreview({ storeId, store }) {
   const preview = autofill ? toFullReport(week, store?.name, autofill) : null;
 
   return (
-    <Section span={12} title="Weekly report — Euka preview" icon="bi-magic" color="#7c3aed"
+    <Section span={12} title="Weekly report — Euka preview" icon="bi-magic" color="var(--purple-text)"
       eyebrow="Boss-only preview. Pick a week to pull the exact stats Euka provides into the weekly-report layout. Nothing is saved — this is a live view, not a real report.">
       <div className="d-flex align-items-center flex-wrap gap-3 mb-2">
         <div className="d-inline-flex align-items-center gap-2">
           <span className="text-muted" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Week anchor</span>
-          <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 9 }}
+          <input type="date" className="form-control form-control-sm" style={{ width: 'auto', borderRadius: 'var(--radius-md)' }}
             value={anchor} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setAnchor(e.target.value)} />
         </div>
         {week && (
@@ -88,7 +88,7 @@ export default function EukaReportPreview({ storeId, store }) {
             {week.label}
           </span>
         )}
-        <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-2" style={{ borderRadius: 9 }}
+        <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-2" style={{ borderRadius: 'var(--radius-md)' }}
           disabled={busy || !storeId || !week} onClick={generate}>
           {busy ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-magic" />}
           Generate preview
@@ -105,7 +105,7 @@ export default function EukaReportPreview({ storeId, store }) {
       {err && <div className="alert alert-danger py-2 small mt-3 mb-0">{err}</div>}
 
       {preview && (
-        <div className="mt-3" style={{ border: '1px dashed var(--border-default)', borderRadius: 12, padding: 4 }}>
+        <div className="mt-3" style={{ border: '1px dashed var(--border-default)', borderRadius: 'var(--radius-md)', padding: 4 }}>
           <div className="px-3 pt-2 pb-1 text-muted" style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <i className="bi bi-eye me-1" />Preview · not saved
           </div>

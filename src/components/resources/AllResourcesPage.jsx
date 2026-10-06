@@ -27,11 +27,13 @@ function brandColor(name = '') {
   return BRAND_PALETTE[Math.abs(h) % BRAND_PALETTE.length];
 }
 
+const tint = (c, pct) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
 const TYPE_CFG = {
-  link:  { icon: 'bi-link-45deg',       label: 'Link',  color: '#0d6efd', bg: '#e8f0fe' },
-  image: { icon: 'bi-image-fill',        label: 'Image', color: '#6610f2', bg: '#f3e8ff' },
-  video: { icon: 'bi-camera-video-fill', label: 'Video', color: '#dc3545', bg: '#ffe8e8' },
-  file:  { icon: 'bi-file-earmark-text', label: 'File',  color: '#0dcaf0', bg: '#e0f7fa' },
+  link:  { icon: 'bi-link-45deg',       label: 'Link',  color: 'var(--info-text)', bg: 'var(--info-soft)' },
+  image: { icon: 'bi-image-fill',        label: 'Image', color: 'var(--purple-text)', bg: 'var(--purple-soft)' },
+  video: { icon: 'bi-camera-video-fill', label: 'Video', color: 'var(--danger-text)', bg: 'var(--danger-soft)' },
+  file:  { icon: 'bi-file-earmark-text', label: 'File',  color: 'var(--text-secondary)', bg: 'var(--surface-2)' },
 };
 
 function detectType(url = '') {
@@ -231,7 +233,7 @@ export default function AllResourcesPage() {
           <div className="btn-group btn-group-sm" role="group">
             <button
               className={`btn ${viewMode === 'grid' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: '8px 0 0 8px' }}
+              style={{ borderRadius: 'var(--radius-sm) 0 0 var(--radius-sm)' }}
               onClick={() => setViewMode('grid')}
               title="Grid view"
             >
@@ -239,7 +241,7 @@ export default function AllResourcesPage() {
             </button>
             <button
               className={`btn ${viewMode === 'list' ? 'btn-dark' : 'btn-outline-secondary'}`}
-              style={{ borderRadius: '0 8px 8px 0' }}
+              style={{ borderRadius: '0 var(--radius-sm) var(--radius-sm) 0' }}
               onClick={() => setViewMode('list')}
               title="List view"
             >
@@ -250,7 +252,7 @@ export default function AllResourcesPage() {
           {/* Add Resource */}
           <button
             className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.8rem' }}
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
             onClick={() => setShowAddModal(true)}
           >
             <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} />
@@ -270,7 +272,7 @@ export default function AllResourcesPage() {
             <div
               key={type}
               className="d-flex align-items-center gap-2 px-3 py-2 rounded-2"
-              style={{ background: cfg.bg, border: `1px solid ${cfg.color}22`, cursor: 'pointer' }}
+              style={{ background: cfg.bg, border: `1px solid ${tint(cfg.color, 13)}`, cursor: 'pointer' }}
               onClick={() => setFilterType(filterType === type ? '' : type)}
               title={`Filter by ${cfg.label}`}
             >
@@ -283,7 +285,7 @@ export default function AllResourcesPage() {
       )}
 
       {/* Filters */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           <div className="d-flex flex-wrap gap-2 align-items-center">
 
@@ -294,7 +296,7 @@ export default function AllResourcesPage() {
                 type="text"
                 className="form-control form-control-sm"
                 placeholder="Search by name, URL, description…"
-                style={{ paddingLeft: 30, borderRadius: 8 }}
+                style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -302,7 +304,7 @@ export default function AllResourcesPage() {
 
             <select
               className="form-select form-select-sm"
-              style={{ borderRadius: 8, width: 'auto', minWidth: 140 }}
+              style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 140 }}
               value={filterBrand}
               onChange={e => setFilterBrand(e.target.value)}
             >
@@ -312,7 +314,7 @@ export default function AllResourcesPage() {
 
             <select
               className="form-select form-select-sm"
-              style={{ borderRadius: 8, width: 'auto', minWidth: 120 }}
+              style={{ borderRadius: 'var(--radius-sm)', width: 'auto', minWidth: 120 }}
               value={filterType}
               onChange={e => setFilterType(e.target.value)}
             >
@@ -329,10 +331,10 @@ export default function AllResourcesPage() {
                 <button key={v.key}
                   className="btn btn-sm d-inline-flex align-items-center gap-1"
                   style={{
-                    borderRadius: 8, fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap',
-                    background: filterScope === v.key ? '#0d6efd' : 'var(--surface-2)',
+                    borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'nowrap',
+                    background: filterScope === v.key ? 'var(--info)' : 'var(--surface-2)',
                     color: filterScope === v.key ? '#fff' : 'var(--text-secondary)',
-                    border: filterScope === v.key ? '1.5px solid #0d6efd' : '1.5px solid var(--border-subtle)',
+                    border: filterScope === v.key ? '2px solid #0d6efd' : '1px solid var(--border-subtle)',
                   }}
                   onClick={() => setFilterScope(filterScope === v.key ? '' : v.key)}>
                   <i className={`bi ${v.icon}`} style={{ fontSize: '0.65rem' }} />{v.label}
@@ -343,7 +345,7 @@ export default function AllResourcesPage() {
             {hasFilters && (
               <button
                 className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 ms-auto"
-                style={{ borderRadius: 8, fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                 onClick={clearFilters}
               >
                 <i className="bi bi-x-circle" /> Clear filters
@@ -362,7 +364,7 @@ export default function AllResourcesPage() {
       ) : filtered.length === 0 ? (
         <div
           className="d-flex flex-column align-items-center justify-content-center py-5"
-          style={{ border: '2px dashed var(--border-subtle)', borderRadius: 16, background: 'var(--surface-1)' }}
+          style={{ border: '2px dashed var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}
         >
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-collection text-muted" style={{ fontSize: '1.6rem', opacity: 0.55 }} />
@@ -374,7 +376,7 @@ export default function AllResourcesPage() {
             {hasFilters ? 'Try adjusting your search or filters.' : 'Click "Add Resource" to create one.'}
           </p>
           {hasFilters && (
-            <button className="btn btn-sm btn-outline-secondary mt-3" style={{ borderRadius: 8 }} onClick={clearFilters}>
+            <button className="btn btn-sm btn-outline-secondary mt-3" style={{ borderRadius: 'var(--radius-sm)' }} onClick={clearFilters}>
               Clear filters
             </button>
           )}
@@ -445,11 +447,11 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
   return (
     <div
       className="card border-0 shadow-sm h-100"
-      style={{ borderRadius: 14, transition: 'transform 0.12s, box-shadow 0.12s', position: 'relative' }}
+      style={{ borderRadius: 'var(--radius-lg)', transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)', position: 'relative' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.1)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
     >
-      <div style={{ height: 4, borderRadius: '14px 14px 0 0', background: isGeneral ? `linear-gradient(90deg,${tCfg.color},#6610f2)` : `linear-gradient(90deg,${bc},${tCfg.color})` }} />
+      <div style={{ height: 4, borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', background: isGeneral ? `linear-gradient(90deg,${tCfg.color},#6610f2)` : `linear-gradient(90deg,${bc},${tCfg.color})` }} />
 
       <div className="card-body p-3 d-flex flex-column gap-2" style={{ minWidth: 0, overflow: 'hidden' }}>
         <div className="d-flex align-items-start gap-2" style={{ minWidth: 0 }}>
@@ -463,12 +465,12 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
             </p>
             <div className="d-flex align-items-center gap-1 flex-wrap mt-1">
               <span className="badge rounded-pill"
-                style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tCfg.color}30`, fontSize: '0.6rem', fontWeight: 600 }}>
+                style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tint(tCfg.color, 19)}`, fontSize: '0.6rem', fontWeight: 600 }}>
                 {tCfg.label}
               </span>
               {isGeneral && visCfg && (
                 <span className="badge rounded-pill d-inline-flex align-items-center gap-1"
-                  style={{ background: `${visCfg.color}15`, color: visCfg.color, border: `1px solid ${visCfg.color}30`, fontSize: '0.58rem', fontWeight: 600 }}
+                  style={{ background: tint(visCfg.color, 8), color: visCfg.color, border: `1px solid ${tint(visCfg.color, 19)}`, fontSize: '0.58rem', fontWeight: 600 }}
                   title={visCfg.label}>
                   <i className={`bi ${visCfg.icon}`} style={{ fontSize: '0.55rem' }} />
                   {r.visibility === 'private' ? 'Private' : r.visibility === 'office' ? 'Office' : r.visibility === 'user' ? 'Shared' : 'Group'}
@@ -544,7 +546,7 @@ function ResourceCard({ r, onDelete, onEdit, currentUid, myRole, brands }) {
 
 function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRole, brands }) {
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto' }}>
         <table className="table table-hover mb-0" style={{ fontSize: '0.83rem', minWidth: 640 }}>
           <thead>
@@ -583,7 +585,7 @@ function ResourceListView({ resources, total, onDelete, onEdit, currentUid, myRo
                     </div>
                   </td>
                   <td style={{ padding: '11px 16px', verticalAlign: 'middle' }}>
-                    <span className="badge rounded-pill" style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tCfg.color}30`, fontSize: '0.65rem', fontWeight: 600 }}>
+                    <span className="badge rounded-pill" style={{ background: tCfg.bg, color: tCfg.color, border: `1px solid ${tint(tCfg.color, 19)}`, fontSize: '0.65rem', fontWeight: 600 }}>
                       {tCfg.label}
                     </span>
                   </td>
@@ -691,8 +693,8 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div className="card-body p-4" style={{ overflowY: 'auto' }}>
           <div className="d-flex align-items-center justify-content-between mb-4">
             <div>
@@ -720,13 +722,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                   onClick={() => setScope('brand')}
                   className="d-inline-flex align-items-center gap-2 rounded-3 border flex-grow-1 p-2"
                   style={{
-                    background: scope === 'brand' ? '#e8f0fe' : 'var(--surface-1)',
-                    borderColor: scope === 'brand' ? '#0d6efd' : 'var(--border-subtle)',
+                    background: scope === 'brand' ? 'var(--info-soft)' : 'var(--surface-1)',
+                    borderColor: scope === 'brand' ? 'var(--info)' : 'var(--border-subtle)',
                     cursor: 'pointer',
                   }}>
-                  <i className="bi bi-shop" style={{ color: '#0d6efd' }} />
+                  <i className="bi bi-shop" style={{ color: 'var(--info-text)' }} />
                   <div className="text-start" style={{ lineHeight: 1.2 }}>
-                    <div className="small fw-semibold" style={{ color: scope === 'brand' ? '#0d6efd' : 'var(--text-secondary)' }}>Brand resource</div>
+                    <div className="small fw-semibold" style={{ color: scope === 'brand' ? 'var(--info-text)' : 'var(--text-secondary)' }}>Brand resource</div>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Tied to a specific brand</div>
                   </div>
                 </button>
@@ -734,13 +736,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                   onClick={() => setScope('general')}
                   className="d-inline-flex align-items-center gap-2 rounded-3 border flex-grow-1 p-2"
                   style={{
-                    background: scope === 'general' ? '#e8f0fe' : 'var(--surface-1)',
-                    borderColor: scope === 'general' ? '#0d6efd' : 'var(--border-subtle)',
+                    background: scope === 'general' ? 'var(--info-soft)' : 'var(--surface-1)',
+                    borderColor: scope === 'general' ? 'var(--info)' : 'var(--border-subtle)',
                     cursor: 'pointer',
                   }}>
-                  <i className="bi bi-globe2" style={{ color: '#0d6efd' }} />
+                  <i className="bi bi-globe2" style={{ color: 'var(--info-text)' }} />
                   <div className="text-start" style={{ lineHeight: 1.2 }}>
-                    <div className="small fw-semibold" style={{ color: scope === 'general' ? '#0d6efd' : 'var(--text-secondary)' }}>General</div>
+                    <div className="small fw-semibold" style={{ color: scope === 'general' ? 'var(--info-text)' : 'var(--text-secondary)' }}>General</div>
                     <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Personal or shared</div>
                   </div>
                 </button>
@@ -751,7 +753,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
             {scope === 'brand' && (
               <div className="mb-3">
                 <label className="form-label small fw-semibold">Brand <span className="text-danger">*</span></label>
-                <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+                <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                   value={brandId} onChange={e => setBrandId(e.target.value)}>
                   <option value="">Select a brand…</option>
                   {brands.map(b => <option key={b.id} value={b.id}>{b.brandName || b.brand_name}</option>)}
@@ -770,8 +772,8 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                       <label key={v}
                         className="d-flex align-items-center gap-2 p-2 rounded-2"
                         style={{
-                          background: visibility === v ? `${cfg.color}15` : 'var(--surface-1)',
-                          border: `1.5px solid ${visibility === v ? cfg.color + '55' : 'var(--border-subtle)'}`,
+                          background: visibility === v ? `${tint(cfg.color, 8)}` : 'var(--surface-1)',
+                          border: `${visibility === v ? '2px' : '1px'} solid ${visibility === v ? cfg.color + '55' : 'var(--border-subtle)'}`,
                           cursor: 'pointer',
                         }}>
                         <input type="radio" className="form-check-input" checked={visibility === v} onChange={() => setVisibility(v)} />
@@ -793,9 +795,9 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                       placeholder="Search users…"
                       value={userSearch}
                       onChange={e => setUserSearch(e.target.value)}
-                      style={{ borderRadius: 8 }}
+                      style={{ borderRadius: 'var(--radius-sm)' }}
                     />
-                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+                    <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
                       {userOptions.length === 0 && (
                         <div className="text-center py-2 small text-muted">No users match</div>
                       )}
@@ -804,7 +806,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                           className="d-flex align-items-center gap-2 p-2"
                           style={{
                             cursor: 'pointer',
-                            background: visibleToUid === u.id ? '#e8f0fe' : 'transparent',
+                            background: visibleToUid === u.id ? 'var(--info-soft)' : 'transparent',
                             borderBottom: '1px solid var(--border-subtle)',
                           }}
                           onClick={() => setVisibleToUid(u.id)}>
@@ -831,7 +833,7 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
                           onClick={() => toggleRole(r)}
                           className="btn btn-sm rounded-pill d-inline-flex align-items-center gap-1"
                           style={{
-                            background: checked ? cfg.color : `${cfg.color}15`,
+                            background: checked ? cfg.color : `${tint(cfg.color, 8)}`,
                             color: checked ? '#fff' : cfg.color,
                             border: `1px solid ${cfg.color}${checked ? '' : '55'}`,
                             fontSize: '0.72rem',
@@ -849,19 +851,19 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
 
             <div className="mb-3">
               <label className="form-label small fw-semibold">URL <span className="text-danger">*</span></label>
-              <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+              <input type="url" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 placeholder="https://…" value={url} onChange={e => setUrl(e.target.value)} autoFocus />
             </div>
 
             <div className="mb-3">
               <label className="form-label small fw-semibold">Name <span className="text-danger">*</span></label>
-              <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+              <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                 placeholder="A short name for this resource" value={name} onChange={e => setName(e.target.value)} />
             </div>
 
             <div className="mb-3">
               <label className="form-label small fw-semibold">Description <span className="text-muted fw-normal">(optional)</span></label>
-              <textarea className="form-control form-control-sm" style={{ borderRadius: 8 }} rows={2}
+              <textarea className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }} rows={2}
                 placeholder="What is this resource for?" value={description} onChange={e => setDescription(e.target.value)} />
             </div>
 
@@ -869,13 +871,13 @@ function AddResourceModal({ brands, allUsers, currentUser, myRole, isApc, saving
             {((scope === 'brand' && brandId) || (scope === 'general' && visibility === 'user' && visibleToUid)) && (
               <div
                 className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3"
-                style={{ background: notifyInApp ? '#e8f0fe' : 'var(--surface-0)', border: `1.5px solid ${notifyInApp ? '#c5d5ff' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
+                style={{ background: notifyInApp ? 'var(--info-soft)' : 'var(--surface-0)', border: `${notifyInApp ? '2px' : '1px'} solid ${notifyInApp ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                 onClick={() => setNotifyInApp(v => !v)}
               >
                 <input type="checkbox" className="form-check-input flex-shrink-0"
                   checked={notifyInApp} onChange={e => setNotifyInApp(e.target.checked)}
                   onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
-                <span className="small mb-0" style={{ cursor: 'pointer', color: notifyInApp ? '#0d6efd' : 'var(--text-secondary)' }}>
+                <span className="small mb-0" style={{ cursor: 'pointer', color: notifyInApp ? 'var(--info-text)' : 'var(--text-secondary)' }}>
                   <i className="bi bi-bell me-1" />
                   Notify {scope === 'brand' ? 'brand members' : 'the recipient'}
                 </span>

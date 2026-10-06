@@ -5,7 +5,7 @@ import {
   listResources, deleteResource, detectSource, thumbnailFor, timeAgo,
   uniqueCreators, inDateRange,
 } from '../../lib/resourcesApi';
-import { ResourceModal } from '../../pages/resources/ResourcesPage';
+import { ResourceModal } from '../resources/ResourceModal';
 import {
   PlusIcon, SearchIcon, AlertIcon, RefreshIcon, XIcon, LinkIcon,
   PencilIcon, BookmarkIcon,

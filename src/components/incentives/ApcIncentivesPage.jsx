@@ -4,6 +4,8 @@ import {
   getIncentives, updateIncentivesProgress, notifyIncentiveEmployee, autoComplete, fmtUnitValue,
 } from '../../lib/incentivesApi';
 import { listBrandsForApc } from '../../lib/agendaApi';
+import { formatPKR } from '../../lib/format';
+import { Button, EmptyState, PageHeader, ProgressBar, StatCard, StatGrid, StatusBadge } from '../ui';
 import BrandChip from './BrandChip';
 import CommissionNote from './CommissionNote';
 
@@ -29,7 +31,7 @@ function itemSuffix(item) {
 function AttendanceBadge() {
   return (
     <span className="badge rounded-pill" title="Auto-filled from monthly attendance %"
-      style={{ fontSize: '0.55rem', background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>
+      style={{ fontSize: '0.55rem', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 }}>
       <i className="bi bi-calendar-check me-1" />Auto
     </span>
   );
@@ -50,8 +52,8 @@ function DetailsModal({ record, items, onClose }) {
       <div
         className="rounded-3 p-3 mb-2"
         style={{
-          background: isCompleted ? '#f0fdf4' : '#fafafa',
-          border: `1.5px solid ${isCompleted ? '#b7dfc4' : '#e9ecef'}`,
+          background: isCompleted ? 'var(--success-soft)' : 'var(--surface-2)',
+          border: `1px solid ${isCompleted ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
         }}
       >
         <div className="d-flex align-items-start justify-content-between gap-2 mb-1">
@@ -59,7 +61,7 @@ function DetailsModal({ record, items, onClose }) {
             <div className="fw-semibold small">{item.text || '—'}</div>
             {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
             <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-              Compensation: <strong style={{ color }}>+{(Number(item.amount) || 0).toLocaleString()} PKR</strong>
+              Compensation: <strong style={{ color }}>+{formatPKR((Number(item.amount) || 0))}</strong>
             </div>
           </div>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
@@ -67,8 +69,8 @@ function DetailsModal({ record, items, onClose }) {
             <span
               className="badge rounded-pill"
               style={{
-                background: isCompleted ? '#e6f4ea' : '#fff3e0',
-                color: isCompleted ? '#198754' : '#fd7e14',
+                background: isCompleted ? 'var(--success-soft)' : 'var(--warning-soft)',
+                color: isCompleted ? 'var(--success-text)' : 'var(--warning-text)',
                 fontSize: '0.6rem',
               }}
             >
@@ -78,7 +80,7 @@ function DetailsModal({ record, items, onClose }) {
         </div>
 
         {(item.targetValue > 0 || item.achievedValue > 0) && (
-          <div className="d-flex gap-3 mb-2" style={{ fontSize: '0.72rem', color: '#6c757d' }}>
+          <div className="d-flex gap-3 mb-2" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
             <span>Target: <strong>{fmtUnitValue(item.targetValue, unitSfx)}</strong></span>
             <span>Achieved: <strong>{fmtUnitValue(item.achievedValue, unitSfx)}</strong></span>
           </div>
@@ -86,24 +88,15 @@ function DetailsModal({ record, items, onClose }) {
 
         {item.targetValue > 0 && (
           <div>
-            <div className="rounded-pill overflow-hidden" style={{ height: 4, background: '#e9ecef' }}>
-              <div
-                className="h-100 rounded-pill"
-                style={{
-                  width: `${p}%`,
-                  background: isCompleted ? '#198754' : p >= 60 ? '#fd7e14' : '#0d6efd',
-                  transition: 'width 0.3s',
-                }}
-              />
-            </div>
-            <div className="text-end mt-1" style={{ fontSize: '0.63rem', color: isCompleted ? '#198754' : '#6c757d' }}>
+            <ProgressBar size="sm" value={p} tone={isCompleted ? 'success' : p >= 60 ? 'warning' : 'info'} />
+            <div className="text-end mt-1" style={{ fontSize: '0.63rem', color: isCompleted ? 'var(--success-text)' : 'var(--text-muted)' }}>
               {p}% {isCompleted ? '— Completed 🎉' : p >= 60 ? '— Getting close' : '— In progress'}
             </div>
           </div>
         )}
 
         {item.completedBy && (
-          <div style={{ fontSize: '0.63rem', color: '#198754', marginTop: 4 }}>
+          <div style={{ fontSize: '0.63rem', color: 'var(--success-text)', marginTop: 4 }}>
             <i className="bi bi-person-check me-1" />Marked by {item.completedBy}
           </div>
         )}
@@ -113,10 +106,10 @@ function DetailsModal({ record, items, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div
         className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}
       >
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -124,13 +117,7 @@ function DetailsModal({ record, items, onClose }) {
               <h6 className="fw-bold mb-0">Incentive Details</h6>
               <p className="text-muted small mb-0">{getMonthLabel(record.month)} · {completedCount}/{allItems.length} completed</p>
             </div>
-            <button
-              className="btn btn-sm btn-light border-0 rounded-circle"
-              onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
 
           {items.incentives.length > 0 && (
@@ -138,21 +125,21 @@ function DetailsModal({ record, items, onClose }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-graph-up-arrow me-1 text-success" />Incentives
               </p>
-              {items.incentives.map(i => <ItemCard key={i.id} item={i} color="#198754" />)}
+              {items.incentives.map(i => <ItemCard key={i.id} item={i} color="var(--success-text)" />)}
             </div>
           )}
 
           {items.bonuses.length > 0 && (
             <div className="mb-3">
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-trophy me-1 text-primary" />Bonuses
+                <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
-              {items.bonuses.map(b => <ItemCard key={b.id} item={b} color="#0d6efd" />)}
+              {items.bonuses.map(b => <ItemCard key={b.id} item={b} color="var(--info-text)" />)}
             </div>
           )}
 
           <div className="d-flex justify-content-end mt-3">
-            <button className="btn btn-sm btn-dark px-4" onClick={onClose}>Close</button>
+            <button className="btn btn-sm btn-primary px-4" onClick={onClose}>Close</button>
           </div>
         </div>
       </div>
@@ -184,15 +171,15 @@ function EditItemRow({ item, category, onChange, month }) {
     <div
       className="rounded-3 p-3 mb-2"
       style={{
-        background: isCompleted ? '#f0fdf4' : '#fafafa',
-        border: `1.5px solid ${isCompleted ? '#b7dfc4' : '#e9ecef'}`,
+        background: isCompleted ? 'var(--success-soft)' : 'var(--surface-2)',
+        border: `1px solid ${isCompleted ? 'color-mix(in srgb, var(--success) 35%, transparent)' : 'var(--border-subtle)'}`,
       }}
     >
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-            Compensation: <strong>+{(Number(item.amount) || 0).toLocaleString()} PKR</strong>
+            Compensation: <strong>+{formatPKR((Number(item.amount) || 0))}</strong>
           </div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
@@ -200,8 +187,8 @@ function EditItemRow({ item, category, onChange, month }) {
           <span
             className="badge rounded-pill"
             style={{
-              background: isCompleted ? '#e6f4ea' : '#fff3e0',
-              color: isCompleted ? '#198754' : '#fd7e14',
+              background: isCompleted ? 'var(--success-soft)' : 'var(--warning-soft)',
+              color: isCompleted ? 'var(--success-text)' : 'var(--warning-text)',
               fontSize: '0.6rem',
             }}
           >
@@ -212,7 +199,7 @@ function EditItemRow({ item, category, onChange, month }) {
 
       <div className="row g-2">
         <div className="col-6">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             Target <span className="text-muted" style={{ fontSize: '0.6rem' }}>(set by OL · read-only)</span>
           </label>
           <div className="input-group input-group-sm">
@@ -220,15 +207,15 @@ function EditItemRow({ item, category, onChange, month }) {
               type="text" className="form-control"
               value={target ? fmtUnitValue(target, unitSfx) : '—'}
               readOnly disabled
-              style={{ background: '#f1f5f9', cursor: 'not-allowed' }}
+              style={{ background: 'var(--surface-2)', cursor: 'not-allowed' }}
             />
-            <span className="input-group-text" style={{ fontSize: '0.7rem', background: '#f1f5f9' }}>
-              <i className="bi bi-lock-fill" style={{ fontSize: '0.7rem', color: '#94a3b8' }} />
+            <span className="input-group-text" style={{ fontSize: '0.7rem', background: 'var(--surface-2)' }}>
+              <i className="bi bi-lock-fill" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }} />
             </span>
           </div>
         </div>
         <div className="col-6">
-          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>
+          <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             Achieved {isAtt
               ? <span className="text-muted">(auto · attendance)</span>
               : isGmvMax
@@ -243,7 +230,7 @@ function EditItemRow({ item, category, onChange, month }) {
               placeholder="Your result" min="0" value={achieved}
               onChange={e => onChange(category, item.id, 'achievedValue', e.target.value)}
               readOnly={isAuto} disabled={isAuto}
-              style={isAuto ? { background: '#eef2f7', cursor: 'not-allowed' } : undefined}
+              style={isAuto ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined}
             />
             {unitSfx && <span className="input-group-text" style={{ fontSize: '0.7rem' }}>{unitSfx}</span>}
           </div>
@@ -252,23 +239,14 @@ function EditItemRow({ item, category, onChange, month }) {
 
       {(target !== '' && achieved !== '') && (
         <div className="mt-2">
-          <div className="rounded-pill overflow-hidden" style={{ height: 4, background: '#e9ecef' }}>
-            <div
-              className="h-100 rounded-pill"
-              style={{
-                width: `${p}%`,
-                background: isCompleted ? '#198754' : p >= 60 ? '#fd7e14' : '#0d6efd',
-                transition: 'width 0.3s',
-              }}
-            />
-          </div>
-          <div className="text-end mt-1" style={{ fontSize: '0.63rem', color: isCompleted ? '#198754' : '#6c757d' }}>
+          <ProgressBar size="sm" value={p} tone={isCompleted ? 'success' : p >= 60 ? 'warning' : 'info'} />
+          <div className="text-end mt-1" style={{ fontSize: '0.63rem', color: isCompleted ? 'var(--success-text)' : 'var(--text-muted)' }}>
             {p}% {isCompleted ? '— Completed! 🎉' : p >= 60 ? '— Getting close' : '— In progress'}
           </div>
         </div>
       )}
       {isComm && (
-        <div className="mt-2" style={{ fontSize: '0.66rem', color: '#166534' }}>
+        <div className="mt-2" style={{ fontSize: '0.66rem', color: 'var(--success-text)' }}>
           <i className="bi bi-percent me-1" />
           <CommissionNote item={item} month={month} />
         </div>
@@ -389,10 +367,10 @@ function EditModal({ record, items, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div
         className="card border-0 shadow-lg"
-        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14, maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}
       >
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
@@ -400,13 +378,7 @@ function EditModal({ record, items, onClose, onSaved }) {
               <h6 className="fw-bold mb-0">Edit Progress</h6>
               <p className="text-muted small mb-0">Update your target & achieved values</p>
             </div>
-            <button
-              className="btn btn-sm btn-light border-0 rounded-circle"
-              onClick={onClose}
-              style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
-            </button>
+            <Button variant="ghost" size="sm" iconOnly aria-label="Close" onClick={onClose}><i className="bi bi-x-lg" /></Button>
           </div>
 
           {editItems.incentives.length > 0 && (
@@ -421,7 +393,7 @@ function EditModal({ record, items, onClose, onSaved }) {
           {editItems.bonuses.length > 0 && (
             <div className="mb-3">
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-trophy me-1 text-primary" />Bonuses
+                <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
               {editItems.bonuses.map(b => <EditItemRow key={b.id} item={b} category="bonuses" onChange={handleChange} month={record?.month} />)}
             </div>
@@ -437,7 +409,7 @@ function EditModal({ record, items, onClose, onSaved }) {
           {apcProfile?.ownerId && (
             <div
               className="d-flex align-items-center gap-2 rounded-2 p-2 mb-3"
-              style={{ background: notifyTL ? '#fff3e0' : '#f8f9fa', border: `1.5px solid ${notifyTL ? '#ffc070' : '#e9ecef'}`, cursor: 'pointer' }}
+              style={{ background: notifyTL ? 'var(--warning-soft)' : 'var(--surface-2)', border: `${notifyTL ? '2px' : '1px'} solid ${notifyTL ? 'color-mix(in srgb, var(--warning) 40%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
               onClick={() => setNotifyTL(v => !v)}
             >
               <input
@@ -449,7 +421,7 @@ function EditModal({ record, items, onClose, onSaved }) {
                 onClick={e => e.stopPropagation()}
                 style={{ cursor: 'pointer' }}
               />
-              <label htmlFor="editModal-notifyTL" className="small mb-0" style={{ cursor: 'pointer', color: notifyTL ? '#fd7e14' : '#495057' }}>
+              <label htmlFor="editModal-notifyTL" className="small mb-0" style={{ cursor: 'pointer', color: notifyTL ? 'var(--warning-text)' : 'var(--text-secondary)' }}>
                 <i className="bi bi-bell me-1" />
                 Notify team lead of progress update
               </label>
@@ -459,7 +431,7 @@ function EditModal({ record, items, onClose, onSaved }) {
           <div className="d-flex gap-2 justify-content-end mt-2">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
             <button
-              className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1"
+              className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1"
               onClick={handleSave} disabled={saving}
             >
               {saving
@@ -543,7 +515,7 @@ export default function ApcIncentivesPage() {
   if (!currentUser) return null;
   if (loading) {
     return (
-      <div style={{ padding: '32px 32px 48px' }} className="text-muted small d-flex align-items-center gap-2">
+      <div className="text-muted small d-flex align-items-center gap-2">
         <span className="spinner-border spinner-border-sm" /> Loading incentives…
       </div>
     );
@@ -552,62 +524,57 @@ export default function ApcIncentivesPage() {
   // tlName/tlEmail removed — incentives are managed by OL, not TL.
 
   return (
-    <div style={{ padding: '32px 32px 48px', maxWidth: 680 }}>
-      {/* Page header */}
-      <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-        <div>
-          <h5 className="fw-bold mb-1">My Incentives &amp; Bonuses</h5>
-          <p className="text-muted mb-0" style={{ fontSize: '0.82rem' }}>
-            <i className="bi bi-calendar3 me-1" />{getMonthLabel(month)}
-            <span className="mx-2">·</span>
-            <i className="bi bi-person-lines-fill me-1" />Managed by Operations Lead
-          </p>
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <input type="month" className="form-control form-control-sm" value={month}
-            onChange={e => setMonth(e.target.value)} style={{ width: 160 }} />
-          {record?.payoutCleared && (
-            <span className="badge rounded-pill d-inline-flex align-items-center gap-1 px-3 py-2"
-              style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7', fontSize: '0.72rem' }}>
-              <i className="bi bi-cash-coin" /> Payout Cleared
-            </span>
-          )}
-          {record?.verified && (
-            <span className="badge rounded-pill d-inline-flex align-items-center gap-1 px-3 py-2"
-              style={{ background: '#e6f4ea', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.72rem' }}>
-              <i className="bi bi-patch-check-fill" /> TL Verified
-            </span>
-          )}
-        </div>
-      </div>
+    <div style={{ maxWidth: 720 }}>
+      <PageHeader
+        title="My Incentives & Bonuses"
+        subtitle={<><i className="bi bi-calendar3 me-1" />{getMonthLabel(month)}<span className="mx-2">·</span><i className="bi bi-person-lines-fill me-1" />Managed by Operations Lead</>}
+        actions={(
+          <>
+            <input type="month" className="form-control form-control-sm" value={month}
+              onChange={e => setMonth(e.target.value)} style={{ width: 160 }} aria-label="Month" />
+            {record?.payoutCleared && <StatusBadge tone="success" dot={false}><i className="bi bi-cash-coin" /> Payout Cleared</StatusBadge>}
+            {record?.verified && <StatusBadge tone="info" dot={false}><i className="bi bi-patch-check-fill" /> TL Verified</StatusBadge>}
+          </>
+        )}
+      />
 
       {!record ? (
-        <div className="text-center py-5 rounded-4" style={{ border: '2px dashed #dee2e6', background: '#fff' }}>
-          <div className="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
-            style={{ width: 64, height: 64, background: '#f8f9fa' }}>
-            <i className="bi bi-trophy text-muted" style={{ fontSize: '1.8rem', opacity: 0.35 }} />
-          </div>
-          <p className="fw-semibold text-dark mb-1">No incentive plan yet</p>
-          <p className="text-muted small mb-0">No plan has been set for {getMonthLabel(month)}.</p>
-          <p className="text-muted small mb-0">Operations Lead will update your incentives soon.</p>
+        <div className="wx-card">
+          <EmptyState
+            icon={<i className="bi bi-trophy" style={{ fontSize: '1.4rem' }} />}
+            title="No incentive plan yet"
+            description={`No plan has been set for ${getMonthLabel(month)}. Your Operations Lead will update your incentives soon.`}
+          />
         </div>
       ) : (
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, overflow: 'hidden' }}>
+        <>
+        {/* At a glance: what's earned so far and how far along the plan is. */}
+        <StatGrid min={180} className="mb-3">
+          <StatCard label="Total earned" value={formatPKR(totalEarned)} hint={`Potential ${formatPKR(totalPotential)}`} />
+          <StatCard label="From incentives & bonuses" value={`+${formatPKR(earnedAmount)}`} hint={`of ${formatPKR(potentialAmt)} possible`} />
+          <StatCard
+            label="Items completed"
+            value={`${completedItems.length}/${allItems.length}`}
+            footer={<ProgressBar size="sm" value={completionPct} tone={completionPct === 100 ? 'success' : 'info'} />}
+          />
+        </StatGrid>
+
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           {/* Color bar */}
           <div style={{
             height: 4,
             background: record.verified
-              ? 'linear-gradient(90deg,#198754,#51cf66)'
+              ? 'var(--success)'
               : record.notified
-                ? 'linear-gradient(90deg,#0d6efd,#6ea8fe)'
-                : 'linear-gradient(90deg,#fd7e14,#ffa94d)',
+                ? 'var(--info)'
+                : 'var(--warning)',
           }} />
 
           {/* Header banner */}
-          <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'linear-gradient(135deg,#1a1a2e,#0f3460)', color: '#fff' }}>
+          <div className="p-3 d-flex align-items-center gap-3" style={{ background: 'var(--spotlight-bg)', color: 'var(--spotlight-fg)' }}>
             <div
               className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-              style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.15)', fontSize: '0.85rem' }}
+              style={{ width: 42, height: 42, background: 'color-mix(in srgb, var(--spotlight-fg) 15%, transparent)', fontSize: '0.85rem' }}
             >
               {(apcProfile?.userName || '?').slice(0, 2).toUpperCase()}
             </div>
@@ -619,7 +586,7 @@ export default function ApcIncentivesPage() {
               </div>
             </div>
             {record.verified && (
-              <span className="badge rounded-pill" style={{ background: '#e6f4ea', color: '#198754', fontSize: '0.62rem' }}>
+              <span className="badge rounded-pill" style={{ background: 'var(--success-soft)', color: 'var(--success-text)', fontSize: '0.62rem' }}>
                 <i className="bi bi-patch-check-fill me-1" />TL Verified
               </span>
             )}
@@ -630,41 +597,46 @@ export default function ApcIncentivesPage() {
             <div className="d-flex flex-column gap-1 mb-3" style={{ fontSize: '0.82rem' }}>
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Basic Salary</span>
-                <span className="fw-medium">{basic.toLocaleString()} PKR</span>
+                <span className="fw-medium">{formatPKR(basic)}</span>
               </div>
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Earned ({completedItems.length}/{allItems.length} items)</span>
-                <span className="fw-medium text-success">+{earnedAmount.toLocaleString()} PKR</span>
+                <span className="fw-medium text-success">+{formatPKR(earnedAmount)}</span>
               </div>
               <div
                 className="d-flex justify-content-between fw-bold pt-2 mt-1"
-                style={{ borderTop: '1.5px solid #dee2e6', fontSize: '0.9rem' }}
+                style={{ borderTop: '1px solid var(--border-subtle)', fontSize: '0.9rem' }}
               >
                 <span>Total Earned</span>
-                <span>{totalEarned.toLocaleString()} PKR</span>
+                <span>{formatPKR(totalEarned)}</span>
               </div>
               <div className="text-muted text-end" style={{ fontSize: '0.68rem' }}>
-                Potential: {totalPotential.toLocaleString()} PKR
+                Potential: {formatPKR(totalPotential)}
               </div>
             </div>
 
-            {/* Progress bar */}
-            <div className="mb-3">
-              <div className="d-flex justify-content-between mb-1" style={{ fontSize: '0.7rem' }}>
-                <span className="text-muted">Overall completion</span>
-                <span className="fw-semibold">{completedItems.length}/{allItems.length} ({completionPct}%)</span>
+            {/* Every item with its own progress, so nothing needs a modal to read. */}
+            {allItems.length > 0 && (
+              <div className="mb-3 d-flex flex-column gap-2">
+                {allItems.map((it) => {
+                  const ip = pct(it.achievedValue, it.targetValue);
+                  const done = !!it.completed;
+                  return (
+                    <div key={it.id} className="rounded-3 p-2" style={{ background: 'var(--surface-2)' }}>
+                      <div className="d-flex justify-content-between align-items-start gap-2 mb-1" style={{ fontSize: '0.78rem' }}>
+                        <span className="fw-semibold" style={{ minWidth: 0 }}>{it.text || '—'}</span>
+                        <span className="flex-shrink-0 fw-semibold" style={{ color: done ? 'var(--success-text)' : 'var(--text-secondary)' }}>
+                          {done ? 'Completed' : `${ip}%`} · +{formatPKR(it.amount)}
+                        </span>
+                      </div>
+                      {Number(it.targetValue) > 0 && (
+                        <ProgressBar size="sm" value={ip} tone={done ? 'success' : ip >= 60 ? 'warning' : 'info'} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div className="rounded-pill overflow-hidden" style={{ height: 6, background: '#e9ecef' }}>
-                <div
-                  className="h-100 rounded-pill"
-                  style={{
-                    width: `${completionPct}%`,
-                    background: completionPct === 100 ? '#198754' : '#0d6efd',
-                    transition: 'width 0.4s',
-                  }}
-                />
-              </div>
-            </div>
+            )}
 
             <p className="text-muted mb-3" style={{ fontSize: '0.68rem' }}>
               * Most items count as completed at ≥90% of the target. A Commission Based Tier line is the exception — it pays a percentage of whatever the brand earns above its benchmark, and nothing at or below it. Final salary is subject to TL verification.
@@ -674,15 +646,15 @@ export default function ApcIncentivesPage() {
             <div className="d-flex gap-2">
               <button
                 className="btn btn-sm flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                style={{ border: '1.5px solid #dee2e6', borderRadius: 8, background: '#fff', color: '#495057', fontSize: '0.78rem' }}
+                style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}
                 onClick={() => setShowDetails(true)}
               >
                 <i className="bi bi-eye" /> View Details
               </button>
               {!record?.payoutCleared && (
                 <button
-                  className="btn btn-sm btn-dark flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
-                  style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                  className="btn btn-sm btn-primary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1"
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                   onClick={() => setShowEdit(true)}
                 >
                   <i className="bi bi-pencil" /> Edit Progress
@@ -691,6 +663,7 @@ export default function ApcIncentivesPage() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {showDetails && record && (

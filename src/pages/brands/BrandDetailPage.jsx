@@ -468,7 +468,7 @@ function TierSaleCard({ brand, canManage, onSaved }) {
 
       <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
         <span style={{
-          fontSize: 11.5, fontWeight: 800, padding: '4px 11px', borderRadius: 999,
+          fontSize: 11.5, fontWeight: 800, padding: '4px 11px', borderRadius: 'var(--radius-pill)',
           background: badge.bg, color: badge.fg,
         }}>{badge.text}</span>
         {info && (
@@ -520,14 +520,14 @@ function OverviewPanel({
   if (gmv != null) {
     tiles.push({
       key: 'gmv', label: 'GMV · 30 day', value: formatMoney(gmv, brand.currency),
-      icon: 'bi-cash-stack', accent: '#0ea5e9',
+      icon: 'bi-cash-stack', accent: 'var(--info)',
       foot: gmv === 0 ? 'No attributed sales yet' : null,
     });
   }
   if (productsCount > 0) {
     tiles.push({
       key: 'products', label: 'Products live', value: productsCount,
-      icon: 'bi-box-seam', accent: '#10b981',
+      icon: 'bi-box-seam', accent: 'var(--success)',
     });
   }
   if (openTaskCount > 0 || overdueCount > 0 || dueTodayCount > 0) {
@@ -536,7 +536,7 @@ function OverviewPanel({
     if (dueTodayCount > 0) foot.push(`${dueTodayCount} due today`);
     tiles.push({
       key: 'tasks', label: 'Open tasks', value: openTaskCount,
-      icon: 'bi-check2-square', accent: '#f59e0b',
+      icon: 'bi-check2-square', accent: 'var(--warning)',
       foot: foot.join(' · ') || null,
       footTone: overdueCount > 0 ? 'danger' : null,
     });
@@ -604,7 +604,7 @@ function OverviewPanel({
                 </div>
                 <span style={{
                   fontSize: 10.5, fontWeight: 800, padding: '2px 8px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   background: 'var(--accent-soft)', color: 'var(--accent)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>TL</span>
@@ -624,7 +624,7 @@ function OverviewPanel({
                 </div>
                 <span style={{
                   fontSize: 10.5, fontWeight: 700, padding: '2px 8px',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   background: 'var(--surface-2)', color: 'var(--text-muted)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>{u.role || '—'}</span>

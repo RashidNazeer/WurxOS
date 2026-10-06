@@ -39,7 +39,7 @@ export default function CurrentTeamTab({ employees }) {
     <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 320 }}>
-          <SearchIcon width="14" height="14" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <SearchIcon width="14" height="14" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text" className="wx-input"
             style={{ paddingLeft: 32 }}
@@ -63,7 +63,7 @@ export default function CurrentTeamTab({ employees }) {
         </select>
       </div>
 
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--surface-1)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="wx-table" style={{ minWidth: 720 }}>
             <thead>
@@ -80,14 +80,14 @@ export default function CurrentTeamTab({ employees }) {
                 <tr key={r.id}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>{r.email}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.email}</div>
                   </td>
                   <td>
-                    <span style={{ padding: '2px 8px', borderRadius: 6, background: '#e0e7ff', color: '#3730a3', fontSize: 12, fontWeight: 500 }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--info-soft)', color: 'var(--purple-text)', fontSize: 12, fontWeight: 500 }}>
                       {ROLE_LABELS[r.role] || r.role}
                     </span>
                   </td>
-                  <td style={{ color: '#475569' }}>{r.department}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{r.department}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.brandCount}</td>
                   <td style={{ textAlign: 'right' }}>
                     <UtilPill value={r.utilization} />
@@ -95,13 +95,13 @@ export default function CurrentTeamTab({ employees }) {
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: 24 }}>No employees match these filters.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No employees match these filters.</td></tr>
               )}
             </tbody>
             {rows.length > 0 && (
               <tfoot>
-                <tr style={{ background: '#f8fafc' }}>
-                  <td colSpan={3} style={{ fontWeight: 600, color: '#475569' }}>TOTAL</td>
+                <tr style={{ background: 'var(--surface-2)' }}>
+                  <td colSpan={3} style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>TOTAL</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{totalBrands}</td>
                   <td />
                 </tr>
@@ -116,14 +116,14 @@ export default function CurrentTeamTab({ employees }) {
 
 function UtilPill({ value }) {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return <span style={{ color: '#94a3b8' }}>—</span>;
+    return <span style={{ color: 'var(--text-muted)' }}>—</span>;
   }
-  let bg = '#f0fdf4', fg = '#166534';       // green ≤ 50
-  if (value > 100)       { bg = '#fef2f2'; fg = '#991b1b'; }
-  else if (value > 85)   { bg = '#fffbeb'; fg = '#92400e'; }
-  else if (value > 50)   { bg = '#eff6ff'; fg = '#1e40af'; }
+  let bg = 'var(--success-soft)', fg = 'var(--success-text)';       // green ≤ 50
+  if (value > 100)       { bg = 'var(--danger-soft)'; fg = 'var(--danger-text)'; }
+  else if (value > 85)   { bg = 'var(--warning-soft)'; fg = 'var(--warning-text)'; }
+  else if (value > 50)   { bg = 'var(--info-soft)'; fg = 'var(--info-text)'; }
   return (
-    <span style={{ padding: '2px 10px', borderRadius: 999, background: bg, color: fg, fontWeight: 600, fontSize: 12 }}>
+    <span style={{ padding: '2px 10px', borderRadius: 'var(--radius-pill)', background: bg, color: fg, fontWeight: 600, fontSize: 12 }}>
       {value}%
     </span>
   );

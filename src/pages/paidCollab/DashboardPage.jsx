@@ -180,27 +180,27 @@ export default function PaidCollabDashboardPage() {
           icon={<UsersIcon width="20" height="20" />}
           label="Unique Creators"
           value={stats.uniqueCreators.toLocaleString()}
-          tone="#3b82f6"
+          tone="var(--info)"
           sub={`${stats.totalDealRecords} deals across ${stats.totalBrands} brands`}
         />
         <StatCard
           icon={<StoreIcon width="20" height="20" />}
           label="Brands"
           value={stats.totalBrands.toLocaleString()}
-          tone="#8b5cf6"
+          tone="var(--purple)"
         />
         <StatCard
           icon={<ChartIcon width="20" height="20" />}
           label="Deal Value"
           value={`$${stats.totalDeal.toLocaleString()}`}
-          tone="#10b981"
+          tone="var(--success)"
           sub={`${stats.totalDealRecords} deals total`}
         />
         <StatCard
           icon={<VideoIcon width="20" height="20" />}
           label="Videos Posted"
           value={stats.videosPosted.toLocaleString()}
-          tone="#f59e0b"
+          tone="var(--warning)"
           sub={`${stats.creatorsDone} of ${stats.totalDealRecords} deals done · ${stats.creatorsInProgress} in progress`}
         />
       </div>
@@ -215,26 +215,26 @@ export default function PaidCollabDashboardPage() {
           <h6 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
             Payment Status
           </h6>
-          <StatusBar label="Paid"     done={stats.paid}        total={stats.totalCreators} color="#10b981" />
+          <StatusBar label="Paid"     done={stats.paid}        total={stats.totalCreators} color="var(--success-text)" />
           {stats.pending > 0 && (
-            <StatusBar label="Pending" done={stats.pending}    total={stats.totalCreators} color="#f59e0b" />
+            <StatusBar label="Pending" done={stats.pending}    total={stats.totalCreators} color="var(--warning-text)" />
           )}
-          <StatusBar label="Not Yet"  done={stats.notYetPaid}  total={stats.totalCreators} color="#94a3b8" />
+          <StatusBar label="Not Yet"  done={stats.notYetPaid}  total={stats.totalCreators} color="var(--text-muted)" />
           {stats.paymentUnknown > 0 && (
-            <StatusBar label="Unknown" done={stats.paymentUnknown} total={stats.totalCreators} color="#cbd5e1" />
+            <StatusBar label="Unknown" done={stats.paymentUnknown} total={stats.totalCreators} color="var(--text-muted)" />
           )}
         </div>
         <div className="wx-card" style={{ padding: 14 }}>
           <h6 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
             Video Delivery
           </h6>
-          <StatusBar label="Done"        done={stats.creatorsDone}       total={stats.totalCreators} color="#10b981" />
-          <StatusBar label="In Progress" done={stats.creatorsInProgress} total={stats.totalCreators} color="#3b82f6" />
+          <StatusBar label="Done"        done={stats.creatorsDone}       total={stats.totalCreators} color="var(--success-text)" />
+          <StatusBar label="In Progress" done={stats.creatorsInProgress} total={stats.totalCreators} color="var(--info-text)" />
           {stats.creatorsNotYet > 0 && (
-            <StatusBar label="Not Yet"   done={stats.creatorsNotYet}     total={stats.totalCreators} color="#94a3b8" />
+            <StatusBar label="Not Yet"   done={stats.creatorsNotYet}     total={stats.totalCreators} color="var(--text-muted)" />
           )}
           {stats.videosUnknown > 0 && (
-            <StatusBar label="Unknown"   done={stats.videosUnknown}      total={stats.totalCreators} color="#cbd5e1" />
+            <StatusBar label="Unknown"   done={stats.videosUnknown}      total={stats.totalCreators} color="var(--text-muted)" />
           )}
         </div>
       </div>
@@ -259,11 +259,11 @@ export default function PaidCollabDashboardPage() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <span style={{
-                  width: 28, height: 28, borderRadius: 6,
+                  width: 28, height: 28, borderRadius: 'var(--radius-sm)',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
-                  fontSize: 10, fontWeight: 700, color: '#fff',
-                  background: ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#6366f1'][i % 8],
+                  fontSize: 10, fontWeight: 700, color: 'var(--text-inverse)',
+                  background: `var(--chart-${[6, 4, 7, 1, 5, 2, 8][i % 7]})`,
                 }}>
                   {b.name.slice(0, 2).toUpperCase()}
                 </span>
@@ -276,7 +276,7 @@ export default function PaidCollabDashboardPage() {
                   </div>
                 </div>
               </div>
-              <span style={{ fontWeight: 700, color: '#10b981', fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontWeight: 700, color: 'var(--success-text)', fontSize: 12.5, fontVariantNumeric: 'tabular-nums' }}>
                 ${b.deal.toLocaleString()}
               </span>
             </div>
@@ -322,8 +322,8 @@ function StatCard({ icon, label, value, tone, sub }) {
   return (
     <div className="wx-card" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 12,
-        background: tone + '18', color: tone,
+        width: 44, height: 44, borderRadius: 'var(--radius-md)',
+        background: `color-mix(in srgb, ${tone} 9%, transparent)`, color: tone,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
@@ -348,8 +348,8 @@ function StatusBar({ label, done, total, color }) {
         <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
         <span style={{ color: 'var(--text-muted)' }}>{done}/{total} ({pct}%)</span>
       </div>
-      <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999, transition: 'width 0.6s ease' }} />
+      <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 'var(--radius-pill)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
       </div>
     </div>
   );
@@ -369,7 +369,7 @@ function Pill({ status, kind }) {
   const meta = map[status] || { bg: '#f3f4f6', fg: '#475569', label: '—' };
   return (
     <span style={{
-      padding: '2px 8px', borderRadius: 999,
+      padding: '2px 8px', borderRadius: 'var(--radius-pill)',
       fontSize: 10, fontWeight: 700,
       background: meta.bg, color: meta.fg,
       whiteSpace: 'nowrap',

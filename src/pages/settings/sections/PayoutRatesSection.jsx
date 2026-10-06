@@ -149,7 +149,7 @@ export default function PayoutRatesSection() {
               return (
                 <div key={code} style={{
                   display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                  padding: '10px 12px', borderRadius: 10,
+                  padding: '10px 12px', borderRadius: 'var(--radius-md)',
                   border: `1px solid ${unset ? 'var(--warning, #fd7e14)' : 'var(--border)'}`,
                   background: unset ? 'rgba(253,126,20,0.06)' : 'transparent',
                 }}>
@@ -182,7 +182,7 @@ export default function PayoutRatesSection() {
                     {savingCur === code ? 'Saving…' : dirty ? 'Save' : unset ? '—' : 'Saved'}
                   </button>
                   {unset && (
-                    <span style={{ fontSize: 11, color: 'var(--warning, #fd7e14)', fontWeight: 600 }}>
+                    <span style={{ fontSize: 11, color: 'var(--warning, var(--warning-text))', fontWeight: 600 }}>
                       Not set for {getMonthLabel(month)}
                     </span>
                   )}

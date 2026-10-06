@@ -139,6 +139,60 @@ export async function getMessageById(id) {
   return data ? toMessage(data) : null;
 }
 
+// ── models (Boss, mig 397) ─────────────────────────────────────────
+export async function listModelCatalog() {
+  const { data, error } = await supabase.from('ai_model_catalog').select('*');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// The model keys, with their labels and order (mig 401). [] if it can't be
+// read: the UI then uses its built-in labels.
+export async function listKeySlots() {
+  const { data, error } = await supabase.from('ai_key_slots').select('*').order('sort');
+  return error ? [] : data || [];
+}
+
+// Probes every model on every key (~60 s). The Boss or a developer (403 otherwise).
+export async function refreshModelList() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new BuddyHttpError(401, 'Not signed in.');
+  const res = await fetch(endpoint(), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_models: true }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new BuddyHttpError(res.status, body?.error || '');
+  return body;
+}
+
+// auto_failover (the "automatic safety net") is newer than the other model
+// columns: until its migration lands, read and save without it.
+const MODEL_COLS = 'model, model_key_slot, fallback_models, fallback_enabled';
+export async function getModelConfig() {
+  if (schema.autoFailover !== false) {
+    const { data, error } = await supabase.from('ai_assistant_config')
+      .select(`${MODEL_COLS}, auto_failover`).eq('id', 1).maybeSingle();
+    if (!error) { schema.autoFailover = true; return data || {}; }
+    if (!missingColumn(error)) throw new Error(error.message);
+    schema.autoFailover = false;
+  }
+  const { data, error } = await supabase.from('ai_assistant_config').select(MODEL_COLS).eq('id', 1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data || {};
+}
+
+// A bad choice is refused by a trigger (mig 397) with a readable message: pass it on.
+export async function saveModelConfig(patch) {
+  const { auto_failover, ...rest } = patch;
+  const row = schema.autoFailover && auto_failover !== undefined ? { ...rest, auto_failover } : rest;
+  const { error } = await supabase.from('ai_assistant_config')
+    .update({ ...row, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) throw new Error(error.message);
+}
+
 // Server-side Stop (mig 386): { cancelled:true } (202) or { cancelled:false,
 // status } (200, already finished). Throws BuddyHttpError otherwise.
 export async function cancelReply(messageId) {
@@ -236,7 +290,7 @@ export async function sendFeedback(requestId, rating, note) {
 }
 
 // The Boss-edited greeting + who may use Buddy (mig 385). allowedRoles is null when the read
-// fails, so the caller falls back to BUDDY_ROLES (boss only).
+// fails, so the caller falls back to BUDDY_ROLES (the Boss and developers only).
 export async function getBuddyConfig() {
   try {
     const { data, error } = await supabase.from('ai_assistant_config').select('greeting, allowed_roles').eq('id', 1).maybeSingle();
@@ -248,8 +302,14 @@ export async function getBuddyConfig() {
 }
 
 // ── settings ───────────────────────────────────────────────────────
-export async function runIngestion() {
-  const { data, error } = await supabase.rpc('ai_run_ingestion');
+// `force` runs during quiet hours. Older backends have no p_force argument, so
+// a "no such function" answer retries without it.
+export async function runIngestion(force = false) {
+  const call = (args) => supabase.rpc('ai_run_ingestion', args);
+  let { data, error } = force ? await call({ p_force: true }) : await call();
+  if (error && force && (error.code === 'PGRST202' || /function .*ai_run_ingestion.* does not exist|without parameters/i.test(error.message || ''))) {
+    ({ data, error } = await call());
+  }
   if (error) throw new Error(/not allowed/i.test(error.message) ? 'not allowed' : error.message);
   return data;
 }

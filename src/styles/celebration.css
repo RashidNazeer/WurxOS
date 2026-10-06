@@ -14,7 +14,9 @@
   inset: 0;
   z-index: 2000;                    /* above every modal in the app */
   display: grid;
-  place-items: center;
+  /* safe-centre: centred when it fits, top-aligned (and scrollable to the
+     trophy) when a short phone can't show the whole card. */
+  place-items: start center;
   padding: 16px;
   overflow-y: auto;
 
@@ -67,14 +69,15 @@
 .cel-card {
   position: relative;
   width: min(760px, 100%);
-  border-radius: 26px;
+  margin: auto 0;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
   border: 1px solid var(--cel-line);
   color: var(--cel-ink);
   background:
     radial-gradient(120% 90% at 50% -10%, var(--cel-bg-1) 0%, var(--cel-bg-2) 55%, var(--cel-bg-3) 100%);
   box-shadow: 0 40px 90px -20px rgba(0, 0, 0, 0.55);
-  animation: cel-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: cel-rise 0.5s var(--ease-emphasized) both;
   text-align: center;
   padding: 40px 28px 28px;
 }
@@ -104,7 +107,7 @@
   border: 1px solid color-mix(in srgb, var(--cel-gold) 42%, transparent);
   background: color-mix(in srgb, var(--cel-gold) 10%, transparent);
   box-shadow: 0 0 0 12px color-mix(in srgb, var(--cel-gold) 6%, transparent);
-  animation: cel-pulse 2.8s ease-in-out infinite;
+  animation: cel-pulse 2.8s var(--ease-in-out) infinite;
 }
 @keyframes cel-pulse {
   0%, 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--cel-gold) 6%, transparent); }
@@ -139,7 +142,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border: 1px solid var(--cel-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--cel-panel);
   overflow: hidden;
   margin-bottom: 22px;
@@ -165,7 +168,7 @@
 .cel-messages {
   position: relative;
   border: 1px solid var(--cel-line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: var(--cel-panel);
   padding: 20px 22px 22px;
   text-align: center;
@@ -189,7 +192,7 @@
 
 .cel-btn {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 13px 34px;
   font-size: 0.92rem;
   font-weight: 800;
@@ -197,7 +200,7 @@
   color: #2a1b00;
   background: linear-gradient(135deg, var(--cel-gold), color-mix(in srgb, var(--cel-gold) 62%, white));
   box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--cel-gold) 70%, transparent);
-  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
 }
 .cel-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .cel-btn:disabled { opacity: 0.65; cursor: progress; }
@@ -211,7 +214,7 @@
   position: absolute;
   top: -12%;
   width: 8px; height: 14px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   opacity: 0;
   animation: cel-fall linear forwards;
 }
@@ -229,7 +232,7 @@
 .cel-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 0.82rem;
   color: var(--text-primary);
   border: 1px solid color-mix(in srgb, var(--warning) 34%, transparent);

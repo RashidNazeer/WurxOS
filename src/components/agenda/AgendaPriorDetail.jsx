@@ -173,12 +173,12 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
   return (
     <div>
       <button className="btn btn-sm btn-outline-secondary mb-3 d-inline-flex align-items-center gap-1"
-        style={{ borderRadius: 8 }} onClick={onBack}>
+        style={{ borderRadius: 'var(--radius-sm)' }} onClick={onBack}>
         <i className="bi bi-arrow-left" /> Back to Prior Meetings
       </button>
 
       {/* Meeting info */}
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-3">
           <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
             <h5 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{teamName} — Agenda Meeting</h5>
@@ -187,7 +187,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
                 <i className="bi bi-check-circle-fill me-1" />Completed
               </span>
             ) : (
-              <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft, #fef3c7)', color: 'var(--warning, #b45309)', fontSize: '0.62rem', fontWeight: 800 }}>
+              <span className="rounded-pill px-2 py-1" style={{ background: 'var(--warning-soft)', color: 'var(--warning, var(--warning-text))', fontSize: '0.62rem', fontWeight: 800 }}>
                 <i className="bi bi-exclamation-triangle-fill me-1" />Missed — never started
               </span>
             )}
@@ -214,7 +214,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
         <>
           {/* Attendance — OL / TL */}
           {!isApc && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
               <div className="card-body p-3">
                 <div className="d-flex align-items-center justify-content-between mb-2">
                   <span className="fw-semibold small d-flex align-items-center gap-2"><i className="bi bi-people-fill text-primary" />Attendance</span>
@@ -287,7 +287,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
 
           {/* TL remarks — OL / TL */}
           {!isApc && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderLeft: '4px solid var(--success)' }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--success)' }}>
               <div className="card-body p-3">
                 <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
                   <i className="bi bi-person-badge text-success" />Team Lead remarks — {teamName}
@@ -306,7 +306,7 @@ export default function AgendaPriorDetail({ meeting, weekIndex, onBack }) {
 
           {/* Presentation timeline — OL + all-meeting attendees (read-only) */}
           {canViewAll && presentations.some((p) => p.started_at) && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
               <div className="card-body p-3">
                 <div className="fw-semibold small mb-2 d-flex align-items-center gap-2">
                   <i className="bi bi-list-ol text-primary" />Presentation timeline
@@ -364,7 +364,7 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, isOL, rating,
   const clvl = checkpoint != null ? getLevelTokens(checkpoint) : null;
 
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
       <div className="card-body p-3 d-flex align-items-center gap-2">
         <button type="button"
           onClick={() => collapsible && setOpen((o) => !o)}
@@ -405,7 +405,7 @@ function ApcRecord({ apc, presentation, reviews, attStatus, order, isOL, rating,
           <button type="button" onClick={onRate}
             className="btn btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
             style={{
-              borderRadius: 8, fontSize: '0.68rem', fontWeight: 700,
+              borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', fontWeight: 700,
               background: checkpoint != null ? 'var(--accent-soft)' : 'var(--accent)',
               color: checkpoint != null ? 'var(--accent)' : 'var(--on-accent)',
               border: checkpoint != null ? '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' : 'none',

@@ -53,8 +53,8 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 14 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <p className="fw-semibold mb-1">Agenda task reset schedule</p>
           <p className="text-muted mb-3" style={{ fontSize: '0.78rem' }}>
@@ -72,8 +72,8 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                 <div className="d-flex gap-2">
                   {CADENCES.map(([v, l]) => (
                     <button key={v} type="button"
-                      className={`btn btn-sm ${cadence === v ? 'btn-dark' : 'btn-outline-secondary'}`}
-                      style={{ borderRadius: 8, fontSize: '0.78rem' }}
+                      className={`btn btn-sm ${cadence === v ? 'btn-primary' : 'btn-outline-secondary'}`}
+                      style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
                       onClick={() => patch({ cadence: v })}>
                       {l}
                     </button>
@@ -84,7 +84,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
               {cadence === 'daily' && (
                 <div className="mb-3">
                   <label className="form-label small fw-semibold">Reset time</label>
-                  <input type="time" className="form-control form-control-sm" style={{ borderRadius: 8, maxWidth: 160 }}
+                  <input type="time" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)', maxWidth: 160 }}
                     value={sched.daily?.time || '00:00'}
                     onChange={(e) => patchBlock('daily', { time: e.target.value })} />
                 </div>
@@ -94,7 +94,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                 <div className="row g-2 mb-3">
                   <div className="col-7">
                     <label className="form-label small fw-semibold">Reset day</label>
-                    <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+                    <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                       value={sched.weekly?.dayOfWeek ?? 1}
                       onChange={(e) => patchBlock('weekly', { dayOfWeek: Number(e.target.value) })}>
                       {DOW.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -102,7 +102,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                   </div>
                   <div className="col-5">
                     <label className="form-label small fw-semibold">Time</label>
-                    <input type="time" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                    <input type="time" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                       value={sched.weekly?.time || '00:00'}
                       onChange={(e) => patchBlock('weekly', { time: e.target.value })} />
                   </div>
@@ -113,7 +113,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                 <div className="row g-2 mb-3">
                   <div className="col-7">
                     <label className="form-label small fw-semibold">Day of month</label>
-                    <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+                    <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                       value={sched.monthly?.dayOfMonth ?? 1}
                       onChange={(e) => patchBlock('monthly', { dayOfMonth: Number(e.target.value) })}>
                       {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
@@ -121,7 +121,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
                   </div>
                   <div className="col-5">
                     <label className="form-label small fw-semibold">Time</label>
-                    <input type="time" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                    <input type="time" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                       value={sched.monthly?.time || '00:00'}
                       onChange={(e) => patchBlock('monthly', { time: e.target.value })} />
                   </div>
@@ -138,7 +138,7 @@ export default function AgendaResetScheduleModal({ onClose, onSaved }) {
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving || loading}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving || loading}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> Save</>}
             </button>
           </div>

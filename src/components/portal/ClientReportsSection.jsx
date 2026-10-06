@@ -5,6 +5,7 @@ import BrandSectionsPanel from './BrandSectionsPanel';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import { formatPctChange, pctChange, pctChangeDir } from '../../utils/formatPctChange';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
+import { useDialogs } from '../common/useDialogs';
 
 /**
  * Public reports viewer for the client portal — exact match to v1's
@@ -118,6 +119,7 @@ export default function ClientReportsSection({
   token = null,
   onMutate,
 }) {
+  const { ask, askText, notify } = useDialogs();
   const adapted = useMemo(() => reports.map(adaptReportForView), [reports]);
 
   // Lookups: per-brand section template list, and per-report value rows.
@@ -204,7 +206,7 @@ export default function ClientReportsSection({
         }
       } catch (err) {
         console.error('[client-export] failed:', err);
-        alert('Failed to export the PDF. Please try again.');
+        notify.error('Failed to export the PDF. Please try again.');
       } finally {
         if (!cancelled) setPendingExport(null);
       }
@@ -273,7 +275,7 @@ export default function ClientReportsSection({
     <div>
       {/* Hero header — matches v1's dark gradient + "{type} Reports" title */}
       <div className="card border-0 shadow-sm mb-4" style={{
-        borderRadius: 14, background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
+        borderRadius: 'var(--radius-lg)', background: 'linear-gradient(135deg, #1e293b, #0f172a)', color: '#fff',
       }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center gap-3">
@@ -301,10 +303,10 @@ export default function ClientReportsSection({
               <button
                 className={`nav-link ${activeType === t ? 'active' : ''}`}
                 style={{
-                  fontSize: '0.82rem', borderRadius: 8, fontWeight: 600,
-                  background: activeType === t ? '#1e293b' : '#fff',
-                  color: activeType === t ? '#fff' : '#1e293b',
-                  border: '1px solid #e2e8f0',
+                  fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', fontWeight: 600,
+                  background: activeType === t ? 'var(--accent)' : 'var(--surface-1)',
+                  color: activeType === t ? 'var(--on-accent)' : 'var(--text-primary)',
+                  border: '1px solid var(--border-subtle)',
                 }}
                 onClick={() => setActiveType(t)}>
                 <i className={`bi ${t === 'biweekly' ? 'bi-calendar2-week-fill' : t === 'monthly' ? 'bi-calendar-month-fill' : 'bi-file-earmark-bar-graph'} me-1`} />
@@ -319,13 +321,13 @@ export default function ClientReportsSection({
           recent commit (515cf30) removed the date filter; clients see
           every approved report. */}
       {brandOptions.length > 1 && (
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <span className="text-muted small">
               {filtered.length} approved report{filtered.length !== 1 ? 's' : ''}
             </span>
             <select className="form-select form-select-sm" value={filterBrand} onChange={e => setFilterBrand(e.target.value)}
-              style={{ width: 200, borderRadius: 8 }}>
+              style={{ width: 200, borderRadius: 'var(--radius-sm)' }}>
               <option value="">All Brands</option>
               {brandOptions.map(b => <option key={b}>{b}</option>)}
             </select>
@@ -343,8 +345,8 @@ export default function ClientReportsSection({
         [...grouped.entries()].map(([brandName, brandReports]) => (
           <div key={brandName} className="mb-4">
             <div className="d-flex align-items-center gap-2 mb-3">
-              <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                style={{ width: 32, height: 32, fontSize: '0.6rem', background: '#3b82f6' }}>
+              <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                style={{ width: 32, height: 32, fontSize: '0.6rem', background: 'var(--info)', color: 'var(--on-info)' }}>
                 {brandName.slice(0, 2).toUpperCase()}
               </div>
               <div>
@@ -366,7 +368,7 @@ export default function ClientReportsSection({
                 return (
                   <div key={r.id} className="col-md-6 col-lg-4">
                     <div className="card border-0 shadow-sm h-100"
-                      style={{ borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s' }}
+                      style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'transform var(--dur-fast) var(--ease-out)' }}
                       onClick={() => setViewReport(r)}
                       onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -403,7 +405,7 @@ export default function ClientReportsSection({
                         {gmvChange !== null && (
                           <div className="mt-1" style={{
                             fontSize: '0.65rem', fontWeight: 600,
-                            color: changeDir > 0 ? '#16a34a' : changeDir < 0 ? '#dc2626' : '#64748b',
+                            color: changeDir > 0 ? 'var(--success-text)' : changeDir < 0 ? 'var(--danger-text)' : 'var(--text-secondary)',
                           }}>
                             <i className={`bi bi-arrow-${changeDir > 0 ? 'up' : changeDir < 0 ? 'down' : 'right'}-short`} />
                             {formatPctChange(gmvChange, { withSign: changeDir !== 0 })} vs prev{' '}
@@ -414,7 +416,7 @@ export default function ClientReportsSection({
                         <button
                           type="button"
                           className="btn btn-sm w-100 mt-2 d-inline-flex align-items-center justify-content-center gap-1"
-                          style={{ borderRadius: 9, fontSize: '0.72rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+                          style={{ borderRadius: 'var(--radius-md)', fontSize: '0.72rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
                           onClick={(e) => { e.stopPropagation(); handleCardExport(r, brandReports); }}
                           disabled={!!pendingExport}
                           title="Download this report as a single-page PDF">
@@ -492,6 +494,9 @@ function shortPeriodLabel(r) {
 // available column, so the layout is identical on every screen (it only shrinks
 // uniformly on narrower windows — it never reflows to a different arrangement).
 const DESIGN_W = 1140;
+// Below this frame width the fixed canvas would shrink to ~0.3x (unreadable on a
+// phone), so it reflows at the real width instead — the report views are responsive.
+const REFLOW_BELOW = 768;
 
 function scrollToTop() {
   if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -558,11 +563,17 @@ function ReportDetailView({
   const [scale, setScale] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [frameH, setFrameH] = useState(undefined);
+  const [reflow, setReflow] = useState(false);
   useEffect(() => {
     const frame = frameRef.current, canvas = canvasRef.current;
     if (!frame || !canvas) return undefined;
     const recompute = () => {
       const w = frame.clientWidth;
+      if (w < REFLOW_BELOW) {
+        setReflow(true); setScale(1); setOffsetX(0); setFrameH(undefined);
+        return;
+      }
+      setReflow(false);
       const s = Math.min(1, w / DESIGN_W);
       setScale(s);
       setOffsetX(Math.max(0, (w - DESIGN_W * s) / 2));
@@ -615,7 +626,7 @@ function ReportDetailView({
       {/* Report body — fixed design width, scaled to fit for an identical layout everywhere. */}
       <div className="preport-frame" ref={frameRef} style={{ height: frameH }}>
         <div className="preport-canvas" ref={canvasRef}
-          style={{ width: DESIGN_W, marginLeft: offsetX, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          style={reflow ? { width: '100%' } : { width: DESIGN_W, marginLeft: offsetX, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
           {report.type === 'monthly' ? (
             <MonthlyReportView report={report} previousReport={prev} clientView reportLinks={brandLinks} />
           ) : (

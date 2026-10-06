@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ROLE_COLORS, roleShortLabel, initialsOf } from './hierarchyTheme';
+import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf } from './hierarchyTheme';
 
 /**
  * Tree view — indented, expandable hierarchy list.
@@ -27,7 +27,7 @@ export default function HierarchyTree({ boss, ols, tls, allReportsCount, allBran
   function isOpen(key) { return expanded.has(key); }
 
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
       <div className="card-body p-3">
         {boss && (
           <BossNode
@@ -63,7 +63,7 @@ export default function HierarchyTree({ boss, ols, tls, allReportsCount, allBran
           from { opacity: 0; transform: translateY(-6px); }
           to   { opacity: 1; transform: translateY(0);    }
         }
-        .tree-children { animation: slide-down 200ms ease-out; }
+        .tree-children { animation: slide-down var(--dur-enter) var(--ease-out); }
       `}</style>
     </div>
   );
@@ -74,12 +74,12 @@ function Chevron({ open, onClick }) {
     <button type="button" onClick={onClick}
       className="border-0 rounded-circle d-flex align-items-center justify-content-center"
       style={{
-        width: 24, height: 24, background: '#f1f5f9', cursor: 'pointer',
-        transition: 'transform 200ms ease',
+        width: 24, height: 24, background: 'var(--surface-2)', cursor: 'pointer',
+        transition: 'transform var(--dur-base) var(--ease-out)',
         transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
         flexShrink: 0,
       }}>
-      <i className="bi bi-chevron-right" style={{ fontSize: '0.65rem', color: '#475569' }} />
+      <i className="bi bi-chevron-right" style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }} />
     </button>
   );
 }
@@ -88,7 +88,7 @@ function RoleBadge({ role }) {
   const c = ROLE_COLORS[role] || ROLE_COLORS.apc;
   return (
     <span className="rounded-pill px-2 ms-2"
-      style={{ background: c.solid, color: '#fff', fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em' }}>
+      style={{ background: c.solid, color: c.on, fontSize: '0.55rem', fontWeight: 800, letterSpacing: '0.06em' }}>
       {roleShortLabel(role)}
     </span>
   );
@@ -101,10 +101,10 @@ function Avatar({ name, size = 26, role, src }) {
         style={{ width: size, height: size, objectFit: 'cover', display: 'block' }} />
     );
   }
-  const c = ROLE_COLORS[role] || { solid: '#3b82f6', text: '#1e3a8a' };
+  const c = ROLE_COLORS[role] || ROLE_COLORS.apc;
   return (
-    <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-      style={{ width: size, height: size, background: `linear-gradient(135deg, ${c.solid}, ${c.text || c.solid})`, fontSize: size > 32 ? '0.72rem' : '0.6rem' }}>
+    <div className="rounded-3 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+      style={{ width: size, height: size, background: c.solid, color: c.on, fontSize: size > 32 ? '0.72rem' : '0.6rem' }}>
       {initialsOf(name)}
     </div>
   );
@@ -126,16 +126,16 @@ function BossNode({ user, open, onToggle, reportsCount, brandsCount, children })
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
         <Avatar name={user.displayName || user.email} size={32} role="boss" src={user.avatar_url} />
-        <span className="fw-bold" style={{ fontSize: '0.92rem', color: '#0f172a' }}>{user.displayName || user.email}</span>
+        <span className="fw-bold" style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>{user.displayName || user.email}</span>
         <RoleBadge role="boss" />
         <MetaRight>
-          <strong style={{ color: '#0f172a' }}>{reportsCount}</strong> reports
+          <strong style={{ color: 'var(--text-primary)' }}>{reportsCount}</strong> reports
           {' · '}
-          <strong style={{ color: '#0f172a' }}>{brandsCount}</strong> brands
+          <strong style={{ color: 'var(--text-primary)' }}>{brandsCount}</strong> brands
         </MetaRight>
       </div>
       {open && (
-        <div className="tree-children" style={{ marginLeft: 16, borderLeft: '1px solid #e2e8f0', paddingLeft: 16 }}>
+        <div className="tree-children" style={{ marginLeft: 16, borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
           {children}
         </div>
       )}
@@ -149,14 +149,14 @@ function OLNode({ user, open, onToggle, reportCount, children }) {
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
         <Avatar name={user.displayName || user.email} size={28} role="ol" src={user.avatar_url} />
-        <span className="fw-semibold" style={{ fontSize: '0.86rem', color: '#0f172a' }}>{user.displayName || user.email}</span>
+        <span className="fw-semibold" style={{ fontSize: '0.86rem', color: 'var(--text-primary)' }}>{user.displayName || user.email}</span>
         <RoleBadge role="ol" />
         <MetaRight>
-          <strong style={{ color: '#0f172a' }}>{reportCount}</strong> reports
+          <strong style={{ color: 'var(--text-primary)' }}>{reportCount}</strong> reports
         </MetaRight>
       </div>
       {open && (
-        <div className="tree-children" style={{ marginLeft: 16, borderLeft: '1px solid #e2e8f0', paddingLeft: 16 }}>
+        <div className="tree-children" style={{ marginLeft: 16, borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
           {children}
         </div>
       )}
@@ -165,33 +165,38 @@ function OLNode({ user, open, onToggle, reportCount, children }) {
 }
 
 function TLNode({ tl, open, onToggle, onSelect, isOpen, onMemberToggle }) {
+  const kind = teamKindOf(tl.role);
   return (
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
         <Chevron open={open} onClick={onToggle} />
-        <Avatar name={tl.displayName || tl.email} size={28} role={tl.role === 'pctl' ? 'pctl' : 'tl'} src={tl.avatar_url} />
+        <Avatar name={tl.displayName || tl.email} size={28} role={tl.role === 'developer' ? 'developer' : (tl.role === 'pctl' ? 'pctl' : 'tl')} src={tl.avatar_url} />
         <button type="button"
           onClick={() => onSelect({ type: 'tl', tl })}
           className="border-0 bg-transparent p-0 fw-semibold text-start"
-          style={{ fontSize: '0.84rem', color: '#0f172a', cursor: 'pointer' }}>
+          style={{ fontSize: '0.84rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
           {tl.displayName || tl.email}
         </button>
-        <RoleBadge role={tl.role === 'pctl' ? 'pctl' : 'tl'} />
+        <RoleBadge role={tl.role === 'developer' ? 'developer' : (tl.role === 'pctl' ? 'pctl' : 'tl')} />
         <MetaRight>
-          <strong style={{ color: '#0f172a' }}>{tl.brands.length}</strong> brand{tl.brands.length === 1 ? '' : 's'}
-          {' · '}
-          <strong style={{ color: '#0f172a' }}>{tl.members.length}</strong> {tl.role === 'pctl' ? 'IPC' : 'APC'}{tl.members.length === 1 ? '' : 's'}
+          {kind.hasBrands && (
+            <>
+              <strong style={{ color: 'var(--text-primary)' }}>{tl.brands.length}</strong> brand{tl.brands.length === 1 ? '' : 's'}
+              {' · '}
+            </>
+          )}
+          <strong style={{ color: 'var(--text-primary)' }}>{tl.members.length}</strong> {kind.memberShortLabel}{tl.members.length === 1 ? '' : 's'}
         </MetaRight>
       </div>
       {open && (
-        <div className="tree-children" style={{ marginLeft: 16, borderLeft: '1px solid #e2e8f0', paddingLeft: 16 }}>
+        <div className="tree-children" style={{ marginLeft: 16, borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
           {tl.brands.length > 0 && (
             <div className="d-flex flex-wrap gap-1 my-1">
               {tl.brands.map(b => (
                 <button key={b.id} type="button"
                   onClick={() => onSelect({ type: 'brand', brand: b, tl })}
                   className="rounded-pill border-0"
-                  style={{ background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', fontSize: '0.62rem', fontWeight: 600, padding: '3px 9px', cursor: 'pointer' }}
+                  style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.62rem', fontWeight: 600, padding: '3px 9px', cursor: 'pointer' }}
                   title={`Reassign ${b.brandName}`}>
                   {b.brandName}
                 </button>
@@ -215,6 +220,7 @@ function TLNode({ tl, open, onToggle, onSelect, isOpen, onMemberToggle }) {
 function MemberNode({ m, tl, open, onToggle, onSelect }) {
   const role = (m.userType || 'apc');
   const brandsCount = (m.brands || []).length;
+  const hasBrands = role !== 'developer';
   return (
     <div>
       <div className="d-flex align-items-center gap-2 py-2">
@@ -223,22 +229,24 @@ function MemberNode({ m, tl, open, onToggle, onSelect }) {
         <button type="button"
           onClick={() => onSelect({ type: 'member', member: m, tl })}
           className="border-0 bg-transparent p-0 fw-semibold text-start"
-          style={{ fontSize: '0.78rem', color: '#0f172a', cursor: 'pointer' }}>
+          style={{ fontSize: '0.78rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
           {m.userName || m.email}
         </button>
         <RoleBadge role={role} />
-        <MetaRight>
-          <strong style={{ color: '#0f172a' }}>{brandsCount}</strong> brand{brandsCount === 1 ? '' : 's'}
-        </MetaRight>
+        {hasBrands && (
+          <MetaRight>
+            <strong style={{ color: 'var(--text-primary)' }}>{brandsCount}</strong> brand{brandsCount === 1 ? '' : 's'}
+          </MetaRight>
+        )}
       </div>
-      {open && brandsCount > 0 && (
+      {open && hasBrands && brandsCount > 0 && (
         <div className="tree-children d-flex flex-wrap gap-1 my-1"
           style={{ marginLeft: 38 }}>
           {m.brands.map(b => (
             <button key={b.id || b.brandName} type="button"
               onClick={() => onSelect({ type: 'brand', brand: b, tl })}
               className="rounded-pill border-0"
-              style={{ background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa', fontSize: '0.6rem', fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>
+              style={{ background: 'var(--warning-soft)', color: 'var(--warning-text)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', fontSize: '0.6rem', fontWeight: 600, padding: '2px 8px', cursor: 'pointer' }}>
               {b.brandName}
             </button>
           ))}

@@ -171,14 +171,16 @@ export default function RoleDashboard() {
           tone={data.myTasksOverdue > 0 ? 'warn' : undefined} />
         <Stat to="/notifications" icon={<BellIcon width="18" height="18" />} label="Unread notifications" value={data.unread} />
         <Stat to="/leave" icon={<HomeIcon width="18" height="18" />} label="My pending leaves" value={data.myPendingLeave} />
-        {['boss', 'tl', 'pctl', 'ol', 'developer'].includes(role) && (
+        {/* Tile/link roles must match the RoleGuard on the target route (App.jsx) —
+            RoleGuard silently bounces to /dashboard, which reads as a dead button. */}
+        {['boss', 'tl', 'pctl', 'ol'].includes(role) && (
           <Stat to="/leave/approvals" icon={<CheckIcon width="18" height="18" />} label="Leaves to approve" value={data.pendingApprovals} />
         )}
-        {['boss', 'ol', 'developer'].includes(role) && (
+        {['boss', 'ol'].includes(role) && (
           <>
             <Stat to="/brands" icon={<StoreIcon width="18" height="18" />} label="Active brands" value={data.globalBrands} />
-            <Stat to="/boss/manage/tls" icon={<UsersIcon width="18" height="18" />} label="Active users" value={data.globalUsers} />
-            <Stat to="/boss/brand-switches" icon={<StoreIcon width="18" height="18" />} label="Switch requests" value={data.pendingSwitches} />
+            <Stat to="/team-hierarchy" icon={<UsersIcon width="18" height="18" />} label="Active users" value={data.globalUsers} />
+            <Stat to="/brand-switcher" icon={<StoreIcon width="18" height="18" />} label="Switch requests" value={data.pendingSwitches} />
           </>
         )}
       </div>
@@ -209,7 +211,7 @@ export default function RoleDashboard() {
 
         {/* My brands */}
         {data.brands && data.brands.length > 0 && (
-          <Panel title="Your brands" linkTo="/brands" linkLabel="Manage →">
+          <Panel title="Your brands" linkTo={isPctl ? '/paid-collab/brands' : '/brands'} linkLabel="Manage →">
             {data.brands.slice(0, 6).map((b) => (
               <div key={b.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -253,7 +255,7 @@ export default function RoleDashboard() {
                   justifySelf: 'end',
                   display: 'inline-block',
                   fontSize: 10.5, fontWeight: 700, textTransform: 'capitalize',
-                  padding: '3px 10px', borderRadius: 999, lineHeight: 1.4,
+                  padding: '3px 10px', borderRadius: 'var(--radius-pill)', lineHeight: 1.4,
                   background: statusTone(r.status).bg,
                   color: statusTone(r.status).fg,
                 }}>{r.status}</span>
@@ -383,9 +385,9 @@ function formatBig(n) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 function statusTone(s) {
-  if (s === 'submitted') return { bg: 'color-mix(in srgb, var(--accent) 20%, transparent)',   fg: 'var(--accent)' };
-  if (s === 'verified')  return { bg: 'color-mix(in srgb, var(--success) 15%, transparent)',  fg: 'var(--success)' };
-  if (s === 'approved')  return { bg: 'color-mix(in srgb, var(--success) 20%, transparent)',  fg: 'var(--success)' };
-  if (s === 'rejected')  return { bg: 'color-mix(in srgb, var(--danger) 20%, transparent)',   fg: 'var(--danger)' };
+  if (s === 'submitted') return { bg: 'color-mix(in srgb, var(--accent) 20%, transparent)',   fg: 'var(--accent-text)' };
+  if (s === 'verified')  return { bg: 'color-mix(in srgb, var(--success) 15%, transparent)',  fg: 'var(--success-text)' };
+  if (s === 'approved')  return { bg: 'color-mix(in srgb, var(--success) 20%, transparent)',  fg: 'var(--success-text)' };
+  if (s === 'rejected')  return { bg: 'color-mix(in srgb, var(--danger) 20%, transparent)',   fg: 'var(--danger-text)' };
   return { bg: 'var(--surface-3)', fg: 'var(--text-muted)' };
 }

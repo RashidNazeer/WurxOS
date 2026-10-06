@@ -88,11 +88,11 @@ export default function ReportPeriodStrip({ reports = [], currentId, onSelect, t
             title={`${labelOf(r)} · ${cfg.label}`}
             style={{
               flex: '0 0 auto', minWidth: 116, textAlign: 'left',
-              padding: '7px 11px', borderRadius: 10, cursor: 'pointer',
+              padding: '7px 11px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
               background: active ? 'var(--accent-soft)' : 'var(--surface-1)',
               border: `1px solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
               boxShadow: active ? '0 2px 8px -4px var(--accent)' : 'none',
-              transition: 'background .12s, border-color .12s',
+              transition: 'background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
             }}>
             <div className="d-flex align-items-center gap-1" style={{ minWidth: 0 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />

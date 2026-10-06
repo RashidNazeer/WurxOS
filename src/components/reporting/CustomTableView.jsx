@@ -10,12 +10,12 @@ export default function CustomTableView({ entry }) {
 
   const th = {
     padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', fontWeight: 700,
-    color: 'var(--text-secondary, #475569)', whiteSpace: 'nowrap',
-    background: 'var(--surface-2, #f8fafc)', borderBottom: '2px solid var(--border-subtle, #e2e8f0)',
+    color: 'var(--text-secondary)', whiteSpace: 'nowrap',
+    background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)',
   };
   const td = {
-    padding: '8px 12px', fontSize: '0.84rem', color: 'var(--text-primary, #1e293b)',
-    borderBottom: '1px solid var(--border-subtle, #eef2f7)', verticalAlign: 'top',
+    padding: '8px 12px', fontSize: '0.84rem', color: 'var(--text-primary)',
+    borderBottom: '1px solid var(--border-subtle)', verticalAlign: 'top',
   };
 
   return (
@@ -39,10 +39,10 @@ export default function CustomTableView({ entry }) {
 }
 
 function fmtCell(v, type) {
-  if (v == null || v === '') return <span style={{ color: 'var(--text-muted, #94a3b8)' }}>—</span>;
+  if (v == null || v === '') return <span style={{ color: 'var(--text-muted)' }}>—</span>;
   if (type === 'url') {
     const href = /^https?:\/\//i.test(v) ? v : `https://${v}`;
-    return <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--accent, #6366f1)' }}>{v}</a>;
+    return <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--accent, var(--purple-text))' }}>{v}</a>;
   }
   if (type === 'currency' || type === 'number') {
     const n = Number(v);

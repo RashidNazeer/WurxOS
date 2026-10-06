@@ -103,7 +103,7 @@ export default function ClientPortalPage() {
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 52, height: 52, borderRadius: 12,
+              width: 52, height: 52, borderRadius: 'var(--radius-md)',
               background: 'rgba(245, 213, 168, 0.18)', backdropFilter: 'blur(4px)',
               display: 'grid', placeItems: 'center', fontSize: 24,
             }}>📊</div>
@@ -122,7 +122,7 @@ export default function ClientPortalPage() {
 
       {/* Tabs */}
       {showTabs && (
-        <div style={{ background: '#fff', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ background: 'var(--glass-bg-strong)', backdropFilter: 'var(--glass-filter-sticky)', WebkitBackdropFilter: 'var(--glass-filter-sticky)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
           <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px' }}>
             <div style={{ display: 'flex', gap: 4 }}>
               {perms.reports && (
@@ -171,7 +171,7 @@ function PortalTab({ label, emoji, tint, active, onClick }) {
         padding: '14px 16px', cursor: 'pointer',
         fontSize: 13.5, fontWeight: active ? 700 : 500,
         color: active ? tint : 'var(--text-secondary)',
-        borderBottom: `3px solid ${active ? tint : 'transparent'}`,
+        borderBottom: `2px solid ${active ? tint : 'transparent'}`,
         display: 'inline-flex', alignItems: 'center', gap: 6,
       }}>
       <span>{emoji}</span> {label}

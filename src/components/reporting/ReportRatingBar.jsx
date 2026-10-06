@@ -13,7 +13,7 @@ function StarPicker({ value, onChange, disabled }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <span key={i} style={{ position: 'relative', display: 'inline-block', width: '1.15rem', height: '1.15rem', cursor: disabled ? 'default' : 'pointer' }}>
           <i className={`bi ${v >= i ? 'bi-star-fill' : v >= i - 0.5 ? 'bi-star-half' : 'bi-star'}`}
-            style={{ color: 'var(--warning, #f59e0b)', fontSize: '1.15rem', position: 'absolute', inset: 0, lineHeight: 1, opacity: disabled ? 0.55 : 1 }} />
+            style={{ color: 'var(--warning, var(--warning-text))', fontSize: '1.15rem', position: 'absolute', inset: 0, lineHeight: 1, opacity: disabled ? 0.55 : 1 }} />
           {!disabled && <>
             <span onMouseDown={noBlur} onClick={() => onChange(i - 0.5)} title={`${i - 0.5} stars`} style={{ position: 'absolute', left: 0, top: 0, width: '50%', height: '100%', zIndex: 1 }} />
             <span onMouseDown={noBlur} onClick={() => onChange(i)} title={`${i} stars`} style={{ position: 'absolute', right: 0, top: 0, width: '50%', height: '100%', zIndex: 1 }} />
@@ -76,7 +76,7 @@ function RatingRow({ label, hint, value, note, onSave, readOnly = false, withNot
       {/* Editable note (the rater) */}
       {withNote && !readOnly && (
         <textarea className="form-control form-control-sm mt-2" rows={2}
-          style={{ borderRadius: 8, fontSize: '0.78rem' }}
+          style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
           placeholder={notePlaceholder}
           value={noteText}
           onChange={(e) => setNoteText(e.target.value)}

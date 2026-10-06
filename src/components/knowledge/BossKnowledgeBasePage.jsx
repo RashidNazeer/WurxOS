@@ -17,6 +17,7 @@ import {
 } from '../../lib/kbApi';
 import BulkImportKnowledgeBaseModal from './BulkImportKnowledgeBaseModal';
 import DuplicateCheckerModal from './DuplicateCheckerModal';
+import { useDialogs } from '../common/useDialogs';
 
 const SOP_TABS = ['delivery_roadmap', 'operational_sops', 'training_sops', 'policies'];
 
@@ -79,12 +80,12 @@ function VideoEmbed({ url }) {
     <div className="mt-2">
       {!show ? (
         <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
-          style={{ fontSize: '0.72rem', borderRadius: 6 }} onClick={() => setShow(true)}>
+          style={{ fontSize: '0.72rem', borderRadius: 'var(--radius-sm)' }} onClick={() => setShow(true)}>
           <i className="bi bi-play-circle" /> Play Video
         </button>
       ) : (
-        <div className="position-relative" style={{ borderRadius: 10, overflow: 'hidden', background: '#000' }}>
-          <button className="btn btn-sm btn-dark position-absolute d-inline-flex align-items-center justify-content-center"
+        <div className="position-relative" style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', background: '#000' }}>
+          <button className="btn btn-sm btn-primary position-absolute d-inline-flex align-items-center justify-content-center"
             style={{ top: 8, right: 8, zIndex: 2, width: 28, height: 28, borderRadius: '50%', padding: 0, opacity: 0.8 }}
             onClick={() => setShow(false)} title="Close">
             <i className="bi bi-x" style={{ fontSize: '0.9rem' }} />
@@ -160,12 +161,12 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 16, maxHeight: '92vh', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">
             <h6 className="fw-bold mb-0">{parent ? `New Version of "${parent.title}"` : editDoc ? 'Edit Document' : 'Add Document'}</h6>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose} style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="btn btn-sm border-0 rounded-circle" aria-label="Close" onClick={onClose} style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
             </button>
           </div>
@@ -196,7 +197,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                       background: selectedTab === t.value ? 'var(--accent)' : 'var(--surface-2)',
                       color: selectedTab === t.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                       borderColor: selectedTab === t.value ? 'var(--accent)' : 'var(--border-subtle)',
-                      cursor: 'pointer', transition: 'all 0.12s',
+                      cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                     }}>
                     <i className={`bi ${t.icon}`} style={{ fontSize: '0.65rem' }} />{t.label}
                   </button>
@@ -229,7 +230,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                       background: visType === v.value ? 'var(--accent)' : 'var(--surface-2)',
                       color: visType === v.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                       borderColor: visType === v.value ? 'var(--accent)' : 'var(--border-subtle)',
-                      cursor: 'pointer', transition: 'all 0.12s',
+                      cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                     }}>
                     <i className={`bi ${v.icon}`} style={{ fontSize: '0.72rem' }} />{v.label}
                   </button>
@@ -242,10 +243,10 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                   <div className="d-flex gap-2 flex-wrap">
                     {[
                       { value: 'tl',   label: 'Team Leads',          color: 'var(--info)' },
-                      { value: 'ol',   label: 'Operation Leads',     color: '#6610f2' },
-                      { value: 'pctl', label: 'Paid Collab TLs',     color: '#d63384' },
+                      { value: 'ol',   label: 'Operation Leads',     color: 'var(--purple-text)' },
+                      { value: 'pctl', label: 'Paid Collab TLs',     color: 'var(--chart-5)' },
                       { value: 'apc',  label: 'APCs',                color: 'var(--success)' },
-                      { value: 'ipc',  label: 'IPCs',                color: '#0dcaf0' },
+                      { value: 'ipc',  label: 'IPCs',                color: 'var(--info)' },
                     ].map(r => {
                       const sel = visRoles.includes(r.value);
                       return (
@@ -254,7 +255,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                           style={{
                             fontSize: '0.76rem', fontWeight: 600, padding: '5px 12px',
                             background: sel ? r.color : 'var(--surface-1)', color: sel ? 'var(--text-inverse)' : r.color,
-                            borderColor: sel ? r.color : `${r.color}55`, cursor: 'pointer',
+                            borderColor: sel ? r.color : `color-mix(in srgb, ${r.color} 33%, transparent)`, cursor: 'pointer',
                           }}>
                           <i className={`bi ${sel ? 'bi-check-circle-fill' : 'bi-circle'}`} style={{ fontSize: '0.65rem' }} />{r.label}
                         </button>
@@ -273,7 +274,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                   <div className="position-relative mb-2">
                     <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.72rem', pointerEvents: 'none' }} />
                     <input type="text" className="form-control form-control-sm" placeholder="Search users…"
-                      style={{ paddingLeft: 28, borderRadius: 8 }} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+                      style={{ paddingLeft: 28, borderRadius: 'var(--radius-sm)' }} value={userSearch} onChange={e => setUserSearch(e.target.value)} />
                   </div>
                   {visUserIds.length > 0 && (
                     <div className="d-flex flex-wrap gap-1 mb-2">
@@ -298,8 +299,8 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
                           style={{ background: sel ? 'var(--info-soft)' : 'var(--surface-1)', border: `1px solid ${sel ? 'color-mix(in srgb, var(--info) 35%, transparent)' : 'var(--border-subtle)'}`, cursor: 'pointer' }}
                           onClick={() => toggleUser(u.id)}>
                           <input type="checkbox" className="form-check-input flex-shrink-0" checked={sel} readOnly style={{ cursor: 'pointer' }} />
-                          <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                            style={{ width: 22, height: 22, background: sel ? 'var(--info)' : 'var(--text-muted)', fontSize: '0.5rem' }}>
+                          <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                            style={{ width: 22, height: 22, background: sel ? 'var(--info)' : 'var(--surface-3)', color: sel ? 'var(--on-info)' : 'var(--text-primary)', fontSize: '0.5rem' }}>
                             {name.slice(0, 2).toUpperCase()}
                           </span>
                           <div className="flex-grow-1" style={{ minWidth: 0 }}>
@@ -316,7 +317,7 @@ function DocModal({ editDoc, newVersionOf, tab: defaultTab, onClose, onSave, sav
 
             <div className="d-flex gap-2 justify-content-end">
               <button type="button" className="btn btn-sm btn-outline-secondary px-3" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" disabled={saving}>
+              <button type="submit" className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" disabled={saving}>
                 {saving ? <><span className="spinner-border spinner-border-sm" />Saving…</> : <><i className="bi bi-check" />{editDoc ? 'Update' : 'Add Document'}</>}
               </button>
             </div>
@@ -360,12 +361,12 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 580, zIndex: 1, borderRadius: 16, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="card-header bg-white border-0 pt-4 pb-2 px-4 flex-shrink-0" style={{ borderRadius: '16px 16px 0 0' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 580, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="card-header border-0 pt-4 pb-2 px-4 flex-shrink-0" style={{ borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }}>
           <div className="d-flex align-items-center justify-content-between mb-2">
             <h6 className="fw-bold mb-0">Acknowledgment Status</h6>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose} style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="btn btn-sm border-0 rounded-circle" aria-label="Close" onClick={onClose} style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
             </button>
           </div>
@@ -373,7 +374,7 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
 
           <div className="d-flex align-items-center gap-2 mb-3">
             <div className="flex-grow-1 rounded-pill" style={{ height: 8, background: 'var(--surface-3)' }}>
-              <div className="rounded-pill" style={{ height: 8, width: `${totalUsers > 0 ? (readCount / totalUsers) * 100 : 0}%`, background: 'var(--success)', transition: 'width 0.3s' }} />
+              <div className="rounded-pill" style={{ height: 8, width: `${totalUsers > 0 ? (readCount / totalUsers) * 100 : 0}%`, background: 'var(--success)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
             </div>
             <span className="small fw-semibold" style={{ color: 'var(--success)', whiteSpace: 'nowrap' }}>{readCount}/{totalUsers}</span>
           </div>
@@ -381,11 +382,11 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
           <div className="d-flex gap-2 align-items-center">
             <div className="position-relative flex-grow-1">
               <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', pointerEvents: 'none' }} />
-              <input type="text" className="form-control form-control-sm" placeholder="Search…" style={{ paddingLeft: 28, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+              <input type="text" className="form-control form-control-sm" placeholder="Search…" style={{ paddingLeft: 28, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             {['all', 'read', 'unread'].map(f => (
-              <button key={f} className={`btn btn-sm ${filter === f ? 'btn-dark' : 'btn-outline-secondary'}`}
-                style={{ borderRadius: 8, fontSize: '0.72rem', textTransform: 'capitalize' }} onClick={() => setFilter(f)}>{f}</button>
+              <button key={f} className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-outline-secondary'}`}
+                style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', textTransform: 'capitalize' }} onClick={() => setFilter(f)}>{f}</button>
             ))}
           </div>
         </div>
@@ -401,8 +402,8 @@ function AckDashboardModal({ item, allUsers: rawAllUsers, ackList, onClose }) {
                   <tr key={r.id}>
                     <td>
                       <div className="d-flex align-items-center gap-2">
-                        <span className="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-                          style={{ width: 24, height: 24, background: r.ack ? 'var(--success)' : 'var(--border-subtle)', fontSize: '0.5rem' }}>
+                        <span className="rounded-circle d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                          style={{ width: 24, height: 24, background: r.ack ? 'var(--success)' : 'var(--surface-3)', color: r.ack ? 'var(--on-success)' : 'var(--text-primary)', fontSize: '0.5rem' }}>
                           {r.name.slice(0, 2).toUpperCase()}
                         </span>
                         <div>
@@ -502,14 +503,14 @@ function BossCommentSection({ docId }) {
             )}
             {replyTarget?.id === c.id && (
               <div className="d-flex gap-2 mt-2">
-                <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+                <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
                   placeholder="Type your reply…" value={replyText} onChange={e => setReplyText(e.target.value)} autoFocus
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleReply(); } }} />
-                <button className="btn btn-sm btn-outline-secondary flex-shrink-0" style={{ borderRadius: 8 }} onClick={() => setReplyTarget(null)}>
+                <button className="btn btn-sm btn-outline-secondary flex-shrink-0" style={{ borderRadius: 'var(--radius-sm)' }} onClick={() => setReplyTarget(null)}>
                   <i className="bi bi-x" />
                 </button>
-                <button className="btn btn-sm btn-dark flex-shrink-0 d-inline-flex align-items-center gap-1"
-                  style={{ borderRadius: 8 }} onClick={handleReply} disabled={replying || !replyText.trim()}>
+                <button className="btn btn-sm btn-primary flex-shrink-0 d-inline-flex align-items-center gap-1"
+                  style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleReply} disabled={replying || !replyText.trim()}>
                   <i className="bi bi-send" style={{ fontSize: '0.7rem' }} />
                 </button>
               </div>
@@ -524,6 +525,7 @@ function BossCommentSection({ docId }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function BossKnowledgeBasePage() {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
 
@@ -597,7 +599,7 @@ export default function BossKnowledgeBasePage() {
   }
 
   async function handleDelete(itemId) {
-    if (!window.confirm('Delete this document? This cannot be undone.')) return;
+    if (!(await ask('Delete this document? This cannot be undone.', { danger: true, confirmLabel: 'Delete' }))) return;
     try { await bossDeleteArticle(itemId); } catch { /* ignore */ }
   }
 
@@ -610,7 +612,7 @@ export default function BossKnowledgeBasePage() {
   }
 
   async function handleReject(pendingDoc) {
-    const reason = window.prompt('Rejection reason (optional):');
+    const reason = await askText('Rejection reason (optional):');
     if (reason === null) return;
     try { await bossReject(pendingDoc.id, reason || ''); } catch { /* ignore */ }
   }
@@ -631,7 +633,7 @@ export default function BossKnowledgeBasePage() {
   }, [items]);
 
   return (
-    <div style={{ padding: '32px 32px 48px' }}>
+    <div style={{ paddingBottom: 48 }}>
       {/* Header */}
       <div className="d-flex align-items-start justify-content-between mb-4">
         <div>
@@ -643,7 +645,7 @@ export default function BossKnowledgeBasePage() {
         </div>
         <div className="d-flex gap-2">
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.8rem',
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem',
               background: duplicateCount > 0 ? 'var(--warning-soft)' : 'var(--surface-2)',
               color: duplicateCount > 0 ? 'var(--warning)' : 'var(--text-secondary)',
               border: `1px solid ${duplicateCount > 0 ? 'color-mix(in srgb, var(--warning) 50%, transparent)' : 'var(--border-default)'}` }}
@@ -659,12 +661,12 @@ export default function BossKnowledgeBasePage() {
             )}
           </button>
           <button className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 8, fontSize: '0.8rem' }}
+            style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
             onClick={() => setShowBulkImport(true)}
             title="Upload a CSV to add many documents at once">
             <i className="bi bi-file-earmark-arrow-up" style={{ fontSize: '0.72rem' }} /> Bulk Import
           </button>
-          <button className="btn btn-sm btn-dark d-inline-flex align-items-center gap-1" style={{ borderRadius: 8, fontSize: '0.8rem' }}
+          <button className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
             onClick={() => { setEditDoc(null); setShowModal(true); }}>
             <i className="bi bi-plus-lg" style={{ fontSize: '0.72rem' }} /> Add Document
           </button>
@@ -673,7 +675,7 @@ export default function BossKnowledgeBasePage() {
 
       {/* ── Pending Submissions ── */}
       {pendingItems.length > 0 && (
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14, border: '2px solid #fbbf24' }}>
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 'var(--radius-lg)', border: '2px solid var(--warning)' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center gap-2 mb-3">
               <div className="rounded-2 d-flex align-items-center justify-content-center" style={{ width: 32, height: 32, background: 'var(--warning-soft)' }}>
@@ -686,7 +688,7 @@ export default function BossKnowledgeBasePage() {
             </div>
             {pendingItems.map(p => (
               <div key={p.id} className="rounded-3 p-3 mb-2 d-flex align-items-start justify-content-between gap-3"
-                style={{ background: 'var(--warning-soft)', border: '1px solid #fde68a' }}>
+                style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="fw-semibold small">{p.title}</div>
                   {p.description && <div className="text-muted" style={{ fontSize: '0.72rem' }}>{p.description}</div>}
@@ -698,12 +700,12 @@ export default function BossKnowledgeBasePage() {
                 </div>
                 <div className="d-flex gap-1 flex-shrink-0">
                   <button className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.75rem', padding: '4px 10px' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', padding: '4px 10px' }}
                     onClick={() => setApproveTarget(p)}>
                     <i className="bi bi-check-lg" /> Approve
                   </button>
                   <button className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                    style={{ borderRadius: 8, fontSize: '0.75rem', padding: '4px 10px' }}
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', padding: '4px 10px' }}
                     onClick={() => handleReject(p)}>
                     <i className="bi bi-x-lg" /> Reject
                   </button>
@@ -733,7 +735,7 @@ export default function BossKnowledgeBasePage() {
             <button key={tab.value}
               className="d-inline-flex align-items-center gap-1 rounded-pill border px-3 py-1"
               style={{
-                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s',
+                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
                 background: activeTab === tab.value ? 'var(--accent)' : 'var(--surface-2)',
                 color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-secondary)',
                 borderColor: activeTab === tab.value ? 'var(--accent)' : 'var(--border-subtle)',
@@ -742,7 +744,7 @@ export default function BossKnowledgeBasePage() {
               <i className={`bi ${tab.icon}`} style={{ fontSize: '0.72rem' }} />
               {tab.label}
               {count > 0 && (
-                <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700, background: activeTab === tab.value ? 'rgba(255,255,255,0.25)' : 'var(--surface-3)', color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-muted)', lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
+                <span className="rounded-pill px-1" style={{ fontSize: '0.6rem', fontWeight: 700, background: activeTab === tab.value ? 'color-mix(in srgb, var(--on-accent) 22%, transparent)' : 'var(--surface-3)', color: activeTab === tab.value ? 'var(--on-accent)' : 'var(--text-muted)', lineHeight: '16px', minWidth: 16, textAlign: 'center' }}>
                   {count}
                 </span>
               )}
@@ -757,7 +759,7 @@ export default function BossKnowledgeBasePage() {
           <div className="position-relative">
             <i className="bi bi-search position-absolute text-muted" style={{ left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.78rem', pointerEvents: 'none' }} />
             <input type="text" className="form-control form-control-sm" placeholder="Search documents…"
-              style={{ paddingLeft: 30, borderRadius: 8 }} value={search} onChange={e => setSearch(e.target.value)} />
+              style={{ paddingLeft: 30, borderRadius: 'var(--radius-sm)' }} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
       )}
@@ -766,19 +768,19 @@ export default function BossKnowledgeBasePage() {
       {loading ? (
         <div className="d-flex align-items-center gap-2 py-5 text-muted"><span className="spinner-border spinner-border-sm" /><span className="small">Loading…</span></div>
       ) : tabItems.length === 0 ? (
-        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 16, background: 'var(--surface-1)' }}>
+        <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ border: '2px dashed var(--border-default)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <div className="rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: 64, height: 64, background: 'var(--surface-2)' }}>
             <i className="bi bi-book text-muted" style={{ fontSize: '1.6rem', opacity: 0.35 }} />
           </div>
-          <p className="fw-semibold text-dark mb-1">{search ? 'No matching documents' : 'No documents in this category'}</p>
-          <button className="btn btn-sm btn-dark mt-2" onClick={() => { setEditDoc(null); setShowModal(true); }}>Add first document</button>
+          <p className="fw-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{search ? 'No matching documents' : 'No documents in this category'}</p>
+          <button className="btn btn-sm btn-primary mt-2" onClick={() => { setEditDoc(null); setShowModal(true); }}>Add first document</button>
         </div>
       ) : (
         <div className="d-flex flex-column gap-3">
           {tabItems.map(item => {
             const isExpanded = expandedId === item.id;
             return (
-              <div key={item.id} className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+              <div key={item.id} className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-md)' }}>
                 <div className="card-body p-3">
                   <div className="d-flex align-items-start justify-content-between">
                     <div className="flex-grow-1">
@@ -807,7 +809,7 @@ export default function BossKnowledgeBasePage() {
                           <span className="badge rounded-pill" style={{ background: 'var(--info-soft)', color: 'var(--info)', fontSize: '0.58rem' }}><i className="bi bi-globe me-1" />Everyone</span>
                         )}
                         {item.visibility?.type === 'roles' && (
-                          <span className="badge rounded-pill" style={{ background: 'color-mix(in srgb, #6610f2 14%, transparent)', color: '#6610f2', fontSize: '0.58rem' }}>
+                          <span className="badge rounded-pill" style={{ background: 'color-mix(in srgb, var(--purple) 14%, transparent)', color: 'var(--purple-text)', fontSize: '0.58rem' }}>
                             <i className="bi bi-people me-1" />{(item.visibility.roles || []).map(r => ROLE_LABELS[r] || r).join(', ')}
                           </span>
                         )}
@@ -822,27 +824,27 @@ export default function BossKnowledgeBasePage() {
                     <div className="d-flex align-items-center gap-1 flex-shrink-0 ms-3">
                       {SOP_TABS.includes(item.tab) && (
                         <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 px-2"
-                          style={{ fontSize: '0.68rem', borderRadius: 6 }}
+                          style={{ fontSize: '0.68rem', borderRadius: 'var(--radius-sm)' }}
                           onClick={() => { setNewVersionTarget(item); setEditDoc(null); setShowModal(true); }}>
                           <i className="bi bi-plus-circle" /> New Ver.
                         </button>
                       )}
                       <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 px-2"
-                        style={{ fontSize: '0.68rem', borderRadius: 6 }} onClick={() => openAckDashboard(item)}>
+                        style={{ fontSize: '0.68rem', borderRadius: 'var(--radius-sm)' }} onClick={() => openAckDashboard(item)}>
                         <i className="bi bi-people" /> Reads
                       </button>
                       <button className="btn btn-sm btn-outline-secondary px-2"
-                        style={{ fontSize: '0.68rem', borderRadius: 6 }}
+                        style={{ fontSize: '0.68rem', borderRadius: 'var(--radius-sm)' }}
                         onClick={() => setExpandedId(isExpanded ? null : item.id)}>
                         <i className={`bi bi-chat-dots${isExpanded ? '-fill' : ''}`} />
                       </button>
                       <button className="btn btn-sm btn-outline-secondary px-2"
-                        style={{ fontSize: '0.68rem', borderRadius: 6 }}
+                        style={{ fontSize: '0.68rem', borderRadius: 'var(--radius-sm)' }}
                         onClick={() => { setEditDoc(item); setNewVersionTarget(null); setShowModal(true); }}>
                         <i className="bi bi-pencil" />
                       </button>
                       <button className="btn btn-sm btn-outline-danger px-2"
-                        style={{ fontSize: '0.68rem', borderRadius: 6 }}
+                        style={{ fontSize: '0.68rem', borderRadius: 'var(--radius-sm)' }}
                         onClick={() => handleDelete(item.id)}>
                         <i className="bi bi-trash3" />
                       </button>
@@ -918,15 +920,15 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1060, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 16, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
             <div>
               <h6 className="fw-bold mb-0">Approve &amp; Set Visibility</h6>
               <p className="text-muted small mb-0">"{pendingDoc.title}" by {pendingDoc.submittedByName}</p>
             </div>
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={onClose}
+            <button className="btn btn-sm border-0 rounded-circle" aria-label="Close" onClick={onClose}
               style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <i className="bi bi-x-lg" style={{ fontSize: '0.85rem' }} />
             </button>
@@ -984,7 +986,7 @@ function ApproveVisibilityModal({ pendingDoc, allUsers, saving, onClose, onAppro
           {visType === 'users' && (
             <div className="rounded-2 p-3 mb-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               <input type="text" className="form-control form-control-sm mb-2" placeholder="Search users…"
-                value={userSearch} onChange={e => setUserSearch(e.target.value)} style={{ borderRadius: 8 }} />
+                value={userSearch} onChange={e => setUserSearch(e.target.value)} style={{ borderRadius: 'var(--radius-sm)' }} />
               {visUserIds.length > 0 && (
                 <div className="d-flex flex-wrap gap-1 mb-2">
                   {visUserIds.map(uid => {

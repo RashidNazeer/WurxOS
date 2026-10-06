@@ -1,17 +1,8 @@
 // Brand avatar: uses the logo if provided, otherwise a deterministic
-// initials tile whose color is derived from the brand name hash.
-// Colors use tokens where possible; palette is theme-independent
-// (looks good on either surface background).
+// initials tile whose colour is a chart-palette slot picked by the name hash
+// (theme-aware; --text-inverse reads on every slot except amber 3, skipped).
 
-const PALETTE = [
-  { bg: '#6366f1', fg: '#ffffff' },
-  { bg: '#10b981', fg: '#ffffff' },
-  { bg: '#f59e0b', fg: '#ffffff' },
-  { bg: '#ec4899', fg: '#ffffff' },
-  { bg: '#06b6d4', fg: '#ffffff' },
-  { bg: '#8b5cf6', fg: '#ffffff' },
-  { bg: '#ef4444', fg: '#ffffff' },
-];
+const PALETTE = [6, 2, 1, 5, 4, 7, 8].map((n) => ({ bg: `var(--chart-${n})`, fg: 'var(--text-inverse)' }));
 
 function hash(s) {
   let h = 0;
@@ -29,6 +20,16 @@ function initials(name) {
     .toUpperCase();
 }
 
+// Callers pass px numbers; snap them onto the shared radius scale.
+function snapRadius(r) {
+  if (typeof r !== 'number') return r;
+  if (r <= 4) return 'var(--radius-xs)';
+  if (r <= 8) return 'var(--radius-sm)';
+  if (r <= 12) return 'var(--radius-md)';
+  if (r <= 16) return 'var(--radius-lg)';
+  return 'var(--radius-xl)';
+}
+
 export default function BrandAvatar({ brand, size = 42, radius = 10 }) {
   const name = brand?.brand_name || brand?.brandName || '';
   const logo = brand?.logo_url || brand?.logoUrl;
@@ -38,7 +39,7 @@ export default function BrandAvatar({ brand, size = 42, radius = 10 }) {
     width: size,
     height: size,
     flex: `0 0 ${size}px`,
-    borderRadius: radius,
+    borderRadius: snapRadius(radius),
     overflow: 'hidden',
     display: 'grid',
     placeItems: 'center',
@@ -46,13 +47,14 @@ export default function BrandAvatar({ brand, size = 42, radius = 10 }) {
   };
 
   if (logo) {
-    // Logos may be transparent PNGs — use a neutral surface so the
-    // palette color doesn't bleed through. `contain` fits the whole
-    // logo inside the box (no cropping), with a tiny inset so the
-    // edges don't touch the border.
+    // Logos are often transparent PNGs drawn for white backgrounds, so they
+    // sit on a light plate in BOTH themes (a dark logo vanished on the dark
+    // surface). --spotlight-fg is the near-white text-on-dark token in both
+    // themes; a dedicated --logo-plate token would be cleaner. `contain`
+    // fits the whole logo inside the box, with a tiny inset off the border.
     const inset = Math.max(2, Math.round(size * 0.08));
     return (
-      <div style={{ ...baseStyle, background: 'var(--surface-1)' }}>
+      <div style={{ ...baseStyle, background: 'var(--logo-plate, var(--spotlight-fg))' }}>
         <img
           src={logo}
           alt={name}

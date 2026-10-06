@@ -17,6 +17,7 @@
 import React, { useState } from 'react';
 import { cleanNumericInput } from '../../lib/reportsApi';
 import RichTextEditor from '../shared/RichTextEditor';
+import { useDialogs } from '../common/useDialogs';
 
 // `onDelete`, when provided, renders a trash button — used ONLY for
 // APC-created custom sections. Built-in/default sections never pass it, so
@@ -58,7 +59,7 @@ export function SectionHeader({ icon, title, color, required, enabled = true, on
           {deletable && (
             <button
               type="button"
-              className="btn btn-sm btn-light border-0 text-danger"
+              className="btn btn-sm btn-outline-secondary border-0 text-danger"
               style={{ padding: '2px 8px', fontSize: '0.72rem' }}
               onClick={onDelete}
               title="Delete this custom section">
@@ -102,7 +103,7 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
           <SectionHeader
             icon={section.kind === 'table' ? 'bi-table' : 'bi-card-text'}
             title={section.name}
-            color="#0ea5e9"
+            color="var(--info-text)"
             enabled={enabled}
             onToggle={toggleSection(section.id)}
             onDelete={() => onDelete(section)}
@@ -125,7 +126,7 @@ export function BrandSectionsBlock({ sections, data, setData, previousReport, se
           <div key={section.id} id={`sec-cs-${section.id}`} style={{ scrollMarginTop: 12 }}>
             {header}
             {enabled && (
-            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
               <div className="card-body p-3">
                 {renderPreset?.(section)}
                 <RichTextEditor
@@ -186,7 +187,7 @@ function BrandTableSection({ section, data, setData, renderPreset }) {
   const th = { padding: '6px 8px', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border-subtle)' };
 
   return (
-    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
       <div className="card-body p-3">
         {renderPreset?.(section)}
         {columns.length === 0 ? (
@@ -212,7 +213,7 @@ function BrandTableSection({ section, data, setData, renderPreset }) {
                         </td>
                       ))}
                       <td style={{ padding: 4, textAlign: 'center' }}>
-                        <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+                        <button type="button" className="btn btn-sm btn-outline-secondary border-0 text-danger"
                           onClick={() => removeRow(ri)} title="Remove row" style={{ padding: '2px 6px' }}>
                           <i className="bi bi-trash3" />
                         </button>
@@ -223,7 +224,7 @@ function BrandTableSection({ section, data, setData, renderPreset }) {
               </table>
             </div>
             <button type="button" className="btn btn-sm btn-outline-secondary mt-2"
-              onClick={addRow} style={{ borderRadius: 8, fontSize: '0.76rem' }}>
+              onClick={addRow} style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.76rem' }}>
               <i className="bi bi-plus-circle" /> Add row
             </button>
           </>
@@ -236,7 +237,7 @@ function BrandTableSection({ section, data, setData, renderPreset }) {
 function BrandFieldInput({ field, value, onChange }) {
   if (field.type === 'dropdown') {
     return (
-      <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+      <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
         value={value || ''} onChange={(e) => onChange(e.target.value)}>
         <option value="">— Select —</option>
         {(field.options || []).map((opt) => (
@@ -248,20 +249,20 @@ function BrandFieldInput({ field, value, onChange }) {
   if (field.type === 'number' || field.type === 'currency') {
     return (
       <input type="text" inputMode="decimal"
-        className="form-control form-control-sm" style={{ borderRadius: 8 }}
+        className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
         placeholder="0" value={value ?? ''}
         onChange={(e) => onChange(cleanNumericInput(e.target.value))} />
     );
   }
   if (field.type === 'url') {
     return (
-      <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+      <input type="url" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
         placeholder="https://…" value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} />
     );
   }
   return (
-    <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+    <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
       value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
   );
 }
@@ -275,6 +276,7 @@ export function BuiltinExtras({
   sectionKey, sectionTitle, fields, data, setData, previousReport,
   disabled, onAddField, onRemoveField, curSym, comparisonLabel = 'Previous',
 }) {
+  const { ask, askText, notify } = useDialogs();
   const [adding, setAdding] = useState(false);
 
   function setValue(fieldId, fieldLabel, fieldType, v) {
@@ -308,12 +310,12 @@ export function BuiltinExtras({
   }
 
   async function handleRemove(field) {
-    const ok = window.confirm(
+    const ok = await ask(
       `Remove "${field.label}" from ${sectionTitle}?\n\nIt'll disappear from this report and from future reports for this brand. Existing reports keep their saved values.`
     );
     if (!ok) return;
     try { await onRemoveField(field.id); }
-    catch (err) { alert(err?.message || 'Could not remove the field.'); }
+    catch (err) { notify.error(err?.message || 'Could not remove the field.'); }
   }
 
   const hasFields = fields.length > 0;
@@ -346,12 +348,12 @@ export function BuiltinExtras({
           onCancel={() => setAdding(false)}
           onSave={async (def) => {
             try { await onAddField(def); setAdding(false); }
-            catch (err) { alert(err?.message || 'Could not save the field.'); }
+            catch (err) { notify.error(err?.message || 'Could not save the field.'); }
           }} />
       ) : (
         <button type="button"
           className="btn btn-sm d-inline-flex align-items-center gap-1"
-          style={{ borderRadius: 9, fontSize: '0.74rem', fontWeight: 600, marginTop: 10, border: '1px solid var(--border-default)', background: 'var(--surface-1)', color: 'var(--text-secondary)' }}
+          style={{ borderRadius: 'var(--radius-md)', fontSize: '0.74rem', fontWeight: 600, marginTop: 10, border: '1px solid var(--border-default)', background: 'var(--surface-1)', color: 'var(--text-secondary)' }}
           disabled={disabled}
           title={disabled ? 'Select a brand first' : 'Add a custom field to this section'}
           onClick={() => setAdding(true)}>
@@ -384,7 +386,7 @@ function ExtraFieldCell({ field, labelText, value, prevValue, comparisonLabel = 
             color: 'var(--text-muted)', cursor: 'pointer',
             fontSize: '0.7rem', lineHeight: 1,
             opacity: hover ? 1 : 0,
-            transition: 'opacity 120ms',
+            transition: 'opacity var(--dur-fast) var(--ease-out)',
           }}>
           <i className="bi bi-x-lg" />
         </button>
@@ -427,7 +429,7 @@ function AddFieldInline({ onCancel, onSave }) {
       padding: 10, marginBottom: 8,
       background: 'var(--accent-soft)',
       border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-      borderRadius: 10,
+      borderRadius: 'var(--radius-md)',
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1.6fr', gap: 8 }}>
         <input className="form-control form-control-sm" autoFocus
@@ -448,8 +450,8 @@ function AddFieldInline({ onCancel, onSave }) {
         ) : <span />}
       </div>
       <div className="d-flex justify-content-end gap-2 mt-2">
-        <button type="button" className="btn btn-sm btn-light" onClick={onCancel}>Cancel</button>
-        <button type="button" className="btn btn-sm btn-dark"
+        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-primary"
           disabled={!canSave}
           onClick={() => onSave({
             label: label.trim(), type,
@@ -515,7 +517,7 @@ export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
     return (
       <button type="button"
         className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
-        style={{ borderRadius: 8, fontSize: '0.78rem' }}
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.78rem' }}
         disabled={disabled}
         title={disabled ? 'Select a brand first' : ''}
         onClick={() => setOpen(true)}>
@@ -552,7 +554,7 @@ export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
             return (
               <button key={t} type="button" onClick={() => toggleApplies(t)}
                 style={{
-                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-pill)',
                   border: on ? '1px solid var(--accent)' : '1px solid var(--border-default)',
                   background: on ? 'var(--accent-soft)' : 'var(--surface-1)',
                   color: on ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer',
@@ -587,7 +589,7 @@ export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
                   value={f.options}
                   onChange={(e) => setFields((cur) => cur.map((x, idx) => idx === i ? { ...x, options: e.target.value } : x))} />
               ) : <span />}
-              <button type="button" className="btn btn-sm btn-light border-0 text-danger"
+              <button type="button" className="btn btn-sm btn-outline-secondary border-0 text-danger"
                 disabled={fields.length === 1}
                 onClick={() => setFields((cur) => cur.filter((_, idx) => idx !== i))}
                 style={{ padding: '2px 8px' }}>
@@ -602,8 +604,8 @@ export function AddCustomSectionInline({ disabled, onAdd, defaultReportType }) {
         </div>
       )}
       <div className="d-flex justify-content-end gap-2">
-        <button type="button" className="btn btn-sm btn-light" onClick={reset}>Cancel</button>
-        <button type="button" className="btn btn-sm btn-dark" disabled={!canSave} onClick={submit}>
+        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={reset}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-primary" disabled={!canSave} onClick={submit}>
           Add section
         </button>
       </div>
@@ -617,8 +619,8 @@ function KindRadio({ active, title, subtitle, onClick }) {
       style={{
         flex: '1 1 220px', textAlign: 'left',
         background: active ? 'var(--surface-1)' : 'transparent',
-        border: `1.5px solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
-        borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
+        border: `${active ? '2px' : '1px'} solid ${active ? 'var(--accent)' : 'var(--border-subtle)'}`,
+        borderRadius: 'var(--radius-sm)', padding: '6px 10px', cursor: 'pointer',
       }}>
       <div style={{ fontSize: 12.5, fontWeight: 700 }}>{title}</div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{subtitle}</div>

@@ -56,8 +56,8 @@ export default function AgendaResourceModal({ resource, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 14 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <p className="fw-semibold mb-3">{isEdit ? 'Edit resource' : 'Add agenda resource'}</p>
 
@@ -68,8 +68,8 @@ export default function AgendaResourceModal({ resource, onClose, onSaved }) {
             <div className="d-flex gap-2 flex-wrap">
               {TYPES.map(([v, l, icon]) => (
                 <button key={v} type="button"
-                  className={`btn btn-sm d-inline-flex align-items-center gap-1 ${type === v ? 'btn-dark' : 'btn-outline-secondary'}`}
-                  style={{ borderRadius: 8, fontSize: '0.76rem' }}
+                  className={`btn btn-sm d-inline-flex align-items-center gap-1 ${type === v ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.76rem' }}
                   onClick={() => setType(v)}>
                   <i className={`bi ${icon}`} /> {l}
                 </button>
@@ -79,19 +79,19 @@ export default function AgendaResourceModal({ resource, onClose, onSaved }) {
 
           <div className="mb-3">
             <label className="form-label small fw-semibold">Name <span className="text-danger">*</span></label>
-            <input type="text" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+            <input type="text" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
               placeholder="e.g. Q2 agenda template" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           <div className="mb-3">
             <label className="form-label small fw-semibold">URL <span className="text-danger">*</span></label>
-            <input type="url" className="form-control form-control-sm" style={{ borderRadius: 8 }}
+            <input type="url" className="form-control form-control-sm" style={{ borderRadius: 'var(--radius-sm)' }}
               placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
           </div>
 
           <div className="mb-3">
             <label className="form-label small fw-semibold">Brand <span className="text-muted fw-normal">(optional)</span></label>
-            <select className="form-select form-select-sm" style={{ borderRadius: 8 }}
+            <select className="form-select form-select-sm" style={{ borderRadius: 'var(--radius-sm)' }}
               value={brandId} onChange={(e) => setBrandId(e.target.value)}>
               <option value="">No brand — general agenda resource</option>
               {brands.map((b) => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
@@ -100,13 +100,13 @@ export default function AgendaResourceModal({ resource, onClose, onSaved }) {
 
           <div className="mb-3">
             <label className="form-label small fw-semibold">Description</label>
-            <textarea className="form-control form-control-sm" rows={2} style={{ borderRadius: 8 }}
+            <textarea className="form-control form-control-sm" rows={2} style={{ borderRadius: 'var(--radius-sm)' }}
               placeholder="Optional note…" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
 
           <div className="d-flex gap-2 justify-content-end">
             <button className="btn btn-sm btn-outline-secondary px-3" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-sm btn-dark px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
+            <button className="btn btn-sm btn-primary px-3 d-inline-flex align-items-center gap-1" onClick={handleSave} disabled={saving}>
               {saving ? <><span className="spinner-border spinner-border-sm" /> Saving…</> : <><i className="bi bi-check-lg" /> {isEdit ? 'Save' : 'Add resource'}</>}
             </button>
           </div>

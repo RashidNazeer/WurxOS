@@ -50,11 +50,15 @@ export default function TeamHierarchyPage() {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  // Build derived org structure (Boss → OLs → TLs → APCs/IPCs)
+  // Build derived org structure (Boss → OLs → TLs/PCTLs/Dev Leads → members).
+  // Developer leads are folded into the same "tls" array as TL/PCTL — the
+  // enrichment below (members + brands lookup) is role-agnostic, and a
+  // developer lead's brands list is always empty, which every card already
+  // renders correctly ("No brands assigned").
   const org = useMemo(() => {
     const boss = users.find((u) => u.role === 'boss') || null;
     const ols = users.filter((u) => u.role === 'ol');
-    const tls = users.filter((u) => u.role === 'tl' || u.role === 'pctl');
+    const tls = users.filter((u) => u.role === 'tl' || u.role === 'pctl' || u.role === 'developer');
 
     const enrichedTls = tls.map((t) => {
       const members = teamUsers.filter((tu) => tu.ownerId === t.id);
@@ -80,6 +84,7 @@ export default function TeamHierarchyPage() {
     if (roleFilter) {
       if (roleFilter === 'tl') list = list.filter((t) => t.role === 'tl');
       else if (roleFilter === 'pctl') list = list.filter((t) => t.role === 'pctl');
+      else if (roleFilter === 'developer') list = list.filter((t) => t.role === 'developer');
       else if (roleFilter === 'apc' || roleFilter === 'ipc') {
         list = list.filter((t) => t.members.some((m) => (m.userType || 'apc') === roleFilter));
       }
@@ -100,9 +105,11 @@ export default function TeamHierarchyPage() {
   const stats = useMemo(() => {
     const tlCount = org.tls.filter((t) => t.role === 'tl').length;
     const pctlCount = org.tls.filter((t) => t.role === 'pctl').length;
+    const devLeadCount = org.tls.filter((t) => t.role === 'developer').length;
     const apcCount = teamUsers.filter((t) => (t.userType || 'apc') === 'apc').length;
     const ipcCount = teamUsers.filter((t) => t.userType === 'ipc').length;
-    const headcount = 1 + org.ols.length + org.tls.length + apcCount + ipcCount;
+    const devMemberCount = teamUsers.filter((t) => t.userType === 'developer').length;
+    const headcount = 1 + org.ols.length + org.tls.length + apcCount + ipcCount + devMemberCount;
     const activeBrands = brands.filter((b) => b.status !== 'inactive').length;
     const unassignedBrands = brands.filter((b) => !b.ownerId).length;
     const apcsWithBrands = teamUsers.filter((t) => (t.userType || 'apc') === 'apc');
@@ -111,8 +118,8 @@ export default function TeamHierarchyPage() {
     return {
       headcount,
       ols: org.ols,
-      tlCount, pctlCount,
-      apcCount, ipcCount,
+      tlCount, pctlCount, devLeadCount,
+      apcCount, ipcCount, devMemberCount,
       avgBrands,
       brandsTotal: brands.length,
       activeBrands,
@@ -136,16 +143,16 @@ export default function TeamHierarchyPage() {
   }
 
   return (
-    <div style={{ padding: '24px 28px 48px', position: 'relative', background: '#f8fafc', minHeight: '100%' }}>
+    <div style={{ padding: '24px 28px 48px', position: 'relative', background: 'var(--surface-2)', minHeight: '100%' }}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>
           <div className="d-flex align-items-center gap-2 mb-2">
             <div className="d-inline-flex align-items-center justify-content-center rounded-3"
-              style={{ width: 38, height: 38, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 6px 20px rgba(124,58,237,0.35)' }}>
-              <i className="bi bi-diagram-3-fill text-white" style={{ fontSize: '1.1rem' }} />
+              style={{ width: 38, height: 38, background: 'var(--purple)', boxShadow: '0 6px 20px color-mix(in srgb, var(--purple) 35%, transparent)' }}>
+              <i className="bi bi-diagram-3-fill" style={{ fontSize: '1.1rem', color: 'var(--on-purple)' }} />
             </div>
-            <h4 className="fw-bold mb-0" style={{ color: '#0f172a', fontSize: '1.5rem', letterSpacing: '-0.02em' }}>
+            <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)', fontSize: '1.5rem', letterSpacing: '-0.02em' }}>
               Team Hierarchy
             </h4>
           </div>
@@ -156,6 +163,7 @@ export default function TeamHierarchyPage() {
             <Pill>{stats.apcCount} APCs</Pill>
             <Pill>{stats.ipcCount} IPCs</Pill>
             <Pill>{stats.brandsTotal} Brands</Pill>
+            {stats.devLeadCount > 0 && <Pill>{stats.devMemberCount + stats.devLeadCount} Developers</Pill>}
           </div>
         </div>
       </div>
@@ -166,8 +174,8 @@ export default function TeamHierarchyPage() {
           dark
           label="Headcount"
           value={stats.headcount}
-          dot="#fb923c"
-          sub={`Across ${1 + stats.ols.length + stats.tlCount + stats.pctlCount} leadership · ${stats.apcCount + stats.ipcCount} on team`}
+          dot="var(--warning)"
+          sub={`Across ${1 + stats.ols.length + stats.tlCount + stats.pctlCount + stats.devLeadCount} leadership · ${stats.apcCount + stats.ipcCount + stats.devMemberCount} on team`}
         />
         <StatCard
           label="Operations Leads"
@@ -190,20 +198,28 @@ export default function TeamHierarchyPage() {
         <StatCard
           label="Brands Managed"
           value={stats.brandsTotal}
-          dot="#fb923c"
+          dot="var(--warning)"
           sub={`${stats.unassignedBrands} unassigned · ${stats.activeBrands} active`}
         />
+        {stats.devLeadCount > 0 && (
+          <StatCard
+            label="Development"
+            value={stats.devLeadCount + stats.devMemberCount}
+            dot={ROLE_COLORS.developer.solid}
+            sub={`${stats.devLeadCount} lead${stats.devLeadCount === 1 ? '' : 's'} · ${stats.devMemberCount} junior${stats.devMemberCount === 1 ? '' : 's'}`}
+          />
+        )}
       </div>
 
       {/* ── Control bar ───────────────────────────────────────────────── */}
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 14 }}>
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-3 d-flex flex-wrap align-items-center gap-2">
           <div className="input-group input-group-sm" style={{ maxWidth: 260 }}>
-            <span className="input-group-text border-0" style={{ background: '#f1f5f9' }}>
+            <span className="input-group-text border-0" style={{ background: 'var(--surface-2)' }}>
               <i className="bi bi-search text-muted" style={{ fontSize: '0.7rem' }} />
             </span>
             <input type="text" className="form-control border-0" placeholder="Search team or brand…"
-              value={search} onChange={(e) => setSearch(e.target.value)} style={{ background: '#f1f5f9' }} />
+              value={search} onChange={(e) => setSearch(e.target.value)} style={{ background: 'var(--surface-2)' }} />
           </div>
 
           <ViewToggle value={viewMode} onChange={setViewMode} />
@@ -218,6 +234,7 @@ export default function TeamHierarchyPage() {
             <option value="pctl">PCTL</option>
             <option value="apc">APC</option>
             <option value="ipc">IPC</option>
+            {stats.devLeadCount > 0 && <option value="developer">Developer</option>}
           </select>
 
           <div className="d-flex align-items-center gap-2 ms-auto flex-wrap" style={{ fontSize: '0.7rem' }}>
@@ -227,6 +244,7 @@ export default function TeamHierarchyPage() {
             <Legend color={ROLE_COLORS.pctl.solid} label="PCTL" />
             <Legend color={ROLE_COLORS.apc.solid}  label="APC"  />
             <Legend color={ROLE_COLORS.ipc.solid}  label="IPC"  />
+            {stats.devLeadCount > 0 && <Legend color={ROLE_COLORS.developer.solid} label="Developer" />}
           </div>
         </div>
       </div>
@@ -276,7 +294,7 @@ export default function TeamHierarchyPage() {
           from { opacity: 0; transform: translateY(8px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .hierarchy-fade { animation: hierarchy-fade-in 280ms ease-out; }
+        .hierarchy-fade { animation: hierarchy-fade-in var(--dur-enter) var(--ease-out); }
       `}</style>
     </div>
   );
@@ -286,7 +304,7 @@ export default function TeamHierarchyPage() {
 
 function Pill({ children }) {
   return (
-    <span className="rounded-pill px-2 py-1" style={{ background: '#fff', border: '1px solid #e2e8f0', fontSize: '0.7rem', fontWeight: 600, color: '#475569' }}>
+    <span className="rounded-pill px-2 py-1" style={{ background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
       {children}
     </span>
   );
@@ -296,12 +314,12 @@ function StatCard({ label, value, sub, dot, dark }) {
   return (
     <div className="col-12 col-md-6 col-xl">
       <div className="card border-0 shadow-sm h-100" style={{
-        borderRadius: 14, overflow: 'hidden',
-        background: dark ? 'linear-gradient(135deg, #0f172a, #1e293b)' : '#fff',
-        color: dark ? '#fff' : '#0f172a',
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+        background: dark ? 'var(--att-spotlight-bg)' : 'var(--surface-1)',
+        color: dark ? 'var(--att-spotlight-fg)' : 'var(--text-primary)',
       }}>
         <div className="card-body p-3">
-          <div className="d-flex align-items-center gap-2 mb-1" style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: dark ? 'rgba(255,255,255,0.7)' : '#64748b' }}>
+          <div className="d-flex align-items-center gap-2 mb-1" style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: dark ? 'color-mix(in srgb, var(--att-spotlight-fg) 75%, transparent)' : 'var(--text-muted)' }}>
             <span className="rounded-circle d-inline-block" style={{ width: 7, height: 7, background: dot }} />
             {label}
           </div>
@@ -309,7 +327,7 @@ function StatCard({ label, value, sub, dot, dark }) {
             {value}
           </div>
           {sub && (
-            <div style={{ fontSize: '0.7rem', marginTop: 4, color: dark ? 'rgba(255,255,255,0.65)' : '#64748b' }}>
+            <div style={{ fontSize: '0.7rem', marginTop: 4, color: dark ? 'color-mix(in srgb, var(--att-spotlight-fg) 70%, transparent)' : 'var(--text-muted)' }}>
               {sub}
             </div>
           )}
@@ -326,7 +344,7 @@ function ViewToggle({ value, onChange }) {
     { key: 'matrix', label: 'Matrix',    icon: 'bi-grid-3x3-gap' },
   ];
   return (
-    <div className="d-flex p-1 rounded-3" style={{ background: '#f1f5f9' }}>
+    <div className="d-flex p-1 rounded-3" style={{ background: 'var(--surface-2)' }}>
       {items.map((it) => {
         const active = value === it.key;
         return (
@@ -334,12 +352,12 @@ function ViewToggle({ value, onChange }) {
             onClick={() => onChange(it.key)}
             className="btn btn-sm d-inline-flex align-items-center gap-1"
             style={{
-              background: active ? '#0f172a' : 'transparent',
-              color: active ? '#fff' : '#64748b',
-              border: 'none', borderRadius: 8,
+              background: active ? 'var(--accent)' : 'transparent',
+              color: active ? 'var(--on-accent)' : 'var(--text-secondary)',
+              border: 'none', borderRadius: 'var(--radius-sm)',
               padding: '5px 12px', fontSize: '0.74rem', fontWeight: 700,
-              boxShadow: active ? '0 2px 6px rgba(15,23,42,0.18)' : 'none',
-              transition: 'all 150ms ease',
+              boxShadow: active ? 'var(--shadow-sm)' : 'none',
+              transition: 'background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
             }}>
             <i className={`bi ${it.icon}`} style={{ fontSize: '0.8rem' }} />{it.label}
           </button>
@@ -351,7 +369,7 @@ function ViewToggle({ value, onChange }) {
 
 function Legend({ color, label }) {
   return (
-    <span className="d-inline-flex align-items-center gap-1" style={{ color: '#64748b' }}>
+    <span className="d-inline-flex align-items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
       <span className="rounded-circle d-inline-block" style={{ width: 8, height: 8, background: color }} />
       {label}
     </span>
@@ -360,9 +378,9 @@ function Legend({ color, label }) {
 
 function MatrixPlaceholder() {
   return (
-    <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+    <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
       <div className="card-body p-5 text-center text-muted">
-        <i className="bi bi-grid-3x3-gap" style={{ fontSize: '2rem', color: '#cbd5e1' }} />
+        <i className="bi bi-grid-3x3-gap" style={{ fontSize: '2rem', color: 'var(--text-muted)' }} />
         <div className="mt-2" style={{ fontSize: '0.92rem', fontWeight: 600 }}>Matrix view — coming soon</div>
         <div style={{ fontSize: '0.78rem' }}>For now use Org Chart or Tree to navigate the hierarchy.</div>
       </div>

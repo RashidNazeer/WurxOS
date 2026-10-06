@@ -1,6 +1,7 @@
 /* Inter is already loaded via the font <link> in index.html — a duplicate CSS
    @import here just adds a render-blocking, serialized request chain. */
 @import './tokens.css';
+@import './ui.css';
 
 *,
 *::before,
@@ -22,6 +23,21 @@ textarea,
 optgroup {
   font-family: inherit;
   font-size: inherit;
+}
+
+/* Native <select> popups. color-scheme alone isn't enough: once a page styles
+   selects at all, Chrome renders the dropdown with author colours and anything
+   left unset falls back to the light UA default — which is how a dark app ends
+   up with a white popup and near-invisible <optgroup> labels. Set both colours
+   explicitly, on every select, in both themes. */
+select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+select optgroup {
+  background-color: var(--input-bg);
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 /* Raw <button>s do NOT inherit text color — the UA default is a near-black
@@ -50,8 +66,6 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color var(--dur-base) var(--ease-out),
-              color var(--dur-base) var(--ease-out);
 }
 
 /* User font-size preference — zoom scales text + spacing + icons
@@ -63,13 +77,15 @@ body {
    viewport. The sidebar/topbar use the natural font-size since
    they're a fixed chrome and shouldn't shrink with the user's
    content scale preference. */
-html[data-font-size='compact']     .shell-content { zoom: 0.925; }
-html[data-font-size='default']     .shell-content { zoom: 1.0;   }
-html[data-font-size='comfortable'] .shell-content { zoom: 1.075; }
-html[data-font-size='large']       .shell-content { zoom: 1.15;  }
+html[data-font-size='compact']     .shell-content { zoom: 0.925; --shell-zoom: 0.925; }
+html[data-font-size='default']     .shell-content { zoom: 1.0;   --shell-zoom: 1; }
+html[data-font-size='comfortable'] .shell-content { zoom: 1.075; --shell-zoom: 1.075; }
+html[data-font-size='large']       .shell-content { zoom: 1.15;  --shell-zoom: 1.15; }
+/* --shell-zoom lets viewport-sized things inside the content (the Settings
+   nav's sticky height) undo the zoom so they still fit the screen. */
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease-out);
 }
@@ -109,19 +125,155 @@ a:hover { color: var(--accent-hover); }
               box-shadow var(--dur-fast) var(--ease-out),
               background-color var(--dur-fast) var(--ease-out);
 }
-.wx-input::placeholder { color: var(--input-placeholder); }
+.wx-input::placeholder { color: var(--input-placeholder); font-style: italic; }
 
-/* Bootstrap's default `.form-control::placeholder` color (around #6c757d)
-   is too close to entered-text grey, making example-value placeholders
-   on report forms look like real data. Force it to the same faded tone
-   we use for our wx-* inputs so users can immediately tell empty fields
-   apart from filled ones. */
+/* Report forms use real-looking example values as placeholders ("55834.62"), so
+   the difference from entered data has to be obvious at a glance. ~2.4:1 against
+   entered text at ~16:1 — roughly a 7x gap — plus italics, because colour alone
+   is a weak cue when the example is a plausible number. Deliberately below the
+   4.5:1 text minimum: these are hints, the field's own label carries the meaning.
+   All inputs, both themes, via the --input-placeholder token. */
 .form-control::placeholder,
 .form-control-sm::placeholder,
 .form-select::placeholder {
   color: var(--input-placeholder) !important;
-  opacity: 0.7;
+  font-style: italic;
+  opacity: 1;
 }
+
+/* ============================================================
+   Bootstrap ↔ token bridge (both themes). data-bs-theme is set next
+   to data-theme (index.html, ThemeContext, useForceLightTheme), so
+   Bootstrap's own dark variants switch on; these map its variables
+   onto our tokens so "primary" is the brand, not #0d6efd.
+   --bs-body-bg is the COMPONENT surface (cards, inputs, modals,
+   tables read it); the page canvas is set on body below.
+   ============================================================ */
+:root,
+[data-theme='light'] {
+  /* -rgb triplets mirror the token hexes in tokens.css; update them with the palette. */
+  --bs-body-bg: var(--surface-1);
+  --bs-body-bg-rgb: 255, 255, 255;
+  --bs-body-color: var(--text-primary);
+  --bs-body-color-rgb: 43, 29, 20;
+  --bs-emphasis-color: var(--text-primary);
+  --bs-emphasis-color-rgb: 43, 29, 20;
+  --bs-secondary-color: var(--text-muted);
+  --bs-secondary-color-rgb: 114, 93, 75;
+  --bs-primary: var(--accent);
+  --bs-primary-rgb: 173, 95, 62;
+  --bs-link-color: var(--accent-text);
+  --bs-link-color-rgb: 148, 80, 47;
+  --bs-link-hover-color: var(--accent-hover);
+  --bs-link-hover-color-rgb: 143, 76, 44;
+}
+[data-theme='dark'] {
+  /* -rgb triplets mirror the token hexes in tokens.css; update them with the palette. */
+  --bs-body-bg: var(--surface-1);
+  --bs-body-bg-rgb: 15, 15, 15;
+  --bs-body-color: var(--text-primary);
+  --bs-body-color-rgb: 250, 247, 242;
+  --bs-emphasis-color: var(--text-primary);
+  --bs-emphasis-color-rgb: 250, 247, 242;
+  --bs-secondary-color: var(--text-muted);
+  --bs-secondary-color-rgb: 250, 247, 242;
+  --bs-tertiary-color: var(--text-muted);
+  --bs-primary: var(--accent);
+  --bs-primary-rgb: 245, 213, 168;
+  --bs-link-color: var(--accent-text);
+  --bs-link-color-rgb: 245, 213, 168;
+  --bs-link-hover-color: var(--accent-hover);
+  --bs-link-hover-color-rgb: 252, 228, 194;
+}
+:root,
+[data-theme='light'],
+[data-theme='dark'] {
+  --bs-secondary-bg: var(--surface-3);
+  --bs-tertiary-bg: var(--surface-2);
+  --bs-border-color: var(--border-default);
+  --bs-border-color-translucent: var(--border-subtle);
+  --bs-primary-text-emphasis: var(--accent-text);
+  --bs-primary-bg-subtle: var(--accent-soft);
+  --bs-primary-border-subtle: color-mix(in srgb, var(--accent) 40%, transparent);
+  --bs-focus-ring-color: var(--accent-ring);
+}
+
+.text-primary { color: var(--accent-text) !important; }
+.text-success { color: var(--success-text) !important; }
+.text-danger  { color: var(--danger-text)  !important; }
+.text-warning { color: var(--warning-text) !important; }
+.text-info    { color: var(--info-text)    !important; }
+
+/* Control boundaries need 3:1; --bs-border-color is a decorative divider. */
+.form-control,
+.form-select,
+.form-check-input { border-color: var(--input-border); }
+
+/* Lora / JetBrains Mono from the font picker apply to reading content only. */
+.rich-content,
+.rte-container .ProseMirror { font-family: var(--font-content); }
+code, kbd, samp, pre { font-family: var(--font-code); }
+
+.btn-primary {
+  --bs-btn-color: var(--on-accent);
+  --bs-btn-bg: var(--accent);
+  --bs-btn-border-color: var(--accent);
+  --bs-btn-hover-color: var(--on-accent);
+  --bs-btn-hover-bg: var(--accent-hover);
+  --bs-btn-hover-border-color: var(--accent-hover);
+  --bs-btn-active-color: var(--on-accent);
+  --bs-btn-active-bg: var(--accent-hover);
+  --bs-btn-active-border-color: var(--accent-hover);
+  --bs-btn-disabled-color: var(--on-accent);
+  --bs-btn-disabled-bg: var(--accent);
+  --bs-btn-disabled-border-color: var(--accent);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--accent-text);
+  --bs-btn-border-color: var(--accent);
+  --bs-btn-hover-color: var(--on-accent);
+  --bs-btn-hover-bg: var(--accent);
+  --bs-btn-hover-border-color: var(--accent);
+  --bs-btn-active-color: var(--on-accent);
+  --bs-btn-active-bg: var(--accent);
+  --bs-btn-active-border-color: var(--accent);
+  --bs-btn-disabled-color: var(--accent-text);
+  --bs-btn-disabled-border-color: var(--accent);
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+.table { --bs-table-border-color: var(--border-subtle); }
+.dropdown-menu {
+  --bs-dropdown-color: var(--text-primary);
+  --bs-dropdown-border-color: var(--glass-border);
+  --bs-dropdown-link-color: var(--text-primary);
+  --bs-dropdown-link-hover-color: var(--text-primary);
+  --bs-dropdown-link-hover-bg: var(--surface-2);
+  --bs-dropdown-link-active-color: var(--on-accent);
+  --bs-dropdown-link-active-bg: var(--accent);
+  --bs-dropdown-header-color: var(--text-secondary);
+  --bs-dropdown-divider-bg: var(--border-subtle);
+}
+.nav-pills {
+  --bs-nav-pills-link-active-bg: var(--accent);
+  --bs-nav-pills-link-active-color: var(--on-accent);
+}
+.pagination {
+  --bs-pagination-active-color: var(--on-accent);
+  --bs-pagination-active-bg: var(--accent);
+  --bs-pagination-active-border-color: var(--accent);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+.list-group {
+  --bs-list-group-active-color: var(--on-accent);
+  --bs-list-group-active-bg: var(--accent);
+  --bs-list-group-active-border-color: var(--accent);
+}
+.progress,
+.progress-stacked { --bs-progress-bar-bg: var(--accent); }
 
 /* ============================================================
    Bootstrap class overrides for DARK theme only.
@@ -135,7 +287,10 @@ a:hover { color: var(--accent-hover); }
   background-color: var(--surface-1) !important;
   color: var(--text-primary);
   border-color: var(--border-subtle);
-  --bs-card-bg: var(--surface-1);
+  --bs-card-bg: var(--glass-card-bg);
+  /* Bootstrap's default cap is rgba(0,0,0,.03) — an opaque wash that would sit
+     as a visible strip on a translucent card. The card is one material. */
+  --bs-card-cap-bg: transparent;
   --bs-card-color: var(--text-primary);
   --bs-card-border-color: var(--border-subtle);
 }
@@ -165,7 +320,9 @@ a:hover { color: var(--accent-hover); }
 [data-theme='dark'] .text-muted {
   color: var(--text-muted) !important;
 }
-[data-theme='dark'] .text-dark {
+/* Not on yellow fills: Bootstrap's warning stays #ffc107 in dark, and cream
+   on it is 1.53:1. Those keep Bootstrap's dark text (about 10:1). */
+[data-theme='dark'] .text-dark:not(.bg-warning):not(.btn-warning):not(.text-bg-warning) {
   color: var(--text-primary) !important;
 }
 [data-theme='dark'] .text-secondary {
@@ -215,17 +372,6 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-primary);
   border-color: var(--border-strong);
 }
-[data-theme='dark'] .btn-outline-primary {
-  color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 50%, transparent);
-  background-color: transparent;
-}
-[data-theme='dark'] .btn-outline-primary:hover,
-[data-theme='dark'] .btn-outline-primary:focus {
-  background-color: color-mix(in srgb, var(--info) 18%, transparent);
-  color: var(--info);
-  border-color: var(--info);
-}
 [data-theme='dark'] .table {
   color: var(--text-primary) !important;
   border-color: var(--border-subtle);
@@ -253,8 +399,6 @@ a:hover { color: var(--accent-hover); }
   border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 [data-theme='dark'] .dropdown-menu {
-  background-color: var(--surface-1);
-  border-color: var(--border-subtle);
   color: var(--text-primary);
 }
 [data-theme='dark'] .dropdown-item {
@@ -276,16 +420,14 @@ a:hover { color: var(--accent-hover); }
   color: var(--accent);
   background-color: var(--surface-2);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 /* Bootstrap modal classes — used heavily by v1-port pages
    (CampaignTracker, ProductCampaigns, brand tabs). Without these
    overrides the dialog renders white-on-black in dark mode. */
 [data-theme='dark'] .modal-content {
-  background-color: var(--surface-1);
   color: var(--text-primary);
-  border-color: var(--border-subtle);
 }
 [data-theme='dark'] .modal-header,
 [data-theme='dark'] .modal-footer {
@@ -293,11 +435,6 @@ a:hover { color: var(--accent-hover); }
 }
 [data-theme='dark'] .modal-title {
   color: var(--text-primary);
-}
-/* The default Bootstrap close X is a black SVG — invisible on dark.
-   `filter: invert()` flips it white without touching light mode. */
-[data-theme='dark'] .btn-close {
-  filter: invert(0.9);
 }
 [data-theme='dark'] .modal-backdrop.show {
   opacity: 0.65;
@@ -355,14 +492,6 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-muted);
 }
 
-/* Bootstrap text-* utility tints — keep semantic meaning but use
-   our brighter dark-mode variants so they read on near-black. */
-[data-theme='dark'] .text-success { color: var(--success) !important; }
-[data-theme='dark'] .text-danger  { color: var(--danger)  !important; }
-[data-theme='dark'] .text-warning { color: var(--warning) !important; }
-[data-theme='dark'] .text-info    { color: var(--info)    !important; }
-[data-theme='dark'] .text-primary { color: var(--info)    !important; }
-[data-theme='dark'] .text-white   { color: var(--text-inverse) !important; }
 
 /* bg-light is used as a chip/pill background in many v1-port files.
    On dark theme the white pill stays white otherwise. */
@@ -422,11 +551,6 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-inverse);
   border-color: var(--warning);
 }
-[data-theme='dark'] .btn-primary {
-  background-color: var(--info);
-  color: var(--text-inverse);
-  border-color: var(--info);
-}
 [data-theme='dark'] .btn-outline-success {
   color: var(--success);
   border-color: color-mix(in srgb, var(--success) 50%, transparent);
@@ -463,12 +587,44 @@ a:hover { color: var(--accent-hover); }
   background-color: var(--input-bg);
   border-color: var(--input-border);
 }
-[data-theme='dark'] .form-check-input:checked {
+[data-theme='dark'] .form-check-label {
+  color: var(--text-primary);
+}
+.form-check-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem var(--accent-ring);
+}
+.form-check-input:checked,
+.form-check-input[type='checkbox']:indeterminate {
   background-color: var(--accent);
   border-color: var(--accent);
 }
-[data-theme='dark'] .form-check-label {
-  color: var(--text-primary);
+/* SVG fills below mirror token hexes (accent, on-accent, cream); update them with the palette. */
+.form-switch .form-check-input:focus {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ad5f3e'/%3e%3c/svg%3e");
+}
+.form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+/* Dark: the white tick/dot/knob is 1.4:1 on the peach fill, and Bootstrap's
+   25%-white unchecked knob is near-invisible on the dark input. */
+[data-theme='dark'] .form-check-input:checked[type='checkbox'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%231a1407' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-check-input[type='checkbox']:indeterminate {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%231a1407' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10h8'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-check-input:checked[type='radio'] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%231a1407'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-switch .form-check-input:not(:checked):not(:focus) {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28250, 247, 242, 0.6%29'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-switch .form-check-input:focus:not(:checked) {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23f5d5a8'/%3e%3c/svg%3e");
+}
+[data-theme='dark'] .form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231a1407'/%3e%3c/svg%3e");
 }
 
 /* Range sliders (.form-range) — Bootstrap forces appearance:none + a fixed
@@ -496,16 +652,9 @@ a:hover { color: var(--accent-hover); }
 .form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 0.2rem var(--accent-ring, rgba(13, 110, 253, 0.25)); }
 .form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 0.2rem var(--accent-ring, rgba(13, 110, 253, 0.25)); }
 
-/* Native datetime/date input picker icon — Chromium renders it
-   black, which becomes invisible on a dark input. Invert it. */
-[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='datetime-local']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='month']::-webkit-calendar-picker-indicator,
-[data-theme='dark'] input[type='week']::-webkit-calendar-picker-indicator {
-  filter: invert(0.85);
-  cursor: pointer;
-}
+/* Native date/time picker icons are themed by `color-scheme` (tokens.css);
+   the old dark-mode invert() hack would now flip them back to black. */
+input::-webkit-calendar-picker-indicator { cursor: pointer; }
 
 /* Bootstrap "border" utilities (used as "border" plain) — make them
    visible against dark surfaces */
@@ -535,7 +684,7 @@ select.wx-input {
   -webkit-appearance: none;
   -moz-appearance: none;
   padding-right: 36px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23725d4b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat;
   background-position: right 12px center;
   cursor: pointer;
@@ -550,9 +699,6 @@ select.wx-input {
   cursor: pointer;
 }
 .wx-input:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
-[data-theme='dark'] .wx-input::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
 
 /* Native checkbox color — respect accent */
 input[type="checkbox"] {
@@ -611,14 +757,10 @@ input[type="checkbox"] {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-out),
-              background-color var(--dur-fast) var(--ease-out),
-              border-color var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-fast) var(--ease-out);
+  transition: var(--t-colors), var(--t-press);
   user-select: none;
 }
 .wx-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.wx-btn:active:not(:disabled) { transform: translateY(1px); }
 
 .wx-btn-primary {
   background: var(--accent);
@@ -652,13 +794,13 @@ input[type="checkbox"] {
   gap: 10px;
   border: 1px solid transparent;
 }
-.wx-alert-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
-.wx-alert-success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
-.wx-alert-info    { background: var(--info-soft);    color: var(--info);    border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+.wx-alert-danger  { background: var(--danger-soft);  color: var(--danger-text);  border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.wx-alert-success { background: var(--success-soft); color: var(--success-text); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+.wx-alert-info    { background: var(--info-soft);    color: var(--info-text);    border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 
 /* ============ Card ============ */
 .wx-card {
-  background: var(--surface-1);
+  background: var(--glass-card-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -676,6 +818,135 @@ input[type="checkbox"] {
 }
 @keyframes wx-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ============ Motion ============
+   Keyframes read --motion-* so reduced motion (tokens.css) turns every
+   entrance into a plain short fade. `from`-only keyframes animate to the
+   element's resting style. */
+:root {
+  --motion-rise:  8px;
+  --motion-scale: 0.98;
+  --motion-pop:   4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-rise: 0px; --motion-scale: 1; --motion-pop: 0px; }
+}
+@keyframes wx-enter-fade { from { opacity: 0; } }
+@keyframes wx-exit-fade  { to   { opacity: 0; } }
+@keyframes wx-enter-rise {
+  from { opacity: 0; transform: translateY(var(--motion-rise)) scale(var(--motion-scale)); }
+}
+@keyframes wx-exit-rise {
+  to { opacity: 0; transform: translateY(calc(var(--motion-rise) / 2)) scale(var(--motion-scale)); }
+}
+/* Popovers drop from an anchor above them */
+@keyframes wx-enter-pop { from { opacity: 0; transform: translateY(calc(var(--motion-pop) * -1)); } }
+/* Flyout grows from the rail on its left */
+@keyframes wx-enter-pop-x { from { opacity: 0; transform: translateX(calc(var(--motion-pop) * -1)); } }
+/* Shared legacy names used by page CSS. Defined once, here only. */
+@keyframes wx-fade { from { opacity: 0; } }
+@keyframes wx-rise {
+  from { opacity: 0; transform: translateY(var(--motion-rise)) scale(var(--motion-scale)); }
+}
+@keyframes wx-pop { from { opacity: 0; transform: translateY(calc(var(--motion-pop) * -1)); } }
+/* Toasts */
+@keyframes wx-enter-up  { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+@keyframes wx-exit-down { to   { opacity: 0; transform: translateY(var(--motion-rise)); } }
+
+/* Press feedback: buttons sink slightly while held */
+.btn { transition: var(--t-colors), var(--t-press); }
+:is(.wx-btn, .btn, .wx-seg-btn):active:not(:disabled):not(.disabled) {
+  transform: scale(0.98);
+}
+
+/* Clickable cards lift on hover. Opt in with .wx-card--interactive
+   (anchors/buttons styled as .wx-card get it automatically). */
+.wx-card--interactive,
+a.wx-card,
+button.wx-card {
+  cursor: pointer;
+  transition: var(--t-colors), transform var(--dur-fast) var(--ease-out);
+}
+.wx-card--interactive:hover,
+a.wx-card:hover,
+button.wx-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.wx-card--interactive:active,
+a.wx-card:active,
+button.wx-card:active {
+  transform: scale(0.99);
+  transition-duration: var(--dur-instant);
+}
+
+/* Bootstrap dialogs and menus (React mounts them already "shown", so the
+   entrance is a keyframe rather than Bootstrap's class transition). */
+.modal.show .modal-dialog {
+  animation: wx-enter-rise var(--dur-enter) var(--ease-emphasized);
+}
+.modal-backdrop.show { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+/* Opacity only: some menus are positioned with an inline transform. */
+.dropdown-menu.show { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+.popover.show { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+.tooltip.show { animation: wx-enter-fade var(--dur-fast) var(--ease-out); }
+.wx-metric-tip { transition: opacity var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
+
+/* Route change: the page container fades in (opacity only, so no
+   transform turns it into a containing block for fixed dialogs). The
+   class is re-applied per pathname by AppShell. */
+.route-enter { animation: wx-enter-fade var(--dur-enter) var(--ease-out); }
+/* Lazy-route spinner waits 200ms so fast chunk loads never flash it. */
+.route-fallback { animation: wx-enter-fade var(--dur-base) var(--ease-out) 200ms both; }
+
+/* Theme switch cross-fade. Preferred path is a View Transition
+   (ThemeContext); browsers without it get this class for ~300ms.
+   Never present on initial load. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 250ms;
+  animation-timing-function: var(--ease-in-out);
+}
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color var(--dur-base) var(--ease-in-out),
+              color var(--dur-base) var(--ease-in-out),
+              border-color var(--dur-base) var(--ease-in-out),
+              fill var(--dur-base) var(--ease-in-out),
+              stroke var(--dur-base) var(--ease-in-out) !important;
+  transition-delay: 0s !important;
+}
+
+/* Reduced motion, app-wide (covers page CSS too): transitions become
+   instant, animations play once and briefly (entrances are fades only via
+   --motion-*); spinners keep turning because they signal progress. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 100ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .wx-spinner,
+  .ui-btn__spinner,
+  .spinner-border,
+  .spinner-grow,
+  .bd-spin,
+  .dv-spinner,
+  .ai-dots::after {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
 }
 
 /* ============ Segmented toggle (reusable) ============ */
@@ -696,12 +967,12 @@ input[type="checkbox"] {
   padding: 6px 12px;
   border-radius: calc(var(--radius-md) - 3px);
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: var(--t-colors), var(--t-press);
 }
 .wx-seg-btn:hover { color: var(--text-primary); }
 .wx-seg-btn.is-active {
   background: var(--surface-1);
-  color: var(--accent);
+  color: var(--accent-text);
   box-shadow: var(--shadow-sm);
 }
 
@@ -818,6 +1089,210 @@ input[type="checkbox"] {
     font-size: 12.5px !important;
   }
 }
+
+/* ============ Keyboard focus ============
+   One ring for every interactive element. :focus-visible keeps it off
+   mouse clicks. Text inputs keep their own accent border + glow. The
+   Bootstrap selectors are listed because Bootstrap sets outline:0 on them. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+[role='menuitem']:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible,
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible,
+input[type='range']:focus-visible,
+.btn:focus-visible,
+.btn-close:focus-visible,
+.nav-link:focus-visible,
+.page-link:focus-visible,
+.dropdown-item:focus-visible,
+.wx-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.nav-link:focus-visible,
+.page-link:focus-visible { box-shadow: none; }
+.btn { --bs-btn-focus-box-shadow: none; }
+.btn-close { --bs-btn-close-focus-shadow: none; }
+
+/* ============ Glass: Bootstrap menus, popovers, dialogs ============
+   Tokens fall back to solid panes without backdrop-filter support or
+   under prefers-reduced-transparency (tokens.css). */
+.dropdown-menu {
+  --bs-dropdown-bg: transparent;
+  --bs-dropdown-border-width: 0;
+  --bs-dropdown-border-radius: var(--radius-glass-sm);
+  --bs-dropdown-inner-border-radius: var(--radius-glass-sm);
+}
+/* No rim ring here: Bootstrap offsets .popover-arrow by
+   --bs-popover-border-width, so a ring-width border would leave the arrow
+   floating clear of the pane. Popovers keep the frosted pane. */
+.popover {
+  --bs-popover-bg: var(--glass-bg-strong);
+  --bs-popover-border-color: var(--glass-border);
+  --bs-popover-border-radius: var(--radius-glass-sm);
+  --bs-popover-inner-border-radius: var(--radius-glass-sm);
+  --bs-popover-header-bg: transparent;
+  --bs-popover-body-color: var(--text-primary);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+}
+/* The blur lives on a pseudo-element: backdrop-filter on .modal-content
+   itself would become the containing block for position:fixed menus
+   inside the dialog and misplace them. */
+.modal-content {
+  --bs-modal-bg: transparent;
+  --bs-modal-border-color: var(--glass-border);
+  --bs-modal-border-radius: var(--radius-glass);
+  --bs-modal-inner-border-radius: var(--radius-glass);
+  isolation: isolate;
+  box-shadow: var(--glass-shadow);
+}
+
+/* ============ Liquid glass: the rim ring ============
+   The pane interior has to stay near-opaque to hold text at 4.5:1, which
+   leaves the refraction almost nothing to bend — that is why the effect read
+   as "very minimal". The ring is the fix: a low-alpha band at the pane edge,
+   the one place the backdrop genuinely shows through, and therefore the one
+   place the bend, the colour split and the lit edge can read. Nothing else
+   about the pane changes, so the contrast floor is untouched.
+
+   Two mechanisms, one look:
+
+   (a) BORDER RING — on surfaces whose glass is the element's own background.
+       `border: <rim> solid transparent`, interior background clipped to
+       padding-box and the rim tint to border-box, so the BROWSER computes the
+       inner radius. The border also RESERVES the ring: children are laid out
+       in the content box and physically cannot paint into it, which is what
+       guarantees no text ever lands on the ring, even in a 3-item menu or a
+       one-line toast. Each surface's own padding is reduced by the same
+       amount (--wx-pad-*) so the inner metrics don't move.
+
+   (b) PSEUDO RING — on surfaces that cannot give up content box (the 68px
+       topbar, the 56px mobile tab bar, the fixed-width drawer) or whose glass
+       already lives on a ::before (the three modals). Same border trick on an
+       absolutely positioned inset:0 layer, so it costs NO layout at all;
+       clearance comes from the surface's existing padding instead.
+
+   Both read as: lit outer edge -> refracting translucent ring -> lit inner
+   edge -> opaque interior under the text. --glass-rim-w-* is 0px outside
+   Chromium (tokens.css), and at 0 both mechanisms collapse to exactly the
+   pane that shipped before. */
+
+.shell-user-menu,
+.shell-nav-flyout,
+.dropdown-menu,
+.ui-toast,
+.global-search-panel,
+html .notif-panel,
+html .notif-toast,
+.ui-modal::before,
+.wx-modal::before,
+.modal-content::before,
+.shell-topbar::before,
+.shell-bottom-bar::before,
+.shell-sidebar::before {
+  /* Always a fallback: an unset custom property in var() without one is
+     invalid at computed-value time, and border-width would land on its
+     3px initial. */
+  border-width: var(--wx-rim, 0px);
+  border-style: solid;
+  border-color: transparent;
+  background-color: transparent;
+  /* Layer order is top-first: the opaque interior covers the specular core,
+     so the bright point only ever shows where it crosses the ring and can
+     never lift the pane sitting behind text. */
+  background-image:
+    linear-gradient(var(--wx-pane, var(--glass-bg-strong)),
+                    var(--wx-pane, var(--glass-bg-strong))),
+    var(--glass-rim-spec),
+    linear-gradient(var(--glass-rim-bg), var(--glass-rim-bg));
+  background-origin: padding-box, border-box, border-box;
+  background-clip:   padding-box, border-box, border-box;
+  background-repeat: no-repeat;
+  box-shadow: var(--glass-rim-lit),
+              var(--wx-drop, var(--glass-shadow)),
+              var(--glass-highlight);
+  -webkit-backdrop-filter: var(--wx-filter, var(--glass-filter));
+  backdrop-filter: var(--wx-filter, var(--glass-filter));
+}
+
+/* The pseudo-ring layers. inset:0 + z-index:-1 puts them above the host's own
+   background and below every child, so the ring is painted without entering
+   the layout. */
+.ui-modal::before,
+.wx-modal::before,
+.modal-content::before,
+.shell-topbar::before,
+.shell-bottom-bar::before,
+.shell-sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  --wx-drop: 0 0 0 0 transparent;
+}
+
+/* Per-surface ring size and padding give-back. All of it lives here rather
+   than next to each surface so the ring can be read, and tuned, in one place.
+   --wx-pad-* is the surface's ORIGINAL padding; the ring is taken out of it,
+   and max(0px, ...) means a surface whose padding is thinner than the ring
+   grows by the difference instead of going negative. */
+.shell-user-menu,
+.shell-nav-flyout,
+.dropdown-menu,
+.ui-toast,
+.global-search-panel,
+html .notif-panel,
+html .notif-toast {
+  padding: max(0px, calc(var(--wx-pad-y, 0px) - var(--wx-rim, 0px)))
+           max(0px, calc(var(--wx-pad-x, 0px) - var(--wx-rim, 0px)));
+  /* These surfaces used to carry the pane's 1px hairline as their border, and
+     the ring has taken the border over. An outline restores it: it follows
+     border-radius, it doesn't enter layout, and it is the only edge left on
+     the engines where the ring and the lit edge are both switched off. None of
+     these surfaces is focusable, so it can't collide with a focus ring. */
+  outline: 1px solid var(--glass-border);
+  outline-offset: -1px;
+}
+.shell-user-menu,
+.shell-nav-flyout { --wx-rim: var(--glass-rim-w-sm); --wx-pad-x: 6px; --wx-pad-y: 6px; }
+.dropdown-menu    { --wx-rim: var(--glass-rim-w-sm); --wx-pad-x: 0px; --wx-pad-y: 8px; }
+.ui-toast         { --wx-rim: var(--glass-rim-w-sm);
+                    --wx-pad-x: var(--space-3); --wx-pad-y: var(--space-3);
+                    /* Asymmetric: the accent rail lives in the extra left
+                       padding, so that side is given back separately. */
+                    padding-left: max(0px, calc(var(--space-5) - var(--wx-rim, 0px))); }
+/* Panel and toast padding live on their children in notifications.css, which
+   this sheet doesn't own — so these two take the narrow ring and keep their
+   own padding. Their inner gutters grow by the ring width. */
+html .notif-panel { --wx-rim: var(--glass-rim-w-sm); }
+html .notif-toast { --wx-rim: var(--glass-rim-w-sm); --wx-drop: var(--shadow-xl); }
+.global-search-panel { --wx-rim: var(--glass-rim-w-sm); --wx-drop: var(--shadow-xl); }
+
+/* Pseudo-ring surfaces. The modals clear the ring with their own --space-4/5
+   padding; the topbar and tab bar clear it because their controls are
+   --control-h tall and vertically centred in a taller bar. */
+.ui-modal::before,
+.wx-modal::before,
+.modal-content::before { --wx-rim: var(--glass-rim-w-lg); }
+/* Always-on-screen chrome: narrowest ring, the soft (non-aberrated) filter,
+   and the weaker --glass-bg pane, because this one re-rasterises on scroll. */
+.shell-topbar::before,
+.shell-bottom-bar::before {
+  --wx-rim: var(--glass-rim-w-xs);
+  --wx-pane: var(--glass-bg);
+  --wx-filter: var(--glass-filter-sticky);
+}
+/* The desktop sidebar used to be excluded here: nothing scrolls behind it, so
+   a ring read as a flat tonal band. shell.css now gives it its own ambient
+   backdrop to refract, and sets the ring itself, so that exclusion is gone. */
 
 /* Hover-tooltip used beside metric labels on the Performance page.
    The tooltip lives inside .wx-metric-tip-wrap and is shown when the

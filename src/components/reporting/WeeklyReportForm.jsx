@@ -34,6 +34,8 @@ import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';
 import { useSectionPresets } from './SectionPresetBar';
 import { parseTopVideosText, parseTopCreatorsText, parseGmvMaxText } from '../../utils/reportPasteParsers';
+import { useDialogs } from '../common/useDialogs';
+import SaveStatus from './SaveStatus';
 import '../../styles/reportImmersive.css';
 
 /* ── Tiny reusable pieces ─────────────────────────────────────────────────── */
@@ -62,7 +64,25 @@ function ComparisonChip({ thisVal, lastVal, format = 'num' }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', placeholder, note, width, readOnly }) {
+// Submit-time validation results, keyed by section id (see issueSection).
+const ReportIssuesContext = React.createContext({});
+
+// Which editor section a validate() message belongs to. Overall-performance
+// fields are split across the Seller and Affiliate overview cards.
+const AFFILIATE_OVERALL = ['Overall: Affiliate GMV', 'Overall: Videos Posted', 'Overall: Total Videos'];
+function issueSection(msg) {
+  if (AFFILIATE_OVERALL.includes(msg)) return 'sec-affiliateOverview';
+  if (msg.startsWith('Overall:')) return 'sec-sellerOverview';
+  if (msg.startsWith('Top Creators')) return 'sec-topCreators';
+  if (msg.startsWith('Top Videos')) return 'sec-topVideos';
+  if (msg.startsWith('GMV Max')) return 'sec-gmvMax';
+  if (msg.startsWith('Product Highlights')) return 'sec-productHighlights';
+  if (msg.startsWith('Current & Upcoming')) return 'sec-upcomingCampaigns';
+  if (msg.startsWith('Operational Updates')) return 'sec-operationalUpdates';
+  return 'sec-sellerOverview';
+}
+
+function Field({ label, value, onChange, type = 'text', placeholder, note, width, readOnly, invalid }) {
   // Use type="text" + inputMode="decimal" for numeric fields so users can paste
   // formatted strings like "$3,456.9" — type="number" silently rejects them.
   // Live-clean via cleanNumericInput so currency, commas, and % drop out.
@@ -73,9 +93,11 @@ function Field({ label, value, onChange, type = 'text', placeholder, note, width
       <input type={isNum ? 'text' : type}
         inputMode={isNum ? 'decimal' : undefined}
         readOnly={readOnly}
-        className="form-control form-control-sm" placeholder={placeholder || label}
+        className={`form-control form-control-sm${invalid ? ' is-invalid' : ''}`} placeholder={placeholder || label}
+        aria-invalid={invalid || undefined}
         value={value} onChange={readOnly ? undefined : (e => onChange(isNum ? cleanNumericInput(e.target.value) : e.target.value))}
-        style={{ borderRadius: 8, ...(readOnly ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : null) }} />
+        style={{ borderRadius: 'var(--radius-sm)', ...(readOnly ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : null) }} />
+      {invalid && <div className="wri-field-error">Required</div>}
       {note && <div className="text-muted" style={{ fontSize: '0.6rem' }}>{note}</div>}
     </div>
   );
@@ -100,7 +122,7 @@ function AutoGrowTextarea({ value, minRows = 3, placeholder, onChange, style }) 
       value={value}
       onChange={e => onChange(e.target.value)}
       onInput={resize}
-      style={{ borderRadius: 8, resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
+      style={{ borderRadius: 'var(--radius-sm)', resize: 'vertical', overflow: 'hidden', ...(style || {}) }}
     />
   );
 }
@@ -123,7 +145,7 @@ function InsightArea({ value, onChange, onGenerate, loading, rows = 3 }) {
         <label className="form-label mb-0" style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Insights</label>
         {onGenerate && (
         <button type="button" className="btn btn-sm d-inline-flex align-items-center gap-1"
-          style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)', color: 'white', borderRadius: 8, fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
+          style={{ background: 'var(--purple)', color: 'var(--on-purple)', borderRadius: 'var(--radius-sm)', fontSize: '0.68rem', padding: '3px 10px', border: 'none' }}
           onClick={onGenerate} disabled={loading}>
           {loading ? <><span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> Generating…</>
             : <><i className="bi bi-stars" /> Generate with AI</>}
@@ -147,13 +169,14 @@ function isHtmlEmpty(html) {
   return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim() === '';
 }
 function FetchPreviousButton({ previousValue, currentValue, onPaste, sourceLabel }) {
+  const { ask, askText, notify } = useDialogs();
   const prevEmpty = isHtmlEmpty(previousValue);
   const curEmpty = isHtmlEmpty(currentValue);
   const disabled = prevEmpty;
-  const handleClick = () => {
+  const handleClick = async () => {
     if (disabled) return;
     if (!curEmpty) {
-      const ok = window.confirm(
+      const ok = await ask(
         `Replace current text with the content from ${sourceLabel}?\n\nYour current text will be lost.`
       );
       if (!ok) return;
@@ -175,7 +198,7 @@ function FetchPreviousButton({ previousValue, currentValue, onPaste, sourceLabel
         background: disabled ? 'var(--surface-2)' : 'var(--surface-1)',
         border: '1px solid var(--border-subtle)',
         color: disabled ? 'var(--text-muted)' : 'var(--text-secondary)',
-        borderRadius: 8,
+        borderRadius: 'var(--radius-sm)',
         fontSize: '0.68rem',
         padding: '3px 10px',
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -221,7 +244,7 @@ function ArraySection({ items, setItems, fields, addLabel }) {
         </div>
       ))}
       <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 mt-1"
-        style={{ borderRadius: 8, fontSize: '0.72rem' }} onClick={add}>
+        style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={add}>
         <i className="bi bi-plus-circle" /> {addLabel || 'Add Row'}
       </button>
     </div>
@@ -252,8 +275,9 @@ function GroupDivider({ id, hue, icon, title, pct }) {
    collapses and only the header stays. The Presets control is rendered as the
    first child in the body. */
 function SectionCard({ id, hue = 'var(--accent)', icon, title, required, enabled = true, onToggle, onDelete, children }) {
+  const issues = React.useContext(ReportIssuesContext)[id] || [];
   return (
-    <section id={id} className={`wri-section${enabled ? '' : ' off'}`} style={{ '--hue': hue }}>
+    <section id={id} className={`wri-section${enabled ? '' : ' off'}${issues.length ? ' has-issues' : ''}`} style={{ '--hue': hue }}>
       <div className="wri-sec-head">
         <span className="wri-sec-icon"><i className={`bi ${icon}`} /></span>
         <h3 className="wri-sec-name">{title}{required && enabled && <span className="wri-sec-req">*</span>}</h3>
@@ -277,6 +301,11 @@ function SectionCard({ id, hue = 'var(--accent)', icon, title, required, enabled
       {enabled && (
         <>
           <div className="wri-sec-divider" />
+          {issues.length > 0 && (
+            <ul className="wri-sec-issues" role="alert">
+              {issues.map((m) => <li key={m}><i className="bi bi-exclamation-circle-fill" aria-hidden="true" /> {m}</li>)}
+            </ul>
+          )}
           <div className="wri-sec-body">{children}</div>
         </>
       )}
@@ -287,6 +316,7 @@ function SectionCard({ id, hue = 'var(--accent)', icon, title, required, enabled
 /* ── Main Form ────────────────────────────────────────────────────────────── */
 
 export default function WeeklyReportForm({ editReportId, onSaved, onCancel, prefillBrandId = null }) {
+  const { ask, askText, notify } = useDialogs();
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
   const userRole = profile?.role || '';
@@ -346,6 +376,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // auto-reload is suppressed and a beforeunload prompt is armed so
   // in-progress report data can't be silently lost.
   const [dirty, setDirty] = useState(false);
+  // Set on the first blocked Submit; from then on missing fields are marked live.
+  const [showIssues, setShowIssues] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null); // for the save indicator only
   useUnsavedGuard(dirty);
   // P5 — reference-equality dirty tracking. The onInput={() => setDirty(true)}
   // catch-all in the form body only fires on native input bubbles, so
@@ -782,7 +815,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       const text = await fn(data, previousReport, brandName, selectedWeek?.label || '');
       setData(d => ({ ...d, [insightKey]: text }));
     } catch (err) {
-      alert('AI generation failed: ' + err.message);
+      notify.error('AI generation failed: ' + err.message);
     } finally {
       setAiLoading(s => ({ ...s, [section]: false }));
     }
@@ -810,10 +843,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     catch (e) { console.error('saveUserCustomFields failed:', e); }
   };
 
-  const addCustomField = () => {
+  const addCustomField = async () => {
     // Prompt OUTSIDE the state updater — StrictMode runs the updater
     // twice in dev, which would fire the prompt twice.
-    const name = window.prompt('Name for new custom field:', 'Notes');
+    const name = await askText('Name for new custom field:', 'Notes');
     if (!name || !name.trim()) return;
     const trimmedName = name.trim();
     const newField = { id: nextFieldId(), name: trimmedName };
@@ -829,11 +862,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     });
   };
 
-  const renameCustomField = (fieldId) => {
+  const renameCustomField = async (fieldId) => {
     // Prompt OUTSIDE the updater — putting it inside would fire twice
     // under React 18 StrictMode (updaters are called twice in dev).
     const current = customFieldDefs.find((f) => f.id === fieldId);
-    const name = window.prompt('Rename field:', current?.name || '');
+    const name = await askText('Rename field:', current?.name || '');
     if (!name || !name.trim()) return;
     setCustomFieldDefs((prev) => {
       const next = prev.map((f) => (f.id === fieldId ? { ...f, name: name.trim() } : f));
@@ -842,8 +875,8 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     });
   };
 
-  const deleteCustomField = (fieldId) => {
-    if (!window.confirm('Remove this custom field from all future reports? (Existing reports keep their data)')) return;
+  const deleteCustomField = async (fieldId) => {
+    if (!(await ask('Remove this custom field from all future reports? (Existing reports keep their data)', { danger: true, confirmLabel: 'Remove' }))) return;
     setCustomFieldDefs((prev) => {
       const next = prev.filter((f) => f.id !== fieldId);
       persistDefs(next);
@@ -908,6 +941,17 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
     return missing;
   };
+
+  // Live validation once a Submit has been blocked: each message is shown in
+  // its section, and overview fields get a red outline.
+  const issues = showIssues ? validate() : [];
+  const issuesBySection = {};
+  issues.forEach((m) => {
+    if (m.startsWith('Overall:')) return; // shown on the field itself
+    const s = issueSection(m);
+    (issuesBySection[s] = issuesBySection[s] || []).push(m);
+  });
+  const missingOverall = (label) => issues.includes(`Overall: ${label}`);
 
   const handleImportPdf = async (file) => {
     if (!file) return;
@@ -1020,7 +1064,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       const insights = await generateAllInsights(data, previousReport, brandName, selectedWeek?.label || '');
       setData(d => ({ ...d, ...insights }));
     } catch (err) {
-      alert('AI generation failed: ' + err.message);
+      notify.error('AI generation failed: ' + err.message);
     } finally {
       setAiLoading({});
     }
@@ -1029,15 +1073,15 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // Allow user to change the week of a report being edited
   const handleChangeWeek = async () => {
     if (!editReportId || !selectedBrand) return;
-    const input = window.prompt(
+    const input = await askText(
       `Enter the new starting date for this report (YYYY-MM-DD).\n\nCurrent: ${selectedWeek?.label}`,
       selectedWeek?.startDate || ''
     );
     if (!input) return;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) { alert('Invalid date format. Use YYYY-MM-DD.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) { notify.error('Invalid date format. Use YYYY-MM-DD.'); return; }
     const newWeek = makeWeekFromStart(input, selectedWeek?.week || 1);
     if (newWeek.startDate === selectedWeek?.startDate) return;
-    if (!window.confirm(`Change week to: ${newWeek.label}? The report will be re-saved under the new date.`)) return;
+    if (!(await ask(`Change week to: ${newWeek.label}? The report will be re-saved under the new date.`))) return;
     try {
       const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
       const newId = await changeReportWeek(editReportId, newWeek, {
@@ -1047,10 +1091,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         createdBy: currentUser.uid,
         createdByName: userName,
       });
-      alert('Week changed successfully. The report list will refresh.');
+      notify.success('Week changed successfully. The report list will refresh.');
       if (onSaved) onSaved({ id: newId, brandId: selectedBrand.id });
     } catch (err) {
-      alert('Failed to change week: ' + err.message);
+      notify.error('Failed to change week: ' + err.message);
     }
   };
 
@@ -1089,6 +1133,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       // server now has the canonical copy.
       clearLocalDraft();
       setDirty(false); // changes are persisted — release the guard
+      setLastSavedAt(Date.now());
       setReportStatus(status); // keep the form's status pill in sync
       // `opts.stay` (used by the leave-guard draft save) persists silently
       // without bubbling the navigate-away that onSaved triggers.
@@ -1109,7 +1154,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       });
       return savedId;
     } catch (err) {
-      alert('Failed to save report: ' + err.message);
+      notify.error('Failed to save report: ' + err.message);
       return false;
     } finally {
       setSaving(false);
@@ -1132,20 +1177,23 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const handleSubmitReport = async () => {
     if (!selectedBrand || !selectedWeek) return;
     if (submitBlock?.kind === 'duplicate') {
-      alert(`You've already submitted a report for ${selectedWeek.label}. You can't submit another one for the same week.`);
+      notify.warning(`You've already submitted a report for ${selectedWeek.label}. You can't submit another one for the same week.`);
       return;
     }
     if (submitBlock?.kind === 'pendingPrior') {
       const prev = submitBlock.report;
-      alert(`Your previous report (${prev.weekLabel}) hasn't been verified by the Team Lead yet. It must be verified before you can submit a new one.`);
+      notify.warning(`Your previous report (${prev.weekLabel}) hasn't been verified by the Team Lead yet. It must be verified before you can submit a new one.`);
       return;
     }
     const missing = validate();
     if (missing.length > 0) {
-      alert('Please fill in all required fields before submitting:\n\n• ' + missing.join('\n• '));
+      setShowIssues(true);
+      notify.warning(` required field${missing.length === 1 ? '' : 's'} still need${missing.length === 1 ? 's' : ''} attention — marked in red below.`);
+      const first = document.getElementById(issueSection(missing[0]));
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    if (!window.confirm('Submit this report for Team Lead review?\n\nOnce submitted you will not be able to edit it unless the TL rejects it back to you.')) return;
+    if (!(await ask('Submit this report for Team Lead review?\n\nOnce submitted you will not be able to edit it unless the TL rejects it back to you.'))) return;
     const userName = userProfile?.displayName || apcProfile?.userName || currentUser.displayName || 'Unknown';
     await _doSave('submitted', {
       rejectionNote: null,
@@ -1190,11 +1238,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         <div className="row g-3">
           {myBrands.map(b => (
             <div key={b.id} className="col-md-6 col-lg-4">
-              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 14, cursor: 'pointer' }}
+              <button className="card border-0 shadow-sm w-100 text-start" style={{ borderRadius: 'var(--radius-lg)', cursor: 'pointer' }}
                 onClick={() => handleBrandSelect(b)}>
                 <div className="card-body p-3 d-flex align-items-center gap-3">
-                  <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold text-white flex-shrink-0"
-                    style={{ width: 42, height: 42, fontSize: '0.7rem', background: '#3b82f6' }}>
+                  <div className="rounded-2 d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                    style={{ width: 42, height: 42, fontSize: '0.7rem', background: 'var(--info)', color: 'var(--on-info)' }}>
                     {(b.name || b.brandName || '??').slice(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -1240,7 +1288,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           This is the first weekly report for this brand. Pick the starting date and
           which week number you&apos;re on — all future reports follow from here.
         </p>
-        <div className="card border-0 shadow-sm" style={{ borderRadius: 14, maxWidth: 460 }}>
+        <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)', maxWidth: 460 }}>
           <div className="card-body p-4">
             <div className="row g-2">
               <div className="col-7">
@@ -1252,7 +1300,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                   className="form-control"
                   value={weekStartInput}
                   onChange={e => setWeekStartInput(e.target.value)}
-                  style={{ borderRadius: 8, fontSize: '0.85rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
                 />
               </div>
               <div className="col-5">
@@ -1265,7 +1313,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                   className="form-control"
                   value={startWeekNumInput}
                   onChange={e => setStartWeekNumInput(e.target.value)}
-                  style={{ borderRadius: 8, fontSize: '0.85rem' }}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
                 />
               </div>
             </div>
@@ -1288,7 +1336,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             )}
             <button
               className="btn btn-primary w-100"
-              style={{ borderRadius: 8, fontSize: '0.85rem' }}
+              style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
               onClick={handleSetWeeklyAnchor}
               disabled={!weekStartInput}
             >
@@ -1348,7 +1396,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const active = activeSection; // scroll-spy group key: seller | affiliate | custom | wrapup
 
   // Group hues drive the nav tiles + the in-scroll group dividers.
-  const GROUP_HUES = { seller: '#4f46e5', affiliate: '#0d9488', custom: '#475569', wrapup: '#d97706' };
+  const GROUP_HUES = { seller: 'var(--chart-6)', affiliate: 'var(--chart-2)', custom: 'var(--text-secondary)', wrapup: 'var(--chart-1)' };
   // Wrap Up merges the three closing sections into one group.
   const wrapupPct = Math.round((operationalPct + recommendationsPct + insightsPct) / 3);
   // Each group tile expands to a submenu of its sections; the `id`s match the
@@ -1386,17 +1434,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
     // zIndex 2000 so they render above it. The onInput catch-all keeps the
     // dirty flag armed for native input events (RTE/pickers/toggles are also
     // covered by the ref-equality effect on `data`).
+    <ReportIssuesContext.Provider value={issuesBySection}>
     <div className="wri-root" onInput={() => setDirty(true)}>
       {guardModal}
 
       {/* ─── Auto Generate from Euka — modals ──────────────────────────── */}
       {eukaModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15,18,24,0.55)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'var(--backdrop)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           {/* Period picker */}
           {eukaModal === 'period' && (
             <div className="wx-card" style={{ padding: 24, width: 460, maxWidth: '92vw' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <i className="bi bi-lightning-charge-fill" style={{ color: '#0f6e6a' }} />
+                <i className="bi bi-lightning-charge-fill" style={{ color: 'var(--chart-2)' }} />
                 <h5 className="fw-bold mb-0" style={{ fontSize: 17 }}>Auto Generate from Euka</h5>
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
@@ -1414,7 +1463,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               {/* Warning shown only when the stats window differs from the report's week */}
               {(eukaStart !== selectedWeek?.startDate || eukaEnd !== selectedWeek?.endDate) && (
                 <div className="alert d-flex align-items-start gap-2 mt-3 mb-0 py-2"
-                  style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+                  style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
                   <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
                   <div style={{ fontSize: 12 }}>
                     You're pulling stats for a <strong>different</strong> period than this report's week
@@ -1425,10 +1474,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }}
+                <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-md)' }}
                   onClick={() => setEukaModal(null)}>Cancel</button>
                 <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-                  style={{ background: '#0f6e6a', color: 'white', border: 'none', borderRadius: 10 }}
+                  style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 'var(--radius-md)' }}
                   onClick={runEukaAutofill} disabled={!eukaStart || !eukaEnd}>
                   <i className="bi bi-lightning-charge-fill" /> Fetch &amp; auto-fill
                 </button>
@@ -1439,7 +1488,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           {/* Running — non-dismissable */}
           {eukaModal === 'running' && (
             <div className="wx-card" style={{ padding: 30, width: 380, maxWidth: '90vw', textAlign: 'center' }}>
-              <div className="spinner-border" style={{ color: '#0f6e6a', width: 34, height: 34, marginBottom: 14 }} />
+              <div className="spinner-border" style={{ color: 'var(--chart-2)', width: 34, height: 34, marginBottom: 14 }} />
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
                 Fetching stats from Euka…
               </div>
@@ -1470,7 +1519,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn btn-sm" style={{ background: '#0f6e6a', color: 'white', border: 'none', borderRadius: 10 }}
+                <button className="btn btn-sm" style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 'var(--radius-md)' }}
                   onClick={() => setEukaModal(null)}>Got it</button>
               </div>
             </div>
@@ -1489,13 +1538,13 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                 If it keeps failing, copy this and send it to the developer on Discord:
               </div>
-              <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 10, fontSize: 10.5, maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>{eukaError.copyText}</pre>
+              <pre style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: 10, fontSize: 10.5, maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>{eukaError.copyText}</pre>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 16 }}>
-                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 10 }}
+                <button className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" style={{ borderRadius: 'var(--radius-md)' }}
                   onClick={copyEukaError}><i className="bi bi-clipboard" /> Copy for Discord</button>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => setEukaModal(null)}>Close</button>
-                  <button className="btn btn-sm" style={{ background: '#0f6e6a', color: 'white', border: 'none', borderRadius: 10 }} onClick={openEukaAutofill}>Try again</button>
+                  <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 'var(--radius-md)' }} onClick={() => setEukaModal(null)}>Close</button>
+                  <button className="btn btn-sm" style={{ background: 'var(--chart-2)', color: 'var(--text-inverse)', border: 'none', borderRadius: 'var(--radius-md)' }} onClick={openEukaAutofill}>Try again</button>
                 </div>
               </div>
             </div>
@@ -1605,6 +1654,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             </div>
           </div>
           <div className="wri-topright">
+            <SaveStatus saving={saving} dirty={dirty} savedAt={lastSavedAt} />
             <div className="wri-overall" title="Overall completion">
               <span className="lbl">Complete</span>
               <span className="wri-obar"><i style={{ width: `${overallPct}%` }} /></span>
@@ -1626,7 +1676,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           {/* ─── Duplicate week guard ─────────────────────────────────────── */}
           {duplicateForThisWeek && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 10, color: 'var(--danger)' }}>
+          style={{ background: 'var(--danger-soft)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--danger)' }}>
           <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" />
           <div className="flex-grow-1" style={{ fontSize: '0.78rem' }}>
             <div className="fw-bold" style={{ fontSize: '0.85rem' }}>This week already has a report</div>
@@ -1645,7 +1695,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           style={{
             background: importToast.kind === 'success' ? 'var(--success-soft)' : importToast.kind === 'warn' ? 'var(--warning-soft)' : 'var(--danger-soft)',
             border: `1px solid ${importToast.kind === 'success' ? 'color-mix(in srgb, var(--success) 35%, transparent)' : importToast.kind === 'warn' ? 'color-mix(in srgb, var(--warning) 35%, transparent)' : 'color-mix(in srgb, var(--danger) 35%, transparent)'}`,
-            borderRadius: 10,
+            borderRadius: 'var(--radius-md)',
             color: importToast.kind === 'success' ? 'var(--success)' : importToast.kind === 'warn' ? 'var(--warning)' : 'var(--danger)',
           }}>
           <i className={`bi ${importToast.kind === 'success' ? 'bi-check-circle-fill' : importToast.kind === 'warn' ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'} flex-shrink-0 mt-1`} />
@@ -1660,7 +1710,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {/* ─── Submission gate banner (APC only) ───────────────────────────── */}
       {submitBlock?.kind === 'duplicate' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-lock-fill flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Already submitted for {selectedWeek.label}</div>
@@ -1670,7 +1720,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       )}
       {submitBlock?.kind === 'pendingPrior' && (
         <div className="alert d-flex align-items-start gap-2 mb-3 py-2"
-          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 10, color: 'var(--warning)' }}>
+          style={{ background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)', borderRadius: 'var(--radius-md)', color: 'var(--warning)' }}>
           <i className="bi bi-hourglass-split flex-shrink-0 mt-1" />
           <div>
             <div className="fw-bold" style={{ fontSize: '0.8rem' }}>Previous report not yet verified</div>
@@ -1683,25 +1733,25 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       )}
 
       {/* ═══ SELLER CENTER ══════════════════════════════════════════════ */}
-      <GroupDivider id="grp-seller" hue="#4f46e5" icon="bi-bag-check-fill" title="Seller Center" pct={sellerPct} />
+      <GroupDivider id="grp-seller" hue="var(--chart-6)" icon="bi-bag-check-fill" title="Seller Center" pct={sellerPct} />
 
-      <SectionCard id="sec-sellerOverview" hue="#4f46e5" icon="bi-bag-check-fill" title="Seller Overview" required
+      <SectionCard id="sec-sellerOverview" hue="var(--chart-6)" icon="bi-bag-check-fill" title="Seller Overview" required
         enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')}>
         <div className="d-flex flex-wrap gap-2 mb-2">
-          <Field label={`GMV ${curSym} (This Week)`} value={data.overallPerformance.gmv} onChange={v => setPerf('gmv', v)} type="number" placeholder="55834.62" />
-          <Field label="Orders" value={data.overallPerformance.orders} onChange={v => setPerf('orders', v)} type="number" placeholder="813" />
-          <Field label="Samples Approved (This week)" value={data.overallPerformance.samplesApproved} onChange={v => setPerf('samplesApproved', v)} type="number" placeholder="488" />
+          <Field label={`GMV ${curSym} (This Week)`} value={data.overallPerformance.gmv} invalid={missingOverall('GMV')} onChange={v => setPerf('gmv', v)} type="number" placeholder="55834.62" />
+          <Field label="Orders" value={data.overallPerformance.orders} invalid={missingOverall('Orders')} onChange={v => setPerf('orders', v)} type="number" placeholder="813" />
+          <Field label="Samples Approved (This week)" value={data.overallPerformance.samplesApproved} invalid={missingOverall('Samples Approved')} onChange={v => setPerf('samplesApproved', v)} type="number" placeholder="488" />
         </div>
         <div className="d-flex flex-wrap gap-2 mb-2">
           <Field label="ROI (auto)" value={weeklyRoi != null ? weeklyRoi.toFixed(2) + '×' : '—'} readOnly
             note={weeklyGmvMaxRows.length
               ? `Auto from this week's ${weeklyGmvMaxRows.length} GMV Max campaign${weeklyGmvMaxRows.length === 1 ? '' : 's'} (GMV ÷ Cost)`
               : "Add this week's GMV Max campaigns below — ROI calculates automatically"} />
-          <Field label="Shop Performance Score" value={data.overallPerformance.shopPerformanceScore} onChange={v => setPerf('shopPerformanceScore', v)} type="number" placeholder="4.7" />
+          <Field label="Shop Performance Score" value={data.overallPerformance.shopPerformanceScore} invalid={missingOverall('Shop Performance Score')} onChange={v => setPerf('shopPerformanceScore', v)} type="number" placeholder="4.7" />
         </div>
         <div className="d-flex flex-wrap gap-2">
           <Field label={`GMV Month-to-Date (${curSym})`} value={data.overallNotes.gmv || ''} onChange={v => setPerfNote('gmv', v)} type="number" placeholder="231714.01" width="240px" />
-          <Field label="Sample Approved (month to date)" value={data.overallNotes.samplesApproved || ''} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
+          <Field label="Sample Approved (month to date)" value={data.overallNotes.samplesApproved || ''} invalid={missingOverall('MTD Approved')} onChange={v => setPerfNote('samplesApproved', v)} type="number" placeholder="854" width="240px" />
         </div>
         <BuiltinExtras sectionKey="overallPerformance" sectionTitle="Overall Performance"
           fields={brandSectionExtras.overallPerformance || []}
@@ -1714,12 +1764,12 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
       {/* Affiliate Center group is rendered below, after the Seller sections. */}
 
-      <SectionCard id="sec-gmvMax" hue="#ef4444" icon="bi-rocket-takeoff-fill" title="GMV Max Performance" required
+      <SectionCard id="sec-gmvMax" hue="var(--danger)" icon="bi-rocket-takeoff-fill" title="GMV Max Performance" required
         enabled={sectEnabled.gmvMax} onToggle={toggleSection('gmvMax')}>
-        {presets.bar('gmvMax', '#ef4444')}
+        {presets.bar('gmvMax', 'var(--danger)')}
         <PasteParsePanel
           noun="campaign"
-          accent="#ef4444"
+          accent="var(--danger)"
           parse={parseGmvMaxText}
           onApply={rows => setData(d => {
             const isReal = g => (g.campaign && g.campaign.trim())
@@ -1747,15 +1797,15 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           onRemoveField={(id) => removeExtraField('gmvMax', id)} />
       </SectionCard>
 
-      <SectionCard id="sec-gmvMaxMtd" hue="#ef4444" icon="bi-calendar-range-fill" title="Month-to-Date GMV Max"
+      <SectionCard id="sec-gmvMaxMtd" hue="var(--danger)" icon="bi-calendar-range-fill" title="Month-to-Date GMV Max"
         enabled={sectEnabled.gmvMax}>
         <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
           Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically, like the weekly section above.
         </p>
-        {presets.bar('gmvMaxMtd', '#ef4444')}
+        {presets.bar('gmvMaxMtd', 'var(--danger)')}
         <PasteParsePanel
           noun="campaign"
-          accent="#ef4444"
+          accent="var(--danger)"
           parse={parseGmvMaxText}
           onApply={rows => setData(d => {
             const isReal = g => (g.campaign && g.campaign.trim())
@@ -1777,9 +1827,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           ]} />
       </SectionCard>
 
-      <SectionCard id="sec-productHighlights" hue="#06b6d4" icon="bi-box-seam-fill" title="Product Highlights" required
+      <SectionCard id="sec-productHighlights" hue="var(--info)" icon="bi-box-seam-fill" title="Product Highlights" required
         enabled={sectEnabled.productHighlights} onToggle={toggleSection('productHighlights')}>
-        {presets.bar('productHighlights', '#06b6d4')}
+        {presets.bar('productHighlights', 'var(--info)')}
         <ArraySection items={data.productHighlights} setItems={v => setData(d => ({ ...d, productHighlights: v }))}
           addLabel="Add Product"
           fields={[
@@ -1800,7 +1850,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           onRemoveField={(id) => removeExtraField('productHighlights', id)} />
       </SectionCard>
 
-      <SectionCard id="sec-offsitePerformance" hue="#10b981" icon="bi-globe2" title="Offsite Performance"
+      <SectionCard id="sec-offsitePerformance" hue="var(--success)" icon="bi-globe2" title="Offsite Performance"
         enabled={sectEnabled.offsitePerformance} onToggle={toggleSection('offsitePerformance')}>
         {/* The week's own offsite figures are often not published yet, so the APC
             reports an older window. Naming that window is the honest fix: the
@@ -1814,19 +1864,19 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
               if (!e.target.checked) { setOffsite('dataFrom', ''); setOffsite('dataTo', ''); }
             }} />
           <label className="form-check-label" htmlFor="offsite-stale-range"
-            style={{ fontSize: '0.78rem', color: offsiteRangeOn ? '#1e40af' : '#6c757d', fontWeight: 600 }}>
+            style={{ fontSize: '0.78rem', color: offsiteRangeOn ? 'var(--info-text)' : 'var(--text-secondary)', fontWeight: 600 }}>
             Latest Data Not available
           </label>
         </div>
         {offsiteRangeOn && (
           <div className="d-flex align-items-end gap-2 mb-3 flex-wrap">
             <div>
-              <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Data from</label>
+              <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Data from</label>
               <input type="date" className="form-control form-control-sm" style={{ width: 165 }}
                 value={data.offsitePerformance.dataFrom || ''} onChange={e => setOffsite('dataFrom', e.target.value)} />
             </div>
             <div>
-              <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: '#6c757d' }}>Data to</label>
+              <label className="form-label mb-1" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Data to</label>
               <input type="date" className="form-control form-control-sm" style={{ width: 165 }}
                 value={data.offsitePerformance.dataTo || ''} onChange={e => setOffsite('dataTo', e.target.value)} />
             </div>
@@ -1847,9 +1897,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           onRemoveField={(id) => removeExtraField('offsitePerformance', id)} />
       </SectionCard>
 
-      <SectionCard id="sec-upcomingCampaigns" hue="#ec4899" icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" required
+      <SectionCard id="sec-upcomingCampaigns" hue="var(--chart-5)" icon="bi-megaphone-fill" title="Current & Upcoming Campaigns" required
         enabled={sectEnabled.upcomingCampaigns} onToggle={toggleSection('upcomingCampaigns')}>
-        {presets.bar('upcomingCampaigns', '#ec4899')}
+        {presets.bar('upcomingCampaigns', 'var(--chart-5)')}
         <div className="d-flex justify-content-end mb-2">
           <FetchPreviousButton
             previousValue={previousReport?.upcomingCampaigns}
@@ -1869,13 +1919,13 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       </SectionCard>
 
       {/* ═══ AFFILIATE CENTER ══════════════════════════════════════════ */}
-      <GroupDivider id="grp-affiliate" hue="#0d9488" icon="bi-people-fill" title="Affiliate Center" pct={affiliatePct} />
+      <GroupDivider id="grp-affiliate" hue="var(--chart-2)" icon="bi-people-fill" title="Affiliate Center" pct={affiliatePct} />
 
-      <SectionCard id="sec-affiliateOverview" hue="#0d9488" icon="bi-people-fill" title="Affiliate Overview" required
+      <SectionCard id="sec-affiliateOverview" hue="var(--chart-2)" icon="bi-people-fill" title="Affiliate Overview" required
         enabled={sectEnabled.overallPerformance} onToggle={toggleSection('overallPerformance')}>
         <div className="d-flex flex-wrap gap-2 mb-2">
-          <Field label={`Affiliate GMV (${curSym})`} value={data.overallPerformance.affiliateGmv} onChange={v => setPerf('affiliateGmv', v)} type="number" placeholder="49494.24" />
-          <Field label="Video Posted (This week)" value={data.overallPerformance.videosPosted} onChange={v => setPerf('videosPosted', v)} type="number" placeholder="1377" />
+          <Field label={`Affiliate GMV (${curSym})`} value={data.overallPerformance.affiliateGmv} invalid={missingOverall('Affiliate GMV')} onChange={v => setPerf('affiliateGmv', v)} type="number" placeholder="49494.24" />
+          <Field label="Video Posted (This week)" value={data.overallPerformance.videosPosted} invalid={missingOverall('Videos Posted')} onChange={v => setPerf('videosPosted', v)} type="number" placeholder="1377" />
         </div>
         <div className="d-flex flex-wrap gap-2">
           <Field label="Videos Posted (Month-to-Date)" value={data.overallNotes.videosMtd || ''} onChange={v => setPerfNote('videosMtd', v)} type="number" placeholder="2140" width="240px" />
@@ -1883,18 +1933,18 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <Field label="Total Videos (all-time)" value={autoTotalVideos} type="number" width="220px" readOnly
               note={`Auto: ${prevAllTimeVideos.toLocaleString()} previous + ${weeklyVideos.toLocaleString()} this week`} />
           ) : (
-            <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px"
+            <Field label="Total Videos (all-time)" value={data.overallNotes.videosPosted || ''} invalid={missingOverall('Total Videos')} onChange={v => setPerfNote('videosPosted', v)} type="number" placeholder="25703" width="220px"
               note="First report: enter the all-time total. Future weeks add automatically." />
           )}
         </div>
       </SectionCard>
 
-      <SectionCard id="sec-topCreators" hue="#f59e0b" icon="bi-star-fill" title="Top Creators" required
+      <SectionCard id="sec-topCreators" hue="var(--warning)" icon="bi-star-fill" title="Top Creators" required
         enabled={sectEnabled.topCreators} onToggle={toggleSection('topCreators')}>
-        {presets.bar('topCreators', '#f59e0b')}
+        {presets.bar('topCreators', 'var(--warning)')}
         <PasteParsePanel
           noun="creator"
-          accent="#f59e0b"
+          accent="var(--warning)"
           parse={parseTopCreatorsText}
           onApply={rows => setData(d => {
             const isReal = c => (c.name && c.name.trim())
@@ -1920,12 +1970,12 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           onRemoveField={(id) => removeExtraField('topCreators', id)} />
       </SectionCard>
 
-      <SectionCard id="sec-topVideos" hue="#8b5cf6" icon="bi-play-circle-fill" title="Top Videos" required
+      <SectionCard id="sec-topVideos" hue="var(--purple)" icon="bi-play-circle-fill" title="Top Videos" required
         enabled={sectEnabled.topVideos} onToggle={toggleSection('topVideos')}>
-        {presets.bar('topVideos', '#8b5cf6')}
+        {presets.bar('topVideos', 'var(--purple)')}
         <PasteParsePanel
           noun="video"
-          accent="#8b5cf6"
+          accent="var(--purple)"
           parse={parseTopVideosText}
           onApply={rows => setData(d => {
             const isReal = v => (v.creatorName && v.creatorName.trim()) || (v.videoLink && v.videoLink.trim())
@@ -1958,7 +2008,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       {/* ═══ CUSTOM SECTIONS ══════════════════════════════════════════ */}
       {showCustom && (
       <>
-      <GroupDivider id="grp-custom" hue="#475569" icon="bi-grid-1x2-fill" title="Custom Sections" pct={customPct} />
+      <GroupDivider id="grp-custom" hue="var(--text-secondary)" icon="bi-grid-1x2-fill" title="Custom Sections" pct={customPct} />
       {brandSectionDefs.length > 0 && (
         <BrandSectionsBlock
           sections={brandSectionDefs}
@@ -1972,7 +2022,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         />
       )}
       {selectedBrand?.id && (
-        <div id="sec-cs-add" className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12, borderStyle: 'dashed', scrollMarginTop: 12 }}>
+        <div id="sec-cs-add" className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)', borderStyle: 'dashed', scrollMarginTop: 12 }}>
           <div className="card-body p-3">
             <AddCustomSectionInline
               disabled={!selectedBrand?.id}
@@ -1991,24 +2041,24 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           field renders as its OWN section titled by the field name so edit
           mode matches the saved view exactly (no generic wrapper header). */}
       {customFieldDefs.map((field) => (
-        <div key={field.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 12 }}>
+        <div key={field.id} className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="card-body p-3">
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div className="d-flex align-items-center gap-2">
                 <div className="rounded-2 d-flex align-items-center justify-content-center"
-                  style={{ width: 32, height: 32, background: '#8b5cf618' }}>
-                  <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: '#8b5cf6' }} />
+                  style={{ width: 32, height: 32, background: 'color-mix(in srgb, var(--purple) 9%, transparent)' }}>
+                  <i className="bi bi-sliders" style={{ fontSize: '0.9rem', color: 'var(--purple-text)' }} />
                 </div>
                 <h6 className="fw-bold mb-0" style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                   {field.name}
                 </h6>
               </div>
               <div className="d-flex gap-1">
-                <button className="btn btn-sm btn-light border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                <button className="btn btn-sm btn-outline-secondary border-0" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
                   onClick={() => renameCustomField(field.id)} title="Rename">
                   <i className="bi bi-pencil" />
                 </button>
-                <button className="btn btn-sm btn-light border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
+                <button className="btn btn-sm btn-outline-secondary border-0 text-danger" style={{ padding: '2px 8px', fontSize: '0.68rem' }}
                   onClick={() => deleteCustomField(field.id)} title="Delete from my template">
                   <i className="bi bi-trash3" />
                 </button>
@@ -2056,11 +2106,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       )}
 
       {/* ═══ WRAP UP ══════════════════════════════════════════════════ */}
-      <GroupDivider id="grp-wrapup" hue="#d97706" icon="bi-check2-square" title="Wrap Up" pct={wrapupPct} />
+      <GroupDivider id="grp-wrapup" hue="var(--chart-1)" icon="bi-check2-square" title="Wrap Up" pct={wrapupPct} />
 
-      <SectionCard id="sec-operationalUpdates" hue="#6366f1" icon="bi-gear-fill" title="Operational Updates" required
+      <SectionCard id="sec-operationalUpdates" hue="var(--chart-6)" icon="bi-gear-fill" title="Operational Updates" required
         enabled={sectEnabled.operationalUpdates} onToggle={toggleSection('operationalUpdates')}>
-        {presets.bar('operationalUpdates', '#6366f1')}
+        {presets.bar('operationalUpdates', 'var(--chart-6)')}
         <div className="d-flex justify-content-end mb-2">
           <FetchPreviousButton
             previousValue={previousReport?.operationalUpdates}
@@ -2079,9 +2129,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           onRemoveField={(id) => removeExtraField('operationalUpdates', id)} />
       </SectionCard>
 
-      <SectionCard id="sec-recommendations" hue="#f59e0b" icon="bi-lightbulb-fill" title="Recommendations & Action Items"
+      <SectionCard id="sec-recommendations" hue="var(--warning)" icon="bi-lightbulb-fill" title="Recommendations & Action Items"
         enabled={sectEnabled.recommendations} onToggle={toggleSection('recommendations')}>
-        {presets.bar('recommendations', '#f59e0b')}
+        {presets.bar('recommendations', 'var(--warning)')}
         <div className="d-flex justify-content-end mb-2">
           <FetchPreviousButton
             previousValue={previousReport?.recommendations}
@@ -2100,8 +2150,8 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           onRemoveField={(id) => removeExtraField('recommendations', id)} />
       </SectionCard>
 
-      <SectionCard id="sec-insights" hue="#7c3aed" icon="bi-stars" title="Insights">
-        {presets.bar('reportInsights', '#7c3aed')}
+      <SectionCard id="sec-insights" hue="var(--chart-4)" icon="bi-stars" title="Insights">
+        {presets.bar('reportInsights', 'var(--chart-4)')}
         <div className="d-flex justify-content-end mb-2">
           <FetchPreviousButton
             previousValue={previousReport?.reportInsights}
@@ -2118,5 +2168,6 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         </div>{/* .wri-scroll */}
       </div>{/* .wri-main */}
     </div>
+    </ReportIssuesContext.Provider>
   );
 }

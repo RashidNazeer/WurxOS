@@ -114,7 +114,7 @@ export default function ClientAccessPage() {
       {links.length > 0 && (
         <div className="wx-card" style={{ padding: 12, marginBottom: 14 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: 'var(--surface-2)', borderRadius: 8, flex: '1 1 220px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', flex: '1 1 220px' }}>
               <SearchIcon width="13" height="13" />
               <input style={{ flex: 1, border: 0, background: 'transparent', outline: 'none', fontSize: 13, padding: '4px 0' }}
                 placeholder="Search by client or brand…"
@@ -150,7 +150,7 @@ export default function ClientAccessPage() {
       {isLoading ? (
         <div className="wx-empty"><span className="wx-spinner" /> Loading…</div>
       ) : links.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 36, border: '2px dashed var(--border)', borderRadius: 14, background: 'var(--surface-1)' }}>
+        <div style={{ textAlign: 'center', padding: 36, border: '2px dashed var(--border)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)' }}>
           <div style={{ fontSize: 30, opacity: 0.5 }}>🔗</div>
           <div style={{ fontWeight: 800, marginTop: 10 }}>No client links yet</div>
           <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: '4px 0 14px' }}>
@@ -184,16 +184,16 @@ export default function ClientAccessPage() {
 
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)' }} onClick={() => setDeleteTarget(null)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={() => setDeleteTarget(null)} />
           <div className="wx-card" style={{ position: 'relative', maxWidth: 420, padding: 22, textAlign: 'center' }}>
-            <div style={{ fontSize: 30, color: '#dc2626' }}>⚠️</div>
+            <div style={{ fontSize: 30, color: 'var(--danger-text)' }}>⚠️</div>
             <h6 style={{ fontWeight: 800, marginTop: 8, marginBottom: 6 }}>Delete this client link?</h6>
             <p style={{ color: 'var(--text-muted)', fontSize: 12.5, margin: '0 0 14px' }}>
               <strong>{deleteTarget.client_name || deleteTarget.label || 'Untitled'}</strong> will be permanently removed and the link will stop working immediately.
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="wx-btn wx-btn-ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button className="wx-btn wx-btn-primary" style={{ background: '#dc2626' }} onClick={handleDelete}>Delete</button>
+              <button className="wx-btn wx-btn-primary" style={{ background: 'var(--danger)' }} onClick={handleDelete}>Delete</button>
             </div>
           </div>
         </div>
@@ -214,7 +214,7 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
 
   return (
     <div className="wx-card" style={{
-      borderRadius: 14, padding: 0, overflow: 'hidden',
+      borderRadius: 'var(--radius-lg)', padding: 0, overflow: 'hidden',
       opacity: isActive ? 1 : 0.65,
     }}>
       <div style={{ height: 4, background: isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#94a3b8' }} />
@@ -223,7 +223,7 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{link.client_name || link.label || 'Unnamed Client'}</div>
             <span style={{
-              display: 'inline-block', marginTop: 4, padding: '2px 8px', borderRadius: 999,
+              display: 'inline-block', marginTop: 4, padding: '2px 8px', borderRadius: 'var(--radius-pill)',
               fontSize: 10, fontWeight: 700,
               background: isActive ? 'color-mix(in srgb, var(--success) 18%, transparent)' : 'var(--surface-3, #e2e8f0)',
               color: isActive ? 'var(--success)' : 'var(--text-muted)',
@@ -253,7 +253,7 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
             return (
               <span key={t} style={{
                 background: col.bg, color: col.fg, fontSize: 10.5, fontWeight: 700,
-                padding: '3px 9px', borderRadius: 999,
+                padding: '3px 9px', borderRadius: 'var(--radius-pill)',
               }}>{meta?.label || t}</span>
             );
           })}
@@ -270,12 +270,12 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
               {brandNames.slice(0, 6).map((n, i) => (
                 <span key={i} style={{
                   background: 'var(--surface-2)', color: 'var(--text-primary)',
-                  border: '1px solid var(--border)', borderRadius: 999,
+                  border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)',
                   padding: '2px 8px', fontSize: 11, fontWeight: 600,
                 }}>{n}</span>
               ))}
               {brandNames.length > 6 && (
-                <span style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 700 }}>
+                <span style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: 10.5, fontWeight: 700 }}>
                   +{brandNames.length - 6} more
                 </span>
               )}
@@ -285,9 +285,9 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
 
         {link.legacy_v1 && (
           <div style={{
-            fontSize: 10.5, fontWeight: 700, color: '#92400e',
-            background: '#fef3c7', border: '1px solid #fde68a',
-            borderRadius: 999, padding: '2px 8px',
+            fontSize: 10.5, fontWeight: 700, color: 'var(--warning-text)',
+            background: 'var(--warning-soft)', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)',
+            borderRadius: 'var(--radius-pill)', padding: '2px 8px',
             display: 'inline-flex', alignItems: 'center', gap: 4,
             marginBottom: 6, alignSelf: 'flex-start',
           }} title="This link was originally shared with the client from v1. The v1 URL still works — it redirects to the v2 portal automatically.">
@@ -296,12 +296,12 @@ function LinkCard({ link, brands, copied, onCopy, onEdit, onToggle, onDelete }) 
         )}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          padding: 8, borderRadius: 8,
-          background: '#f0f4ff', border: '1px solid #c5d5ff',
+          padding: 8, borderRadius: 'var(--radius-sm)',
+          background: 'var(--info-soft)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)',
         }}>
-          <LinkIcon width="13" height="13" style={{ color: '#3b82f6', flexShrink: 0 }} />
+          <LinkIcon width="13" height="13" style={{ color: 'var(--info)', flexShrink: 0 }} />
           <input readOnly value={url} onClick={e => e.target.select()}
-            style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 11.5, color: '#1e40af', outline: 'none' }} />
+            style={{ flex: 1, minWidth: 0, border: 0, background: 'transparent', fontSize: 11.5, color: 'var(--text-primary)', outline: 'none' }} />
           <button className="wx-btn wx-btn-ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={onCopy}>
             {copied ? <><CheckIcon width="11" height="11" /> Copied</> : <><CopyIcon width="11" height="11" /> Copy</>}
           </button>
@@ -358,8 +358,8 @@ function ClientAccessModal({ link, brands, existingClientNames = [], onClose, on
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)' }} onClick={onClose} />
-      <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, borderRadius: 18 }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)' }} onClick={onClose} />
+      <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, borderRadius: 'var(--radius-xl)' }}>
         <div style={{ padding: '18px 22px 12px', borderBottom: '1px solid var(--border)' }}>
           <h6 style={{ fontWeight: 800, margin: '0 0 4px', fontSize: 15 }}>
             {link ? 'Edit Client Link' : 'New Client Link'}
@@ -403,9 +403,9 @@ function ClientAccessModal({ link, brands, existingClientNames = [], onClose, on
                 return (
                   <label key={o.id} style={{
                     display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-                    padding: '8px 10px', borderRadius: 10,
+                    padding: '8px 10px', borderRadius: 'var(--radius-md)',
                     background: checked ? col.bg : 'var(--surface-2)',
-                    border: `1.5px solid ${checked ? col.fg : 'var(--border)'}`,
+                    border: `1px solid ${checked ? col.fg : 'var(--border)'}`,
                     color: checked ? col.fg : 'var(--text-primary)',
                     fontSize: 13, fontWeight: 600,
                   }}>
@@ -430,13 +430,13 @@ function ClientAccessModal({ link, brands, existingClientNames = [], onClose, on
                   onClick={() => setBrandIds([])}>Clear</button>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: 'var(--surface-2)', borderRadius: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', marginBottom: 8 }}>
               <SearchIcon width="13" height="13" />
               <input style={{ flex: 1, border: 0, background: 'transparent', outline: 'none', fontSize: 13, padding: '4px 0' }}
                 placeholder="Search brand…"
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface-1)' }}>
+            <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--surface-1)' }}>
               {filteredBrands.length === 0 ? (
                 <div style={{ padding: 14, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>No brands match.</div>
               ) : filteredBrands.map(b => {

@@ -86,22 +86,22 @@ export default function TierNotificationsSection() {
           </div>
         </div>
         <span style={{
-          width: 36, height: 20, borderRadius: 999,
+          width: 36, height: 20, borderRadius: 'var(--radius-pill)',
           background: enabled ? 'var(--accent)' : 'var(--surface-3)',
           border: '1px solid', borderColor: enabled ? 'var(--accent)' : 'var(--border-default)',
-          position: 'relative', flex: '0 0 auto', transition: 'background var(--dur-fast)',
+          position: 'relative', flex: '0 0 auto', transition: 'background-color var(--dur-fast) var(--ease-out)',
         }}>
           <span style={{
             position: 'absolute', top: 1, left: enabled ? 17 : 1,
-            width: 16, height: 16, borderRadius: '50%', background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'left var(--dur-fast)',
+            width: 16, height: 16, borderRadius: '50%', background: 'var(--surface-1)',
+            boxShadow: 'var(--shadow-sm)', transition: 'left var(--dur-fast) var(--ease-out)',
           }} />
         </span>
       </div>
 
       <div style={{
         padding: '10px 12px',
-        background: 'var(--surface-2)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)',
+        background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', fontSize: 12.5, color: 'var(--text-secondary)',
       }}>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>How it works</div>
         <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>

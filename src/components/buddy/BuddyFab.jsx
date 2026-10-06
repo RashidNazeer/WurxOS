@@ -29,7 +29,7 @@ export default function BuddyFab() {
   useEffect(() => {
     if (wasOpen.current && !panelOpen) {
       const a = document.activeElement;
-      if (!a || a === document.body || a.closest?.('#buddy-panel')) fabRef.current?.focus();
+      if (!a || a === document.body || a.matches?.('.shell-content') || a.closest?.('#buddy-panel')) fabRef.current?.focus();
     }
     wasOpen.current = panelOpen;
   }, [panelOpen]);

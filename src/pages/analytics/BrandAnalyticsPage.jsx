@@ -32,14 +32,14 @@ const BA_CSS = `
   --ba-ontrack:#2dd4bf; --ba-ontrack-soft:rgba(45,212,191,.15); --ba-ontrack-bd:rgba(45,212,191,.35);
   --ba-behind:#fbbf24;  --ba-behind-soft:rgba(251,191,36,.15);  --ba-behind-bd:rgba(251,191,36,.35);
 }
-.ba-card{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:16px;transition:transform .18s ease, box-shadow .18s ease;cursor:pointer;text-align:left;width:100%;}
+.ba-card{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);cursor:pointer;text-align:left;width:100%;}
 .ba-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);}
 .ba-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-.ba-chip{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s,border-color .15s;}
-.ba-gauge-arc{transition:stroke-dashoffset 1s cubic-bezier(.22,1,.36,1);}
-.ba-bar-fill{transition:width 1s cubic-bezier(.22,1,.36,1);}
+.ba-chip{padding:6px 14px;border-radius:var(--radius-pill);font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);}
+.ba-gauge-arc{transition: stroke-dashoffset 1s cubic-bezier(.22,1,.36,1);}
+.ba-bar-fill{transition: width 1s cubic-bezier(.22,1,.36,1);}
 @keyframes ba-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(1.6);}}
-.ba-pulse{animation:ba-pulse 2s cubic-bezier(.4,0,.6,1) infinite;}
+.ba-pulse{animation:ba-pulse 2s var(--ease-in-out) infinite;}
 @media (prefers-reduced-motion: reduce){.ba-gauge-arc,.ba-bar-fill{transition:none;}.ba-pulse{animation:none;}}
 `;
 
@@ -267,7 +267,7 @@ export default function BrandAnalyticsPage() {
         <>
           {/* Control bar */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14,
-            background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 14 }}>
+            background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
             <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 200 }}>
               <i className="bi bi-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 13, pointerEvents: 'none' }} />
               <input className="wx-input" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -303,8 +303,8 @@ export default function BrandAnalyticsPage() {
               </div>
               <div style={{ flex: '1 1 240px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 220 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: 64, textAlign: 'right' }}>{fmtFull(summary.achieved)}</span>
-                <div style={{ position: 'relative', flex: 1, height: 12, background: 'var(--ba-track)', borderRadius: 999, overflow: 'hidden' }}>
-                  <div className="ba-bar-fill" style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${Math.min(100, summary.pct)}%`, background: 'var(--accent)', borderRadius: 999 }} />
+                <div style={{ position: 'relative', flex: 1, height: 12, background: 'var(--ba-track)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+                  <div className="ba-bar-fill" style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${Math.min(100, summary.pct)}%`, background: 'var(--accent)', borderRadius: 'var(--radius-pill)' }} />
                   <div style={{ position: 'absolute', top: 0, bottom: 0, width: 2, left: `${Math.min(100, summary.marker)}%`, background: 'var(--text-primary)', opacity: 0.85 }} />
                 </div>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', minWidth: 64 }}>{fmtFull(summary.goal)}</span>
@@ -336,7 +336,7 @@ export default function BrandAnalyticsPage() {
             <button className="wx-btn wx-btn-ghost" onClick={() => { setBrandId(''); setEditing(false); }} style={{ padding: '8px 12px' }}>
               <i className="bi bi-arrow-left me-1" /> Brands
             </button>
-            <BrandAvatar brand={selectedBrand} size={38} radius={9} />
+            <BrandAvatar brand={selectedBrand} size={38} radius={10} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedBrand.brand_name}</div>
               {selectedBrand.client_name && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{selectedBrand.client_name}</div>}
@@ -422,7 +422,7 @@ export default function BrandAnalyticsPage() {
 function MonthNav({ month, setMonth, thisMonth, monthsWithData }) {
   const isCur = month === thisMonth;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 'none', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 3 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 'none', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: 3 }}>
       <button className="wx-btn wx-btn-ghost" onClick={() => setMonth((m) => addMonths(m, -1))} title="Previous month" style={{ padding: '5px 9px' }}>
         <i className="bi bi-chevron-left" style={{ fontSize: 12 }} />
       </button>
@@ -464,9 +464,9 @@ function Gauge({ pct, color, size = 92 }) {
 // ── Pace bar with a marker at "where you should be today" ───────────
 function PaceBar({ fillPct, markerPct, color }) {
   return (
-    <div style={{ position: 'relative', height: 8, background: 'var(--ba-track)', borderRadius: 999 }}>
-      <div className="ba-bar-fill" style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${Math.max(0, Math.min(100, fillPct))}%`, background: color, borderRadius: 999 }} />
-      <div style={{ position: 'absolute', top: -2, bottom: -2, width: 2, left: `${Math.max(0, Math.min(100, markerPct))}%`, background: 'var(--text-primary)', borderRadius: 1 }} />
+    <div style={{ position: 'relative', height: 8, background: 'var(--ba-track)', borderRadius: 'var(--radius-pill)' }}>
+      <div className="ba-bar-fill" style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${Math.max(0, Math.min(100, fillPct))}%`, background: color, borderRadius: 'var(--radius-pill)' }} />
+      <div style={{ position: 'absolute', top: -2, bottom: -2, width: 2, left: `${Math.max(0, Math.min(100, markerPct))}%`, background: 'var(--text-primary)', borderRadius: 'var(--radius-xs)' }} />
     </div>
   );
 }
@@ -480,7 +480,7 @@ function StatusBadge({ status }) {
   };
   const s = map[status] || map.nogoal;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap', color: s.c, background: s.bg, border: `1px solid ${s.bd}` }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 'var(--radius-sm)', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap', color: s.c, background: s.bg, border: `1px solid ${s.bd}` }}>
       {s.icon && <i className={`bi ${s.icon}`} style={{ fontSize: 12 }} />}{s.label}
     </span>
   );
@@ -610,7 +610,7 @@ function LinkedIncentives({ brandId, month, goal }) {
         {links.map((l, i) => (
           <div key={`${l.user_id}-${i}`} style={{
             display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-            padding: '8px 12px', borderRadius: 10,
+            padding: '8px 12px', borderRadius: 'var(--radius-md)',
             background: l.completed ? 'var(--ba-ontrack-soft)' : 'var(--surface-2)',
             border: `1px solid ${l.completed ? 'var(--ba-ontrack-bd)' : 'var(--border-subtle)'}`,
           }}>
@@ -619,7 +619,7 @@ function LinkedIncentives({ brandId, month, goal }) {
             <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{l.display_name}</span>
             <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
               color: 'var(--text-muted)', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)',
-              borderRadius: 6, padding: '2px 7px' }}>
+              borderRadius: 'var(--radius-sm)', padding: '2px 7px' }}>
               {ROLE_LABEL[l.role] || l.role}
             </span>
             {l.paid && (
@@ -654,13 +654,13 @@ function MetricCard({ metric, target, achieved, unlimited = false }) {
   return (
     <div className="wx-card" style={{ padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center',
+        <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'grid', placeItems: 'center',
           background: `${metric.tint}1f`, color: metric.tint }}>
           <i className={`bi ${metric.icon}`} style={{ fontSize: '1rem' }} />
         </div>
         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{metric.label}</div>
         {unlimited ? (
-          <div style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+          <div style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 'var(--radius-pill)',
             color: 'var(--success)',
             background: 'color-mix(in srgb, var(--success) 12%, transparent)',
             border: '1px solid color-mix(in srgb, var(--success) 32%, transparent)' }}>
@@ -675,8 +675,8 @@ function MetricCard({ metric, target, achieved, unlimited = false }) {
       </div>
 
       {!unlimited && (
-        <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct == null ? 0 : Math.min(pct, 100)}%`, background: barColor, borderRadius: 999, transition: 'width .3s' }} />
+        <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct == null ? 0 : Math.min(pct, 100)}%`, background: barColor, borderRadius: 'var(--radius-pill)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
       )}
 
@@ -750,10 +750,10 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
-      <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
+      <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-xl)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {brand && <BrandAvatar brand={brand} size={34} radius={8} />}
+          {brand && <BrandAvatar brand={brand} size={34} radius={6} />}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{brand?.brand_name} goals</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{prettyMonth(month)}</div>
@@ -778,7 +778,7 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
                   <i className={`bi ${m.icon}`} style={{ color: m.tint }} />
                   <span style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>{m.label}</span>
                   {isSamples && (
-                    <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2, padding: 2, borderRadius: 999,
+                    <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2, padding: 2, borderRadius: 'var(--radius-pill)',
                       background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                       {[{ v: false, l: 'Fixed goal' }, { v: true, l: 'Unlimited' }].map((o) => {
                         const active = unlimitedSamples === o.v;
@@ -786,7 +786,7 @@ function EditModal({ brand, month, data, metrics = METRICS, canEditActuals = tru
                           <button key={String(o.v)} type="button" disabled={saving}
                             onClick={() => setUnlimitedSamples(o.v)}
                             style={{
-                              border: 0, borderRadius: 999, padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
+                              border: 0, borderRadius: 'var(--radius-pill)', padding: '3px 11px', fontSize: 11.5, fontWeight: 700,
                               whiteSpace: 'nowrap', cursor: saving ? 'not-allowed' : 'pointer',
                               background: active ? 'var(--surface-1)' : 'transparent',
                               color: active ? 'var(--text-primary)' : 'var(--text-muted)',

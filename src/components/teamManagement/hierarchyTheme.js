@@ -1,26 +1,54 @@
 // Shared color theme + helpers for the Team Hierarchy page.
-// Mirrors v1's src/components/teamManagement/hierarchyTheme.js verbatim.
+// Ported from v1's hierarchyTheme.js; colours moved onto theme tokens.
 
+// Role palette on the shared chart slots (they theme for light/dark).
+// solid = fill, on = text on that fill, light = tinted panel, text = readable
+// role-coloured text on surfaces. --chart-3 (amber) is avoided for fills.
+const tone = (n) => ({
+  solid: `var(--chart-${n})`,
+  on: 'var(--text-inverse)',
+  light: `color-mix(in srgb, var(--chart-${n}) 10%, var(--surface-1))`,
+  text: `color-mix(in srgb, var(--chart-${n}) 80%, var(--text-primary))`,
+});
 export const ROLE_COLORS = {
-  boss: { solid: '#0f172a', light: '#f1f5f9', text: '#0f172a' },
-  ol:   { solid: '#7c3aed', light: '#f5f3ff', text: '#5b21b6' },
-  tl:   { solid: '#16a34a', light: '#f0fdf4', text: '#166534' },
-  pctl: { solid: '#0891b2', light: '#ecfeff', text: '#155e75' },
-  apc:  { solid: '#3b82f6', light: '#eff6ff', text: '#1d4ed8' },
-  ipc:  { solid: '#ec4899', light: '#fdf2f8', text: '#9d174d' },
+  boss: tone(8),
+  ol:   tone(4),
+  tl:   tone(7),
+  pctl: tone(2),
+  apc:  tone(6),
+  ipc:  tone(5),
+  // Engineering — a separate branch from the TL/PCTL brand pods, so it gets
+  // its own colour rather than borrowing one that implies a brand-owning team.
+  developer: tone(1),
 };
+
+// Translucent version of any colour token (replaces hex-alpha suffixes).
+export const alpha = (color, pct) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
 export function roleLabel(role) {
   return {
     boss: 'BOSS', ol: 'OL', tl: 'TEAM LEAD', pctl: 'PAID COLLAB TL',
-    apc: 'APC', ipc: 'IPC', ads_manager: 'ADS MANAGER',
+    apc: 'APC', ipc: 'IPC', ads_manager: 'ADS MANAGER', developer: 'DEVELOPER',
   }[role] || (role || '').toUpperCase();
 }
 
 export function roleShortLabel(role) {
   return {
-    boss: 'BOSS', ol: 'OL', tl: 'TL', pctl: 'PCTL', apc: 'APC', ipc: 'IPC', ads_manager: 'ADS MGR',
+    boss: 'BOSS', ol: 'OL', tl: 'TL', pctl: 'PCTL', apc: 'APC', ipc: 'IPC',
+    ads_manager: 'ADS MGR', developer: 'DEV',
   }[role] || (role || '').toUpperCase();
+}
+
+// Header label + member-section label per team-lead role. Brands are a
+// TL/PCTL concept only — a developer team never owns one, so callers that
+// render a brands section should skip it entirely when hasBrands is false,
+// rather than showing it permanently empty.
+const TEAM_KIND = {
+  pctl:      { headerLabel: 'PAID COLLAB TL', memberLabel: 'IPCs',       memberShortLabel: 'IPC',       hasBrands: true },
+  developer: { headerLabel: 'TEAM LEAD',      memberLabel: 'Developers', memberShortLabel: 'Developer', hasBrands: false },
+};
+export function teamKindOf(role) {
+  return TEAM_KIND[role] || { headerLabel: 'TEAM LEAD', memberLabel: 'APCs', memberShortLabel: 'APC', hasBrands: true };
 }
 
 export function initialsOf(s) {

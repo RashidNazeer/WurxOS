@@ -2,7 +2,7 @@ import {
   HomeIcon, UsersIcon, ShieldIcon, StoreIcon, ChecklistIcon, SettingsIcon, BellIcon, ReportIcon,
   MegaphoneIcon, ClockIcon, BookmarkIcon, StarIcon, RefreshIcon, DiagramIcon,
   BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon, PlayIcon,
-  TrophyIcon,
+  TrophyIcon, ChartIcon, TargetIcon, GridIcon, FolderIcon, VideoIcon, LinkIcon, MailIcon, ArrowUpIcon,
 } from '../common/Icon';
 import BuddyIcon from '../buddy/BuddyIcon';
 import { BUDDY_ROLES } from '../../lib/buddyLogic';
@@ -24,17 +24,17 @@ import { BUDDY_ROLES } from '../../lib/buddyLogic';
 
 // --- Reusable single items -----------------------------------------
 const TASKS_ITEM        = { label: 'Tasks',         icon: ChecklistIcon, to: '/tasks',         category: 'task' };
-const BRAND_ANALYTICS   = { label: 'Brand analytics', icon: ReportIcon, to: '/analytics/brands' };
+const BRAND_ANALYTICS   = { label: 'Brand Analytics', icon: ChartIcon, to: '/analytics/brands' };
 const EUKA_ANALYTICS_ITEM = { label: 'Euka Analytics', icon: StoreIcon,  to: '/euka' };
-const HALO_ITEM           = { label: 'Amazon Halo',    icon: DiagramIcon, to: '/halo' };
-const VIDEO_REVIEWS_ITEM  = { label: 'Video Reviews', icon: PlayIcon, to: '/video-reviews' };
+const HALO_ITEM           = { label: 'Amazon Halo',    icon: ArrowUpIcon, to: '/halo' };
+const VIDEO_REVIEWS_ITEM  = { label: 'Video Reviews', icon: VideoIcon, to: '/video-reviews' };
 const BRAND_SWITCHES    = { label: 'Brand Switcher',  icon: RefreshIcon,  to: '/brand-switcher', category: 'brand' };
-const AUDIT_LOG         = { label: 'Audit log',       icon: ShieldIcon, to: '/audit' };
+const AUDIT_LOG         = { label: 'Audit Log',       icon: ShieldIcon, to: '/audit' };
 const BRANDS_ITEM       = { label: 'Brands',        icon: StoreIcon,     to: '/brands',        category: 'brand' };
 const PRODUCT_CAMPAIGNS = { label: 'Product Campaigns', icon: MegaphoneIcon, to: '/product-campaigns', category: 'product_campaign' };
 const CAMPAIGNS         = { label: 'Campaigns', icon: MegaphoneIcon, to: '/campaigns', category: 'campaign' };
 const MY_BRANDS         = { label: 'My Brands',     icon: StoreIcon,     to: '/brands',        category: 'brand' };
-const CLIENT_ACCESS_ITEM  = { label: 'Client Access', icon: ShieldIcon, to: '/client-access' };
+const CLIENT_ACCESS_ITEM  = { label: 'Client Access', icon: LinkIcon, to: '/client-access' };
 const TEAM_MGMT_ITEM      = { label: 'Team Management', icon: UsersIcon, to: '/team-management' };
 const TEAM_HIERARCHY_ITEM = { label: 'Team Hierarchy', icon: DiagramIcon, to: '/team-hierarchy' };
 const NOTIFS_ITEM   = { label: 'Notifications', icon: BellIcon,      to: '/notifications' };
@@ -49,13 +49,13 @@ const PERFORMANCE_ITEM = { label: 'Performance', icon: StarIcon, to: '/performan
 // incentives, so it sits with the people who already manage pay. The route
 // carries the same RoleGuard — the menu is convenience, not the boundary.
 const ACHIEVEMENTS_ITEM = { label: 'Achievements', icon: TrophyIcon, to: '/achievements' };
-const INCENTIVES_ITEM = { label: 'Incentives',  icon: ReportIcon, to: '/incentives' };
+const INCENTIVES_ITEM = { label: 'Incentives',  icon: TargetIcon, to: '/incentives' };
 // `alert:true` — when this category has unread notifications the sidebar item
 // doesn't just show a dot, it inverts + blinks (IPCs nudge TL/OLs to review;
 // this is time-critical, so it must be impossible to miss). Cleared when the
 // user opens the page (CreatorLibraryPage marks the category read).
 const CREATOR_LIBRARY_ITEM = { label: 'Creator Library', icon: UsersIcon, to: '/creator-library', category: 'creator_library', alert: true };
-const CHAT_ITEM       = { label: 'Chat',        icon: UsersIcon, to: '/chat' };
+const CHAT_ITEM       = { label: 'Chat',        icon: MessageIcon, to: '/chat' };
 const KNOWLEDGE_ITEM  = { label: 'Knowledge Base', icon: BookmarkIcon, to: '/kb', category: 'knowledge_base' };
 const REMINDERS_ITEM  = { label: 'Reminders', icon: BellIcon, to: '/reminders', category: 'reminder' };
 const BROADCASTS_ITEM = { label: 'Broadcasts', icon: MegaphoneIcon, to: '/broadcasts' };
@@ -81,36 +81,11 @@ const REPORTS_GROUP = {
 // having both "My Leave" and "Leave Approvals" in the menu was a
 // duplicate that caused user confusion (and showed the older buggy
 // implementation if the user clicked the wrong one).
-const REQUESTS_GROUP_BOSS = {
+// One group for every role (the four per-role copies were identical; the
+// label, and so the saved-layout key group:Requests, is unchanged).
+const REQUESTS_GROUP = {
   label: 'Requests',
-  icon: MessageIcon,
-  children: [
-    { label: 'Leave Requests', to: '/leave' },
-    { label: 'Bug Reports',    to: '/bugs' },
-    { label: 'Suggestions',    to: '/suggestions' },
-  ],
-};
-const REQUESTS_GROUP_OL = {
-  label: 'Requests',
-  icon: MessageIcon,
-  children: [
-    { label: 'Leave',       to: '/leave' },
-    { label: 'Bug Reports', to: '/bugs' },
-    { label: 'Suggestions', to: '/suggestions' },
-  ],
-};
-const REQUESTS_GROUP_APPROVER = {
-  label: 'Requests',
-  icon: MessageIcon,
-  children: [
-    { label: 'Leave',       to: '/leave' },
-    { label: 'Bug Reports', to: '/bugs' },
-    { label: 'Suggestions', to: '/suggestions' },
-  ],
-};
-const REQUESTS_GROUP_APPLIER = {
-  label: 'Requests',
-  icon: MessageIcon,
+  icon: MailIcon,
   children: [
     { label: 'Leave',       to: '/leave' },
     { label: 'Bug Reports', to: '/bugs' },
@@ -119,16 +94,21 @@ const REQUESTS_GROUP_APPLIER = {
 };
 
 // --- Paid Collab group ---------------------------------------------
-const PAID_COLLAB_BOSS_OL = {
+const PAID_COLLAB_OL = {
   label: 'Paid Collab',
   icon: MegaphoneIcon,
   category: 'paid_collab',
   children: [
-    { label: 'Brands',   to: '/paid-collab/brands' },
+    { label: 'Collab Brands', to: '/paid-collab/brands' },
     { label: 'Creators', to: '/paid-collab/creators' },
     { label: 'Videos',   to: '/paid-collab/videos' },
     { label: 'IPCs',     to: '/pctl/ipcs' },
   ],
+};
+// Boss reaches IPCs through Employees, so no second IPCs entry here.
+const PAID_COLLAB_BOSS = {
+  ...PAID_COLLAB_OL,
+  children: PAID_COLLAB_OL.children.filter((c) => c.to !== '/pctl/ipcs'),
 };
 
 const PAID_COLLAB_PCTL = {
@@ -137,7 +117,7 @@ const PAID_COLLAB_PCTL = {
   category: 'paid_collab',
   children: [
     { label: 'Dashboard', to: '/paid-collab/dashboard' },
-    { label: 'Brands',    to: '/paid-collab/brands' },
+    { label: 'Collab Brands', to: '/paid-collab/brands' },
     { label: 'Creators',  to: '/paid-collab/creators' },
     { label: 'Videos',    to: '/paid-collab/videos' },
     { label: 'IPCs',      to: '/pctl/ipcs' },
@@ -150,8 +130,8 @@ const EMPLOYEES_GROUP = {
   label: 'Employees',
   icon: UsersIcon,
   children: [
-    { label: 'Affiliate TLs',   to: '/boss/manage/tls' },
-    { label: 'Paid Collab TLs', to: '/boss/manage/pctls' },
+    { label: 'Team Leads',   to: '/boss/manage/tls' },
+    { label: 'Paid Collab Team Leads', to: '/boss/manage/pctls' },
     { label: 'Operation Leads', to: '/boss/manage/ols' },
     { label: 'APCs',            to: '/boss/manage/apcs' },
     { label: 'IPCs',            to: '/boss/manage/ipcs' },
@@ -173,9 +153,9 @@ const AGENDA_GROUP_FULL = {
     { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
     { label: 'Prior Meetings',    to: '/agenda/prior' },
     { label: 'Weekly Checkpoint', to: '/agenda/checkpoint' },
-    { label: 'Tasks',             to: '/agenda/tasks' },
-    { label: 'Resources',         to: '/agenda/resources' },
-    { label: 'Settings',          to: '/agenda/settings' },
+    { label: 'Agenda Tasks',      to: '/agenda/tasks' },
+    { label: 'Meeting Resources', to: '/agenda/resources' },
+    { label: 'Agenda Settings',   to: '/agenda/settings' },
   ],
 };
 const AGENDA_GROUP_BASIC = {
@@ -187,8 +167,8 @@ const AGENDA_GROUP_BASIC = {
     { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
     { label: 'Prior Meetings',    to: '/agenda/prior' },
     { label: 'Weekly Checkpoint', to: '/agenda/checkpoint' },
-    { label: 'Tasks',             to: '/agenda/tasks' },
-    { label: 'Resources',         to: '/agenda/resources' },
+    { label: 'Agenda Tasks',      to: '/agenda/tasks' },
+    { label: 'Meeting Resources', to: '/agenda/resources' },
   ],
 };
 // Ads Managers attend meetings as a guest team (Paid Media) — they don't
@@ -202,8 +182,8 @@ const AGENDA_GROUP_GUEST = {
     { label: 'Upcoming Meetings', to: '/agenda/upcoming' },
     { label: 'Ongoing Meetings',  to: '/agenda/ongoing' },
     { label: 'Prior Meetings',    to: '/agenda/prior' },
-    { label: 'Tasks',             to: '/agenda/tasks' },
-    { label: 'Resources',         to: '/agenda/resources' },
+    { label: 'Agenda Tasks',      to: '/agenda/tasks' },
+    { label: 'Meeting Resources', to: '/agenda/resources' },
   ],
 };
 
@@ -224,15 +204,15 @@ const BUDDY_ITEM = { label: 'Wurx Buddy', icon: BuddyIcon, to: '/buddy' };
 // `prefix` keeps a child highlighted on deeper pages (/development/projects/wurxos).
 const DEVELOPMENT_GROUP = {
   label: 'Development',
-  icon: DiagramIcon,
+  icon: FolderIcon,
   category: 'development',
   dot: true,
   children: [
     { label: 'Roadmap',   to: '/development/roadmap',  prefix: true },
     { label: 'Overview',  to: '/development/overview' },
     { label: 'Projects',  to: '/development/projects', prefix: true },
-    { label: 'All tasks', to: '/development/tasks' },
-    { label: 'Bugs',      to: '/development/bugs' },
+    { label: 'All Tasks', to: '/development/tasks' },
+    { label: 'Dev Bugs',  to: '/development/bugs' },
     { label: 'Team',      to: '/development/team' },
     { label: 'Activity',  to: '/development/activity' },
   ],
@@ -254,7 +234,7 @@ export const MENUS = {
     TASKS_ITEM,
     RESOURCES_ITEM,
     AGENDA_GROUP_FULL,
-    { label: 'Resource Planner', icon: DiagramIcon, to: '/boss/resource-planner' },
+    { label: 'Resource Planner', icon: GridIcon, to: '/boss/resource-planner' },
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
     HOLIDAYS_ITEM,
@@ -268,9 +248,9 @@ export const MENUS = {
     TEAM_MGMT_ITEM,
     TEAM_HIERARCHY_ITEM,
     AUDIT_LOG,
-    PAID_COLLAB_BOSS_OL,
+    PAID_COLLAB_BOSS,
     REPORTS_GROUP,
-    REQUESTS_GROUP_BOSS,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     NOTIFS_ITEM,
     SETTINGS_ITEM,
@@ -299,9 +279,9 @@ export const MENUS = {
     TEAM_MGMT_ITEM,
     TEAM_HIERARCHY_ITEM,
     AUDIT_LOG,
-    PAID_COLLAB_BOSS_OL,
+    PAID_COLLAB_OL,
     REPORTS_GROUP,
-    REQUESTS_GROUP_OL,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
@@ -313,7 +293,7 @@ export const MENUS = {
     BRAND_ANALYTICS,
     CREATOR_LIBRARY_ITEM,
     HALO_ITEM,
-    { label: 'My team', icon: UsersIcon, to: '/tl/team' },
+    { label: 'My Team', icon: UsersIcon, to: '/tl/team' },
     CAMPAIGNS,
     PRODUCT_CAMPAIGNS,
     TASKS_ITEM,
@@ -327,7 +307,7 @@ export const MENUS = {
     KNOWLEDGE_ITEM,
     CHANGES_ITEM,
     REPORTS_GROUP,
-    REQUESTS_GROUP_APPROVER,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
@@ -346,7 +326,7 @@ export const MENUS = {
     AGENDA_GROUP_BASIC,
     PAID_COLLAB_PCTL,
     REPORTS_GROUP,
-    REQUESTS_GROUP_APPROVER,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
@@ -369,7 +349,7 @@ export const MENUS = {
     KNOWLEDGE_ITEM,
     CHANGES_ITEM,
     REPORTS_GROUP,
-    REQUESTS_GROUP_APPLIER,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
@@ -387,7 +367,7 @@ export const MENUS = {
     KNOWLEDGE_ITEM,
     CHANGES_ITEM,
     AGENDA_GROUP_BASIC,
-    REQUESTS_GROUP_APPLIER,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
@@ -408,7 +388,7 @@ export const MENUS = {
     INCENTIVES_ITEM,
     ATTENDANCE_ITEM,
     KNOWLEDGE_ITEM,
-    REQUESTS_GROUP_APPLIER,
+    REQUESTS_GROUP,
     CHAT_ITEM,
     MY_COMPENSATION_ITEM,
     NOTIFS_ITEM,
@@ -435,8 +415,8 @@ export const MENUS = {
 export function getMenuForRole(role, opts = {}) {
   const base = MENUS[role] || MENUS.apc;
   const out = [...base];
-  // Wurx Buddy: opts.buddy is BuddyProvider's gate (ai_assistant_config.allowed_roles,
-  // the list the assistant function enforces); BUDDY_ROLES (boss) when not given.
+  // Wurx Buddy: opts.buddy is BuddyProvider's gate (the Boss and developers
+  // always, plus ai_assistant_config.allowed_roles); BUDDY_ROLES when not given.
   if (opts.buddy ?? BUDDY_ROLES.includes(role)) {
     const i = out.indexOf(CHAT_ITEM);
     const j = out.indexOf(NOTIFS_ITEM);

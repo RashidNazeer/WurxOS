@@ -20,6 +20,7 @@ import BrandReportLinks, { EmbeddedLinks, useBrandReportLinks } from './BrandRep
 import { useAuth } from '../../contexts/AuthContext';
 import BrandSectionsPanel from '../portal/BrandSectionsPanel';
 import { exportReportToPdf } from '../../utils/exportReportPdf';
+import { useDialogs } from '../common/useDialogs';
 
 /* ─── Editorial palette ───────────────────────────────────────────────────
  *   Same theme-aware structure as WeeklyReportView. Hero stays as a
@@ -32,7 +33,7 @@ const C = {
   line:       'var(--border-subtle)',
   surface:    'var(--surface-1)',
   surfaceAlt: 'var(--surface-2)',
-  hero:       '#1f1208',
+  hero:       'var(--spotlight-bg)',
   amber:      'var(--warning)',
   amberSoft:  'var(--warning-soft)',
   amberLine:  'color-mix(in srgb, var(--warning) 50%, transparent)',
@@ -106,8 +107,8 @@ function avatarColor(name) {
   let h = 0;
   const s = String(name || '');
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  const hue = Math.abs(h) % 360;
-  return `hsl(${hue}, 55%, 48%)`;
+  // Chart palette slots (theme-aware, text-inverse readable); amber slot 3 skipped.
+  return `var(--chart-${[1, 2, 4, 5, 6, 7, 8][Math.abs(h) % 7]})`;
 }
 function posterGradient(seed) {
   const palette = [
@@ -143,7 +144,7 @@ function DeltaPill({ pct, size = 'sm' }) {
         fontSize, fontWeight: 600,
         color: up ? C.green : C.red,
         background: up ? C.greenSoft : C.redSoft,
-        padding: '2px 8px', borderRadius: 999, lineHeight: 1.2,
+        padding: '2px 8px', borderRadius: 'var(--radius-pill)', lineHeight: 1.2,
       }}>
       {up ? '▲' : '▼'} {formatPctChange(pct, { withSign: false })}
     </span>
@@ -168,18 +169,18 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
   const pct = hasPrev ? pctChange(current !== undefined ? current : value, prevValue) : null;
 
   const baseStyle = {
-    borderRadius: 14,
+    borderRadius: 'var(--radius-lg)',
     padding: '18px 18px 16px',
     height: '100%',
     border: `1px solid ${C.line}`,
     background: primary ? C.hero : C.surface,
-    color: primary ? '#f5f5f4' : C.ink,
-    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+    color: primary ? 'var(--spotlight-fg)' : C.ink,
+    boxShadow: 'var(--shadow-sm)',
   };
   const labelStyle = {
     fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: primary ? '#a8a29e' : C.muted,
+    color: primary ? 'var(--spotlight-fg-muted)' : C.muted,
   };
 
   return (
@@ -192,7 +193,7 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
       {prevValue !== undefined && prevValue !== null && (
         <div style={{
           fontSize: '0.74rem', marginTop: 6,
-          color: primary ? '#a8a29e' : C.inkDim,
+          color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim,
         }}>
           Prev month <span style={{ fontWeight: 500 }}>{typeof prevValue === 'string' ? prevValue : ''}</span>
         </div>
@@ -200,13 +201,13 @@ function StatCard({ label, value, prevValue, current, color = C.amber, sparkData
       {pct !== null && (
         <div className="mt-2">
           <DeltaPill pct={pct} />
-          <span style={{ fontSize: '0.66rem', color: primary ? '#a8a29e' : C.inkDim, marginLeft: 6 }}>
+          <span style={{ fontSize: '0.66rem', color: primary ? 'var(--spotlight-fg-muted)' : C.inkDim, marginLeft: 6 }}>
             {pct >= 0 ? '+' : ''}{(num(current) - num(prevValue)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </span>
         </div>
       )}
       {subText && (
-        <div style={{ fontSize: '0.66rem', color: primary ? '#a8a29e' : C.muted, marginTop: 6 }}>{subText}</div>
+        <div style={{ fontSize: '0.66rem', color: primary ? 'var(--spotlight-fg-muted)' : C.muted, marginTop: 6 }}>{subText}</div>
       )}
       {sparkData && sparkData.length > 1 && (
         <Sparkline data={sparkData} color={primary ? C.amber : color} />
@@ -235,14 +236,14 @@ function ContentSection({ icon, color = C.amber, title, eyebrow, children }) {
     <div className="mt-3" style={{
       background: C.surface,
       border: `1px solid ${C.line}`,
-      borderRadius: 14,
+      borderRadius: 'var(--radius-lg)',
       padding: '20px 22px',
       position: 'relative',
       overflow: 'hidden',
     }}>
       <div className="d-flex align-items-center gap-3 mb-3">
         <div style={{
-          width: 38, height: 38, borderRadius: 10,
+          width: 38, height: 38, borderRadius: 'var(--radius-md)',
           background: color + '15', color,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
@@ -266,14 +267,14 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
   return (
     <div className="d-flex align-items-center gap-3 px-3 py-3" style={{ borderTop: `1px solid ${C.line}` }}>
       <div style={{
-        width: 22, height: 22, borderRadius: 5,
-        background: rank === 1 ? '#fef3c7' : rank === 2 ? '#e2e8f0' : rank === 3 ? '#fde68a' : '#f1f5f9',
-        color: '#1f2937', fontSize: '0.72rem', fontWeight: 700,
+        width: 22, height: 22, borderRadius: 'var(--radius-sm)',
+        background: rank === 1 ? 'color-mix(in srgb, var(--warning) 35%, var(--surface-1))' : rank === 2 ? 'var(--surface-3)' : rank === 3 ? 'color-mix(in srgb, var(--warning) 18%, var(--surface-1))' : 'var(--surface-2)',
+        color: C.ink, fontSize: '0.72rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{rank}</div>
       <div style={{
         width: 32, height: 32, borderRadius: '50%',
-        background: avatarColor(handle), color: '#fff',
+        background: avatarColor(handle), color: 'var(--text-inverse)',
         fontSize: '0.7rem', fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>{initials(handle)}</div>
@@ -282,8 +283,8 @@ function CreatorRow({ creator, rank, totalGmv, currency = DEFAULT_CURRENCY }) {
         <div style={{ fontSize: '0.7rem', color: C.muted }}>Share of top-creator GMV {sharePct.toFixed(1)}%</div>
       </div>
       <div style={{ width: 140 }}>
-        <div style={{ height: 6, background: C.line, borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${Math.min(100, sharePct)}%`, background: C.amber, borderRadius: 999 }} />
+        <div style={{ height: 6, background: C.line, borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${Math.min(100, sharePct)}%`, background: C.amber, borderRadius: 'var(--radius-pill)' }} />
         </div>
       </div>
       <div style={{ width: 90, textAlign: 'center', fontSize: '0.86rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt$short(gmv, currency)}</div>
@@ -321,10 +322,10 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
       rel={linkOk ? 'noopener noreferrer' : undefined}
       style={{
         display: 'block', textDecoration: 'none', color: 'inherit',
-        borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.line}`,
-        background: C.surface, transition: 'transform 120ms ease, box-shadow 120ms ease',
+        borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: `1px solid ${C.line}`,
+        background: C.surface, transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
       }}
-      onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(15,23,42,0.10)'; } }}
+      onMouseEnter={e => { if (linkOk) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; } }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
       title={linkOk ? 'Open TikTok video' : undefined}>
       <div style={{
@@ -336,7 +337,7 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
           position: 'absolute', top: 10, right: 10,
           // Pill is fixed-white in both themes (video thumbnail
           // background), so the rank text stays dark in both themes.
-          background: 'rgba(255,255,255,0.92)', color: '#0f172a', borderRadius: 4,
+          background: 'color-mix(in srgb, var(--surface-1) 92%, transparent)', color: 'var(--text-primary)', borderRadius: 'var(--radius-xs)',
           fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', minWidth: 22, textAlign: 'center',
         }}>{rank}</div>
         <div style={{
@@ -354,9 +355,9 @@ function VideoPosterCard({ video, rank, currency = DEFAULT_CURRENCY }) {
             position: 'absolute', right: 10, bottom: 10,
             width: 30, height: 30, borderRadius: '50%',
             // Fixed-white play icon button — text stays dark in both themes.
-            background: 'rgba(255,255,255,0.95)', color: '#0f172a',
+            background: 'color-mix(in srgb, var(--surface-1) 95%, transparent)', color: 'var(--text-primary)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--shadow-md)',
           }}>
             <i className="bi bi-play-fill" style={{ fontSize: '0.95rem', marginLeft: 1 }} />
           </div>
@@ -380,7 +381,7 @@ function ProductRow({ product, rank, gmvShare, currency = DEFAULT_CURRENCY, goal
     <div className="d-flex align-items-center gap-3 px-3 py-3"
       style={{ borderTop: rank === 1 ? 'none' : `1px solid ${C.line}` }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 6,
+        width: 44, height: 44, borderRadius: 'var(--radius-sm)',
         background: C.surfaceAlt, border: `1px solid ${C.line}`,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         color: C.muted,
@@ -425,7 +426,7 @@ function DonutChart({ slices, total, currencySym = '$', size = 180, thickness = 
   return (
     <div className="d-flex align-items-center gap-3 flex-wrap" style={{ minHeight: size }}>
       <svg width={size} height={size} style={{ display: 'block', flexShrink: 0 }}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--chart-track)" strokeWidth={thickness} />
         {filtered.map((s, i) => {
           const v = Number(s.value);
           const pct = v / total;
@@ -456,7 +457,7 @@ function DonutChart({ slices, total, currencySym = '$', size = 180, thickness = 
           const pct = (v / total) * 100;
           return (
             <div key={i} className="d-flex align-items-center gap-2 mb-2">
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+              <span style={{ width: 10, height: 10, borderRadius: 'var(--radius-xs)', background: s.color, flexShrink: 0 }} />
               <span style={{ fontSize: '0.78rem', color: C.ink, flex: 1 }}>{s.label}</span>
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>
                 {currencySym}{v.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -482,22 +483,22 @@ function ComparisonRow({ label, current, previous, fmt }) {
   const max = Math.max(num(current), num(previous), 0.0001);
   const pct = pctChange(current, previous);
   return (
-    <div className="d-flex flex-column gap-1" style={{ background: C.surfaceAlt, padding: '14px 16px', borderRadius: 10 }}>
+    <div className="d-flex flex-column gap-1" style={{ background: C.surfaceAlt, padding: '14px 16px', borderRadius: 'var(--radius-md)' }}>
       <div className="d-flex align-items-center justify-content-between" style={{ fontSize: '0.7rem', fontWeight: 600, color: C.inkDim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         <span>{label}</span>
         <DeltaPill pct={pct} />
       </div>
       <div className="d-flex align-items-center gap-2 mt-1">
         <span style={{ width: 70, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>This mo</span>
-        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(num(current) / max) * 100}%`, background: C.amber, transition: 'width 320ms ease' }} />
+        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${(num(current) / max) * 100}%`, background: C.amber, transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
         <span style={{ minWidth: 88, textAlign: 'right', fontSize: '0.78rem', fontWeight: 700, color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{fmt(current)}</span>
       </div>
       <div className="d-flex align-items-center gap-2">
         <span style={{ width: 70, fontSize: '0.64rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last mo</span>
-        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width 320ms ease' }} />
+        <div style={{ flex: 1, height: 16, background: C.line, borderRadius: 'var(--radius-xs)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${(num(previous) / max) * 100}%`, background: 'var(--border-default)', transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
         <span style={{ minWidth: 88, textAlign: 'right', fontSize: '0.78rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmt(previous)}</span>
       </div>
@@ -562,16 +563,16 @@ function TrendTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{
-      background: 'var(--surface-1)', border: `1px solid ${C.line}`, borderRadius: 10,
-      padding: '8px 12px', boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
+      background: 'var(--chart-tooltip-bg)', color: 'var(--chart-tooltip-fg)', border: `1px solid ${C.line}`, borderRadius: 'var(--radius-md)',
+      padding: '8px 12px', boxShadow: 'var(--shadow-md)',
       fontSize: '0.74rem',
     }}>
-      <div style={{ fontWeight: 700, color: C.ink, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
       {payload.map(p => (
-        <div key={p.dataKey} className="d-flex align-items-center gap-2" style={{ color: C.inkDim }}>
-          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: p.color }} />
+        <div key={p.dataKey} className="d-flex align-items-center gap-2" style={{ color: 'color-mix(in srgb, var(--chart-tooltip-fg) 75%, transparent)' }}>
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 'var(--radius-xs)', background: p.color }} />
           <span style={{ flex: 1 }}>{p.name}</span>
-          <strong style={{ color: C.ink, fontVariantNumeric: 'tabular-nums' }}>{p.value}</strong>
+          <strong style={{ color: 'var(--chart-tooltip-fg)', fontVariantNumeric: 'tabular-nums' }}>{p.value}</strong>
         </div>
       ))}
     </div>
@@ -591,12 +592,12 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
       color={C.amber}
       title="Trends over time"
       eyebrow={eyebrow}>
-      <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: '14px 14px 8px' }}>
+      <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-md)', padding: '14px 14px 8px' }}>
         <div className="d-flex align-items-center justify-content-between mb-2">
           <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.muted }}>GMV & Orders</div>
           <div className="d-flex gap-3" style={{ fontSize: '0.7rem', color: C.inkDim }}>
-            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.amber, borderRadius: 2 }} />GMV</span>
-            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.green, borderRadius: 2 }} />Orders</span>
+            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.amber, borderRadius: 'var(--radius-xs)' }} />GMV</span>
+            <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 10, height: 10, background: C.green, borderRadius: 'var(--radius-xs)' }} />Orders</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={220}>
@@ -607,10 +608,10 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
                 <stop offset="100%" stopColor={C.amber} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="2 4" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
-            <YAxis yAxisId="gmv" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
-            <YAxis yAxisId="orders" orientation="right" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
+            <CartesianGrid strokeDasharray="2 4" stroke="var(--chart-grid)" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
+            <YAxis yAxisId="gmv" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
+            <YAxis yAxisId="orders" orientation="right" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} />
             <Tooltip content={<TrendTooltip />} cursor={{ stroke: C.amber, strokeOpacity: 0.25 }} />
             <Area yAxisId="gmv" type="monotone" dataKey="gmv" stroke={C.amber} strokeWidth={2}
               fill="url(#monthGmvFill)" name="GMV" isAnimationActive={false} dot={{ r: 2.5, fill: C.amber }} />
@@ -621,7 +622,7 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
       </div>
       <div className="row g-3 mt-1">
         <div className="col-12 col-md-6">
-          <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: '14px' }}>
+          <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-md)', padding: '14px' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.muted }}>Affiliate GMV</div>
               <div style={{ fontSize: '0.7rem', color: C.inkDim }}>Per month</div>
@@ -634,9 +635,9 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
                     <stop offset="100%" stopColor={C.green} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="2 4" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} tickFormatter={moneyFmt} />
                 <Tooltip content={<TrendTooltip />} cursor={{ stroke: C.green, strokeOpacity: 0.25 }} />
                 <Area type="monotone" dataKey="affiliateGmv" stroke={C.green} strokeWidth={2}
                   fill="url(#monthAffFill)" name="Affiliate GMV" isAnimationActive={false} dot={{ r: 2.5, fill: C.green }} />
@@ -645,18 +646,18 @@ function TrendsPanel({ trendData, currency = DEFAULT_CURRENCY }) {
           </div>
         </div>
         <div className="col-12 col-md-6">
-          <div style={{ background: C.surfaceAlt, borderRadius: 12, padding: '14px' }}>
+          <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-md)', padding: '14px' }}>
             <div className="d-flex align-items-center justify-content-between mb-2">
               <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: C.muted }}>New videos posted</div>
               <div style={{ fontSize: '0.7rem', color: C.inkDim }}>Per month</div>
             </div>
             <ResponsiveContainer width="100%" height={150}>
               <BarChart data={trendData} margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="2 4" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
-                <Tooltip content={<TrendTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                <Bar dataKey="newVideos" fill="#f97316" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--chart-axis)' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<TrendTooltip />} cursor={{ fill: 'var(--chart-track)' }} />
+                <Bar dataKey="newVideos" fill="var(--warning)" radius={[6, 6, 0, 0]} name="Videos" isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -709,8 +710,8 @@ function MetricTile({ label, value, prevValue, formatter, accent = C.amber, subT
   return (
     <div style={{
       background: C.surface, border: `1px solid ${C.line}`,
-      borderRadius: 12, padding: '14px 14px 12px',
-      boxShadow: '0 1px 3px rgba(15,23,42,0.04)', height: '100%',
+      borderRadius: 'var(--radius-md)', padding: '14px 14px 12px',
+      boxShadow: 'var(--shadow-sm)', height: '100%',
     }}>
       <div style={{
         fontSize: '0.6rem', fontWeight: 700, color: C.muted,
@@ -731,7 +732,7 @@ function MetricTile({ label, value, prevValue, formatter, accent = C.amber, subT
       {subText && (
         <div style={{ fontSize: '0.66rem', color: C.muted, marginTop: 4 }}>{subText}</div>
       )}
-      <div style={{ height: 2, background: accent, borderRadius: 999, marginTop: 10, opacity: 0.65 }} />
+      <div style={{ height: 2, background: accent, borderRadius: 'var(--radius-pill)', marginTop: 10, opacity: 0.65 }} />
     </div>
   );
 }
@@ -768,6 +769,8 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
     { label: 'CPO', value: m(row.cpo) },
   ];
   const spend = num(row.spend), gmv = num(row.gmv);
+  // Both bar segments stay visible (15–85%): when ROI < 1 the old 100% `in`
+  // segment left the `returned` label with zero width.
   const ratio = spend > 0 && gmv > 0 ? Math.min(1, spend / gmv) : 0;
   return (
     <div className={isFirst ? '' : 'mt-3 pt-3'} style={{ borderTop: isFirst ? 'none' : `1px solid ${C.line}` }}>
@@ -777,7 +780,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
       <div className="row g-2">
         {cells.map(c => (
           <div className="col-4 col-md" key={c.label}>
-            <div style={{ background: C.surfaceAlt, borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+            <div style={{ background: C.surfaceAlt, borderRadius: 'var(--radius-sm)', padding: '10px 12px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.6rem', color: C.muted, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{c.label}</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: c.accent || C.ink, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{c.value}</div>
             </div>
@@ -790,8 +793,8 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
             <span>Cost efficiency</span>
             <span>{sym}1 → {sym}{(gmv / spend).toFixed(2)}</span>
           </div>
-          <div className="d-flex" style={{ height: 14, borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.max(15, ratio * 100)}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
+          <div className="d-flex" style={{ height: 14, borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.66rem', fontWeight: 600, width: `${Math.min(85, Math.max(15, ratio * 100))}%`, padding: '0 10px', display: 'flex', alignItems: 'center' }}>
               {ms(spend)} in
             </div>
             <div style={{ flex: 1, background: C.amber, color: C.hero, fontSize: '0.66rem', fontWeight: 700, padding: '0 10px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -806,6 +809,7 @@ function GmvMaxCard({ row, currency = DEFAULT_CURRENCY, isFirst }) {
 
 /* ─── Main view ───────────────────────────────────────────────────────── */
 export default function MonthlyReportView({ report, previousReport, allReports, clientView = false, onActions, reportType = 'monthly', reportLinks = null }) {
+  const { ask, askText, notify } = useDialogs();
   const printRef = useRef();
   // Per-product monthly sample goals for this report's brand (keyed by
   // normalized product name). Self-fetched like the weekly view; never in the
@@ -976,7 +980,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       });
     } catch (err) {
       console.error('[export-pdf] failed:', err);
-      alert('Failed to export the PDF. Please try again.');
+      notify.error('Failed to export the PDF. Please try again.');
     } finally {
       setPdfBusy(false);
     }
@@ -1019,7 +1023,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             type="button"
             onClick={() => setHighlighterActive(v => !v)}
             className={`btn btn-sm d-inline-flex align-items-center gap-2 ${highlighterActive ? 'btn-warning' : 'btn-outline-warning'}`}
-            style={{ borderRadius: 10, fontSize: '0.78rem' }}
+            style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}
             title={highlighterActive
               ? 'Highlighter is ON — drag across text to highlight, drag across an existing highlight to remove it. Click to turn off.'
               : 'Turn on highlighter — then drag across any text to highlight it for everyone viewing this report.'}>
@@ -1028,7 +1032,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           </button>
           {(userRole === 'tl' || userRole === 'pctl') && (
             <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-              style={{ borderRadius: 10, fontSize: '0.78rem',
+              style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem',
                 background: copyState === 'done' ? 'var(--success)' : 'var(--accent)',
                 color: 'var(--on-accent)', border: 'none' }}
               onClick={handleCopyInsights}
@@ -1038,7 +1042,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             </button>
           )}
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+            style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
             onClick={handleExport} disabled={pdfBusy}
             title="Download the report as a single-page PDF">
             {pdfBusy
@@ -1052,7 +1056,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       {clientView && (
         <div className="d-flex justify-content-end mb-3">
           <button className="btn btn-sm d-inline-flex align-items-center gap-1"
-            style={{ borderRadius: 10, fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
+            style={{ borderRadius: 'var(--radius-md)', fontSize: '0.78rem', background: 'var(--accent)', color: 'var(--on-accent)', border: 'none' }}
             onClick={handleExport} disabled={pdfBusy}
             title="Download this report as a single-page PDF">
             {pdfBusy
@@ -1074,7 +1078,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       )}
 
       {/* ─── Canvas (printable) ─────────────────────────────────────── */}
-      <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 18, border: `1px solid ${C.line}` }}>
+      <div ref={printRef} className="report-canvas" style={{ background: C.surfaceAlt, padding: '24px', borderRadius: 'var(--radius-xl)', border: `1px solid ${C.line}` }}>
 
         {/* Brand chip + breadcrumb — sticky so the OL always knows which report
             they're reading while scrolling a long report. Pins flush under the
@@ -1086,8 +1090,8 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             borderBottom: `1px solid ${C.line}` }}>
           <div className="d-flex align-items-center gap-3">
             <div style={{
-              width: 42, height: 42, borderRadius: 10, background: C.amber,
-              color: '#fff', fontSize: '1.05rem', fontWeight: 700,
+              width: 42, height: 42, borderRadius: 'var(--radius-md)', background: C.amber,
+              color: 'var(--on-warning)', fontSize: '1.05rem', fontWeight: 700,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}>{(report.brandName || '?').charAt(0).toUpperCase()}</div>
             <div>
@@ -1177,26 +1181,26 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
               key: 'affiliate',
               label: 'Affiliate GMV',
               value: num(g.affiliateGmv),
-              color: '#0891b2',
+              color: 'var(--info-text)',
               children: [
-                { label: 'LIVE GMV',  value: num(g.liveGmv),  color: '#ef4444' },
-                { label: 'Video GMV', value: num(g.videoGmv), color: '#8b5cf6' },
+                { label: 'LIVE GMV',  value: num(g.liveGmv),  color: 'var(--danger-text)' },
+                { label: 'Video GMV', value: num(g.videoGmv), color: 'var(--purple-text)' },
               ],
             },
             {
               key: 'organic',
               label: 'Organic GMV',
               value: num(g.organicGmv),
-              color: '#10b981',
+              color: 'var(--success-text)',
               children: [
-                { label: 'Product Card GMV', value: num(g.productCardGmv), color: '#f59e0b' },
+                { label: 'Product Card GMV', value: num(g.productCardGmv), color: 'var(--warning-text)' },
               ],
             },
           ];
           const total = parents.reduce((s, p) => s + p.value, 0);
           if (!total) return null;
           return (
-            <ContentSection icon="bi-pie-chart-fill" color="#0891b2" title="GMV breakdown" eyebrow="Revenue mix by traffic source">
+            <ContentSection icon="bi-pie-chart-fill" color="var(--info-text)" title="GMV breakdown" eyebrow="Revenue mix by traffic source">
               <HierarchicalGmvDonut parents={parents} total={total} currencySym={sym} />
             </ContentSection>
           );
@@ -1207,7 +1211,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           <div className="row g-3 mt-1">
             {sectEnabled.topCreators && sortedCreators.length > 0 && (
               <div className="col-12 col-lg-7">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div className="px-3 py-3">
                     <SectionHead
                       title="Top creators this month"
@@ -1223,7 +1227,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             )}
             {sectEnabled.productAnalytics && sortedProducts.length > 0 && (
               <div className="col-12 col-lg-5">
-                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                   <div className="px-3 py-3">
                     <SectionHead
                       title="Products driving GMV"
@@ -1274,7 +1278,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
 
         {/* ─── Top Videos (poster cards) ────────────────────────────── */}
         {sectEnabled.topVideos && sortedVideos.length > 0 && (
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px 18px 20px', marginTop: 12 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 'var(--radius-lg)', padding: '18px 18px 20px', marginTop: 12 }}>
             <SectionHead
               title="Top videos"
               eyebrow="Best performers by GMV this month · click any card to open the TikTok video"
@@ -1294,24 +1298,24 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const v = report.videoPerformance || {};
           const pv = prev.videoPerformance || {};
           const items = [
-            { label: 'Product Impressions', value: v.productImpressions, prevValue: pv.productImpressions, formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Product Clicks',      value: v.productClicks,      prevValue: pv.productClicks,      formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Video Views',         value: v.videoViews,         prevValue: pv.videoViews,         formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'CTR',                 value: v.ctr,                prevValue: pv.ctr,                formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: '#6366f1' },
-            { label: 'CTOR',                value: v.ctor,               prevValue: pv.ctor,               formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: '#6366f1' },
-            { label: 'SKU Orders',          value: v.skuOrders,          prevValue: pv.skuOrders,          formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Video GMV',           value: v.gmv,                prevValue: pv.gmv,                formatter: m, accent: '#6366f1' },
-            { label: 'New Videos Posted',   value: v.newVideosPosted,    prevValue: pv.newVideosPosted,    formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos 1M+ views',    value: v.videos1MViews,      prevValue: pv.videos1MViews,      formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos 100k+ views',  value: v.videos100kViews,    prevValue: pv.videos100kViews,    formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos 10k+ views',   value: v.videos10kViews,     prevValue: pv.videos10kViews,     formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos $1k+ GMV',     value: v.videos1000Gmv,      prevValue: pv.videos1000Gmv,      formatter: fmtRaw, accent: '#6366f1' },
-            { label: 'Videos $100+ GMV',    value: v.videos100Gmv,       prevValue: pv.videos100Gmv,       formatter: fmtRaw, accent: '#6366f1' },
+            { label: 'Product Impressions', value: v.productImpressions, prevValue: pv.productImpressions, formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Product Clicks',      value: v.productClicks,      prevValue: pv.productClicks,      formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Video Views',         value: v.videoViews,         prevValue: pv.videoViews,         formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'CTR',                 value: v.ctr,                prevValue: pv.ctr,                formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: 'var(--purple)' },
+            { label: 'CTOR',                value: v.ctor,               prevValue: pv.ctor,               formatter: (x) => `${String(x).replace(/%/g, '')}%`, accent: 'var(--purple)' },
+            { label: 'SKU Orders',          value: v.skuOrders,          prevValue: pv.skuOrders,          formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Video GMV',           value: v.gmv,                prevValue: pv.gmv,                formatter: m, accent: 'var(--purple)' },
+            { label: 'New Videos Posted',   value: v.newVideosPosted,    prevValue: pv.newVideosPosted,    formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos 1M+ views',    value: v.videos1MViews,      prevValue: pv.videos1MViews,      formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos 100k+ views',  value: v.videos100kViews,    prevValue: pv.videos100kViews,    formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos 10k+ views',   value: v.videos10kViews,     prevValue: pv.videos10kViews,     formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos $1k+ GMV',     value: v.videos1000Gmv,      prevValue: pv.videos1000Gmv,      formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Videos $100+ GMV',    value: v.videos100Gmv,       prevValue: pv.videos100Gmv,       formatter: fmtRaw, accent: 'var(--purple)' },
           ];
           const grid = <MetricGrid items={items} cols={4} />;
           if (!grid) return null;
           return (
-            <ContentSection icon="bi-camera-reels-fill" color="#6366f1" title="Video performance" eyebrow="Reach, engagement and content output">
+            <ContentSection icon="bi-camera-reels-fill" color="var(--purple-text)" title="Video performance" eyebrow="Reach, engagement and content output">
               {grid}
             </ContentSection>
           );
@@ -1322,16 +1326,16 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const c = report.creatorsPerformance || {};
           const pc = prev.creatorsPerformance || {};
           const items = [
-            { label: 'Creators 1+ videos',  value: c.creators1Plus,  prevValue: pc.creators1Plus,  formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators 3+ videos',  value: c.creators3Plus,  prevValue: pc.creators3Plus,  formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators 10+ videos', value: c.creators10Plus, prevValue: pc.creators10Plus, formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators $1k+ GMV',   value: c.creators1kGmv,  prevValue: pc.creators1kGmv,  formatter: fmtRaw, accent: '#a855f7' },
-            { label: 'Creators $100+ GMV',  value: c.creators100Gmv, prevValue: pc.creators100Gmv, formatter: fmtRaw, accent: '#a855f7' },
+            { label: 'Creators 1+ videos',  value: c.creators1Plus,  prevValue: pc.creators1Plus,  formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators 3+ videos',  value: c.creators3Plus,  prevValue: pc.creators3Plus,  formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators 10+ videos', value: c.creators10Plus, prevValue: pc.creators10Plus, formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators $1k+ GMV',   value: c.creators1kGmv,  prevValue: pc.creators1kGmv,  formatter: fmtRaw, accent: 'var(--purple)' },
+            { label: 'Creators $100+ GMV',  value: c.creators100Gmv, prevValue: pc.creators100Gmv, formatter: fmtRaw, accent: 'var(--purple)' },
           ];
           const grid = <MetricGrid items={items} cols={5} />;
           if (!grid) return null;
           return (
-            <ContentSection icon="bi-person-video3" color="#a855f7" title="Creators' performance" eyebrow="Activation tiers across the affiliate roster">
+            <ContentSection icon="bi-person-video3" color="var(--purple-text)" title="Creators' performance" eyebrow="Activation tiers across the affiliate roster">
               {grid}
             </ContentSection>
           );
@@ -1371,16 +1375,16 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           const c = report.customers || {};
           const pc = prev.customers || {};
           const items = [
-            { label: 'Aware Customers',         value: c.awareCustomers,        prevValue: pc.awareCustomers,        formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'New Customers',           value: c.newCustomers,          prevValue: pc.newCustomers,          formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'Potential New Customers', value: c.potentialNewCustomers, prevValue: pc.potentialNewCustomers, formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'CRM Messages Sent',       value: c.crmMessagesSent,       prevValue: pc.crmMessagesSent,       formatter: fmtRaw, accent: '#0ea5e9' },
-            { label: 'Converted Customers',     value: c.convertedCustomers,    prevValue: pc.convertedCustomers,    formatter: fmtRaw, accent: '#0ea5e9' },
+            { label: 'Aware Customers',         value: c.awareCustomers,        prevValue: pc.awareCustomers,        formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'New Customers',           value: c.newCustomers,          prevValue: pc.newCustomers,          formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'Potential New Customers', value: c.potentialNewCustomers, prevValue: pc.potentialNewCustomers, formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'CRM Messages Sent',       value: c.crmMessagesSent,       prevValue: pc.crmMessagesSent,       formatter: fmtRaw, accent: 'var(--info)' },
+            { label: 'Converted Customers',     value: c.convertedCustomers,    prevValue: pc.convertedCustomers,    formatter: fmtRaw, accent: 'var(--info)' },
           ];
           const grid = <MetricGrid items={items} cols={5} />;
           if (!grid) return null;
           return (
-            <ContentSection icon="bi-people" color="#0ea5e9" title="Customers" eyebrow="Awareness, acquisition and CRM activity">
+            <ContentSection icon="bi-people" color="var(--info-text)" title="Customers" eyebrow="Awareness, acquisition and CRM activity">
               {grid}
             </ContentSection>
           );
@@ -1406,7 +1410,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
           return (
             <ContentSection
               icon="bi-megaphone-fill"
-              color="#ec4899"
+              color="var(--danger-text)"
               title="Campaigns"
               eyebrow="Active and upcoming TikTok Shop campaigns">
               {has && (
@@ -1414,7 +1418,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
                   highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                   style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
               )}
-              <EmbeddedLinks section={links} accent="#ec4899" />
+              <EmbeddedLinks section={links} accent="var(--chart-5)" />
             </ContentSection>
           );
         })()}
@@ -1482,7 +1486,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             const hasData = (entry.rows || []).some((r) => cols.some((c) => r?.[c.id] != null && r[c.id] !== ''));
             if (!hasData) return null;
             return (
-              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="#0ea5e9" title={entry.name}>
+              <ContentSection key={`tblnew:${sectionId}`} icon="bi-table" color="var(--info-text)" title={entry.name}>
                 <CustomTableView entry={entry} />
               </ContentSection>
             );
@@ -1495,7 +1499,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             const nonEmpty = group.rows.filter((r) => r.value !== '' && r.value != null);
             if (nonEmpty.length === 0) return null;
             return (
-              <ContentSection key={`tbl:${group.sectionId}`} icon="bi-table" color="#0ea5e9" title={group.name}>
+              <ContentSection key={`tbl:${group.sectionId}`} icon="bi-table" color="var(--info-text)" title={group.name}>
                 <div className="row g-3">
                   {nonEmpty.map((r) => {
                     const numericType = (r.type === 'number' || r.type === 'currency');
@@ -1529,13 +1533,13 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
             if (name) customNames.push(name);
             if (isEmpty && !links) return null;
             return (
-              <ContentSection key={fieldId} icon="bi-sliders" color="#8b5cf6" title={name || 'Custom Field'}>
+              <ContentSection key={fieldId} icon="bi-sliders" color="var(--purple-text)" title={name || 'Custom Field'}>
                 {!isEmpty && (
                   <HighlightableContent html={value} report={report} fieldKey={`customField_${fieldId}`}
                     highlighterActive={highlighterActive} highlightColor={highlightColor} highlightIntensity={highlightIntensity}
                     style={{ fontSize: '0.88rem', lineHeight: 1.7, color: C.ink }} />
                 )}
-                <EmbeddedLinks section={links} accent="#8b5cf6" />
+                <EmbeddedLinks section={links} accent="var(--chart-4)" />
               </ContentSection>
             );
           });

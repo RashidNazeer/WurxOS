@@ -1,0 +1,8 @@
+node_modules/
+deno.lock
+# crawled corpora, DB exports and live-data profiles: large, regenerable, may hold sensitive aggregates
+data/
+backups/*/
+inventory.json
+# secrets never live here, but just in case
+.env*

@@ -44,3 +44,8 @@ Thumbs.db
 
 .vercel
 backups/
+
+# Assistant project — crawled corpora and DB profiles (large, regenerable,
+# and inventory.json holds live-data aggregates).
+Assistant/data/
+Assistant/inventory.json

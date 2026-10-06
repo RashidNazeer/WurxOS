@@ -42,7 +42,7 @@ function Segments({ label, options, value, onChange }) {
       aria-label={label}
       style={{
         height: BAR_H, display: 'inline-flex', alignItems: 'center', gap: 2, padding: 3,
-        borderRadius: 999, background: 'var(--surface-3)', border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-pill)', background: 'var(--surface-3)', border: '1px solid var(--border-subtle)',
         boxSizing: 'border-box',
       }}
     >
@@ -57,7 +57,7 @@ function Segments({ label, options, value, onChange }) {
             title={o.title}
             style={{
               height: SEG_INNER_H, display: 'inline-flex', alignItems: 'center', gap: 4,
-              border: 'none', padding: '0 11px', borderRadius: 999, cursor: 'pointer',
+              border: 'none', padding: '0 11px', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
               fontSize: FONT, fontFamily: 'inherit', lineHeight: 1,
               fontWeight: on ? 800 : 600,
               background: on ? 'var(--surface-1)' : 'transparent',
@@ -318,7 +318,7 @@ const MenuChip = ({ children, onClick, disabled }) => (
     type="button" onClick={onClick} disabled={disabled}
     style={{
       height: 26, padding: '0 10px', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit',
-      borderRadius: 999, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
+      borderRadius: 'var(--radius-pill)', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1,
       background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-default)',
     }}
   >{children}</button>

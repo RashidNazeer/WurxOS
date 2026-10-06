@@ -1,0 +1,21 @@
+{
+  "name": "wurxos-assistant-v2",
+  "private": true,
+  "version": "0.1.0",
+  "description": "WurxOS Assistant v2 (agentic hybrid RAG): scripts, tests and dev tooling. Never published.",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"supabase/functions/_shared/ai/__tests__/*.test.ts\"",
+    "db:status": "node scripts/db-dev.mjs status",
+    "sql:acl": "node scripts/db-dev.mjs sql tests/sql/acl.sql",
+    "sql:queue": "node scripts/db-dev.mjs sql tests/sql/queue.sql",
+    "sql:grants": "node scripts/db-dev.mjs sql tests/sql/grants.sql",
+    "sql:search": "node scripts/db-dev.mjs sql tests/sql/search.sql",
+    "sql:v1compat": "node scripts/db-dev.mjs sql tests/sql/v1compat.sql",
+    "preview": "node --experimental-strip-types scripts/chunk-preview.mjs"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "pg": "^8.13.0"
+  }
+}

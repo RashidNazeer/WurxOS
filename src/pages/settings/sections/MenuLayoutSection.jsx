@@ -9,6 +9,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useBuddy } from '../../../contexts/BuddyContext';
 import { updateUserProfile } from '../../../lib/adminApi';
 import { getMenuForRole, menuKey, applyMenuLayout } from '../../../components/layout/menu';
+import { withApprovals, SECTIONS } from '../../../components/layout/navStructure';
 import { BookmarkIcon, AlertIcon, CheckIcon, StarIcon, ChevronDownIcon } from '../../../components/common/Icon';
 import SectionShell from './SectionShell';
 
@@ -20,7 +21,15 @@ export default function MenuLayoutSection() {
 
   // The role menu (post-injection) + a key→entry map for rendering.
   const buddy = !!useBuddy()?.allowed;
-  const base = useMemo(() => (role ? getMenuForRole(role, { buddy }) : []), [role, buddy]);
+  const base = useMemo(() => (role ? withApprovals(getMenuForRole(role, { buddy }), role) : []), [role, buddy]);
+  // Section name per key, shown as a hint so people can see where the
+  // recommended (sectioned) layout puts each item.
+  const sectionByKey = useMemo(() => {
+    const m = new Map();
+    (SECTIONS[role] || []).forEach((s) => s.keys.forEach((k) => m.set(k, s.label)));
+    return m;
+  }, [role]);
+  const hasSaved = !!(profile?.menu_layout?.order?.length || profile?.menu_layout?.pinned?.length);
   const entryByKey = useMemo(() => new Map(base.map((e) => [menuKey(e), e])), [base]);
   const defaultKeys = useMemo(() => base.map(menuKey), [base]);
 
@@ -97,6 +106,18 @@ export default function MenuLayoutSection() {
     setRestKeys(defaultKeys);
   }
 
+  // One click back to the sectioned default: clears the saved layout.
+  async function applyRecommended() {
+    setErr(''); setOk(''); setSaving(true);
+    try {
+      await updateUserProfile(user.id, { menu_layout: {} });
+      await refreshProfile();
+      setOk('Recommended layout restored.');
+      setTimeout(() => setOk(''), 2500);
+    } catch (e) { setErr(e.message || 'Failed to save.'); }
+    finally { setSaving(false); }
+  }
+
   async function save() {
     setErr(''); setOk(''); setSaving(true);
     try {
@@ -118,6 +139,7 @@ export default function MenuLayoutSection() {
 
   const rowProps = (listId, key, i, len) => ({
     entry: entryByKey.get(key), keyStr: key, listId,
+    section: sectionByKey.get(key),
     isPinned: listId === 'pinned',
     canUp: i > 0, canDown: i < len - 1,
     onUp: () => bump(listId, key, -1),
@@ -164,17 +186,23 @@ export default function MenuLayoutSection() {
         <button className="wx-btn wx-btn-ghost" onClick={resetToDefault} disabled={saving || isDefault}>
           Reset to default
         </button>
+        {SECTIONS[role] && (
+          <button className="wx-btn wx-btn-ghost" onClick={applyRecommended} disabled={saving || !hasSaved}
+            title="Sidebar grouped into sections, ordered by daily use">
+            Use recommended layout
+          </button>
+        )}
       </div>
     </SectionShell>
   );
 }
 
 // ── one draggable row ──────────────────────────────────────────────
-function Row({ entry, keyStr, isPinned, canUp, canDown, onUp, onDown, onPinToggle, onDragStart, onDragOver, onDragEnd }) {
+function Row({ entry, keyStr, section, isPinned, canUp, canDown, onUp, onDown, onPinToggle, onDragStart, onDragOver, onDragEnd }) {
   if (!entry) return null;
   const Icon = entry.icon;
   const isGroup = !!entry.children;
-  const btn = { display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', cursor: 'pointer', color: 'var(--text-secondary)' };
+  const btn = { display: 'grid', placeItems: 'center', width: 28, height: 28, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--surface-1)', cursor: 'pointer', color: 'var(--text-secondary)' };
   const btnDim = (on) => ({ ...btn, opacity: on ? 1 : 0.35, cursor: on ? 'pointer' : 'not-allowed' });
   return (
     <div
@@ -193,7 +221,8 @@ function Row({ entry, keyStr, isPinned, canUp, canDown, onUp, onDown, onPinToggl
       </span>
       <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
         {entry.label}
-        {isGroup && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-2)', borderRadius: 5, padding: '1px 6px' }}>group</span>}
+        {isGroup && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '1px 6px' }}>group</span>}
+        {section && <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>· {section}</span>}
       </span>
       <button type="button" style={btnDim(canUp)} disabled={!canUp} onClick={onUp} aria-label="Move up"><ChevronDownIcon width="14" height="14" style={{ transform: 'rotate(180deg)' }} /></button>
       <button type="button" style={btnDim(canDown)} disabled={!canDown} onClick={onDown} aria-label="Move down"><ChevronDownIcon width="14" height="14" /></button>
@@ -202,9 +231,9 @@ function Row({ entry, keyStr, isPinned, canUp, canDown, onUp, onDown, onPinToggl
         onClick={onPinToggle}
         aria-label={isPinned ? 'Unpin' : 'Pin'}
         title={isPinned ? 'Unpin' : 'Pin to top'}
-        style={{ ...btn, width: 30, color: isPinned ? '#f59e0b' : 'var(--text-muted)', borderColor: isPinned ? '#f59e0b' : 'var(--border-subtle)', background: isPinned ? 'color-mix(in srgb, #f59e0b 12%, transparent)' : 'var(--surface-1)' }}
+        style={{ ...btn, width: 30, color: isPinned ? 'var(--warning-text)' : 'var(--text-muted)', borderColor: isPinned ? 'var(--warning)' : 'var(--border-subtle)', background: isPinned ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'var(--surface-1)' }}
       >
-        <StarIcon width="15" height="15" fill={isPinned ? '#f59e0b' : 'none'} />
+        <StarIcon width="15" height="15" fill={isPinned ? 'var(--warning)' : 'none'} />
       </button>
     </div>
   );

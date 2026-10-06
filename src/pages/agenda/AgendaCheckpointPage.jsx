@@ -40,6 +40,7 @@ import BrandAvatar from '../../components/brands/BrandAvatar';
 import { AlertIcon } from '../../components/common/Icon';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useReportLeaveGuard } from '../../components/reporting/useReportLeaveGuard';
+import { useDialogs } from '../../components/common/useDialogs';
 import '../../styles/checkpoint.css';
 
 const SLIDE_COUNT = 12;
@@ -78,6 +79,7 @@ export default function AgendaCheckpointPage() {
 }
 
 function ApcCheckpointPage() {
+  const { ask, notify } = useDialogs();
   const { profile } = useAuth();
   const qc = useQueryClient();
   const [brandId, setBrandId] = useState('');
@@ -474,7 +476,7 @@ function ApcCheckpointPage() {
         title: `${brandName || 'Brand'} — Weekly Checkpoint ${weekLabel}`,
         onProgress: (i, total) => setProgress({ i, total }),
       });
-    } catch (e) { alert(`Couldn't generate the PDF: ${e?.message || e}`); } // eslint-disable-line no-alert
+    } catch (e) { notify.error(`Couldn't generate the PDF: ${e?.message || e}`); } // eslint-disable-line no-alert
     finally { setBusy(false); setProgress(null); }
   }
 
@@ -492,7 +494,7 @@ function ApcCheckpointPage() {
       after?.();
     } catch (e) {
       // eslint-disable-next-line no-alert
-      alert(`Couldn't delete this checkpoint: ${e?.message || e}`);
+      notify.error(`Couldn't delete this checkpoint: ${e?.message || e}`);
     } finally { setDeleting(false); }
   }
 
@@ -537,7 +539,7 @@ function ApcCheckpointPage() {
         <>
           <div className="wx-card" style={{ padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 220, flex: '1 1 220px' }}>
-              {selectedBrand && <BrandAvatar brand={selectedBrand} size={38} radius={9} />}
+              {selectedBrand && <BrandAvatar brand={selectedBrand} size={38} radius={10} />}
               <select className="wx-input" value={brandId} onChange={(e) => setBrandId(e.target.value)} disabled={brandsLoading} style={{ flex: 1, minWidth: 0, fontWeight: 700 }}>
                 {brandsLoading && <option>Loading…</option>}
                 {!brandsLoading && brands.length === 0 && <option value="">No brands available</option>}

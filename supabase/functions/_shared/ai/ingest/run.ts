@@ -11,6 +11,7 @@
 // wall-clock limit (150 s on the free plan) and the tick's 150 s HTTP timeout.
 
 import { DEFAULT_CONFIG } from '../config.ts';
+import type { AltKeys } from '../embedder.ts';
 import type { Rpc } from './db.ts';
 import { runWorker } from './worker.ts';
 import type { Embedder, RunStats } from './worker.ts';
@@ -31,6 +32,8 @@ export function parseMode(body: unknown): IngestMode | null {
 export async function runIngest(mode: IngestMode, o: {
   rpc: Rpc;
   embed: Embedder;
+  embedAlt?: Embedder;      // the alt space (mig 406), if the caller built it
+  altKeys?: AltKeys;        // or its keys: the provider is a setting (mig 408)
   timeBudgetMs?: number;
   now?: () => number;
   log?: (msg: string) => void;
@@ -45,6 +48,6 @@ export async function runIngest(mode: IngestMode, o: {
     out.skipped_drain = true;
     return out;
   }
-  out.stats = await runWorker({ rpc: o.rpc, embed: o.embed, timeBudgetMs: left, now, log: o.log });
+  out.stats = await runWorker({ rpc: o.rpc, embed: o.embed, embedAlt: o.embedAlt, altKeys: o.altKeys, timeBudgetMs: left, now, log: o.log });
   return out;
 }

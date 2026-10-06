@@ -53,11 +53,11 @@ export default function AnniversaryBanner() {
       gap: 14,
       opacity: animateOut ? 0 : 1,
       transform: animateOut ? 'translateY(-6px)' : 'translateY(0)',
-      transition: 'opacity 200ms ease, transform 200ms ease',
+      transition: 'opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out)',
     }}>
       <div style={{
         width: 48, height: 48, borderRadius: 'var(--radius-pill)',
-        background: 'var(--accent)', color: '#fff',
+        background: 'var(--accent)', color: 'var(--on-accent)',
         display: 'grid', placeItems: 'center', flex: '0 0 auto',
         boxShadow: '0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent)',
       }}>
