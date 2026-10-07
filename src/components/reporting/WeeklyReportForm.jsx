@@ -32,6 +32,8 @@ import {
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';
+import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
+import { loadColumns } from '../../lib/gmvMaxLayout';
 import { useSectionPresets } from './SectionPresetBar';
 import { parseTopVideosText, parseTopCreatorsText, parseGmvMaxText } from '../../utils/reportPasteParsers';
 import { useDialogs } from '../common/useDialogs';
@@ -1767,10 +1769,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       <SectionCard id="sec-gmvMax" hue="var(--danger)" icon="bi-rocket-takeoff-fill" title="GMV Max Performance" required
         enabled={sectEnabled.gmvMax} onToggle={toggleSection('gmvMax')}>
         {presets.bar('gmvMax', 'var(--danger)')}
+        <GmvMaxColumnsEditor accent="var(--danger)" />
         <PasteParsePanel
           noun="campaign"
           accent="var(--danger)"
-          parse={parseGmvMaxText}
+          parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
           onApply={rows => setData(d => {
             const isReal = g => (g.campaign && g.campaign.trim())
               || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());
@@ -1803,10 +1806,11 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
           Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically, like the weekly section above.
         </p>
         {presets.bar('gmvMaxMtd', 'var(--danger)')}
+        <GmvMaxColumnsEditor accent="var(--danger)" />
         <PasteParsePanel
           noun="campaign"
           accent="var(--danger)"
-          parse={parseGmvMaxText}
+          parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
           onApply={rows => setData(d => {
             const isReal = g => (g.campaign && g.campaign.trim())
               || (g.gmv != null && String(g.gmv).trim()) || (g.spend != null && String(g.spend).trim());

@@ -1,3 +1,4 @@
+import { typeForColumn, fieldForColumn, splitAtSchedule } from '../lib/gmvMaxLayout.js';
 // Parsers that turn raw copy-pasted TikTok Shop analytics text into the shapes
 // the weekly report form uses. Best-effort: the UI always falls back to manual
 // entry, so these tolerate missing columns rather than throwing.
@@ -283,8 +284,50 @@ export function mergeGmvMaxRows(existing, rows) {
  * @param {string} raw
  * @returns {Array<{campaign,spend,roi,orders,cpo,gmv,notes}>}
  */
-export function parseGmvMaxText(raw) {
+/**
+ * Map one campaign's lines onto a user-supplied column layout.
+ *
+ * TikTok omits a line entirely for a column with no value (the On/Off toggle
+ * never emits one, and empty columns show as "-" or vanish), so headers and
+ * values cannot be zipped together position-for-position. Instead we walk the
+ * expected columns and the actual values in step, consuming a value only when
+ * its SHAPE matches what that column should produce, and skipping the column
+ * otherwise. That tolerates blanks while still following the declared order.
+ *
+ * Returns null if the layout doesn't fit the data, so the caller can fall back
+ * to the shape-based parser rather than emit wrong numbers.
+ */
+function mapByLayout(lines, from, to, cols, out) {
+  const shapeOf = (l) => {
+    if (USD_VALUE_RE.test(l)) return 'money';
+    if (PURE_DECIMAL_RE.test(l)) return 'decimal';
+    if (PURE_INT_RE.test(l)) return 'int';
+    return 'text';
+  };
+  let v = from;
+  let hits = 0;
+  for (const col of cols) {
+    const want = typeForColumn(col);
+    if (want === 'text') continue;              // labels/status: never a value we want
+    while (v < to && shapeOf(lines[v]) === 'text') v++;   // skip status text, "-", etc.
+    if (v >= to) break;
+    const got = shapeOf(lines[v]);
+    // An int is an acceptable stand-in for a decimal column (ROI of exactly 2).
+    const fits = got === want || (want === 'decimal' && got === 'int');
+    if (!fits) continue;                        // this column was blank in the paste
+    const field = fieldForColumn(col);
+    if (field && !out[field]) {
+      out[field] = want === 'money' ? stripUsd(lines[v]) : lines[v].replace(/,/g, '');
+      hits++;
+    }
+    v++;
+  }
+  return hits;
+}
+
+export function parseGmvMaxText(raw, opts) {
   if (!raw || !raw.trim()) return [];
+  const columns = opts && Array.isArray(opts.columns) && opts.columns.length >= 4 ? opts.columns : null;
   const lines = raw.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
 
   const dts = [];
@@ -369,6 +412,45 @@ export function parseGmvMaxText(raw) {
       const ordersBefore = usdLeft[1] ? usdLeft[1].k : roiIdx;
       for (let k = ordersBefore - 1; k > dt; k--) {
         if (PURE_INT_RE.test(lines[k]) && !USD_VALUE_RE.test(lines[k])) { orders = lines[k].replace(/,/g, ''); break; }
+      }
+    }
+
+    // A declared layout wins when it actually fits: it follows TikTok's real
+    // column order, so it survives columns being inserted. If it maps fewer
+    // than two of our five fields the layout is stale or the paste is odd, so
+    // we keep the shape-based result rather than emit half-empty rows.
+    if (columns) {
+      const { header: hCols, tail: tCols } = splitAtSchedule(columns);
+      const byLayout = {};
+      let hits = mapByLayout(lines, nIdx + 1, dt, hCols, byLayout);
+      hits += mapByLayout(lines, dt + 1, tailEnd, tCols, byLayout);
+      // Correctness guard: ROI should equal GMV / Cost. If the declared layout
+      // produces numbers that break that and the shape-based read doesn't, the
+      // layout is stale or mis-typed — trust the one that holds the invariant,
+      // because a silently misaligned column is the exact failure we're
+      // protecting against.
+      const consistent = (s, g, r) => {
+        const S = Number(s), G = Number(g), R = Number(r);
+        if (!S || !G || !R) return null;             // can't tell
+        return Math.abs(G / S - R) / R < 0.05;       // 5% for rounding
+      };
+      const layoutOk = consistent(byLayout.spend ?? spend, byLayout.gmv ?? gmv, byLayout.roi ?? roi);
+      const heuristicOk = consistent(spend, gmv, roi);
+      if (layoutOk === false && heuristicOk === true) {
+        rows.push({ campaign, spend, roi, orders, cpo, gmv, notes: '' });
+        continue;
+      }
+      if (hits >= 2) {
+        rows.push({
+          campaign,
+          spend: byLayout.spend ?? spend,
+          roi: byLayout.roi ?? roi,
+          orders: byLayout.orders ?? orders,
+          cpo: byLayout.cpo ?? cpo,
+          gmv: byLayout.gmv ?? gmv,
+          notes: '',
+        });
+        continue;
       }
     }
 
