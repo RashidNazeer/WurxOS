@@ -161,13 +161,14 @@ export default function ClockWidget() {
           }
         });
 
-        // Streak — consecutive days with a record, walking back from today
+        // Streak — consecutive days with a record, walking back from today.
+        // Saturday and Sunday are company holidays, so they never break it.
         const dateSet = new Set(records.map(r => r.date));
         let streak = 0;
         for (let i = 0; i < 30; i++) {
           const d = new Date(today); d.setDate(d.getDate() - i);
           if (dateSet.has(ymd(d))) streak++;
-          else if (i === 0) continue; // today may not be logged yet — don't break on zero
+          else if (i === 0 || d.getDay() === 0 || d.getDay() === 6) continue;
           else break;
         }
 

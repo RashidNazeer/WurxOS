@@ -43,7 +43,7 @@
   border-radius: inherit;
   border: 2px solid var(--danger);
   opacity: 0;
-  animation: notif-pulse 1.8s var(--ease-out) infinite;
+  animation: notif-pulse 1.8s var(--ease-out) 4;
 }
 @keyframes notif-pulse {
   0%   { transform: scale(0.7); opacity: 0.55; }
@@ -518,7 +518,6 @@
   padding: 14px 14px 12px 17px;
   overflow: hidden;
   animation: notif-toast-in var(--dur-slow) var(--ease-out) both;
-  will-change: transform, opacity;
 }
 .notif-toast.is-leaving {
   animation: notif-toast-out var(--dur-exit) var(--ease-in) forwards;
@@ -715,5 +714,5 @@
   border-radius: 50%;
   border: 2px solid var(--accent);
   opacity: 0;
-  animation: notif-pulse 1.8s var(--ease-out) infinite;
+  animation: notif-pulse 1.8s var(--ease-out) 4;
 }

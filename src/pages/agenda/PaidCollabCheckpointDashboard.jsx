@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { defaultReviewWeekStart, addWeeks, weekLabelForStart } from '../../lib/checkpointModel';
 import {
-  listManagedBrands, getPaidCollabEntriesForWeek, savePaidCollabEntry, getSaverNames,
+  listManagedBrands, subscribePaidCollabBrands, getPaidCollabEntriesForWeek, savePaidCollabEntry, getSaverNames,
   emptyPaidCollab, isPaidCollabFilled,
 } from '../../lib/paidCollabCheckpointApi';
 
@@ -67,6 +67,16 @@ export default function PaidCollabCheckpointDashboard() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { loadBrands(); }, [loadBrands]);
+
+  // A live list change must not reset the cards being edited, so only swap the
+  // array when the set of brands actually changed.
+  const refreshBrands = useCallback(async () => {
+    try {
+      const next = await listManagedBrands();
+      setBrands((prev) => (prev.length === next.length && prev.every((b, i) => b.id === next[i].id) ? prev : next));
+    } catch (e) { setError(e.message || String(e)); }
+  }, []);
+  useEffect(() => subscribePaidCollabBrands(refreshBrands), [refreshBrands]);
 
   useEffect(() => {
     let alive = true;

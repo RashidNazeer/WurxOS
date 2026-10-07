@@ -211,7 +211,11 @@ export function parseTopCreatorsText(raw) {
 }
 
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/;   // 2026-02-13 06:58:53
-const USD_VALUE_RE = /^\$?\s*[\d,]+(?:\.\d+)?\s*USD$/i;           // 160.00 USD, 3,197.20 USD
+// A money cell: "160.00 USD", "3,197.20 USD", "826.71 GBP", "$223.90".
+// It must carry a currency marker — a bare number is Orders / ROI / Target ROI,
+// and the tail logic depends on telling those apart. Matching only "USD" meant
+// non-USD brands parsed nothing at all.
+const USD_VALUE_RE = /^(?:[$£€₨]\s*)?[\d,]+(?:\.\d+)?\s*(?:USD|GBP|EUR|AUD|CAD|SGD|AED|PKR|INR|JPY)$|^[$£€₨]\s*[\d,]+(?:\.\d+)?$/i;
 const PURE_INT_RE = /^\d{1,3}(?:,\d{3})*$|^\d+$/;                 // 61, 1,234
 const PURE_DECIMAL_RE = /^\d+\.\d+$/;                             // 0.77, 1.50
 
@@ -321,27 +325,50 @@ export function parseGmvMaxText(raw) {
       if (recIdx < 0 && /recommendation/i.test(lines[k])) recIdx = k;
       if (USD_VALUE_RE.test(lines[k])) headerUsd.push({ k, v: lines[k] });
     }
-    if (recIdx >= 0) {
+    // Cost is the LAST bare USD in the header: everything after it (ROI
+    // protection, Active upgrades) is text, and the columns before it that
+    // carry money are budgets. The 2026 layout added "Offers" between
+    // Recommendations and Cost, so "first USD after the recommendation line" is
+    // no longer dependable; last-USD survives further columns being inserted.
+    // One header USD means only the budget is present and Cost was "-", so
+    // spend stays blank rather than reporting the budget as spend.
+    if (headerUsd.length > 1) spend = stripUsd(headerUsd[headerUsd.length - 1].v);
+    if (!spend && recIdx >= 0) {
       const afterRec = headerUsd.find(u => u.k > recIdx);
       if (afterRec) spend = stripUsd(afterRec.v);
     }
-    if (!spend && headerUsd.length > 1) spend = stripUsd(headerUsd[1].v);
 
     // Tail metrics live between this start-time and the next campaign's name.
+    //
+    // Read the tail BACKWARDS from ROI. TikTok's 2026 layout inserted "Target
+    // ROI" and "Net Cost" BEFORE SKU orders, so scanning forward for "the first
+    // bare integer" picks up Target ROI whenever it has no decimals ("2"), and
+    // every later column then lands one place out — orders=2, CPO=Net Cost,
+    // GMV=CPO. That reads as plausible data, so it fails silently.
+    //
+    // The trailing columns are stable in both the old and new layouts:
+    //   … Net Cost | SKU orders | Cost per order | Gross revenue | ROI [| coupon revenue]
+    // so anchoring on the LAST bare decimal (ROI) and walking left is immune to
+    // anything new being added ahead of it.
     const tailEnd = c + 1 < dts.length ? nameIdx[c + 1] : lines.length;
     let orders = '', cpo = '', gmv = '', roi = '';
-    let ordersIdx = -1;
-    for (let k = dt + 1; k < tailEnd; k++) {
-      if (PURE_INT_RE.test(lines[k]) && !USD_VALUE_RE.test(lines[k])) { orders = lines[k].replace(/,/g, ''); ordersIdx = k; break; }
+    let roiIdx = -1;
+    for (let k = tailEnd - 1; k > dt; k--) {
+      if (PURE_DECIMAL_RE.test(lines[k])) { roi = lines[k]; roiIdx = k; break; }
     }
-    if (ordersIdx >= 0) {
-      const usds = [];
-      for (let k = ordersIdx + 1; k < tailEnd; k++) if (USD_VALUE_RE.test(lines[k])) usds.push({ k, v: lines[k] });
-      if (usds[0]) cpo = stripUsd(usds[0].v);
-      if (usds[1]) gmv = stripUsd(usds[1].v);
-      const afterGmv = usds[1] ? usds[1].k : ordersIdx;
-      for (let k = afterGmv + 1; k < tailEnd; k++) {
-        if (PURE_DECIMAL_RE.test(lines[k])) { roi = lines[k]; break; }
+    if (roiIdx >= 0) {
+      // The two money columns immediately left of ROI are Gross revenue (GMV)
+      // then Cost per order. Net Cost sits further left and is not collected.
+      const usdLeft = [];
+      for (let k = roiIdx - 1; k > dt && usdLeft.length < 2; k--) {
+        if (USD_VALUE_RE.test(lines[k])) usdLeft.push({ k, v: lines[k] });
+      }
+      if (usdLeft[0]) gmv = stripUsd(usdLeft[0].v);
+      if (usdLeft[1]) cpo = stripUsd(usdLeft[1].v);
+      // SKU orders is the last bare integer left of Cost per order.
+      const ordersBefore = usdLeft[1] ? usdLeft[1].k : roiIdx;
+      for (let k = ordersBefore - 1; k > dt; k--) {
+        if (PURE_INT_RE.test(lines[k]) && !USD_VALUE_RE.test(lines[k])) { orders = lines[k].replace(/,/g, ''); break; }
       }
     }
 
