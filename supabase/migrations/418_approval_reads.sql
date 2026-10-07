@@ -1,5 +1,5 @@
 -- ============================================================
--- WurxOS v2 — Migration 414: per-user read state for the Approvals inbox.
+-- WurxOS v2 — Migration 418: per-user read state for the Approvals inbox.
 --
 -- "Mark as read" on /approvals records the items the user has seen, so the
 -- sidebar / bottom-tab count drops to zero. The item stays in the inbox until
@@ -30,7 +30,7 @@ begin
     select 1 from pg_policies
      where schemaname = 'public' and tablename = 'approval_reads' and policyname = 'approval_reads_own'
   ) then
-    raise exception '414: approval_reads_own policy missing';
+    raise exception '418: approval_reads_own policy missing';
   end if;
 end
 $verify$;
