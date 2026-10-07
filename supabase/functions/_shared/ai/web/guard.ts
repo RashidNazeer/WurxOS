@@ -245,8 +245,8 @@ export function checkUrl(raw: string, opts: CheckOpts = {}): GuardResult {
 // does not work outside Deno. That is recorded as the accepted residual risk:
 // a DNS-rebinding attacker who wins the race between our lookup and the
 // connection is still possible, and the runtime's egress rules are the backstop.
-export async function resolvesPublic(host: string, resolver?: (h: string, t: 'A' | 'AAAA') => Promise<string[]>):
-  Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function resolvesPublic(host: string, resolver?: (h: string, t: 'A' | 'AAAA') => Promise<string[]>,
+  opts: { allowRfc1918?: boolean } = {}): Promise<{ ok: true } | { ok: false; reason: string }> {
   const resolve = resolver ?? (globalThis as any).Deno?.resolveDns;
   if (!resolve) return { ok: true };
   // A literal IP was already judged by checkUrl.
@@ -256,8 +256,19 @@ export async function resolvesPublic(host: string, resolver?: (h: string, t: 'A'
   };
   const [v4, v6] = await Promise.all([lookup('A'), lookup('AAAA')]);
   if (!v4.length && !v6.length) return { ok: true };   // nothing resolved: let fetch report it
-  for (const a of v4) { const o = ipv4Octets(a); if (!o || isPrivateIpv4(o)) return { ok: false, reason: `${host} resolves to a private address` }; }
-  for (const a of v6) { if (isPrivateIpv6(a)) return { ok: false, reason: `${host} resolves to a private address` }; }
+  // With allowRfc1918 (an admin-configured LAN host) a 10/172.16/192.168
+  // answer is fine, but loopback, link-local/metadata and multicast never are.
+  const badV4 = (o: number[] | null) => {
+    if (!o) return true;
+    if (o[0] === 127 || o[0] === 0 || (o[0] === 169 && o[1] === 254) || o[0] >= 224) return true;
+    return opts.allowRfc1918 ? false : isPrivateIpv4(o);
+  };
+  for (const a of v4) if (badV4(ipv4Octets(a))) return { ok: false, reason: `${host} resolves to an address we will not fetch` };
+  for (const a of v6) {
+    const b = ipv6Bytes(a);
+    const hardNo = !b || (b.slice(0, 15).every((x) => x === 0) && b[15] <= 1) || b[0] === 0xff || (b[0] === 0xfe && (b[1] & 0xc0) === 0x80);
+    if (hardNo || (!opts.allowRfc1918 && isPrivateIpv6(a))) return { ok: false, reason: `${host} resolves to an address we will not fetch` };
+  }
   return { ok: true };
 }
 
@@ -299,10 +310,14 @@ export async function safeFetch(raw: string, init: RequestInit & {
     // Brave's X-Subscription-Token or Tavily's bearer token to another host.
     if (origin && origin !== g.url.origin) headers = stripCredentialHeaders(headers);
     origin = g.url.origin;
-    if (!trusted) {
-      const dns = await resolvesPublic(g.url.hostname, resolver);
-      if (!dns.ok) throw new Error(`refused to fetch ${hop ? 'a redirect' : 'that URL'}: ${dns.reason}`);
-    }
+    // An admin-typed LAN host is allowed to resolve to RFC1918 space — that is
+    // the point of allowPrivate — but NOT to loopback, link-local/metadata or
+    // multicast. Otherwise `http://x.attacker.example` with an A record of
+    // 169.254.169.254 walks in through the SearXNG setting (QA F5).
+    const dns = trusted
+      ? await resolvesPublic(g.url.hostname, resolver, { allowRfc1918: true })
+      : await resolvesPublic(g.url.hostname, resolver);
+    if (!dns.ok) throw new Error(`refused to fetch ${hop ? 'a redirect' : 'that URL'}: ${dns.reason}`);
     const res = await fetchImpl(g.url.toString(), { ...rest, headers, method, body, redirect: 'manual' });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get('location');

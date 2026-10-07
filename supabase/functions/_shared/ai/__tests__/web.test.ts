@@ -1030,7 +1030,7 @@ test('resolvesPublic: ANY private answer refuses, even beside public ones (mixed
   ] as [string, string[]][]) {
     const r = await resolvesPublic('evil.example.com', dns({ 'evil.example.com': ans }).fn);
     assert.equal(r.ok, false, name);
-    assert.match((r as any).reason, /evil\.example\.com resolves to a private address/, name);
+    assert.match((r as any).reason, /evil\.example\.com resolves to an address we will not fetch/, name);
   }
 });
 
@@ -1066,18 +1066,18 @@ test('resolvesPublic: literal IPs are not looked up; without Deno or a resolver 
 test('safeFetch + resolver: a public-looking name that resolves inward is refused before any fetch', async () => {
   for (const ans of [['169.254.169.254'], ['127.0.0.1'], ['10.0.0.8'], ['93.184.216.34', '192.168.1.1']]) {
     const s = stub(() => html('LEAK'));
-    await assert.rejects(() => safeFetch('https://attacker.example.org/x', { fetchImpl: s.fn, resolver: dns({ 'attacker.example.org': ans }).fn }), /refused to fetch that URL: attacker\.example\.org resolves to a private address/);
+    await assert.rejects(() => safeFetch('https://attacker.example.org/x', { fetchImpl: s.fn, resolver: dns({ 'attacker.example.org': ans }).fn }), /refused to fetch that URL: attacker\.example\.org resolves to an address we will not fetch/);
     assert.equal(s.calls.length, 0);
   }
   const s6 = stub(() => html('LEAK'));
-  await assert.rejects(() => safeFetch('https://attacker.example.org/x', { fetchImpl: s6.fn, resolver: dns({}, { 'attacker.example.org': ['64:ff9b::a9fe:a9fe'] }).fn }), /private/);
+  await assert.rejects(() => safeFetch('https://attacker.example.org/x', { fetchImpl: s6.fn, resolver: dns({}, { 'attacker.example.org': ['64:ff9b::a9fe:a9fe'] }).fn }), /resolves to an address we will not fetch/);
   assert.equal(s6.calls.length, 0);
 });
 
 test('safeFetch + resolver: every redirect hop is re-resolved (a public host redirecting to a name that resolves inward)', async () => {
   const d = dns({ 'good.example.com': ['93.184.216.34'], 'sneaky.example.net': ['169.254.169.254'] });
   const s = stub((u) => (u.startsWith('https://good.example.com') ? redirect('https://sneaky.example.net/steal') : html('LEAK')));
-  await assert.rejects(() => safeFetch('https://good.example.com/a', { fetchImpl: s.fn, resolver: d.fn }), /refused to fetch a redirect: sneaky\.example\.net resolves to a private address/);
+  await assert.rejects(() => safeFetch('https://good.example.com/a', { fetchImpl: s.fn, resolver: d.fn }), /refused to fetch a redirect: sneaky\.example\.net resolves to an address we will not fetch/);
   assert.deepEqual(s.calls.map((c) => c.url), ['https://good.example.com/a']);
   assert.ok(d.seen.includes('A:sneaky.example.net'));
   // and a clean chain goes through, resolving each host
@@ -1088,14 +1088,14 @@ test('safeFetch + resolver: every redirect hop is re-resolved (a public host red
   assert.ok(d2.seen.includes('A:good.example.com') && d2.seen.includes('A:other.example.org'));
 });
 
-test('safeFetch: a literal-IP URL never reaches the resolver; allowPrivate skips DNS (admin LAN names)', async () => {
+test('safeFetch: a literal-IP URL never reaches the resolver; allowPrivate is resolved too (QA F5) and admits only RFC1918 answers', async () => {
   const d = dns({});
   const s = stub(() => html('ok'));
   await safeFetch('https://8.8.8.8/', { fetchImpl: s.fn, resolver: d.fn });
   assert.deepEqual(d.seen, []);
   const d2 = dns({ 'nas.lan': ['192.168.1.5'] });
   await safeFetch('http://nas.lan:8080/', { fetchImpl: s.fn, resolver: d2.fn, allowHttp: true, allowPrivate: true });
-  assert.deepEqual(d2.seen, []);
+  assert.ok(d2.seen.length > 0, 'the trusted hop is resolved as well');
 });
 
 test('GAP: generic DNS rebinding (an attacker domain whose A record flips between our lookup and the connection) cannot be closed here', { todo: 'resolvesPublic resolves, then fetch resolves AGAIN: a TTL-0 record can answer public to us and 169.254.169.254 to the connect. Outside Deno resolveDns is skipped altogether. Real fix: connect to the vetted IP (Deno.createHttpClient + dial) or rely on edge egress rules' }, async () => {

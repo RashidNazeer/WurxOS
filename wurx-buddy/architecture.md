@@ -1593,7 +1593,65 @@ key later needs no code change — only the function secret.
 | `web/index.ts` | config parsing, provider orchestration, dedupe/merge, `webFetchPage` |
 | `agent/tools.ts` | `search_the_web`, `open_web_page`, the `W#` citation kind, `runWeb` |
 
-### 24.4 Security
+### 24.4 Stopping data leaving (the exfiltration guard)
+
+The sharp risk of web search is not that Buddy reads the wrong thing. It is
+that Buddy can read salaries through a role-checked tool and then **send text
+to a third party** in the same turn — the `search_the_web` query and the
+`open_web_page` URL both leave the building. A security review proved the
+chain: after `get_salary`, a query carrying a real pay figure reached the
+provider. The prompt said not to, which is probabilistic and exactly what a
+prompt injection in a poisoned SOP, report or fetched page defeats.
+
+Three controls in `agent/tools.ts`, held per turn in `TurnGuard`:
+
+| | Control | Why that shape |
+|---|---|---|
+| 1 | Once any tool in `PEOPLE_PAY_TOOLS` returns, **both web tools are shut for the rest of the turn** | The leak needs the data *before* the send, so closing the door after the read breaks it however the model is steered. Set in the data-tool branch **and** the search branch, because `search_incentive_plans` and `search_everything` return plan amounts without touching the data branch |
+| 2 | Query capped at `WEB_QUERY_MAX_CHARS` (300); the `open_web_page` hint at 200; domain filters hostname-validated and capped at 20 | A real query is a few words. A 60,145-character "query" had been reaching Tavily |
+| 3 | `open_web_page` only opens a URL **the user supplied** or that **a search returned this turn** (compared by `canonicalUrl`) | The SSRF guard checks the host is public; nothing checked that `?d=<secret>` was riding along. Exact match means the model cannot append data to a legitimate URL |
+
+The same latch gates model failover: once private data is in the turn, free
+tier slots (Groq, Gemini, NVIDIA) are skipped, because a quota error on the
+paid key would otherwise have handed payroll to a free endpoint mid-turn. If
+only free targets remain the turn fails, which is the right way round.
+
+**Known residuals, accepted and deliberate:**
+
+- **History replay.** The latch is per turn. A salary quoted in a *previous*
+  answer is replayed in the conversation history, so a later turn could in
+  principle carry it into a query. Closing it means tainting a turn from the
+  previous row's `meta.tools`. Left open because this is the model repeating
+  its own earlier output rather than a fresh tool read, and a leak needs two
+  successful steps through the 300-character cap.
+- **Report data is not latched.** `get_reports` and the other `[D#]` tools are
+  client business data, not payroll, so they do not close the latch — only the
+  caps apply. Latching every data tool would make the web unusable alongside
+  any report question. **This is an Owner call**: if clients' numbers must not
+  leave either, extend the latch to all `[D#]` tools.
+- **Single-label LAN hosts** (`kong`, `db`) are admitted with `allowPrivate`,
+  which a Docker SearXNG needs. Acceptable because `allowPrivate` only applies
+  to the Boss-configured URL on the first hop, and loopback and metadata stay
+  refused.
+
+### 24.5 Who may change where data goes
+
+`searxng_url` is the first provider in the default order, so it receives
+**every web query from every role, verbatim**. Mig 403 had made the whole
+config writable by the Boss *or any active developer* (Owner, 2026-10-01), so
+a developer could have pointed it at a host they control and read the Boss's
+questions — routing around the rule that a developer may not see pay data,
+with no trace in the app.
+
+**Mig 417** narrows three columns to the Boss: `searxng_url`,
+`searxng_allow_http`, `free_provider_sources`. Everything else a developer
+could already change stays theirs, including the persona and the web switches
+(the migration explains why `persona` was considered and left out). The guard
+is `before insert or update or delete`, not UPDATE alone: `ai_config_write` is
+`for all`, so a developer could otherwise have deleted the `id = 1` row and
+inserted a replacement carrying their own URL.
+
+### 24.6 Security
 
 `open_web_page` fetches a URL chosen by the **model**, which may have read it
 out of an untrusted web page. That is attacker-influenced input to a server
@@ -1643,7 +1701,7 @@ formats, the v4-mapped spelling under `allowPrivate`, `open_web_page` handing an
 unvalidated URL to Tavily, and the quadratic HTML regexes (50 KB of `<`
 characters took 6.2 s before the linear tokeniser; it is 7 ms now).
 
-### 24.5 Citations and cost
+### 24.7 Citations and cost
 
 Web sources get `W1..Wn`, beside `S#` (passages) and `D#` (data). A `[W#]`
 counts as grounding for a figure, so a number quoted from a page the model
@@ -1656,7 +1714,7 @@ with the credit count in `tokens_in` and `est_cost_usd` left at 0 and
 `unpriced` true: the Boss sees how much was used without Buddy inventing a
 dollar rate for a plan it cannot see. SearXNG is free by definition.
 
-### 24.6 Still to do
+### 24.8 Still to do
 
 - Deploy `assistant` and set the `TAVILY_API_KEY` function secret.
 - Set `BRAVE_API_KEY` when the Owner has it. No code change is needed; Brave is

@@ -20,7 +20,7 @@ import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIss
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
 import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
 import { budgetFor, budgetFromError, estimate, fitRequest, learnBudget } from './compact.ts';
-import { CiteRegistry, runTool, toolDefsFor, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
+import { CiteRegistry, newTurnGuard, runTool, toolDefsFor, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
 import { usableProviders, webAllowedForRole, webConfig, type WebEnv, type WebKeys, type WebUsage } from '../web/index.ts';
 
 export type Emit = (ev: Record<string, unknown>) => void;
@@ -327,6 +327,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     return usableProviders(env).length ? env : null;
   })();
   const webUsage: { kind: 'web_search' | 'web_extract'; usage: WebUsage[] }[] = [];
+  const turnGuard = newTurnGuard(message);
   const toolsCalled: string[] = [];
   let serious = isSeriousTopic(message);
   const surface = req.surface === 'slack' ? 'slack' : cleanSurface(req.surface);
@@ -347,6 +348,11 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const reg = new CiteRegistry();
   const env: ToolEnv = {
     admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: embedWatched, embedAlt: deps.embedAlt, rerank: deps.rerank,
+    // The per-turn guard, seeded with any link the person put in their own
+    // message (those they may always open). It is created whether or not the
+    // web is on, because it also latches "private data has been read", which
+    // gates free-tier model failover.
+    turn: turnGuard,
     ...(webEnv ? { web: webEnv, onWebUsage: (kind, usage) => { webUsage.push({ kind, usage }); } } : {}),
     // userClient: the caller's own JWT client, so people & pay tools read under
     // that user's RLS (Engineer 2, ui-design §8). None on the internal (Boss) path.
@@ -389,6 +395,20 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     for (let paramTries = 0; ;) {
       // A model that just failed for quota / limit / a refused key is skipped
       // (the last one left is always tried).
+      // Pay data must not fail over onto a free tier. Once a people/pay tool
+      // has returned, its output is in `input`, and every later model call
+      // carries it — so a quota error on the paid key would have handed
+      // salaries to Gemini/Groq/NVIDIA free endpoints, whose terms are not
+      // what we would choose for payroll (QA F8). Free slots are skipped from
+      // that moment; if only free ones remain the turn fails, which is the
+      // right way round.
+      if (turnGuard?.sensitiveUsed) {
+        for (let guard = 0; SLOTS[target.keySlot].free && ti + 1 < targets.length && guard < targets.length; guard++) {
+          ((flags.skipped_free_tier ??= []) as string[]).push(tag(target));
+          moveOn('private data in this turn: free tiers skipped');
+        }
+        if (SLOTS[target.keySlot].free) throw new Error('No non-free model is available, and this turn has read private data.');
+      }
       for (let c = coolingDown(target); c && ti + 1 < targets.length; c = coolingDown(target)) {
         ((flags.skipped_cooling ??= []) as string[]).push(tag(target));
         if (c.issue !== 'busy') chainIssues.push({ issue: c.issue, model: target.model, slot: target.keySlot, waitMs: c.waitMs });

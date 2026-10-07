@@ -12,6 +12,7 @@
 // the prompt rules, gated by web_search_enabled and web_allowed_roles.
 
 import { checkUrl, safeFetch } from './guard.ts';
+import { scrubSecrets } from '../providerErrors.ts';
 import { searxngSearch, SearxngError } from './searxng.ts';
 import { tavilyExtract, tavilySearch, TavilyError } from './tavily.ts';
 import { braveSearch, BraveError } from './brave.ts';
@@ -225,7 +226,14 @@ export async function webSearch(env: WebEnv, a: {
   return { hits: mergeHits(lists, max), answer, usage, providersTried, errors };
 }
 
+// Everything here can reach a tool result the model reads and the request log,
+// and some of it is raw provider body text, so it all goes through
+// scrubSecrets on the way out.
 export function describeProviderError(e: unknown): string {
+  return scrubSecrets(describeRaw(e));
+}
+
+function describeRaw(e: unknown): string {
   if (e instanceof SearxngError) return [e.message, e.hint].filter(Boolean).join(' ');
   if (e instanceof BraveError) {
     if (e.status === 401 || e.status === 403) return 'Brave refused the API key.';
