@@ -1244,6 +1244,18 @@ html .notif-toast,
    --wx-pad-* is the surface's ORIGINAL padding; the ring is taken out of it,
    and max(0px, ...) means a surface whose padding is thinner than the ring
    grows by the difference instead of going negative. */
+/* Padding give-back applies ONLY to surfaces that declare --wx-pad-*. The
+   notification panel/toast and the search panel keep their padding on their
+   own children, so for them this rule computed max(0px, 0 - 0) = 0 and wiped
+   that padding — which is how toast text ended up against the edge, under the
+   category rail. */
+.shell-user-menu,
+.shell-nav-flyout,
+.dropdown-menu,
+.ui-toast {
+  padding: max(0px, calc(var(--wx-pad-y, 0px) - var(--wx-rim, 0px)))
+           max(0px, calc(var(--wx-pad-x, 0px) - var(--wx-rim, 0px)));
+}
 .shell-user-menu,
 .shell-nav-flyout,
 .dropdown-menu,
@@ -1251,8 +1263,6 @@ html .notif-toast,
 .global-search-panel,
 html .notif-panel,
 html .notif-toast {
-  padding: max(0px, calc(var(--wx-pad-y, 0px) - var(--wx-rim, 0px)))
-           max(0px, calc(var(--wx-pad-x, 0px) - var(--wx-rim, 0px)));
   /* These surfaces used to carry the pane's 1px hairline as their border, and
      the ring has taken the border over. An outline restores it: it follows
      border-radius, it doesn't enter layout, and it is the only edge left on
