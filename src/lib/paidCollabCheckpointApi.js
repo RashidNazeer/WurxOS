@@ -43,6 +43,16 @@ export async function listManagedBrandIds() {
   return (data || []).map((r) => r.brand_id);
 }
 
+// Fires on every change to the shared list, and once on (re)connect so a change
+// made while the socket was down is still picked up.
+export function subscribePaidCollabBrands(onChange) {
+  const ch = supabase
+    .channel(`paid-collab-brands-${Math.random().toString(36).slice(2, 8)}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: BRANDS }, () => onChange())
+    .subscribe((status) => { if (status === 'SUBSCRIBED') onChange(); });
+  return () => supabase.removeChannel(ch);
+}
+
 export async function addManagedBrand(brandId) {
   const me = await uid();
   const { error } = await supabase.from(BRANDS).insert({ brand_id: brandId, added_by: me });

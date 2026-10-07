@@ -514,7 +514,8 @@
   z-index: 1;
   /* Pane, ring, border and shadow: shared rim-ring block in global.css. */
   border-radius: var(--radius-glass-sm);
-  padding: 13px 14px 11px 18px;
+  /* Left clears the inset rail (6px + 3px) with room to breathe. */
+  padding: 14px 14px 12px 17px;
   overflow: hidden;
   animation: notif-toast-in var(--dur-slow) var(--ease-out) both;
   will-change: transform, opacity;
@@ -533,21 +534,27 @@
   to   { opacity: 0; transform: translateX(calc(100% + 28px)); }
 }
 
-/* Colored category rail down the left edge */
+/* Category rail. Inset with rounded ends so it reads as a deliberate marker
+   floating on the glass, not a hard band welded to the pane edge. Colours come
+   from the tokens (they were hardcoded hex, so they ignored the theme) and
+   match the category icon beside them. */
 .notif-toast-rail {
   position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
+  left: 6px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
 }
 .notif-toast-rail-task        { background: var(--accent); }
-.notif-toast-rail-report      { background: #818cf8; }
-.notif-toast-rail-brand       { background: #eab308; }
-.notif-toast-rail-paid_collab { background: #10b981; }
-.notif-toast-rail-leave       { background: #06b6d4; }
-.notif-toast-rail-resource    { background: #ec4899; }
-.notif-toast-rail-performance { background: #f59e0b; }
-.notif-toast-rail-agenda      { background: #6366f1; }
+.notif-toast-rail-report      { background: var(--purple); }
+.notif-toast-rail-brand       { background: var(--warning); }
+.notif-toast-rail-paid_collab { background: var(--success); }
+.notif-toast-rail-leave       { background: var(--info); }
+.notif-toast-rail-resource    { background: var(--text-secondary); }
+.notif-toast-rail-performance { background: var(--warning); }
+.notif-toast-rail-agenda      { background: var(--purple); }
 .notif-toast-rail-system      { background: var(--text-muted); }
 
 /* Header row: icon · category · stack badge · time · close */
