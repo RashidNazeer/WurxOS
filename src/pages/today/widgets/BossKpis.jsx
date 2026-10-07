@@ -27,7 +27,7 @@ export function BossKpis() {
   const { brands } = useBrands();
   const statuses = useReportStatuses();
   const att = useQuery({ queryKey: ['today', 'companyToday'], queryFn: fetchCompanyToday, staleTime: 30_000, ...POLL });
-  const { count: pending, loading: apprLoading } = useApprovals();
+  const { pendingTotal: pending, loading: apprLoading } = useApprovals();
   const week = useMemo(() => currentReportableWeek(), []);
   const compliance = useMemo(() => {
     const cells = computeCompliance(brands, statuses.data, week);
