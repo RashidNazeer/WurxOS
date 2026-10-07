@@ -28,6 +28,8 @@ import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
 import PasteParsePanel from './PasteParsePanel';
+import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
+import { loadColumns } from '../../lib/gmvMaxLayout';
 import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
@@ -1191,10 +1193,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 'var(--radius-md)' }}>
         <div className="card-body p-3">
           {presets.bar('gmvMax', 'var(--danger)')}
+          <GmvMaxColumnsEditor accent="var(--danger)" />
           <PasteParsePanel
             noun="campaign"
             accent="var(--danger)"
-            parse={parseGmvMaxText}
+            parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
             onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
             hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this report period</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
           />
@@ -1228,10 +1231,11 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             Enter each campaign's spend / GMV / orders for the month so far. The overall MTD totals are calculated automatically.
           </p>
           {presets.bar('gmvMaxMtd', 'var(--danger)')}
+          <GmvMaxColumnsEditor accent="var(--danger)" />
           <PasteParsePanel
             noun="campaign"
             accent="var(--danger)"
-            parse={parseGmvMaxText}
+            parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
             onApply={rows => setData(d => ({ ...d, gmvMaxMtd: mergeGmvMaxRows(d.gmvMaxMtd, rows) }))}
             hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the box above.</>}
           />
