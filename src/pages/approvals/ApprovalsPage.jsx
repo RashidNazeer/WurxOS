@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button, EmptyState, PageHeader, SkeletonRows, Tabs } from '../../components/ui';
 import { useDialogs } from '../../components/common/useDialogs';
 import ApprovalRow from '../../components/approvals/ApprovalRow';
-import { useApprovals, useApprovalAction, KIND_LABEL } from '../../lib/approvalsApi';
+import { useApprovals, useApprovalAction, useMarkApprovalsRead, KIND_LABEL } from '../../lib/approvalsApi';
 import '../../styles/today.css';
 
 // /approvals — everything waiting on the signed-in TL / PCTL / OL / Boss in
@@ -14,21 +14,22 @@ export default function ApprovalsPage() {
   const { profile } = useAuth();
   const role = profile?.role;
   const [params, setParams] = useSearchParams();
-  const { kinds, items, sources, loading } = useApprovals();
+  const { kinds, items, sources, loading, count } = useApprovals();
   const tab = params.get('kind') || 'all';
   const setTab = (k) => setParams(k === 'all' ? {} : { kind: k }, { replace: true });
   const [selected, setSelected] = useState(() => new Set());
   const act = useApprovalAction();
+  const markRead = useMarkApprovalsRead();
   const { ask } = useDialogs();
 
   const tabs = useMemo(() => {
-    const t = [{ id: 'all', label: 'All', badge: items.filter((x) => x.canAct || x.openOnly).length || undefined }];
+    const t = [{ id: 'all', label: 'All', badge: count || undefined }];
     kinds.forEach((k) => {
-      const n = sources[k]?.count || 0;
-      if (n > 0 || sources[k]?.error) t.push({ id: k, label: KIND_LABEL[k], badge: n || undefined });
+      const s = sources[k];
+      if ((s?.total || 0) > 0 || s?.error) t.push({ id: k, label: KIND_LABEL[k], badge: s?.count || undefined });
     });
     return t;
-  }, [kinds, items, sources]);
+  }, [kinds, count, sources]);
 
   const list = items.filter((x) => tab === 'all' || x.kind === tab);
   const batchable = (x) => x.canAct && (x.kind === 'reports' || x.kind === 'attendance') && (role === 'tl' || role === 'ol');
@@ -52,8 +53,14 @@ export default function ApprovalsPage() {
   return (
     <div className="appr-page">
       <PageHeader title="Approvals" subtitle="Everything waiting on you, in one place."
-        actions={chosen.length > 0 && (
-          <Button onClick={approveSelected} loading={act.isPending}>Approve selected ({chosen.length})</Button>
+        actions={(
+          <>
+            <Button variant="secondary" disabled={count === 0} loading={markRead.isPending}
+              onClick={() => markRead.mutate(items)}>Mark all as read</Button>
+            {chosen.length > 0 && (
+              <Button onClick={approveSelected} loading={act.isPending}>Approve selected ({chosen.length})</Button>
+            )}
+          </>
         )} />
       {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={setTab} ariaLabel="Approval types" />}
       {failed.map(([k, s]) => (
