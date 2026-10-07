@@ -97,7 +97,10 @@
 .preport-tile-gmv-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; }
 
 .preport-frame { position: relative; width: 100%; overflow: hidden; }
-.preport-canvas { will-change: transform; }
+/* No permanent will-change: it pins a GPU layer for the whole report canvas for
+   the life of the page, which costs memory on every client view for a transform
+   that only changes on resize. */
+.preport-canvas { }
 
 .preport-scrolltop {
   position: fixed; right: 24px; bottom: 24px; z-index: 50;

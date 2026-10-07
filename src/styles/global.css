@@ -1271,6 +1271,16 @@ html .notif-toast {
   outline: 1px solid var(--glass-border);
   outline-offset: -1px;
 }
+/* Small, frequently-opened surfaces take the lighter filter (blur + saturate,
+   no refraction). A dropdown is opened dozens of times a session and is too
+   small for the bend to read anyway, so the displacement pass is pure cost.
+   Modals and the big panels keep the full filter, where it shows. */
+.dropdown-menu,
+.shell-user-menu,
+.shell-nav-flyout,
+.ui-toast,
+html .notif-toast { --wx-filter: var(--glass-filter-sticky); }
+
 .shell-user-menu,
 .shell-nav-flyout { --wx-rim: var(--glass-rim-w-sm); --wx-pad-x: 6px; --wx-pad-y: 6px; }
 .dropdown-menu    { --wx-rim: var(--glass-rim-w-sm); --wx-pad-x: 0px; --wx-pad-y: 8px; }
