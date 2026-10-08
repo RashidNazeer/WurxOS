@@ -147,13 +147,49 @@ export function clearReloadGuard() {
   try { sessionStorage.removeItem('chunk-reload-pending'); } catch { /* noop */ }
 }
 
+// How long to wait for a waiting service worker to take over before giving
+// up and reloading anyway. A reload must never hang indefinitely on this.
+const SW_UPDATE_TIMEOUT_MS = 2000;
+
+// Clearing CacheStorage doesn't replace the service worker that's already
+// controlling the page — a plain reload still goes through whichever worker
+// is currently active. If a new worker finished installing but is stuck in
+// the "waiting" state (e.g. an earlier tab load raced the update), reload
+// alone can keep reusing the stale one indefinitely, which is how the
+// "new version" prompt could survive a reload even after clearing storage:
+// 2026-10 incident, one user's browser never picked up a deploy despite
+// repeated reloads and manually clearing site data. Nudge the waiting
+// worker to activate and wait briefly for the handover before reloading.
+// Never blocks longer than SW_UPDATE_TIMEOUT_MS, and any failure here
+// (no SW support, no registration, API error) just falls through to a
+// plain reload — this is a best-effort nudge, not a requirement.
+async function forceServiceWorkerUpdate() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return;
+    await reg.update().catch(() => {});
+    const waiting = reg.waiting;
+    if (!waiting) return;
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      navigator.serviceWorker.addEventListener('controllerchange', finish, { once: true });
+      waiting.postMessage({ type: 'SKIP_WAITING' });
+      setTimeout(finish, SW_UPDATE_TIMEOUT_MS);
+    });
+  } catch { /* best effort — a plain reload still follows */ }
+}
+
 /**
- * Clear the service-worker / cache-storage caches, THEN reload. A plain reload
- * can be handed a STALE index.html or chunk by the service worker (public/sw.js
- * caches the app shell + hashed assets) — which is exactly why the "new version"
- * prompt could survive a reload: the tab kept booting the old build and its
- * now-deleted chunks 404'd again. Wiping CacheStorage first guarantees the next
- * load pulls fresh assets from the network, breaking the loop.
+ * Clear the service-worker / cache-storage caches, force the active service
+ * worker to update, THEN reload. A plain reload can be handed a STALE
+ * index.html or chunk by the service worker (public/sw.js caches the app
+ * shell + hashed assets) — which is exactly why the "new version" prompt
+ * could survive a reload: the tab kept booting the old build and its
+ * now-deleted chunks 404'd again. Wiping CacheStorage and forcing the
+ * worker handover first guarantees the next load pulls fresh assets from
+ * the network, breaking the loop.
  */
 export async function forceFreshReload() {
   try {
@@ -162,6 +198,7 @@ export async function forceFreshReload() {
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
   } catch { /* Cache API blocked/unavailable — reload anyway */ }
+  await forceServiceWorkerUpdate();
   if (typeof window !== 'undefined') window.location.reload();
 }
 
