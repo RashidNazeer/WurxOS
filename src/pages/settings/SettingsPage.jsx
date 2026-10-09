@@ -28,6 +28,7 @@ import MaintenanceSection    from './sections/MaintenanceSection';
 import ComingSoonSection     from './sections/ComingSoonSection';
 import MenuLayoutSection     from './sections/MenuLayoutSection';
 import BuddySection          from './sections/BuddySection';
+import AcknowledgementsSection from './sections/AcknowledgementsSection';
 import BuddyIcon             from '../../components/buddy/BuddyIcon';
 import { BUDDY_TABS, buddyTab, buddyTabLabel, canEditSettings } from '../../lib/buddyLogic';
 import '../../styles/settings.css';
@@ -85,6 +86,9 @@ const GROUPS = [
         allow: canEditSettings,
         // Sub-tabs: ?section=buddy&tab=models|access|knowledge|personality|usage (Models by default).
         subtabs: BUDDY_TABS, tabOf: buddyTab, tabLabel: buddyTabLabel },
+      { id: 'acknowledgements', label: 'Acknowledgements', sub: 'Make one person read a message before using WurxOS',
+        icon: ShieldIcon, component: AcknowledgementsSection,
+        roles: ['boss'] },
       { id: 'leaveDefaults', label: 'Leave Defaults', sub: 'Starting quota for new hires',
         icon: ClockIcon, component: LeaveDefaultsSection,
         roles: ['boss'] },
