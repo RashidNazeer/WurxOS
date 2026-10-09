@@ -13,6 +13,7 @@ import BuddyGate from './components/buddy/BuddyGate';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleGuard from './components/auth/RoleGuard';
 import AppShell from './components/layout/AppShell';
+import AckGate from './components/ack/AckGate';
 import { ToastProvider } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { TextPromptProvider } from './components/common/useDialogs';
@@ -234,7 +235,12 @@ export default function App() {
                 <BrandsProvider>
                   <NotificationsProvider>
                     <BuddyProvider>
-                      <AppShell />
+                      {/* The Boss's acknowledgement sits over the whole shell
+                          (mig 419): nothing below it is reachable until the
+                          person acknowledges AND the Boss switches it off. */}
+                      <AckGate>
+                        <AppShell />
+                      </AckGate>
                     </BuddyProvider>
                   </NotificationsProvider>
                 </BrandsProvider>

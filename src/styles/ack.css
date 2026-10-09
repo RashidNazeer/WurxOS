@@ -1,0 +1,157 @@
+/* Boss acknowledgement (mig 419) — the blocking dialog.
+   Colours come from tokens.css so it follows light/dark like everything else;
+   the backdrop is deliberately heavier than a normal modal's, because this one
+   is not a question being asked, it is a stop. */
+
+.ack-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;                 /* above the shell, the Buddy FAB and toasts */
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 16, 28, 0.72);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+
+.ack-dialog {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface, #fff);
+  color: var(--text-primary, #202b3c);
+  border: 1px solid var(--border-color, #e5eaf1);
+  border-radius: 16px;
+  padding: 27px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+}
+
+.ack-sender { display: flex; gap: 10px; align-items: center; margin-bottom: 22px; }
+
+.ack-avatar {
+  height: 36px; width: 36px; flex: 0 0 36px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent-soft, #dde6fc);
+  color: var(--accent, #38578f);
+  font-size: 12px; font-weight: 700;
+}
+
+.ack-sender-name { font-size: 13px; font-weight: 600; }
+.ack-time { font-size: 12px; color: var(--text-muted, #637086); margin-top: 2px; }
+
+.ack-heading {
+  font-size: 20px; line-height: 1.35; letter-spacing: -0.4px;
+  margin: 0 0 14px;
+}
+
+.ack-message {
+  font-size: 14px; line-height: 1.8;
+  white-space: pre-wrap;          /* the Boss's paragraph breaks survive */
+  overflow-wrap: anywhere;        /* a pasted URL cannot widen the dialog */
+  margin: 0 0 22px;
+}
+
+.ack-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+
+.ack-input {
+  width: 100%; height: 45px;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary, #202b3c);
+  border: 1px solid var(--border-color, #e5eaf1);
+  border-radius: 9px;
+  padding: 11px 13px;
+  font-size: 14px;
+  margin-bottom: 13px;
+}
+
+.ack-button {
+  width: 100%;
+  min-height: 44px;
+  background: var(--accent, #315bdd);
+  color: #fff;
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 23px;
+  font-size: 14px; font-weight: 650;
+  cursor: pointer;
+}
+.ack-button:hover:not(:disabled) { filter: brightness(1.08); }
+.ack-button:disabled {
+  background: var(--border-color, #e8ecf3);
+  color: var(--text-muted, #8490a4);
+  cursor: not-allowed;
+}
+
+.ack-receipt {
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--text-muted, #637086);
+  font-size: 12px;
+}
+
+.ack-done {
+  margin-top: 4px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  text-align: center;
+  font-size: 13px; font-weight: 600;
+  color: var(--success, #19724d);
+  background: var(--success-soft, rgba(25, 114, 77, 0.1));
+}
+
+.ack-error {
+  margin: 0 0 13px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--danger, #b4232a);
+  background: var(--danger-soft, rgba(180, 35, 42, 0.1));
+}
+
+@media (max-width: 420px) {
+  .ack-backdrop { padding: 14px; }
+  .ack-dialog { padding: 22px 19px; }
+  .ack-heading { font-size: 18px; }
+}
+
+/* ── Settings list (Boss) ───────────────────────────────────────────────── */
+.ack-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-color, #e5eaf1);
+}
+.ack-row:first-child { border-top: 0; }
+.ack-row-main { min-width: 0; flex: 1; }
+.ack-row-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ack-row-name { font-weight: 600; font-size: 14px; }
+.ack-row-msg {
+  margin: 6px 0 6px;
+  font-size: 13px; color: var(--text-muted, #637086);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ack-row-reply {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent, #315bdd);
+  background: var(--surface-2, rgba(49, 91, 221, 0.06));
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ack-status { font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.ack-status.is-ack { color: var(--success, #19724d); }
+.ack-status.is-wait { color: var(--warning, #916313); }
+.ack-dot { height: 6px; width: 6px; border-radius: 50%; background: currentColor; }
+
+.ack-locked-banner {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--warning, #916313);
+  background: var(--warning-soft, rgba(145, 99, 19, 0.1));
+}
