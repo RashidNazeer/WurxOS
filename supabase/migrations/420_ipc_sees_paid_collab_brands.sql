@@ -1,5 +1,5 @@
 -- ============================================================
--- WurxOS v2 — Migration 419: an IPC can see any brand Boss/OL put on the
+-- WurxOS v2 — Migration 420: an IPC can see any brand Boss/OL put on the
 -- Paid Collab list, even without a brand_assignments row.
 --
 -- Root cause of "Joymode doesn't show for the IPC, other brands do":
@@ -64,7 +64,7 @@ begin
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'can_view_brand'
   ) then
-    raise exception '419: can_view_brand missing';
+    raise exception '420: can_view_brand missing';
   end if;
 end
 $verify$;
