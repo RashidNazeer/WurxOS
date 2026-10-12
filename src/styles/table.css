@@ -39,6 +39,25 @@
 }
 .wx-segmented-btn svg { flex: 0 0 auto; opacity: 0.85; }
 .wx-segmented-btn[data-active='true'] svg { color: var(--accent); opacity: 1; }
+/* Count beside a segment label, e.g. "Ex-employees 3". Tabular figures so the
+   pill does not jump width as the number changes. */
+.wx-segmented-n {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+.wx-segmented-btn[data-active='true'] .wx-segmented-n { background: var(--accent-soft); color: var(--accent); }
+
+/* A former employee's row: present and readable, but visibly not current.
+   Only the identity is dimmed — the "Left <date>" badge stays at full
+   strength, because that is what the reader came for. */
+.wx-list-row[data-former] .wx-user-cell,
+.wx-list-row[data-former] .wx-user-email { opacity: 0.72; }
+.wx-list-row[data-former] .wx-user-avatar { filter: grayscale(1); }
 
 /* HTML <table> styled as a clean data grid. Used by the Resource
    Planner Role Capacity tab and any other place that needs a
