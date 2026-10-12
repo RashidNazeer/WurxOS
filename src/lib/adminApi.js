@@ -71,6 +71,27 @@ export async function listProfilesByRole(role) {
   return data || [];
 }
 
+// What a person holds against brands, for the retire confirmation.
+//
+// Two different things, and the difference matters:
+//   owned    — brands.owner_id (the Team Lead). owner_id is not-null, so these
+//              MUST be moved to another owner before the person can go.
+//   assigned — brand_assignments (an APC's brands). delete-user deletes these,
+//              which is what leaves the brand unassigned for the Boss or an OL
+//              to give to someone else.
+export async function getUserBrandHoldings(userId) {
+  const [owned, assigned] = await Promise.all([
+    supabase.from('brands').select('brand_name').eq('owner_id', userId),
+    supabase.from('brand_assignments').select('brands(brand_name)').eq('user_id', userId),
+  ]);
+  if (owned.error) throw new Error(owned.error.message);
+  if (assigned.error) throw new Error(assigned.error.message);
+  return {
+    owned: (owned.data || []).map((b) => b.brand_name).filter(Boolean),
+    assigned: (assigned.data || []).map((a) => a?.brands?.brand_name).filter(Boolean),
+  };
+}
+
 // Former staff of a role: the people `delete-user` has retired
 // (is_active = false, deleted_at set). They are kept rather than erased,
 // because reports, approvals, assignments and the audit trail still point at

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { listProfilesByRole, listFormerProfilesByRole, deleteUser } from '../../../lib/adminApi';
+import {
+  listProfilesByRole, listFormerProfilesByRole, getUserBrandHoldings, deleteUser,
+} from '../../../lib/adminApi';
 import { getRoleExtras } from '../../../lib/roles';
 import { useAuth } from '../../../contexts/AuthContext';
 import CreateUserModal from '../../../components/boss/CreateUserModal';
@@ -322,6 +324,15 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
   const [confirm, setConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  // What this person holds right now, so the decision is informed rather than
+  // a surprise afterwards. Brands they OWN have to move first (owner_id is
+  // not-null); brands they are ASSIGNED to simply come free.
+  const { data: holdings } = useQuery({
+    queryKey: ['user-brand-holdings', user.id],
+    queryFn: () => getUserBrandHoldings(user.id),
+  });
+  const owns = holdings?.owned ?? [];
+  const assigned = holdings?.assigned ?? [];
 
   const target = (user.display_name || user.email || '').trim();
   const canSubmit = confirm.trim() === target && !deleting;
@@ -379,8 +390,27 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
             their reports, approvals and assignments stay as they are, and you will find them under
             <strong style={{ color: 'var(--text-secondary)' }}> Ex-employees</strong> on this page.
           </div>
+          {assigned.length > 0 && (
+            <div className="wx-alert wx-alert-info" style={{ marginBottom: 12 }}>
+              <span>
+                <strong>{assigned.length} brand{assigned.length === 1 ? '' : 's'} will become unassigned</strong>
+                {' '}— {assigned.join(', ')}. Assign {assigned.length === 1 ? 'it' : 'them'} to someone else afterwards.
+              </span>
+            </div>
+          )}
+          {owns.length > 0 && (
+            <div className="wx-alert wx-alert-danger" style={{ marginBottom: 12 }}>
+              <AlertIcon width="16" height="16" />
+              <span>
+                They <strong>own</strong> {owns.length} brand{owns.length === 1 ? '' : 's'} — {owns.join(', ')}.
+                A brand must always have an owner, so move {owns.length === 1 ? 'it' : 'them'} to another
+                Team Lead first. Only the Boss can retire a brand owner, and the brands pass to the Boss.
+              </span>
+            </div>
+          )}
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
-            Reassign their brands and anyone reporting to them first — those do not move by themselves.
+            Anyone reporting to them keeps reporting to them until you move those people — that does not
+            happen by itself.
           </div>
           <label className="wx-label" style={{ marginBottom: 6 }}>
             Type <strong style={{ color: 'var(--text-primary)' }}>{target}</strong> to confirm
