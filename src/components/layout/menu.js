@@ -124,6 +124,20 @@ const PAID_COLLAB_PCTL = {
   ],
 };
 
+// --- Employees group, OL variant -----------------------------------
+// Only the two rosters an OL can act on. An OL may mark an APC or a Team Lead
+// as an ex-employee (Owner, 2026-10-12); they cannot create accounts or edit
+// profiles, and those controls are hidden on the page. The other rosters,
+// Salaries included, stay off this menu.
+const EMPLOYEES_GROUP_OL = {
+  label: 'Employees',
+  icon: UsersIcon,
+  children: [
+    { label: 'Team Leads', to: '/boss/manage/tls' },
+    { label: 'APCs',       to: '/boss/manage/apcs' },
+  ],
+};
+
 // --- Employees group (boss only, v1: MANAGE_SUB) -------------------
 // Onboarding is omitted — no v2 page yet.
 const EMPLOYEES_GROUP = {
@@ -257,6 +271,7 @@ export const MENUS = {
   ],
   ol: [
     DASHBOARD_ITEM,
+    EMPLOYEES_GROUP_OL,
     BRANDS_ITEM,
     CREATOR_LIBRARY_ITEM,
     BRAND_ANALYTICS,

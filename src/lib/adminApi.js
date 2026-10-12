@@ -57,12 +57,35 @@ export async function deleteUser(userId) {
 export async function listProfilesByRole(role) {
   // Join parent profile (reports_to → profiles) so we can show "Reports to: X"
   // Filter out soft-deleted users (deleted_at IS NOT NULL).
+  //
+  // Keep this CURRENT-STAFF-ONLY. It also feeds the payroll page
+  // (BossSalariesPage), so widening it would put ex-employees back on the
+  // salary surface. Former staff have their own query below.
   const { data, error } = await supabase
     .from('profiles')
     .select('*, parent:reports_to(id, display_name, role)')
     .eq('role', role)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Former staff of a role: the people `delete-user` has retired
+// (is_active = false, deleted_at set). They are kept rather than erased,
+// because reports, approvals, assignments and the audit trail still point at
+// them — `verified_by` / `approved_by` are `on delete set null`, so wiping the
+// row would quietly blank out who approved what.
+//
+// Newest departure first: when someone has just left, they are who the Boss is
+// looking for.
+export async function listFormerProfilesByRole(role) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*, parent:reports_to(id, display_name, role)')
+    .eq('role', role)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
   if (error) throw new Error(error.message);
   return data || [];
 }

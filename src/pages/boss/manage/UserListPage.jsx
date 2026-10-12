@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { listProfilesByRole, deleteUser } from '../../../lib/adminApi';
+import { listProfilesByRole, listFormerProfilesByRole, deleteUser } from '../../../lib/adminApi';
 import { getRoleExtras } from '../../../lib/roles';
 import { useAuth } from '../../../contexts/AuthContext';
 import CreateUserModal from '../../../components/boss/CreateUserModal';
@@ -10,30 +10,61 @@ import {
 } from '../../../components/common/Icon';
 import '../../../styles/table.css';
 
+// Who an Operation Lead may retire (Owner, 2026-10-12: "if an APC or Teamlead
+// is laid off the boss or OL must be able to mark them as ex-employee").
+// Enforced for real in the delete-user function; this only decides whether the
+// button is worth showing.
+const OL_MAY_RETIRE = ['apc', 'tl'];
+
 export default function UserListPage({ role, title, emptyHint }) {
-  const { user: me } = useAuth();
+  const { user: me, profile } = useAuth();
+  const myRole = String(profile?.role || '').toLowerCase();
+  const isBoss = myRole === 'boss';
+  // Creating accounts and editing a profile stay with the Boss: create-user is
+  // Boss-only, and the profiles UPDATE policy is self-or-boss, so an OL
+  // pressing either would just collect a 403.
+  const canCreate = isBoss;
+  const canEdit = isBoss;
+  const canRetire = isBoss || (myRole === 'ol' && OL_MAY_RETIRE.includes(role));
   const [q, setQ] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  // Current staff by default. Former staff are a deliberate second view rather
+  // than mixed into the list: almost every reason to open this page is about
+  // someone who still works here.
+  const [tab, setTab] = useState('current');
 
   const qc = useQueryClient();
   const { data: rows = [], isLoading: loading, error: queryError } = useQuery({
     queryKey: ['profiles-by-role', role],
     queryFn: () => listProfilesByRole(role),
   });
-  const error = queryError?.message || '';
-  const load  = () => qc.invalidateQueries({ queryKey: ['profiles-by-role', role] });
+  // Fetched alongside, not on demand, so the tab can show its count and
+  // switching is instant.
+  const { data: formerRows = [], isLoading: loadingFormer, error: formerError } = useQuery({
+    queryKey: ['profiles-by-role-former', role],
+    queryFn: () => listFormerProfilesByRole(role),
+  });
+  const error = queryError?.message || formerError?.message || '';
+  const load  = () => {
+    qc.invalidateQueries({ queryKey: ['profiles-by-role', role] });
+    qc.invalidateQueries({ queryKey: ['profiles-by-role-former', role] });
+  };
+
+  const isFormer = tab === 'former';
+  const source = isFormer ? formerRows : rows;
+  const busy = isFormer ? loadingFormer : loading;
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    if (!qq) return rows;
-    return rows.filter(
+    if (!qq) return source;
+    return source.filter(
       (r) =>
         (r.display_name || '').toLowerCase().includes(qq) ||
         (r.email || '').toLowerCase().includes(qq),
     );
-  }, [rows, q]);
+  }, [source, q]);
 
   return (
     <>
@@ -41,14 +72,38 @@ export default function UserListPage({ role, title, emptyHint }) {
         <div>
           <h1 className="page-title">{title}</h1>
           <p className="page-subtitle">
-            {rows.length} {rows.length === 1 ? 'user' : 'users'}
-            {q && filtered.length !== rows.length && ` · ${filtered.length} matching "${q}"`}
+            {isFormer
+              ? `${formerRows.length} former ${formerRows.length === 1 ? 'member' : 'members'}`
+              : `${rows.length} ${rows.length === 1 ? 'user' : 'users'}`}
+            {q && filtered.length !== source.length && ` · ${filtered.length} matching "${q}"`}
           </p>
         </div>
-        <button className="wx-btn wx-btn-primary" onClick={() => setShowCreate(true)}>
-          <PlusIcon width="16" height="16" /> Add {title.replace(/s$/, '')}
-        </button>
+        {canCreate && (
+          <button className="wx-btn wx-btn-primary" onClick={() => setShowCreate(true)}>
+            <PlusIcon width="16" height="16" /> Add {title.replace(/s$/, '')}
+          </button>
+        )}
       </div>
+
+      {/* Only worth showing once somebody has actually left this role. */}
+      {formerRows.length > 0 && (
+        <div className="wx-segmented" role="tablist" aria-label="Current or former staff" style={{ marginBottom: 12 }}>
+          <button
+            type="button" role="tab" className="wx-segmented-btn"
+            aria-selected={!isFormer} data-active={!isFormer}
+            onClick={() => setTab('current')}
+          >
+            Current <span className="wx-segmented-n">{rows.length}</span>
+          </button>
+          <button
+            type="button" role="tab" className="wx-segmented-btn"
+            aria-selected={isFormer} data-active={isFormer}
+            onClick={() => setTab('former')}
+          >
+            Ex-employees <span className="wx-segmented-n">{formerRows.length}</span>
+          </button>
+        </div>
+      )}
 
       <div className="wx-toolbar">
         <div className="wx-search">
@@ -75,31 +130,40 @@ export default function UserListPage({ role, title, emptyHint }) {
         <div className="wx-list-row wx-list-header">
           <div>Name</div>
           <div>Email</div>
-          <div>Status</div>
+          <div>{isFormer ? 'Left' : 'Status'}</div>
           <div />
         </div>
 
-        {loading && (
+        {busy && (
           <div className="wx-empty">
             <span className="wx-spinner" style={{ color: 'var(--accent)' }} /> Loading…
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!busy && filtered.length === 0 && (
           <div className="wx-empty">
             <div style={{ display: 'grid', placeItems: 'center', width: 48, height: 48, borderRadius: 'var(--radius-pill)', background: 'var(--surface-2)', color: 'var(--text-muted)', margin: '0 auto 12px' }}>
               <UsersIcon width="22" height="22" />
             </div>
-            <div className="wx-empty-title">No {title.toLowerCase()} yet</div>
-            <div>{emptyHint || 'Click the button above to add one.'}</div>
+            <div className="wx-empty-title">
+              {isFormer ? `No former ${title.toLowerCase()}` : `No ${title.toLowerCase()} yet`}
+            </div>
+            <div>
+              {isFormer
+                ? 'Nobody in this role has left.'
+                : (emptyHint || 'Click the button above to add one.')}
+            </div>
           </div>
         )}
 
-        {!loading && filtered.map((u) => (
+        {!busy && filtered.map((u) => (
           <UserRow
             key={u.id}
             user={u}
+            former={isFormer}
             isSelf={me?.id === u.id}
+            canEdit={canEdit}
+            canRetire={canRetire}
             onEdit={() => setEditUser(u)}
             onDelete={() => setDeleteTarget(u)}
           />
@@ -134,13 +198,13 @@ export default function UserListPage({ role, title, emptyHint }) {
   );
 }
 
-function UserRow({ user, isSelf, onEdit, onDelete }) {
+function UserRow({ user, former = false, isSelf, canEdit = true, canRetire = true, onEdit, onDelete }) {
   const initials = (user.display_name || user.email || '?')
     .split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
   const extras = getRoleExtras(user.role);
   const activePerms = extras.permissions.filter((p) => user.permissions?.[p.key]);
   return (
-    <div className="wx-list-row">
+    <div className="wx-list-row" data-former={former || undefined}>
       <div className="wx-user-cell">
         <div className="wx-user-avatar">
           {user.avatar_url
@@ -203,7 +267,11 @@ function UserRow({ user, isSelf, onEdit, onDelete }) {
       </div>
       <div className="wx-user-email">{user.email}</div>
       <div>
-        {user.is_active ? (
+        {former ? (
+          <span className="wx-badge wx-badge-muted" title={user.deleted_at || ''}>
+            <span className="wx-badge-dot" /> {leftOn(user.deleted_at)}
+          </span>
+        ) : user.is_active ? (
           <span className="wx-badge wx-badge-success">
             <span className="wx-badge-dot" /> Active
           </span>
@@ -214,20 +282,25 @@ function UserRow({ user, isSelf, onEdit, onDelete }) {
         )}
       </div>
       <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-        <button
-          className="wx-btn wx-btn-ghost"
-          style={{ padding: '6px 12px', fontSize: 12.5 }}
-          onClick={onEdit}
-        >
-          <PencilIcon width="14" height="14" /> Edit
-        </button>
-        {!isSelf && user.role !== 'boss' && (
+        {/* A former member has no account to edit and cannot be retired twice,
+            so the row is read-only. Their history stays reachable through the
+            reports and audit trail that still reference them. */}
+        {!former && canEdit && (
+          <button
+            className="wx-btn wx-btn-ghost"
+            style={{ padding: '6px 12px', fontSize: 12.5 }}
+            onClick={onEdit}
+          >
+            <PencilIcon width="14" height="14" /> Edit
+          </button>
+        )}
+        {!former && canRetire && !isSelf && user.role !== 'boss' && (
           <button
             className="wx-btn wx-btn-ghost"
             style={{ padding: '6px 10px', fontSize: 12.5, color: 'var(--danger)' }}
             onClick={onDelete}
-            title="Delete user"
-            aria-label="Delete user"
+            title="Mark as ex-employee"
+            aria-label="Mark as ex-employee"
           >
             <TrashIcon width="14" height="14" />
           </button>
@@ -235,6 +308,14 @@ function UserRow({ user, isSelf, onEdit, onDelete }) {
       </div>
     </div>
   );
+}
+
+// "Left 12 Oct 2026" — the date is what the Boss is scanning for.
+function leftOn(ts) {
+  if (!ts) return 'Ex-employee';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return 'Ex-employee';
+  return `Left ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
 
 function DeleteUserModal({ user, onClose, onDeleted }) {
@@ -274,7 +355,7 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
             }}>
               <TrashIcon width="16" height="16" />
             </span>
-            Delete user
+            Mark as ex-employee
           </div>
           <button type="button" className="shell-icon-btn" onClick={onClose} aria-label="Close">
             <XIcon width="16" height="16" />
@@ -287,11 +368,19 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
             </div>
           )}
           <div style={{ fontSize: 13.5, color: 'var(--text-primary)', marginBottom: 6, lineHeight: 1.5 }}>
-            Are you sure you want to delete <strong>{user.display_name || user.email}</strong>?
+            Mark <strong>{user.display_name || user.email}</strong> as an ex-employee?
+          </div>
+          {/* The old copy said "This is permanent … a deleted account", which
+              was never what happens: delete-user soft-deletes, so the person
+              and their history are kept. Saying otherwise made the Boss think
+              retiring someone destroyed their records. */}
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
+            They lose access immediately and are signed out of any open session. Nothing is deleted:
+            their reports, approvals and assignments stay as they are, and you will find them under
+            <strong style={{ color: 'var(--text-secondary)' }}> Ex-employees</strong> on this page.
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
-            This is permanent. The user will no longer be able to sign in. Their historical assignments
-            and audit trail will reference a deleted account.
+            Reassign their brands and anyone reporting to them first — those do not move by themselves.
           </div>
           <label className="wx-label" style={{ marginBottom: 6 }}>
             Type <strong style={{ color: 'var(--text-primary)' }}>{target}</strong> to confirm
@@ -322,7 +411,7 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
             onClick={handleDelete}
             disabled={!canSubmit}
           >
-            {deleting ? <><span className="wx-spinner" /> Deleting…</> : 'Delete user'}
+            {deleting ? <><span className="wx-spinner" /> Saving…</> : 'Mark as ex-employee'}
           </button>
         </div>
       </div>

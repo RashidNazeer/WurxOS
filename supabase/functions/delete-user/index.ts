@@ -14,7 +14,9 @@
 //      lists so the user disappears from APC/IPC/TL/etc. pages.
 //
 // Guards:
-//   * Caller must be an active Boss.
+//   * Caller must be an active Boss, or an active Operation Lead.
+//   * An OL may retire ONLY an APC or a Team Lead. The Boss may retire anyone
+//     except another Boss.
 //   * Cannot delete self.
 //   * Cannot delete another Boss account.
 //
@@ -60,9 +62,20 @@ Deno.serve(async (req) => {
     .eq('id', user.id)
     .maybeSingle();
   if (callerErr) return json({ error: callerErr.message }, 500);
-  if (!caller || !caller.is_active || caller.role !== 'boss') {
+  // The Boss may retire anyone (bar another Boss, checked below). An active
+  // Operation Lead may retire an APC or a Team Lead and nobody else (Owner,
+  // 2026-10-12: "if an APC or Teamlead is laid off the boss or OL must be able
+  // to mark them as ex-employee"). An OL explicitly may NOT retire another OL,
+  // a PCTL, an IPC, a developer or the Boss — otherwise one OL could remove
+  // their own peers, and an OL could not be held to the Boss's org decisions.
+  //
+  // This is the only gate that matters: the UI's hidden button is a courtesy,
+  // and the function runs with the service role, so it bypasses RLS entirely.
+  if (!caller || !caller.is_active || !['boss', 'ol'].includes(caller.role)) {
     return json({ error: 'Forbidden' }, 403);
   }
+  const callerIsBoss = caller.role === 'boss';
+  const OL_MAY_RETIRE = ['apc', 'tl'];
 
   let body: { userId?: string };
   try { body = await req.json(); }
@@ -81,6 +94,10 @@ Deno.serve(async (req) => {
   if (!target)   return json({ error: 'User not found.' }, 404);
   if (target.role === 'boss') {
     return json({ error: 'Boss accounts cannot be deleted from here.' }, 400);
+  }
+  if (!callerIsBoss && !OL_MAY_RETIRE.includes(target.role)) {
+    // Deliberately says what IS allowed, so an OL is not left guessing.
+    return json({ error: 'An Operation Lead can only mark an APC or a Team Lead as an ex-employee. Ask the Boss for anyone else.' }, 403);
   }
 
   // Soft-delete the auth user (the second arg is shouldSoftDelete).
