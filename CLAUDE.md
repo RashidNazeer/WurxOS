@@ -47,8 +47,17 @@ portals — everything an agency needs.
 
 ### Migrations
 - Live in `supabase/migrations/*.sql`. Naming: `NNN_short_name.sql`. Highest is
-  **359** (next available is 360), as of 2026-09-11. Don't trust this number
+  **416** (next available is 417), as of 2026-10-06. Don't trust this number
   blindly — `ls` the folder, it moves most weeks.
+- **NEVER reuse a number, even on a different branch.** The CLI keys its ledger
+  on the numeric prefix alone, so two files sharing one number means only one
+  can ever be recorded and the other is skipped **silently, reporting success**.
+  This bit us: `407_ai_ingest_quiet_hours.sql` and `407_brand_temp_assign.sql`
+  both existed after a merge, quiet hours took the slot, and production ran for
+  weeks with the Brand Switcher temporary-cover UI live but none of its tables
+  or functions. Recovered by re-applying the loser under a free number
+  (mig 414). When merging branches that both added migrations, check for a
+  collision before pushing: `ls supabase/migrations | cut -c1-3 | sort | uniq -d`.
 - Apply via `supabase db push --include-all`. The CLI is already linked to the
   WurxOS-V2 project (ref `xoaaidgvblondjpvxjqp`).
 - Triggers do NOT fire retroactively. If you ship a trigger to keep some
@@ -132,8 +141,11 @@ portals — everything an agency needs.
 ### Wurx Buddy (the AI assistant, v2)
 - Design, decisions, runbook, tests, and the 57 app how-to guides live in
   **`wurx-buddy/`** (start with `wurx-buddy/runbook-ingestion.md` and `wurx-buddy/ui-design.md`).
-  What ships is still this repo's `supabase/` (migrations 367–397, functions
-  `assistant`, `ai-ingest`, `tts-crawl`, shared `_shared/ai/`) and `src/`.
+  What ships is this repo's `supabase/` (migrations 367–416, functions
+  `assistant`, `ai-ingest`, `tts-crawl`, shared `_shared/ai/`) and `src/`. There is no copy under
+  `wurx-buddy/supabase/` any more. The unit tests live beside the code in
+  `supabase/functions/_shared/ai/__tests__/` (run `npm test` from the repo root, no network);
+  `wurx-buddy/` holds the design docs, runbooks, dev scripts and app guides.
 - **Taking it to production:** follow `wurx-buddy/prompt.md` step by step.
 - `wurx-buddy/` scripts are dev-only and read `../.env.dev` (repo root, gitignored).
 - The Supabase CLI is **not** pre-linked on a fresh machine (the "already linked" note above

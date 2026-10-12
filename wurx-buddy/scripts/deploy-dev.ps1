@@ -20,7 +20,7 @@
  argument, environment variable, ..\.env.dev value or supabase\.temp link file
  names another project, and every CLI call passes --project-ref <dev> and
  --workdir <Assistant> explicitly (no `supabase link`, no config.toml needed:
- --workdir makes the CLI use Assistant\supabase\functions without searching
+ --workdir <repo root> makes the CLI use supabase\functions without searching
  upward). Production is never a possible target.
  Skip steps with -SkipSecrets, -SkipFunctions, -SkipMigrations, -SkipConfig.
 
@@ -51,6 +51,7 @@ $ErrorActionPreference = 'Stop'
 $DevRef    = 'vyvkwbvreeycmmnikqbz'                               # wurxos-dev
 $Forbidden = @('xoaaidgvblondjpvxjqp', 'yrthghmzlbdmgwzaoeec')    # WurxOSV2 (production), gmv-intel
 $Assistant = Split-Path -Parent $PSScriptRoot
+$Repo      = Split-Path -Parent $Assistant                          # the shipped supabase/ lives here
 $EnvFile   = Join-Path (Split-Path -Parent $Assistant) '.env.dev'
 $Functions = @('ai-ingest', 'tts-crawl')
 $Migrations = @('379', '380', '374', '375', '381')
@@ -88,7 +89,7 @@ if ($envMap['WURXOS_DEV_PROJECT_REF'] -ne $DevRef) { Stop-Deploy "WURXOS_DEV_PRO
 foreach ($k in $envMap.Keys) {
   foreach ($f in $Forbidden) { if ([string]$envMap[$k] -match $f) { Stop-Deploy ".env.dev value $k names a forbidden project." } }
 }
-foreach ($dir in @((Join-Path $Assistant 'supabase\.temp'), (Join-Path (Split-Path -Parent $Assistant) 'supabase\.temp'))) {
+foreach ($dir in @((Join-Path $Repo 'supabase\.temp'))) {
   $pr = Join-Path $dir 'project-ref'
   if ((Test-Path $pr) -and ((Get-Content $pr -Raw).Trim() -ne $DevRef)) { Stop-Deploy "$pr links another project (run nothing; ask the Lead)." }
   $lp = Join-Path $dir 'linked-project.json'
@@ -99,12 +100,12 @@ foreach ($dir in @((Join-Path $Assistant 'supabase\.temp'), (Join-Path (Split-Pa
   }
 }
 foreach ($fn in $Functions) {
-  if (-not (Test-Path (Join-Path $Assistant "supabase\functions\$fn\index.ts"))) { Stop-Deploy "supabase\functions\$fn\index.ts not found." }
+  if (-not (Test-Path (Join-Path $Repo "supabase\functions\$fn\index.ts"))) { Stop-Deploy "supabase\functions\$fn\index.ts not found." }
 }
 
 # Every CLI call goes through here: the dev ref and the Assistant workdir, always.
 function Invoke-Supabase([string[]]$cliArgs) {
-  $all = @($cliArgs) + @('--project-ref', $DevRef, '--workdir', $Assistant)
+  $all = @($cliArgs) + @('--project-ref', $DevRef, '--workdir', $Repo)
   foreach ($a in $all) { foreach ($f in $Forbidden) { if ($a -match $f) { Stop-Deploy "a CLI argument names a forbidden project." } } }
   & npx --yes supabase @all
   if ($LASTEXITCODE -ne 0) { throw "supabase $($cliArgs -join ' ') failed (exit $LASTEXITCODE)" }
@@ -112,7 +113,7 @@ function Invoke-Supabase([string[]]$cliArgs) {
 
 Push-Location $Assistant
 try {
-  Write-Host "Target: DEV $DevRef (wurxos-dev). Workdir: $Assistant" -ForegroundColor Yellow
+  Write-Host "Target: DEV $DevRef (wurxos-dev). Workdir: $Repo" -ForegroundColor Yellow
   if ($DryRun) { Write-Host 'DRY RUN: checks only, nothing is changed.' -ForegroundColor Yellow }
 
   # ---------------------------------------------------------------- (a)
@@ -183,7 +184,7 @@ try {
   else {
     foreach ($fn in $Functions) {
       $deployArgs = @('functions', 'deploy', $fn) + $(if ($NoVerifyJwt) { @('--no-verify-jwt') } else { @() }) + @('--use-api')
-      if ($DryRun) { Write-Host "would run: supabase $($deployArgs -join ' ') --project-ref $DevRef --workdir $Assistant" }
+      if ($DryRun) { Write-Host "would run: supabase $($deployArgs -join ' ') --project-ref $DevRef --workdir $Repo" }
       else { Invoke-Supabase $deployArgs; Write-Host "ok: $fn deployed." }
     }
   }
@@ -228,7 +229,7 @@ try {
     Write-Host @"
 
 Verification checklist (dev, assistant):
-  1. npx supabase functions list --project-ref $DevRef --workdir "$Assistant"   -> assistant ACTIVE, verify_jwt true.
+  1. npx supabase functions list --project-ref $DevRef --workdir "$Repo"   -> assistant ACTIVE, verify_jwt true.
   2. node scripts\db-dev.mjs status   -> 378, 383, 385, 386, 387 listed.
   3. Signed in as the dev Boss: POST https://$DevRef.supabase.co/functions/v1/assistant
        {"message":"What does our SOP say about approving sample requests?","stream":true}
@@ -240,7 +241,7 @@ Verification checklist (dev, assistant):
   Write-Host @"
 
 Verification checklist (dev):
-  1. npx supabase functions list --project-ref $DevRef --workdir "$Assistant"
+  1. npx supabase functions list --project-ref $DevRef --workdir "$Repo"
        ai-ingest and tts-crawl ACTIVE, verify_jwt false.
   2. node scripts\db-dev.mjs status          -> 374, 375, 379, 380, 381 listed.
   3. SQL: select jobname, schedule from cron.job where jobname like 'ai-%';

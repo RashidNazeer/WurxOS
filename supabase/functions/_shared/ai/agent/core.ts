@@ -11,7 +11,7 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, monthSpend, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, saverOn, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
 import { chatRespond } from '../llm/chat.ts';
 import { stripToolMarkup } from '../llm/textTools.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
@@ -20,7 +20,8 @@ import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIss
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
 import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
 import { budgetFor, budgetFromError, estimate, fitRequest, learnBudget } from './compact.ts';
-import { ALL_TOOL_DEFS, CiteRegistry, runTool, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
+import { CiteRegistry, newTurnGuard, runTool, toolDefsFor, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
+import { usableProviders, webAllowedForRole, webConfig, type WebEnv, type WebKeys, type WebUsage } from '../web/index.ts';
 
 export type Emit = (ev: Record<string, unknown>) => void;
 
@@ -85,6 +86,9 @@ export type CoreDeps = {
   geminiKey?: string | null;         // GEMINI_API_KEY (the 'gemini' slot, Chat Completions)
   nvidiaKey?: string | null;         // NVIDIA_API_KEY (the 'nvidia' slot; free, dev/test only)
   nvidia2Key?: string | null;        // NVIDIA_API_KEY_2 (the 'nvidia2' slot)
+  tavilyKey?: string | null;         // TAVILY_API_KEY (web search / page extraction, mig 415)
+  braveKey?: string | null;          // BRAVE_API_KEY (web search, mig 416; unset until the Owner adds it)
+  fetchImpl?: typeof fetch;          // test seam for the web tools
   catalog?: CatalogRow[];            // tests; otherwise read from ai_model_catalog
   rateLimitExempt?: boolean;         // local server only (serve-assistant --no-rate-limit); still logged
   embedDown?: () => boolean;         // query embeddings known to be failing on every key
@@ -92,7 +96,6 @@ export type CoreDeps = {
   embedAlt?: (text: string) => Promise<number[] | null>;   // NVIDIA query vector (mig 406)
   rerank?: Reranker;
   model?: string;                    // local override (serve-assistant --model); still allow-listed
-  monthSpend?: () => Promise<number | null>;   // test seam: month-to-date spend (budget saver)
   modelKeySlot?: KeySlot;            // with `model`: that key, taken as given (serve-assistant --key-slot)
   meter?: UsageMeter;                // rerank + query-embedding usage of this question (→ ai_usage_log)
   now?: () => Date;
@@ -112,8 +115,10 @@ const add = (a: Usage, b: Usage): Usage => ({ input: a.input + b.input, cached: 
 
 async function loadConfig(admin: any) {
   const cols = 'persona, model, enabled, retrieval, prices, model_key_slot, fallback_models, fallback_enabled';
-  const { data, error } = await admin.from('ai_assistant_config').select(`${cols}, auto_failover, role_models, budget_saver_pct, monthly_budget_usd`).eq('id', 1).maybeSingle();
-  // Before mig 401 / 404 there are no auto_failover / role_models columns: read the rest.
+  const { data, error } = await admin.from('ai_assistant_config')
+    .select(`${cols}, auto_failover, role_models, web_search_enabled, web_providers, searxng_url, web_max_results, web_allowed_roles`)
+    .eq('id', 1).maybeSingle();
+  // Before mig 401 / 404 / 415 there are no auto_failover / role_models / web_* columns: read the rest.
   if (error) return (await admin.from('ai_assistant_config').select(cols).eq('id', 1).maybeSingle()).data ?? {};
   return data ?? {};
 }
@@ -169,6 +174,30 @@ export function usageRows(meter: UsageMeter | undefined, prices: Prices, who: { 
   return rows;
 }
 
+// Web calls as ai_usage_log rows (mig 415). Tavily bills in credits, not
+// tokens, so the credit count goes in tokens_in (the only integer column the
+// usage view sums) and est_cost_usd stays 0 with unpriced=true: the Boss sees
+// HOW MUCH was used without Buddy inventing a dollar rate for a plan it cannot
+// see. SearXNG is the company's own instance, so it is free by definition.
+export function webUsageRows(entries: { kind: 'web_search' | 'web_extract'; usage: WebUsage[] }[],
+  who: { user_id: string; request_id: string }) {
+  const byKey = new Map<string, { kind: string; provider: string; calls: number; credits: number }>();
+  for (const e of entries) {
+    for (const u of e.usage) {
+      const k = `${e.kind}|${u.provider}`;
+      const prev = byKey.get(k) ?? { kind: e.kind, provider: u.provider, calls: 0, credits: 0 };
+      prev.calls += u.calls;
+      prev.credits += u.credits;
+      byKey.set(k, prev);
+    }
+  }
+  return [...byKey.values()].map((v) => ({
+    ...who, kind: v.kind, model: v.provider, key_slot: 'web', calls: v.calls,
+    tokens_in: Math.round(v.credits), tokens_cached: 0, tokens_out: 0,
+    est_cost_usd: 0, unpriced: v.credits > 0,
+  }));
+}
+
 export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Promise<TurnResult> {
   const t0 = Date.now();
   const now = deps.now?.() ?? new Date();
@@ -192,10 +221,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
     nvidia: deps.nvidiaKey ?? null, nvidia2: deps.nvidia2Key ?? null };
   const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
-  // Per-role models (mig 404); the budget saver switches roles with an economy model.
-  const hasEconomy = Object.values((row.role_models ?? {}) as Record<string, any>).some((v) => v?.economy?.model);
-  const economyOn = hasEconomy && Number(row.budget_saver_pct) > 0 && saverOn(row, await (deps.monthSpend ?? (() => monthSpend(admin)))());
-  const resolved = resolveRoleConfig(row, req.role, economyOn);
+  // Per-role models (mig 404): the Boss / a developer picks the model per role.
+  const resolved = resolveRoleConfig(row, req.role);
   const chain = chooseTargets(resolved, catalog, keys, override);
   // Buddy must never go down (Owner 2026-10-01): after the Boss's chain, every
   // other usable model in the catalog, unless auto_failover is switched off.
@@ -289,6 +316,18 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const left = () => deadline - Date.now();
 
   const persona = effectivePersona(row.persona);
+  // The open internet (mig 415): off unless switched on AND this role is
+  // allowed AND a provider is actually usable. All three have to hold, or the
+  // tools are not offered and the prompt never mentions the web.
+  const webCfg = webConfig(row);
+  const webKeys: WebKeys = { tavily: deps.tavilyKey ?? null, brave: deps.braveKey ?? null };
+  const webEnv: WebEnv | null = (() => {
+    if (!webAllowedForRole(webCfg, req.role)) return null;
+    const env: WebEnv = { config: webCfg, keys: webKeys, ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}) };
+    return usableProviders(env).length ? env : null;
+  })();
+  const webUsage: { kind: 'web_search' | 'web_extract'; usage: WebUsage[] }[] = [];
+  const turnGuard = newTurnGuard(message);
   const toolsCalled: string[] = [];
   let serious = isSeriousTopic(message);
   const surface = req.surface === 'slack' ? 'slack' : cleanSurface(req.surface);
@@ -297,8 +336,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     ...[await pageContextNote(admin, req.userId, req.pageContext ?? null)].filter((x): x is string => !!x),
     ...(deps.embedDown?.() ? ['SEARCH is in keyword-only mode right now (no semantic search): search with the exact words a document would use, and if you cannot find something, say so plainly.'] : []),
   ];
-  const { instructions } = buildInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now, notes });
-  const compactBase = compactInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now });
+  const { instructions } = buildInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now, notes, web: !!webEnv });
+  const compactBase = compactInstructions({ persona: persona.text, role: req.role, displayName: req.displayName, now, web: !!webEnv });
   const compactTried = new Set<string>();
 
   // Search without embeddings (no credits on any key): the keyword arm only.
@@ -309,6 +348,12 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const reg = new CiteRegistry();
   const env: ToolEnv = {
     admin, searchRpc: deps.searchRpc, asUser: deps.asUser, embed: embedWatched, embedAlt: deps.embedAlt, rerank: deps.rerank,
+    // The per-turn guard, seeded with any link the person put in their own
+    // message (those they may always open). It is created whether or not the
+    // web is on, because it also latches "private data has been read", which
+    // gates free-tier model failover.
+    turn: turnGuard,
+    ...(webEnv ? { web: webEnv, onWebUsage: (kind, usage) => { webUsage.push({ kind, usage }); } } : {}),
     // userClient: the caller's own JWT client, so people & pay tools read under
     // that user's RLS (Engineer 2, ui-design §8). None on the internal (Boss) path.
     retrieval, agent, ctx: { userId: req.userId, role: req.role, ...(deps.userClient ? { userClient: deps.userClient } : {}) }, now,
@@ -350,6 +395,20 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     for (let paramTries = 0; ;) {
       // A model that just failed for quota / limit / a refused key is skipped
       // (the last one left is always tried).
+      // Pay data must not fail over onto a free tier. Once a people/pay tool
+      // has returned, its output is in `input`, and every later model call
+      // carries it — so a quota error on the paid key would have handed
+      // salaries to Gemini/Groq/NVIDIA free endpoints, whose terms are not
+      // what we would choose for payroll (QA F8). Free slots are skipped from
+      // that moment; if only free ones remain the turn fails, which is the
+      // right way round.
+      if (turnGuard?.sensitiveUsed) {
+        for (let guard = 0; SLOTS[target.keySlot].free && ti + 1 < targets.length && guard < targets.length; guard++) {
+          ((flags.skipped_free_tier ??= []) as string[]).push(tag(target));
+          moveOn('private data in this turn: free tiers skipped');
+        }
+        if (SLOTS[target.keySlot].free) throw new Error('No non-free model is available, and this turn has read private data.');
+      }
       for (let c = coolingDown(target); c && ti + 1 < targets.length; c = coolingDown(target)) {
         ((flags.skipped_cooling ??= []) as string[]).push(tag(target));
         if (c.issue !== 'busy') chainIssues.push({ issue: c.issue, model: target.model, slot: target.keySlot, waitMs: c.waitMs });
@@ -378,7 +437,9 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       try {
         const res = await (chat ? chatLlm : llm)({
           apiKey: keyFor(keys, target.keySlot)!, model: target.model, instructions, input,
-          promptCacheKey: `wurx-buddy-${req.role}`, timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta,
+            // The web rules are part of the stable prefix, so they are part of
+          // the cache key: otherwise two different prefixes share one cache.
+          promptCacheKey: `wurx-buddy-${req.role}${webEnv ? '-web' : ''}`, timeoutMs: agent.MODEL_TIMEOUT_MS, deadline, signal: cancelCtrl.signal, onDelta,
           ...(chat ? { endpoint: endpointFor(target.keySlot) } : {}),
           ...(omit.length ? { omit } : {}), ...call,
         });
@@ -436,6 +497,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   flags.llm_ms = llmMs;
   flags.model_attempts = attempts;
   flags.model_source = override ? 'override' : resolved.model_source;
+  if (webEnv) flags.web = { providers: usableProviders(webEnv), merge: webCfg.merge };
   const input: InputItem[] = [...history, { role: 'user', content: message }];
   let step = 'start';
 
@@ -453,7 +515,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       const tl = Date.now();
       const res = await ask({
         instructions: serious ? `${instructions}\nThis is a SERIOUS topic: no emoji, no jokes.` : instructions,
-        tools: toolsAllowed ? ALL_TOOL_DEFS : undefined,
+        tools: toolsAllowed ? toolDefsFor(!!webEnv) : undefined,
         effort: (toolsAllowed ? agent.EFFORT_TOOL_ROUNDS : agent.EFFORT_ANSWER) as any,
         maxOutputTokens: toolsAllowed ? agent.TOOL_ROUND_MAX_OUTPUT_TOKENS : agent.ANSWER_MAX_OUTPUT_TOKENS,
       });
@@ -596,7 +658,10 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   } catch (e) {
     console.error('ai_request_log write failed', (e as Error)?.message ?? e);
   }
-  const extra = usageRows(deps.meter, prices, { user_id: req.userId, request_id: requestId });
+  const extra = [
+    ...usageRows(deps.meter, prices, { user_id: req.userId, request_id: requestId }),
+    ...webUsageRows(webUsage, { user_id: req.userId, request_id: requestId }),
+  ];
   if (extra.length) {
     try {
       const { error: e } = await admin.from('ai_usage_log').insert(extra);

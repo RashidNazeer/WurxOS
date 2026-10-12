@@ -45,7 +45,7 @@ const one = async (sql, params) => (await q(sql, params))[0];
 // 382 as written (halfvec indexes), or with --full: the same design on full
 // vectors, for the comparison.
 function migration382({ full }) {
-  const sql = stripBom(fs.readFileSync(path.join(ASSISTANT, 'supabase/migrations/382_ai_corpus_indexes.sql'), 'utf8'));
+  const sql = stripBom(fs.readFileSync(path.join(ASSISTANT, '..', 'supabase/migrations/382_ai_corpus_indexes.sql'), 'utf8'));
   let idx = [...sql.matchAll(/create index if not exists (\w+) on public\.ai_chunks([\s\S]*?);/g)]
     .map(([, name, body]) => `create index ${name} on scratch382.ai_chunks${body};`);
   let fn = sql.slice(sql.indexOf('create or replace function public.ai_search('));

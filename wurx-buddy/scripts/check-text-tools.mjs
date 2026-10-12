@@ -1,5 +1,5 @@
 // Quick check: the exact nemotron output the Owner saw parses into a real rank_brands call.
-import { parseTextToolCalls, looksLikeToolMarkup, stripToolMarkup } from '../supabase/functions/_shared/ai/llm/textTools.ts';
+import { parseTextToolCalls, looksLikeToolMarkup, stripToolMarkup } from '../../supabase/functions/_shared/ai/llm/textTools.ts';
 
 const sample = `<tool_call>
 <function=rank_brands>

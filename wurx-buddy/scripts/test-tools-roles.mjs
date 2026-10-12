@@ -31,7 +31,7 @@ const env = readEnv();
   }
 }
 const svc = createClient(env.VITE_SUPABASE_URL, env.WURXOS_DEV_SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const T = await import('../supabase/functions/_shared/ai/tools/index.ts');
+const T = await import('../../supabase/functions/_shared/ai/tools/index.ts');
 const db = new pg.Client({ connectionString: devDbUrl(), ssl: SSL });
 await db.connect();
 const q = async (sql, params) => (await db.query(sql, params)).rows;

@@ -22,14 +22,14 @@
 import fs from 'node:fs';
 import pg from 'pg';
 import { devDbUrl, readEnv, SSL } from './dev-env.mjs';
-import { PIPELINE_VERSION, DEFAULT_CONFIG } from '../supabase/functions/_shared/ai/config.ts';
-import { SOURCE_TYPES } from '../supabase/functions/_shared/ai/extractors/index.ts';
-import { extractors } from '../supabase/functions/_shared/ai/extractors/index.ts';
-import { loaders } from '../supabase/functions/_shared/ai/ingest/loaders.ts';
-import { pgRpc } from '../supabase/functions/_shared/ai/ingest/db.ts';
-import { planDocument } from '../supabase/functions/_shared/ai/ingest/plan.ts';
-import { crawlToRows } from '../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { openAiEmbedder, runWorker } from '../supabase/functions/_shared/ai/ingest/worker.ts';
+import { PIPELINE_VERSION, DEFAULT_CONFIG } from '../../supabase/functions/_shared/ai/config.ts';
+import { SOURCE_TYPES } from '../../supabase/functions/_shared/ai/extractors/index.ts';
+import { extractors } from '../../supabase/functions/_shared/ai/extractors/index.ts';
+import { loaders } from '../../supabase/functions/_shared/ai/ingest/loaders.ts';
+import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
+import { planDocument } from '../../supabase/functions/_shared/ai/ingest/plan.ts';
+import { crawlToRows } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
+import { openAiEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const PRICE_PER_M = 0.02;   // text-embedding-3-small, USD per 1M tokens (check on the day)
 const args = process.argv.slice(2);

@@ -14,10 +14,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { ASSISTANT, readEnv } from '../../scripts/dev-env.mjs';
-import { supabaseRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
-import { retrievalConfig } from '../../supabase/functions/_shared/ai/retrieval/config.ts';
-import { searchIndex } from '../../supabase/functions/_shared/ai/retrieval/search.ts';
-import { openAiQueryEmbedder, openAiReranker } from '../../supabase/functions/_shared/ai/retrieval/rerank.ts';
+import { supabaseRpc } from '../../../supabase/functions/_shared/ai/ingest/db.ts';
+import { retrievalConfig } from '../../../supabase/functions/_shared/ai/retrieval/config.ts';
+import { searchIndex } from '../../../supabase/functions/_shared/ai/retrieval/search.ts';
+import { openAiQueryEmbedder, openAiReranker } from '../../../supabase/functions/_shared/ai/retrieval/rerank.ts';
 
 const argv = process.argv.slice(2);
 const opt = (f, d) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : d; };

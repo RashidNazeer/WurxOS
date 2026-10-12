@@ -5,7 +5,7 @@
   "description": "WurxOS Assistant v2 (agentic hybrid RAG): scripts, tests and dev tooling. Never published.",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types --test \"supabase/functions/_shared/ai/__tests__/*.test.ts\"",
+    "test": "node --experimental-strip-types --test \"tests/*.test.ts\"",
     "db:status": "node scripts/db-dev.mjs status",
     "sql:acl": "node scripts/db-dev.mjs sql tests/sql/acl.sql",
     "sql:queue": "node scripts/db-dev.mjs sql tests/sql/queue.sql",

@@ -16,15 +16,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
 import { ASSISTANT, devDbUrl, SSL } from '../../scripts/dev-env.mjs';
-import { chunkDocument } from '../../supabase/functions/_shared/ai/chunker.ts';
-import { chunkParamsFor, DEFAULT_CONFIG, PIPELINE_VERSION, pipelineSalt } from '../../supabase/functions/_shared/ai/config.ts';
-import { extractors } from '../../supabase/functions/_shared/ai/extractors/index.ts';
-import { pkr } from '../../supabase/functions/_shared/ai/extractors/incentive.ts';
-import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
-import { loaders } from '../../supabase/functions/_shared/ai/ingest/loaders.ts';
-import { crawlToRows, importArticles } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { openAiEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
-import * as FX from '../../supabase/functions/_shared/ai/__tests__/fixtures/reports.ts';
+import { chunkDocument } from '../../../supabase/functions/_shared/ai/chunker.ts';
+import { chunkParamsFor, DEFAULT_CONFIG, PIPELINE_VERSION, pipelineSalt } from '../../../supabase/functions/_shared/ai/config.ts';
+import { extractors } from '../../../supabase/functions/_shared/ai/extractors/index.ts';
+import { pkr } from '../../../supabase/functions/_shared/ai/extractors/incentive.ts';
+import { pgRpc } from '../../../supabase/functions/_shared/ai/ingest/db.ts';
+import { loaders } from '../../../supabase/functions/_shared/ai/ingest/loaders.ts';
+import { crawlToRows, importArticles } from '../../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
+import { openAiEmbedder, runWorker } from '../../../supabase/functions/_shared/ai/ingest/worker.ts';
+import * as FX from '../../../supabase/functions/_shared/ai/__tests__/fixtures/reports.ts';
 
 const MODEL = DEFAULT_CONFIG.EMBED_MODEL;
 const results = [];
@@ -98,8 +98,8 @@ try {
   const appliedMigs = new Set((await q(`select version from supabase_migrations.schema_migrations`)).map((r) => r.version));
   for (const v of ['379', '380']) {
     if (appliedMigs.has(v)) continue;
-    const f = fs.readdirSync(path.join(ASSISTANT, 'supabase/migrations')).find((n) => n.startsWith(`${v}_`));
-    await c.query(fs.readFileSync(path.join(ASSISTANT, 'supabase/migrations', f), 'utf8').replace(/^﻿/, ''));
+    const f = fs.readdirSync(path.join(ASSISTANT, '..', 'supabase/migrations')).find((n) => n.startsWith(`${v}_`));
+    await c.query(fs.readFileSync(path.join(ASSISTANT, '..', 'supabase/migrations', f), 'utf8').replace(/^﻿/, ''));
   }
   const pre = await one(`select (select count(*)::int from ai_documents) d, (select count(*)::int from ai_chunks) ch,
       (select count(*)::int from tts_articles) t, (select count(*)::int from ai_ingest_queue where status in ('pending','processing')) qb`);
@@ -848,7 +848,7 @@ try {
   qaDocs.set('qa-zombie', { sections: [{ key: 'a', title: 'A', kind: 'prose', text: 'QA Zq zombie v1 zqzombie.' }] });
   await enqueue([['qa_test', 'qa-zombie']]);
   const [itA] = await q(`select * from ai_ingest_claim(1, 'worker-A')`);
-  const { planDocument } = await import('../../supabase/functions/_shared/ai/ingest/plan.ts');
+  const { planDocument } = await import('../../../supabase/functions/_shared/ai/ingest/plan.ts');
   const srcA = (await qaSource.fetch(['qa-zombie']))[0];
   const planA = await planDocument('qa_test', srcA, null, { pipelineVersion: pipeline, model }, qaSource);   // A's stale view
   await q(`update ai_ingest_queue set locked_at = now() - interval '11 minutes' where id = $1`, [itA.id]);

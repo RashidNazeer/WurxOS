@@ -556,6 +556,8 @@
   border-radius: var(--radius-md); background: var(--danger-soft); color: var(--text-primary); font-size: 13px;
 }
 .bd-banner > i { color: var(--danger); margin-top: 2px; }
+.bd-banner.is-warn { background: var(--warning-soft); }
+.bd-banner.is-warn > i { color: var(--warning); }
 .bd-model-select { width: 100%; max-width: 520px; }
 .bd-badges { display: flex; flex-wrap: wrap; gap: 4px; }
 .bd-badge-chip {
@@ -563,6 +565,10 @@
   background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border-subtle); white-space: nowrap;
 }
 .bd-badge-chip.is-warn { background: var(--warning-soft); color: var(--text-primary); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+/* Quiet inline note next to a provider: which secret it needs. Hidden on
+   narrow screens, where the row has no room for it. */
+.bd-hint-inline { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+@media (max-width: 575.98px) { .bd-hint-inline { display: none; } }
 .bd-subhead { font-size: 13px; font-weight: 800; margin: 16px 0 6px; }
 .bd-chain { list-style: none; padding: 0; margin: 6px 0; }
 .bd-row-line.is-off { opacity: 0.55; }

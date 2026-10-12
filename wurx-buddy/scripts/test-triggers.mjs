@@ -21,7 +21,7 @@ import { ASSISTANT, devDbUrl, SSL, stripBom } from './dev-env.mjs';
 
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ ok: !!ok, name, detail: String(detail).slice(0, 180) }); };
-const mig = (n) => stripBom(fs.readFileSync(path.join(ASSISTANT, 'supabase/migrations', fs.readdirSync(path.join(ASSISTANT, 'supabase/migrations')).find((f) => f.startsWith(`${n}_`))), 'utf8'));
+const mig = (n) => stripBom(fs.readFileSync(path.join(ASSISTANT, '..', 'supabase/migrations', fs.readdirSync(path.join(ASSISTANT, '..', 'supabase/migrations')).find((f) => f.startsWith(`${n}_`))), 'utf8'));
 
 const c = new pg.Client({ connectionString: devDbUrl(), ssl: SSL, connectionTimeoutMillis: 20_000, query_timeout: 120_000 });
 c.on('error', () => {});
