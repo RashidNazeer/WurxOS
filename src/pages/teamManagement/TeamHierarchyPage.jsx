@@ -62,7 +62,12 @@ export default function TeamHierarchyPage() {
 
     const enrichedTls = tls.map((t) => {
       const members = teamUsers.filter((tu) => tu.ownerId === t.id);
-      const tlBrands = brands.filter((b) => b.ownerId === t.id);
+      // Active brands only. brands.owner_id is not-null, so a brand we have
+      // stopped working on still points at whichever TL last held it — it has
+      // to point at somebody. Showing those under the TL made retired clients
+      // look like live work (Owner, 2026-10-12). The stats below still count
+      // every brand, which is where the real totals belong.
+      const tlBrands = brands.filter((b) => b.ownerId === t.id && b.status !== 'inactive');
       return {
         ...t,
         members: members.map((m) => ({
@@ -111,7 +116,14 @@ export default function TeamHierarchyPage() {
     const devMemberCount = teamUsers.filter((t) => t.userType === 'developer').length;
     const headcount = 1 + org.ols.length + org.tls.length + apcCount + ipcCount + devMemberCount;
     const activeBrands = brands.filter((b) => b.status !== 'inactive').length;
-    const unassignedBrands = brands.filter((b) => !b.ownerId).length;
+    // "Unassigned" means no APC is working it. It used to test !b.ownerId,
+    // which is dead: brands.owner_id is NOT NULL, so that count was always
+    // zero and the card always read "0 unassigned". An active brand with no
+    // one assigned is the thing worth surfacing — it is exactly what is left
+    // behind when an APC becomes an ex-employee.
+    const unassignedBrands = brands.filter(
+      (b) => b.status !== 'inactive' && (b.assignedUsers || []).length === 0,
+    ).length;
     const apcsWithBrands = teamUsers.filter((t) => (t.userType || 'apc') === 'apc');
     const totalApcBrands = apcsWithBrands.reduce((s, a) => s + ((a.assignedBrands || []).length), 0);
     const avgBrands = apcCount > 0 ? (totalApcBrands / apcCount).toFixed(1) : '0';

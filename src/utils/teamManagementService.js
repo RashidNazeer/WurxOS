@@ -38,8 +38,12 @@ export async function loadTeamMembers() {
 
   // brand_assignments(user_id, brand_id) is exposed by fetchTeamRoster as
   // brands[].assigneeIds. Invert it into a per-user brand list.
+  // Inactive brands are skipped: a client we no longer work for should not
+  // appear under anybody's name (Owner, 2026-10-12). The assignment row is
+  // left alone in the database — this is only about what the team sees.
   const brandsByUser = new Map();
   for (const b of brands) {
+    if (b.status === 'inactive') continue;
     for (const uid of b.assigneeIds || []) {
       if (!brandsByUser.has(uid)) brandsByUser.set(uid, []);
       brandsByUser.get(uid).push({ id: b.id, brandName: b.brand_name, status: b.status });
