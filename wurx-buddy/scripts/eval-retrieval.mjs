@@ -31,12 +31,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import pg from 'pg';
 import { ASSISTANT, devDbUrl, readEnv, SSL } from './dev-env.mjs';
-import { retrievalConfig } from '../supabase/functions/_shared/ai/retrieval/config.ts';
-import { indexForSourceType } from '../supabase/functions/_shared/ai/retrieval/indexes.ts';
-import { detectPeriods } from '../supabase/functions/_shared/ai/retrieval/resolve.ts';
-import { searchEverything, searchIndex } from '../supabase/functions/_shared/ai/retrieval/search.ts';
-import { embedTexts } from '../supabase/functions/_shared/ai/embedder.ts';
-import { openAiReranker } from '../supabase/functions/_shared/ai/retrieval/rerank.ts';
+import { retrievalConfig } from '../../supabase/functions/_shared/ai/retrieval/config.ts';
+import { indexForSourceType } from '../../supabase/functions/_shared/ai/retrieval/indexes.ts';
+import { detectPeriods } from '../../supabase/functions/_shared/ai/retrieval/resolve.ts';
+import { searchEverything, searchIndex } from '../../supabase/functions/_shared/ai/retrieval/search.ts';
+import { embedTexts } from '../../supabase/functions/_shared/ai/embedder.ts';
+import { openAiReranker } from '../../supabase/functions/_shared/ai/retrieval/rerank.ts';
 
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
@@ -356,7 +356,7 @@ if (flag('--examples')) {
     { q: 'What did we recommend about creator outreach this month?', runs: [['reports', 'period:this month|sections:written:recommendations']] },
     { q: "What is TikTok's late dispatch rate requirement?", runs: [['tiktok', {}]] },
   ];
-  const { resolvePeriod } = await import('../supabase/functions/_shared/ai/retrieval/resolve.ts');
+  const { resolvePeriod } = await import('../../supabase/functions/_shared/ai/retrieval/resolve.ts');
   await embedAll(EX.map((e) => e.q));
   for (const e of EX) {
     console.log(`\n=== ${e.q}`);

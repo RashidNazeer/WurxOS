@@ -642,7 +642,7 @@ export default function App() {
               {/* Boss-only routes */}
               <Route
                 path="/boss/manage/tls"
-                element={<RoleGuard allow="boss"><TLsPage /></RoleGuard>}
+                element={<RoleGuard allow={['boss', 'ol']}><TLsPage /></RoleGuard>}
               />
               <Route
                 path="/boss/manage/pctls"
@@ -654,7 +654,7 @@ export default function App() {
               />
               <Route
                 path="/boss/manage/apcs"
-                element={<RoleGuard allow="boss"><APCsPage /></RoleGuard>}
+                element={<RoleGuard allow={['boss', 'ol']}><APCsPage /></RoleGuard>}
               />
               <Route
                 path="/boss/manage/ipcs"

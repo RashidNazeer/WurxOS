@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import pg from 'pg';
 import { ASSISTANT, devDbUrl, SSL } from './dev-env.mjs';
-import { importArticles } from '../supabase/functions/_shared/ai/ingest/ttsImport.ts';
+import { importArticles } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
 
 const args = process.argv.slice(2);
 const val = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };

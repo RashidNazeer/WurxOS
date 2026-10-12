@@ -43,7 +43,18 @@ export function providerAccountIssue(e: unknown): ProviderIssue | null {
 }
 
 // Provider text can quote a (masked) key: never store or print it.
-export const scrubSecrets = (s: string) => s.replace(/\b(sk|rk|gsk)[-_][A-Za-z0-9_\-*]{4,}/g, '$1-…').replace(/\bAIza[A-Za-z0-9_\-*]{8,}/g, 'AIza…');
+//
+// Every prefix we hand out has to be listed, or a provider that echoes the key
+// in an error body puts it straight into ai_request_log, ai_model_catalog
+// .last_error, or a tool result the model can read back. The web providers
+// (tvly-, BSA…, nvapi-) were missing, as was a bare Bearer token.
+export const scrubSecrets = (s: string) => String(s)
+  .replace(/\b(sk|rk|gsk|tvly|nvapi|pplx|xai)[-_][A-Za-z0-9_\-*]{4,}/gi, '$1-…')
+  .replace(/\bAIza[A-Za-z0-9_\-*]{8,}/g, 'AIza…')
+  .replace(/\bBSA[A-Za-z0-9_\-*]{8,}/g, 'BSA…')
+  .replace(/\b(Bearer|Token)\s+[A-Za-z0-9._\-*]{8,}/gi, '$1 …')
+  // Brave's header, if a provider ever quotes the whole request.
+  .replace(/(x-subscription-token"?\s*[:=]\s*"?)[A-Za-z0-9._\-*]{8,}/gi, '$1…');
 
 const aboutHours = (ms: number) => (ms >= 5_400_000 ? `about ${Math.round(ms / 3_600_000)} h` : `about ${Math.max(1, Math.round(ms / 60_000))} min`);
 

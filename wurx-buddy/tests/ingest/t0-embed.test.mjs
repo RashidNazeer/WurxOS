@@ -3,7 +3,7 @@
 // from ../.env.dev and never printed.
 //   node --experimental-strip-types tests/ingest/t0-embed.test.mjs
 import { readEnv } from '../../scripts/dev-env.mjs';
-import { embedTexts } from '../../supabase/functions/_shared/ai/embedder.ts';
+import { embedTexts } from '../../../supabase/functions/_shared/ai/embedder.ts';
 
 const key = readEnv().OPEN_AI_API_KEY;
 if (!key) { console.error('OPEN_AI_API_KEY missing in ../.env.dev'); process.exit(1); }

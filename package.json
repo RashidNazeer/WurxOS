@@ -11,6 +11,7 @@
     "dev:demo": "vite --mode demo",
     "dev:dev": "vite --mode dev",
     "build:dev": "vite build --mode dev",
+    "test": "node --experimental-strip-types --test \"supabase/functions/_shared/ai/__tests__/*.test.ts\"",
     "test:halo-v2": "node scripts/halo-v2-tests.mjs",
     "test:brand-switch": "node scripts/brand-switch-tests.mjs",
     "test:buddy": "node scripts/buddy-tests.mjs",

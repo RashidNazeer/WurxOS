@@ -608,7 +608,7 @@ export const canEditSettings = (profile) => !!profile && profile.is_active !== f
 
 // Settings › Wurx Buddy › <tab> (/settings?section=buddy&tab=<id>). Models first.
 export const BUDDY_TABS = [
-  ['models', 'Models'], ['access', 'Access'], ['knowledge', 'Knowledge'], ['personality', 'Personality'], ['usage', 'Usage'],
+  ['models', 'Models'], ['access', 'Access'], ['knowledge', 'Knowledge'], ['web', 'Web'], ['personality', 'Personality'], ['usage', 'Usage'],
 ];
 export const buddyTab = (t) => (BUDDY_TABS.some(([id]) => id === t) ? t : 'models');
 export const buddyTabLabel = (t) => BUDDY_TABS.find(([id]) => id === buddyTab(t))[1];
@@ -750,11 +750,14 @@ export function chainAdd(chain, item, max = FALLBACK_MAX) {
   return [...c, { key_slot: String(item.key_slot), model: item.model }];
 }
 
-// ── models by role (Owner, 2026-10-01; contract provisional) ───────
-// ai_assistant_config.role_models: { role: { model, key_slot, fallback_models,
-// economy: { model, key_slot } } }. A missing field means "Default" (inherit
-// the global setting). budget_saver_pct: at this % of the monthly budget,
-// roles with an economy model switch to it (null = off).
+// ── models by role (Owner, 2026-10-01) ────────────────────────────
+// ai_assistant_config.role_models: { role: { model, key_slot, fallback_models } }.
+// A missing field means "Default" (inherit the global setting).
+//
+// There is no economy/budget-saver tier: the Owner removed it on 2026-10-02
+// ("we have budget or no budget the boss or developers can choose the models
+// role wise"), and the server stopped reading it, so a value written here
+// would be silently ignored.
 export const ROLE_MODEL_ROLES = ['boss', 'ol', 'tl', 'pctl', 'apc', 'ipc', 'developer', 'ads_manager'];
 const ROLE_LABEL = Object.fromEntries(ALL_ROLES);
 export const roleLabel = (r) => ROLE_LABEL[r] || r;
@@ -772,8 +775,6 @@ export function normalizeRoleModels(raw) {
     const main = pickTarget(e);
     if (main) { x.model = main.model; x.key_slot = main.key_slot; }
     if (Array.isArray(e.fallback_models)) x.fallback_models = e.fallback_models.map(pickTarget).filter(Boolean).slice(0, FALLBACK_MAX);
-    const eco = pickTarget(e.economy);
-    if (eco) x.economy = eco;
     if (Object.keys(x).length) out[role] = x;
   }
   return out;
@@ -788,7 +789,6 @@ export function roleModelView(roleModels, role, global = {}) {
     backups: Array.isArray(e.fallback_models)
       ? { inherit: false, chain: e.fallback_models }
       : { inherit: true, chain: Array.isArray(global.fallback_models) ? global.fallback_models : [] },
-    economy: pickTarget(e.economy),
   };
 }
 
@@ -808,11 +808,93 @@ export const setRoleBackups = (rm, role, chain) => setRoleField(rm, role, (e) =>
   delete e.fallback_models;
   return Array.isArray(chain) ? { ...e, fallback_models: chain.slice(0, FALLBACK_MAX) } : e;
 });
-export const setRoleEconomy = (rm, role, target) => setRoleField(rm, role, (e) => {
-  delete e.economy;
-  const t = pickTarget(target);
-  return t ? { ...e, economy: t } : e;
-});
+
+// ── web search (Settings › Wurx Buddy › Web) ───────────────────────
+// ai_assistant_config: web_search_enabled, web_providers (ordered, enabled
+// ones only), web_merge, searxng_url, searxng_allow_http, web_max_results
+// (1..20), web_allowed_roles (null = every role that may use Buddy).
+// Order here is the default order, and it is deliberate: SearXNG is the
+// company's own instance (free, and it leaks no questions to anyone else),
+// Brave has its own independent index and a free tier, and Tavily bills
+// credits per call, so it goes last. A provider with no key or URL is skipped
+// by the server, so Brave sits out until BRAVE_API_KEY is set.
+export const WEB_PROVIDERS = [['searxng', 'SearXNG'], ['brave', 'Brave Search'], ['tavily', 'Tavily']];
+export const WEB_MAX_RESULTS_RANGE = [1, 20];
+export const WEB_MAX_RESULTS_DEFAULT = 6;
+const WEB_PROVIDER_IDS = WEB_PROVIDERS.map(([id]) => id);
+export const webProviderLabel = (id) => (WEB_PROVIDERS.find(([p]) => p === id)?.[1] ?? id);
+
+export const clampWebMaxResults = (n) => {
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return WEB_MAX_RESULTS_DEFAULT;
+  return Math.min(WEB_MAX_RESULTS_RANGE[1], Math.max(WEB_MAX_RESULTS_RANGE[0], v));
+};
+
+// Only the known shape survives, with the column defaults as fallbacks.
+export function normalizeWebConfig(raw) {
+  const c = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const providers = Array.isArray(c.web_providers)
+    ? [...new Set(c.web_providers.map((p) => String(p).toLowerCase()).filter((p) => WEB_PROVIDER_IDS.includes(p)))]
+    : [...WEB_PROVIDER_IDS];
+  const url = typeof c.searxng_url === 'string' ? c.searxng_url.trim() : '';
+  const roles = Array.isArray(c.web_allowed_roles)
+    ? ALL_ROLES.map(([r]) => r).filter((r) => c.web_allowed_roles.map((x) => String(x).toLowerCase()).includes(r))
+    : null;
+  return {
+    web_search_enabled: c.web_search_enabled === true,
+    web_providers: providers,
+    web_merge: c.web_merge === true,
+    searxng_url: url || null,
+    searxng_allow_http: c.searxng_allow_http === true,
+    web_max_results: c.web_max_results == null ? WEB_MAX_RESULTS_DEFAULT : clampWebMaxResults(c.web_max_results),
+    web_allowed_roles: roles,
+  };
+}
+
+// Provider rows for the editor: enabled ones in their saved order, then the rest (off).
+export const webProviderRows = (providers) => {
+  const on = (Array.isArray(providers) ? providers : []).filter((p) => WEB_PROVIDER_IDS.includes(p));
+  return [...on.map((id) => ({ id, on: true })), ...WEB_PROVIDER_IDS.filter((id) => !on.includes(id)).map((id) => ({ id, on: false }))];
+};
+export const webProviderToggle = (providers, id, on) => {
+  const c = (Array.isArray(providers) ? providers : []).filter((p) => p !== id);
+  return on && WEB_PROVIDER_IDS.includes(id) ? [...c, id] : c;
+};
+
+// SearXNG instance URL check. Returns { ok, error, url }. Loopback is never
+// allowed; private/LAN hosts and plain http only with allowHttp.
+export function validateSearxngUrl(value, allowHttp = false) {
+  const fail = (error) => ({ ok: false, error, url: null });
+  const text = String(value ?? '').trim();
+  if (!text) return fail('Enter the address of your SearXNG instance.');
+  let u;
+  try { u = new URL(text); } catch { return fail('That is not a valid URL. Start with https://'); }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return fail('The URL must start with https:// (or http://).');
+  if (u.username || u.password) return fail('Remove the username and password from the URL.');
+  const host = u.hostname.toLowerCase().replace(/\.$/, '');
+  if (!host) return fail('The URL has no host name.');
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  const [a, b] = v4 ? [Number(v4[1]), Number(v4[2])] : [-1, -1];
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '[::1]' || host === '[::]' || a === 127 || (v4 && a === 0)) {
+    return fail('localhost and loopback addresses cannot be used.');
+  }
+  const internal = !host.includes('.') || host.endsWith('.local') || host.endsWith('.internal')
+    || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254);
+  if (internal && !allowHttp) return fail('That looks like an internal address. Turn on "Allow plain http" to use one on your own network.');
+  if (u.protocol === 'http:' && !allowHttp) return fail('Plain http is off. Use https://, or turn on "Allow plain http".');
+  return { ok: true, error: '', url: u.href.replace(/\/+$/, '') };
+}
+
+// What stops a save: '' when fine. The URL matters only when SearXNG is in use or filled in.
+export function webConfigError(cfg) {
+  const c = normalizeWebConfig(cfg);
+  if (c.web_providers.includes('searxng') || c.searxng_url) {
+    const v = validateSearxngUrl(c.searxng_url, c.searxng_allow_http);
+    if (!v.ok) return v.error;
+  }
+  if (c.web_search_enabled && c.web_providers.length === 0) return 'Turn on at least one provider.';
+  return '';
+}
 
 // The budget saver line: is a budget set, how much is used, is it active now.
 export function budgetSaverState(pct, monthToDate) {
@@ -829,7 +911,7 @@ export function budgetSaverState(pct, monthToDate) {
 export const validSaverPct = (v) => v === '' || v == null || (Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 100);
 
 // meta.model_source on an answer (Boss/developer debug line).
-const MODEL_SOURCE_LABEL = { role: 'role setting', global: 'global setting', economy: 'budget saver (economy)' };
+const MODEL_SOURCE_LABEL = { role: 'role setting', global: 'global setting' };
 export const modelSourceLabel = (s) => (s ? MODEL_SOURCE_LABEL[s] || s : null);
 
 // ── ingestion fallbacks (mig 402, Engineer 2; names provisional) ───
@@ -936,6 +1018,9 @@ export function chainMove(chain, i, dir) {
 const SOURCE_LABEL = {
   kb_article: 'SOP', ai_doc: 'Guide', app_guide: 'App guide', tts_article: 'TikTok Academy',
   report: 'Report', incentive: 'Incentive',
+  // The open internet (mig 415). Labelled distinctly on purpose: the reader
+  // must be able to tell at a glance that this did NOT come from our systems.
+  web_result: 'Web', web_page: 'Web page', web: 'Web',
 };
 export const sourceLabel = (t) => SOURCE_LABEL[t] || 'Data';
 
@@ -954,8 +1039,8 @@ export function orderSources(sources) {
     .map((s, i) => ({ ...s, n: i + 1 }));
 }
 
-// [S1] / [D1, S2], and the fullwidth 【S1】 some models write.
-const CITE_RE = /[[【]((?:[SD]\d{1,3})(?:\s*[,;，]\s*[SD]\d{1,3})*)[\]】]/g;
+// [S1] / [D1, S2] / [W1], and the fullwidth 【S1】 some models write.
+const CITE_RE = /[[【]((?:[SDW]\d{1,3})(?:\s*[,;，]\s*[SDW]\d{1,3})*)[\]】]/g;
 // A tag, with quoted attribute values allowed to contain '>'.
 const TAG_RE = /<(?:[^>"']|"[^"]*"|'[^']*')*>/g;
 

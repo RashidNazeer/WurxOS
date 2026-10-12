@@ -15,7 +15,7 @@
 //           otherwise    → JSON { conversationId, requestId, reply, sources }
 //
 // Allowed roles: boss and developer always, plus ai_assistant_config.allowed_roles.
-// Env (function secrets): OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_API_KEY, GEMINI_API_KEY, NVIDIA_API_KEY, NVIDIA_API_KEY_2 (optional), AI_INTERNAL_SECRET,
+// Env (function secrets): OPEN_AI_API_KEY, OPEN_AI_API_KEY_FALLBACK, GROQ_API_KEY, GEMINI_API_KEY, NVIDIA_API_KEY, NVIDIA_API_KEY_2 (optional), TAVILY_API_KEY + BRAVE_API_KEY (optional, web search), AI_INTERNAL_SECRET,
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (automatic).
 // Deploy: NOT YET — only with the Owner's go (TEAM.md rule 0/3), --project-ref dev.
 // ============================================================
@@ -34,6 +34,12 @@ const env: ServerEnv = {
   geminiKey: Deno.env.get('GEMINI_API_KEY') ?? null,
   nvidiaKey: Deno.env.get('NVIDIA_API_KEY') ?? null,
   nvidia2Key: Deno.env.get('NVIDIA_API_KEY_2') ?? null,
+  // Web search (migs 415, 416). TAVILY_API_KEY / BRAVE_API_KEY are the
+  // canonical names; the Tavily_API and Brave_API spellings are read too
+  // because that is what the Owner's .env.dev uses. A provider with no key is
+  // simply skipped, so Brave stays dormant until its key is added.
+  tavilyKey: Deno.env.get('TAVILY_API_KEY') ?? Deno.env.get('Tavily_API') ?? null,
+  braveKey: Deno.env.get('BRAVE_API_KEY') ?? Deno.env.get('Brave_API') ?? Deno.env.get('BRAVE_SEARCH_API_KEY') ?? null,
   createClient,
 };
 const AI_INTERNAL_SECRET = Deno.env.get('AI_INTERNAL_SECRET') ?? '';

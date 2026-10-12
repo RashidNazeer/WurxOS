@@ -23,10 +23,10 @@
 import http from 'node:http';
 import { createClient } from '@supabase/supabase-js';
 import { devDbUrl, readEnv } from './dev-env.mjs';
-import { json } from '../supabase/functions/_shared/ai/agent/http.ts';
-import { checkProfile, handleAsk, identify } from '../supabase/functions/_shared/ai/agent/server.ts';
-import { ALLOWED_MODELS } from '../supabase/functions/_shared/ai/llm/openai.ts';
-import { KEY_SLOTS } from '../supabase/functions/_shared/ai/agent/models.ts';
+import { json } from '../../supabase/functions/_shared/ai/agent/http.ts';
+import { checkProfile, handleAsk, identify } from '../../supabase/functions/_shared/ai/agent/server.ts';
+import { ALLOWED_MODELS } from '../../supabase/functions/_shared/ai/llm/openai.ts';
+import { KEY_SLOTS } from '../../supabase/functions/_shared/ai/agent/models.ts';
 
 const argv = process.argv.slice(2);
 const opt = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : undefined; };
