@@ -124,8 +124,12 @@ export async function fetchHierarchy() {
     .filter((p) => p.role === 'apc' || p.role === 'ipc'
       || (p.role === 'developer' && p.reports_to && devLeadIds.has(p.reports_to)))
     .map((p) => {
+      // Active brands only. An inactive brand is a client we no longer work
+      // for, so listing it under a person overstates their book and makes the
+      // org chart look busier than the team really is (Owner, 2026-10-12).
+      // The full list is still returned below for the totals.
       const assignedBrands = v1Brands
-        .filter((b) => b.assignedUsers.some((au) => au.id === p.id))
+        .filter((b) => b.status !== 'inactive' && b.assignedUsers.some((au) => au.id === p.id))
         .map((b) => ({ id: b.id, brandName: b.brandName }));
       const owner = p.reports_to ? byId.get(p.reports_to) : null;
       return {
