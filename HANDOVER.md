@@ -8,6 +8,9 @@ Read `CLAUDE.md` after this one — it is the standing project context and it is
 loaded automatically by Claude Code. This file is the *situational* half: what
 is half-finished, what is waiting on you, and what has already gone wrong.
 
+`DEPENDENCIES.md` covers what to install and what every package is for,
+including the Deno imports and the external APIs Buddy calls.
+
 ---
 
 ## 1. What this is
