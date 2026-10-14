@@ -145,6 +145,19 @@ Dev kept working throughout because dev operations were driven by
 `WURXOS_DEV_DB_PASSWORD` (a direct database password), which does not need the
 management API. Production had no such password stored.
 
+**The workaround, while the account is wrong:** `ops/_run-on-dev.mjs` applies a
+`.sql` file to dev over a direct Postgres connection using `WURXOS_DEV_DB_URL`,
+skipping the management API entirely. It refuses to run against anything but
+the dev ref.
+
+```bash
+node ops/_run-on-dev.mjs ops/<file>.sql
+```
+
+There is no production equivalent, because no production database password or
+access token is stored on this machine — production work goes through the SQL
+Editor until the CLI account is fixed.
+
 ---
 
 ## 4. Deploying
@@ -286,12 +299,17 @@ That key bypasses **every** RLS policy. Rotate it (Supabase → Project Settings
 → API → roll `service_role`), delete that file, and do not carry it to the new
 machine. Move the other keys into `.env.dev`.
 
-### 8.3 🟡 Migration 420 is renumbered but never applied
+### 8.3 ✅ Migration 420 — DONE 2026-10-14
 
-`420_ipc_sees_paid_collab_brands.sql` — the IPC visibility fix from PR #50 that
-the `419` collision swallowed. It is in the repo and has run **nowhere**. It
-widens RLS (an IPC gains sight of paid-collab brands), so it needs a deliberate
-decision, not a reflex `db push`.
+`420_ipc_sees_paid_collab_brands.sql`, the IPC visibility fix from PR #50 that
+the `419` collision swallowed, had run **nowhere**. It surfaced as "IPCs cannot
+see the brands the Boss made visible to them, or their reports" — one cause,
+both symptoms, because report visibility runs through `can_view_brand`.
+
+Applied to **production** (verified: every active IPC sees every Paid Collab
+brand, and `visible_reports` equals `reports_on_brand` on each) and to **dev**
+(verified: clause present, ledger row recorded). `ops/apply-420-ipc-visibility.sql`
+is kept as the record; it is idempotent if it ever needs re-running.
 
 ### 8.4 🟡 Wurx Buddy web search ships OFF
 
