@@ -113,6 +113,19 @@ export default function AgendaUpcomingPage() {
     return m;
   }, [teams]);
 
+  // A schedule whose TL is no longer an ACTIVE TL — promoted, role-changed,
+  // deactivated or soft-deleted — keeps its agenda_team_schedules row: the FK's
+  // ON DELETE CASCADE never fires on a soft delete, and a role change cleans up
+  // nothing. Mig 197 fixed the server half for a deleted TL; this is the client
+  // half, which still rendered the stale row as a ghost "Team · 0 APCs" card
+  // carrying a live Notify button. listAgendaTeams() IS the definition of a live
+  // team, so drive the grid off the schedules that resolve against it — the same
+  // pattern AgendaSchedulesTab already uses.
+  const liveSchedules = useMemo(
+    () => schedules.filter((s) => teamsById.has(s.tl_id)),
+    [schedules, teamsById],
+  );
+
   // Week cards = the weeks of the current month that contain at least
   // one team's scheduled meeting day. Derived purely from the team
   // schedules (no separate "default day" setting).
@@ -120,7 +133,7 @@ export default function AgendaUpcomingPage() {
     const now = new Date();
     const y = now.getFullYear(); const mo = now.getMonth();
     const weekMap = new Map(); // weekStart -> earliest meeting date that week
-    schedules.forEach((s) => {
+    liveSchedules.forEach((s) => {
       const dow = DAY_INDEX[s.meeting_day];
       if (dow == null) return;
       const d = new Date(y, mo, 1);
@@ -137,7 +150,7 @@ export default function AgendaUpcomingPage() {
     return weekStarts.map((weekStart, i) => {
       const isCurrent = weekStart === currentWeekStart;
       const isPast    = weekStart < currentWeekStart;
-      const rows = schedules.map((s) => {
+      const rows = liveSchedules.map((s) => {
         const team = teamsById.get(s.tl_id);
         const mDate = addDays(weekStart, DAY_OFFSET[s.meeting_day] ?? 1);
         const meeting = meetings.find((mm) => mm.tl_id === s.tl_id && mm.week_start === weekStart);
@@ -156,7 +169,7 @@ export default function AgendaUpcomingPage() {
       }).sort((a, b) => a.tlName.localeCompare(b.tlName));
       return { index: i + 1, anchor: weekMap.get(weekStart), weekStart, isCurrent, isPast, rows };
     });
-  }, [schedules, meetings, teamsById, currentWeekStart]);
+  }, [liveSchedules, meetings, teamsById, currentWeekStart]);
 
   async function handleNotify() {
     setNotifying(true); setFlash('');
