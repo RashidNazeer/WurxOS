@@ -54,7 +54,20 @@ export async function fetchEukaCheckpoint(brandId, startDate, endDate) {
   const { data, error } = await supabase.functions.invoke('euka-checkpoint-autofill', {
     body: { brandId, startDate, endDate },
   });
-  if (error) throw new Error(error.message || 'Euka request failed.');
+  if (error) {
+    // A non-2xx from an Edge Function arrives as a generic "non-2xx status
+    // code"; the real body is on error.context. Without this unwrap every
+    // message the function writes -- "You do not have access to this brand.",
+    // the Euka timeout text, the missing-key text -- was discarded, which is
+    // why a failed pull looked identical to an empty one. Same idiom as
+    // adminApi.js; euka-report-autofill sidesteps it with a raw fetch.
+    let msg = error.message;
+    try {
+      const ctx = await error.context?.json?.();
+      if (ctx?.error) msg = ctx.error.message || ctx.error;
+    } catch { /* keep the generic message */ }
+    throw new Error(msg || 'Euka request failed.');
+  }
   if (data?.error) throw new Error(data.error.message || 'Euka request failed.');
   return data || {};
 }
@@ -152,7 +165,12 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
       const euka = await fetchEukaCheckpoint(brandId, weekStart, addDaysISO(weekStart, 6));
       if (euka.targetInvites != null) set('funnel.targetInvites', euka.targetInvites);
       if (euka.optedIn != null) set('funnel.optedIn', euka.optedIn);
-      meta.eukaOk = true;
+      // The function answers 200 with per-call reasons (invitesError /
+      // funnelError) when Euka rejects one of the two pulls, so "nothing threw"
+      // is NOT "it worked". Reporting eukaOk unconditionally printed a Euka
+      // tick beside two empty fields and left nobody anything to act on.
+      meta.eukaOk = euka.targetInvites != null || euka.optedIn != null;
+      meta.eukaError = [euka.invitesError, euka.funnelError].filter(Boolean).join(' - ') || null;
       meta.eukaStages = euka.funnelStages || null;
     } catch (e) { meta.eukaError = e?.message || String(e); }
   }

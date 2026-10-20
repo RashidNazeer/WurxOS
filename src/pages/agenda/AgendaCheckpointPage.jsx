@@ -63,7 +63,11 @@ function autofillSummary(meta, created) {
   if (!meta) return created ? 'Blank checkpoint created — fill in each section below, then Done → Submit.' : '';
   const bits = [meta.reportFound ? 'weekly report ✓' : 'no weekly report for this week'];
   if (meta.reportN2Found) bits.push('N-2 report ✓');
-  if (meta.eukaTried) bits.push(meta.eukaOk ? 'Euka ✓' : 'Euka unavailable');
+  if (meta.eukaTried) {
+    if (meta.eukaOk && !meta.eukaError) bits.push('Euka ✓');
+    else if (meta.eukaOk) bits.push('Euka partly filled — ' + meta.eukaError);
+    else bits.push('Euka unavailable — ' + (meta.eukaError || 'no reason given'));
+  }
   const n = meta.filled || 0;
   const lead = created ? 'Created & auto-filled' : 'Auto-filled';
   return `${lead} ${n} field${n === 1 ? '' : 's'} from your data (${bits.join(' · ')}). Review those numbers, then complete the rest below.`;
