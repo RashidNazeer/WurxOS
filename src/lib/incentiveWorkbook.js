@@ -94,13 +94,27 @@ function monthOf(label) {
   return -1;
 }
 
+// A day range: "1-30", "1 - 31", "1 to 29". These are what mark an ACHIEVED
+// column, and their numbers must never be mistaken for a year.
+const DAY_RANGE = /\d{1,2}\s*(?:-|–|to)\s*\d{1,2}/;
+
+/** True when a header names a span of days, i.e. an achieved column. */
+export const looksAchieved = (label) => DAY_RANGE.test(norm(label));
+
+/** The label with any day range removed, so a year hint cannot read a day. */
+const withoutDayRange = (label) => norm(label).replace(new RegExp(DAY_RANGE.source, 'g'), ' ');
+
 /**
  * Explicit year in a header, or null.
  * "26" -> 2026, "2025" -> 2025. A LONE single digit ("January 2", "November 2")
  * is a disambiguator the author added for a repeated month, not a year.
+ *
+ * The day range is stripped FIRST. Without that, "Sep 1-30" reads as 2030 and
+ * "February (1-25)" as 2025 — the two-digit pattern happily matches a day, and
+ * a sheet whose last column is a date range ends up anchored years out.
  */
 function yearHintOf(label) {
-  const s = norm(label);
+  const s = withoutDayRange(label);
   const four = s.match(/\b(20\d{2})\b/);
   if (four) return Number(four[1]);
   const two = s.match(/\b([2-9]\d)\b/);
@@ -162,6 +176,17 @@ export function resolveTargetColumns(headerCells) {
   while (last >= 1 && !norm(headerCells[last])) last--;
   if (last < 1) return { targets, issues: [{ reason: 'no month headers found' }] };
 
+  // The anchor must be a TARGET column. Several sheets end on the achieved half
+  // of the current month (Longevity Box and Dr Tobias both end "Sep 1-30"),
+  // and anchoring there would offset the whole walk by one — every "target"
+  // read would in fact be an achieved figure. A target is never a day range.
+  if (looksAchieved(headerCells[last])) {
+    issues.push({ col: last, label: headerCells[last], reason: 'last column is an achieved figure; anchored on the target to its left' });
+    last -= 1;
+    while (last >= 1 && !norm(headerCells[last])) last--;
+    if (last < 1) return { targets, issues: [...issues, { reason: 'no target column found' }] };
+  }
+
   const anchorMonth = monthOf(headerCells[last]);
   if (anchorMonth < 0) {
     return { targets, issues: [{ col: last, label: headerCells[last], reason: 'the last column does not name a month' }] };
@@ -173,6 +198,10 @@ export function resolveTargetColumns(headerCells) {
     const label = headerCells[col];
     if (isPlaceholder(label)) {
       issues.push({ col, label, reason: 'placeholder header, no month named' });
+    } else if (looksAchieved(label)) {
+      // A day range where a target was expected means the two-column rhythm has
+      // broken. Refuse rather than return the achieved figure as a target.
+      issues.push({ col, label, reason: 'a day range sits where this month\'s target should be' });
     } else {
       const got = monthOf(label);
       const hint = yearHintOf(label);

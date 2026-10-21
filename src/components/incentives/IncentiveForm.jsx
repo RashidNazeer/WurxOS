@@ -923,7 +923,7 @@ export default function IncentiveForm() {
         {/* Pull this month's targets for the brand options out of the workbook.
             APC/IPC only: the five options are per-brand creator metrics, and a
             TL's or Ads Manager's plan is not built from them. */}
-        {(targetRole === 'apc' || targetRole === 'ipc') && brands.length > 0 && (
+        {targetRole === 'apc' && brands.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
             <button type="button" className="wx-btn wx-btn-ghost" onClick={() => setWbOpen(true)}>
               <i className="bi bi-journal-arrow-down me-1" /> Add from brand workbook

@@ -41,9 +41,15 @@ function existingSelections(incentives, bonuses) {
   const out = new Map();
   for (const it of [...(incentives || []), ...(bonuses || [])]) {
     if (!it || !it.brandId) continue;
-    // `wbOption` marks a workbook line. Older lines are matched on their label
-    // so a plan built before this feature still reconciles instead of doubling.
+    // `wbOption` marks a workbook line. Plans built before this feature are
+    // reconciled too, or ticking an option would add a SECOND line for a brand
+    // that already has one — and two lines pay twice.
+    //
+    // A pre-existing per-brand GMV-Max line is flagged { source: 'gmv_max' }
+    // and titled "Total Revenue in GMV Max", so it matches neither the marker
+    // nor the workbook's label. Recognise it by its source.
     const key = it.wbOption
+      || (it.source === 'gmv_max' ? 'gmv_max' : null)
       || INCENTIVE_OPTIONS.find((o) => canon(o.label) === canon(it.text))?.key;
     if (key) out.set(selKey(it.brandId, key), it.id);
   }
@@ -132,10 +138,17 @@ export default function WorkbookIncentivesModal({
       const opt = OPTION_BY_KEY[optionKey];
       if (!brand || !opt) continue;
       const res = getTarget(sheets?.[brandId], optionKey, month);
-      const targetValue = res.value !== undefined ? String(res.value) : '';
+      // A ratio target is stored as a PERCENTAGE, not the sheet's 0.95.
+      // autoComplete is achieved / target >= 0.9, so a target of 0.95 against
+      // an achieved figure anyone would type as 89 gives 93.7 — the line marks
+      // itself complete and becomes payable at any value above 0.86.
+      const targetValue = res.value === undefined ? ''
+        : String(opt.unit === 'ratio' ? Math.round(res.value * 1000) / 10 : res.value);
 
       const existingId = already.get(k);
-      if (existingId) { updates.set(existingId, { targetValue }); continue; }
+      // Stamp the marker on a line matched by label or source, or the database
+      // guard in mig 422 will never count it.
+      if (existingId) { updates.set(existingId, { targetValue, wbOption: opt.key }); continue; }
       addTo[opt.section].push({
         id: uid4(),
         text: opt.label,
@@ -246,8 +259,11 @@ export default function WorkbookIncentivesModal({
                           ) : (
                             <>
                               {opts.map((o) => {
-                                const blocked = !o.selected && atLimit;
                                 const value = o.res?.value;
+                                // An option with no target would save an empty
+                                // targetValue, which pays nothing and reads as
+                                // a half-built line. Nothing to tick.
+                                const blocked = (!o.selected && atLimit) || value === undefined;
                                 return (
                                   <label key={o.key}
                                     style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '6px 0', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.5 : 1 }}>

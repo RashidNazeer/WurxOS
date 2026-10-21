@@ -9,10 +9,9 @@
 // is a wrong number in somebody's pay.
 // ============================================================
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
 
-const LIB = 'C:/Users/Umar Wurx/Wurx Stuff/Wurx Stuff/WurxOS/src/lib/incentiveWorkbook.js';
-const M = await import(pathToFileURL(LIB).href);
+// Resolved relative to this file, so the suite runs on any machine.
+const M = await import(new URL('../src/lib/incentiveWorkbook.js', import.meta.url).href);
 
 let pass = 0, fail = 0;
 const t = (name, fn) => {
@@ -92,13 +91,52 @@ t('Cutler: explicit years re-anchor the walk across two years', () => {
 t('placeholders and month mismatches are refused, not guessed', () => {
   const b = M.resolveTargetColumns(BENTGO);
   assert.ok(b.issues.some((i) => /placeholder/.test(i.reason)), 'Column 4 refused');
-  assert.ok(b.issues.some((i) => /expected august, header says july/.test(i.reason)),
-    'a column naming the wrong month is refused');
+  // "July 1 to 29" sits where August's target should be. It is refused as a day
+  // range (the more precise reason) rather than as a month mismatch; either way
+  // it must never be read as a target.
+  assert.ok(b.issues.some((i) => /day range sits where/.test(i.reason) || /expected august/.test(i.reason)),
+    'a column holding an achieved figure where a target belongs is refused');
+  assert.ok(!Object.values(b.targets).includes(1), '"July 1 to 29" is never a target column');
   const a = M.resolveTargetColumns(AURELIA);
   assert.equal(a.issues.filter((i) => /placeholder/.test(i.reason)).length, 2);
 });
+// Longevity Box and Dr Tobias both END on the achieved half of September.
+// Anchoring there would offset the whole walk by one and every "target" read
+// would in fact be an achieved figure.
+const LONGEVITY = ['Longevity Box', 'Feb 1-28', 'March', 'Mar 1-31', 'April 26', 'April 1-30',
+  'May 26', 'May 1-31', 'June ', 'June 1-30', 'July 26 ', 'July 1-31', 'AUG', 'Aug 1-31',
+  'Sep 26', 'Sep 1-30'];
+const TOBIAS = ['Dr. Tobias', 'Aug 1-31', 'Sep 26', 'Sep 1-30'];
+
+t('a sheet ending on an ACHIEVED column anchors on the target to its left', () => {
+  const l = M.resolveTargetColumns(LONGEVITY);
+  assert.equal(l.targets['2026-09'], 14, '"Sep 26" is the target, not "Sep 1-30"');
+  assert.equal(l.targets['2026-08'], 12);   // "AUG"
+  assert.ok(!Object.values(l.targets).includes(15), 'the achieved column is never a target');
+
+  const d = M.resolveTargetColumns(TOBIAS);
+  assert.equal(d.targets['2026-09'], 2);
+  assert.ok(!Object.values(d.targets).includes(3));
+});
+
+t('a day number is never read as a year', () => {
+  // "Sep 1-30" would give 2030, "Feb 1-28" 2028, "February (1-25)" 2025.
+  for (const h of [LONGEVITY, TOBIAS]) {
+    for (const key of Object.keys(M.resolveTargetColumns(h).targets)) {
+      const year = Number(key.slice(0, 4));
+      assert.ok(year >= 2024 && year <= 2027, `implausible year ${key} — a day was read as a year`);
+    }
+  }
+  assert.ok(M.looksAchieved('Sep 1-30'));
+  assert.ok(M.looksAchieved('July 1 to 29'));
+  assert.ok(M.looksAchieved('Feb 1 - 25'));
+  assert.ok(!M.looksAchieved('Sep 26'));
+  assert.ok(!M.looksAchieved('December 2025'));
+  assert.ok(!M.looksAchieved('January  2'));
+});
+
 t('no two months ever share a column', () => {
-  for (const h of [BENTGO, AURELIA, CUTLER]) {
+  for (const h of [BENTGO, AURELIA, CUTLER, LONGEVITY, TOBIAS]) {
     const cols = Object.values(M.resolveTargetColumns(h).targets);
     assert.equal(new Set(cols).size, cols.length, 'duplicate column across months');
   }
