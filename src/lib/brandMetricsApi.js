@@ -76,6 +76,54 @@ export async function saveBrandMonthlyMetrics(brandId, monthKey, values) {
   if (error) throw new Error(error.message);
 }
 
+// The goal (target) half of METRIC_COLUMNS. Bulk update writes only these.
+export const GOAL_COLUMNS = [
+  'gmv_target', 'samples_target', 'paid_collab_allocated', 'gmv_max_allocated', 'roi_target',
+];
+
+// Write ONLY the goal columns the caller names; leave every other column alone.
+//
+// Deliberately NOT a read-modify-write through saveBrandMonthlyMetrics. That
+// writes all ten columns, so anything it isn't handed becomes null — and a merge
+// built from a row read even seconds earlier would clobber a gmv_achieved the
+// APC refreshed at clock-in in between (mig 311), which is the number a GMV Max
+// incentive reads to decide it is payable (mig 366). A partial upsert updates
+// only the columns present in the payload, so the achieved side is never touched
+// and there is no race to lose.
+//
+// One call per brand on purpose: a batched upsert whose rows carry different
+// column sets nulls the columns each row omits.
+export async function saveBrandGoals(brandId, monthKey, targets) {
+  const { data: sess } = await supabase.auth.getSession();
+  const row = {
+    brand_id: brandId,
+    month_key: monthKey,
+    updated_at: new Date().toISOString(),
+    updated_by: sess?.session?.user?.id || null,
+  };
+  for (const col of GOAL_COLUMNS) {
+    if (Object.prototype.hasOwnProperty.call(targets || {}, col)) row[col] = targets[col];
+  }
+  const { data, error } = await supabase
+    .from('brand_monthly_metrics')
+    .upsert(row, { onConflict: 'brand_id,month_key' })
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  // RLS refuses a write by returning no row rather than raising, so an
+  // unverified "success" here would be a silent no-op on someone else's brand.
+  if (!data) throw new Error('No row came back — you may not have permission to edit this brand.');
+  for (const col of GOAL_COLUMNS) {
+    if (!Object.prototype.hasOwnProperty.call(row, col)) continue;
+    const want = row[col];
+    const got = data[col];
+    if (want == null ? got != null : (got == null || Number(got) !== Number(want))) {
+      throw new Error(`Saved ${col} as ${got}, expected ${want}.`);
+    }
+  }
+  return data;
+}
+
 // Who is on this brand's "Total Revenue in GMV Max" incentive for the month,
 // and whether the brand's figure has reached their target (mig 366).
 //

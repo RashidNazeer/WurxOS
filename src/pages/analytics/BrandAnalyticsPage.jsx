@@ -11,6 +11,7 @@ import {
 } from '../../lib/brandMetricsApi';
 import { isManagedByUs } from '../../lib/roles';
 import { setBrandUnlimitedSampleGoal } from '../../lib/productsApi';
+import BulkGoalsModal from '../../components/analytics/BulkGoalsModal';
 
 // ── The 5 metrics (each a target/achieved pair) ─────────────────────
 const METRICS = [
@@ -153,6 +154,7 @@ export default function BrandAnalyticsPage() {
   const [brandId, setBrandId] = useState('');
   const [month, setMonth] = useState(pakistanMonth);
   const [editing, setEditing] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // all | ontrack | set | unset
 
@@ -191,6 +193,15 @@ export default function BrandAnalyticsPage() {
     queryFn: () => listMonthsWithData(brandId),
     enabled: !!brandId,
   });
+  // Brands this person may actually WRITE, which is narrower than the list RLS
+  // lets them read: a TL with canViewAllBrands (mig 192) sees every brand but
+  // owns only some, and bulk update must not offer rows RLS will then refuse.
+  const editableBrands = useMemo(() => {
+    if (isAdmin) return brands;
+    if (profile?.role === 'tl') return brands.filter((b) => b.owner_id === profile?.id);
+    return [];
+  }, [brands, isAdmin, profile]);
+
   const visibleMetrics = useMemo(() => visibleMetricsFor(selectedBrand), [selectedBrand]);
   const hiddenGroups = useMemo(() => {
     const groups = [];
@@ -250,11 +261,18 @@ export default function BrandAnalyticsPage() {
           <h1 className="page-title">Brand analytics</h1>
           <p className="page-subtitle">Real-time tracking of affiliate GMV goals</p>
         </div>
-        {selectedBrand && canEditGoals && (
-          <button className="wx-btn wx-btn-primary" disabled={!isSuccess} onClick={() => setEditing(true)}>
-            <i className="bi bi-pencil-square me-1" /> {hasAny ? 'Edit goals' : 'Set goals'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canEditGoals && editableBrands.length > 0 && (
+            <button className="wx-btn wx-btn-ghost" disabled={brandsLoading} onClick={() => setBulkOpen(true)}>
+              <i className="bi bi-table me-1" /> Bulk update
+            </button>
+          )}
+          {selectedBrand && canEditGoals && (
+            <button className="wx-btn wx-btn-primary" disabled={!isSuccess} onClick={() => setEditing(true)}>
+              <i className="bi bi-pencil-square me-1" /> {hasAny ? 'Edit goals' : 'Set goals'}
+            </button>
+          )}
+        </div>
       </div>
 
       {err && (
@@ -389,6 +407,23 @@ export default function BrandAnalyticsPage() {
             </>
           )}
         </>
+      )}
+
+      {bulkOpen && canEditGoals && (
+        <BulkGoalsModal
+          brands={editableBrands}
+          month={month}
+          monthLabel={prettyMonth(month)}
+          onClose={() => setBulkOpen(false)}
+          onApplied={() => {
+            // Same keys the single-brand save invalidates, so the cards, the
+            // month map and the months-with-data navigator all catch up.
+            qc.invalidateQueries({ queryKey: ['brandMetrics', 'monthMap', month] });
+            qc.invalidateQueries({ queryKey: ['brandMetrics', 'months', brandId] });
+            if (brandId) qc.invalidateQueries({ queryKey: ['brandMetrics', brandId, month] });
+            qc.invalidateQueries({ queryKey: ['brandMetrics', 'gmvMaxLinks', brandId, month] });
+          }}
+        />
       )}
 
       {editing && selectedBrand && canEditGoals && (
