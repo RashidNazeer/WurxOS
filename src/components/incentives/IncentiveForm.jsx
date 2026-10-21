@@ -6,6 +6,8 @@ import {
   getIncentivesTemplate, setIncentivesTemplate, fetchBrandCommissionAllocations,
 } from '../../lib/incentivesApi';
 import { listBrandMetricsForMonth } from '../../lib/brandMetricsApi';
+import { MAX_SELECTIONS_PER_APC } from '../../lib/incentiveWorkbook';
+import WorkbookIncentivesModal from './WorkbookIncentivesModal';
 import { currencySymbol } from '../../utils/currencies';
 import { formatMoney, formatPKR } from '../../lib/format';
 import { useToast, useConfirm } from '../ui';
@@ -574,6 +576,19 @@ export default function IncentiveForm() {
   const [commAlloc, setCommAlloc] = useState(new Map());
   // brand_id -> the month's brand_monthly_metrics row, for the GMV-Max targets.
   const [gmvGoals, setGmvGoals] = useState({});
+  const [wbOpen, setWbOpen] = useState(false);
+
+  // Apply the workbook picks onto the plan. The modal only decides WHAT was
+  // chosen; the form owns the arrays, so a pick can never bypass the editing
+  // rules or the save path.
+  function applyWorkbookPicks({ add, updates, removed }) {
+    const patch = (list) => list
+      .filter((it) => !removed.has(it.id))
+      .map((it) => (updates.has(it.id) ? { ...it, ...updates.get(it.id) } : it));
+    setIncentives((prev) => [...patch(prev), ...(add.incentives || [])]);
+    setBonuses((prev) => [...patch(prev), ...(add.bonuses || [])]);
+    setWbOpen(false);
+  }
 
   useEffect(() => {
     async function load() {
@@ -634,6 +649,9 @@ export default function IncentiveForm() {
               achievedValue: 0, completed: false, completedBy: null,
               ...(i.source ? { source: i.source } : {}),
               ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+              // Carry the workbook marker too, so next month's plan still
+              // reconciles against the picker instead of duplicating lines.
+              ...(i.wbOption ? { wbOption: i.wbOption } : {}),
               // Carry the agreed share into the new month; without it the line
               // arrives set to nothing and quietly pays nothing.
               ...(i.commissionPct != null ? { commissionPct: Number(i.commissionPct) || 0 } : {}),
@@ -728,6 +746,10 @@ export default function IncentiveForm() {
         ...(i.source ? { source: i.source } : {}),
         // Hard brand link (new model). Kept only when set, so "Other" items stay unlinked.
         ...(i.brandId ? { brandId: i.brandId, brandName: i.brandName || null } : {}),
+        // Which workbook option produced this line. Without it the workbook
+        // picker cannot tell an existing line from a new one and would offer to
+        // add the same option a second time.
+        ...(i.wbOption ? { wbOption: i.wbOption } : {}),
         // The OL's typed share for a Commission Based Tier line. This map is a
         // fixed field list, so an omitted field is a field deleted on save —
         // and this one is the whole input to the payout calculation.
@@ -897,6 +919,31 @@ export default function IncentiveForm() {
             </div>
           </div>
         </div>
+
+        {/* Pull this month's targets for the brand options out of the workbook.
+            APC/IPC only: the five options are per-brand creator metrics, and a
+            TL's or Ads Manager's plan is not built from them. */}
+        {(targetRole === 'apc' || targetRole === 'ipc') && brands.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+            <button type="button" className="wx-btn wx-btn-ghost" onClick={() => setWbOpen(true)}>
+              <i className="bi bi-journal-arrow-down me-1" /> Add from brand workbook
+            </button>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              Up to {MAX_SELECTIONS_PER_APC} options across all {brands.length} brand{brands.length === 1 ? '' : 's'} combined.
+            </span>
+          </div>
+        )}
+
+        {wbOpen && (
+          <WorkbookIncentivesModal
+            brands={brands}
+            month={currentMonth}
+            incentives={incentives}
+            bonuses={bonuses}
+            onClose={() => setWbOpen(false)}
+            onApply={applyWorkbookPicks}
+          />
+        )}
 
         {/* Incentives — brand groups + Other */}
         <PlanSection
