@@ -184,5 +184,75 @@ t('the five options split 3 incentives / 2 bonuses', () => {
   assert.equal(M.MAX_SELECTIONS_PER_APC, 5);
 });
 
+// ── turning ticked options into plan lines ─────────────────────────
+const SHEET = M.readBrandSheet(GRID);
+const BRANDS = [{ id: 'b1', name: 'Aurelia' }];
+const sheetsByBrand = { b1: SHEET };
+let seq = 0;
+const newId = () => `id${++seq}`;
+const build = (picked, existing = new Map(), month = '2026-10') => {
+  seq = 0;
+  return M.buildSelectionChanges({ picked: new Set(picked), brands: BRANDS, sheetsByBrand, month, existing, newId });
+};
+
+t('a ticked option becomes a line with the sheet target', () => {
+  const r = build(['b1::creators_3plus']);
+  assert.equal(r.add.incentives.length, 1);
+  const line = r.add.incentives[0];
+  assert.equal(line.text, 'Creators with more than three videos');
+  assert.equal(line.targetValue, '10');
+  assert.equal(line.brandId, 'b1');
+  assert.equal(line.wbOption, 'creators_3plus');
+  assert.equal(line.amount, '', 'the PKR amount stays for the OL to type');
+});
+t('a ratio target is stored as a percentage, not 0.95', () => {
+  const line = build(['b1::video_authorized']).add.incentives[0];
+  assert.equal(line.targetValue, '95', 'stored as 95 so autoComplete cannot pay at 86%');
+  assert.equal(line.suffix, '%');
+});
+t('options land in the right section, and GMV Max keeps its auto source', () => {
+  const r = build(['b1::creators_3plus', 'b1::gmv_max']);
+  assert.equal(r.add.incentives.length, 1);
+  assert.equal(r.add.bonuses.length, 1);
+  assert.equal(r.add.bonuses[0].wbOption, 'gmv_max');
+  assert.equal(r.add.bonuses[0].source, 'gmv_max', 'achieved keeps coming from mig 317');
+  assert.ok(!('source' in r.add.incentives[0]), 'the other options stay manual');
+});
+t('an option with no target this month is NEVER added as a blank line', () => {
+  const r = build(['b1::onboarding_l3']);     // this grid has no such row
+  assert.equal(r.add.incentives.length + r.add.bonuses.length, 0);
+  assert.equal(r.skipped.length, 1);
+  assert.equal(r.skipped[0].kept, false);
+});
+t('an EXISTING line whose target is unavailable keeps its old value', () => {
+  // The regression that matters: a line carried from last month arrives already
+  // ticked, so it reaches the builder even when this month has no column.
+  // Writing '' here would wipe a figure nobody asked to change.
+  const existing = new Map([['b1::onboarding_l3', 'old-1']]);
+  const r = build(['b1::onboarding_l3'], existing);
+  const patch = r.updates.get('old-1');
+  assert.ok(patch, 'the existing line is still updated');
+  assert.ok(!('targetValue' in patch), 'targetValue must NOT be overwritten with a blank');
+  assert.equal(patch.wbOption, 'onboarding_l3', 'the marker is stamped so mig 422 counts it');
+  assert.equal(r.skipped[0].kept, true);
+});
+t('an existing line IS updated when the sheet answers', () => {
+  const existing = new Map([['b1::creators_3plus', 'old-2']]);
+  const r = build(['b1::creators_3plus'], existing);
+  assert.deepEqual(r.updates.get('old-2'), { targetValue: '10', wbOption: 'creators_3plus' });
+  assert.equal(r.add.incentives.length, 0, 'no duplicate line');
+});
+t('unticking an option removes the line it created', () => {
+  const existing = new Map([['b1::creators_3plus', 'old-3'], ['b1::gmv_max', 'old-4']]);
+  const r = build(['b1::gmv_max'], existing);
+  assert.deepEqual([...r.removed], ['old-3']);
+  assert.ok(r.updates.has('old-4'));
+});
+t('a brand or option that no longer exists is ignored, not crashed on', () => {
+  const r = build(['nope::creators_3plus', 'b1::not_an_option']);
+  assert.equal(r.add.incentives.length + r.add.bonuses.length, 0);
+  assert.equal(r.removed.size, 0);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

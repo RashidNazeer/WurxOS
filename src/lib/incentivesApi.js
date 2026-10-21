@@ -1105,3 +1105,39 @@ export async function setIncentivesTemplate({ basicSalary, incentives: inc, bonu
   if (error) throw new Error(error.message);
   return value;
 }
+
+// ── Brand workbook location (mig 423) ─────────────────────────────
+// The OL keeps one published Google Sheet of brand targets. Storing its
+// address means they maintain the sheet and never hunt for the file again.
+//
+// Normalised to the xlsx export on the way in. A published sheet offers
+// ?output=csv too, but that returns only the FIRST tab — one brand out of
+// ninety — which would look like it worked and quietly answer for the wrong
+// brand. xlsx returns the whole workbook.
+export function normaliseWorkbookUrl(raw) {
+  const url = String(raw || '').trim();
+  if (!url) return '';
+  if (!/^https:\/\/docs\.google\.com\//i.test(url)) return url;
+  if (!/\/pub\b/i.test(url)) return url;
+  return url.replace(/([?&])output=[^&]*/i, '$1output=xlsx')
+    + (/[?&]output=/i.test(url) ? '' : (url.includes('?') ? '&' : '?') + 'output=xlsx');
+}
+
+export async function getIncentiveWorkbookUrl() {
+  const { data, error } = await supabase
+    .from('app_config').select('value, updated_at')
+    .eq('key', 'incentive_workbook_url').maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.value?.url ? { url: data.value.url, label: data.value.label || '', updatedAt: data.updated_at } : null;
+}
+
+export async function setIncentiveWorkbookUrl(url, label = '') {
+  const clean = normaliseWorkbookUrl(url);
+  if (!clean) throw new Error('A link is required.');
+  const { error } = await supabase.from('app_config').upsert(
+    { key: 'incentive_workbook_url', value: { url: clean, label }, updated_at: new Date().toISOString() },
+    { onConflict: 'key' },
+  );
+  if (error) throw new Error(error.message);
+  return clean;
+}

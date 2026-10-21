@@ -19,9 +19,10 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  INCENTIVE_OPTIONS, OPTION_BY_KEY, MAX_SELECTIONS_PER_APC,
-  readBrandSheet, getTarget, formatTarget, availableMonths,
+  INCENTIVE_OPTIONS, MAX_SELECTIONS_PER_APC,
+  readBrandSheet, getTarget, formatTarget, availableMonths, buildSelectionChanges,
 } from '../../lib/incentiveWorkbook';
+import { getIncentiveWorkbookUrl, setIncentiveWorkbookUrl } from '../../lib/incentivesApi';
 
 const uid4 = () => Math.random().toString(36).slice(2, 10);
 const canon = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -59,10 +60,14 @@ function existingSelections(incentives, bonuses) {
 export default function WorkbookIncentivesModal({
   brands = [], month, incentives = [], bonuses = [], onApply, onClose,
 }) {
-  const [file, setFile] = useState(null);
+  const [source, setSource] = useState('');       // what the data came from, for the status line
   const [parsing, setParsing] = useState(false);
   const [wbError, setWbError] = useState('');
   const [sheets, setSheets] = useState(null);     // brandId -> readBrandSheet() result | { missing: true }
+  const [link, setLink] = useState(null);         // { url, label, updatedAt } | null
+  const [linkDraft, setLinkDraft] = useState('');
+  const [editingLink, setEditingLink] = useState(false);
+  const [savingLink, setSavingLink] = useState(false);
   const [open, setOpen] = useState(() => (brands.length === 1 ? brands[0].id : null));
   const [picked, setPicked] = useState(() => new Set(existingSelections(incentives, bonuses).keys()));
   const fileRef = useRef(null);
@@ -73,15 +78,75 @@ export default function WorkbookIncentivesModal({
 
   useEffect(() => { if (brands.length === 1) setOpen(brands[0].id); }, [brands]);
 
+  // Load from the stored link the moment the picker opens, so the usual case
+  // needs no file at all. The OL maintains the sheet; the app follows it.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let saved = null;
+      try { saved = await getIncentiveWorkbookUrl(); } catch { /* fall back to upload */ }
+      if (cancelled) return;
+      setLink(saved);
+      setLinkDraft(saved?.url || '');
+      if (saved?.url) loadFrom(saved.url);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadFrom(url) {
+    setWbError(''); setSheets(null); setParsing(true);
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`The sheet could not be fetched (HTTP ${res.status}). Check it is still published to the web.`);
+      await parseBuffer(await res.arrayBuffer());
+      setSource(`the shared sheet, fetched just now`);
+    } catch (err) {
+      setWbError(
+        /Failed to fetch|NetworkError/i.test(err?.message || '')
+          ? 'Could not reach the sheet. It may no longer be published to the web — republish it, or upload the file below.'
+          : (err?.message || String(err)),
+      );
+      setSheets(null);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  async function saveLink() {
+    setSavingLink(true); setWbError('');
+    try {
+      const clean = await setIncentiveWorkbookUrl(linkDraft);
+      setLink({ url: clean, label: link?.label || '' });
+      setEditingLink(false);
+      await loadFrom(clean);
+    } catch (err) {
+      setWbError(err?.message || String(err));
+    } finally {
+      setSavingLink(false);
+    }
+  }
+
   async function onFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setFile(f); setWbError(''); setSheets(null); setParsing(true);
+    setWbError(''); setSheets(null); setParsing(true);
     try {
+      await parseBuffer(await f.arrayBuffer());
+      setSource(`the file ${f.name}`);
+    } catch (err) {
+      setWbError(err?.message || String(err));
+      setSheets(null);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  async function parseBuffer(buf) {
+    {
       const XLSX = await import('xlsx');
-      const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
-      if (!wb.SheetNames?.length) throw new Error('That file has no sheets.');
+      if (!wb.SheetNames?.length) throw new Error('That workbook has no sheets.');
 
       // Sheets were renamed to the app's brand names, so an exact match is the
       // normal case; canonical is a fallback, never a fuzzy guess.
@@ -96,14 +161,9 @@ export default function WorkbookIncentivesModal({
         found++;
       }
       if (!found) {
-        throw new Error(`None of this person's brands has a sheet in that workbook. Sheet names must match the brand names in WurxOS — run scripts/rename-workbook-sheets.mjs if they do not.`);
+        throw new Error(`None of this person's brands has a tab in that workbook. Tab names must match the brand names in WurxOS — run scripts/rename-google-sheet-tabs.gs on the sheet if they do not.`);
       }
       setSheets(map);
-    } catch (err) {
-      setWbError(err?.message || String(err));
-      setSheets(null);
-    } finally {
-      setParsing(false);
     }
   }
 
@@ -130,46 +190,10 @@ export default function WorkbookIncentivesModal({
 
   /** Build the lines and hand them back; the form owns the state. */
   function apply() {
-    const addTo = { incentives: [], bonuses: [] };
-    const updates = new Map();     // existing item id -> { targetValue }
-    for (const k of picked) {
-      const [brandId, optionKey] = k.split('::');
-      const brand = brands.find((b) => b.id === brandId);
-      const opt = OPTION_BY_KEY[optionKey];
-      if (!brand || !opt) continue;
-      const res = getTarget(sheets?.[brandId], optionKey, month);
-      // A ratio target is stored as a PERCENTAGE, not the sheet's 0.95.
-      // autoComplete is achieved / target >= 0.9, so a target of 0.95 against
-      // an achieved figure anyone would type as 89 gives 93.7 — the line marks
-      // itself complete and becomes payable at any value above 0.86.
-      const targetValue = res.value === undefined ? ''
-        : String(opt.unit === 'ratio' ? Math.round(res.value * 1000) / 10 : res.value);
-
-      const existingId = already.get(k);
-      // Stamp the marker on a line matched by label or source, or the database
-      // guard in mig 422 will never count it.
-      if (existingId) { updates.set(existingId, { targetValue, wbOption: opt.key }); continue; }
-      addTo[opt.section].push({
-        id: uid4(),
-        text: opt.label,
-        amount: '',
-        suffix: opt.unit === 'ratio' ? '%' : '',
-        targetValue,
-        achievedValue: 0,
-        completed: false,
-        brandId: brand.id,
-        brandName: brand.name,
-        wbOption: opt.key,
-        // The GMV-Max line already has an automatic achieved figure (mig 317):
-        // the brand's gmv_achieved, which the APC enters at clock-in. Flagging
-        // it keeps one source for that number instead of two.
-        ...(opt.key === 'gmv_max' ? { source: 'gmv_max' } : {}),
-      });
-    }
-    // Unticking removes the line it created.
-    const removed = new Set();
-    for (const [k, id] of already) if (!picked.has(k)) removed.add(id);
-    onApply({ add: addTo, updates, removed });
+    const { add, updates, removed } = buildSelectionChanges({
+      picked, brands, sheetsByBrand: sheets || {}, month, existing: already, newId: uid4,
+    });
+    onApply({ add, updates, removed });
   }
 
   const brandRows = brands.map((b) => {
@@ -206,21 +230,58 @@ export default function WorkbookIncentivesModal({
 
           {/* 1 — the workbook */}
           <section>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)', marginBottom: 8 }}>1 · Upload the brand workbook</div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="wx-input" style={{ width: '100%' }} onChange={onFile} />
-            {parsing && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--text-muted)' }}><span className="wx-spinner" /> Reading…</div>}
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)', marginBottom: 8 }}>1 · Brand targets</div>
+
+            {!editingLink && link?.url && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <i className="bi bi-link-45deg" style={{ color: 'var(--text-muted)' }} />
+                <span style={{ fontSize: 12.5, color: 'var(--text-muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {link.label || 'Shared brand workbook'}
+                </span>
+                <button type="button" className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }}
+                  onClick={() => loadFrom(link.url)} disabled={parsing}>
+                  <i className="bi bi-arrow-clockwise me-1" /> Reload
+                </button>
+                <button type="button" className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }}
+                  onClick={() => setEditingLink(true)}>Change link</button>
+              </div>
+            )}
+
+            {(editingLink || !link?.url) && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input className="wx-input" style={{ flex: 1, minWidth: 220 }}
+                  placeholder="Published Google Sheet link (File → Share → Publish to web)"
+                  value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} />
+                <button type="button" className="wx-btn wx-btn-primary" onClick={saveLink} disabled={savingLink || !linkDraft.trim()}>
+                  {savingLink ? <><span className="wx-spinner" /> Saving…</> : 'Save link'}
+                </button>
+                {link?.url && <button type="button" className="wx-btn wx-btn-ghost" onClick={() => { setEditingLink(false); setLinkDraft(link.url); }}>Cancel</button>}
+              </div>
+            )}
+
+            {parsing && <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--text-muted)' }}><span className="wx-spinner" /> Reading the workbook…</div>}
+
             {wbError && (
               <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--danger-soft, rgba(220,38,38,.1))', color: 'var(--danger, #dc2626)', fontSize: 12.5 }}>
                 {wbError}
               </div>
             )}
+
             {sheets && !wbError && (
               <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--success, #16a34a)' }}>
                 <i className="bi bi-check-circle-fill me-1" />
-                {file?.name} read · {Object.values(sheets).filter((s) => !s.missing).length} of {brands.length} brand sheet(s) found
+                Read from {source} · {Object.values(sheets).filter((s) => !s.missing).length} of {brands.length} brand tab(s) found
               </div>
             )}
+
+            {/* Fallback only. The link is the normal path; this covers a sheet
+                that has been unpublished or a one-off correction. */}
+            <details style={{ marginTop: 10 }}>
+              <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>Upload a file instead</summary>
+              <input ref={fileRef} type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="wx-input" style={{ width: '100%', marginTop: 8 }} onChange={onFile} />
+            </details>
+
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
               Read in your browser and discarded — nothing is uploaded or stored.
             </div>

@@ -287,3 +287,77 @@ export function formatTarget(value, unit) {
   if (unit === 'money') return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
   return Number(value).toLocaleString();
 }
+
+// ── turning ticked options into plan lines ────────────────────────
+/**
+ * Work out what the picked options mean for a plan: lines to add, existing
+ * lines to update, and lines to remove because their option was unticked.
+ *
+ * Pure, and separate from the modal, because this is where a wrong decision
+ * costs money — an unavailable target that overwrites a good one, a new line
+ * that can never complete, a marker that never gets stamped.
+ *
+ * `picked`   Set of "brandId::optionKey"
+ * `existing` Map of "brandId::optionKey" -> the id of the line already on the plan
+ * `sheetsByBrand` brandId -> readBrandSheet() result
+ * `newId`    id factory, injected so tests are deterministic
+ */
+export function buildSelectionChanges({
+  picked, brands, sheetsByBrand = {}, month, existing = new Map(), newId,
+}) {
+  const makeId = newId || (() => Math.random().toString(36).slice(2, 10));
+  const add = { incentives: [], bonuses: [] };
+  const updates = new Map();
+  const removed = new Set();
+  const skipped = [];
+
+  for (const key of picked) {
+    const sep = key.indexOf('::');
+    const brandId = key.slice(0, sep);
+    const optionKey = key.slice(sep + 2);
+    const brand = (brands || []).find((b) => b.id === brandId);
+    const opt = OPTION_BY_KEY[optionKey];
+    if (!brand || !opt) continue;
+
+    const res = getTarget(sheetsByBrand[brandId], optionKey, month);
+    const hasTarget = res.value !== undefined;
+    const targetValue = hasTarget
+      ? String(opt.unit === 'ratio' ? Math.round(res.value * 1000) / 10 : res.value)
+      : '';
+
+    const existingId = existing.get(key);
+    if (existingId) {
+      // Only write the target when the sheet answered. An option carried from
+      // last month arrives already ticked, so it reaches here even when this
+      // month has no column — and writing '' would wipe a figure nobody asked
+      // to change. Stamp the marker either way, or mig 422 never counts it.
+      updates.set(existingId, hasTarget ? { targetValue, wbOption: opt.key } : { wbOption: opt.key });
+      if (!hasTarget) skipped.push({ brand: brand.name, option: opt.label, reason: res.unavailable, kept: true });
+      continue;
+    }
+    if (!hasTarget) {
+      // A new line with no target saves one that can never complete.
+      skipped.push({ brand: brand.name, option: opt.label, reason: res.unavailable, kept: false });
+      continue;
+    }
+    add[opt.section].push({
+      id: makeId(),
+      text: opt.label,
+      amount: '',
+      suffix: opt.unit === 'ratio' ? '%' : '',
+      targetValue,
+      achievedValue: 0,
+      completed: false,
+      brandId: brand.id,
+      brandName: brand.name,
+      wbOption: opt.key,
+      // The GMV-Max line already derives its achieved figure from the brand's
+      // gmv_achieved (mig 317) — the number the APC enters at clock-in. Keep
+      // one source for it rather than two.
+      ...(opt.key === 'gmv_max' ? { source: 'gmv_max' } : {}),
+    });
+  }
+
+  for (const [key, id] of existing) if (!picked.has(key)) removed.add(id);
+  return { add, updates, removed, skipped };
+}
