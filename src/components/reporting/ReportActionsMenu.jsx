@@ -62,7 +62,8 @@ export default function ReportActionsMenu({ actions, extraItems = [], hidePrimar
       {open && (
         <div style={{
           position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 30,
-          minWidth: 224, background: 'var(--surface-1)',
+          minWidth: 224, background: 'var(--glass-bg-strong)',
+          backdropFilter: 'var(--glass-filter)', WebkitBackdropFilter: 'var(--glass-filter)',
           border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
           boxShadow: 'var(--shadow-lg, 0 12px 32px rgba(0,0,0,0.2))', padding: 6,
         }}>

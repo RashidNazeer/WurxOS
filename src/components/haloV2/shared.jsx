@@ -224,7 +224,15 @@ export function Popover({ open, onClose, children, width = 260, align = 'left' }
       style={{
         position: 'absolute', top: 'calc(100% + 6px)', [align]: 0, zIndex: 30, width,
         maxWidth: 'calc(100vw - 32px)',
-        background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+        // This floats over charts and tables with nothing between, and
+        // --surface-1 is TRANSLUCENT (0.62 light / 0.68 dark) with no blur --
+        // so whatever was underneath read straight through the menu text. The
+        // glass pane is the same opacity but brings the blur that pays for it
+        // ("at 31.2px a chart behind the pane is a colour wash, not edges"),
+        // and falls back to a solid panel where backdrop-filter is missing.
+        background: 'var(--glass-bg-strong)',
+        backdropFilter: 'var(--glass-filter)', WebkitBackdropFilter: 'var(--glass-filter)',
+        border: '1px solid var(--border-default)',
         borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', padding: 10,
       }}
     >
@@ -262,7 +270,9 @@ export function UnderConstruction({ children, subline = null, previewHeight = 19
       }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 7,
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+          background: 'var(--glass-bg-strong)',
+          backdropFilter: 'var(--glass-filter)', WebkitBackdropFilter: 'var(--glass-filter)',
+          border: '1px solid var(--border-default)',
           borderRadius: 'var(--radius-pill)', padding: '6px 14px', boxShadow: 'var(--shadow-sm)',
           fontSize: 12, fontWeight: 800, letterSpacing: '.04em', color: 'var(--text-secondary)',
         }}>

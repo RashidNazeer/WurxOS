@@ -25,7 +25,17 @@ export default function HierarchyReassignPanel({
   const actor = { uid: user?.id, name: profile?.display_name || user?.email || 'Manager' };
 
   return (
-    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px, 100vw)', zIndex: 1500, background: 'var(--surface-1)', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(420px, 100vw)', zIndex: 1500,
+      // --surface-1 is translucent (0.62 light / 0.68 dark) and this drawer sits
+      // over the org chart with nothing behind it, so the chart read straight
+      // through the text. The glass pane is the same opacity but carries the
+      // blur that pays for it, and degrades to a solid panel where
+      // backdrop-filter is unavailable.
+      background: 'var(--glass-bg-strong)',
+      backdropFilter: 'var(--glass-filter)', WebkitBackdropFilter: 'var(--glass-filter)',
+      boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column',
+    }}>
       <div className="d-flex align-items-center justify-content-between p-3 border-bottom" style={{ background: 'var(--surface-2)' }}>
         <h6 className="fw-bold mb-0">
           {selection.type === 'tl' && <><i className="bi bi-person-badge me-2" style={{ color: 'var(--success-text)' }} />Team Lead</>}
