@@ -131,6 +131,9 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
   }
 
   const lockStyle = isAtt ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined;
+  // lockStyle is attendance-only, so a workbook-owned field needs its own or it
+  // would read as editable while refusing every keystroke.
+  const wbLockStyle = fromWorkbook ? { background: 'var(--surface-2)', cursor: 'not-allowed' } : undefined;
   const pct = item.commissionPct ?? '';
   const pctOverAllocated = Number(pct) > 100;
 
@@ -159,7 +162,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           readOnly={fromWorkbook}
           disabled={fromWorkbook}
           title={fromWorkbook ? 'Set by the brand workbook — change it there, or untick the option in “Add from brand workbook”.' : undefined}
-          style={fromWorkbook ? lockStyle : undefined}
+          style={wbLockStyle}
         />
         <button
           type="button"
@@ -345,7 +348,7 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               readOnly={isAtt || isComm || goalLocked || fromWorkbook}
               disabled={isAtt || isComm || goalLocked || fromWorkbook}
               title={fromWorkbook && !goalLocked ? 'This month\'s target, read from the brand workbook.' : undefined}
-              style={isAtt || isComm || goalLocked || fromWorkbook ? lockStyle : undefined}
+              style={(isAtt || isComm || goalLocked) ? lockStyle : wbLockStyle}
             />
             <input
               type="text"

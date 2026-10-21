@@ -19,8 +19,8 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  INCENTIVE_OPTIONS, OPTION_BY_KEY, MAX_SELECTIONS_PER_APC,
-  readBrandSheet, getTarget, formatTarget, availableMonths,
+  INCENTIVE_OPTIONS, MAX_SELECTIONS_PER_APC,
+  readBrandSheet, getTarget, formatTarget, availableMonths, buildSelectionChanges,
 } from '../../lib/incentiveWorkbook';
 import { getIncentiveWorkbookUrl, setIncentiveWorkbookUrl } from '../../lib/incentivesApi';
 
@@ -190,46 +190,10 @@ export default function WorkbookIncentivesModal({
 
   /** Build the lines and hand them back; the form owns the state. */
   function apply() {
-    const addTo = { incentives: [], bonuses: [] };
-    const updates = new Map();     // existing item id -> { targetValue }
-    for (const k of picked) {
-      const [brandId, optionKey] = k.split('::');
-      const brand = brands.find((b) => b.id === brandId);
-      const opt = OPTION_BY_KEY[optionKey];
-      if (!brand || !opt) continue;
-      const res = getTarget(sheets?.[brandId], optionKey, month);
-      // A ratio target is stored as a PERCENTAGE, not the sheet's 0.95.
-      // autoComplete is achieved / target >= 0.9, so a target of 0.95 against
-      // an achieved figure anyone would type as 89 gives 93.7 — the line marks
-      // itself complete and becomes payable at any value above 0.86.
-      const targetValue = res.value === undefined ? ''
-        : String(opt.unit === 'ratio' ? Math.round(res.value * 1000) / 10 : res.value);
-
-      const existingId = already.get(k);
-      // Stamp the marker on a line matched by label or source, or the database
-      // guard in mig 422 will never count it.
-      if (existingId) { updates.set(existingId, { targetValue, wbOption: opt.key }); continue; }
-      addTo[opt.section].push({
-        id: uid4(),
-        text: opt.label,
-        amount: '',
-        suffix: opt.unit === 'ratio' ? '%' : '',
-        targetValue,
-        achievedValue: 0,
-        completed: false,
-        brandId: brand.id,
-        brandName: brand.name,
-        wbOption: opt.key,
-        // The GMV-Max line already has an automatic achieved figure (mig 317):
-        // the brand's gmv_achieved, which the APC enters at clock-in. Flagging
-        // it keeps one source for that number instead of two.
-        ...(opt.key === 'gmv_max' ? { source: 'gmv_max' } : {}),
-      });
-    }
-    // Unticking removes the line it created.
-    const removed = new Set();
-    for (const [k, id] of already) if (!picked.has(k)) removed.add(id);
-    onApply({ add: addTo, updates, removed });
+    const { add, updates, removed } = buildSelectionChanges({
+      picked, brands, sheetsByBrand: sheets || {}, month, existing: already, newId: uid4,
+    });
+    onApply({ add, updates, removed });
   }
 
   const brandRows = brands.map((b) => {
