@@ -67,7 +67,7 @@ function BreakDetailsModal({ record, onClose }) {
   }, 0);
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-header border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0' }}>
           <div>
@@ -447,7 +447,7 @@ function ApprovalModal({ record, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-clock-history me-2 text-primary" />Clock-Out Request</h6>
@@ -522,7 +522,7 @@ function EditRequestModal({ record, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-pencil-square me-2 text-primary" />Clock-In Edit Request</h6>
@@ -602,7 +602,7 @@ function BreaksEditModal({ record, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <h6 className="fw-bold mb-3"><i className="bi bi-cup-hot-fill me-2 text-warning" />Break Edit Request</h6>
@@ -1146,7 +1146,7 @@ function BulkMarkConfirmModal({ monthStr, targetRows, running, progress, onRun, 
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={running ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={running ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-body p-4" style={{ overflowY: 'auto' }}>
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -1404,7 +1404,7 @@ function RosterAdjustModal({ row, month, editor, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={pendingDate ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={pendingDate ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -1613,7 +1613,7 @@ function ForceCloseModal({ record, closer, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={saving ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -2490,7 +2490,7 @@ export default function AttendancePage() {
       {/* Quota conflict confirmation modal */}
       {quotaConflicts && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setQuotaConflicts(null)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={() => setQuotaConflicts(null)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
             <div className="card-body p-4" style={{ overflowY: 'auto' }}>
               <div className="d-flex align-items-start gap-3 mb-3">
@@ -2605,7 +2605,7 @@ function EditOutRequestModal({ record, approverId, onClose, onDone }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={saving ? undefined : onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">

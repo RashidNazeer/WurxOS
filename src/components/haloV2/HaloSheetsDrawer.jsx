@@ -37,7 +37,7 @@ export default function HaloSheetsDrawer({ selected, onClose, onRefresh, onDelet
   return createPortal(
     // z-index 995 keeps the share modal (backdrop 1000) able to stack on top.
     <div style={{ position: 'fixed', inset: 0, zIndex: 995 }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} />
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} />
       <div
         role="dialog"
         aria-label={`Sheets for ${brand.brand_name}`}

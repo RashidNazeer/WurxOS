@@ -207,7 +207,7 @@ export default function WorkbookIncentivesModal({
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1080, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={onClose} />
       <div className="wx-card" style={{ position: 'relative', width: '100%', maxWidth: 740, zIndex: 1, borderRadius: 'var(--radius-xl)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
 
         <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -56,7 +56,7 @@ export default function AgendaResourceModal({ resource, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <p className="fw-semibold mb-3">{isEdit ? 'Edit resource' : 'Add agenda resource'}</p>

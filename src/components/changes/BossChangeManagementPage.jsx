@@ -262,7 +262,7 @@ function ReviewModal({ change, allUsers, onClose, onSaved, sopDocs }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 640, zIndex: 1, borderRadius: 'var(--radius-xl)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="px-4 pt-4 pb-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="d-flex align-items-start justify-content-between">

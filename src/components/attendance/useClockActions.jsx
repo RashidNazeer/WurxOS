@@ -274,7 +274,7 @@ export function useClockActions() {
     {/* Clock-out request modal */}
     {showClockOut && (
       <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={() => setShowClockOut(false)} />
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={() => setShowClockOut(false)} />
         <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 420, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
           <div className="card-body p-4">
             <h6 className="fw-bold mb-1">Clock Out</h6>

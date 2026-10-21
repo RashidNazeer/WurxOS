@@ -232,7 +232,7 @@ export default function RichTextEditor({
           display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
           padding: 8px 10px;
           background: color-mix(in srgb, var(--surface-2) 88%, transparent);
-          backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+          backdrop-filter: blur(13px); -webkit-backdrop-filter: blur(13px);
           border-bottom: 1px solid var(--border-subtle);
           border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
         }

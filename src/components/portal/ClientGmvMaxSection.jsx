@@ -50,7 +50,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
       border: `1px solid ${dark ? WURX.borderSoft : (has ? tint + '22' : 'var(--border)')}`,
       borderRadius: 'var(--radius-lg)', padding: '14px 16px',
       position: 'relative', overflow: 'hidden',
-      backdropFilter: dark ? 'blur(10px) saturate(1.05)' : 'none',
+      backdropFilter: dark ? 'blur(13px) saturate(1.05)' : 'none',
       transition: 'transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -90,7 +90,7 @@ function MetricTile({ field, value, prevValue, dark, currency = 'USD' }) {
           background: delta.up ? (dark ? 'rgba(34, 197, 94, 0.22)' : '#dcfce7') : (dark ? 'rgba(239, 68, 68, 0.22)' : '#fef2f2'),
           color: delta.up ? (dark ? '#86efac' : 'var(--success-text)') : (dark ? '#fca5a5' : 'var(--danger-text)'),
           fontSize: 10.5, fontWeight: 700,
-          backdropFilter: dark ? 'blur(8px)' : 'none',
+          backdropFilter: dark ? 'blur(10.4px)' : 'none',
         }}>
           {delta.up ? '↗' : '↘'} {delta.up ? '+' : ''}{formatPctChange(delta.pct, { withSign: false })}
         </div>
@@ -135,7 +135,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
             background: isPrimary ? 'rgba(245, 213, 168, 0.15)' : '#fef3e2',
             color: isPrimary ? WURX.peach : 'var(--warning-text)',
             fontSize: 10, fontWeight: 700,
-            backdropFilter: 'blur(8px)',
+            backdropFilter: 'blur(10.4px)',
             border: isPrimary ? `1px solid ${WURX.borderSoft}` : 'none',
           }}>
             ↔ vs prev month
@@ -171,7 +171,7 @@ function MonthlyCard({ label, sublabel, report, prevReport, isPrimary, currency 
           marginTop: 14, padding: 12, borderRadius: 'var(--radius-md)',
           background: isPrimary ? 'rgba(245, 213, 168, 0.06)' : `linear-gradient(135deg, #ffffff, ${WURX.lightTintBg})`,
           border: isPrimary ? `1px solid ${WURX.borderSoft}` : `1px solid ${WURX.lightTintBorder}`,
-          backdropFilter: 'blur(8px)', position: 'relative',
+          backdropFilter: 'blur(10.4px)', position: 'relative',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: isPrimary ? WURX.peach : WURX.peachDeep }}>Notes</span>
@@ -192,7 +192,7 @@ function MetaPill({ label, value, dark }) {
       color: dark ? WURX.peach : WURX.peachDeep,
       border: dark ? `1px solid ${WURX.borderSoft}` : `1px solid ${WURX.lightTintBorder}`,
       padding: '5px 13px', fontSize: 11, fontWeight: 600,
-      backdropFilter: 'blur(8px)',
+      backdropFilter: 'blur(10.4px)',
     }}>
       <span style={{ opacity: 0.75, fontWeight: 500 }}>{label}</span>
       <span style={{ fontWeight: 700, color: dark ? WURX.cream : '#1f1714' }}>{value}</span>

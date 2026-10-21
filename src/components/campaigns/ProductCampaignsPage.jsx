@@ -281,7 +281,7 @@ function CampaignModal({ editProduct, brandId, brandName, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 560, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
         <div className="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex align-items-center justify-content-between" style={{ borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', flexShrink: 0 }}>
           <div>

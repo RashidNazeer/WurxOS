@@ -57,7 +57,7 @@ export default function ReportFiltersPopover({ filters, onClear }) {
           {/* Backdrop that dims the page behind the popover */}
           <div style={{
             position: 'fixed', inset: 0, zIndex: 999,
-            background: 'color-mix(in srgb, var(--backdrop) 50%, transparent)', backdropFilter: 'blur(2px)',
+            background: 'color-mix(in srgb, var(--backdrop) 50%, transparent)', backdropFilter: 'blur(2.6px)',
           }} onClick={() => setOpen(false)} />
 
           <div ref={popRef}

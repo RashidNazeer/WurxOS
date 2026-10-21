@@ -380,7 +380,7 @@
   position: fixed; inset: 0; z-index: 1250;
   display: grid; place-items: center; padding: 20px;
   background: color-mix(in srgb, #0b1020 55%, transparent);
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(2.6px);
   animation: wx-fade var(--dur-enter) var(--ease-out);
 }
 .ck-overlay-card {

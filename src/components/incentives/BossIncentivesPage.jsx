@@ -106,7 +106,7 @@ function DetailsModal({ rec, userName, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 520, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
@@ -163,7 +163,7 @@ function ResetModal({ defaultSource, defaultTarget, recordCount, onConfirm, onCl
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 480, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">
@@ -228,7 +228,7 @@ function ClearPayoutConfirmModal({ userName, roleTab, onConfirm, onClose, cleari
   const verifier = (roleTab === 'apcs' || roleTab === 'ipcs') ? 'OL' : 'Boss';
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-start gap-3 mb-3">

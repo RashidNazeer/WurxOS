@@ -256,7 +256,7 @@ function ErrorModal({ err, onClose }) {
         background: 'rgba(15, 23, 42, 0.55)',
         display: 'grid', placeItems: 'center',
         padding: 16,
-        backdropFilter: 'blur(2px)',
+        backdropFilter: 'blur(2.6px)',
       }}>
       <div
         onClick={(e) => e.stopPropagation()}

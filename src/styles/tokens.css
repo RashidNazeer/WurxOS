@@ -443,10 +443,12 @@
      label behind the pane is a smooth colour wash, not edges. Sticky chrome
      (topbar, tab bar) is one scale step down because its backdrop changes on
      every scroll frame. Safe: 24-40px transient, 14-24px sticky. */
-  /* 24, not 40: blur cost rises with radius and every dropdown and modal open
-     re-runs it. 24 still reads as glass and stops the open/close stutter. */
-  --glass-blur:   24px;
-  --glass-blur-sticky: 14px;
+  /* Not 40: blur cost rises with radius and every dropdown and modal open
+     re-runs it. Raised from 24 to 31.2 (x1.3) on request. The open/close
+     stutter was measured clean at 24 — NOT at this radius — so if dropdowns
+     start feeling slow on an older machine, this is the first dial to turn. */
+  --glass-blur:   31.2px;
+  --glass-blur-sticky: 18.2px;
 
   /* Refraction / edge lensing. The SVG displacement filters are inlined in
      index.html; this token picks which one (or none). Empty by default â€” the
@@ -522,7 +524,7 @@
 
   /* Dialog scrim blur â€” much weaker than the pane blur; it only has to
      take the edge off the page behind a modal. */
-  --glass-blur-backdrop: 2px;
+  --glass-blur-backdrop: 2.6px;
 }
 
 /* Reduced motion: near-zero durations everywhere; entries keep a short

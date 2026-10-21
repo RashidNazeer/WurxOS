@@ -108,7 +108,7 @@ export default function ClockInReminder() {
       alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
       <div
-        style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }}
+        style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }}
         onClick={softHide}
       />
       <div className="card border-0 shadow-lg"

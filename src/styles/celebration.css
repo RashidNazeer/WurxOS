@@ -62,7 +62,7 @@
   position: absolute;
   inset: 0;
   background: rgba(4, 14, 11, 0.72);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(7.8px);
 }
 :root:not([data-theme="dark"]) .cel-scrim { background: rgba(40, 34, 18, 0.42); }
 
