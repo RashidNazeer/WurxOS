@@ -93,6 +93,11 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
   const isGmvMax   = source === 'gmv_max';
   const isComm     = source === 'commission_tier';
   const isAuto     = !!source;
+  // A line the brand workbook owns. Its description and target come from the
+  // sheet, so they are shown and not typed: the OL maintains the sheet, and a
+  // figure edited here would silently disagree with it. The amount in PKR is
+  // still theirs — the workbook holds no money.
+  const fromWorkbook = !!item.wbOption;
   // A GMV-Max target is owned by the brand's monthly GMV goal (mig 366). Lock
   // it only when a goal actually exists: otherwise a brand nobody has set a
   // goal for could never be given a target, and the line could never complete.
@@ -151,6 +156,10 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
           placeholder="e.g. 250 affiliates with 3+ videos"
           value={item.text}
           onChange={e => onChange(item.id, 'text', e.target.value)}
+          readOnly={fromWorkbook}
+          disabled={fromWorkbook}
+          title={fromWorkbook ? 'Set by the brand workbook — change it there, or untick the option in “Add from brand workbook”.' : undefined}
+          style={fromWorkbook ? lockStyle : undefined}
         />
         <button
           type="button"
@@ -173,12 +182,25 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
             ...(isAuto ? { borderColor: 'color-mix(in srgb, var(--info) 35%, transparent)', background: 'var(--info-soft)', color: 'var(--info-text)', fontWeight: 600 } : {}) }}
           value={source}
           onChange={e => applySource(e.target.value)}
+          // The workbook picker already decided this: it stamps gmv_max on the
+          // GMV-Max option and leaves the rest manual. Letting the OL change it
+          // afterwards would only break the pairing.
+          disabled={fromWorkbook}
+          title={fromWorkbook ? 'Set by the brand workbook.' : undefined}
         >
           {sourceOptionsFor(hideToggles, source).map(v => (
             <option key={v || 'manual'} value={v}>{SOURCE_LABELS[v] || v}</option>
           ))}
         </select>
       </div>
+      {fromWorkbook && (
+        <div className="mb-2" style={{ fontSize: '0.68rem', color: 'var(--info-text)' }}>
+          <i className="bi bi-journal-check me-1" />
+          From the brand workbook. The description and this month's target come from the
+          sheet — update the sheet, then reload it in <strong>Add from brand workbook</strong>.
+          The amount is still yours to set.
+        </div>
+      )}
       {isAtt && (
         <div className="mb-2" style={{ fontSize: '0.68rem', color: 'var(--info-text)' }}>
           <i className="bi bi-info-circle me-1" />
@@ -320,9 +342,10 @@ function LineRow({ item, onChange, onRemove, hideToggles, brandCurrency, othersP
               min="0"
               value={isAtt ? 100 : isComm ? '' : goalLocked ? gmvGoal : (item.targetValue ?? '')}
               onChange={e => onChange(item.id, 'targetValue', e.target.value)}
-              readOnly={isAtt || isComm || goalLocked}
-              disabled={isAtt || isComm || goalLocked}
-              style={isAtt || isComm || goalLocked ? lockStyle : undefined}
+              readOnly={isAtt || isComm || goalLocked || fromWorkbook}
+              disabled={isAtt || isComm || goalLocked || fromWorkbook}
+              title={fromWorkbook && !goalLocked ? 'This month\'s target, read from the brand workbook.' : undefined}
+              style={isAtt || isComm || goalLocked || fromWorkbook ? lockStyle : undefined}
             />
             <input
               type="text"
