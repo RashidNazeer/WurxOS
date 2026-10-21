@@ -573,7 +573,7 @@ export default function KnowledgeBasePage() {
       {/* ── Submission Success Dialog ── */}
       {proposeSuccess && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setProposeSuccess(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={() => setProposeSuccess(false)} />
           <div className="card border-0 shadow-lg text-center" style={{ position: 'relative', width: '100%', maxWidth: 400, zIndex: 1, borderRadius: 'var(--radius-lg)', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
             <div className="card-body p-4">
               <div className="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
@@ -633,7 +633,7 @@ function ProposeModal({ onClose, onSave, saving }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={onClose} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 500, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto', background: 'var(--surface-1)', color: 'var(--text-primary)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-4">

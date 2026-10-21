@@ -449,7 +449,7 @@ function EukaMode() {
 
       {/* Non-dismissable processing dialog */}
       {running && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15,18,24,0.55)', backdropFilter: 'blur(2px)',
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15,18,24,0.55)', backdropFilter: 'blur(2.6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="wx-card" style={{ padding: 30, width: 380, maxWidth: '90vw', textAlign: 'center' }}>
             <div className="wx-spinner" style={{ width: 34, height: 34, margin: '0 auto 16px', borderWidth: 3 }} />

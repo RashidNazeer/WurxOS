@@ -1442,7 +1442,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
 
       {/* ─── Auto Generate from Euka — modals ──────────────────────────── */}
       {eukaModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'var(--backdrop)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           {/* Period picker */}
           {eukaModal === 'period' && (
             <div className="wx-card" style={{ padding: 24, width: 460, maxWidth: '92vw' }}>

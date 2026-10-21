@@ -194,8 +194,8 @@
   top: 0;
   z-index: 1;
   background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(7.8px);
+  backdrop-filter: blur(7.8px);
 }
 .notif-panel-footer {
   padding: 10px 14px;

@@ -104,7 +104,7 @@ export default function ClientPortalPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
               width: 52, height: 52, borderRadius: 'var(--radius-md)',
-              background: 'rgba(245, 213, 168, 0.18)', backdropFilter: 'blur(4px)',
+              background: 'rgba(245, 213, 168, 0.18)', backdropFilter: 'blur(5.2px)',
               display: 'grid', placeItems: 'center', fontSize: 24,
             }}>📊</div>
             <div style={{ minWidth: 0 }}>

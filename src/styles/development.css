@@ -690,7 +690,7 @@ textarea.dv-input { height: auto; padding: 8px 10px; line-height: 1.5; resize: v
 .dv-feed-empty { margin: 0; font-size: 13px; }
 
 /* ── Overlays ───────────────────────────────────────────────── */
-.dv-drawer-backdrop { position: fixed; inset: 0; z-index: 1040; background: var(--dv-backdrop); backdrop-filter: blur(2px); }
+.dv-drawer-backdrop { position: fixed; inset: 0; z-index: 1040; background: var(--dv-backdrop); backdrop-filter: blur(2.6px); }
 .dv-drawer {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 1041; width: min(680px, 100vw);
   display: flex; flex-direction: column; background: var(--surface-1); color: var(--text-primary);
@@ -845,7 +845,7 @@ textarea.dv-panel-title:focus { outline: none; border-color: var(--accent); box-
 /* ── Dialogs ────────────────────────────────────────────────── */
 .dv-modal-backdrop {
   position: fixed; inset: 0; z-index: 1060; display: grid; place-items: center; padding: 20px;
-  background: var(--dv-backdrop); backdrop-filter: blur(3px);
+  background: var(--dv-backdrop); backdrop-filter: blur(3.9px);
 }
 .dv-modal {
   width: 100%; max-height: calc(100dvh - 40px); display: flex; flex-direction: column; outline: none;

@@ -707,7 +707,7 @@ export default function AgendaOngoingPage() {
       {/* Finish-meeting guard — present APCs who never presented */}
       {finishModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1070, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2px)' }} onClick={() => setFinishModalOpen(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(2.6px)' }} onClick={() => setFinishModalOpen(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 460, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-start gap-3 mb-3">

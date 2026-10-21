@@ -72,7 +72,7 @@ function ModalShell({ onClose, title, subtitle, children }) {
       position: 'fixed', inset: 0, zIndex: 1070,
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={onClose} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={onClose} />
       <div className="wx-card" style={{
         position: 'relative', width: '100%', maxWidth: 720, zIndex: 1, borderRadius: 'var(--radius-xl)',
         maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0,

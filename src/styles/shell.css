@@ -895,8 +895,8 @@
     position: fixed;
     inset: 0;
     background: var(--backdrop);
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2.6px);
+    backdrop-filter: blur(2.6px);
     z-index: var(--z-overlay);
     opacity: 0;
     visibility: hidden;

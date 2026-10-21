@@ -856,7 +856,7 @@ export default function ClockWidget() {
       {/* Edit clock-in modal */}
       {showEditClockIn && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1071, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={() => !editSaving && setShowEditClockIn(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={() => !editSaving && setShowEditClockIn(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
             <div className="card-body p-4">
               <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
@@ -931,7 +931,7 @@ export default function ClockWidget() {
           self-approval for everyone else). */}
       {showEditBreaks && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1071, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={() => !breakSaving && setShowEditBreaks(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={() => !breakSaving && setShowEditBreaks(false)} />
           <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 540, zIndex: 1, borderRadius: 'var(--radius-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="card-body p-4">
               <h6 className="fw-bold mb-1 d-flex align-items-center gap-2">
@@ -1258,7 +1258,7 @@ function AdjustClockOutModal({ record, isApcOrIpc, onCancel, onSubmit }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3px)' }} onClick={saving ? undefined : onCancel} />
+      <div style={{ position: 'absolute', inset: 0, background: 'var(--backdrop)', backdropFilter: 'blur(3.9px)' }} onClick={saving ? undefined : onCancel} />
       <div className="card border-0 shadow-lg" style={{ position: 'relative', width: '100%', maxWidth: 440, zIndex: 1, borderRadius: 'var(--radius-lg)' }}>
         <div className="card-body p-4">
           <div className="d-flex align-items-center justify-content-between mb-3">
