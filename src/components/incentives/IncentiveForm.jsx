@@ -686,9 +686,28 @@ export default function IncentiveForm() {
             // list is empty (that reconciles to "drop everything"); keep them as
             // orphans instead, so a mis-load can't wipe the whole plan.
             const keep = (i) => !i.brandId || curIds.size === 0 || curIds.has(i.brandId);
-            setIncentives((prior.incentives || []).filter(keep).map(carry));
-            setBonuses((prior.bonuses || []).filter(keep).map(carry));
-            setCarryoverInfo({ source: 'prior', sourceMonth: prior.month });
+
+            // ── A fresh APC month starts almost empty ──────────────────────
+            // An APC's brand lines now come from the brand workbook, so carrying
+            // last month's forward only fills the page with figures the OL is
+            // about to replace — and a stale target that nobody notices is one
+            // that can still pay. Keep the person-level AUTOMATIC lines, which
+            // are the same every month and fill themselves in (attendance /
+            // punctuality, and an OL's brand roll-up), and drop the rest until
+            // the OL picks this month's options.
+            //
+            // APC and IPC only. A TL, OL or Ads Manager has no picker to rebuild
+            // from, so emptying their plan would just mean retyping it.
+            // u.role, not targetRole: setTargetRole(u.role) was called earlier in
+            // THIS function, so the state variable is still the previous render's
+            // value here and would read as '' on first load.
+            const freshStart = u.role === 'apc' || u.role === 'ipc';
+            const isAutoPersonLine = (i) => !i.brandId && (i.source === 'attendance' || i.source === 'ol_brands');
+            const keepForMonth = freshStart ? ((i) => keep(i) && isAutoPersonLine(i)) : keep;
+
+            setIncentives((prior.incentives || []).filter(keepForMonth).map(carry));
+            setBonuses((prior.bonuses || []).filter(keepForMonth).map(carry));
+            setCarryoverInfo({ source: 'prior', sourceMonth: prior.month, freshStart });
           }
         } catch (err) {
           // eslint-disable-next-line no-console
@@ -883,7 +902,9 @@ export default function IncentiveForm() {
           <i className="bi bi-arrow-down-circle-fill flex-shrink-0 mt-1" />
           <div>
             {carryoverInfo.source === 'prior'
-              ? <>Pre-filled from this user's previous plan ({getMonthLabel(carryoverInfo.sourceMonth)}). Targets and amounts carried over; progress reset. Click <b>Save</b> to lock it in for {getMonthLabel(currentMonth)}.</>
+              ? (carryoverInfo.freshStart
+                ? <>Nothing is set for {getMonthLabel(currentMonth)} yet. Only the automatic lines (attendance / punctuality) were carried over from {getMonthLabel(carryoverInfo.sourceMonth)} — add this month's brand options with <b>Add from brand workbook</b>, then <b>Save</b>.</>
+                : <>Pre-filled from this user's previous plan ({getMonthLabel(carryoverInfo.sourceMonth)}). Targets and amounts carried over; progress reset. Click <b>Save</b> to lock it in for {getMonthLabel(currentMonth)}.</>)
               : <>Pre-filled from your default template. Click <b>Save</b> to lock it in for {getMonthLabel(currentMonth)}.</>}
           </div>
         </div>
