@@ -506,7 +506,9 @@ export default function HaloV2Explorer({
           role="status"
           style={{
             position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 60,
-            background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+            background: 'var(--glass-bg-strong)',
+            backdropFilter: 'var(--glass-filter)', WebkitBackdropFilter: 'var(--glass-filter)',
+            border: '1px solid var(--border-default)',
             borderRadius: 'var(--radius-pill)', boxShadow: 'var(--shadow-lg)', padding: '8px 16px',
             fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)',
             display: 'inline-flex', alignItems: 'center', gap: 8,
