@@ -60,11 +60,16 @@ create policy "app_config_workbook_url_update"
 -- Seed the sheet the OL is using today, so the picker works the moment this
 -- ships. Changing it later is a normal edit from the picker; `do nothing` means
 -- re-running this never overwrites a newer address.
+--
+-- app_config is (key text, value text) — there is no jsonb column and no
+-- updated_at. Rows that need structure serialise JSON into that text column;
+-- leave_quota_default already does exactly this. So the value is a JSON STRING,
+-- not a jsonb expression, which would not assign to a text column at all.
 insert into public.app_config (key, value)
-values ('incentive_workbook_url', jsonb_build_object(
-  'url', 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTcMypy4hfxxLuepCJSzcjQ-8mQc5iV--YLyMu_j-FvogxNyxsjTzQ7OK4MoQ5ZxuU4dm8Ylg4jdd-P/pub?output=xlsx',
-  'label', 'Brand targets (published Google Sheet)'
-))
+values (
+  'incentive_workbook_url',
+  '{"url":"https://docs.google.com/spreadsheets/d/e/2PACX-1vTcMypy4hfxxLuepCJSzcjQ-8mQc5iV--YLyMu_j-FvogxNyxsjTzQ7OK4MoQ5ZxuU4dm8Ylg4jdd-P/pub?output=xlsx","label":"Brand targets (published Google Sheet)"}'
+)
 on conflict (key) do nothing;
 
 -- ---- verification ----------------------------------------------------------
@@ -73,6 +78,12 @@ declare n int;
 begin
   select count(*) into n from public.app_config where key = 'incentive_workbook_url';
   if n <> 1 then raise exception 'expected the workbook url row to exist, found %', n; end if;
+
+  -- The value must be readable JSON carrying a url, or the picker gets nothing.
+  perform (select (value::jsonb) ->> 'url' from public.app_config where key = 'incentive_workbook_url');
+  if (select nullif((value::jsonb) ->> 'url', '') from public.app_config where key = 'incentive_workbook_url') is null then
+    raise exception 'the workbook url row does not hold a readable url';
+  end if;
 
   select count(*) into n from pg_policies
    where schemaname = 'public' and tablename = 'app_config'
