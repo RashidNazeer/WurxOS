@@ -1124,18 +1124,26 @@ export function normaliseWorkbookUrl(raw) {
 }
 
 export async function getIncentiveWorkbookUrl() {
+  // app_config is (key text, value text) -- no jsonb, no updated_at. Existing
+  // rows store JSON serialised into that text column (leave_quota_default does
+  // the same), so read it back the same way. A bare URL is tolerated in case
+  // someone sets the row by hand.
   const { data, error } = await supabase
-    .from('app_config').select('value, updated_at')
+    .from('app_config').select('value')
     .eq('key', 'incentive_workbook_url').maybeSingle();
   if (error) throw new Error(error.message);
-  return data?.value?.url ? { url: data.value.url, label: data.value.label || '', updatedAt: data.updated_at } : null;
+  const raw = data?.value;
+  if (!raw) return null;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { parsed = { url: String(raw) }; }
+  return parsed?.url ? { url: parsed.url, label: parsed.label || '' } : null;
 }
 
 export async function setIncentiveWorkbookUrl(url, label = '') {
   const clean = normaliseWorkbookUrl(url);
   if (!clean) throw new Error('A link is required.');
   const { error } = await supabase.from('app_config').upsert(
-    { key: 'incentive_workbook_url', value: { url: clean, label }, updated_at: new Date().toISOString() },
+    { key: 'incentive_workbook_url', value: JSON.stringify({ url: clean, label }) },
     { onConflict: 'key' },
   );
   if (error) throw new Error(error.message);
