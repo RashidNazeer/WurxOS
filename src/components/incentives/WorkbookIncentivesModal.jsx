@@ -52,7 +52,7 @@ function existingSelections(incentives, bonuses) {
     const key = it.wbOption
       || (it.source === 'gmv_max' ? 'gmv_max' : null)
       || INCENTIVE_OPTIONS.find((o) => canon(o.label) === canon(it.text))?.key;
-    if (key) out.set(selKey(it.brandId, key), it.id);
+    if (key) out.set(selKey(it.brandId, key), it);
   }
   return out;
 }
@@ -191,16 +191,37 @@ export default function WorkbookIncentivesModal({
   /** Build the lines and hand them back; the form owns the state. */
   function apply() {
     const { add, updates, removed } = buildSelectionChanges({
-      picked, brands, sheetsByBrand: sheets || {}, month, existing: already, newId: uid4,
+      picked,
+      brands,
+      sheetsByBrand: sheets || {},
+      month,
+      existing: new Map([...already].map(([k, it]) => [k, it.id])),
+      newId: uid4,
     });
     onApply({ add, updates, removed });
   }
+
+  /**
+   * A line already on the plan whose target no longer matches the sheet.
+   *
+   * This is what made Bentgo look broken: the October line still carried July's
+   * 100 because it was carried forward, while the sheet had since been filled
+   * in with 75. Nothing on screen said the two disagreed, so the workbook
+   * looked wrong when it was the plan that was stale.
+   */
+  const staleTarget = (o) => {
+    if (!o.existing || o.res?.value === undefined) return null;
+    const now = o.unit === 'ratio' ? Math.round(o.res.value * 1000) / 10 : o.res.value;
+    const was = Number(o.existing.targetValue);
+    if (!Number.isFinite(was) || was === Number(now)) return null;
+    return { was: formatTarget(o.unit === 'ratio' ? was / 100 : was, o.unit), now: formatTarget(o.res.value, o.unit) };
+  };
 
   const brandRows = brands.map((b) => {
     const sheet = sheets?.[b.id];
     const opts = INCENTIVE_OPTIONS.map((o) => {
       const res = sheet && !sheet.missing ? getTarget(sheet, o.key, month) : null;
-      return { ...o, res, selected: picked.has(selKey(b.id, o.key)) };
+      return { ...o, res, selected: picked.has(selKey(b.id, o.key)), existing: already.get(selKey(b.id, o.key)) || null };
     });
     return { brand: b, sheet, opts, chosen: opts.filter((o) => o.selected).length };
   });
