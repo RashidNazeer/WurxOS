@@ -67,6 +67,8 @@ function autofillSummary(meta, created) {
     if (meta.eukaOk && !meta.eukaError) bits.push('Euka ✓');
     else if (meta.eukaOk) bits.push('Euka partly filled — ' + meta.eukaError);
     else bits.push('Euka unavailable — ' + (meta.eukaError || 'no reason given'));
+  } else if (meta.eukaLinked === false) {
+    bits.push('this brand is not on Euka, so the two funnel fields stay manual');
   }
   const n = meta.filled || 0;
   const lead = created ? 'Created & auto-filled' : 'Auto-filled';
@@ -699,7 +701,14 @@ function ApcCheckpointPage() {
               <select className="wx-input" value={data?.currency || '$'} disabled={!data} style={{ width: 74 }} onChange={(e) => setData((d) => ({ ...d, currency: e.target.value }))}>
                 <option value="$">$</option><option value="£">£</option><option value="€">€</option>
               </select>
-              <button className="wx-btn wx-btn-ghost" onClick={onAutofill} disabled={autofilling || !data}>
+              <button
+                className="wx-btn wx-btn-ghost"
+                onClick={onAutofill}
+                disabled={autofilling || !data}
+                title={selectedBrand?.euka_store_id
+                  ? 'Fills from this week’s weekly report, plus target invites and opted-in from Euka.'
+                  : `Fills from this week’s weekly report. ${brandName || 'This brand'} is not linked to a Euka store, so the Euka funnel fields stay manual.`}
+              >
                 {autofilling ? <><span className="wx-spinner" /> Auto-filling…</> : <><i className="bi bi-magic me-1" /> Auto-fill{selectedBrand?.euka_store_id ? ' + Euka' : ''}</>}
               </button>
               <button className="wx-btn wx-btn-primary" onClick={onDone}><i className="bi bi-check2 me-1" /> Done</button>

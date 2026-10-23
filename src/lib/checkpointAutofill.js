@@ -158,6 +158,10 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
   if (n2) set('funnel.approvedN2', n2.overallPerformance?.samplesApproved);
 
   // ── Euka (only when the brand is on Euka) — target invites + opted in ──
+  // A brand with no euka_store_id is skipped silently here, which read to APCs
+  // on unlinked brands (Aqua Sonic, Honeysticks, Mineral Ice Extreme…) as
+  // "auto-fill is broken". Record the fact so the banner can say so.
+  meta.eukaLinked = !!brand?.euka_store_id;
   if (brand?.euka_store_id) {
     meta.eukaTried = true;
     stage('Fetching Euka data…', 70);
