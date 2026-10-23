@@ -174,11 +174,30 @@ Deno.serve(async (req) => {
     const { slug: brandSlug, key: brandKey, storeId: brandStoreId } = keyForBrand(payload?.brand ?? null);
     if (!brandKey) return json({ error: `Euka key not configured for brand "${brandSlug}"` }, 500);
 
-    // Shared-key brands: the key sees ALL stores, so the frontend can't tell
-    // them apart. Force the request to THIS brand's store so it can never read
-    // a sibling brand's data. (Dashboard endpoints take storeId in the body.)
-    if (brandStoreId && path.startsWith('/dashboard/')) {
-      body = { ...(body && typeof body === 'object' ? body : {}), storeId: brandStoreId };
+    // Dashboard endpoints: scope the call server-side.
+    //
+    // storeId, because a shared key sees ALL stores and the frontend cannot
+    // tell them apart — forcing THIS brand's store means it can never read a
+    // sibling brand's data.
+    //
+    // brandId, because Euka now REQUIRES it here. Without it every
+    // /dashboard/* call answers 400 {"code":"BAD_REQUEST","message":"Input
+    // validation failed"} — verified against the live API on 2026-10-23 for
+    // performance-overview, top-creators-by-gmv, products-performance and
+    // creator-outreach-funnel. It is the same change Euka made to /data-export
+    // (mig 315), and it is resolved from euka_stores for the same reason: the
+    // brand id is what actually SCOPES the rows, so a guessed or mismatched one
+    // returns another brand's figures with a 200 and no way to notice.
+    if (path.startsWith('/dashboard/')) {
+      const b = (body && typeof body === 'object') ? { ...body as Record<string, unknown> } : {};
+      const storeId = brandStoreId || String(b.storeId || '').trim();
+      if (!storeId) return json({ error: 'dashboard calls need a storeId' }, 400);
+      const { data: st } = await admin
+        .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
+      if (!st?.euka_brand_id) {
+        return json({ error: `No Euka brand id on file for store ${storeId} — add it to euka_stores.euka_brand_id.` }, 500);
+      }
+      body = { ...b, storeId, brandId: st.euka_brand_id };
     }
 
     // /data-export is a GET, so its scope lives in the QUERY, not the body

@@ -230,6 +230,20 @@ Deno.serve(async (req) => {
     const key = eukaKeyForSlug(String(brand.euka_slug));
     if (!key) return fail('config', `Euka key not configured for "${brand.brand_name}" — tell the developer.`, 500);
 
+    // Euka now REQUIRES brandId on every /dashboard/* call. Without it they all
+    // answer 400 "Input validation failed" — which is what an APC hit on Inno
+    // Supps for the week of 12 Oct. Same change Euka made to /data-export
+    // (mig 315), and the pairing comes from the same place for the same reason:
+    // brandId is what SCOPES the rows, so a mismatched one quietly returns
+    // another brand's figures with a 200.
+    const { data: storeRow } = await admin
+      .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
+    const eukaBrandId = String(storeRow?.euka_brand_id || '');
+    if (!eukaBrandId) {
+      return fail('config',
+        `No Euka brand id on file for "${brand.brand_name}" — set euka_stores.euka_brand_id for store ${storeId}.`, 500);
+    }
+
     // ── Month-to-Date window ──────────────────────────────────────────
     // The MTD month is decided by the WEEK'S END DATE: a week ending
     // 2026-07-04 is July MTD (2026-07-01..04), even though it began in June.
@@ -248,17 +262,17 @@ Deno.serve(async (req) => {
     let overview: any, creatorsResp: any, prodResp: any, mtdResp: any;
     try {
       [overview, creatorsResp, prodResp, mtdResp] = await Promise.all([
-        eukaPost('/dashboard/performance-overview', { storeId, startDate, endDate }, key, budget, timings),
-        eukaPost('/dashboard/top-creators-by-gmv', { storeId, postedDateRange: { start: startDate, end: endDate }, limit: 5 }, key, budget, timings).catch(() => null),
+        eukaPost('/dashboard/performance-overview', { storeId, brandId: eukaBrandId, startDate, endDate }, key, budget, timings),
+        eukaPost('/dashboard/top-creators-by-gmv', { storeId, brandId: eukaBrandId, postedDateRange: { start: startDate, end: endDate }, limit: 5 }, key, budget, timings).catch(() => null),
         // products-performance carries per-product affiliateGmv + orders itself.
         // (It replaced top-products-by-video-revenue, which Euka removed in Aug
         // 2026 — that 404 was swallowed here, so product rows silently stopped
         // filling. Ranked by total GMV; we re-rank by AFFILIATE GMV below, so
         // ask for more rows than the 5 we keep.)
-        eukaPost('/dashboard/products-performance', { storeId, postedDateRange: { start: startDate, end: endDate }, pageSize: 25, sortField: 'gmv', sortOrder: 'DESC' }, key, budget, timings).catch(() => null),
+        eukaPost('/dashboard/products-performance', { storeId, brandId: eukaBrandId, postedDateRange: { start: startDate, end: endDate }, pageSize: 25, sortField: 'gmv', sortOrder: 'DESC' }, key, budget, timings).catch(() => null),
         // Best-effort: no MTD figure is a blank field, not a failed report.
         needMtd
-          ? eukaPost('/dashboard/performance-overview', { storeId, startDate: mtdStart, endDate }, key,
+          ? eukaPost('/dashboard/performance-overview', { storeId, brandId: eukaBrandId, startDate: mtdStart, endDate }, key,
               budget, timings, 'performance-overview (MTD)').catch(() => null)
           : Promise.resolve(null),
       ]);
@@ -270,7 +284,15 @@ Deno.serve(async (req) => {
           'Euka did not answer within two minutes, so the auto-fill was stopped before the server cut it off. Euka is slow right now, not broken — try again in a few minutes, or fill this week in manually.',
           504, { ...(e as object), timings }, Date.now() - t0);
       }
-      return errOut('euka-fetch', 'Euka did not return performance data for this period. It may be too recent (data not synced yet) or Euka may be temporarily unavailable. Try a slightly older week.', 502, { ...(e as object), timings }, Date.now() - t0);
+      // A 400 is Euka rejecting the REQUEST, not a gap in the data. Telling an
+      // APC to "try an older week" for a malformed call sends them round a loop
+      // that can never work — which is exactly what happened when Euka began
+      // requiring brandId. Say which it was.
+      const status = (e as { lastErr?: { status?: number } })?.lastErr?.status;
+      const message = status === 400
+        ? 'Euka rejected the request for this brand (400). That is a configuration problem, not missing data — a different week will not help. Tell the developer.'
+        : 'Euka did not return performance data for this period. It may be too recent (data not synced yet) or Euka may be temporarily unavailable. Try a slightly older week.';
+      return errOut('euka-fetch', message, 502, { ...(e as object), timings }, Date.now() - t0);
     }
     if (!overview || overview.totalShopGMV == null) {
       return fail('euka-empty', 'Euka returned no performance numbers for this period. Pick a week whose data has settled and try again.', 502, { overview, timings });
