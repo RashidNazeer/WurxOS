@@ -188,7 +188,12 @@ Deno.serve(async (req) => {
       + `&start_date=${startDate}&end_date=${endDate}&export_type=json`;
     const [invitesResp, funnelResp] = await Promise.all([
       eukaGet(`/data-export?${qs}`, key, budget).catch((e) => ({ __err: String(e) })),
-      eukaPost('/dashboard/creator-outreach-funnel', { storeId, postedDateRange: { start: startDate, end: endDate } }, key, budget).catch((e) => ({ __err: String(e) })),
+      // brandId is required here too since Euka's 2026-10 change; without it
+      // this answers 400 and optedIn silently stayed blank. eukaBrandId is
+      // already resolved above for /data-export.
+      eukaPost('/dashboard/creator-outreach-funnel',
+        { storeId, brandId: eukaBrandId, postedDateRange: { start: startDate, end: endDate } },
+        key, budget).catch((e) => ({ __err: String(e) })),
     ]);
 
     const targetInvites = Array.isArray(invitesResp?.data) ? invitesResp.data.length : null;
