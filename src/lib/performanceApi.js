@@ -118,6 +118,36 @@ export async function getOverview(month = currentMonth()) {
   return data || [];
 }
 
+// --- Finalised months (mig 424) ---
+// Once a month is locked its scores are STORED, not derived. The page's parity
+// layer must not recompute them: a closed month's live inputs keep moving
+// (brands get reassigned, people are laid off, closed-month GMV goals get
+// edited) and recomputing re-wrote September's scores weeks after the fact.
+// Returns {} for an open month, so callers fall back to live math.
+export async function listMonthSnapshots(month = currentMonth()) {
+  const { data, error } = await supabase
+    .from('performance_month_snapshots')
+    .select('user_id, performance_score, incentives_score, attendance_score, flags_score, composite_score, level, warning_count, locked_at, breakdown')
+    .eq('month', month);
+  if (error) throw new Error(error.message);
+  const map = {};
+  (data || []).forEach((r) => { map[r.user_id] = r; });
+  return map;
+}
+
+// Pillar scores off a snapshot row, in the shape calcComposite/getLevel expect.
+// Numbers come back from PostgREST as strings, hence the Number() pass.
+export function snapshotPillars(snap) {
+  if (!snap) return null;
+  const n = (v) => (v == null ? null : Number(v));
+  return {
+    performance: n(snap.performance_score),
+    incentives:  n(snap.incentives_score),
+    attendance:  n(snap.attendance_score),
+    flags:       n(snap.flags_score),
+  };
+}
+
 export async function getConfig() {
   const { data, error } = await supabase
     .from('performance_config').select('*').eq('id', 1).maybeSingle();
