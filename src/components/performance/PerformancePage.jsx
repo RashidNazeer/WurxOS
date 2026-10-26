@@ -1322,7 +1322,9 @@ export default function PerformancePage() {
       // Team data.
       if (hasTeamTab) {
         const users = await listEvaluableUsers({
-          uid: currentUser.uid, viewerRole: effectiveRole,
+          // `month` so a finalised month still lists the people who worked it,
+          // not just whoever is on staff today (mig 424).
+          uid: currentUser.uid, viewerRole: effectiveRole, month,
         });
         if (cancelled) return;
         setTeamUsers(users);
