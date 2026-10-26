@@ -4,9 +4,10 @@ import { formatPKR } from '../../lib/format';
 import { roleLabel } from '../../lib/roles';
 import { Button, EmptyState, PageHeader, ProgressBar } from '../ui';
 import {
-  getIncentives, updateIncentivesProgress, autoComplete, fmtUnitValue,
+  getIncentives, updateIncentivesProgress, autoComplete, fmtUnitValue, fetchBrandHandlerMap,
 } from '../../lib/incentivesApi';
 import BrandChip from './BrandChip';
+import HandlerChip from './HandlerChip';
 import CommissionNote from './CommissionNote';
 import InactiveBrandsNotice from './InactiveBrandsNotice';
 
@@ -59,7 +60,7 @@ function calcBreakdown(rec) {
 // Boss and is read-only (a TL must not lower their own target to pass it). Mirrors
 // the APC page (ApcIncentivesPage EditItemRow). Save also re-reads the target from
 // the original record so a tampered client can't persist a changed target either.
-function EditProgressRow({ item, cat, onChange, month }) {
+function EditProgressRow({ item, cat, onChange, month, handlers = {} }) {
   const isAtt    = item.source === 'attendance';
   // GMV-Max achieved comes from Brand Analytics (mig 317) — not typed here.
   const isGmvMax = item.source === 'gmv_max';
@@ -79,7 +80,12 @@ function EditProgressRow({ item, cat, onChange, month }) {
       <div className="d-flex align-items-start justify-content-between gap-2 mb-2">
         <div>
           <div className="fw-semibold small">{item.text || '—'}</div>
-          {item.brandName && <div className="mt-1 mb-1"><BrandChip name={item.brandName} /></div>}
+          {(item.brandName || handlers[item.brandId]) && (
+            <div className="mt-1 mb-1 d-flex flex-wrap align-items-center gap-1">
+              <BrandChip name={item.brandName} />
+              <HandlerChip names={handlers[item.brandId]} />
+            </div>
+          )}
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>+{formatPKR((Number(item.amount) || 0))}</div>
         </div>
         <div className="d-flex align-items-center gap-1 flex-shrink-0">
@@ -136,7 +142,7 @@ function EditProgressRow({ item, cat, onChange, month }) {
 
 // ── TL Edit Own Progress Modal ───────────────────────────────────────────────
 
-function EditProgressModal({ record, onClose, onSaved }) {
+function EditProgressModal({ record, onClose, onSaved, handlers = {} }) {
   // v2 auth shim
   const { user, profile } = useAuth();
   const currentUser = user ? { uid: user.id, email: user.email, displayName: profile?.display_name || '' } : null;
@@ -216,7 +222,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-graph-up-arrow me-1 text-success" />Incentives
               </p>
-              {items.incentives.map(i => <EditProgressRow key={i.id} item={i} cat="incentives" onChange={handleChange} month={record?.month} />)}
+              {items.incentives.map(i => <EditProgressRow key={i.id} item={i} cat="incentives" onChange={handleChange} month={record?.month} handlers={handlers} />)}
             </div>
           )}
           {items.bonuses.length > 0 && (
@@ -224,7 +230,7 @@ function EditProgressModal({ record, onClose, onSaved }) {
               <p className="text-muted fw-semibold mb-2" style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <i className="bi bi-trophy me-1 text-info" />Bonuses
               </p>
-              {items.bonuses.map(b => <EditProgressRow key={b.id} item={b} cat="bonuses" onChange={handleChange} month={record?.month} />)}
+              {items.bonuses.map(b => <EditProgressRow key={b.id} item={b} cat="bonuses" onChange={handleChange} month={record?.month} handlers={handlers} />)}
             </div>
           )}
           {error && <div className="alert alert-danger py-2 small mb-3">{error}</div>}
@@ -252,6 +258,8 @@ export default function IncentivesPage() {
   useEffect(() => { if (refreshProfile) refreshProfile(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const [myRec,   setMyRec]   = useState(null);
+  // brandId -> [APC name]. Looked up live, never snapshotted: assignments move.
+  const [handlers, setHandlers] = useState({});
   const [loading, setLoading] = useState(true);
   const [showEditProgress, setShowEditProgress] = useState(false);
 
@@ -266,6 +274,10 @@ export default function IncentivesPage() {
       const rec = await getIncentives(currentUser.uid, myMonth);
       setMyRec(rec || null);
       setLoading(false);
+      // After the plan is on screen, not before it: the names are a nicety and
+      // must never hold up the figures.
+      const ids = [...(rec?.incentives || []), ...(rec?.bonuses || [])].map((i) => i.brandId);
+      setHandlers(await fetchBrandHandlerMap(ids));
     }
     load();
   }, [currentUser?.uid, myMonth]);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -361,7 +373,15 @@ export default function IncentivesPage() {
                       return (
                         <div key={it.id} className="rounded-3 p-2" style={{ background: 'var(--surface-2)' }}>
                           <div className="d-flex justify-content-between align-items-start gap-2 mb-1" style={{ fontSize: '0.78rem' }}>
-                            <span className="fw-semibold" style={{ minWidth: 0 }}>{it.text || '—'}</span>
+                            <span className="d-flex flex-wrap align-items-center gap-1" style={{ minWidth: 0 }}>
+                              <span className="fw-semibold" style={{ minWidth: 0 }}>{it.text || '—'}</span>
+                              {/* Which brand, and who runs it. An Ads Manager's plan is
+                                  fourteen identically-worded GMV Max lines; without these
+                                  there is no way to tell them apart, or to know who to ask
+                                  about one that is behind. */}
+                              <BrandChip name={it.brandName} />
+                              <HandlerChip names={handlers[it.brandId]} />
+                            </span>
                             <span className="flex-shrink-0 fw-semibold" style={{ color: done ? 'var(--success-text)' : 'var(--text-secondary)' }}>
                               {done ? 'Completed' : `${ip}%`} · +{formatPKR(it.amount)}
                             </span>
@@ -400,6 +420,7 @@ export default function IncentivesPage() {
           record={myRec}
           onClose={() => setShowEditProgress(false)}
           onSaved={handleMyProgressSaved}
+          handlers={handlers}
         />
       )}
     </div>

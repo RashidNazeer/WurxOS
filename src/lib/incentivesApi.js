@@ -1149,3 +1149,34 @@ export async function setIncentiveWorkbookUrl(url, label = '') {
   if (error) throw new Error(error.message);
   return clean;
 }
+
+// ── Who runs each brand ───────────────────────────────────────────
+// An Ads Manager's plan is a column of "Total Revenue in GMV Max" lines, one
+// per brand, which read identically until the brand is on them. The APC is the
+// person they would actually talk to about a brand that is behind, so the line
+// names them too.
+//
+// Scoped to the brands on the plan rather than listing every brand. RLS does
+// the rest: brand_assignments is readable for any brand can_view_brand allows,
+// which for an Ads Manager is their granted brands (mig 316).
+//
+// Returns brandId -> [displayName]. A brand can have more than one APC, and a
+// brand with none returns nothing rather than an empty-looking chip.
+export async function fetchBrandHandlerMap(brandIds) {
+  const ids = [...new Set((brandIds || []).filter(Boolean))];
+  if (!ids.length) return {};
+  const { data, error } = await supabase
+    .from('brand_assignments')
+    .select('brand_id, profile:user_id(display_name, role, is_active, deleted_at)')
+    .in('brand_id', ids);
+  // Advisory: a name is a nicety, so a failure here must not break the page.
+  if (error) return {};
+  const out = {};
+  for (const row of data || []) {
+    const p = row.profile;
+    if (!p || p.role !== 'apc' || p.is_active === false || p.deleted_at) continue;
+    (out[row.brand_id] ||= []).push(p.display_name);
+  }
+  for (const k of Object.keys(out)) out[k].sort((a, b) => String(a).localeCompare(String(b)));
+  return out;
+}
