@@ -118,6 +118,36 @@ export async function getOverview(month = currentMonth()) {
   return data || [];
 }
 
+// --- Finalised months (mig 424) ---
+// Once a month is locked its scores are STORED, not derived. The page's parity
+// layer must not recompute them: a closed month's live inputs keep moving
+// (brands get reassigned, people are laid off, closed-month GMV goals get
+// edited) and recomputing re-wrote September's scores weeks after the fact.
+// Returns {} for an open month, so callers fall back to live math.
+export async function listMonthSnapshots(month = currentMonth()) {
+  const { data, error } = await supabase
+    .from('performance_month_snapshots')
+    .select('user_id, performance_score, incentives_score, attendance_score, flags_score, composite_score, level, warning_count, locked_at, breakdown')
+    .eq('month', month);
+  if (error) throw new Error(error.message);
+  const map = {};
+  (data || []).forEach((r) => { map[r.user_id] = r; });
+  return map;
+}
+
+// Pillar scores off a snapshot row, in the shape calcComposite/getLevel expect.
+// Numbers come back from PostgREST as strings, hence the Number() pass.
+export function snapshotPillars(snap) {
+  if (!snap) return null;
+  const n = (v) => (v == null ? null : Number(v));
+  return {
+    performance: n(snap.performance_score),
+    incentives:  n(snap.incentives_score),
+    attendance:  n(snap.attendance_score),
+    flags:       n(snap.flags_score),
+  };
+}
+
 export async function getConfig() {
   const { data, error } = await supabase
     .from('performance_config').select('*').eq('id', 1).maybeSingle();
@@ -601,24 +631,53 @@ export async function saveV1Weights(weights) {
 // PCTL → IPCs reporting to me (treated identically by the page)
 // Returns rows shaped as v1 expects (with `_tab` flag for the
 // active sub-tab and v1 fields displayName/userName/userType).
-export async function listEvaluableUsers({ uid, viewerRole }) {
-  let q = supabase
-    .from('profiles')
-    .select('id, display_name, email, role, reports_to')
-    .is('deleted_at', null)
-    .eq('is_active', true);
-  if (viewerRole === 'boss' || viewerRole === 'developer') {
-    q = q.in('role', ['ol', 'tl', 'pctl', 'apc', 'ipc']);
-  } else if (viewerRole === 'ol') {
-    q = q.in('role', ['tl', 'pctl', 'apc', 'ipc']);
-  } else if (viewerRole === 'tl' || viewerRole === 'pctl') {
-    q = q.in('role', ['apc', 'ipc']).eq('reports_to', uid);
-  } else {
-    return [];
-  }
-  const { data, error } = await q;
+// `month` is optional. When given and that month is finalised (mig 424), people
+// who have left are included as well, because a closed month's roster is who
+// LIVED it: after the 12 Oct layoff the is_active filter silently erased nine
+// APCs from September, so the month a TL was scored on no longer listed the team
+// they were scored for. A live month still lists only current staff.
+export async function listEvaluableUsers({ uid, viewerRole, month = null }) {
+  const roleFilter = (q) => {
+    if (viewerRole === 'boss' || viewerRole === 'developer') return q.in('role', ['ol', 'tl', 'pctl', 'apc', 'ipc']);
+    if (viewerRole === 'ol') return q.in('role', ['tl', 'pctl', 'apc', 'ipc']);
+    if (viewerRole === 'tl' || viewerRole === 'pctl') return q.in('role', ['apc', 'ipc']).eq('reports_to', uid);
+    return null;
+  };
+
+  const base = roleFilter(
+    supabase.from('profiles')
+      .select('id, display_name, email, role, reports_to')
+      .is('deleted_at', null)
+      .eq('is_active', true)
+  );
+  if (!base) return [];
+  const { data, error } = await base;
   if (error) throw new Error(error.message);
-  return (data || []).map((p) => ({
+  const rows = [...(data || [])];
+
+  // Top up with the leavers a finalised month was scored on. Two queries rather
+  // than one OR: PostgREST cannot express "active OR has a snapshot" in a single
+  // filter, and a frozen month is read far less often than the live one.
+  if (month) {
+    const seen = new Set(rows.map((p) => p.id));
+    const { data: snaps } = await supabase
+      .from('performance_month_snapshots').select('user_id').eq('month', month);
+    const missing = (snaps || []).map((s) => s.user_id).filter((id) => !seen.has(id));
+    if (missing.length) {
+      const extra = roleFilter(
+        supabase.from('profiles')
+          .select('id, display_name, email, role, reports_to')
+          .in('id', missing)
+      );
+      if (extra) {
+        const { data: left } = await extra;
+        (left || []).forEach((p) => { if (!seen.has(p.id)) { seen.add(p.id); rows.push({ ...p, _departed: true }); } });
+      }
+    }
+  }
+
+  return rows.map((p) => ({
+    _departed: p._departed === true,
     id:           p.id,
     displayName:  p.display_name || p.email || '—',
     userName:     p.display_name || p.email || '—',

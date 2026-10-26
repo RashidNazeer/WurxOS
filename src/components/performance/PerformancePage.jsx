@@ -16,6 +16,8 @@ import {
   ROLE_LABEL, canRate,
   // APC blend parity mirror (mig 304) — same math the SQL composite uses.
   calcCheckpointAvg, apcPerfPillar,
+  // Finalised months (mig 424) — stored scores win over the parity layer.
+  listMonthSnapshots, snapshotPillars,
 } from '../../lib/performanceApi';
 import {
   listPendingApcRatings, getWeeklyRatingsEnabled, setWeeklyRatingsEnabled,
@@ -1212,6 +1214,8 @@ export default function PerformancePage() {
   // scores (boss/ol), the breakdown-modal target, and the viewer's own preview.
   const [tlCfg, setTlCfg]             = useState({ enabled: false, since: null });
   const [tlReporting, setTlReporting] = useState({});
+  // user_id -> frozen row for the selected month (mig 424); {} while open.
+  const [snapshots, setSnapshots]     = useState({});
   const [tlTarget, setTlTarget]       = useState(null);
   const [tlSwitchBusy, setTlSwitchBusy] = useState(false);
   const [myTlPreview, setMyTlPreview] = useState(null);
@@ -1227,6 +1231,15 @@ export default function PerformancePage() {
     listTlReporting(month).then((m) => { if (!cancelled) setTlReporting(m || {}); }).catch(() => { if (!cancelled) setTlReporting({}); });
     return () => { cancelled = true; };
   }, [month, isBoss, effectiveRole]);
+  // Frozen scores for a finalised month (mig 424). Empty for an open month, so
+  // everything below falls through to the live parity math unchanged.
+  useEffect(() => {
+    let cancelled = false;
+    listMonthSnapshots(month)
+      .then((m) => { if (!cancelled) setSnapshots(m || {}); })
+      .catch(() => { if (!cancelled) setSnapshots({}); });
+    return () => { cancelled = true; };
+  }, [month]);
   useEffect(() => {
     if (effectiveRole !== 'tl' || !currentUser?.uid) { setMyTlPreview(null); return undefined; }
     let cancelled = false;
@@ -1309,7 +1322,9 @@ export default function PerformancePage() {
       // Team data.
       if (hasTeamTab) {
         const users = await listEvaluableUsers({
-          uid: currentUser.uid, viewerRole: effectiveRole,
+          // `month` so a finalised month still lists the people who worked it,
+          // not just whoever is on staff today (mig 424).
+          uid: currentUser.uid, viewerRole: effectiveRole, month,
         });
         if (cancelled) return;
         setTeamUsers(users);
@@ -1454,6 +1469,10 @@ export default function PerformancePage() {
   const baseCompositeById = useMemo(() => {
     const m = {};
     for (const u of teamUsers) {
+      // A finalised month is served from its frozen row (mig 424), so a TL's
+      // team average is pinned to the same APC numbers everyone else reads.
+      const snap = snapshots[u.id];
+      if (snap) { m[u.id] = snap.composite_score == null ? null : Number(snap.composite_score); continue; }
       const rec = teamRecords[u.id];
       const isApc = (u.role || u.userRole) === 'apc';
       // APC perf pillar under the live weekly method = the checkpoint+report blend
@@ -1468,7 +1487,7 @@ export default function PerformancePage() {
       m[u.id] = calcComposite({ performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore }, weights);
     }
     return m;
-  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, month, weights, attError, weeklyLive, apcReporting]);
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, month, weights, attError, weeklyLive, apcReporting, snapshots]);
 
   // Per-TL blended pillar = round(0.6×team + 0.4×reporting). Always computed (the
   // preview); it becomes the OFFICIAL perf pillar for TL rows when tlLive.
@@ -1508,14 +1527,29 @@ export default function PerformancePage() {
         perfScore = apcPerfPillar(rec ? calcCheckpointAvg(rec.metrics) : null, apcReporting[u.id]?.report_score ?? null);
         rec = perfScore == null ? null : (rec || { apc_derived: true });
       }
-      const incScore = calcIncentiveScore(teamIncentives[u.id]);
       const attData = teamAttendance[u.id] || null;
       const wd = attData ? attData.daysThisMonth : 0;
-      const attScore = attendanceScoreFrom(attData);
-      const flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
-      const pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
-      const composite = calcComposite(pillarScores, weights);
-      const incPending = isIncPending(teamIncentives[u.id]);
+      // FROZEN MONTH (mig 424): show the stored pillars and composite rather
+      // than re-deriving them. The attendance *detail* (days) stays live
+      // because it is only a tooltip, not a score input here.
+      const snap = snapshots[u.id];
+      let incScore, attScore, flagScore, pillarScores, composite;
+      if (snap) {
+        pillarScores = snapshotPillars(snap);
+        ({ incentives: incScore, attendance: attScore, flags: flagScore } = pillarScores);
+        perfScore = pillarScores.performance;
+        if (perfScore != null && !rec) rec = { frozen: true };
+        composite = snap.composite_score == null ? null : Number(snap.composite_score);
+      } else {
+        incScore = calcIncentiveScore(teamIncentives[u.id]);
+        attScore = attendanceScoreFrom(attData);
+        flagScore = calcFlagsScore(teamFlags[u.id] || [], month);
+        pillarScores = { performance: perfScore, incentives: incScore, attendance: attScore, flags: flagScore };
+        composite = calcComposite(pillarScores, weights);
+      }
+      // A frozen month was finalised with its plan settled, so it can never be
+      // "pending verification" after the fact.
+      const incPending = snap ? false : isIncPending(teamIncentives[u.id]);
       const gCount = (teamFlags[u.id] || []).filter(f => f.type === 'green').length;
       const rCount = (teamFlags[u.id] || []).filter(f => f.type === 'red').length;
       const wCount = teamWarnings[u.id] || 0;
@@ -1537,26 +1571,38 @@ export default function PerformancePage() {
         && getLevel(u.composite).label.toLowerCase() === levelFilter);
     }
     return list;
-  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError, tlBlendById, tlLive, weeklyLive, apcReporting]);
+  }, [teamUsers, teamRecords, teamIncentives, teamAttendance, teamFlags, teamWarnings, teamSubTab, search, levelFilter, effectiveRole, weights, month, attError, tlBlendById, tlLive, weeklyLive, apcReporting, snapshots]);
 
   // The attendance pillar failed to load → calcComposite silently re-weights
   // over the remaining pillars. Refuse to show a composite rather than show a
   // plausible-looking wrong one.
-  const compositeOk = !attError;
+  // A frozen month carries its own attendance pillar, so a failed live
+  // attendance fetch can't invalidate it (mig 424).
+  const snapshotRows = Object.values(snapshots);
+  const monthLocked = snapshotRows.length > 0;
+  const compositeOk = !attError || monthLocked;
+  const lockedAt = monthLocked ? snapshotRows[0].locked_at : null;
 
   // My pillar scores. A TL viewing themselves under the live method sees the
   // blended pillar (team + reporting) instead of the old OL rating.
-  const myPerfScore = (effectiveRole === 'tl' && tlLive)
+  // My own month may be frozen too (mig 424) — read it rather than re-derive it,
+  // so what I see matches what my manager and the Boss see, permanently.
+  const mySnap = currentUser?.uid ? snapshots[currentUser.uid] : null;
+  const mySnapPillars = snapshotPillars(mySnap);
+  const myPerfScore = mySnapPillars ? mySnapPillars.performance
+    : (effectiveRole === 'tl' && tlLive)
     ? (myTlPreview?.blended ?? null)
     : (effectiveRole === 'apc' && weeklyLive)
     ? (myApcPreview?.blended ?? null)
     : (myRecord ? calcMetricsAvg(myRecord.metrics) : null);
-  const myIncScore  = calcIncentiveScore(myIncRecord);
-  const myIncPending = isIncPending(myIncRecord);
-  const myAttScore  = attendanceScoreFrom(myAttendanceDays);
-  const myFlagScore = calcFlagsScore(myFlags, month);
+  const myIncScore  = mySnapPillars ? mySnapPillars.incentives : calcIncentiveScore(myIncRecord);
+  const myIncPending = mySnap ? false : isIncPending(myIncRecord);
+  const myAttScore  = mySnapPillars ? mySnapPillars.attendance : attendanceScoreFrom(myAttendanceDays);
+  const myFlagScore = mySnapPillars ? mySnapPillars.flags : calcFlagsScore(myFlags, month);
   const myPillarScores = { performance: myPerfScore, incentives: myIncScore, attendance: myAttScore, flags: myFlagScore };
-  const myComposite = calcComposite(myPillarScores, weights);
+  const myComposite = mySnap
+    ? (mySnap.composite_score == null ? null : Number(mySnap.composite_score))
+    : calcComposite(myPillarScores, weights);
   const myLevel = selfLevel(getLevel(myComposite));
 
   // Stats
@@ -1633,6 +1679,24 @@ export default function PerformancePage() {
         <div>
           <h5 className="fw-bold mb-0">Performance Review</h5>
           <p className="text-muted small mb-0">{getMonthLabel(month)}</p>
+          {/* A finalised month shows stored scores (mig 424). Say so, or a
+              number that no longer moves looks like a bug. */}
+          {monthLocked && (
+            <span className="d-inline-flex align-items-center gap-1 mt-1"
+              style={{
+                fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px',
+                borderRadius: 'var(--radius-pill, 999px)',
+                background: 'var(--info-soft, color-mix(in srgb, var(--info, #0d6efd) 14%, transparent))',
+                color: 'var(--info, #0d6efd)',
+                border: '1px solid color-mix(in srgb, var(--info, #0d6efd) 32%, transparent)',
+              }}
+              title={lockedAt
+                ? `Finalised on ${new Date(lockedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Karachi' })}. These scores are saved and no longer recalculated.`
+                : 'These scores are saved and no longer recalculated.'}>
+              <i className="bi bi-lock-fill" />
+              Finalised
+            </span>
+          )}
         </div>
         <div className="d-flex align-items-center gap-2">
           <input type="month" className="form-control form-control-sm" value={month}
