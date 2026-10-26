@@ -18,7 +18,7 @@ const TEMPLATE = [
 /* ── CSV parser (handles quoted fields and embedded commas/quotes) ───────── */
 function parseCSV(text) {
   const rows = []; let current = []; let field = ''; let inQ = false;
-  const src = text.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const src = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
     if (inQ) {

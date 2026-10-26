@@ -104,7 +104,7 @@ export function suggestedFilename(month) {
 // knowledge-base bulk import, which has survived real sheets.
 export function parseCsv(text) {
   const rows = []; let current = []; let field = ''; let inQ = false;
-  const src = String(text || '').replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const src = String(text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
     if (inQ) {

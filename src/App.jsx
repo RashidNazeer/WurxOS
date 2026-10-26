@@ -152,9 +152,8 @@ function PublicOnly({ children }) {
   return children;
 }
 
-// Dashboard is role-aware. For now only Boss has a real dashboard;
-// other roles see a placeholder until we build their features.
-// Developers land on Development → Roadmap (owner, 2026-09-16).
+// Dashboard is role-aware: TodayRouter builds every role a real dashboard from
+// the Today widgets. Developers land on Development → Roadmap instead.
 function DashboardRouter() {
   const { profile, loading } = useAuth();
   // Render a real spinner while the profile is still loading instead

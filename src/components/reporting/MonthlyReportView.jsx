@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import ReportReturnNotice from './ReportReturnNotice';
 import HierarchicalGmvDonut from './HierarchicalGmvDonut';
 import GoalBar, { UnlimitedGoalNote } from './GoalBar';
@@ -861,6 +861,14 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
   const userRole = profile?.role || '';
   const [copyState, setCopyState] = React.useState('idle');
   const [highlighterActive, setHighlighterActive] = React.useState(false);
+  // pdfBusy and the onActions effect below USED to sit further down, past the
+  // `if (!report) return null` guard — so this component ran 7 hooks on a null
+  // report and 9 otherwise. React keys hook state by call order, so a render
+  // that crossed that boundary in place would have thrown "rendered more hooks
+  // than during the previous render". Every current caller only mounts this
+  // under a truthy report, which is the sole reason it never fired. Hoisted
+  // above the guard so the count is fixed regardless of caller.
+  const [pdfBusy, setPdfBusy] = React.useState(false);
   const { color: highlightColor, setColor: setHighlightColor,
           intensity: highlightIntensity, setIntensity: setHighlightIntensity } = useHighlightStyle();
 
@@ -892,6 +900,30 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
   }, [allReports, report]);
 
   const sparkFor = (key) => trendData.map(d => ({ v: d[key] }));
+
+  // Hands the report-bar actions up to the parent list page so they can live in
+  // the sticky "Other options" menu. When onActions is supplied, this view
+  // skips rendering its own action bar. Monthly reports have no Word export, so
+  // onExportWord is omitted.
+  //
+  // Sits ABOVE the !report guard to keep the hook count fixed (see pdfBusy).
+  // The `!report` test is what makes that safe: the body closes over
+  // handleExport / handleCopyInsights, which are declared past the guard and so
+  // are still in their temporal dead zone on a null-report render. Bailing
+  // first means that reference is never reached.
+  React.useEffect(() => {
+    if (!report || !onActions || clientView) return;
+    onActions({
+      highlighterActive,
+      onToggleHighlighter: () => setHighlighterActive((v) => !v),
+      onExportPdf: handleExport,
+      pdfBusy,
+      canCopyInsights: userRole === 'tl' || userRole === 'pctl',
+      onCopyInsights: handleCopyInsights,
+      copyDone: copyState === 'done',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report, onActions, clientView, highlighterActive, pdfBusy, copyState, userRole]);
 
   if (!report) return null;
 
@@ -970,7 +1002,7 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
   };
 
   // Single continuous-page PDF export — see utils/exportReportPdf.js.
-  const [pdfBusy, setPdfBusy] = useState(false);
+  // (pdfBusy is declared with the other hooks, above the !report guard.)
   const handleExport = async () => {
     if (pdfBusy) return;
     setPdfBusy(true);
@@ -985,24 +1017,6 @@ export default function MonthlyReportView({ report, previousReport, allReports, 
       setPdfBusy(false);
     }
   };
-
-  // Hand the report-bar actions up to the parent list page so they
-  // can live in the sticky "Other options" menu. When onActions is
-  // supplied, this view skips rendering its own action bar. Monthly
-  // reports have no Word export, so onExportWord is omitted.
-  React.useEffect(() => {
-    if (!onActions || clientView) return;
-    onActions({
-      highlighterActive,
-      onToggleHighlighter: () => setHighlighterActive((v) => !v),
-      onExportPdf: handleExport,
-      pdfBusy,
-      canCopyInsights: userRole === 'tl' || userRole === 'pctl',
-      onCopyInsights: handleCopyInsights,
-      copyDone: copyState === 'done',
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onActions, clientView, highlighterActive, pdfBusy, copyState, userRole]);
 
   return (
     <div>

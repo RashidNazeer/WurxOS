@@ -8,8 +8,8 @@ import { lazyWithRetry as lazy } from '../lib/lazyWithRetry';
 // chunk that downloads only when its route is hit. This shrinks the
 // initial bundle from ~1.6MB to a few hundred KB and makes the first
 // paint dramatically faster.
-// /dashboard. A stub that renders Boss/RoleDashboard until Engineer B ships
-// the Today pages in the same file (Round 4 F1).
+// /dashboard. The Today pages shipped, so this is the real dashboard for every
+// role — the old Boss/RoleDashboard stubs it replaced have been deleted.
 export const TodayRouter           = lazy(() => import('../pages/today/TodayRouter'));
 // /r/:reportId. Day-1 stand-in; B swaps in ReportLinkResolver (F2).
 export const ReportLinkResolver    = lazy(() => import('./ReportLinkStub'));

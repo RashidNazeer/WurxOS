@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useEffect, useState, useMemo } from 'react';
+// The clock-in/out/break mutations and the auth shim moved into
+// useClockActions when that hook was extracted; this file only renders. What
+// stays below is what the markup itself still calls.
 import {
-  clockIn, clockOut, startBreak, endBreak,
-  requestClockOut, onActiveRecord, resumeShift,
   calcTimes, fmtDuration, fmtDurationLive, fmtTime,
   requestEditClockIn, editClockInDirect,
   requestBreakEdit,
@@ -10,8 +10,6 @@ import {
   requestEditClockOut, editClockOutDirect, getEffectiveStatus,
   getUserHistory,
   isOverReminder, hasFreshStillWorkingAck, markStillWorking,
-  checkApcDailyTasks, setAutoClockOut as apiSetAutoClockOut,
-  setAutoClockOutNote as apiSetAutoClockOutNote,
 } from '../../lib/attendanceApi';
 import { getNow, getNowDate } from '../../lib/serverTime';
 import { useClockActions } from './useClockActions';
@@ -87,8 +85,17 @@ export default function ClockWidget() {
   // the ported markup keeps using the v1 names. apcProfile.ownerId
   // ↔ profile.reports_to. apcProfile.ownerName is fetched on demand
   // via the optional ownerName state below.
+  // useClockActions owns the whole clock state machine and returns ~45 values.
+  // This destructure takes only what the markup reads — pulling the rest in
+  // just to leave it unused made it look as though this component still drove
+  // the clock, which it has not since the hook was extracted.
   const {
-    user, profile, record, setRecord, loading, setLoading, action, setAction, showClockIn, setShowClockIn, showClockOut, setShowClockOut, clockOutNote, setClockOutNote, taskError, setTaskError, showGmvGate, setShowGmvGate, gmvStatus, setGmvStatus, pendingLocation, setPendingLocation, clockedInToast, setClockedInToast, tlStatus, setTlStatus, tlAutoNote, setTlAutoNote, autoClockOutEnabled, setAutoClockOutEnabled, autoClockOutNote, setAutoClockOutNote, currentUser, userRole, apcProfile, _uid, isApcOrIpc, isTL, ownerId, ownerName, userName, refetchRecord, performClockIn, doClockIn, handleClockIn, handleGmvConfirm, handleBreak, handleClockOut, handleResumeShift, handleRequestClockOut, checkDailyTasks, handleToggleAutoClockOut, handleSaveAutoNote,
+    record, loading, action, refetchRecord,
+    showClockIn, setShowClockIn, taskError, setTaskError,
+    tlStatus, tlAutoNote, autoClockOutEnabled, autoClockOutNote, setAutoClockOutNote,
+    currentUser, isApcOrIpc, isTL, ownerId, userName,
+    handleClockIn, handleBreak, handleClockOut, handleResumeShift,
+    handleToggleAutoClockOut, handleSaveAutoNote,
     modals: clockModals,
   } = useClockActions();
 

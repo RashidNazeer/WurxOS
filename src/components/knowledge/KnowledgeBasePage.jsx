@@ -369,10 +369,10 @@ export default function KnowledgeBasePage() {
       });
       setShowPropose(false);
       setProposeSuccess(true);
-    } catch (err) {
       // Surface the failure — a silent catch let a failed propose look like a
       // success while nothing was saved (the "added but never persisted" ghost).
-      throw err;
+      // There is deliberately no catch: the error propagates to the caller and
+      // finally still clears the saving flag.
     } finally { setProposeSaving(false); }
   }
 
