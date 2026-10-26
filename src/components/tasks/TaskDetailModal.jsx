@@ -1,4 +1,4 @@
-import { XIcon, PencilIcon, StoreIcon, UserIcon, CalendarIcon, ClockIcon, CheckIcon, AlertIcon, LinkIcon } from '../common/Icon';
+import { XIcon, PencilIcon, StoreIcon, UserIcon, CalendarIcon, ClockIcon, LinkIcon } from '../common/Icon';
 import BrandAvatar from '../brands/BrandAvatar';
 import TaskCommentsPanel from './TaskCommentsPanel';
 import TaskAttachmentsPanel from './TaskAttachmentsPanel';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { listTasks, deleteTask } from '../../lib/tasksApi';
+import { listTasks } from '../../lib/tasksApi';
 import CreateTaskModal from '../../components/tasks/CreateTaskModal';
 import GroupTaskModal from '../../components/tasks/GroupTaskModal';
 import TaskRow from '../../components/tasks/TaskRow';

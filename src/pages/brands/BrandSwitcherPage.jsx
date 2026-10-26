@@ -6,8 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import BrandAvatar from '../../components/brands/BrandAvatar';
 import SwitchApcModal from '../../components/brands/SwitchApcModal';
 import {
-  RefreshIcon, CheckIcon, XIcon, AlertIcon, SearchIcon, UsersIcon,
-  ChecklistIcon, StoreIcon, ClockIcon,
+  RefreshIcon, CheckIcon, XIcon, AlertIcon, SearchIcon, StoreIcon, ClockIcon,
 } from '../../components/common/Icon';
 import '../../styles/brandSwitcher.css';
 

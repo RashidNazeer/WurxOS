@@ -11,7 +11,7 @@
 // here writes anything. V2 is additive by construction.
 // ============================================================
 
-import { signedCorrelation } from './correlation.js';
+
 import { lagCorrelations, bestObservedLag, lagWarnings, DEFAULT_MAX_LAG } from './lagAnalysis.js';
 import { fitDistributedLag } from './distributedLag.js';
 import { PERIODS_PER_YEAR } from './controls.js';

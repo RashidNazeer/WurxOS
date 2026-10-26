@@ -6,9 +6,8 @@ import GoalBar, { UnlimitedGoalNote } from './GoalBar';
 // (productId is unreliable free text, so we key goals by trimmed lowercase name).
 const normName = (s) => String(s || '').trim().toLowerCase();
 import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart,
-  ResponsiveContainer, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip,
+  LineChart, Line, Area, BarChart, Bar, ComposedChart, ResponsiveContainer, PieChart,
+  Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import { num, pctChange, resolveWeeklySectionsEnabled } from '../../utils/reportingService';
 import { productUnitsLabel } from '../../lib/reportUnitsLabel';

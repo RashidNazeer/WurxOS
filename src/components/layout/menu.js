@@ -1,8 +1,9 @@
 import {
-  HomeIcon, UsersIcon, ShieldIcon, StoreIcon, ChecklistIcon, SettingsIcon, BellIcon, ReportIcon,
-  MegaphoneIcon, ClockIcon, BookmarkIcon, StarIcon, RefreshIcon, DiagramIcon,
-  BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon, PlayIcon,
-  TrophyIcon, ChartIcon, TargetIcon, GridIcon, FolderIcon, VideoIcon, LinkIcon, MailIcon, ArrowUpIcon,
+  HomeIcon, UsersIcon, ShieldIcon, StoreIcon, ChecklistIcon, SettingsIcon, BellIcon,
+  ReportIcon, MegaphoneIcon, ClockIcon, BookmarkIcon, StarIcon, RefreshIcon, DiagramIcon,
+  BugIcon, LightbulbIcon, ArrowLeftRightIcon, MessageIcon, CalendarIcon, TrophyIcon,
+  ChartIcon, TargetIcon, GridIcon, FolderIcon, VideoIcon, LinkIcon, MailIcon,
+  ArrowUpIcon,
 } from '../common/Icon';
 import BuddyIcon from '../buddy/BuddyIcon';
 import { BUDDY_ROLES } from '../../lib/buddyLogic';

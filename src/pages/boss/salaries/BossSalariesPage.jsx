@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../../../contexts/AuthContext';
+
 import { listProfilesByRole } from '../../../lib/adminApi';
 import {
   listAllCompensation, listAllHistory,

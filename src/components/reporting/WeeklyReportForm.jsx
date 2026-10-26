@@ -5,15 +5,11 @@ import { useReportLeaveGuard } from './useReportLeaveGuard';
 import { useStickyHeaderOffset } from '../../hooks/useStickyHeaderOffset';
 import { useBrands } from '../../contexts/BrandsContext';
 import {
-  detectNextWeek, emptyReport, makeWeekFromStart,
-  saveReport, getReportsForBrand, getReport, changeReportWeek,
-  getUserCustomFields, saveUserCustomFields,
-  REPORT_STATUSES, cleanNumericInput,
-  WEEKLY_SECTIONS, resolveWeeklySectionsEnabled,
+  detectNextWeek, emptyReport, makeWeekFromStart, saveReport, getReportsForBrand,
+  getReport, changeReportWeek, getUserCustomFields, saveUserCustomFields,
+  REPORT_STATUSES, cleanNumericInput, resolveWeeklySectionsEnabled,
 } from '../../utils/reportingService';
 import {
-  generateOverallInsight, generateCreatorsInsight, generateVideosInsight,
-  generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,
   generateAllInsights,
 } from '../../utils/aiInsights';
 import { findPreviousReport, num as parseNum } from '../../lib/reportsApi';
@@ -28,7 +24,7 @@ import ReportReturnNotice from './ReportReturnNotice';
 import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useBrandSections, cleanCustomFields } from './useBrandSections';
 import {
-  SectionHeader, BrandSectionsBlock, BuiltinExtras, AddCustomSectionInline,
+  BrandSectionsBlock, BuiltinExtras, AddCustomSectionInline,
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';

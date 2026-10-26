@@ -8,8 +8,8 @@
 import { forwardRef } from 'react';
 import '../../styles/checkpoint.css';
 import {
-  num, pct, deltaPct, fmtInt, fmtNum, fmtMoney, fmtPct, fmtX, fmtKpi,
-  SNAPSHOT_KPIS, STATUS_OPTIONS,
+  num, pct, deltaPct, fmtInt, fmtMoney, fmtPct, fmtX, fmtKpi, SNAPSHOT_KPIS,
+  STATUS_OPTIONS,
 } from '../../lib/checkpointModel';
 
 // ── small helpers ───────────────────────────────────────────────────

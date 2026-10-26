@@ -4,8 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
   getReportsForBrand, getReportsForTL, deleteReport, findPreviousReport, num,
-  getWeeksForMonth, getAnchorDate, detectNextWeek, getFirstTimeWeekOptions,
-  REPORT_STATUSES, getReportStatus, updateReportStatus,
+  getWeeksForMonth, getAnchorDate, REPORT_STATUSES, getReportStatus, updateReportStatus,
 } from '../../utils/reportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import { deductPromptApcReport } from '../../lib/apcReportingApi';

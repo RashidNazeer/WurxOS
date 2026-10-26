@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import BrandAvatar from './BrandAvatar';
-import { PencilIcon, RefreshIcon, ChevronRightIcon } from '../common/Icon';
+import { PencilIcon, RefreshIcon } from '../common/Icon';
 import { currencySymbol } from '../../utils/currencies';
 
 /**
