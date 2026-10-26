@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { bossDeleteArticle, groupDuplicates } from '../../lib/kbApi';
 import { useDialogs } from '../common/useDialogs';
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { listAgendaMeetings, subscribeAgendaMeetings } from '../../lib/agendaApi';
 import MonthNavigator, { currentMonthStr, monthLabel, stepMonthStr } from '../../components/leave/MonthNavigator';
 import AgendaPriorDetail from '../../components/agenda/AgendaPriorDetail';

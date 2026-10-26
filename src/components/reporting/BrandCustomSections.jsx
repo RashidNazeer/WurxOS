@@ -14,7 +14,7 @@
 //   builtin_extra:  { [field.id]:   { name, value, kind:'builtin_extra', sectionKey, sectionTitle, type, source:'brand' } }
 // These coexist with legacy user-level custom fields (no `kind`/`source`).
 // ============================================================
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { cleanNumericInput } from '../../lib/reportsApi';
 import RichTextEditor from '../shared/RichTextEditor';
 import { useDialogs } from '../common/useDialogs';

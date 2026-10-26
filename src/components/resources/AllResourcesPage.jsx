@@ -8,7 +8,7 @@
 //   4. serverTimestamp() → dropped (v2 created_at default)
 //   5. getDocs/addDoc/updateDoc/deleteDoc → addResourceV1/updateResourceV1/
 //      deleteResourceV1/listAllResourcesV1
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrands } from '../../contexts/BrandsContext';
 import {

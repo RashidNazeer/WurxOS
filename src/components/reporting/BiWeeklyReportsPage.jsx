@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReportsRealtime } from '../../lib/useReportsRealtime';

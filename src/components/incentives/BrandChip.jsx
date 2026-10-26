@@ -1,4 +1,3 @@
-import React from 'react';
 
 // Small brand tag shown on a linked incentive/bonus line so a user can see which
 // brand the item belongs to (an APC often handles several brands). The brand name

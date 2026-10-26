@@ -12,7 +12,7 @@
 //      should go through the KB module's own flow, not this boss page).
 //      The v1 form still allows entering newVersion + sopDocLink — they
 //      get saved on the change row via boss_comment fallback.
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   subscribeAllChanges, subscribeChangeThread,

@@ -1,4 +1,3 @@
-import React from 'react';
 
 // Sample-goal progress bar — shows MTD approved vs a monthly goal, with the
 // pending count. Gradient fill (turns green when the goal is met). Shared by

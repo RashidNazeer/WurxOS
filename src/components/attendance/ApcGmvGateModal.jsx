@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { currencySymbol, fmtMoney } from '../../utils/currencies';
 // These stylesheets are imported per-page (not global); the attendance page
 // doesn't otherwise load them, so pull them in wherever this modal renders.

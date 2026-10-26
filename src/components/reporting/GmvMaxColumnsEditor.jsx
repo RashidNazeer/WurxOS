@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   DEFAULT_COLUMNS, parseColumnList, loadColumns, saveColumns, resetColumns, isCustom,
 } from '../../lib/gmvMaxLayout';

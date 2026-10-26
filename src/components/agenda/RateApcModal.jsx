@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import WeeklyRatingFields from '../performance/WeeklyRatingFields';
 import { markPresented } from '../../lib/agendaApi';

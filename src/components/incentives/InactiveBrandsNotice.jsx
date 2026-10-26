@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { listInactiveBrandsForUser } from '../../lib/incentivesApi';
 
 // Amber notice listing the inactive brands a person manages that are therefore

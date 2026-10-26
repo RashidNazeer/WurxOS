@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { bossSaveArticle, normalizeUrl } from '../../lib/kbApi';
 
 const VALID_TABS = ['delivery_roadmap', 'bootcamp', 'operational_sops', 'training_sops', 'policies'];

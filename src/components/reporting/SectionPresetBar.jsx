@@ -9,7 +9,7 @@
 // sections (looked up in reportPresetSections.js) and `custom(section, accent)`
 // for brand custom sections (table → object, long_text → text).
 // ============================================================
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   listSectionPresetsForType, saveSectionPreset, deleteSectionPreset,
 } from '../../lib/reportSectionPresetsApi';

@@ -1,4 +1,3 @@
-import React from 'react';
 
 // Who runs the brand this line is about. Sits beside BrandChip on a
 // brand-linked incentive, because an Ads Manager's plan is a column of

@@ -6,7 +6,7 @@
 //   2. v2 has a single BrandSwitcherPage (no OL-specific variant — RLS
 //      handles the role split server-side). Both boss and OL hit the
 //      same component.
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import BrandSwitcherPage from '../../pages/brands/BrandSwitcherPage';
 import ReassignApcLeadTab from './ReassignApcLeadTab';
