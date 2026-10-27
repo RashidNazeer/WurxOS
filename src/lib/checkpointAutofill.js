@@ -7,7 +7,8 @@
 //   • DERIVED LIVE on the form + deck (NOT here): "Videos now live" is manual,
 //     and "Sample→video N-2" = videos now live ÷ approved(N-2). Neither is ever
 //     taken from this-week's videosPosted (that is not the N-2 cohort).
-//   • EUKA (only if the brand is on Euka) — funnel.targetInvites + funnel.optedIn.
+//   • EUKA or REACHER (whichever the brand is on) — funnel.targetInvites + funnel.optedIn
+//     (Reacher also supplies funnel.sampleRequests).
 //   • "last week" columns come from CARRY-FORWARD at create (checkpointCarry),
 //     NOT here — the two mechanisms never overlap.
 //
@@ -50,10 +51,19 @@ function getIn(obj, path) {
 
 // Call the Euka edge function for the two funnel counts. Returns
 // { targetInvites, optedIn, optInStage, funnelStages } or throws.
-export async function fetchEukaCheckpoint(brandId, startDate, endDate) {
-  const { data, error } = await supabase.functions.invoke('euka-checkpoint-autofill', {
-    body: { brandId, startDate, endDate },
-  });
+export function fetchEukaCheckpoint(brandId, startDate, endDate) {
+  return invokeCheckpoint('euka-checkpoint-autofill', { brandId, startDate, endDate });
+}
+
+// Same two counts (plus sample requests) from Reacher, for brands on Reacher.
+// targetInvites comes back flagged approximate: it tracks the APC's own figure
+// to within ~1% but is not exact.
+export function fetchReacherCheckpoint(brandId, startDate, endDate) {
+  return invokeCheckpoint('reacher-autofill', { mode: 'checkpoint', brandId, startDate, endDate });
+}
+
+async function invokeCheckpoint(fn, body) {
+  const { data, error } = await supabase.functions.invoke(fn, { body });
   if (error) {
     // A non-2xx from an Edge Function arrives as a generic "non-2xx status
     // code"; the real body is on error.context. Without this unwrap every
@@ -81,7 +91,7 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
   const stage = (label, pct) => { try { onStage?.({ label, pct }); } catch { /* ignore */ } };
   const scalars = {};
   const arrays = {};
-  const meta = { reportFound: false, reportN2Found: false, eukaTried: false, eukaOk: false, eukaError: null, eukaStages: null, filled: 0 };
+  const meta = { reportFound: false, reportN2Found: false, providerName: null, providerLinked: false, providerTried: false, providerOk: false, providerError: null, providerNote: null, eukaStages: null, filled: 0 };
   const set = (path, v) => { const val = asStr(v); if (val !== null) { scalars[path] = val; meta.filled++; } };
 
   // ── weekly reports (this week + N-2) ───────────────────────────────
@@ -157,26 +167,34 @@ export async function runCheckpointAutofill({ brandId, weekStart, brand, onStage
   // videosPosted, which is not the N-2 cohort).
   if (n2) set('funnel.approvedN2', n2.overallPerformance?.samplesApproved);
 
-  // ── Euka (only when the brand is on Euka) — target invites + opted in ──
-  // A brand with no euka_store_id is skipped silently here, which read to APCs
-  // on unlinked brands (Aqua Sonic, Honeysticks, Mineral Ice Extreme…) as
-  // "auto-fill is broken". Record the fact so the banner can say so.
-  meta.eukaLinked = !!brand?.euka_store_id;
-  if (brand?.euka_store_id) {
-    meta.eukaTried = true;
-    stage('Fetching Euka data…', 70);
+  // ── Euka OR Reacher (whichever the brand is on) — target invites + opted in ──
+  // A brand on neither is skipped silently here, which read to APCs on unlinked
+  // brands as "auto-fill is broken". Record the fact so the banner can say so.
+  const provider = brand?.euka_store_id ? 'euka' : brand?.reacher_shop_id ? 'reacher' : null;
+  meta.providerName = provider === 'euka' ? 'Euka' : provider === 'reacher' ? 'Reacher' : null;
+  meta.providerLinked = provider !== null;
+  if (provider) {
+    meta.providerTried = true;
+    stage('Fetching ' + meta.providerName + ' data…', 70);
     try {
-      const euka = await fetchEukaCheckpoint(brandId, weekStart, addDaysISO(weekStart, 6));
+      const euka = provider === 'euka'
+        ? await fetchEukaCheckpoint(brandId, weekStart, addDaysISO(weekStart, 6))
+        : await fetchReacherCheckpoint(brandId, weekStart, addDaysISO(weekStart, 6));
       if (euka.targetInvites != null) set('funnel.targetInvites', euka.targetInvites);
       if (euka.optedIn != null) set('funnel.optedIn', euka.optedIn);
+      // Only Reacher supplies this; for Euka brands it stays a manual field.
+      if (euka.sampleRequests != null) set('funnel.sampleRequests', euka.sampleRequests);
+      if (euka.approximate?.includes('targetInvites') && euka.targetInvites != null) {
+        meta.providerNote = "target invites is an estimate (within about 1% of Reacher's own figure) - check it";
+      }
       // The function answers 200 with per-call reasons (invitesError /
       // funnelError) when Euka rejects one of the two pulls, so "nothing threw"
       // is NOT "it worked". Reporting eukaOk unconditionally printed a Euka
       // tick beside two empty fields and left nobody anything to act on.
-      meta.eukaOk = euka.targetInvites != null || euka.optedIn != null;
-      meta.eukaError = [euka.invitesError, euka.funnelError].filter(Boolean).join(' - ') || null;
+      meta.providerOk = euka.targetInvites != null || euka.optedIn != null;
+      meta.providerError = [euka.invitesError, euka.funnelError].filter(Boolean).join(' - ') || null;
       meta.eukaStages = euka.funnelStages || null;
-    } catch (e) { meta.eukaError = e?.message || String(e); }
+    } catch (e) { meta.providerError = e?.message || String(e); }
   }
 
   stage('Finishing up…', 90);

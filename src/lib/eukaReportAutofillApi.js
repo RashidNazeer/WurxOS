@@ -8,9 +8,27 @@ import { assertAllowedInDemo } from './demoMode';
 // { brandLabel, period:{startDate,endDate}, data (partial report), meta }.
 // Throws an Error whose `.detail` carries the structured error for the
 // copy-to-Discord message.
-export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
+export function runEukaReportAutofill({ brandId, startDate, endDate }) {
+  return runReportAutofill('euka-report-autofill', 'Euka', { brandId, startDate, endDate });
+}
+
+// Same contract, for brands that run on Reacher rather than Euka (brands.reacher_shop_id).
+export function runReacherReportAutofill({ brandId, startDate, endDate }) {
+  return runReportAutofill('reacher-autofill', 'Reacher', { mode: 'report', brandId, startDate, endDate });
+}
+
+// Which provider auto-fills this brand, if any: 'euka' | 'reacher' | null.
+// A brand has at most one (brands_one_data_provider, mig 427).
+export function reportProviderOf(brand) {
+  if (brand?.euka_store_id) return 'euka';
+  if (brand?.reacher_shop_id) return 'reacher';
+  return null;
+}
+export const PROVIDER_LABEL = { euka: 'Euka', reacher: 'Reacher' };
+
+async function runReportAutofill(fnName, providerLabel, reqBody) {
   // Raw fetch, so the invoke wrapper in supabase.js does not cover this one.
-  assertAllowedInDemo('euka-report-autofill');
+  assertAllowedInDemo(fnName);
   const base = import.meta.env.VITE_SUPABASE_URL;
   const { data: sess } = await supabase.auth.getSession();
   const accessToken = sess?.session?.access_token;
@@ -27,10 +45,10 @@ export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
 
   let res, body;
   try {
-    res = await fetch(`${base}/functions/v1/euka-report-autofill`, {
+    res = await fetch(`${base}/functions/v1/${fnName}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandId, startDate, endDate }),
+      body: JSON.stringify(reqBody),
       signal: ctl.signal,
     });
   } catch (netErr) {
@@ -42,10 +60,10 @@ export async function runEukaReportAutofill({ brandId, startDate, endDate }) {
     const elapsedMs = Date.now() - t0;
     const aborted = ctl.signal.aborted;
     const e = new Error(aborted
-      ? 'The server stopped responding altogether. Euka is most likely very slow right now — try again shortly, or fill this week in manually.'
+      ? `The server stopped responding altogether. ${providerLabel} is most likely very slow right now — try again shortly, or fill this week in manually.`
       : elapsedMs < 5000
         ? 'Could not reach the server. Check your internet and try again.'
-        : `No response from the server after ${Math.round(elapsedMs / 1000)}s. The request was cut off rather than refused — this is usually Euka being slow, not your connection.`);
+        : `No response from the server after ${Math.round(elapsedMs / 1000)}s. The request was cut off rather than refused — this is usually ${providerLabel} being slow, not your connection.`);
     e.detail = { stage: aborted ? 'client-timeout' : 'network', elapsedMs, message: String(netErr) };
     throw e;
   } finally {
@@ -98,12 +116,16 @@ export async function listMyEukaReportBrands() {
 export function mergeAutofill(current, partial) {
   if (!partial) return current;
   const next = { ...current, ...partial };
+  // The autofill sends '' for fields it deliberately leaves to the APC (samples,
+  // ROI...). A plain spread lets those blanks overwrite a number the APC had
+  // already typed, so only values the provider actually supplied are applied.
+  const filled = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== '' && v != null));
   if (partial.overallPerformance) {
-    next.overallPerformance = { ...current.overallPerformance, ...partial.overallPerformance };
+    next.overallPerformance = { ...current.overallPerformance, ...filled(partial.overallPerformance) };
   }
   // MTD GMV lives in overallNotes — deep-merge so manual MTD fields survive.
   if (partial.overallNotes) {
-    next.overallNotes = { ...current.overallNotes, ...partial.overallNotes };
+    next.overallNotes = { ...current.overallNotes, ...filled(partial.overallNotes) };
   }
   // Arrays: only replace when the autofill supplied rows (else keep manual).
   if (partial.topCreators && partial.topCreators.length) next.topCreators = partial.topCreators;

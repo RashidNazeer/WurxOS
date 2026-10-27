@@ -74,8 +74,11 @@ export const eukaAffiliateFunnel = (storeId, startDate, endDate, fresh) =>
 export const eukaConversionFunnel = (storeId, startDate, endDate, fresh) =>
   call('/dashboard/conversion-funnel', { body: { storeId, startDate, endDate }, fresh });
 
-// ── Dashboard — {postedDateRange:{start,end}} form ────────────────
-const pdr = (storeId, start, end, extra = {}) => ({ storeId, postedDateRange: { start, end }, ...extra });
+// ── Dashboard — {postedDateRange:{startDate,endDate}} form ─────────
+// Euka rejects the older {start, end} with 400 'Input validation failed' on every
+// endpoint below (verified against the live API, Oct 2026). Only the key names
+// changed; the window itself did not.
+const pdr = (storeId, start, end, extra = {}) => ({ storeId, postedDateRange: { startDate: start, endDate: end }, ...extra });
 // Products: Euka REMOVED /dashboard/top-products-by-video-revenue (Aug 2026 —
 // 404 "Route not found"). products-performance replaces it and is richer: it
 // returns per-product totalGmv / affiliateGmv / orders / itemsSold / videosPosted
@@ -102,7 +105,7 @@ export const eukaOutreachFunnel = (storeId, start, end, extra = {}, fresh) =>
 
 // ── Top videos — nested {filter:{postedDateRange}} form ───────────
 export const eukaTopVideos = (storeId, start, end, extra = {}, fresh) =>
-  call('/dashboard/top-videos-by-revenue', { body: { storeId, filter: { postedDateRange: { start, end }, ...extra } }, fresh });
+  call('/dashboard/top-videos-by-revenue', { body: { storeId, filter: { postedDateRange: { startDate: start, endDate: end }, ...extra } }, fresh });
 
 // ── Data export (json) ────────────────────────────────────────────
 export const eukaDataExport = (type, storeId, { startDate, endDate, exportType = 'json', creatorHandle, creatorUsername } = {}) =>
@@ -130,7 +133,7 @@ export const eukaDataExport = (type, storeId, { startDate, endDate, exportType =
 // Date shapes are non-interchangeable, so we reuse the wrappers above,
 // which already encode the right shape per endpoint:
 //   performance-overview  → flat {startDate,endDate}
-//   top-creators / top-products → {postedDateRange:{start,end}}
+//   top-creators / top-products → {postedDateRange:{startDate,endDate}}
 const _num = (v) => (v == null || Number.isNaN(Number(v)) ? '' : Number(v));
 
 function _overallInsightsHtml(ov, creators) {

@@ -13,7 +13,7 @@ import {
   generateAllInsights,
 } from '../../utils/aiInsights';
 import { findPreviousReport, num as parseNum } from '../../lib/reportsApi';
-import { runEukaReportAutofill, mergeAutofill } from '../../lib/eukaReportAutofillApi';
+import { runEukaReportAutofill, runReacherReportAutofill, reportProviderOf, PROVIDER_LABEL, mergeAutofill } from '../../lib/eukaReportAutofillApi';
 import { productUnitsLabel } from '../../lib/reportUnitsLabel';
 import { notifyReportSubmitted } from '../../utils/reportNotifications';
 // parsePdfToReport pulls in pdfjs (~424 KB) — imported dynamically inside the
@@ -1002,7 +1002,9 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   };
 
   // ── Auto Generate from Euka ──────────────────────────────────────
-  const brandHasEuka = !!selectedBrand?.euka_store_id;
+  // 'euka' | 'reacher' | null -- a brand reads from at most one (mig 427).
+  const autofillProvider = reportProviderOf(selectedBrand);
+  const providerName = PROVIDER_LABEL[autofillProvider] || '';
 
   const addDaysStr = (d, n) => {
     const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n);
@@ -1020,11 +1022,12 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   const onEukaStartChange = (v) => { setEukaStart(v); if (v) setEukaEnd(addDaysStr(v, 6)); };
 
   const runEukaAutofill = async () => {
-    if (!brandHasEuka || !eukaStart || !eukaEnd) return;
+    if (!autofillProvider || !eukaStart || !eukaEnd) return;
     setEukaModal('running');
     setEukaError(null);
     try {
-      const res = await runEukaReportAutofill({
+      const run = autofillProvider === 'reacher' ? runReacherReportAutofill : runEukaReportAutofill;
+      const res = await run({
         brandId: selectedBrand.id, startDate: eukaStart, endDate: eukaEnd,
       });
       setData((d) => mergeAutofill(d, res.data));
@@ -1035,7 +1038,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       // Build a copy-for-Discord block: human message + machine detail.
       const stamp = new Date().toISOString();
       const copyText = [
-        'WurxOS · Auto Generate from Euka — error',
+        `WurxOS · Auto Generate from ${providerName} — error`,
         `Brand: ${brandLabel} (${selectedBrand?.id})`,
         `Report week: ${selectedWeek?.label || '—'}`,
         `Stats period: ${eukaStart} → ${eukaEnd}`,
@@ -1444,10 +1447,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <div className="wx-card" style={{ padding: 24, width: 460, maxWidth: '92vw' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <i className="bi bi-lightning-charge-fill" style={{ color: 'var(--chart-2)' }} />
-                <h5 className="fw-bold mb-0" style={{ fontSize: 17 }}>Auto Generate from Euka</h5>
+                <h5 className="fw-bold mb-0" style={{ fontSize: 17 }}>Auto Generate from {providerName}</h5>
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-                Fetch the exact stats Euka provides for <strong>{brandLabel}</strong> and fill this report. Everything Euka can't verify stays blank for you to enter.
+                Fetch the exact stats {providerName} provides for <strong>{brandLabel}</strong> and fill this report. Everything {providerName} can't verify stays blank for you to enter.
               </div>
 
               <label className="wx-label">Stats period (7 days)</label>
@@ -1488,7 +1491,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             <div className="wx-card" style={{ padding: 30, width: 380, maxWidth: '90vw', textAlign: 'center' }}>
               <div className="spinner-border" style={{ color: 'var(--chart-2)', width: 34, height: 34, marginBottom: 14 }} />
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                Fetching stats from Euka…
+                Fetching stats from {providerName}…
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                 Pulling overall performance, top creators, and product stats. This can take up to a minute — please keep this open.
@@ -1503,17 +1506,25 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                 <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--success-soft)' }}>
                   <i className="bi bi-check-lg" style={{ color: 'var(--success)' }} />
                 </div>
-                <h5 className="fw-bold mb-0" style={{ fontSize: 16 }}>Auto-filled from Euka</h5>
+                <h5 className="fw-bold mb-0" style={{ fontSize: 16 }}>Auto-filled from {providerName}</h5>
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 14 }}>
                 Filled the exact-match stats for <strong>{eukaResult.period?.startDate} → {eukaResult.period?.endDate}</strong>:
                 <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-                  <li>Overall: GMV, Affiliate GMV, Orders{eukaResult.meta?.mtdGmv != null ? ', GMV Month-to-Date' : ''}</li>
+                  <li>Overall: GMV, Affiliate GMV, Orders{autofillProvider === 'reacher' ? ', Videos Posted, Shop Performance Score' : ''}{eukaResult.meta?.mtdGmv != null ? ', GMV Month-to-Date' : ''}</li>
                   <li>Top {eukaResult.meta?.creatorCount || 0} creators (handle, videos, GMV)</li>
                   <li>Top {eukaResult.meta?.productCount || 0} products (name, ID, orders, GMV)</li>
                 </ul>
+                {/* Euka refused part of the request: say so, instead of a green tick
+                    over "Top 0 creators" that reads as "this brand had none". */}
+                {eukaResult.meta?.skipped?.length > 0 && (
+                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 'var(--radius-md)', background: 'var(--warning-soft)', color: 'var(--warning)', fontWeight: 600 }}>
+                    <i className="bi bi-exclamation-triangle-fill me-1" />
+                    {providerName} would not return {eukaResult.meta.skipped.map((s) => (s === 'topCreators' ? 'top creators' : s === 'productHighlights' ? 'product highlights' : s)).join(' or ')} this time — those tables were left as they were. Try again, or fill them manually.
+                  </div>
+                )}
                 <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>
-                  Please <strong>verify these</strong> and fill in the remaining fields (ROI, SPS, samples, videos posted, offsite, GMV Max, per-creator units) manually.
+                  Please <strong>verify these</strong> and fill in the remaining fields ({autofillProvider === 'reacher' ? 'ROI, samples approved, per-creator videos, offsite, GMV Max' : 'ROI, SPS, samples, videos posted, offsite, GMV Max, per-creator units'}) manually.
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1530,7 +1541,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
                 <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 30, height: 30, background: 'var(--danger-soft)' }}>
                   <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--danger)' }} />
                 </div>
-                <h5 className="fw-bold mb-0" style={{ fontSize: 16 }}>Couldn't auto-fill from Euka</h5>
+                <h5 className="fw-bold mb-0" style={{ fontSize: 16 }}>Couldn't auto-fill from {providerName}</h5>
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{eukaError.message}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
@@ -1600,10 +1611,10 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
         <div className="wri-actions">
           <input ref={pdfInputRef} type="file" accept="application/pdf" style={{ display: 'none' }}
             onChange={e => handleImportPdf(e.target.files?.[0])} />
-          {brandHasEuka && (
+          {autofillProvider && (
             <button type="button" className="wri-btn wri-btn-euka" onClick={openEukaAutofill} disabled={saving}
-              title="Fetch this week's exact stats from Euka and auto-fill the form">
-              <i className="bi bi-lightning-charge-fill" /> Auto Generate from Euka
+              title={`Fetch this week's exact stats from ${providerName} and auto-fill the form`}>
+              <i className="bi bi-lightning-charge-fill" /> Auto Generate from {providerName}
             </button>
           )}
           <button type="button" className="wri-btn" onClick={() => pdfInputRef.current?.click()} disabled={importing}
