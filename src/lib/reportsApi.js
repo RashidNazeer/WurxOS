@@ -1689,7 +1689,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   if (canViewAll) {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id, currency, owner:owner_id(id, display_name)')
+      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id, reacher_shop_id, currency, owner:owner_id(id, display_name)')
       .eq('status', 'active')
       .order('brand_name');
     if (error) throw new Error(error.message);
@@ -1698,7 +1698,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   if (role === 'tl') {
     const { data, error } = await supabase
       .from('brands')
-      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id, currency, owner:owner_id(id, display_name)')
+      .select('id, brand_name, logo_url, owner_id, client_name, euka_slug, euka_store_id, reacher_shop_id, currency, owner:owner_id(id, display_name)')
       .eq('status', 'active')
       .eq('owner_id', uid)
       .order('brand_name');
@@ -1708,7 +1708,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
   // APC/IPC — use brand_assignments
   const { data, error } = await supabase
     .from('brand_assignments')
-    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name, euka_slug, euka_store_id, currency)')
+    .select('brand:brand_id(id, brand_name, logo_url, owner_id, status, client_name, euka_slug, euka_store_id, reacher_shop_id, currency)')
     .eq('user_id', uid);
   if (error) throw new Error(error.message);
   return (data || [])
@@ -1724,7 +1724,7 @@ export async function listBrandsForReporting({ role, uid, permissions = {} }) {
 export async function listBrandsForEukaReport() {
   const { data, error } = await supabase
     .from('brands')
-    .select('id, brand_name, logo_url, euka_slug, euka_store_id')
+    .select('id, brand_name, logo_url, euka_slug, euka_store_id, reacher_shop_id')
     .eq('status', 'active')
     .order('brand_name');
   if (error) throw new Error(error.message);

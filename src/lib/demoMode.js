@@ -98,6 +98,7 @@ export const DEMO_BLOCKED_FUNCTIONS = new Set([
   'euka-api',
   'euka-checkpoint-autofill',
   'euka-report-autofill',
+  'reacher-autofill',
   'video-review-targets',
   'creator-sheet',
   'tiktok-oauth',

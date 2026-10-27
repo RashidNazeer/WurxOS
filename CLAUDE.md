@@ -47,7 +47,7 @@ portals — everything an agency needs.
 
 ### Migrations
 - Live in `supabase/migrations/*.sql`. Naming: `NNN_short_name.sql`. Highest is
-  **416** (next available is 417), as of 2026-10-06. Don't trust this number
+  **427** (next available is 428), as of 2026-10-27. Don't trust this number
   blindly — `ls` the folder, it moves most weeks.
 - **NEVER reuse a number, even on a different branch.** The CLI keys its ledger
   on the numeric prefix alone, so two files sharing one number means only one
@@ -69,6 +69,9 @@ portals — everything an agency needs.
   `supabase functions deploy <name>`.
 - Active functions: `ai-chat`, `create-user`, `creator-sheet`, `delete-user`,
   `euka-api`, `euka-checkpoint-autofill`, `euka-report-autofill`,
+  `reacher-autofill` (report + checkpoint for brands on Reacher, i.e.
+  `brands.reacher_shop_id`; mapping and what is deliberately NOT filled live in
+  `_shared/reacher.ts`),
   `mark-notification-read`, `send-push`, `slack-events`, `snooze-notification`,
   `tiktok-oauth`, `video-review-targets`, `wipe-data`. (`euka-sync` is RETIRED —
   the v1 MCP sync; it still exists on the Supabase project but nothing calls it.)

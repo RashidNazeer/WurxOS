@@ -190,9 +190,11 @@ Deno.serve(async (req) => {
       eukaGet(`/data-export?${qs}`, key, budget).catch((e) => ({ __err: String(e) })),
       // brandId is required here too since Euka's 2026-10 change; without it
       // this answers 400 and optedIn silently stayed blank. eukaBrandId is
-      // already resolved above for /data-export.
+      // already resolved above for /data-export. The window must be
+      // postedDateRange: {startDate, endDate} -- the older {start, end} is the
+      // same 400, and the same silent blank.
       eukaPost('/dashboard/creator-outreach-funnel',
-        { storeId, brandId: eukaBrandId, postedDateRange: { start: startDate, end: endDate } },
+        { storeId, brandId: eukaBrandId, postedDateRange: { startDate, endDate } },
         key, budget).catch((e) => ({ __err: String(e) })),
     ]);
 

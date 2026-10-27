@@ -260,16 +260,27 @@ Deno.serve(async (req) => {
 
     // ── Fetch the exact-match stats (mirrors buildEukaAutofillData) ──
     let overview: any, creatorsResp: any, prodResp: any, mtdResp: any;
+    // Sections Euka would not give us. These two calls are best-effort, but they
+    // used to vanish into `.catch(() => null)`, so a rejected request left the
+    // Top Creators and Product tables blank with nothing to say why -- twice now
+    // (the Aug 2026 404 below, then the Oct 2026 date-shape 400). Named here and
+    // returned in meta so the form can say so.
+    const skipped: string[] = [];
     try {
       [overview, creatorsResp, prodResp, mtdResp] = await Promise.all([
         eukaPost('/dashboard/performance-overview', { storeId, brandId: eukaBrandId, startDate, endDate }, key, budget, timings),
-        eukaPost('/dashboard/top-creators-by-gmv', { storeId, brandId: eukaBrandId, postedDateRange: { start: startDate, end: endDate }, limit: 5 }, key, budget, timings).catch(() => null),
+        // The /dashboard endpoints that take a posted-date window want it as
+        // postedDateRange: {startDate, endDate}. The older {start, end} is
+        // rejected with 400 "Input validation failed".
+        eukaPost('/dashboard/top-creators-by-gmv', { storeId, brandId: eukaBrandId, postedDateRange: { startDate, endDate }, limit: 5 }, key, budget, timings)
+          .catch(() => { skipped.push('topCreators'); return null; }),
         // products-performance carries per-product affiliateGmv + orders itself.
         // (It replaced top-products-by-video-revenue, which Euka removed in Aug
         // 2026 — that 404 was swallowed here, so product rows silently stopped
         // filling. Ranked by total GMV; we re-rank by AFFILIATE GMV below, so
         // ask for more rows than the 5 we keep.)
-        eukaPost('/dashboard/products-performance', { storeId, brandId: eukaBrandId, postedDateRange: { start: startDate, end: endDate }, pageSize: 25, sortField: 'gmv', sortOrder: 'DESC' }, key, budget, timings).catch(() => null),
+        eukaPost('/dashboard/products-performance', { storeId, brandId: eukaBrandId, postedDateRange: { startDate, endDate }, pageSize: 25, sortField: 'gmv', sortOrder: 'DESC' }, key, budget, timings)
+          .catch(() => { skipped.push('productHighlights'); return null; }),
         // Best-effort: no MTD figure is a blank field, not a failed report.
         needMtd
           ? eukaPost('/dashboard/performance-overview', { storeId, brandId: eukaBrandId, startDate: mtdStart, endDate }, key,
@@ -357,6 +368,8 @@ Deno.serve(async (req) => {
         mtdPeriod: { startDate: mtdStart, endDate },
         creatorCount: topCreators.length,
         productCount: productHighlights.length,
+        // Sections Euka would not return (empty on a clean run).
+        skipped,
         // Returned even on success: a run that took 70 of its 90 seconds is
         // one slow week away from failing, and this is the only place that
         // would show it before it does.

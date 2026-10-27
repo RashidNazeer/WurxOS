@@ -63,12 +63,13 @@ function autofillSummary(meta, created) {
   if (!meta) return created ? 'Blank checkpoint created — fill in each section below, then Done → Submit.' : '';
   const bits = [meta.reportFound ? 'weekly report ✓' : 'no weekly report for this week'];
   if (meta.reportN2Found) bits.push('N-2 report ✓');
-  if (meta.eukaTried) {
-    if (meta.eukaOk && !meta.eukaError) bits.push('Euka ✓');
-    else if (meta.eukaOk) bits.push('Euka partly filled — ' + meta.eukaError);
-    else bits.push('Euka unavailable — ' + (meta.eukaError || 'no reason given'));
-  } else if (meta.eukaLinked === false) {
-    bits.push('this brand is not on Euka, so the two funnel fields stay manual');
+  if (meta.providerTried) {
+    const who = meta.providerName;
+    if (meta.providerOk && !meta.providerError) bits.push(who + ' ✓' + (meta.providerNote ? ' (' + meta.providerNote + ')' : ''));
+    else if (meta.providerOk) bits.push(who + ' partly filled — ' + meta.providerError);
+    else bits.push(who + ' unavailable — ' + (meta.providerError || 'no reason given'));
+  } else if (meta.providerLinked === false) {
+    bits.push('this brand is not on Euka or Reacher, so the funnel fields stay manual');
   }
   const n = meta.filled || 0;
   const lead = created ? 'Created & auto-filled' : 'Auto-filled';
@@ -705,11 +706,11 @@ function ApcCheckpointPage() {
                 className="wx-btn wx-btn-ghost"
                 onClick={onAutofill}
                 disabled={autofilling || !data}
-                title={selectedBrand?.euka_store_id
-                  ? 'Fills from this week’s weekly report, plus target invites and opted-in from Euka.'
-                  : `Fills from this week’s weekly report. ${brandName || 'This brand'} is not linked to a Euka store, so the Euka funnel fields stay manual.`}
+                title={selectedBrand?.euka_store_id || selectedBrand?.reacher_shop_id
+                  ? `Fills from this week’s weekly report, plus target invites and opted-in from ${selectedBrand?.euka_store_id ? 'Euka' : 'Reacher'}.`
+                  : `Fills from this week’s weekly report. ${brandName || 'This brand'} is not linked to Euka or Reacher, so the funnel fields stay manual.`}
               >
-                {autofilling ? <><span className="wx-spinner" /> Auto-filling…</> : <><i className="bi bi-magic me-1" /> Auto-fill{selectedBrand?.euka_store_id ? ' + Euka' : ''}</>}
+                {autofilling ? <><span className="wx-spinner" /> Auto-filling…</> : <><i className="bi bi-magic me-1" /> Auto-fill{selectedBrand?.euka_store_id ? ' + Euka' : selectedBrand?.reacher_shop_id ? ' + Reacher' : ''}</>}
               </button>
               <button className="wx-btn wx-btn-primary" onClick={onDone}><i className="bi bi-check2 me-1" /> Done</button>
             </div>
@@ -743,7 +744,7 @@ function ApcCheckpointPage() {
             <div className="ck-overlay-title">Preparing {brandName || 'the'} checkpoint</div>
             <div className="ck-overlay-stage">{createStage.label || 'Working…'}</div>
             <div className="ck-overlay-bar"><div className="ck-overlay-bar-fill" style={{ width: `${Math.max(6, Math.min(100, createStage.pct || 0))}%` }} /></div>
-            <div className="ck-overlay-note">Pulling in your weekly report{selectedBrand?.euka_store_id ? ' and Euka data' : ''} and auto-filling. Please don't close this window.</div>
+            <div className="ck-overlay-note">Pulling in your weekly report{selectedBrand?.euka_store_id ? ' and Euka data' : selectedBrand?.reacher_shop_id ? ' and Reacher data' : ''} and auto-filling. Please don't close this window.</div>
           </div>
         </div>
       )}

@@ -174,6 +174,20 @@ Deno.serve(async (req) => {
     const { slug: brandSlug, key: brandKey, storeId: brandStoreId } = keyForBrand(payload?.brand ?? null);
     if (!brandKey) return json({ error: `Euka key not configured for brand "${brandSlug}"` }, 500);
 
+    // The store this brand is scoped to. A shared-key brand gets it from
+    // EUKA_SHARED_BRANDS; a per-slug key is assumed to own exactly one store, but
+    // that stopped being true once one key was issued for two brands (Dr Tobias +
+    // Dr. Harvey's): its /stores lists both, and the page takes stores[0], so one
+    // brand's analytics would have shown the other's numbers. euka_stores is the
+    // source of truth for slug -> store, so resolve from there when the secret
+    // map did not supply one.
+    let scopeStoreId = brandStoreId || '';
+    if (!scopeStoreId) {
+      const { data: own } = await admin
+        .from('euka_stores').select('store_id').eq('slug', brandSlug).eq('is_active', true).maybeSingle();
+      scopeStoreId = own?.store_id ? String(own.store_id) : '';
+    }
+
     // Dashboard endpoints: scope the call server-side.
     //
     // storeId, because a shared key sees ALL stores and the frontend cannot
@@ -190,7 +204,7 @@ Deno.serve(async (req) => {
     // returns another brand's figures with a 200 and no way to notice.
     if (path.startsWith('/dashboard/')) {
       const b = (body && typeof body === 'object') ? { ...body as Record<string, unknown> } : {};
-      const storeId = brandStoreId || String(b.storeId || '').trim();
+      const storeId = scopeStoreId || String(b.storeId || '').trim();
       if (!storeId) return json({ error: 'dashboard calls need a storeId' }, 400);
       const { data: st } = await admin
         .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
@@ -208,7 +222,7 @@ Deno.serve(async (req) => {
     // whatever the client sent.
     let effQuery: Record<string, unknown> = (query && typeof query === 'object') ? { ...query } : {};
     if (path === '/data-export') {
-      const storeId = brandStoreId || String(effQuery.store_id || '').trim();
+      const storeId = scopeStoreId || String(effQuery.store_id || '').trim();
       if (!storeId) return json({ error: 'data-export needs a store_id' }, 400);
       const { data: st } = await admin
         .from('euka_stores').select('euka_brand_id').eq('store_id', storeId).maybeSingle();
@@ -271,11 +285,11 @@ Deno.serve(async (req) => {
       return json({ error: `Euka ${upstream.status}`, detail: data }, upstream.status === 401 ? 502 : upstream.status);
     }
 
-    // Shared-key brands: the key lists ALL stores/brands on the account. Narrow
+    // Multi-store keys: the key lists ALL stores/brands on the account. Narrow
     // /stores (and /brands) to JUST the selected brand so the frontend — which
     // takes stores[0] — never picks a sibling brand's store.
-    if (brandStoreId && Array.isArray(data)) {
-      if (path === '/stores') data = (data as any[]).filter((s) => s?.id === brandStoreId);
+    if (scopeStoreId && Array.isArray(data)) {
+      if (path === '/stores') data = (data as any[]).filter((s) => s?.id === scopeStoreId);
     }
 
     // Store in cache (best-effort; never block the response on a cache write).
