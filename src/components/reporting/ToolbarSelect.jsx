@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * Compact standalone single-select for the report toolbars — the period picker

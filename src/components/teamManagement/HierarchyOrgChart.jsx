@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, useLayoutEffect } from 'react';
+import { useRef, useState, useMemo, useLayoutEffect } from 'react';
 import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf, alpha } from './hierarchyTheme';
 
 /**

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { bossSaveArticle, normalizeUrl } from '../../lib/kbApi';
 
 const VALID_TABS = ['delivery_roadmap', 'bootcamp', 'operational_sops', 'training_sops', 'policies'];
@@ -18,7 +18,7 @@ const TEMPLATE = [
 /* ── CSV parser (handles quoted fields and embedded commas/quotes) ───────── */
 function parseCSV(text) {
   const rows = []; let current = []; let field = ''; let inQ = false;
-  const src = text.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const src = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
     if (inQ) {

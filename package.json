@@ -16,7 +16,9 @@
     "test:brand-switch": "node scripts/brand-switch-tests.mjs",
     "test:buddy": "node scripts/buddy-tests.mjs",
     "test:euka-timeouts": "npx --yes deno@latest run --no-lock --allow-read --allow-write --allow-net scripts/euka-timeout-tests.ts",
-    "test:incentive-workbook": "node scripts/incentive-workbook-tests.mjs"
+    "test:incentive-workbook": "node scripts/incentive-workbook-tests.mjs",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -46,7 +48,12 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
     "pg": "^8.23.0",
     "vite": "^6.0.3"
   }

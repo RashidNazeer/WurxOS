@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
-  getMonthlyReportsForBrand, getMonthlyReportsForTL, deleteMonthlyReport,
-  REPORT_STATUSES, getReportStatus, updateReportStatus,
-  num, findPreviousMonthlyReport,
+  getMonthlyReportsForTL, deleteMonthlyReport, REPORT_STATUSES, getReportStatus,
+  updateReportStatus, num, findPreviousMonthlyReport,
 } from '../../utils/monthlyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';
 import MonthlyReportForm from './MonthlyReportForm';

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -432,12 +432,19 @@ function BrandDetailModal({ brandName, creators, month, onClose }) {
   }, [creators]);
 
   const [activeVideo, setActiveVideo] = useState(videos[0] || null);
-  useMemo(() => {
-    if (!activeVideo && videos.length > 0) setActiveVideo(videos[0]);
+  // Keep the selection valid as the video list changes: pick the first when
+  // nothing is selected, and re-pick when the selected one disappears.
+  //
+  // This was a useMemo whose return value was discarded and whose body called
+  // setActiveVideo — i.e. a state update during render, which React does not
+  // guarantee to run when you expect and which warns under StrictMode. It
+  // happened to work. useEffect is what this always meant.
+  useEffect(() => {
+    if (!activeVideo && videos.length > 0) { setActiveVideo(videos[0]); return; }
     if (activeVideo && !videos.find((v) => v.key === activeVideo.key)) {
       setActiveVideo(videos[0] || null);
     }
-  }, [videos]);
+  }, [videos, activeVideo]);
 
   const totals = useMemo(() => {
     const total   = creators.reduce((s, c) => s + Number(c.dealAmount || 0), 0);

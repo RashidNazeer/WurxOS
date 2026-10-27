@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReportsRealtime } from '../../lib/useReportsRealtime';
 import {
-  getBiWeeklyReportsForBrand, getBiWeeklyReportsForTL, getAllBiWeeklyReports,
-  deleteBiWeeklyReport, getBiWeeklyAnchor,
+  getBiWeeklyReportsForBrand, getBiWeeklyReportsForTL, deleteBiWeeklyReport,
   REPORT_STATUSES, getReportStatus, updateReportStatus,
 } from '../../utils/biWeeklyReportingService';
 import { currencySymbol, DEFAULT_CURRENCY } from '../../utils/currencies';

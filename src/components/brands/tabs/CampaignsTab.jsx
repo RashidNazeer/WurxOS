@@ -3,7 +3,7 @@
 //   1. Firebase imports → v1-compat shim (campaignsApiV1.js)
 //   2. useAuth() returns {user, profile} → reconstruct {currentUser}
 //   3. Brand prop comes in v2-shape (snake_case) → adapter at top
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   subscribeBrandCampaigns, addCampaign, updateCampaign,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   eukaMe, eukaStores, eukaOverview, eukaSeries, eukaAffiliateFunnel, eukaConversionFunnel,
@@ -8,8 +8,8 @@ import {
   EUKA_BRANDS_FALLBACK, eukaBrandList, setEukaBrand, getEukaBrand,
 } from '../../lib/eukaAnalyticsApi';
 import {
-  fmtMoney, fmtMoney0, fmtNum, fmtPct, fmtCompact, Delta, Section, Kpi, Empty,
-  LineChart, FunnelBars, Table,
+  fmtMoney, fmtMoney0, fmtNum, fmtPct, fmtCompact, Delta, Section, Kpi, LineChart,
+  FunnelBars, Table,
 } from './EukaKit';
 import EukaReportPreview from './EukaReportPreview';
 

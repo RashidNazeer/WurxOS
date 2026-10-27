@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useBrands } from '../../contexts/BrandsContext';
 import GmvMaxTab from '../brands/tabs/GmvMaxTab';
 

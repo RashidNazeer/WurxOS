@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ROLE_COLORS, roleShortLabel, initialsOf, teamKindOf } from './hierarchyTheme';
 
 /**

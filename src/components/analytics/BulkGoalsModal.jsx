@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import BrandAvatar from '../brands/BrandAvatar';
 import { listBrandMetricsForMonth, saveBrandGoals } from '../../lib/brandMetricsApi';
 import {
-  buildGoalsCsv, parseGoalsCsv, diffGoalRows, suggestedFilename, GOAL_FIELDS,
+  buildGoalsCsv, parseGoalsCsv, diffGoalRows, suggestedFilename,
 } from '../../lib/brandGoalsBulk';
 
 const fmt = (v, unit) => {

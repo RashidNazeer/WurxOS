@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * Shared month navigator for the leave pages — ‹ Month YYYY › with a

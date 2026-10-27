@@ -12,7 +12,7 @@ import {
   detectNextBiWeeklyPeriod,
   REPORT_STATUSES,
 } from '../../utils/biWeeklyReportingService';
-import { getUserCustomFields, saveUserCustomFields, cleanNumericInput, WEEKLY_SECTIONS, resolveWeeklySectionsEnabled } from '../../utils/reportingService';
+import { getUserCustomFields, saveUserCustomFields, cleanNumericInput, resolveWeeklySectionsEnabled } from '../../utils/reportingService';
 import {
   generateOverallInsight, generateCreatorsInsight, generateVideosInsight,
   generateGmvMaxInsight, generateProductsInsight, generateOffsiteInsight,

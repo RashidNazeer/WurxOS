@@ -1,7 +1,7 @@
 import React from 'react';
 import { logAppEvent } from '../../lib/appEvents';
 import { supabase } from '../../lib/supabase';
-import { requestAppReload } from '../../lib/appUpdate';
+import { requestAppReload, reloadNow } from '../../lib/appUpdate';
 import ChunkReloadNotice from './ChunkReloadNotice';
 
 /**
@@ -188,7 +188,13 @@ export default class RouteErrorBoundary extends React.Component {
             </button>
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              // reloadNow, not a bare reload: STALE_DEPLOY_RE above is a
+              // heuristic over six known message shapes, so a stale-chunk
+              // crash worded differently lands on this generic card instead.
+              // A plain reload would serve the same cached broken chunk and
+              // loop; reloadNow clears CacheStorage and hands the worker over
+              // first. Safe for any crash, so it is the better default here.
+              onClick={reloadNow}
               style={{
                 background: 'var(--surface-2)',
                 color: 'var(--text-primary)',

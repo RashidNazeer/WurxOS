@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchHierarchy } from '../../lib/teamApi';
 import HierarchyReassignPanel from '../../components/teamManagement/HierarchyReassignPanel';

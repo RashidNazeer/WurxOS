@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { karachiYmd, karachiMonth } from '../../lib/serverTime';
@@ -6,23 +6,16 @@ import ClockWidget from './ClockWidget';
 import { useConfirm, useToast } from '../ui';
 import {
   onTeamToday, onAllToday, onPendingApprovals, onActiveRecord,
-  onPendingEditClockOutRequests,
-  getTeamAndSelfHistory, getAllHistory, getUserHistory,
-  approveClockOut, rejectClockOut,
-  approveEditClockIn, rejectEditClockIn,
-  approveEditClockOut, rejectEditClockOut,
-  decideAttendanceEdit,
-  calcTimes, fmtDuration, fmtTime, exportToCSV,
-  getEffectiveStatus, forceCloseSession,
-  getAdjustmentsForMonth, createAttendanceAdjustment,
-  updateAttendanceAdjustment, deleteAttendanceAdjustment,
-  bulkMarkMissedAsPresent,
+  onPendingEditClockOutRequests, getTeamAndSelfHistory, getAllHistory, getUserHistory,
+  approveClockOut, rejectClockOut, approveEditClockIn, rejectEditClockIn,
+  approveEditClockOut, rejectEditClockOut, decideAttendanceEdit, calcTimes, fmtDuration,
+  fmtTime, exportToCSV, getEffectiveStatus, forceCloseSession, getAdjustmentsForMonth,
+  createAttendanceAdjustment, deleteAttendanceAdjustment, bulkMarkMissedAsPresent,
   // Attendance coverage now comes from ONE server-side source of truth
   // (mig 252) — no formula lives in this file any more.
-  fetchAttendanceBreakdown, fetchAttendanceBreakdownBulk,
-  fetchRosterMonth,
-  listExpectedMembers, getLeaveQuotaDefault, setLeaveQuotaDefault,
-  scanLeaveQuotaConflicts,
+  fetchAttendanceBreakdown,
+  fetchAttendanceBreakdownBulk, fetchRosterMonth, listExpectedMembers,
+  getLeaveQuotaDefault, setLeaveQuotaDefault, scanLeaveQuotaConflicts,
 } from '../../lib/attendanceApi';
 
 const ROLE_OPTIONS = [

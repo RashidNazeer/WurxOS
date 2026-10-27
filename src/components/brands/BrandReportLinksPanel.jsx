@@ -17,8 +17,7 @@ function effectiveApplies(section) {
   return REPORT_TYPES.slice();
 }
 import {
-  PlusIcon, XIcon, PencilIcon, TrashIcon, LinkIcon,
-  BookmarkIcon, AlertIcon,
+  PlusIcon, PencilIcon, TrashIcon, LinkIcon, BookmarkIcon, AlertIcon,
 } from '../common/Icon';
 
 /**

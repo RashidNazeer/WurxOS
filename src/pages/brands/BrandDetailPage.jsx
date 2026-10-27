@@ -35,9 +35,8 @@ import TaskRow from '../../components/tasks/TaskRow';
 import TaskDetailModal from '../../components/tasks/TaskDetailModal';
 import CreateTaskModal from '../../components/tasks/CreateTaskModal';
 import {
-  ChevronRightIcon, ChevronDownIcon, PencilIcon, AlertIcon,
-  PlusIcon, StoreIcon, ChecklistIcon, ReportIcon, UsersIcon, BookmarkIcon,
-  ShieldIcon, SettingsIcon, ClockIcon, BoxIcon, MegaphoneIcon, StarIcon,
+  ChevronRightIcon, PencilIcon, PlusIcon, StoreIcon, ChecklistIcon, ReportIcon,
+  UsersIcon, BookmarkIcon, SettingsIcon, ClockIcon, BoxIcon, MegaphoneIcon, StarIcon,
 } from '../../components/common/Icon';
 import '../../styles/table.css';
 import '../../styles/brands.css';

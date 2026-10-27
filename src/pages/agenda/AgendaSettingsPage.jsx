@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getAgendaSettings, updateAgendaSettings } from '../../lib/agendaApi';
 import AgendaSchedulesTab from '../../components/agenda/AgendaSchedulesTab';
 import AgendaGuestTeamsTab from '../../components/agenda/AgendaGuestTeamsTab';

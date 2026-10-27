@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   subscribeArticles,
@@ -590,11 +590,11 @@ export default function BossKnowledgeBasePage() {
         await bossSaveArticle(data);
       }
       setShowModal(false); setEditDoc(null); setNewVersionTarget(null);
-    } catch (err) {
       // NEVER swallow a save failure — a silent catch here let RLS/constraint/
       // network errors drop a doc while the user thought it saved (the "added
-      // but never persisted" ghost). Surface it so the modal shows why + stays open.
-      throw err;
+      // but never persisted" ghost). There is deliberately no catch: the error
+      // propagates so the modal shows why and stays open, while finally still
+      // clears the saving flag.
     } finally { setSaving(false); }
   }
 

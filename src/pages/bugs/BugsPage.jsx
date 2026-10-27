@@ -8,8 +8,7 @@ import {
   bugTypeMeta, bugPriorityMeta, bugStatusMeta,
 } from '../../lib/bugsApi';
 import {
-  PlusIcon, AlertIcon, RefreshIcon, SearchIcon, XIcon, CheckIcon,
-  BugIcon, MessageIcon, TrashIcon, MoreIcon,
+  PlusIcon, AlertIcon, RefreshIcon, SearchIcon, XIcon, BugIcon, MessageIcon, TrashIcon,
 } from '../../components/common/Icon';
 import '../../styles/table.css';
 

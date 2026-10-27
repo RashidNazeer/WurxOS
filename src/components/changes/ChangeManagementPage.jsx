@@ -7,7 +7,7 @@
 //   3. createNotification dropped — v2 server-side trigger handles fan-out
 //   4. onSnapshot → subscribeAllChanges / subscribeChangeThread
 //   5. addDoc/updateDoc → submitChangeV1/updateChangeV1/postChangeMessageV1
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   subscribeAllChanges, subscribeChangeThread,

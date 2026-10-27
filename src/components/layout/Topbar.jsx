@@ -9,7 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { clearVisits } from '../../lib/recentVisits';
 import NotificationBell from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
-import { ChevronDownIcon, LogoutIcon, UserIcon, SettingsIcon, InstallIcon, MenuIcon, SunIcon, MoonIcon } from '../common/Icon';
+import { ChevronDownIcon, LogoutIcon, SettingsIcon, InstallIcon, MenuIcon, SunIcon, MoonIcon } from '../common/Icon';
 import { canInstall, onInstallAvailable, promptInstall, isStandalone } from '../../lib/pwa';
 // Dialogs on Settings, Chat, Incentives and Creator Library use .wx-modal from
 // this sheet without importing it; the top bar is on every page, so it loads it.
