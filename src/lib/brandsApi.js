@@ -365,13 +365,23 @@ export async function listBrandsForUsers(userIds) {
 export async function listAssignableApcs() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, email, role, avatar_url, reports_to, manager:reports_to(id, display_name, role)')
+    .select(`id, display_name, email, role, avatar_url, reports_to, manager:reports_to(id, display_name, role),
+      team_leads:apc_team_leads!apc_team_leads_apc_id_fkey(tl:profiles!apc_team_leads_tl_id_fkey(id, display_name))`)
     .in('role', ['apc', 'ipc'])
     .eq('is_active', true)
     .not('reports_to', 'is', null)
     .order('display_name');
   if (error) throw new Error(error.message);
-  return data || [];
+  // teamLeadNames: every TL they work under, primary first, for the pickers'
+  // "reports to" line -- an APC on two teams must not read as one.
+  return (data || []).map((a) => ({
+    ...a,
+    teamLeadNames: (a.team_leads || [])
+      .map((l) => l.tl)
+      .filter(Boolean)
+      .sort((x, y) => (y.id === a.reports_to) - (x.id === a.reports_to))
+      .map((t) => t.display_name),
+  }));
 }
 
 // --------------------------------------------------------------
@@ -418,19 +428,32 @@ export async function listActiveTLs() {
   return data || [];
 }
 
-// APCs that report to a given TL — used when picking assigned APCs
-// for a brand owned by that TL.
+// APCs on a given TL's team -- primary (reports_to) AND additional links
+// (apc_team_leads, mig 428). Used when picking assigned APCs for a brand owned by
+// that TL, and for the TL's own team page. `other_tls` names the TL's teammates'
+// other teams so a shared APC reads as shared.
 export async function listAPCsUnderTL(tlId) {
   if (!tlId) return [];
+  const { data: links, error: linkErr } = await supabase
+    .from('apc_team_leads')
+    .select('apc_id')
+    .eq('tl_id', tlId);
+  if (linkErr) throw new Error(linkErr.message);
+  const ids = (links || []).map((l) => l.apc_id);
+  if (ids.length === 0) return [];
+
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, email')
+    .select('id, display_name, email, reports_to, team_leads:apc_team_leads!apc_team_leads_apc_id_fkey(tl:profiles!apc_team_leads_tl_id_fkey(id, display_name))')
     .eq('role', 'apc')
     .eq('is_active', true)
-    .eq('reports_to', tlId)
+    .in('id', ids)
     .order('display_name', { ascending: true });
   if (error) throw new Error(error.message);
-  return data || [];
+  return (data || []).map(({ team_leads, ...a }) => ({
+    ...a,
+    other_tls: (team_leads || []).map((l) => l.tl).filter((t) => t && t.id !== tlId).map((t) => t.display_name),
+  }));
 }
 
 // Same as listAPCsUnderTL but augmented with each APC's current brand
@@ -444,15 +467,24 @@ export async function listAPCsUnderTLWithLoad(tlId) {
   const ids = apcs.map((a) => a.id);
   const { data: rows, error } = await supabase
     .from('brand_assignments')
-    .select('user_id')
+    .select('user_id, brand:brand_id(owner_id)')
     .in('user_id', ids);
   if (error) throw new Error(error.message);
 
+  // brand_count is the APC's whole workload (drives "already managing" vs
+  // "available"); team_brand_count is only the brands THIS TL owns, which is what
+  // a shared APC's card on this TL's team page should claim.
   const byUser = new Map();
+  const byUserHere = new Map();
   for (const r of rows || []) {
     byUser.set(r.user_id, (byUser.get(r.user_id) || 0) + 1);
+    if (r.brand?.owner_id === tlId) byUserHere.set(r.user_id, (byUserHere.get(r.user_id) || 0) + 1);
   }
-  return apcs.map((a) => ({ ...a, brand_count: byUser.get(a.id) || 0 }));
+  return apcs.map((a) => ({
+    ...a,
+    brand_count: byUser.get(a.id) || 0,
+    team_brand_count: byUserHere.get(a.id) || 0,
+  }));
 }
 
 // Active IPCs across the agency (for BrandForm IPC assignment)

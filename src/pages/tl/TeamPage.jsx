@@ -36,7 +36,10 @@ export default function TeamPage() {
     );
   }, [apcs, q]);
 
-  const withBrands = apcs.filter((a) => a.brand_count > 0).length;
+  // A shared APC is counted by the brands THIS TL owns; one on a single team by
+  // everything they hold, as before.
+  const brandsHere = (a) => (a.other_tls?.length ? a.team_brand_count : a.brand_count);
+  const withBrands = apcs.filter((a) => brandsHere(a) > 0).length;
   const idle       = apcs.length - withBrands;
 
   return (
@@ -109,7 +112,8 @@ export default function TeamPage() {
 }
 
 function ApcCard({ apc }) {
-  const hasBrands = apc.brand_count > 0;
+  const brandCount = apc.other_tls?.length ? apc.team_brand_count : apc.brand_count;
+  const hasBrands = brandCount > 0;
   return (
     <div style={{
       display: 'grid',
@@ -143,6 +147,11 @@ function ApcCard({ apc }) {
         }}>
           <MailIcon width="11" height="11" /> {apc.email}
         </div>
+        {apc.other_tls?.length > 0 && (
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+            Also on {apc.other_tls.join(', ')}'s team
+          </div>
+        )}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           marginTop: 8,
@@ -156,7 +165,7 @@ function ApcCard({ apc }) {
         }}>
           <StoreIcon width="11" height="11" />
           {hasBrands
-            ? `${apc.brand_count} brand${apc.brand_count === 1 ? '' : 's'}`
+            ? `${brandCount} brand${brandCount === 1 ? '' : 's'}`
             : 'Available'}
         </div>
       </div>

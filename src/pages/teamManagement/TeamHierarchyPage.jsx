@@ -61,7 +61,8 @@ export default function TeamHierarchyPage() {
     const tls = users.filter((u) => u.role === 'tl' || u.role === 'pctl' || u.role === 'developer');
 
     const enrichedTls = tls.map((t) => {
-      const members = teamUsers.filter((tu) => tu.ownerId === t.id);
+      // Linked, not just reporting: an APC on two teams is listed under both.
+      const members = teamUsers.filter((tu) => (tu.teamLeadIds?.length ? tu.teamLeadIds : [tu.ownerId]).includes(t.id));
       // Active brands only. brands.owner_id is not-null, so a brand we have
       // stopped working on still points at whichever TL last held it — it has
       // to point at somebody. Showing those under the TL made retired clients
@@ -72,9 +73,12 @@ export default function TeamHierarchyPage() {
         ...t,
         members: members.map((m) => ({
           ...m,
+          // On a shared APC's card under THIS lead, show the brands this lead
+          // owns -- not the ones they run for the other team.
           brands: (m.assignedBrands || [])
             .map((ab) => brands.find((b) => b.id === ab.id) || ab)
-            .filter(Boolean),
+            .filter(Boolean)
+            .filter((b) => !(m.teamLeadIds?.length > 1) || b.ownerId === t.id),
         })),
         brands: tlBrands,
       };

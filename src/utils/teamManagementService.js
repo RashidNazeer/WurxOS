@@ -17,7 +17,7 @@
 // So derive BOTH from the real shape: supervisors come from profiles (tl/pctl),
 // and each user's brands come from brands[].assigneeIds (i.e. brand_assignments).
 
-import { fetchTeamRoster, moveApcToTl } from '../lib/teamApi';
+import { fetchTeamRoster, moveApcToTl, addApcTl, removeApcTl } from '../lib/teamApi';
 
 export async function loadTeamMembers() {
   const roster = await fetchTeamRoster();
@@ -46,7 +46,7 @@ export async function loadTeamMembers() {
     if (b.status === 'inactive') continue;
     for (const uid of b.assigneeIds || []) {
       if (!brandsByUser.has(uid)) brandsByUser.set(uid, []);
-      brandsByUser.get(uid).push({ id: b.id, brandName: b.brand_name, status: b.status });
+      brandsByUser.get(uid).push({ id: b.id, brandName: b.brand_name, status: b.status, ownerId: b.owner_id });
     }
   }
 
@@ -59,6 +59,7 @@ export async function loadTeamMembers() {
       email: p.email || '',
       ownerId: p.reports_to || null,
       ownerName: p.reports_to ? (nameById.get(p.reports_to) || '') : '',
+      teamLeadIds: p.team_lead_ids?.length ? p.team_lead_ids : (p.reports_to ? [p.reports_to] : []),
       assignedBrands: brandsByUser.get(p.id) || [],
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -73,4 +74,10 @@ export async function reassignApcLead({ apcId, newTL, brandCount = 0 }) {
   // leaves brand_assignments alone — an APC's brands are assigned to the PERSON,
   // so they follow them to the new TL. Report the APC's own brand count.
   return { changed: brandCount };
+}
+
+/** Add (on=true) or remove (on=false) an additional Team Lead for an APC. */
+export async function setApcExtraTl({ apcId, tlId, on }) {
+  if (on) await addApcTl(apcId, tlId);
+  else await removeApcTl(apcId, tlId);
 }
