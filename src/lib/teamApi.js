@@ -14,6 +14,32 @@ export async function moveApcToTl(apcId, newTlId) {
   return data;
 }
 
+/** Add a Team Lead to an APC/IPC without moving them off their current ones.
+ *  Boss/OL only. The primary stays profiles.reports_to; this adds a second team. */
+export async function addApcTl(apcId, tlId) {
+  const { error } = await supabase.rpc('add_apc_tl', { p_apc: apcId, p_tl: tlId });
+  if (error) throw new Error(error.message);
+}
+
+/** Take an APC off one of their additional Team Leads. The server refuses the
+ *  primary TL, and any TL whose live brand the APC still holds. */
+export async function removeApcTl(apcId, tlId) {
+  const { error } = await supabase.rpc('remove_apc_tl', { p_apc: apcId, p_tl: tlId });
+  if (error) throw new Error(error.message);
+}
+
+/** apc_id -> [tl_id] for every team an APC/IPC works under (primary included). */
+async function fetchTeamLeadLinks() {
+  const { data, error } = await supabase.from('apc_team_leads').select('apc_id, tl_id');
+  if (error) throw new Error(error.message);
+  const byApc = new Map();
+  for (const l of data || []) {
+    if (!byApc.has(l.apc_id)) byApc.set(l.apc_id, []);
+    byApc.get(l.apc_id).push(l.tl_id);
+  }
+  return byApc;
+}
+
 /** Move a brand to a different TL. Pass `apcId = null` to leave it
  *  unassigned; otherwise the APC must report to the new TL. */
 export async function moveBrand(brandId, newTlId, apcId = null, note = null) {
@@ -94,6 +120,7 @@ export async function fetchHierarchy() {
       assignments:brand_assignments(user_id)
     `);
   if (brErr) throw new Error(brErr.message);
+  const linksByApc = await fetchTeamLeadLinks();
 
   // Index profiles by id for owner / member lookups.
   const byId = new Map((profiles || []).map((p) => [p.id, p]));
@@ -140,6 +167,10 @@ export async function fetchHierarchy() {
         avatar_url: p.avatar_url,
         ownerId: p.reports_to,
         ownerName: owner?.display_name || '',
+        // Every team this person works under, primary included. ownerId stays
+        // the primary: org-chart grouping uses teamLeadIds, everything that
+        // asks "who is their manager" keeps using ownerId.
+        teamLeadIds: linksByApc.get(p.id) || (p.reports_to ? [p.reports_to] : []),
         responsibilities: p.responsibilities || [],
         assignedBrands,
       };
@@ -180,9 +211,10 @@ export async function fetchTeamRoster() {
       assignments:brand_assignments(user_id)
     `);
   if (brErr) throw new Error(brErr.message);
+  const linksByApc = await fetchTeamLeadLinks();
 
   return {
-    profiles: profiles || [],
+    profiles: (profiles || []).map((p) => ({ ...p, team_lead_ids: linksByApc.get(p.id) || [] })),
     brands: (brands || []).map((b) => ({
       ...b,
       assigneeIds: (b.assignments || []).map((a) => a.user_id),

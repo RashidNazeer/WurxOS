@@ -39,7 +39,7 @@ export default function AssignBrandModal({ brand, onClose, onDone }) {
       .filter((c) => !qq
         || (c.display_name || '').toLowerCase().includes(qq)
         || (c.email || '').toLowerCase().includes(qq)
-        || (c.manager?.display_name || '').toLowerCase().includes(qq));
+        || (c.teamLeadNames?.join(' ') || c.manager?.display_name || '').toLowerCase().includes(qq));
   }, [candidates, currentIds, q]);
 
   async function add() {
@@ -121,7 +121,7 @@ export default function AssignBrandModal({ brand, onClose, onDone }) {
                   <Avatar user={c} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13 }}>{c.display_name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{String(c.role).toUpperCase()} · reports to <strong style={{ color: 'var(--text-secondary)' }}>{c.manager?.display_name || '—'}</strong></div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{String(c.role).toUpperCase()} · reports to <strong style={{ color: 'var(--text-secondary)' }}>{c.teamLeadNames?.join(' · ') || c.manager?.display_name || '—'}</strong></div>
                   </div>
                   {on && <CheckIcon width="14" height="14" style={{ color: 'var(--accent)' }} />}
                 </button>

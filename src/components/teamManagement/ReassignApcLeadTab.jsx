@@ -5,7 +5,7 @@
 //      (already shimmed to wrap v2's teamApi RPC)
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { loadTeamMembers, reassignApcLead } from '../../utils/teamManagementService';
+import { loadTeamMembers, reassignApcLead, setApcExtraTl } from '../../utils/teamManagementService';
 import { Button } from '../ui';
 
 export default function ReassignApcLeadTab() {
@@ -23,9 +23,12 @@ export default function ReassignApcLeadTab() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [linkBusy, setLinkBusy] = useState('');
 
-  const refresh = React.useCallback(async () => {
-    setLoading(true);
+  // `silent` reloads in place: toggling an additional TL must not blank the
+  // picker the user is standing in.
+  const refresh = React.useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await loadTeamMembers();
       setTls(data.tls);
@@ -58,6 +61,28 @@ export default function ReassignApcLeadTab() {
     const scoped = tls.filter(t => t.role === want);
     return scoped.length ? scoped : tls;
   }, [tls, selectedApc]);
+
+  // TLs whose live brand the APC holds can't be unlinked (the server refuses);
+  // say so up front instead of offering a toggle that will fail.
+  const heldBrandsByTl = useMemo(() => {
+    const m = new Map();
+    for (const b of selectedApc?.assignedBrands || []) {
+      if (!m.has(b.ownerId)) m.set(b.ownerId, []);
+      m.get(b.ownerId).push(b.brandName);
+    }
+    return m;
+  }, [selectedApc]);
+
+  async function toggleExtraTl(tl, on) {
+    setLinkBusy(tl.id); setError(''); setSuccess('');
+    try {
+      await setApcExtraTl({ apcId: selectedApc.id, tlId: tl.id, on });
+      setSuccess(on ? `${selectedApc.name} now also works under ${tl.name}.` : `${selectedApc.name} no longer works under ${tl.name}.`);
+      await refresh(true);
+    } catch (e) {
+      setError(e?.message || 'Could not update the team lead.');
+    } finally { setLinkBusy(''); }
+  }
 
   async function handleReassign() {
     if (!selectedApc || !selectedTL) return;
@@ -153,6 +178,7 @@ export default function ReassignApcLeadTab() {
                             <div className="text-muted text-truncate" style={{ fontSize: '0.66rem' }}>
                               {a.role?.toUpperCase()} · {(a.assignedBrands || []).length} brand{(a.assignedBrands || []).length === 1 ? '' : 's'}
                               {a.ownerName ? ` · TL: ${a.ownerName}` : ' · No TL'}
+                              {a.teamLeadIds.length > 1 ? ` +${a.teamLeadIds.length - 1} more` : ''}
                             </div>
                           </div>
                           {isSel && <i className="bi bi-check-circle-fill" style={{ color: 'var(--info-text)' }} />}
@@ -214,6 +240,50 @@ export default function ReassignApcLeadTab() {
               </div>
             </div>
           </div>
+
+          {/* Additional TLs: a second team, without moving the APC */}
+          {selectedApc && (
+            <div className="col-12">
+              <div className="card border-0 shadow-sm" style={{ borderRadius: 'var(--radius-lg)' }}>
+                <div className="card-body p-3">
+                  <h6 className="fw-bold mb-1" style={{ fontSize: '0.85rem' }}>
+                    <i className="bi bi-diagram-3 me-1" />Also works under
+                  </h6>
+                  <p className="text-muted mb-2" style={{ fontSize: '0.72rem' }}>
+                    For an APC who runs brands for more than one Team Lead. They appear in each lead's team and keep every brand;
+                    {' '}{selectedApc.ownerName || 'their primary TL'} stays their manager for attendance, leave and incentives.
+                  </p>
+                  <div className="d-flex flex-wrap gap-2">
+                    {eligibleTls.filter(t => t.id !== selectedApc.ownerId).map(t => {
+                      const on = selectedApc.teamLeadIds.includes(t.id);
+                      const held = heldBrandsByTl.get(t.id);
+                      return (
+                        <label key={t.id} className="d-flex align-items-center gap-2 px-3 py-2"
+                          title={on && held ? `Still manages ${held.join(', ')} for ${t.name}` : undefined}
+                          style={{
+                            border: `1px solid ${on ? 'var(--success)' : 'var(--border-subtle)'}`,
+                            background: on ? 'var(--success-soft)' : 'var(--surface-1)',
+                            borderRadius: 'var(--radius-md)', fontSize: '0.78rem',
+                            opacity: on && held ? 0.75 : 1,
+                            cursor: linkBusy || (on && held) ? 'not-allowed' : 'pointer',
+                          }}>
+                          <input type="checkbox" checked={on}
+                            disabled={!!linkBusy || (on && !!held)}
+                            onChange={(e) => toggleExtraTl(t, e.target.checked)} />
+                          <span className="fw-semibold">{t.name}</span>
+                          {on && held && <span className="text-muted" style={{ fontSize: '0.66rem' }}>· {held.length} brand{held.length === 1 ? '' : 's'}</span>}
+                          {linkBusy === t.id && <span className="spinner-border spinner-border-sm" />}
+                        </label>
+                      );
+                    })}
+                    {eligibleTls.filter(t => t.id !== selectedApc.ownerId).length === 0 && (
+                      <span className="text-muted small">No other team leads available.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Confirm bar */}
           {selectedApc && selectedTL && !sameTl && (

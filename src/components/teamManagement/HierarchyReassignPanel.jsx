@@ -239,8 +239,12 @@ function BrandPanel({ brand, currentTl, tls, teamUsers, actor: _actor, onSaved }
         // sync with the assigned APC's lead chain. team_move_brand
         // accepts a new TL + an APC, and the v2 RPC re-points
         // brand_assignments to that APC.
+        // An APC on several teams keeps the brand with the TL who already owns
+        // it; only an APC from a different team pulls it to their TL.
         const newApcOwnerTl = tls.find((t) => t.id === newApc.ownerId);
-        const targetTlId = newApcOwnerTl?.id || brand.ownerId;
+        const targetTlId = newApc.teamLeadIds?.includes(brand.ownerId)
+          ? brand.ownerId
+          : (newApcOwnerTl?.id || brand.ownerId);
         await moveBrand(brand.id, targetTlId, newApc.id);
       }
       onSaved({ kind: 'brand' });

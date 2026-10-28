@@ -47,7 +47,7 @@ portals — everything an agency needs.
 
 ### Migrations
 - Live in `supabase/migrations/*.sql`. Naming: `NNN_short_name.sql`. Highest is
-  **427** (next available is 428), as of 2026-10-27. Don't trust this number
+  **428** (next available is 429), as of 2026-10-28. Don't trust this number
   blindly — `ls` the folder, it moves most weeks.
 - **NEVER reuse a number, even on a different branch.** The CLI keys its ledger
   on the numeric prefix alone, so two files sharing one number means only one
@@ -91,6 +91,14 @@ portals — everything an agency needs.
 - The `profiles.permissions` jsonb column has per-user override flags:
   `canAddAPC`, `canAddBrand`, `canManageIncentives`, **`canViewAllBrands`** (added mig 192 for Subhan).
   Use this pattern for new role-bypass features rather than hardcoding UIDs.
+
+### APC ↔ Team Lead (many-to-many, mig 428)
+- `brands.owner_id` is the brand's TL. `profiles.reports_to` is the APC's **primary** TL and still
+  drives attendance, leave, incentives and performance. `apc_team_leads` lists **every** TL an APC works
+  under (primary included) and drives team lists, brand pickers and the org chart.
+- Triggers keep it in step with `reports_to` and with live permanent `brand_assignments`. Boss/OL add or
+  remove extra TLs via `add_apc_tl` / `remove_apc_tl`. Never derive a brand's TL from the APC's
+  `reports_to`; `apc_brand_owner(apc, current_owner)` is the rule the assign/swap RPCs use.
 
 ### Realtime
 - Supabase Realtime channels are used across the app — incentives, profiles,
