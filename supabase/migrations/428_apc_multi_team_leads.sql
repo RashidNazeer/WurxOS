@@ -106,47 +106,95 @@ create trigger profiles_sync_apc_primary_tl
 -- Brand ownership and assignment change through many paths (BrandForm, the assign
 -- modal, the RPCs below). Linking here, not in each path, is what keeps "the APC
 -- works a live brand under TL X" and "the APC is on X's team" from drifting.
+--
+-- DEFERRED to commit, and re-reading current state rather than trusting NEW: the
+-- swap and move RPCs change brands.owner_id BEFORE they delete and re-insert the
+-- assignments, so a trigger acting on the row it was fired for would link the
+-- OUTGOING APC (and any IPC) to the incoming owner's team. At commit the brand has
+-- one owner and one set of holders, whatever order the statements ran in.
+-- Drop a TL's DERIVED links that have lost their cause. Never the primary
+-- (reports_to) and never a link a Boss/OL added by hand (assigned_by set).
+create or replace function public.prune_derived_tl_links(p_tl uuid)
+returns void
+language sql security definer set search_path = public
+as $$
+  delete from public.apc_team_leads l
+   using public.profiles p
+   where l.tl_id = p_tl and l.assigned_by is null
+     and p.id = l.apc_id and p.reports_to is distinct from l.tl_id
+     and not exists (
+       select 1 from public.brand_assignments ba join public.brands b on b.id = ba.brand_id
+        where ba.user_id = l.apc_id and ba.expires_at is null
+          and b.status <> 'inactive' and b.owner_id = l.tl_id);
+$$;
+
 create or replace function public.link_holder_to_brand_owner()
 returns trigger
 language plpgsql security definer set search_path = public
 as $$
+declare
+  v_brand uuid;
 begin
-  -- brand_assign_apc writes the assignment BEFORE it corrects the owner, so this
-  -- trigger would link the APC to the brand's OLD owner. It sets every
-  -- relationship itself and says so with this flag (mig 360).
-  if coalesce(current_setting('wurxos.skip_owner_cascade', true), 'off') = 'on' then return new; end if;
-  if tg_table_name = 'brand_assignments' then
-    if new.expires_at is not null then return new; end if;   -- temp cover is not a team
-    insert into public.apc_team_leads (apc_id, tl_id)
-    select new.user_id, b.owner_id
-      from public.brands b
-      join public.profiles p on p.id = new.user_id and p.role in ('apc','ipc')
-      join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl')
-     where b.id = new.brand_id and b.status <> 'inactive'
-    on conflict do nothing;
-  else
-    insert into public.apc_team_leads (apc_id, tl_id)
-    select ba.user_id, new.owner_id
-      from public.brand_assignments ba
-      join public.profiles p on p.id = ba.user_id and p.role in ('apc','ipc')
-      join public.profiles o on o.id = new.owner_id and o.role in ('tl','pctl')
-     where ba.brand_id = new.id and ba.expires_at is null
-    on conflict do nothing;
+  if tg_table_name = 'brands' then v_brand := new.id; else v_brand := new.brand_id; end if;
+  insert into public.apc_team_leads (apc_id, tl_id)
+  select ba.user_id, b.owner_id
+    from public.brands b
+    join public.brand_assignments ba on ba.brand_id = b.id and ba.expires_at is null   -- temp cover is not a team
+    join public.profiles p on p.id = ba.user_id and p.role in ('apc','ipc')
+    join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl')
+   where b.id = v_brand and b.status <> 'inactive'
+  on conflict do nothing;
+
+  -- A brand that left a TL (new owner, or gone inactive) may have been the only
+  -- thing tying its holders to that team.
+  if tg_table_name = 'brands' then
+    perform public.prune_derived_tl_links(old.owner_id);
+    perform public.prune_derived_tl_links(new.owner_id);
   end if;
-  return new;
+  return null;
 end;
 $$;
 
 drop trigger if exists brand_assignments_link_tl on public.brand_assignments;
-create trigger brand_assignments_link_tl
+create constraint trigger brand_assignments_link_tl
   after insert or update of expires_at on public.brand_assignments
+  deferrable initially deferred
   for each row execute function public.link_holder_to_brand_owner();
 
 drop trigger if exists brands_link_holders_to_owner on public.brands;
-create trigger brands_link_holders_to_owner
+create constraint trigger brands_link_holders_to_owner
   after update of owner_id, status on public.brands
-  for each row when (new.status <> 'inactive' and new.owner_id is not null)
-  execute function public.link_holder_to_brand_owner();
+  deferrable initially deferred
+  for each row execute function public.link_holder_to_brand_owner();
+
+-- The other half: when a holding goes away the link it caused goes with it --
+-- but only a DERIVED link. The primary TL (reports_to) and any link a Boss/OL
+-- added by hand (assigned_by set) are never removed here. BrandSwitcher changes
+-- the owner and drops the APCs in two separate requests, so deferral alone
+-- cannot cover it.
+create or replace function public.unlink_holder_from_brand_owner()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if old.expires_at is not null then return old; end if;
+  delete from public.apc_team_leads l
+   using public.brands b, public.profiles p
+   where b.id = old.brand_id and l.apc_id = old.user_id and l.tl_id = b.owner_id
+     and p.id = old.user_id and p.reports_to is distinct from l.tl_id
+     and l.assigned_by is null
+     and not exists (
+       select 1 from public.brand_assignments ba join public.brands b2 on b2.id = ba.brand_id
+        where ba.user_id = old.user_id and ba.expires_at is null and ba.brand_id <> old.brand_id
+          and b2.status <> 'inactive' and b2.owner_id = l.tl_id);
+  return old;
+end;
+$$;
+
+drop trigger if exists brand_assignments_unlink_tl on public.brand_assignments;
+create trigger brand_assignments_unlink_tl
+  after delete on public.brand_assignments
+  for each row execute function public.unlink_holder_from_brand_owner();
 
 -- ---- 4. backfill (triggers are not retroactive) -------------------------------
 -- (a) everybody's primary TL
@@ -184,8 +232,11 @@ begin
   select * into v_tl from public.profiles where id = p_tl and is_active and deleted_at is null;
   if not found or v_tl.role not in ('tl','pctl') then raise exception 'Team Lead not found, inactive, or not a TL/PCTL'; end if;
 
+  -- An existing DERIVED link (assigned_by null) is upgraded to explicit, so the
+  -- brand-drop cleanup never removes something a person chose.
   insert into public.apc_team_leads (apc_id, tl_id, assigned_by) values (p_apc, p_tl, v_caller)
-  on conflict do nothing;
+  on conflict (apc_id, tl_id) do update set assigned_by = excluded.assigned_by, assigned_at = now()
+   where public.apc_team_leads.assigned_by is null;
   get diagnostics v_added = row_count;
   if v_added = 0 then return p_apc; end if;   -- already linked: no audit row for a non-event
 
@@ -197,7 +248,7 @@ begin
   if p_tl <> v_caller then
     perform public.emit_notification(p_tl, v_caller, 'team', 'team.apc_linked', 'Team change',
       public.profile_display_name(v_caller) || ' added ' || coalesce(v_apc.display_name, 'an APC') || ' to your team',
-      'profiles', p_apc, '/team');
+      'profiles', p_apc, case when v_tl.role = 'tl' then '/tl/team' end);
   end if;
   return p_apc;
 end;
