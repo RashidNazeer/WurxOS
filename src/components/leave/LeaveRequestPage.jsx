@@ -12,6 +12,7 @@ import {
 import { listHolidaysInRange, analyzeLeaveRange } from '../../lib/holidaysApi';
 import MonthNavigator, { currentMonthStr, monthLabel, stepMonthStr } from './MonthNavigator';
 import { Button, StatCard, StatGrid, useConfirm, useToast } from '../ui';
+import ApproverChips from './ApproverChips';
 
 // Readable in both themes: amber tint + neutral text (bg-warning/text-dark flipped unreadable in dark).
 const UNPAID_CHIP = { background: 'var(--warning-soft)', color: 'var(--text-primary)', border: '1px solid color-mix(in srgb, var(--warning) 45%, transparent)' };
@@ -969,11 +970,17 @@ export default function LeaveRequestPage() {
   // pending_tl; OL acts on pending_ol. Requests already forwarded to
   // Boss (pending_boss) shouldn't inflate the OL's queue badge.
   // Spans all months so a future request shows up in the tab badge.
+  // A request that needs several Team Leads stays pending for the ones who have
+  // already decided; only a lead with a still-pending row has anything to do.
+  const waitingOnMe = (r) => !r.approvers?.length
+    || r.approvers.some((a) => a.approverId === uid && a.decision === 'pending');
+
   const teamPendingCount = useMemo(() => {
     if (isOL)   return teamRequests.filter(r => r.status === 'pending_ol').length;
     if (isPCTL) return teamRequests.filter(r => r.status === 'pending_pctl').length;
-    return teamRequests.filter(r => r.status === 'pending_tl').length;
-  }, [teamRequests, isOL, isPCTL]);
+    return teamRequests.filter(r => r.status === 'pending_tl' && waitingOnMe(r)).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamRequests, isOL, isPCTL, uid]);
 
   function renderRequestCard(r, showActions = false) {
     const catCfg = getCatCfg(r.category);
@@ -1136,6 +1143,7 @@ export default function LeaveRequestPage() {
                   </div>
                 )}
 
+                <ApproverChips approvers={r.approvers} meId={uid} />
                 <div className="text-muted mt-1" style={{ fontSize: '0.65rem' }}>Submitted {formatDate(r.createdAt)}</div>
               </div>
             </div>
@@ -1151,8 +1159,8 @@ export default function LeaveRequestPage() {
                 // approved / rejected) hides the buttons — which is why
                 // the OL was previously able to click Approve on requests
                 // already forwarded to Boss and get "not authorized".
-                (isTL && r.status === 'pending_tl') ||
-                (isPCTL && r.status === 'pending_pctl') ||
+                (isTL && r.status === 'pending_tl' && waitingOnMe(r)) ||
+                (isPCTL && r.status === 'pending_pctl' && waitingOnMe(r)) ||
                 (isOL && r.status === 'pending_ol')
               ) && (
                 <div className="d-flex gap-1">

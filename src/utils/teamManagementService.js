@@ -17,7 +17,7 @@
 // So derive BOTH from the real shape: supervisors come from profiles (tl/pctl),
 // and each user's brands come from brands[].assigneeIds (i.e. brand_assignments).
 
-import { fetchTeamRoster, moveApcToTl, addApcTl, removeApcTl } from '../lib/teamApi';
+import { fetchTeamRoster, moveApcToTl } from '../lib/teamApi';
 
 export async function loadTeamMembers() {
   const roster = await fetchTeamRoster();
@@ -74,10 +74,4 @@ export async function reassignApcLead({ apcId, newTL, brandCount = 0 }) {
   // leaves brand_assignments alone — an APC's brands are assigned to the PERSON,
   // so they follow them to the new TL. Report the APC's own brand count.
   return { changed: brandCount };
-}
-
-/** Add (on=true) or remove (on=false) an additional Team Lead for an APC. */
-export async function setApcExtraTl({ apcId, tlId, on }) {
-  if (on) await addApcTl(apcId, tlId);
-  else await removeApcTl(apcId, tlId);
 }

@@ -23,6 +23,7 @@ import { listHaloEnabledBrands } from '../../lib/haloBrandsApi';
 import HaloV2Explorer from '../../components/haloV2/HaloV2Explorer';
 import HaloV2ShareModal from '../../components/haloV2/HaloV2ShareModal';
 import HaloSheetsDrawer from '../../components/haloV2/HaloSheetsDrawer';
+import { downloadHaloSheets } from '../../lib/haloExport';
 
 export default function HaloV2Page() {
   const [brands, setBrands] = useState([]);
@@ -31,6 +32,7 @@ export default function HaloV2Page() {
   const [error, setError] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
   const [sheetsOpen, setSheetsOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   // A CALLBACK, not a one-shot effect. The brand list carries each brand's
   // uploaded sheets, so after an upload, replace or delete it has to be read
@@ -53,6 +55,20 @@ export default function HaloV2Page() {
   const selected = brands.find((x) => x.brand.id === selectedBrandId) || null;
   const brandDatasets = useMemo(() => (selected ? Object.values(selected.datasets) : []), [selected]);
   const loadRows = useCallback((id) => getHaloRows(id), []);
+
+  const anySheets = useMemo(() => brands.some((x) => Object.keys(x.datasets).length > 0), [brands]);
+
+  async function handleDownloadAll() {
+    setError('');
+    setDownloading(true);
+    try {
+      await downloadHaloSheets(brands);
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function handleDelete(id, granLabel) {
     if (!window.confirm(`Delete the ${granLabel} for this brand?`)) return;
@@ -89,6 +105,14 @@ export default function HaloV2Page() {
               title="Upload, replace or delete this brand's sheets">
               <i className="bi bi-upload" style={{ marginRight: 6 }} />Manage sheets
             </button>
+            {anySheets && (
+              <button type="button" className="wx-btn wx-btn-ghost" onClick={handleDownloadAll} disabled={downloading}
+                title="Download every brand's uploaded sheets as one zip (a folder per brand)">
+                {downloading
+                  ? <><span className="wx-spinner" style={{ marginRight: 6 }} />Preparing…</>
+                  : <><i className="bi bi-download" style={{ marginRight: 6 }} />Download all sheets</>}
+              </button>
+            )}
             {/* Client links normally live inside the explorer's Share menu.
                 With no sheets there is no explorer, so keep one way in. */}
             {!brandDatasets.length && (

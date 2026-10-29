@@ -1,4 +1,15 @@
 import { supabase } from './supabase';
+import { queryClient } from './queryClient';
+
+// Team membership is derived from brand assignments (mig 428), so any change to who
+// holds a brand or who owns it changes a Team Lead's team. The query cache keeps
+// data fresh for 5 minutes, so drop the team lists explicitly.
+const refreshTeams = (fn) => async (...args) => {
+  const out = await fn(...args);
+  queryClient.invalidateQueries({ queryKey: ['tl-team'] });
+  return out;
+};
+
 
 // --------------------------------------------------------------
 // Reads
@@ -73,7 +84,7 @@ export async function listEukaStores() {
 
 // Brand row and initial assignments are written in one transaction (mig 412),
 // so a failure never leaves a half-created brand behind to be duplicated on retry.
-export async function createBrand({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null, assigneeIds = [] }) {
+async function createBrandImpl({ brandName, clientName, tier, gmv, ownerId, logoUrl, status = 'active', paidCollabStatus = 'not_applicable', gmvMaxStatus = 'not_applicable', currency = 'USD', eukaStoreId = null, eukaSlug = null, assigneeIds = [] }) {
   const { data, error } = await supabase.rpc('brand_create_with_assignments', {
     p_brand_name: brandName.trim(),
     p_client_name: (clientName || '').trim(),
@@ -99,7 +110,7 @@ function toNumberOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function updateBrand(id, patch) {
+async function updateBrandImpl(id, patch) {
   const payload = {};
   if ('brandName'  in patch) payload.brand_name  = patch.brandName.trim();
   if ('clientName' in patch) payload.client_name = (patch.clientName || '').trim();
@@ -200,7 +211,7 @@ export async function reactivateBrand(id) {
  * delete-everything behaviour, so callers that genuinely own the whole set
  * (an admin tool) still work — but BrandForm must always pass its roles.
  */
-export async function setBrandAssignments(brandId, userIds, roles = null) {
+async function setBrandAssignmentsImpl(brandId, userIds, roles = null) {
   const { data: current, error: curErr } = await supabase
     .from('brand_assignments')
     .select('user_id, profiles:user_id!inner(role)')
@@ -246,7 +257,7 @@ export async function setBrandAssignments(brandId, userIds, roles = null) {
 // temporary assignment (auto-removed by the expire-brand-assignments cron),
 // or null for permanent. RLS already gates this to can_edit_brand.
 // --------------------------------------------------------------
-export async function assignBrandUser(brandId, userId, expiresAt = null) {
+async function assignBrandUserImpl(brandId, userId, expiresAt = null) {
   const { data: me } = await supabase.auth.getUser();
   const { error } = await supabase
     .from('brand_assignments')
@@ -257,7 +268,7 @@ export async function assignBrandUser(brandId, userId, expiresAt = null) {
   if (error) throw new Error(error.message);
 }
 
-export async function unassignBrandUser(brandId, userId) {
+async function unassignBrandUserImpl(brandId, userId) {
   const { error } = await supabase
     .from('brand_assignments')
     .delete()
@@ -276,7 +287,7 @@ export async function unassignBrandUser(brandId, userId) {
 // `notify` defaults to false — notifications are opt-in. The RPC
 // only dispatches the brand.switched notification to the new APC and
 // their Team Lead when the caller explicitly ticks the UI checkbox.
-export async function switchBrandApc(brandId, newApcId, note = null, notify = false) {
+async function switchBrandApcImpl(brandId, newApcId, note = null, notify = false) {
   const { error } = await supabase.rpc('brand_switch_apc', {
     p_brand: brandId, p_new_apc: newApcId, p_note: note, p_notify: notify,
   });
@@ -292,7 +303,7 @@ export async function switchBrandApc(brandId, newApcId, note = null, notify = fa
 // cover on the brand are left in place. See lib/brandSwitchRules.js for the
 // preview-side mirror of who gets replaced.
 // --------------------------------------------------------------
-export async function assignBrandApc(brandId, newApcId, note = null, notify = false) {
+async function assignBrandApcImpl(brandId, newApcId, note = null, notify = false) {
   const { error } = await supabase.rpc('brand_assign_apc', {
     p_brand: brandId, p_new_apc: newApcId, p_note: note, p_notify: notify,
   });
@@ -309,7 +320,7 @@ export async function assignBrandApc(brandId, newApcId, note = null, notify = fa
 // reverts it automatically at `endsAt`; endTempAssignmentEarly can also end
 // it sooner (the employee came back early).
 // --------------------------------------------------------------
-export async function temporarilyAssignBrand(brandId, coveringApcId, endsAt, note = null, notify = false) {
+async function temporarilyAssignBrandImpl(brandId, coveringApcId, endsAt, note = null, notify = false) {
   const { data, error } = await supabase.rpc('brand_temp_assign', {
     p_brand: brandId, p_covering: coveringApcId, p_ends_at: endsAt, p_note: note, p_notify: notify,
   });
@@ -365,23 +376,43 @@ export async function listBrandsForUsers(userIds) {
 export async function listAssignableApcs() {
   const { data, error } = await supabase
     .from('profiles')
-    .select(`id, display_name, email, role, avatar_url, reports_to, manager:reports_to(id, display_name, role),
-      team_leads:apc_team_leads!apc_team_leads_apc_id_fkey(tl:profiles!apc_team_leads_tl_id_fkey(id, display_name))`)
+    .select('id, display_name, email, role, avatar_url, reports_to, manager:reports_to(id, display_name, role)')
     .in('role', ['apc', 'ipc'])
     .eq('is_active', true)
     .not('reports_to', 'is', null)
     .order('display_name');
   if (error) throw new Error(error.message);
+  const names = await tlNamesByApc((data || []).map((a) => a.id));
   // teamLeadNames: every TL they work under, primary first, for the pickers'
   // "reports to" line -- an APC on two teams must not read as one.
   return (data || []).map((a) => ({
     ...a,
-    teamLeadNames: (a.team_leads || [])
-      .map((l) => l.tl)
-      .filter(Boolean)
+    teamLeadNames: (names.get(a.id) || [])
       .sort((x, y) => (y.id === a.reports_to) - (x.id === a.reports_to))
-      .map((t) => t.display_name),
+      .map((t) => t.name),
   }));
+}
+
+// apc id -> [{ id, name }] of every TL on whose team they work (the
+// apc_team_leads view: reports_to + owners of the live brands they hold). Two
+// queries, not an embed: PostgREST cannot follow a view's relationships.
+async function tlNamesByApc(apcIds) {
+  const out = new Map();
+  if (!apcIds.length) return out;
+  const { data: links, error } = await supabase
+    .from('apc_team_leads').select('apc_id, tl_id').in('apc_id', apcIds);
+  if (error) throw new Error(error.message);
+  const tlIds = [...new Set((links || []).map((l) => l.tl_id))];
+  if (!tlIds.length) return out;
+  const { data: tls, error: tlErr } = await supabase
+    .from('profiles').select('id, display_name').in('id', tlIds);
+  if (tlErr) throw new Error(tlErr.message);
+  const nameOf = new Map((tls || []).map((t) => [t.id, t.display_name]));
+  for (const l of links) {
+    if (!out.has(l.apc_id)) out.set(l.apc_id, []);
+    out.get(l.apc_id).push({ id: l.tl_id, name: nameOf.get(l.tl_id) || '' });
+  }
+  return out;
 }
 
 // --------------------------------------------------------------
@@ -428,8 +459,8 @@ export async function listActiveTLs() {
   return data || [];
 }
 
-// APCs on a given TL's team -- primary (reports_to) AND additional links
-// (apc_team_leads, mig 428). Used when picking assigned APCs for a brand owned by
+// APCs on a given TL's team -- those who report to them AND those who hold a
+// live brand they own (the derived apc_team_leads view, mig 428). Used when picking assigned APCs for a brand owned by
 // that TL, and for the TL's own team page. `other_tls` names the TL's teammates'
 // other teams so a shared APC reads as shared.
 export async function listAPCsUnderTL(tlId) {
@@ -444,15 +475,16 @@ export async function listAPCsUnderTL(tlId) {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, display_name, email, reports_to, team_leads:apc_team_leads!apc_team_leads_apc_id_fkey(tl:profiles!apc_team_leads_tl_id_fkey(id, display_name))')
+    .select('id, display_name, email, reports_to')
     .eq('role', 'apc')
     .eq('is_active', true)
     .in('id', ids)
     .order('display_name', { ascending: true });
   if (error) throw new Error(error.message);
-  return (data || []).map(({ team_leads, ...a }) => ({
+  const names = await tlNamesByApc(ids);
+  return (data || []).map((a) => ({
     ...a,
-    other_tls: (team_leads || []).map((l) => l.tl).filter((t) => t && t.id !== tlId).map((t) => t.display_name),
+    other_tls: (names.get(a.id) || []).filter((t) => t.id !== tlId).map((t) => t.name),
   }));
 }
 
@@ -516,3 +548,12 @@ export async function listActiveIPCsWithLoad() {
   }
   return ipcs.map((i) => ({ ...i, brand_count: byUser.get(i.id) || 0 }));
 }
+
+export const createBrand = refreshTeams(createBrandImpl);
+export const updateBrand = refreshTeams(updateBrandImpl);
+export const setBrandAssignments = refreshTeams(setBrandAssignmentsImpl);
+export const assignBrandUser = refreshTeams(assignBrandUserImpl);
+export const unassignBrandUser = refreshTeams(unassignBrandUserImpl);
+export const switchBrandApc = refreshTeams(switchBrandApcImpl);
+export const assignBrandApc = refreshTeams(assignBrandApcImpl);
+export const temporarilyAssignBrand = refreshTeams(temporarilyAssignBrandImpl);

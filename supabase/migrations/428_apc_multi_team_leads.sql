@@ -1,56 +1,65 @@
 -- ============================================================
--- WurxOS v2 — Migration 428: an APC can work under more than one Team Lead.
+-- WurxOS v2 — Migration 428: APCs across several Team Leads, and leave / WFH
+-- that needs every one of those Team Leads.
 --
--- THE GAP: profiles.reports_to is ONE column, so an APC has exactly one TL.
--- Real teams are not that tidy -- Abrahim runs JoyMode (Ali Hamza's brand) AND
--- Inno Supps (Haider Ali's). Until now he showed only under Ali Hamza, Haider's
--- team page did not list him, and Haider's brand form silently pruned him from
--- his own brand's APC picker.
+-- THE GAP: profiles.reports_to is ONE column, so an APC had exactly one TL even
+-- when they run brands for two. Abrahim runs JoyMode (Ali Hamza's brand) AND Inno
+-- Supps (Haider Ali's); Haider's team page did not list him, his brand form pruned
+-- him from his own brand's APC picker, and his leave went to Ali Hamza alone.
 --
--- THE MODEL
---   brands.owner_id       = the brand's Team Lead. Unchanged, and the ONLY
---                           source for "which TL does this brand belong to".
---   profiles.reports_to   = the APC's PRIMARY TL. Unchanged: attendance, leave,
---                           incentive and performance routing all walk it, and
---                           moving them would change TL scores and approvers.
---   apc_team_leads (new)  = EVERY TL an APC works under, primary included. Team
---                           lists, brand pickers and the org chart read this. A
---                           trigger keeps the primary row in step with reports_to
---                           so the two cannot drift.
+-- THE MODEL -- nothing new is stored for membership
+--   brands.owner_id        the brand's Team Lead. The ONLY source for "which TL
+--                          does this brand belong to".
+--   brand_assignments      who runs the brand. The source of truth for which teams
+--                          an APC works across.
+--   apc_team_leads (VIEW)  derived: the APC's reports_to PLUS the owner of every
+--                          live (active, permanent) brand they hold. It cannot
+--                          drift because there is nothing to keep in step.
+--   profiles.reports_to    unchanged. Still the APC's manager for attendance,
+--                          incentives and performance, and still keeps an APC with
+--                          no brands yet on their TL's team.
 --
--- THE TRAP THIS FIXES: brand_assign_apc / brand_switch_apc / team_move_brand all
--- stamp brands.owner_id (or reports_to) from the target APC's reports_to. With one
--- TL per APC that was right; with two, assigning Abrahim to Haider's brand would
--- re-own it to Ali Hamza. Each now keeps the brand's current owner when it is one
--- of the APC's TLs and falls back to reports_to otherwise -- a single-team APC
--- behaves exactly as before.
+-- LEAVE / WFH (one table, one workflow: WFH is leave_requests.type = 'wfh')
+--   An APC whose live brands span TWO OR MORE Team Leads needs all of them.
+--   leave_request_approvers holds one row per required TL on the SAME request;
+--   the request flips to approved only when every row is approved, and to
+--   rejected as soon as any row rejects -- in one UPDATE, so the coverage trigger
+--   and the quota maths fire exactly once. Everyone else (including every APC on
+--   one team) keeps today's chain untouched.
+--
+--   POLICY for later changes: the required approvers are a SNAPSHOT taken at
+--   submit time and never silently recalculated -- not when a brand is reassigned
+--   and not when an approver is deactivated. A new request routes to whoever
+--   holds the brands then. A stuck request is the Boss's to decide (the Boss can
+--   always act, and that decision is final).
+--
+-- brand_assign_apc / brand_switch_apc / team_move_brand used to stamp the brand's
+-- owner (or the APC's reports_to) from the APC's reports_to, which is exactly the
+-- "TL from the APC's profile" the model rules out. See section 2.
 --
 -- The patched functions are the LIVE bodies (pg_get_functiondef), each patch
--- asserted to match exactly once -- not the migration files that first built them.
--- Idempotent.
+-- asserted to match exactly once. Idempotent.
 -- ============================================================
 
--- ---- 1. table ---------------------------------------------------------------
-create table if not exists public.apc_team_leads (
-  apc_id      uuid not null references public.profiles(id) on delete cascade,
-  tl_id       uuid not null references public.profiles(id) on delete cascade,
-  assigned_by uuid references public.profiles(id) on delete set null,
-  assigned_at timestamptz not null default now(),
-  primary key (apc_id, tl_id)
-);
-create index if not exists apc_team_leads_tl_idx on public.apc_team_leads(tl_id);
+-- ---- 1. who works under which TL (derived) ------------------------------------------
+create or replace view public.apc_team_leads as
+  select p.id as apc_id, p.reports_to as tl_id
+    from public.profiles p
+   where p.role in ('apc','ipc') and p.reports_to is not null
+     and p.is_active and p.deleted_at is null
+  union
+  select ba.user_id, b.owner_id
+    from public.brand_assignments ba
+    join public.brands   b on b.id = ba.brand_id and b.status <> 'inactive'
+    join public.profiles p on p.id = ba.user_id and p.role in ('apc','ipc') and p.is_active and p.deleted_at is null
+    join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl') and o.is_active and o.deleted_at is null
+   where ba.expires_at is null;      -- temporary cover is leave cover, not a team
 
-comment on table public.apc_team_leads is
-  'Every Team Lead an APC/IPC works under, primary (profiles.reports_to) included. Written only by the sync trigger and add_apc_tl/remove_apc_tl.';
+comment on view public.apc_team_leads is
+  'Derived (mig 428): every Team Lead an APC/IPC works under = their reports_to + the owner of each live permanent brand they hold. Runs with the owner''s rights on purpose: it exposes ids only, the same visibility profiles already have.';
+revoke all on public.apc_team_leads from public, anon;
+grant select on public.apc_team_leads to authenticated, service_role;
 
-alter table public.apc_team_leads enable row level security;
--- Same visibility as profiles (any signed-in user): these rows are names a team
--- page already shows. No write policy, so writes go through the RPCs below only.
-drop policy if exists apc_team_leads_select on public.apc_team_leads;
-create policy apc_team_leads_select on public.apc_team_leads
-  for select to authenticated using (true);
-
--- ---- 2. helpers -------------------------------------------------------------
 create or replace function public.apc_tl_ids(p_apc uuid)
 returns uuid[]
 language sql stable security definer set search_path = public
@@ -58,248 +67,46 @@ as $$
   select coalesce(array_agg(tl_id), '{}'::uuid[]) from public.apc_team_leads where apc_id = p_apc;
 $$;
 
--- Who owns a brand this APC is being given: the brand's current owner when it is
--- already one of the APC's TLs, else the APC's primary TL (the old rule).
+-- Who owns a brand this APC takes over in a swap: the brand's current owner when
+-- it is already one of the APC's TLs, else the APC's reports_to (the old rule).
 create or replace function public.apc_brand_owner(p_apc uuid, p_current_owner uuid)
 returns uuid
 language sql stable security definer set search_path = public
 as $$
   select case
-    when p_current_owner is not null and exists (
-      select 1 from public.apc_team_leads where apc_id = p_apc and tl_id = p_current_owner
-    ) then p_current_owner
+    when p_current_owner is not null and p_current_owner = any (public.apc_tl_ids(p_apc)) then p_current_owner
     else (select reports_to from public.profiles where id = p_apc)
   end;
 $$;
 
--- ---- 3. keep the primary link in step with reports_to ---------------------------
-create or replace function public.sync_apc_primary_tl()
-returns trigger
-language plpgsql security definer set search_path = public
+-- The Team Leads whose BRANDS an APC runs right now (reports_to deliberately not
+-- included): the people whose work a leave actually affects, each with the brands
+-- that go into the snapshot a request stores.
+create or replace function public.apc_brand_team_leads(p_apc uuid)
+returns table (tl_id uuid, brands jsonb)
+language sql stable security definer set search_path = public
 as $$
-begin
-  if new.role not in ('apc','ipc') or new.reports_to is null then return new; end if;
-
-  insert into public.apc_team_leads (apc_id, tl_id) values (new.id, new.reports_to)
-  on conflict do nothing;
-
-  -- A move: the old primary stops being a link, unless this person still
-  -- permanently holds a live brand that TL owns -- they still work under them.
-  if tg_op = 'UPDATE' and old.reports_to is not null and old.reports_to <> new.reports_to then
-    delete from public.apc_team_leads l
-     where l.apc_id = new.id and l.tl_id = old.reports_to
-       and not exists (
-         select 1 from public.brand_assignments ba join public.brands b on b.id = ba.brand_id
-          where ba.user_id = new.id and ba.expires_at is null
-            and b.status <> 'inactive' and b.owner_id = old.reports_to);
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists profiles_sync_apc_primary_tl on public.profiles;
-create trigger profiles_sync_apc_primary_tl
-  after insert or update of reports_to, role on public.profiles
-  for each row execute function public.sync_apc_primary_tl();
-
--- ---- 3b. a TL who owns a brand an APC holds is one of that APC's TLs --------------
--- Brand ownership and assignment change through many paths (BrandForm, the assign
--- modal, the RPCs below). Linking here, not in each path, is what keeps "the APC
--- works a live brand under TL X" and "the APC is on X's team" from drifting.
---
--- DEFERRED to commit, and re-reading current state rather than trusting NEW: the
--- swap and move RPCs change brands.owner_id BEFORE they delete and re-insert the
--- assignments, so a trigger acting on the row it was fired for would link the
--- OUTGOING APC (and any IPC) to the incoming owner's team. At commit the brand has
--- one owner and one set of holders, whatever order the statements ran in.
--- Drop a TL's DERIVED links that have lost their cause. Never the primary
--- (reports_to) and never a link a Boss/OL added by hand (assigned_by set).
-create or replace function public.prune_derived_tl_links(p_tl uuid)
-returns void
-language sql security definer set search_path = public
-as $$
-  delete from public.apc_team_leads l
-   using public.profiles p
-   where l.tl_id = p_tl and l.assigned_by is null
-     and p.id = l.apc_id and p.reports_to is distinct from l.tl_id
-     and not exists (
-       select 1 from public.brand_assignments ba join public.brands b on b.id = ba.brand_id
-        where ba.user_id = l.apc_id and ba.expires_at is null
-          and b.status <> 'inactive' and b.owner_id = l.tl_id);
-$$;
-
-create or replace function public.link_holder_to_brand_owner()
-returns trigger
-language plpgsql security definer set search_path = public
-as $$
-declare
-  v_brand uuid;
-begin
-  if tg_table_name = 'brands' then v_brand := new.id; else v_brand := new.brand_id; end if;
-  insert into public.apc_team_leads (apc_id, tl_id)
-  select ba.user_id, b.owner_id
-    from public.brands b
-    join public.brand_assignments ba on ba.brand_id = b.id and ba.expires_at is null   -- temp cover is not a team
-    join public.profiles p on p.id = ba.user_id and p.role in ('apc','ipc')
-    join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl')
-   where b.id = v_brand and b.status <> 'inactive'
-  on conflict do nothing;
-
-  -- A brand that left a TL (new owner, or gone inactive) may have been the only
-  -- thing tying its holders to that team.
-  if tg_table_name = 'brands' then
-    perform public.prune_derived_tl_links(old.owner_id);
-    perform public.prune_derived_tl_links(new.owner_id);
-  end if;
-  return null;
-end;
-$$;
-
-drop trigger if exists brand_assignments_link_tl on public.brand_assignments;
-create constraint trigger brand_assignments_link_tl
-  after insert or update of expires_at on public.brand_assignments
-  deferrable initially deferred
-  for each row execute function public.link_holder_to_brand_owner();
-
-drop trigger if exists brands_link_holders_to_owner on public.brands;
-create constraint trigger brands_link_holders_to_owner
-  after update of owner_id, status on public.brands
-  deferrable initially deferred
-  for each row execute function public.link_holder_to_brand_owner();
-
--- The other half: when a holding goes away the link it caused goes with it --
--- but only a DERIVED link. The primary TL (reports_to) and any link a Boss/OL
--- added by hand (assigned_by set) are never removed here. BrandSwitcher changes
--- the owner and drops the APCs in two separate requests, so deferral alone
--- cannot cover it.
-create or replace function public.unlink_holder_from_brand_owner()
-returns trigger
-language plpgsql security definer set search_path = public
-as $$
-begin
-  if old.expires_at is not null then return old; end if;
-  delete from public.apc_team_leads l
-   using public.brands b, public.profiles p
-   where b.id = old.brand_id and l.apc_id = old.user_id and l.tl_id = b.owner_id
-     and p.id = old.user_id and p.reports_to is distinct from l.tl_id
-     and l.assigned_by is null
-     and not exists (
-       select 1 from public.brand_assignments ba join public.brands b2 on b2.id = ba.brand_id
-        where ba.user_id = old.user_id and ba.expires_at is null and ba.brand_id <> old.brand_id
-          and b2.status <> 'inactive' and b2.owner_id = l.tl_id);
-  return old;
-end;
-$$;
-
-drop trigger if exists brand_assignments_unlink_tl on public.brand_assignments;
-create trigger brand_assignments_unlink_tl
-  after delete on public.brand_assignments
-  for each row execute function public.unlink_holder_from_brand_owner();
-
--- ---- 4. backfill (triggers are not retroactive) -------------------------------
--- (a) everybody's primary TL
-insert into public.apc_team_leads (apc_id, tl_id)
-select id, reports_to from public.profiles
- where role in ('apc','ipc') and reports_to is not null and deleted_at is null
-on conflict do nothing;
--- (b) a TL who owns a live brand the APC permanently holds. Temporary cover
--- (expires_at set) is time-boxed leave cover, not a team.
-insert into public.apc_team_leads (apc_id, tl_id)
-select distinct ba.user_id, b.owner_id
-  from public.brand_assignments ba
-  join public.profiles p on p.id = ba.user_id and p.role in ('apc','ipc') and p.is_active and p.deleted_at is null
-  join public.brands b on b.id = ba.brand_id and b.status <> 'inactive'
-  join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl') and o.is_active
- where ba.expires_at is null
-on conflict do nothing;
-
--- ---- 5. RPCs: link / unlink (Boss/OL) -------------------------------------------
-create or replace function public.add_apc_tl(p_apc uuid, p_tl uuid)
-returns uuid
-language plpgsql security definer set search_path = public
-as $$
-declare
-  v_caller uuid := auth.uid();
-  v_apc public.profiles%rowtype;
-  v_tl  public.profiles%rowtype;
-  v_added int;
-begin
-  if not public._team_mgr_authz(v_caller) then
-    raise exception 'only Boss/OL can assign team leads' using errcode = '42501';
-  end if;
-  select * into v_apc from public.profiles where id = p_apc and is_active and deleted_at is null;
-  if not found or v_apc.role not in ('apc','ipc') then raise exception 'APC not found, inactive, or not an APC/IPC'; end if;
-  select * into v_tl from public.profiles where id = p_tl and is_active and deleted_at is null;
-  if not found or v_tl.role not in ('tl','pctl') then raise exception 'Team Lead not found, inactive, or not a TL/PCTL'; end if;
-
-  -- An existing DERIVED link (assigned_by null) is upgraded to explicit, so the
-  -- brand-drop cleanup never removes something a person chose.
-  insert into public.apc_team_leads (apc_id, tl_id, assigned_by) values (p_apc, p_tl, v_caller)
-  on conflict (apc_id, tl_id) do update set assigned_by = excluded.assigned_by, assigned_at = now()
-   where public.apc_team_leads.assigned_by is null;
-  get diagnostics v_added = row_count;
-  if v_added = 0 then return p_apc; end if;   -- already linked: no audit row for a non-event
-
-  insert into public.audit_log (actor_id, action, entity_type, entity_id, before, after)
-  values (v_caller, 'team.apc_link_tl', 'profiles', p_apc,
-          jsonb_build_object('team_leads', (select coalesce(jsonb_agg(tl_id), '[]'::jsonb) from public.apc_team_leads where apc_id = p_apc and tl_id <> p_tl)),
-          jsonb_build_object('added_tl', p_tl));
-
-  if p_tl <> v_caller then
-    perform public.emit_notification(p_tl, v_caller, 'team', 'team.apc_linked', 'Team change',
-      public.profile_display_name(v_caller) || ' added ' || coalesce(v_apc.display_name, 'an APC') || ' to your team',
-      'profiles', p_apc, case when v_tl.role = 'tl' then '/tl/team' end);
-  end if;
-  return p_apc;
-end;
-$$;
-
-create or replace function public.remove_apc_tl(p_apc uuid, p_tl uuid)
-returns uuid
-language plpgsql security definer set search_path = public
-as $$
-declare
-  v_caller uuid := auth.uid();
-  v_primary uuid;
-  v_held text;
-begin
-  if not public._team_mgr_authz(v_caller) then
-    raise exception 'only Boss/OL can assign team leads' using errcode = '42501';
-  end if;
-  select reports_to into v_primary from public.profiles where id = p_apc;
-  if v_primary = p_tl then
-    raise exception 'That is this APC''s primary Team Lead -- use Reassign Team Lead to move them instead.';
-  end if;
-
-  select string_agg(b.brand_name, ', ' order by b.brand_name) into v_held
-    from public.brand_assignments ba join public.brands b on b.id = ba.brand_id
-   where ba.user_id = p_apc and ba.expires_at is null and b.status <> 'inactive' and b.owner_id = p_tl;
-  if v_held is not null then
-    raise exception 'Still manages % for this Team Lead -- move or reassign those brands first.', v_held;
-  end if;
-
-  delete from public.apc_team_leads where apc_id = p_apc and tl_id = p_tl;
-  if not found then return p_apc; end if;
-
-  insert into public.audit_log (actor_id, action, entity_type, entity_id, before, after)
-  values (v_caller, 'team.apc_unlink_tl', 'profiles', p_apc,
-          jsonb_build_object('removed_tl', p_tl), jsonb_build_object('primary_tl', v_primary));
-  return p_apc;
-end;
+  select b.owner_id,
+         jsonb_agg(jsonb_build_object('id', b.id, 'name', b.brand_name) order by b.brand_name)
+    from public.brand_assignments ba
+    join public.brands   b on b.id = ba.brand_id and b.status <> 'inactive'
+    join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl') and o.is_active and o.deleted_at is null
+   where ba.user_id = p_apc and ba.expires_at is null
+   group by b.owner_id;
 $$;
 
 do $g$
 declare f text;
 begin
-  foreach f in array array['add_apc_tl(uuid,uuid)','remove_apc_tl(uuid,uuid)'] loop
+  foreach f in array array['apc_tl_ids(uuid)','apc_brand_owner(uuid,uuid)','apc_brand_team_leads(uuid)'] loop
     execute format('revoke all on function public.%s from public', f);
     execute format('revoke all on function public.%s from anon', f);   -- by name: see mig 359
     execute format('grant execute on function public.%s to authenticated, service_role', f);
   end loop;
 end $g$;
 
--- ---- 6. live functions, patched --------------------------------------------------
--- brand_assign_apc: keep the brand's TL when it is one of the target APC's TLs
+-- ---- 2. live functions, patched ----------------------------------------------------------
+-- brand_assign_apc: the brand keeps its Team Lead -- the APC joins that team by holding the brand
 CREATE OR REPLACE FUNCTION public.brand_assign_apc(p_brand uuid, p_new_apc uuid, p_note text DEFAULT NULL::text, p_notify boolean DEFAULT false)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -337,7 +144,7 @@ begin
   if v_new_apc.role not in ('apc','ipc') then
     raise exception 'target user is not an APC/IPC (got %)', v_new_apc.role;
   end if;
-  v_new_tl := public.apc_brand_owner(p_new_apc, v_brand.owner_id);  -- mig 428
+  v_new_tl := v_brand.owner_id;  -- mig 428: assigning an APC never re-owns the brand; its TL is its own team
   if v_new_tl is null then
     raise exception 'target APC has no Team Lead (reports_to is null)';
   end if;
@@ -491,7 +298,7 @@ begin
 end;
 $function$;
 
--- brand_switch_apc: the swap re-owns each moved brand per brand, not from reports_to
+-- brand_switch_apc: the swap re-owns each moved brand per brand, keeping a TL the new holder already works under
 CREATE OR REPLACE FUNCTION public.brand_switch_apc(p_brand uuid, p_new_apc uuid, p_note text DEFAULT NULL::text, p_notify boolean DEFAULT false)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -772,7 +579,7 @@ begin
 end;
 $function$;
 
--- team_move_brand: a pinned APC who still holds brands under their primary TL gains a link, not a new reports_to
+-- team_move_brand: a pinned APC who still holds brands under their reports_to is not re-pointed
 CREATE OR REPLACE FUNCTION public.team_move_brand(p_brand uuid, p_new_tl uuid, p_new_apc uuid DEFAULT NULL::uuid, p_note text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -843,17 +650,9 @@ begin
        where ba.user_id = p_new_apc and ba.expires_at is null and b.status <> 'inactive'
          and b.id <> p_brand and b.owner_id = v_apc_old_reports_to
     ) then
-      -- mig 428: still holds brands under their primary TL, so this is a second
-      -- team, not a move. Link instead of re-pointing reports_to.
-      with ins as (
-        insert into public.apc_team_leads (apc_id, tl_id, assigned_by)
-        values (p_new_apc, p_new_tl, v_caller) on conflict do nothing returning 1
-      )
-      insert into public.audit_log (actor_id, action, entity_type, entity_id, before, after)
-      select v_caller, 'team.apc_link_tl', 'profiles', p_new_apc,
-             jsonb_build_object('primary_tl', v_apc_old_reports_to),
-             jsonb_build_object('added_tl', p_new_tl, 'via', 'team_move_brand')
-        from ins;
+      -- mig 428: still runs brands for their reports_to, so this is a second team
+      -- (derived from the brand they now hold), not a move. Leave reports_to alone.
+      null;
     elsif v_apc_old_reports_to is distinct from p_new_tl then
       update public.profiles
          set reports_to = p_new_tl, updated_at = now()
@@ -929,7 +728,7 @@ begin
 end;
 $function$;
 
--- team_move_apc_to_tl: brands owned by the APC's OTHER team leads stay put when the primary moves
+-- team_move_apc_to_tl: brands owned by the APC's OTHER team leads stay put when their reports_to moves
 CREATE OR REPLACE FUNCTION public.team_move_apc_to_tl(p_apc uuid, p_new_tl uuid)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -1036,41 +835,452 @@ begin
 end;
 $function$;
 
--- ---- 7. verification (structure + backfill; behaviour is covered by the rollback test) ----
-do $verify$
-declare n int; r record;
-begin
-  -- every active APC/IPC with a primary TL has that link
-  select count(*) into n from public.profiles p
-   where p.role in ('apc','ipc') and p.reports_to is not null and p.deleted_at is null
-     and not exists (select 1 from public.apc_team_leads l where l.apc_id = p.id and l.tl_id = p.reports_to);
-  if n <> 0 then raise exception 'mig 428: % APC(s) are missing their primary-TL link', n; end if;
+-- ---- 3. leave / WFH needing several Team Leads ----------------------------------------
+create table if not exists public.leave_request_approvers (
+  request_id  uuid not null references public.leave_requests(id) on delete cascade,
+  approver_id uuid not null references public.profiles(id),
+  brands      jsonb not null default '[]'::jsonb,       -- [{id,name}] this TL's brands the APC held at submit time
+  decision    text  not null default 'pending'
+              check (decision in ('pending','approved','rejected','superseded')),
+  forward     boolean not null default false,            -- approved AND asked to escalate to the next level
+  decided_at  timestamptz,
+  note        text,
+  created_at  timestamptz not null default now(),
+  primary key (request_id, approver_id)
+);
+create index if not exists leave_request_approvers_approver_idx on public.leave_request_approvers(approver_id, decision);
 
-  -- invariant: a live permanent brand's owner is always one of the holder's TLs
+comment on table public.leave_request_approvers is
+  'One row per Team Lead a leave/WFH request needs (APC whose live brands span 2+ TLs). A snapshot taken at submit time; never recalculated. superseded = the request was decided without this TL (a peer rejected, or the Boss decided).';
+
+alter table public.leave_request_approvers enable row level security;
+-- Supabase grants every new table to anon/authenticated by default (see mig 359).
+-- Reads only, and only signed-in: all writes go through the security-definer functions.
+revoke all on public.leave_request_approvers from public, anon;
+revoke insert, update, delete, truncate on public.leave_request_approvers from authenticated;
+grant select on public.leave_request_approvers to authenticated;
+grant all on public.leave_request_approvers to service_role;
+
+create or replace function public.leave_is_approver(p_request uuid, p_uid uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (select 1 from public.leave_request_approvers where request_id = p_request and approver_id = p_uid);
+$$;
+revoke all on function public.leave_is_approver(uuid, uuid) from public, anon;
+grant execute on function public.leave_is_approver(uuid, uuid) to authenticated, service_role;
+
+-- Read-only for everyone: the requester, every TL on the request (so each sees the
+-- others' decisions), the Boss, OL and developer. Writes happen only inside
+-- leave_decide / the seed trigger (security definer); there is no write policy.
+drop policy if exists leave_approvers_select on public.leave_request_approvers;
+create policy leave_approvers_select on public.leave_request_approvers
+  for select to authenticated using (
+    approver_id = auth.uid()
+    or public.leave_is_approver(request_id, auth.uid())
+    or exists (select 1 from public.leave_requests r where r.id = request_id and r.requester_id = auth.uid())
+    or public.is_boss(auth.uid())
+    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_active and p.role in ('ol','developer'))
+  );
+
+-- Seed on submit. Only when 2+ distinct TLs own the APC's live brands; otherwise
+-- there are no rows and every function below behaves exactly as before.
+-- Named to sort BEFORE leave_notify_ai (same-event triggers fire alphabetically),
+-- so the insert notification can fan out to the rows.
+create or replace function public.leave_seed_approvers()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.status <> 'pending' then return new; end if;
+  if not exists (select 1 from public.profiles where id = new.requester_id and role in ('apc','ipc')) then return new; end if;
+  if (select count(*) from public.apc_brand_team_leads(new.requester_id)) < 2 then return new; end if;
+
+  insert into public.leave_request_approvers (request_id, approver_id, brands)
+  select new.id, t.tl_id, t.brands from public.apc_brand_team_leads(new.requester_id) t
+  on conflict do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists leave_approvers_seed_ai on public.leave_requests;
+create trigger leave_approvers_seed_ai
+  after insert on public.leave_requests
+  for each row execute function public.leave_seed_approvers();
+
+-- The chain's resolved approver. For a request that needs several TLs there is no
+-- single approver at level 1: returning null also closes the leave_update policy,
+-- which would otherwise let reports_to approve the row directly and skip the rest.
+create or replace function public.leave_current_approver(p_request_id uuid)
+returns uuid
+language plpgsql stable security definer set search_path to 'public'
+as $function$
+declare
+  v_req       record;
+  v_cur       uuid;
+  v_i         int;
+  v_boss      uuid;
+begin
+  select requester_id, current_level, status
+    into v_req
+    from public.leave_requests
+    where id = p_request_id;
+
+  if not found or v_req.status <> 'pending' then return null; end if;
+
+  -- mig 428: several TLs decide this one together (leave_decide); nobody alone.
+  if v_req.current_level = 1
+     and exists (select 1 from public.leave_request_approvers where request_id = p_request_id) then
+    return null;
+  end if;
+
+  select id into v_boss from public.profiles
+   where role = 'boss' and is_active = true
+   order by created_at asc limit 1;
+
+  -- Ads Managers: straight to the Boss, whoever they report to.
+  if exists (select 1 from public.profiles where id = v_req.requester_id and role = 'ads_manager') then
+    return v_boss;
+  end if;
+
+  v_cur := v_req.requester_id;
+  for v_i in 1..v_req.current_level loop
+    select reports_to into v_cur from public.profiles where id = v_cur;
+    if v_cur is null then
+      return v_boss;  -- chain ended early, Boss is the final arbiter
+    end if;
+  end loop;
+
+  -- If we climbed the full ladder and the person is the same as the
+  -- requester (possible on Boss self-requests), return Boss itself.
+  if v_cur = v_req.requester_id then return v_boss; end if;
+  return v_cur;
+end;
+$function$;
+
+drop policy if exists leave_select on public.leave_requests;
+create policy leave_select on public.leave_requests
+  for select using (
+    auth.uid() = requester_id
+    or auth.uid() = public.leave_current_approver(id)
+    or auth.uid() = public.leave_approver(requester_id)
+    or public.leave_is_approver(id, auth.uid())          -- mig 428: every required TL, before AND after deciding
+    or public.is_boss(auth.uid())
+    or exists (select 1 from public.profiles p
+                where p.id = auth.uid() and p.role in ('ol','developer') and p.is_active = true)
+  );
+
+create or replace function public.leave_decide(p_request_id uuid, p_action text, p_note text default null)
+returns public.leave_requests
+language plpgsql security definer set search_path to 'public'
+as $function$
+declare
+  v_req         public.leave_requests;
+  v_me          uuid := auth.uid();
+  v_approver    uuid;
+  v_name        text;
+  v_decisions   jsonb;
+  v_new_level   int;
+  v_requester   public.profiles%rowtype;
+  v_me_role     text;
+  v_me_active   boolean := false;
+  v_authorized  boolean := false;
+  v_multi       boolean;
+  v_boss        boolean;
+  v_row         public.leave_request_approvers;
+  v_outstanding int;
+  v_escalate    boolean;
+  v_other       uuid;
+  v_label       text;
+  v_brands      text;
+begin
+  if v_me is null then raise exception 'not authenticated'; end if;
+
+  -- The lock that makes "everyone approved" a single, race-free decision: two TLs
+  -- approving at the same instant queue here and the second one sees the first.
+  select * into v_req from public.leave_requests where id = p_request_id for update;
+  if not found                  then raise exception 'request not found'; end if;
+  if v_req.status <> 'pending'  then raise exception 'request already decided (status=%)', v_req.status; end if;
+
+  v_boss  := public.is_boss(v_me);
+  v_multi := v_req.current_level = 1
+             and exists (select 1 from public.leave_request_approvers where request_id = p_request_id);
+  v_approver := public.leave_current_approver(p_request_id);
+
+  -- (1) Boss can always act, and the Boss's decision is final
+  if v_boss then
+    v_authorized := true;
+  -- (1b) several TLs: only a TL who still has a pending row on this request
+  elsif v_multi then
+    select * into v_row from public.leave_request_approvers
+     where request_id = p_request_id and approver_id = v_me and decision = 'pending' for update;
+    v_authorized := found;
+  -- (2) The chain's resolved approver can act
+  elsif v_approver = v_me then
+    v_authorized := true;
+  else
+    -- (3) Any active OL can act on a TL/PCTL level-1 request
+    select * into v_requester from public.profiles where id = v_req.requester_id;
+    if found and v_req.current_level = 1 and v_requester.role in ('tl', 'pctl') then
+      select role, (is_active = true and deleted_at is null)
+        into v_me_role, v_me_active
+        from public.profiles
+       where id = v_me;
+      if v_me_active and v_me_role = 'ol' then
+        v_authorized := true;
+      end if;
+    end if;
+  end if;
+
+  if not v_authorized then
+    raise exception 'not authorized to decide this request';
+  end if;
+
+  v_name := coalesce(public.profile_display_name(v_me), 'Someone');
+  v_decisions := v_req.decisions || jsonb_build_array(jsonb_build_object(
+    'level',   v_req.current_level,
+    'action',  p_action,
+    'by',      v_me,
+    'by_name', v_name,
+    'at',      to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+    'note',    p_note
+  ));
+
+  -- ===== several Team Leads: record this TL's decision against the same request =====
+  if v_multi and not v_boss then
+    if p_action not in ('approve', 'reject', 'forward') then raise exception 'invalid action: %', p_action; end if;
+
+    update public.leave_request_approvers
+       set decision   = case when p_action = 'reject' then 'rejected' else 'approved' end,
+           forward    = (p_action = 'forward'),
+           decided_at = now(),
+           note       = p_note
+     where request_id = p_request_id and approver_id = v_me;
+
+    v_label := coalesce(v_req.other_title, case v_req.type when 'wfh' then 'WFH' when 'half_leave' then 'half-day leave' else v_req.type || ' leave' end);
+
+    if p_action = 'reject' then
+      -- Any rejection is final. The TLs who had not decided are superseded, not approved.
+      update public.leave_request_approvers set decision = 'superseded'
+       where request_id = p_request_id and decision = 'pending';
+      update public.leave_requests
+         set status = 'rejected', decided_by = v_me, decided_at = now(),
+             decision_note = p_note, decisions = v_decisions
+       where id = p_request_id
+       returning * into v_req;
+      for v_other in select approver_id from public.leave_request_approvers
+                      where request_id = p_request_id and approver_id <> v_me loop
+        perform public.emit_notification(v_other, v_me, 'leave', 'leave.rejected_by_peer',
+          'Leave request rejected',
+          v_name || ' rejected ' || public.profile_display_name(v_req.requester_id) || '''s ' || v_label || ' request.',
+          'leave', p_request_id, '/leave/approvals');
+      end loop;
+      return v_req;
+    end if;
+
+    select count(*) filter (where decision = 'pending'), coalesce(bool_or(forward), false)
+      into v_outstanding, v_escalate
+      from public.leave_request_approvers where request_id = p_request_id;
+
+    if v_outstanding > 0 then
+      -- Still waiting on someone: the request stays pending at level 1. The decision
+      -- is appended so the row changes and anything subscribed to it refreshes.
+      update public.leave_requests set decisions = v_decisions
+       where id = p_request_id returning * into v_req;
+      perform public.emit_notification(v_req.requester_id, v_me, 'leave', 'leave.partially_approved',
+        'Leave partly approved',
+        v_name || ' approved your ' || v_label || ' (' || v_outstanding || ' approval' || case when v_outstanding = 1 then '' else 's' end || ' still to come).',
+        'leave', p_request_id, '/leave');
+    elsif v_escalate then
+      -- Every TL has approved and at least one asked to escalate: only now does it move up.
+      v_new_level := v_req.current_level + 1;
+      update public.leave_requests set current_level = v_new_level, decisions = v_decisions
+       where id = p_request_id returning * into v_req;
+    else
+      update public.leave_requests
+         set status = 'approved', decided_by = v_me, decided_at = now(),
+             decision_note = p_note, decisions = v_decisions
+       where id = p_request_id
+       returning * into v_req;
+      -- Tell every required TL what is now settled and which of their brands are covered.
+      for v_other in select approver_id from public.leave_request_approvers where request_id = p_request_id loop
+        select string_agg(x ->> 'name', ', ' order by x ->> 'name') into v_brands
+          from public.leave_request_approvers a, jsonb_array_elements(a.brands) x
+         where a.request_id = p_request_id and a.approver_id = v_other;
+        if v_other <> v_me then
+          perform public.emit_notification(v_other, v_me, 'leave', 'leave.fully_approved',
+            'Leave approved',
+            public.profile_display_name(v_req.requester_id) || '''s ' || v_label || ' is approved by all Team Leads'
+              || coalesce(' — not working on ' || v_brands, '') || '.',
+            'leave', p_request_id, '/leave/approvals');
+        end if;
+      end loop;
+    end if;
+    return v_req;
+  end if;
+
+  -- ===== existing single-chain behaviour =====
+  -- A Boss decision on a several-TL request is final: nobody is left to decide.
+  if v_multi then
+    update public.leave_request_approvers set decision = 'superseded'
+     where request_id = p_request_id and decision = 'pending';
+  end if;
+
+  if p_action = 'approve' then
+    update public.leave_requests
+       set status        = 'approved',
+           decided_by    = v_me,
+           decided_at    = now(),
+           decision_note = p_note,
+           decisions     = v_decisions
+     where id = p_request_id
+     returning * into v_req;
+
+  elsif p_action = 'reject' then
+    update public.leave_requests
+       set status        = 'rejected',
+           decided_by    = v_me,
+           decided_at    = now(),
+           decision_note = p_note,
+           decisions     = v_decisions
+     where id = p_request_id
+     returning * into v_req;
+
+  elsif p_action = 'forward' then
+    v_new_level := v_req.current_level + 1;
+    if v_new_level > 3 then raise exception 'already at top of approval chain'; end if;
+    update public.leave_requests
+       set current_level = v_new_level,
+           decisions     = v_decisions
+     where id = p_request_id
+     returning * into v_req;
+
+  else
+    raise exception 'invalid action: %', p_action;
+  end if;
+
+  return v_req;
+end;
+$function$;
+
+-- Insert notification: fan out to every required TL when the request needs several.
+create or replace function public.leave_notify_on_insert()
+returns trigger
+language plpgsql security definer set search_path to 'public'
+as $function$
+declare
+  v_requester_role text;
+  v_name           text;
+  v_label          text;
+  v_title          text;
+  v_body           text;
+  v_recipient      uuid;
+begin
+  select role into v_requester_role
+    from public.profiles
+   where id = new.requester_id;
+
+  v_name  := public.profile_display_name(new.requester_id);
+  v_label := case new.type
+    when 'wfh'        then 'WFH'
+    when 'medical'    then 'medical leave'
+    when 'emergency'  then 'emergency leave'
+    when 'half_leave' then 'half-day leave'
+    when 'other'      then coalesce(new.other_title, 'time off')
+    else new.type
+  end;
+  v_title := 'New leave request';
+  v_body  := v_name || ' requested ' || v_label || ' ('
+    || to_char(new.start_date, 'Mon DD')
+    || case when new.end_date <> new.start_date then ' – ' || to_char(new.end_date, 'Mon DD') else '' end
+    || ')';
+
+  -- TL/PCTL submissions at level 1 → fan out to ALL active OLs.
+  -- Mirrors mig 193's broadened auth rule.
+  if v_requester_role in ('tl', 'pctl') and new.current_level = 1 then
+    for v_recipient in
+      select id from public.profiles
+       where role = 'ol'
+         and is_active = true
+         and deleted_at is null
+         and id <> new.requester_id
+    loop
+      perform public.emit_notification(
+        v_recipient, new.requester_id, 'leave', 'leave.requested',
+        v_title, v_body,
+        'leave', new.id, '/leave/approvals'
+      );
+    end loop;
+    return new;
+  end if;
+
+  -- mig 428: every Team Lead the request needs, with the brands it affects.
+  if exists (select 1 from public.leave_request_approvers where request_id = new.id) then
+    for v_recipient in select approver_id from public.leave_request_approvers where request_id = new.id loop
+      perform public.emit_notification(
+        v_recipient, new.requester_id, 'leave', 'leave.requested',
+        v_title,
+        v_body || ' — needs approval from all of their Team Leads'
+          || coalesce(' (your brands: ' || (select string_agg(x ->> 'name', ', ' order by x ->> 'name')
+                from public.leave_request_approvers a, jsonb_array_elements(a.brands) x
+               where a.request_id = new.id and a.approver_id = v_recipient) || ')', ''),
+        'leave', new.id, '/leave/approvals'
+      );
+    end loop;
+    return new;
+  end if;
+
+  -- All other roles use the chain-resolved approver (APC → TL,
+  -- IPC → PCTL, OL → Boss, etc.).
+  v_recipient := public.leave_current_approver(new.id);
+  if v_recipient is null or v_recipient = new.requester_id then return new; end if;
+  perform public.emit_notification(
+    v_recipient, new.requester_id, 'leave', 'leave.requested',
+    v_title, v_body,
+    'leave', new.id, '/leave/approvals'
+  );
+  return new;
+end;
+$function$;
+
+
+-- ---- 4. verification (structure; behaviour is covered by the rollback test) ---------------
+do $verify$
+declare n int;
+begin
+  -- every active APC/IPC with a TL is on that TL's team
+  select count(*) into n from public.profiles p
+   where p.role in ('apc','ipc') and p.is_active and p.deleted_at is null and p.reports_to is not null
+     and not exists (select 1 from public.apc_team_leads v where v.apc_id = p.id and v.tl_id = p.reports_to);
+  if n <> 0 then raise exception 'mig 428: % APC(s) missing from their reports_to team', n; end if;
+
+  -- invariant: whoever runs a live permanent brand is on its Team Lead's team
   select count(*) into n
     from public.brand_assignments ba
     join public.profiles p on p.id = ba.user_id and p.role in ('apc','ipc') and p.is_active and p.deleted_at is null
     join public.brands b on b.id = ba.brand_id and b.status <> 'inactive'
     join public.profiles o on o.id = b.owner_id and o.role in ('tl','pctl') and o.is_active
    where ba.expires_at is null
-     and not exists (select 1 from public.apc_team_leads l where l.apc_id = p.id and l.tl_id = b.owner_id);
-  if n <> 0 then raise exception 'mig 428: % brand holding(s) have an owner the APC is not linked to', n; end if;
+     and not exists (select 1 from public.apc_team_leads v where v.apc_id = p.id and v.tl_id = b.owner_id);
+  if n <> 0 then raise exception 'mig 428: % brand holding(s) are not on their brand''s TL team', n; end if;
 
-  for r in select proname from (values ('brand_assign_apc'),('brand_switch_apc')) v(proname) loop
-    if not exists (select 1 from pg_proc p join pg_namespace s on s.oid = p.pronamespace
-                    where s.nspname = 'public' and p.proname = r.proname
-                      and pg_get_functiondef(p.oid) like '%apc_brand_owner%') then
-      raise exception 'mig 428: % was not patched', r.proname;
-    end if;
-  end loop;
   if not exists (select 1 from pg_proc p join pg_namespace s on s.oid = p.pronamespace
-                  where s.nspname = 'public' and p.proname = 'team_move_brand'
-                    and pg_get_functiondef(p.oid) like '%apc_team_leads%') then
-    raise exception 'mig 428: team_move_brand was not patched';
+                  where s.nspname = 'public' and p.proname = 'brand_switch_apc'
+                    and pg_get_functiondef(p.oid) like '%apc_brand_owner%') then
+    raise exception 'mig 428: brand_switch_apc was not patched';
   end if;
-  if has_function_privilege('anon', 'public.add_apc_tl(uuid,uuid)', 'EXECUTE')
-     or has_function_privilege('anon', 'public.remove_apc_tl(uuid,uuid)', 'EXECUTE') then
-    raise exception 'mig 428: anon can execute the team-lead RPCs';
+  if not exists (select 1 from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+                  where s.nspname = 'public' and p.proname = 'leave_decide'
+                    and pg_get_functiondef(p.oid) like '%leave_request_approvers%') then
+    raise exception 'mig 428: leave_decide was not replaced';
   end if;
-  raise notice '428 verified: % links.', (select count(*) from public.apc_team_leads);
+  if not (select relrowsecurity from pg_class where oid = 'public.leave_request_approvers'::regclass) then
+    raise exception 'mig 428: leave_request_approvers has no RLS';
+  end if;
+  if has_table_privilege('anon', 'public.apc_team_leads', 'SELECT')
+     or has_table_privilege('anon', 'public.leave_request_approvers', 'SELECT')
+     or has_function_privilege('anon', 'public.leave_is_approver(uuid,uuid)', 'EXECUTE') then
+    raise exception 'mig 428: anon can reach the new objects';
+  end if;
+  raise notice '428 verified: % derived team links.', (select count(*) from public.apc_team_leads);
 end $verify$;
