@@ -16,10 +16,16 @@ import { useClockActions } from './useClockActions';
 import { getMyAchievement, monthLabel } from '../../lib/achievementsApi';
 import '../../styles/celebration.css';
 
+// What can be picked when clocking in. The Lake City office is closed (the team
+// moved to Bahria), so it is no longer offered; old records still say 'lakecity'
+// and keep their label below.
 const LOCATIONS = [
   { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building',  color: 'var(--info-text)' },
-  { key: 'lakecity', label: 'Lake City Office', icon: 'bi-buildings', color: 'var(--purple-text)' },
   { key: 'wfh',      label: 'Work From Home',   icon: 'bi-house-door', color: 'var(--success-text)' },
+];
+const RECORD_LOCATIONS = [
+  ...LOCATIONS,
+  { key: 'lakecity', label: 'Lake City Office', icon: 'bi-buildings', color: 'var(--purple-text)' },
 ];
 
 // All attendance display + editing is locked to Pakistan time
@@ -282,7 +288,7 @@ export default function ClockWidget() {
     return now.toLocaleDateString('en-US', opts);
   }, [now]);
 
-  const locInfo = LOCATIONS.find(l => l.key === record?.location);
+  const locInfo = RECORD_LOCATIONS.find(l => l.key === record?.location);
 
 
   async function handleSubmitEditClockIn() {
