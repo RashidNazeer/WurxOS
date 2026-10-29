@@ -14,21 +14,8 @@ export async function moveApcToTl(apcId, newTlId) {
   return data;
 }
 
-/** Add a Team Lead to an APC/IPC without moving them off their current ones.
- *  Boss/OL only. The primary stays profiles.reports_to; this adds a second team. */
-export async function addApcTl(apcId, tlId) {
-  const { error } = await supabase.rpc('add_apc_tl', { p_apc: apcId, p_tl: tlId });
-  if (error) throw new Error(error.message);
-}
-
-/** Take an APC off one of their additional Team Leads. The server refuses the
- *  primary TL, and any TL whose live brand the APC still holds. */
-export async function removeApcTl(apcId, tlId) {
-  const { error } = await supabase.rpc('remove_apc_tl', { p_apc: apcId, p_tl: tlId });
-  if (error) throw new Error(error.message);
-}
-
-/** apc_id -> [tl_id] for every team an APC/IPC works under (primary included). */
+/** apc_id -> [tl_id] for every team an APC/IPC works under: their reports_to plus the
+ *  owner of every live brand they hold (the apc_team_leads view, mig 428). */
 async function fetchTeamLeadLinks() {
   const { data, error } = await supabase.from('apc_team_leads').select('apc_id, tl_id');
   if (error) throw new Error(error.message);

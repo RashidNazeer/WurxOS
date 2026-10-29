@@ -24,7 +24,7 @@ export const LEVEL_LABEL = { 1: 'Direct manager', 2: 'Senior approver', 3: 'Boss
 export async function listMyLeaves(uid) {
   const { data, error } = await supabase
     .from('leave_requests')
-    .select('*, decider:decided_by(display_name), requester:requester_id(display_name)')
+    .select('*, decider:decided_by(display_name), requester:requester_id(display_name), approvers:leave_request_approvers(approver_id, decision, brands, decided_at, note, approver:approver_id(display_name))')
     .eq('requester_id', uid)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
@@ -38,7 +38,7 @@ export async function listLeavesForApproval(uid) {
   const since = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
   const { data, error } = await supabase
     .from('leave_requests')
-    .select('*, requester:requester_id(id, display_name, email, role, leave_quota)')
+    .select('*, requester:requester_id(id, display_name, email, role, leave_quota), approvers:leave_request_approvers(approver_id, decision, brands, decided_at, note, approver:approver_id(display_name))')
     .or(`status.eq.pending,decided_at.gte.${since}`)
     .neq('requester_id', uid)
     .order('created_at', { ascending: false });
@@ -412,6 +412,17 @@ export function _normLeave(row) {
     createdAt:       fsTsLeave(row.created_at),
     decidedAt:       fsTsLeave(row.decided_at),
     decisions:       row.decisions || [],
+    // One entry per Team Lead the request needs (empty for an ordinary request).
+    approvers:       (row.approvers || [])
+      .map((a) => ({
+        approverId: a.approver_id,
+        name:       a.approver?.display_name || 'Team Lead',
+        decision:   a.decision,
+        brands:     a.brands || [],
+        decidedAt:  a.decided_at,
+        note:       a.note || '',
+      }))
+      .sort((x, y) => x.name.localeCompare(y.name)),
     _raw:            row,
   };
 }
@@ -435,7 +446,7 @@ export async function listMyLeavesV1(uid) {
 export async function listAllLeavesV1() {
   const { data, error } = await supabase
     .from('leave_requests')
-    .select('*, requester:requester_id(id, display_name, email, role, leave_quota)')
+    .select('*, requester:requester_id(id, display_name, email, role, leave_quota), approvers:leave_request_approvers(approver_id, decision, brands, decided_at, note, approver:approver_id(display_name))')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data || []).map(_normLeave);

@@ -8,6 +8,7 @@ import {
 } from '../../lib/leaveApi';
 import { supabase } from '../../lib/supabase';
 import MonthNavigator from './MonthNavigator';
+import ApproverChips from './ApproverChips';
 import { useToast } from '../ui';
 
 // Readable in both themes: amber tint + neutral text (bg-warning/text-dark flipped unreadable in dark).
@@ -155,6 +156,7 @@ function ApproveModal({ request, onConfirm, onCancel, saving, userQuota, paidOve
             </div>
             <div className="text-muted small">{request.startDate} — {request.endDate} · {daysLabel(request)}</div>
             <div className="text-muted small mt-1">{request.reason}</div>
+            <ApproverChips approvers={request.approvers} />
           </div>
 
           {request.intermediateApproval && (request.intermediateApproval.status === 'approved' || request.intermediateApproval.status === 'forwarded') && (
