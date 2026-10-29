@@ -7,11 +7,12 @@ import { Button, StatusBadge, Skeleton } from '../ui';
 // Compact clock control for the Today strip: status, live timer, Clock in
 // (with the same location picker), Break, Clock out — shown under the same
 // conditions as ClockWidget. All rules live in useClockActions; UI only.
+// Lake City is closed (team moved to Bahria): not offered, but old records keep their label.
 const LOCATIONS = [
   { key: 'bahria',   label: 'Bahria Office',    icon: 'bi-building' },
-  { key: 'lakecity', label: 'Lake City Office', icon: 'bi-buildings' },
   { key: 'wfh',      label: 'Work From Home',   icon: 'bi-house-door' },
 ];
+const RECORD_LOCATIONS = [...LOCATIONS, { key: 'lakecity', label: 'Lake City Office', icon: 'bi-buildings' }];
 const STATUS = {
   'clocked-in':       { tone: 'success', label: 'Working' },
   'on-break':         { tone: 'warning', label: 'On break' },
@@ -40,7 +41,7 @@ export default function ClockQuickControl() {
   const st = STATUS[eff] || { tone: 'neutral', label: 'Not clocked in' };
   const times = record ? calcTimes(record) : { totalWorkMs: 0 };
   const isClockedOut = !record || record.status === 'clocked-out';
-  const location = LOCATIONS.find((l) => l.key === record?.location);
+  const location = RECORD_LOCATIONS.find((l) => l.key === record?.location);
 
   return (
     <div className="today-clock">
