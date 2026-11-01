@@ -24,7 +24,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
-  const [openId, setOpenId] = useState(initialMeetingId);
+  const [openId, setOpenId] = useState(null);
   const today = karachiYmd();
 
   const load = useCallback(async () => {
@@ -46,7 +46,28 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
     return map;
   }, [ratings]);
 
-  // Projected monthly score = average of the rated weeks (mirrors the SQL rollup).
+  // One row per WEEK. An APC under 2+ TLs has a meeting (and a rating) per TL in the
+  // same week; the week shows the average of them so it counts once (mig 429).
+  const weeks = useMemo(() => {
+    const map = new Map();
+    for (const m of meetings) {
+      if (!map.has(m.week_start)) map.set(m.week_start, { key: m.week_start, meetings: [] });
+      map.get(m.week_start).meetings.push(m);
+    }
+    return [...map.values()].map((w) => {
+      const rated = w.meetings.map((m) => byMeeting[m.id]).filter(Boolean);
+      return { ...w, date: w.meetings[0].meeting_date, rated, avg: rated.length ? weeklyOverall(averageWeeklyMetrics(rated)) : null };
+    });
+  }, [meetings, byMeeting]);
+
+  // Open the week holding the meeting we were deep-linked to.
+  useEffect(() => {
+    if (!initialMeetingId || !meetings.length) return;
+    const m = meetings.find((x) => x.id === initialMeetingId);
+    if (m) setOpenId(m.week_start);
+  }, [initialMeetingId, meetings]);
+
+  // Projected monthly score = average of the weekly averages (mirrors the SQL rollup).
   const projected = useMemo(() => {
     if (!ratings.length) return null;
     return weeklyOverall(averageWeeklyMetrics(ratings));
@@ -79,7 +100,7 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
               <div className="text-muted" style={{ fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {enabled ? 'Monthly checkpoint (official)' : 'Monthly checkpoint (trial preview)'}
               </div>
-              <div className="text-muted" style={{ fontSize: '0.68rem' }}>{ratings.length} week{ratings.length === 1 ? '' : 's'} rated · 0.6 of performance</div>
+              <div className="text-muted" style={{ fontSize: '0.68rem' }}>{weeks.filter((w) => w.rated.length).length} week{weeks.filter((w) => w.rated.length).length === 1 ? '' : 's'} rated · 0.6 of performance</div>
             </div>
             {projected != null ? (
               <span className="rounded-pill px-3 py-1" style={{ background: lvl.bg, color: lvl.color, fontSize: '1rem', fontWeight: 800 }}>{projected}/100</span>
@@ -102,40 +123,54 @@ export default function WeeklyBreakdownModal({ apc, month, enabled, canWrite, in
             <div className="text-muted small py-3">No meetings this APC took part in for {month} yet.</div>
           ) : (
             <div className="d-flex flex-column gap-2">
-              {meetings.map((m) => {
-                const r = byMeeting[m.id];
-                const rated = !!r;
-                const upcoming = m.meeting_date > today;
-                const ov = rated ? weeklyOverall(r.metrics) : null;
-                const rlvl = ov != null ? getLevelTokens(ov) : null;
-                const isOpen = openId === m.id;
+              {weeks.map((w) => {
+                const rated = w.rated.length > 0;
+                const multi = w.meetings.length > 1;
+                const upcoming = w.date > today;
+                const rlvl = rated ? getLevelTokens(w.avg) : null;
+                const isOpen = openId === w.key;
                 return (
-                  <div key={m.id} className="rounded-3" style={{ border: '1px solid var(--border-subtle)' }}>
+                  <div key={w.key} className="rounded-3" style={{ border: '1px solid var(--border-subtle)' }}>
                     <button type="button" className="btn w-100 d-flex align-items-center justify-content-between px-3 py-2"
                       style={{ background: 'transparent', border: 'none' }}
-                      onClick={() => setOpenId(isOpen ? null : m.id)}>
+                      onClick={() => setOpenId(isOpen ? null : w.key)}>
                       <span className="d-flex align-items-center gap-2">
                         <i className={`bi ${isOpen ? 'bi-chevron-down' : 'bi-chevron-right'}`} style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }} />
-                        <span className="fw-semibold" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{fmtDate(m.meeting_date)}</span>
+                        <span className="fw-semibold" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{fmtDate(w.date)}</span>
                         {upcoming && <span className="rounded-pill px-2" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', fontSize: '0.6rem', fontWeight: 700 }}>Upcoming</span>}
+                        {multi && <span className="text-muted" style={{ fontSize: '0.64rem' }}>average of {w.rated.length} of {w.meetings.length} Team Leads</span>}
                       </span>
                       {rated ? (
-                        <span className="rounded-pill px-2 py-1" style={{ background: rlvl.bg, color: rlvl.color, fontSize: '0.72rem', fontWeight: 800 }}>{ov}/100</span>
+                        <span className="rounded-pill px-2 py-1" style={{ background: rlvl.bg, color: rlvl.color, fontSize: '0.72rem', fontWeight: 800 }}>{w.avg}/100</span>
                       ) : (
                         <span className="rounded-pill px-2 py-1" style={{ background: 'var(--danger-soft)', color: 'var(--danger-text)', fontSize: '0.64rem', fontWeight: 700 }}>Not rated</span>
                       )}
                     </button>
                     {isOpen && (
-                      <div className="px-3 pb-3">
-                        {upcoming ? (
-                          <div className="text-muted small">This meeting hasn’t happened yet — you can rate it once the APC has presented.</div>
-                        ) : canWrite ? (
-                          <WeeklyRatingFields apcId={apcId} meetingId={m.id} enabled={enabled} onSaved={onSaved} />
-                        ) : rated ? (
-                          <div className="text-muted small">Scored {ov}/100 by {r.rater?.display_name || 'the OL'}.</div>
-                        ) : (
-                          <div className="text-muted small">Not rated yet.</div>
-                        )}
+                      <div className="px-3 pb-3 d-flex flex-column gap-3">
+                        {w.meetings.map((m) => {
+                          const r = byMeeting[m.id];
+                          const ov = r ? weeklyOverall(r.metrics) : null;
+                          const mUpcoming = m.meeting_date > today;
+                          return (
+                            <div key={m.id}>
+                              {multi && (
+                                <div className="fw-semibold mb-1" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                  {m.tl?.display_name ? `${m.tl.display_name}’s meeting` : 'Meeting'}{ov != null ? ` · ${ov}/100` : ' · not rated'}
+                                </div>
+                              )}
+                              {mUpcoming ? (
+                                <div className="text-muted small">This meeting hasn’t happened yet — you can rate it once the APC has presented.</div>
+                              ) : canWrite ? (
+                                <WeeklyRatingFields apcId={apcId} meetingId={m.id} enabled={enabled} onSaved={onSaved} />
+                              ) : r ? (
+                                <div className="text-muted small">Scored {ov}/100 by {r.rater?.display_name || 'the OL'}.</div>
+                              ) : (
+                                <div className="text-muted small">Not rated yet.</div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
