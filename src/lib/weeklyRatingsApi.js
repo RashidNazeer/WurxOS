@@ -34,12 +34,30 @@ export function weeklyOverall(metrics) {
 
 // Per-metric average across a set of weekly rows → the monthly metrics object
 // (mirrors the SQL rollup, so the client preview equals what "go live" writes).
+// An APC under 2+ TLs is rated once per TL meeting in the same week (mig 429): the
+// ratings of one week are averaged first, then the weeks, so the week counts once.
+// → one metrics object per week (the average of that week's ratings), in order.
+export function perWeekMetrics(rows) {
+  const weeks = new Map();
+  for (const r of rows || []) {
+    const key = r.week_start || r.meeting_id || r.id;
+    if (!weeks.has(key)) weeks.set(key, []);
+    weeks.get(key).push(r);
+  }
+  return [...weeks.values()].map((rs) => {
+    const w = {};
+    for (const k of WEEKLY_METRIC_KEYS) w[k] = rs.reduce((a, r) => a + (Number(r.metrics?.[k]) || 0), 0) / rs.length;
+    return w;
+  });
+}
+
 export function averageWeeklyMetrics(rows) {
   if (!rows || !rows.length) return null;
+  const perWeek = perWeekMetrics(rows);
   const out = {};
   for (const k of WEEKLY_METRIC_KEYS) {
-    const sum = rows.reduce((a, r) => a + (Number(r.metrics?.[k]) || 0), 0);
-    out[k] = Math.round((sum / rows.length) * 100) / 100; // 2dp, like the SQL rollup
+    const sum = perWeek.reduce((a, w) => a + w[k], 0);
+    out[k] = Math.round((sum / perWeek.length) * 100) / 100; // 2dp, like the SQL rollup
   }
   return out;
 }
@@ -127,11 +145,11 @@ export async function listApcMeetingsForMonth(apcId, month) {
   const [pres, rated] = await Promise.all([
     supabase
       .from('agenda_presentations')
-      .select('meeting:meeting_id(id, week_start, meeting_date, status)')
+      .select('meeting:meeting_id(id, week_start, meeting_date, status, tl:tl_id(display_name))')
       .eq('apc_id', apcId),
     supabase
       .from('weekly_performance_ratings')
-      .select('meeting:meeting_id(id, week_start, meeting_date, status)')
+      .select('meeting:meeting_id(id, week_start, meeting_date, status, tl:tl_id(display_name))')
       .eq('apc_id', apcId)
       .eq('month', month),
   ]);

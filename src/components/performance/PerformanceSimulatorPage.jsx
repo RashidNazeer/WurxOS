@@ -8,7 +8,7 @@ import {
   CHECKPOINT_METRIC_KEYS, calcCheckpointAvg, apcPerfPillar,
 } from '../../lib/performanceApi';
 import { getTlPerfEnabled, tlPerfPreview } from '../../lib/tlPerfApi';
-import { getWeeklyRatingsEnabled, listWeeklyRatingsForApcMonth, apcPerfPreview } from '../../lib/weeklyRatingsApi';
+import { getWeeklyRatingsEnabled, listWeeklyRatingsForApcMonth, perWeekMetrics, apcPerfPreview } from '../../lib/weeklyRatingsApi';
 
 // ============================================================
 // Performance Simulator — a private, READ-ONLY what-if tool.
@@ -268,7 +268,7 @@ export default function PerformanceSimulatorPage() {
             apcPerfPreview(uid, month).catch(() => null),
             listWeeklyRatingsForApcMonth(uid, month).catch(() => []),
           ]);
-          weeks = (rows || []).map((r, i) => seedApcWeek(r.metrics, `Wk ${i + 1}`));
+          weeks = perWeekMetrics(rows).map((m, i) => seedApcWeek(m, `Wk ${i + 1}`));
           if (!weeks.length) { const r = await getRatingFor(uid, month).catch(() => null); weeks = [seedApcWeek(r?.metrics || {}, 'Wk 1')]; }
           if (!cancelled && pv) {
             // External report factor (mig 304): per-report TL star + accountability.
