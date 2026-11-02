@@ -582,10 +582,17 @@ export const USAGE_KIND_LABEL = {
 // (mig 401) via keySlotMeta(); these defaults mirror that table and are only
 // used until it loads (or if it can't be read). Unknown slots from the
 // catalog are still shown, under their own name, after the known ones.
-export const KEY_SLOTS = ['primary', 'fallback', 'gemini', 'groq'];
+// Buddy answers with FREE models only (mig 431): there is no paid OpenAI slot.
+// 'fallback' is the OpenAI FREE-tier key and may only ever ask for its free model.
+// NVIDIA keys are testing-only, so they are the last step of the safety net.
+export const KEY_SLOTS = ['gemini', 'groq', 'fallback', 'nvidia', 'nvidia2'];
 export const KEY_SLOT_LABEL = {
-  primary: 'OpenAI', fallback: 'OpenAI (fallback key)', gemini: 'Gemini (free)', groq: 'Groq (free)',
+  fallback: 'OpenAI (free tier)', gemini: 'Gemini (free)', groq: 'Groq (free)',
+  nvidia: 'NVIDIA (testing key, last resort)', nvidia2: 'NVIDIA 2 (testing key, last resort)',
 };
+export const FREE_TIER_MODELS = { fallback: ['gpt-6-luna'] };
+export const FREE_TIER_NOTE = 'Buddy uses free models only. Free tiers have per-minute and daily limits, and a provider\'s free-tier terms may let it keep or learn from what it receives. NVIDIA keys are testing-only, so NVIDIA is the last resort.';
+const slotAllows = (slot, model) => !FREE_TIER_MODELS[slot] || FREE_TIER_MODELS[slot].includes(model);
 export const DEFAULT_SLOT_META = { order: KEY_SLOTS, labels: KEY_SLOT_LABEL };
 
 // ai_key_slots rows ({slot, label, sort, …}) → { order, labels }.
@@ -621,24 +628,14 @@ export function slotsOf(catalog, meta = DEFAULT_SLOT_META) {
   return [...meta.order, ...extra];
 }
 
-// The three built-ins keep their friendly labels, and are what the picker
-// offers when the catalog is empty (the database accepts only these then).
-export const BUILTIN_MODELS = [
-  ['gpt-5.4-nano', 'cheapest'],
-  ['gpt-5.4-mini', 'recommended'],
-  ['gpt-5.5', 'strongest'],
-];
-const BUILTIN = new Map(BUILTIN_MODELS);
-export const modelLabel = (model) => (BUILTIN.has(model) ? `${model} (${BUILTIN.get(model)})` : model);
+export const modelLabel = (model) => model;
 
-export const isQuotaError = (e) => /quota|credit/i.test(String(e || ''));
+export const isQuotaError = (e) => /quota|credit|rate.?limit|exhausted/i.test(String(e || ''));
 
 // Mirrors public.ai_model_usable for one catalog row: works with tools and
-// streaming, or a built-in on the main key that failed only for lack of credits
-// (it works again the moment the account is topped up).
-export const catalogRowUsable = (r) => !!r && (
-  (r.available && r.supports_tools && r.supports_stream)
-  || (r.key_slot === 'primary' && BUILTIN.has(r.model) && isQuotaError(r.last_error)));
+// streaming, and on the OpenAI free-tier key only its free model.
+export const catalogRowUsable = (r) => !!r && !!r.available && !!r.supports_tools && !!r.supports_stream
+  && slotAllows(r.key_slot, r.model);
 
 // A model whose check failed only for a passing provider error (5xx, timeout).
 // The backend keeps it in the Boss's chain (models.ts TRANSIENT_REASON).
@@ -651,6 +648,7 @@ function unusableReason(r) {
   if (!r.available) return r.last_error || 'not available on this key';
   if (!r.supports_tools) return 'no tool calling (Buddy needs it to look things up)';
   if (!r.supports_stream) return 'no streaming';
+  if (!slotAllows(r.key_slot, r.model)) return 'not free: the OpenAI free-tier key allows gpt-6-luna only';
   return '';
 }
 
@@ -659,24 +657,24 @@ export function modelBadges(r) {
   if (r.free) b.push('Free');
   if (r.supports_tools) b.push('Tools ✓');
   if (r.supports_stream) b.push('Streaming ✓');
-  if (r.key_slot === 'primary' && isQuotaError(r.last_error)) b.push('Needs credits');
+  if (isQuotaError(r.last_error)) b.push('Free limit reached');
   if (!catalogRowUsable(r)) b.push('Not usable');
   return b;
 }
 
-// Picker options per key slot: { primary: [...], fallback: [...], gemini, groq,
+// Picker options per key slot: { gemini: [...], groq: [...], fallback, nvidia,
 // …any other }, each { key_slot, model, label, usable, reason, badges }. Every
 // catalogued model is listed (unusable ones carry their reason). Usable first,
-// then the built-ins, then A–Z. A slot with no rows offers nothing, except the
-// main key, which falls back to the three built-ins.
+// then A–Z. A slot with no rows offers nothing, except the OpenAI free-tier
+// key, which offers its one free model.
 export function modelOptions(catalog, meta = DEFAULT_SLOT_META) {
   const rows = Array.isArray(catalog) ? catalog : [];
   const out = {};
   for (const slot of slotsOf(rows, meta)) {
     const mine = rows.filter((r) => r.key_slot === slot);
-    const list = mine.length || slot !== 'primary'
+    const list = mine.length || !FREE_TIER_MODELS[slot]
       ? mine
-      : BUILTIN_MODELS.map(([model]) => ({ key_slot: 'primary', model, available: true, supports_tools: true, supports_stream: true, free: false, builtinOnly: true }));
+      : FREE_TIER_MODELS[slot].map((model) => ({ key_slot: slot, model, available: true, supports_tools: true, supports_stream: true, free: true, builtinOnly: true }));
     out[slot] = list.map((r) => {
       const usable = r.builtinOnly || catalogRowUsable(r);
       return {
@@ -685,7 +683,7 @@ export function modelOptions(catalog, meta = DEFAULT_SLOT_META) {
         reason: usable ? '' : unusableReason(r),
         badges: r.builtinOnly ? [] : modelBadges(r),
       };
-    }).sort((a, b) => (b.usable - a.usable) || (BUILTIN.has(b.model) - BUILTIN.has(a.model)) || a.model.localeCompare(b.model));
+    }).sort((a, b) => (b.usable - a.usable) || a.model.localeCompare(b.model));
   }
   return out;
 }
@@ -696,12 +694,13 @@ export const parseOptionKey = (k) => {
   return i < 0 ? null : { key_slot: String(k).slice(0, i), model: String(k).slice(i + 1) };
 };
 
-// The main key is out of credits: from the last refresh, or (after a reload)
-// from the catalog: main-key rows exist, none answer, and some failed on quota.
-export function creditsExhausted(catalog, refresh) {
-  const flag = refresh?.slots?.primary?.credits_exhausted;
+// The chosen model's provider has no free quota left right now: from the last
+// refresh, or (after a reload) from the catalog: the slot has rows, none
+// answer, and some failed on quota. Free limits reset by themselves.
+export function creditsExhausted(catalog, refresh, slot = 'gemini') {
+  const flag = refresh?.slots?.[slot]?.credits_exhausted;
   if (typeof flag === 'boolean') return flag;
-  const rows = (catalog || []).filter((r) => r.key_slot === 'primary');
+  const rows = (catalog || []).filter((r) => r.key_slot === slot);
   return rows.length > 0 && !rows.some((r) => r.available) && rows.some((r) => isQuotaError(r.last_error));
 }
 
@@ -785,7 +784,7 @@ export function roleModelView(roleModels, role, global = {}) {
   const e = roleModels?.[role] || {};
   const main = pickTarget(e);
   return {
-    main: main ? { inherit: false, ...main } : { inherit: true, key_slot: global.model_key_slot || 'primary', model: global.model || null },
+    main: main ? { inherit: false, ...main } : { inherit: true, key_slot: global.model_key_slot || 'gemini', model: global.model || null },
     backups: Array.isArray(e.fallback_models)
       ? { inherit: false, chain: e.fallback_models }
       : { inherit: true, chain: Array.isArray(global.fallback_models) ? global.fallback_models : [] },
@@ -920,7 +919,8 @@ export const modelSourceLabel = (s) => (s ? MODEL_SOURCE_LABEL[s] || s : null);
 export function vectorsByModel(stats) {
   const v = stats?.vectors_by_model ?? stats?.embeddings_by_model ?? null;
   if (!v) {
-    // mig 402 shape: stats.vectors = { alt_filled, pending_with_alt, … }.
+    // mig 402 shape: stats.vectors = { alt_filled, … }. (From mig 432 the two
+    // spaces are listed by embeddingSpaces() instead.)
     const alt = Number(stats?.vectors?.alt_filled);
     const model = stats?.embed_model_alt;
     return Number.isFinite(alt) && alt > 0 && model ? [{ model: String(model), count: alt }] : [];
@@ -931,10 +931,19 @@ export function vectorsByModel(stats) {
   return rows.filter((r) => Number.isFinite(r.count)).sort((a, b) => b.count - a.count || a.model.localeCompare(b.model));
 }
 
-// Progress for the ingestion card: the queue draining, and AI-vector coverage.
-// Chunks with no main-key vector are already keyword-searchable, and searchable
-// by meaning too when a fallback provider has given them one (pending_with_alt).
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const has = (v) => v != null && Number.isFinite(Number(v));
+const docChunks = (stats) => Object.values(stats?.documents && typeof stats.documents === 'object' ? stats.documents : {})
+  .reduce((n, d) => n + num(d?.chunks), 0);
+
+// Progress for the ingestion card: the queue draining, and how many chunks are
+// searchable BY MEANING. A chunk counts once if it has a vector in either space.
+// Chunks no free provider may see (incentive pay data) are keyword-only by
+// design: neither "ready" nor "waiting", and left out of the bar so it can reach 100%.
+//   mig 432: ready = main-space chunks + chunks only the second space has;
+//            waiting = vectors.waiting; keywordOnly = vectors.keyword_only_not_allowed.
+//   older database (no spaces): vector_pending = chunks with no MAIN vector and
+//            pending_with_alt (if present) = of those, the ones a fallback covers.
 export function ingestProgress(stats) {
   if (!stats) return null;
   const q = stats.queue || {};
@@ -943,14 +952,72 @@ export function ingestProgress(stats) {
   const qTotal = left + done;
   const queue = qTotal > 0 ? { done, left, total: qTotal, pct: Math.round((done / qTotal) * 100) } : null;
 
-  const pending = num(stats.vector_pending);
-  const withAlt = num(stats.vectors?.pending_with_alt);
-  const total = num(stats.chunks ?? stats.documents?.chunks ?? stats.vectors?.chunks)
-    || (num(stats.vectors?.alt_filled) + pending) || 0;
+  const v = stats.vectors || {};
+  let ready; let waiting; let keywordOnly = 0; let withAlt = 0;
+  if (has(v.waiting) && has(v.by_space?.main)) {
+    waiting = num(v.waiting);
+    keywordOnly = num(v.keyword_only_not_allowed);
+    ready = num(v.by_space.main) + num(v.main_missing);
+  } else {
+    const pendingMain = num(stats.vector_pending);
+    withAlt = Math.min(pendingMain, num(v.pending_with_alt));
+    waiting = pendingMain - withAlt;
+    const all = num(stats.chunks ?? v.chunks) || docChunks(stats) || (num(v.alt_filled) + pendingMain);
+    ready = Math.max(0, all - waiting);
+  }
+  const total = ready + waiting;
   const vectors = total > 0
-    ? { ready: Math.max(0, total - pending), pending, withAlt, total, pct: Math.round(((total - pending) / total) * 100) }
+    ? { ready, pending: waiting, waiting, keywordOnly, withAlt, total, pct: Math.round((ready / total) * 100) }
     : null;
   return { queue, vectors };
+}
+
+const PROVIDER_NAME = { nvidia: 'NVIDIA', gemini: 'Gemini', openai: 'OpenAI' };
+const providerName = (p) => PROVIDER_NAME[p] || (p ? String(p) : 'a free provider');
+const SPACE_STATUS = {
+  complete: 'Complete',
+  filling: 'Filling in',
+  down: 'Paused after an error',
+  paused_quiet_hours: 'Resting for quiet hours',
+  daily_limit: 'Daily free limit reached',
+};
+const shortModel = (m) => String(m ?? '').replace(/^[a-z0-9_-]+:/i, '');
+
+// The two search spaces from stats.vectors.spaces (mig 432), in plain language.
+// null on an older database. `when(iso)` formats a time; `quietNext` is when
+// quiet hours end.
+export function embeddingSpaces(stats, { when = (x) => String(x), quietNext = null } = {}) {
+  const sp = stats?.vectors?.spaces;
+  if (!sp || typeof sp !== 'object') return null;
+  return [['main', 'Main search'], ['alt', 'Second search']].filter(([k]) => sp[k]).map(([key, title]) => {
+    const x = sp[key];
+    const status = SPACE_STATUS[x.status] ? x.status : 'filling';
+    let detail = '';
+    if (status === 'down') {
+      detail = `${x.next_try_at ? `Next try ${when(x.next_try_at)}. ` : ''}${x.last_error ? `Last error: ${x.last_error}` : ''}`.trim();
+    } else if (status === 'paused_quiet_hours') {
+      detail = quietNext ? `Resumes ${when(quietNext)}.` : 'Resumes after quiet hours.';
+    } else if (status === 'daily_limit') {
+      detail = `${providerName(x.provider)}'s free allowance for the day is used up; it carries on by itself when the allowance resets${x.next_try_at ? ` (next try ${when(x.next_try_at)})` : ''}.`;
+    } else if (status === 'filling' && has(x.daily_budget_left)) {
+      detail = `${fmtCount(num(x.daily_budget_left))} more allowed today on the free tier.`;
+    }
+    return {
+      key, title, provider: providerName(x.provider), model: shortModel(x.model),
+      filled: num(x.filled), waiting: num(x.missing), notAllowed: num(x.not_allowed),
+      status, statusText: SPACE_STATUS[status], detail,
+    };
+  });
+}
+
+// Chunks kept keyword-only on purpose (types no free provider may see:
+// incentive pay data). count 0 on an older database.
+export function keywordOnlyInfo(stats) {
+  const v = stats?.vectors || {};
+  const byType = v.keyword_only_by_type && typeof v.keyword_only_by_type === 'object' ? v.keyword_only_by_type : {};
+  const rows = Object.entries(byType).map(([type, n]) => ({ type, count: num(n) })).filter((r) => r.count > 0)
+    .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
+  return { count: has(v.keyword_only_not_allowed) ? num(v.keyword_only_not_allowed) : rows.reduce((n, r) => n + r.count, 0), rows };
 }
 
 // The circular ring in the ingestion card, shown only while a run is working.
@@ -987,11 +1054,18 @@ export function quietHours(stats) {
 }
 
 // Document types that may go to free AI providers. Incentive plans contain pay
-// amounts, so they are left out unless the Boss ticks them.
-export const FREE_SOURCES_DEFAULT_OFF = ['incentive'];
+// amounts: the screen never offers them and never saves them into a list.
+export const NEVER_FREE_SOURCES = ['incentive'];
 export function freeSourcesValue(saved, allTypes) {
-  if (Array.isArray(saved)) return allTypes.filter((t) => saved.includes(t));
-  return allTypes.filter((t) => !FREE_SOURCES_DEFAULT_OFF.includes(t));
+  const ok = allTypes.filter((t) => !NEVER_FREE_SOURCES.includes(t));
+  return Array.isArray(saved) ? ok.filter((t) => saved.includes(t)) : ok;
+}
+// Gemini's own, narrower list (mig 432; reports off by default). It is
+// intersected with the free list above, so it can never widen it.
+export const GEMINI_SOURCES_DEFAULT = ['kb_article', 'ai_doc', 'app_guide', 'tts_article'];
+export function geminiSourcesValue(saved, allTypes) {
+  const list = Array.isArray(saved) ? saved : GEMINI_SOURCES_DEFAULT;
+  return allTypes.filter((t) => !NEVER_FREE_SOURCES.includes(t) && list.includes(t));
 }
 export function toggleInList(list, item, on, order) {
   const set = new Set(list || []);
@@ -999,7 +1073,7 @@ export function toggleInList(list, item, on, order) {
   return (order || [...set]).filter((x) => set.has(x));
 }
 
-// Usage "by key": the four known slots always (zeros if unused), then any other.
+// Usage "by key": the known slots always (zeros if unused), then any other.
 export function keySlotRows(byKeySlot, meta = DEFAULT_SLOT_META) {
   const d = byKeySlot || {};
   const slots = [...meta.order, ...Object.keys(d).filter((s) => !meta.order.includes(s)).sort()];

@@ -14,7 +14,7 @@
 //   ai_backfill would enqueue. --tts-jsonl plans the TikTok crawl file as if
 //   it were imported (tts_articles is empty until the import).
 // --backfill: select ai_backfill(<source>) — enqueues only what differs.
-// --drain: runs the worker (real OpenAI embeddings) until the queue is empty.
+// --drain: runs the worker (real NVIDIA / Gemini embeddings: free tiers, mig 432) until the queue is empty.
 //
 // --backfill and --drain write. They refuse to run without --owner-approved:
 // the INGESTION HOLD (TEAM.md rule 8) stands until the Owner approves.
@@ -29,7 +29,7 @@ import { loaders } from '../../supabase/functions/_shared/ai/ingest/loaders.ts';
 import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
 import { planDocument } from '../../supabase/functions/_shared/ai/ingest/plan.ts';
 import { crawlToRows } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { openAiEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
+import { runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const PRICE_PER_M = 0.02;   // text-embedding-3-small, USD per 1M tokens (check on the day)
 const args = process.argv.slice(2);
@@ -42,7 +42,7 @@ const MODE = has('--drain') ? 'drain' : has('--backfill') ? 'backfill' : 'dry-ru
 if (SOURCE && !SOURCE_TYPES.includes(SOURCE)) { console.error(`unknown --source ${SOURCE}; one of ${SOURCE_TYPES.join(', ')}`); process.exit(1); }
 if (MODE !== 'dry-run' && !has('--owner-approved')) {
   console.error([
-    `Refusing to run --${MODE}: it writes to the ingest queue / vector store and ${MODE === 'drain' ? 'calls the OpenAI embeddings API' : 'queues embedding work'}.`,
+    `Refusing to run --${MODE}: it writes to the ingest queue / vector store and ${MODE === 'drain' ? 'calls the free embeddings APIs (NVIDIA, Gemini)' : 'queues embedding work'}.`,
     'The INGESTION HOLD (Assistant/TEAM.md rule 8, Owner 2026-09-28) is in force.',
     'Re-run with --owner-approved only after the Owner has explicitly approved ingestion.',
     'Without flags this script does a read-only --dry-run.',
@@ -166,19 +166,16 @@ async function backfillRun() {
 
 async function drain() {
   const env = readEnv();
-  const key = env.OPEN_AI_API_KEY;
-  if (!key) { console.error('OPEN_AI_API_KEY missing in ../.env.dev'); process.exit(1); }
-  // mig 406/408: the fallback OpenAI key, and the alt space's keys (.env.dev
-  // OPEN_AI_NVA / NEM_API for NVIDIA, Gemini_Fallback for Gemini). The provider
-  // comes from ai_assistant_config.embed_alt_provider.
-  const altKeys = { nvidia: env.OPEN_AI_NVA, nvidia2: env.NEM_API, gemini: env.Gemini_Fallback };
+  // Free providers only (.env.dev: OPEN_AI_NVA / NEM_API are NVIDIA keys, Gemini_Fallback is Gemini). Each space's
+  // provider comes from the database settings (ai_embed_settings): NVIDIA main, ai_assistant_config.embed_alt_provider second.
+  const keys = { nvidia: env.OPEN_AI_NVA, nvidia2: env.NEM_API, gemini: env.Gemini_Fallback };
+  if (!keys.nvidia && !keys.nvidia2) { console.error('no NVIDIA key (OPEN_AI_NVA / NEM_API) in ../.env.dev'); process.exit(1); }
   const c = await newClient();
   try {
     const rpc = pgRpc(c);
     let total = 0;
     for (;;) {
-      const s = await runWorker({ rpc, embed: openAiEmbedder([key, env.OPEN_AI_API_KEY_FALLBACK]),
-        altKeys,
+      const s = await runWorker({ rpc, keys,
         maxItems: LIMIT === null ? undefined : LIMIT - total, log: (m) => console.log(m) });
       total += s.claimed;
       console.log(JSON.stringify({ claimed: s.claimed, succeeded: s.succeeded, failed: s.failed, skipped: s.skipped_unchanged,

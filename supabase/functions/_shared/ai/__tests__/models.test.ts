@@ -2,7 +2,7 @@
 // (mig 397). All faked: no API calls.
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { _resetCooldowns, chatModels, chooseTargets, modelUsable, omitFor, refreshModels, unsupportedParam, type CatalogRow } from '../agent/models.ts';
+import { _resetCooldowns, chatModels, chooseTargets, modelUsable, omitFor, refreshModels, resolveRoleConfig, unsupportedParam, type CatalogRow, type KeySlot } from '../agent/models.ts';
 
 beforeEach(() => _resetCooldowns());
 import { runTurn } from '../agent/core.ts';
@@ -13,47 +13,63 @@ import { providerAccountIssue, providerIssueMessage, retryAfterMs, scrubSecrets 
 import { embedTexts } from '../embedder.ts';
 
 const QUOTA = JSON.stringify({ error: { message: 'Your credit balance is exhausted.', type: 'insufficient_quota', code: 'credit_balance_exhausted' } });
-const row = (slot: 'primary' | 'fallback', model: string, o: Partial<CatalogRow> = {}): CatalogRow =>
-  ({ key_slot: slot, model, available: true, supports_tools: true, supports_stream: true, free: false, params: {}, ...o });
-const KEYS = { primary: 'pk', fallback: 'fk' };
+const row = (slot: KeySlot, model: string, o: Partial<CatalogRow> = {}): CatalogRow =>
+  ({ key_slot: slot, model, available: true, supports_tools: true, supports_stream: true, free: true, params: {}, ...o });
+const KEYS = { gemini: 'gk', groq: 'qk', fallback: 'fk' };
 
 // ── catalog ─────────────────────────────────────────────────────────────────
 
-test('chatModels: chat models only; a dated snapshot only when its alias is missing', () => {
-  const ids = ['gpt-5.4-mini', 'gpt-5.4-mini-2026-03-17', 'gpt-5.4-nano-2026-03-17', 'gpt-image-1', 'gpt-4o-audio-preview', 'gpt-4o-realtime-preview',
-    'gpt-4o-mini-tts', 'gpt-4o-transcribe', 'text-embedding-3-small', 'gpt-4o-search-preview', 'o3-pro', 'gpt-5-codex', 'gpt-3.5-turbo-instruct', 'gpt-6-luna', 'o4-mini', 'dall-e-3', 'chatgpt-4o-latest'];
-  assert.deepEqual(chatModels(ids), ['gpt-5.4-mini', 'gpt-5.4-nano-2026-03-17', 'gpt-6-luna', 'o4-mini']);
+test('chatModels: chat models only; a dated snapshot only when its alias is missing; the OpenAI key lists only the free model', () => {
+  const ids = ['gemini-3.6-flash', 'gemini-3.6-flash-2026-03-17', 'gemini-3.5-flash-2026-03-17', 'imagen-4', 'gemini-2.5-flash-tts', 'text-embedding-004', 'gemini-live-2.5-flash'];
+  assert.deepEqual(chatModels(ids, 'gemini'), ['gemini-3.5-flash-2026-03-17', 'gemini-3.6-flash']);
+  // OpenAI: nothing is probed or offered except the free-tier model (a probe is a real call)
+  const oa = ['gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.5', 'gpt-4o-mini', 'o4-mini', 'gpt-6-luna'];
+  assert.deepEqual(chatModels(oa, 'fallback'), ['gpt-6-luna']);
 });
 
-test('modelUsable: an empty catalog allows the three built-ins on primary only; a catalogued key needs tools + stream', () => {
-  assert.equal(modelUsable([], 'primary', 'gpt-5.5'), true);
-  assert.equal(modelUsable([], 'primary', 'gpt-6-luna'), false);
-  assert.equal(modelUsable([], 'fallback', 'gpt-5.4-mini'), false);
-  const cat = [row('fallback', 'gpt-6-luna'), row('fallback', 'gpt-x', { supports_stream: false }), row('primary', 'gpt-5.4-mini', { available: false })];
-  assert.equal(modelUsable(cat, 'fallback', 'gpt-6-luna'), true);
-  assert.equal(modelUsable(cat, 'fallback', 'gpt-x'), false);
-  assert.equal(modelUsable(cat, 'primary', 'gpt-5.4-mini'), false);   // the primary key is catalogued now
-  // out of credit: a built-in stays choosable (it works after a top-up); other models do not
-  const broke = [row('primary', 'gpt-5.4-nano', { available: false, supports_tools: false, supports_stream: false, last_error: 'HTTP 429: insufficient_quota' }),
-    row('primary', 'gpt-odd', { available: false, supports_tools: false, supports_stream: false, last_error: 'HTTP 429: insufficient_quota' })];
-  assert.equal(modelUsable(broke, 'primary', 'gpt-5.4-nano'), true);
-  assert.equal(modelUsable(broke, 'primary', 'gpt-odd'), false);
+test('modelUsable: the OpenAI key only ever allows the free model; a catalogued key needs tools + stream; the old primary slot is nothing', () => {
+  assert.equal(modelUsable([], 'fallback', 'gpt-6-luna'), true);
+  for (const paid of ['gpt-5.5', 'gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-4o']) assert.equal(modelUsable([], 'fallback', paid), false);
+  // even a catalog row that claims a paid model is available does not unlock it
+  assert.equal(modelUsable([row('fallback', 'gpt-5.5')], 'fallback', 'gpt-5.5'), false);
+  // the catalog must mark the free model free
+  assert.equal(modelUsable([row('fallback', 'gpt-6-luna', { free: false })], 'fallback', 'gpt-6-luna'), false);
+  assert.equal(modelUsable([row('fallback', 'gpt-6-luna')], 'fallback', 'gpt-6-luna'), true);
+  const cat = [row('gemini', 'g-ok'), row('gemini', 'g-nostream', { supports_stream: false }), row('gemini', 'g-gone', { available: false })];
+  assert.deepEqual(['g-ok', 'g-nostream', 'g-gone', 'g-unknown'].map((m) => modelUsable(cat, 'gemini', m)), [true, false, false, false]);
+  assert.equal(modelUsable([], 'gemini', 'anything'), true);        // a slot not listed yet is tried anyway
+  assert.equal(modelUsable([], 'primary' as any, 'gpt-5.4-mini'), false);
 });
 
-test('chooseTargets: configured model first, then the fallbacks in order; bad entries skipped', () => {
-  const cfg = { model: 'gpt-5.5', model_key_slot: 'primary', fallback_enabled: true,
-    fallback_models: [{ key_slot: 'fallback', model: 'gpt-6-luna' }, { key_slot: 'primary', model: 'gpt-5.5' }, { key_slot: 'fallback', model: 'nope' }, { key_slot: 'primary', model: 'gpt-5.4-nano' }] };
-  const cat = [row('fallback', 'gpt-6-luna')];
+test('chooseTargets: configured model first, then the fallbacks in order; bad entries skipped; never empty', () => {
+  const cfg = { model: 'gemini-3.5-flash-lite', model_key_slot: 'gemini', fallback_enabled: true,
+    fallback_models: [{ key_slot: 'groq', model: 'openai/gpt-oss-120b' }, { key_slot: 'gemini', model: 'gemini-3.5-flash-lite' }, { key_slot: 'groq', model: 'nope' }, { key_slot: 'fallback', model: 'gpt-6-luna' }] };
+  const cat = [row('gemini', 'gemini-3.5-flash-lite'), row('groq', 'openai/gpt-oss-120b'), row('fallback', 'gpt-6-luna')];
   assert.deepEqual(chooseTargets(cfg, cat, KEYS), [
-    { keySlot: 'primary', model: 'gpt-5.5' }, { keySlot: 'fallback', model: 'gpt-6-luna' }, { keySlot: 'primary', model: 'gpt-5.4-nano' }]);
-  // no fallback key → fallback entries dropped; disabled chain → just the model
-  assert.deepEqual(chooseTargets(cfg, cat, { primary: 'pk' }).map((t) => t.model), ['gpt-5.5', 'gpt-5.4-nano']);
+    { keySlot: 'gemini', model: 'gemini-3.5-flash-lite' }, { keySlot: 'groq', model: 'openai/gpt-oss-120b' }, { keySlot: 'fallback', model: 'gpt-6-luna' }]);
+  // no Groq key: its entry is dropped; disabled chain: just the model
+  assert.deepEqual(chooseTargets(cfg, cat, { gemini: 'gk', fallback: 'fk' }).map((t) => t.model), ['gemini-3.5-flash-lite', 'gpt-6-luna']);
   assert.deepEqual(chooseTargets({ ...cfg, fallback_enabled: false }, cat, KEYS).length, 1);
-  // an unusable configured model falls back to the default; a fallback-key model can be the main one
-  assert.deepEqual(chooseTargets({ model: 'mystery' }, [], KEYS)[0], { keySlot: 'primary', model: 'gpt-5.4-mini' });
-  assert.deepEqual(chooseTargets({ model: 'gpt-6-luna', model_key_slot: 'fallback' }, cat, KEYS)[0], { keySlot: 'fallback', model: 'gpt-6-luna' });
-  // an uncatalogued fallback key: tried anyway (its catalog is empty)
-  assert.equal(chooseTargets({ model: 'gpt-5.4-mini', fallback_models: [{ key_slot: 'fallback', model: 'gpt-6-luna' }] }, [], KEYS).length, 2);
+  // an unusable configured model: the default free chain starts
+  assert.deepEqual(chooseTargets({ model: 'mystery', model_key_slot: 'gemini' }, cat, KEYS)[0], { keySlot: 'gemini', model: 'gemini-3.5-flash-lite' });
+  assert.ok(chooseTargets({}, [], {}).length === 1, 'no key anywhere: one doomed target so the turn fails with a clear message');
+  // an uncatalogued slot: tried anyway
+  assert.equal(chooseTargets({ model: 'x', model_key_slot: 'gemini', fallback_models: [{ key_slot: 'groq', model: 'y' }] }, [], KEYS).length, 2);
+});
+
+test('legacy rows: slot "primary" (the removed paid key) and paid OpenAI models do not crash and resolve to the free chain', () => {
+  const cat = [row('gemini', 'gemini-3.5-flash-lite'), row('gemini', 'gemini-3.6-flash'), row('groq', 'openai/gpt-oss-120b'), row('fallback', 'gpt-6-luna')];
+  const legacy = { model: 'gpt-5.4-nano', model_key_slot: 'primary', fallback_enabled: true, fallback_models: [
+    { key_slot: 'gemini', model: 'gemini-3.6-flash' }, { key_slot: 'primary', model: 'gpt-5.5' }, { key_slot: 'fallback', model: 'gpt-5.4-mini' }, { key_slot: 'fallback', model: 'gpt-6-luna' }] };
+  assert.deepEqual(chooseTargets(legacy, cat, KEYS), [{ keySlot: 'gemini', model: 'gemini-3.6-flash' }, { keySlot: 'fallback', model: 'gpt-6-luna' }]);
+  // nothing usable left in the row at all: the default free chain
+  const bare = chooseTargets({ model: 'gpt-5.4-nano', model_key_slot: 'primary', fallback_models: [{ key_slot: 'primary', model: 'gpt-5.5' }] }, cat, KEYS);
+  assert.deepEqual(bare.map((t) => t.keySlot), ['gemini', 'groq', 'gemini', 'fallback']);
+  assert.ok(bare.every((t) => t.keySlot !== ('primary' as any) && !/^gpt-5/.test(t.model)));
+  // a role model on the old slot (or with no slot, which used to mean it) is ignored; the global model stays
+  const rm = { tl: { model: 'gpt-5.4-nano' }, ol: { model: 'gpt-5.5', key_slot: 'primary' }, apc: { model: 'm', key_slot: 'groq' } };
+  for (const role of ['tl', 'ol']) assert.deepEqual([resolveRoleConfig({ model: 'g', model_key_slot: 'gemini', role_models: rm }, role).model, resolveRoleConfig({ model: 'g', model_key_slot: 'gemini', role_models: rm }, role).model_source], ['g', 'global']);
+  assert.equal(resolveRoleConfig({ model: 'g', model_key_slot: 'gemini', role_models: rm }, 'apc').model_key_slot, 'groq');
 });
 
 test('parameter compatibility: which field to drop, and the request without it', () => {
@@ -67,7 +83,7 @@ test('parameter compatibility: which field to drop, and the request without it',
   assert.equal(b.reasoning, undefined);
   assert.equal(b.include, undefined);
   assert.deepEqual(b.input.map((x: any) => x.type ?? x.role), ['user', 'function_call']);   // reasoning items dropped with include
-  assert.deepEqual(omitFor([row('primary', 'm', { params: { omit: ['text'] } })], { keySlot: 'primary', model: 'm' }), ['text']);
+  assert.deepEqual(omitFor([row('gemini', 'm', { params: { omit: ['text'] } })], { keySlot: 'gemini', model: 'm' }), ['text']);
 });
 
 // ── the turn ────────────────────────────────────────────────────────────────
@@ -76,8 +92,8 @@ function db(tables: Record<string, any[]> = {}) {
   const inserts: Record<string, any[]> = {};
   const updates: any[] = [];
   let seq = 0;
-  const base: Record<string, any[]> = { ai_assistant_config: [{ id: 1, persona: '', model: 'gpt-5.4-mini', enabled: true, retrieval: {}, prices: {},
-    model_key_slot: 'primary', fallback_enabled: true, fallback_models: [{ key_slot: 'fallback', model: 'gpt-6-luna' }] }], ...tables };
+  const base: Record<string, any[]> = { ai_assistant_config: [{ id: 1, persona: '', model: 'gemini-3.5-flash-lite', enabled: true, retrieval: {}, prices: {},
+    model_key_slot: 'gemini', fallback_enabled: true, fallback_models: [{ key_slot: 'fallback', model: 'gpt-6-luna' }] }], ...tables };
   const from = (table: string) => {
     let op = 'select'; let payload: any = null; const where: any = {};
     const q: any = {
@@ -97,28 +113,27 @@ function db(tables: Record<string, any[]> = {}) {
   };
   return { from, rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'missing' } }), inserts, updates };
 }
-const deps = (d: any, llm: any, o: any = {}) => ({ admin: d, searchRpc: async () => [], asUser: 'u1', apiKey: 'pk', fallbackKey: 'fk', embed: async () => [0.1], llm, requestId: 'r1', ...o });
+const deps = (d: any, llm: any, o: any = {}) => ({ admin: d, searchRpc: async () => [], asUser: 'u1', geminiKey: 'gk', groqKey: 'qk', fallbackKey: 'fk', embed: async () => [0.1], llm, requestId: 'r1', ...o });
 const ok = (text: string): LlmResult => ({ text, toolCalls: [], output: [], usage: { input: 100, cached: 0, output: 10, reasoning: 0 }, status: 'completed' });
 
-test('fallback chain: no credits on the primary → the SAME turn answers on gpt-6-luna with the fallback key, flagged', async () => {
+test('fallback chain: Gemini out of quota → the SAME turn answers on the OpenAI free-tier model, flagged, cost 0', async () => {
   const d = db();
   const seen: LlmRequest[] = [];
   const llm = async (r: LlmRequest) => {
     seen.push(r);
-    if (r.apiKey === 'pk') throw new LlmError(`model HTTP 429: ${QUOTA}`, 429);
+    if (r.apiKey === 'gk') throw new LlmError(`model HTTP 429: ${QUOTA}`, 429);
     r.onDelta?.('Answer from luna.');
     return ok('Answer from luna.');
   };
   const events: any[] = [];
   const res = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm), (e) => events.push(e));
   assert.equal(res.answer, 'Answer from luna.');
-  assert.deepEqual(seen.map((r) => [r.apiKey, r.model]), [['pk', 'gpt-5.4-mini'], ['fk', 'gpt-6-luna']]);
+  assert.deepEqual(seen.map((r) => [r.apiKey, r.model]), [['gk', 'gemini-3.5-flash-lite'], ['fk', 'gpt-6-luna']]);
   assert.ok(!events.some((e) => e.error), 'the user never saw an error');
   const log = d.inserts.ai_request_log[0];
   assert.deepEqual([log.model, log.key_slot, log.flags.fallback_used], ['gpt-6-luna', 'fallback',
-    { from: 'primary:gpt-5.4-mini', to: 'fallback:gpt-6-luna', reason: 'quota' }]);
-  assert.equal(log.est_cost_usd, 0);                  // luna is free
-  assert.ok(!log.flags.unpriced);
+    { from: 'gemini:gemini-3.5-flash-lite', to: 'fallback:gpt-6-luna', reason: 'quota' }]);
+  assert.equal(log.est_cost_usd, 0);
   const reply = d.inserts.ai_messages.find((m: any) => m.role === 'assistant');
   assert.deepEqual([reply.meta.model, reply.meta.key_slot, reply.meta.fallback_used.to], ['gpt-6-luna', 'fallback', 'fallback:gpt-6-luna']);
 });
@@ -135,7 +150,7 @@ test('fallback chain: when every entry fails, the quota message is shown; reason
   const events: any[] = [];
   await runTurn({ userId: 'u1', role: 'apc', message: 'hi' }, deps(d, llm), (e) => events.push(e));
   assert.equal(events.find((e) => e.error).error, providerIssueMessage('quota', 'apc'));
-  assert.ok(inputs[1].some((x) => x.type === 'reasoning'), 'the primary saw its own reasoning');
+  assert.ok(inputs[1].some((x) => x.type === 'reasoning'), 'the first model saw its own reasoning');
   assert.ok(!inputs[2].some((x) => x.type === 'reasoning'), 'the fallback did not get it');
   assert.equal(d.inserts.ai_request_log[0].flags.provider_quota, true);
 });
@@ -145,16 +160,16 @@ test('a rejected parameter is dropped, the call retried once, and the finding re
   const seen: LlmRequest[] = [];
   const llm = async (r: LlmRequest) => {
     seen.push(r);
-    if (!r.omit?.includes('reasoning')) throw new LlmError('model HTTP 400: {"error":{"param":"reasoning.effort","code":"unsupported_parameter"}}', 400);
+    if (!r.omit?.includes('reasoning_effort')) throw new LlmError('model HTTP 400: `reasoning_effort` is not supported with this model', 400);
     r.onDelta?.('fine');
     return ok('fine');
   };
-  const res = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm, { catalog: [row('primary', 'gpt-5.4-mini'), row('fallback', 'gpt-6-luna')] }), () => {});
+  const res = await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm, { catalog: [row('gemini', 'gemini-3.5-flash-lite'), row('fallback', 'gpt-6-luna')] }), () => {});
   assert.equal(res.answer, 'fine');
-  assert.deepEqual(seen.map((r) => r.omit ?? []), [[], ['reasoning']]);
-  assert.deepEqual(d.inserts.ai_request_log[0].flags.params_dropped, ['primary:gpt-5.4-mini:reasoning']);
+  assert.deepEqual(seen.map((r) => r.omit ?? []), [[], ['reasoning_effort']]);
+  assert.deepEqual(d.inserts.ai_request_log[0].flags.params_dropped, ['gemini:gemini-3.5-flash-lite:reasoning_effort']);
   const upd = d.updates.find((u: any) => u.table === 'ai_model_catalog');
-  assert.deepEqual([upd.set, upd.where], [{ params: { omit: ['reasoning'] } }, { key_slot: 'primary', model: 'gpt-5.4-mini' }]);
+  assert.deepEqual([upd.set, upd.where], [{ params: { omit: ['reasoning_effort'] } }, { key_slot: 'gemini', model: 'gemini-3.5-flash-lite' }]);
 });
 
 test('keyword-only search: flagged when embedding fails, and the prompt says so when embeddings are known to be down', async () => {
@@ -174,70 +189,76 @@ test('keyword-only search: flagged when embedding fails, and the prompt says so 
   assert.equal(calls.find(([f]) => f === 'ai_search')[1].p_query_embedding, null);   // the fts arm only
 });
 
-test('an unpriced model costs 0 and is marked unpriced', async () => {
-  const d = db({ ai_assistant_config: [{ id: 1, model: 'gpt-mystery', model_key_slot: 'primary', enabled: true, retrieval: {}, prices: {}, fallback_models: [] }] });
+test('a free model costs 0 whatever the price table says, and is never marked unpriced', async () => {
+  const d = db({ ai_assistant_config: [{ id: 1, model: 'gemini-mystery', model_key_slot: 'gemini', enabled: true, retrieval: {}, prices: { 'gemini-mystery': { in: 99, cached: 99, out: 99 } }, fallback_models: [] }] });
   const llm = async (r: LlmRequest) => { r.onDelta?.('x'); return ok('x'); };
-  await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm, { catalog: [row('primary', 'gpt-mystery')] }), () => {});
+  await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm, { catalog: [row('gemini', 'gemini-mystery')] }), () => {});
   const log = d.inserts.ai_request_log[0];
-  assert.deepEqual([log.model, log.est_cost_usd, log.flags.unpriced], ['gpt-mystery', 0, true]);
+  assert.deepEqual([log.model, log.est_cost_usd, log.flags.unpriced, log.flags.free_tier], ['gemini-mystery', 0, undefined, true]);
 });
 
 // ── embeddings across keys ──────────────────────────────────────────────────
 
-test('query embeddings: primary, then the fallback key; both out of credit → down for 10 minutes, no more calls', async () => {
+test('query embeddings: free providers only; every refused/out-of-quota provider → down for 10 minutes, no more calls (the OpenAI keys are never used)', async () => {
   _resetEmbedDown();
   const hits: string[] = [];
-  const mk = (fallbackOk: boolean) => async (_u: any, init: any) => {
-    const key = String(init.headers.authorization).slice(7);
-    hits.push(key);
-    if (key === 'pk' || !fallbackOk) return new Response(QUOTA, { status: 429 });
+  const mk = (ok: boolean) => async (url: any, init: any) => {
+    hits.push(String(url));
+    if (!ok) return new Response(QUOTA, { status: 429 });
     return new Response(JSON.stringify({ data: [{ index: 0, embedding: new Array(1536).fill(0) }], usage: { prompt_tokens: 3, total_tokens: 3 } }), { status: 200 });
   };
-  const meter = new UsageMeter();
-  const good = chainEmbedder({ openAiKey: 'pk', openAiKeyFallback: 'fk', fetchImpl: mk(true) as any } as any, meter);
+  const env = (ok: boolean) => ({ openAiKeyFallback: 'fk', nvidiaKey: 'nv', fetchImpl: mk(ok) as any } as any);
+  const good = chainEmbedder(env(true), new UsageMeter());
   assert.equal((await good.embed('a')).length, 1536);
-  assert.deepEqual(hits, ['pk', 'fk']);
-  assert.equal(meter.embed.keySlot, 'fallback');
+  assert.ok(hits.every((u) => u.includes('nvidia.com')), 'only NVIDIA was asked');
   hits.length = 0;
-  const bad = chainEmbedder({ openAiKey: 'pk', openAiKeyFallback: 'fk', fetchImpl: mk(false) as any } as any, new UsageMeter());
+  const bad = chainEmbedder(env(false), new UsageMeter());
   await assert.rejects(bad.embed('b'));
+  await assert.rejects(bad.alt!('b'));   // no second provider configured here
   assert.equal(bad.down(), true);
   const before = hits.length;
   await assert.rejects(bad.embed('c'));
   assert.equal(hits.length, before, 'no call while down');
+  assert.ok(!hits.some((u) => u.includes('openai.com')));
   _resetEmbedDown();
 });
 
 // ── refresh_models ──────────────────────────────────────────────────────────
 
-test('refreshModels: lists, probes, marks free while credits are exhausted, upserts, keeps learned params', async () => {
+test('refreshModels: probes free models only; the OpenAI key is probed for the free-tier model alone; upserts, keeps learned params', async () => {
+  const probed: string[] = [];
   const fetchImpl = async (url: string, init: any) => {
     const key = String(init.headers.authorization).slice(7);
-    if (url.endsWith('/v1/models')) {
-      const ids = key === 'pk' ? ['gpt-5.4-mini', 'gpt-image-1'] : ['gpt-6-luna', 'gpt-5.4-mini', 'gpt-4o-mini-tts'];
+    if (url.endsWith('/models')) {
+      const ids = key === 'fk' ? ['gpt-6-luna', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-4o-mini-tts'] : ['gemini-3.5-flash-lite', 'imagen-4', 'gemini-broken'];
       return new Response(JSON.stringify({ data: ids.map((id) => ({ id })) }), { status: 200 });
     }
     const body = JSON.parse(init.body);
-    if (body.model !== 'gpt-6-luna') return new Response(QUOTA, { status: 429 });
-    if (body.stream) return new Response('event: x\ndata: {"type":"response.output_text.delta","delta":"hi"}\n\n', { status: 200 });
-    if (body.tools) return new Response(JSON.stringify({ output: [{ type: 'function_call' }], usage: { input_tokens: 40, output_tokens: 10 } }), { status: 200 });
-    return new Response(JSON.stringify({ output: [], usage: { input_tokens: 12, output_tokens: 2 } }), { status: 200 });
+    probed.push(`${key}:${body.model}`);
+    if (body.model === 'gemini-broken') return new Response('{"error":{"message":"not found"}}', { status: 404 });
+    if (url.includes('openai.com')) {
+      if (body.stream) return new Response('event: x\ndata: {"type":"response.output_text.delta","delta":"hi"}\n\n', { status: 200 });
+      if (body.tools) return new Response(JSON.stringify({ output: [{ type: 'function_call' }], usage: { input_tokens: 40, output_tokens: 10 } }), { status: 200 });
+      return new Response(JSON.stringify({ output: [], usage: { input_tokens: 12, output_tokens: 2 } }), { status: 200 });
+    }
+    if (body.stream) return new Response('data: {"choices":[{"delta":{"content":"hi"}}]}\n\n', { status: 200 });
+    if (body.tools) return new Response(JSON.stringify({ choices: [{ message: { tool_calls: [{ id: 'c' }] } }], usage: { prompt_tokens: 40, completion_tokens: 10 } }), { status: 200 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }], usage: { prompt_tokens: 12, completion_tokens: 2 } }), { status: 200 });
   };
   const d = db({ ai_model_catalog: [{ key_slot: 'fallback', model: 'gpt-6-luna', params: { omit: ['text'] } }] });
   const r = await refreshModels({ keys: KEYS, admin: d, prices: pricesFrom({}), fetchImpl: fetchImpl as any });
-  // every listed model is stored; non-chat ones with a reason and no call
-  assert.deepEqual(r.slots.primary, { listed: 2, probed: 1, available: 0, usable: 0, free: [], credits_exhausted: true });
-  assert.deepEqual(r.slots.fallback, { listed: 3, probed: 2, available: 1, usable: 1, free: ['gpt-6-luna'], credits_exhausted: true });
-  assert.deepEqual(r.models.filter((m) => m.reason && !m.last_error).map((m) => [m.key_slot, m.model, m.reason]),
-    [['fallback', 'gpt-4o-mini-tts', 'audio model (not for chat)'], ['primary', 'gpt-image-1', 'image model (not for chat)']]);
-  assert.equal(r.models.find((m) => m.key_slot === 'primary' && m.model === 'gpt-5.4-mini')!.reason, 'no quota on this key');
+  // no paid OpenAI model is ever sent a request
+  assert.ok(probed.filter((p) => p.startsWith('fk:')).every((p) => p === 'fk:gpt-6-luna'), probed.join(','));
+  assert.deepEqual(r.models.filter((m) => m.key_slot === 'fallback' && m.model !== 'gpt-6-luna').map((m) => [m.model, m.available, m.reason]),
+    [['gpt-4o-mini-tts', false, 'audio model (not for chat)'], ['gpt-5.4-mini', false, 'paid OpenAI model (Buddy uses free models only)'], ['gpt-5.5', false, 'paid OpenAI model (Buddy uses free models only)']]);
+  assert.deepEqual(r.slots.fallback, { listed: 4, probed: 1, available: 1, usable: 1, free: ['gpt-6-luna'], credits_exhausted: false });
+  assert.deepEqual([r.slots.gemini.probed, r.slots.gemini.usable, r.slots.gemini.free], [2, 1, ['gemini-3.5-flash-lite']]);
+  assert.equal(r.models.find((m) => m.model === 'gemini-broken')!.reason, 'retired or not found on this key');
   const luna = r.models.find((m) => m.model === 'gpt-6-luna')!;
   assert.deepEqual([luna.available, luna.supports_tools, luna.supports_stream, luna.free], [true, true, true, true]);
-  assert.match(r.models.find((m) => m.key_slot === 'primary')!.last_error!, /429/);
   const up = d.inserts.ai_model_catalog.find((x: any) => x.model === 'gpt-6-luna');
   assert.deepEqual(up.params, { omit: ['text'] });
   assert.equal(r.probe_cost_usd_est, 0);
-  assert.equal(r.probe_tokens.input, 52);
 });
 
 // ── a free model's used-up allowance (live bug 2026-10-01) ──────────────────
@@ -271,24 +292,23 @@ test('an in-stream rate-limit error gets status 429, its code and its wait; a wa
   assert.equal(scrubSecrets('Incorrect API key provided: sk-proj-abc123****wxyz.'), 'Incorrect API key provided: sk-….');
 });
 
-test('whole chain out (primary no credits, luna limit): a specific message, and the real error in flags.error_detail', async () => {
+test('whole chain out (Gemini no quota, luna limit): a specific message, and the real error in flags.error_detail', async () => {
   const d = db();
-  const fetchImpl = async (_u: any, init: any) => String(init.headers.authorization).endsWith(' pk')
-    ? new Response(QUOTA, { status: 429 })
-    : sse({ type: 'error', code: 'rate_limit_exceeded', message: LUNA_LIMIT_MSG });
-  const llm = (r: LlmRequest) => respond({ ...r, fetchImpl: fetchImpl as any });
+  const fetchImpl = async () => sse({ type: 'error', code: 'rate_limit_exceeded', message: LUNA_LIMIT_MSG });
+  const llm = (r: LlmRequest) => (r.apiKey === 'gk' ? Promise.reject(new LlmError(`model HTTP 429: ${QUOTA}`, 429)) : respond({ ...r, fetchImpl: fetchImpl as any }));
   const events: any[] = [];
   const t0 = Date.now();
   await runTurn({ userId: 'u1', role: 'boss', message: 'hi' }, deps(d, llm), (e) => events.push(e));
   assert.ok(Date.now() - t0 < 1000, 'no retry waits');
   const msg = events.find((e) => e.error).error;
-  assert.match(msg, /OpenAI credits are used up/);
-  assert.match(msg, /gpt-6-luna has used up its OpenAI token allowance \(OpenAI estimates about 37 h before a question fits again\)/);
+  assert.match(msg, /Gemini has no free quota left on its key \(gemini-3.5-flash-lite\)/);
+  assert.doesNotMatch(msg, /credits|billing|top up/i);
+  assert.match(msg, /gpt-6-luna has used up its OpenAI \(free tier\) token allowance \(OpenAI \(free tier\) estimates about 37 h before a question fits again\)/);
   assert.ok(events.some((e) => e.status === 'Switching to a backup model…'));
   const log = d.inserts.ai_request_log[0];
   assert.deepEqual(log.flags.error_detail, { step: 'model round 0', class: 'LlmError', status: 429, code: 'rate_limit_exceeded',
     message: log.error.slice(0, 300), target: 'fallback:gpt-6-luna', retry_after_s: 132866 });
-  assert.deepEqual([log.flags.provider_issue, log.flags.model_attempts.map((a: any) => a.target)], ['limit', ['primary:gpt-5.4-mini', 'fallback:gpt-6-luna']]);
+  assert.deepEqual([log.flags.provider_issue, log.flags.model_attempts.map((a: any) => a.target)], ['limit', ['gemini:gemini-3.5-flash-lite', 'fallback:gpt-6-luna']]);
   const reply = d.inserts.ai_messages.find((m: any) => m.role === 'assistant');
   assert.equal(reply.meta.error, msg);                  // the saved reply says the same, not "Something went wrong"
   // other roles: no technical detail

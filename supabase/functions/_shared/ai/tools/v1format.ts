@@ -10,6 +10,7 @@ export const ROLE_LABEL: Record<string, string> = {
   pctl: 'Paid Collab Team Lead (PCTL)',
   apc: 'Affiliate Program Coordinator (APC)',
   ipc: 'Influencer Program Coordinator (IPC)',
+  ads_manager: 'Ads Manager',
   developer: 'Developer',
 };
 

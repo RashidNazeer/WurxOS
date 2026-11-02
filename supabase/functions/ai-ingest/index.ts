@@ -10,22 +10,20 @@
 // and worker.ts, which scripts/ingest.mjs and the tests run under Node too.
 //
 // Secrets: AI_INGEST_SECRET (same value as app_config.ai_ingest_secret),
-// OPEN_AI_API_KEY; SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are built in.
+// NVIDIA_API_KEY (+ NVIDIA_API_KEY_2) and GEMINI_API_KEY: the FREE embedding providers.
+// OpenAI is not used for embeddings any more. SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are built in.
 // ============================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { supabaseRpc } from '../_shared/ai/ingest/db.ts';
 import { parseMode, runIngest } from '../_shared/ai/ingest/run.ts';
-import { openAiEmbedder } from '../_shared/ai/ingest/worker.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const INGEST_SECRET = Deno.env.get('AI_INGEST_SECRET') ?? '';
-const OPENAI_KEY = Deno.env.get('OPEN_AI_API_KEY') ?? '';
-const OPENAI_KEY_FALLBACK = Deno.env.get('OPEN_AI_API_KEY_FALLBACK') ?? '';
-// The second vector space (mig 406): the provider is a setting (mig 408,
-// embed_alt_provider), so every key is handed over and the worker picks.
-const ALT_KEYS = {
+// Two vector spaces (mig 432): NVIDIA fills the main one, the provider in embed_alt_provider
+// (Gemini) the second. Every key is handed over and the worker picks per the settings.
+const KEYS = {
   nvidia: Deno.env.get('NVIDIA_API_KEY') ?? null,
   nvidia2: Deno.env.get('NVIDIA_API_KEY_2') ?? null,
   gemini: Deno.env.get('GEMINI_API_KEY') ?? null,
@@ -48,7 +46,7 @@ Deno.serve(async (req) => {
   if (!INGEST_SECRET || !sameSecret(req.headers.get('x-webhook-secret') ?? '', INGEST_SECRET)) {
     return new Response('Unauthorized', { status: 401 });
   }
-  if (!SUPABASE_URL || !SERVICE_KEY || !OPENAI_KEY) return json({ error: 'function secrets missing' }, 500);
+  if (!SUPABASE_URL || !SERVICE_KEY || !(KEYS.nvidia || KEYS.nvidia2 || KEYS.gemini)) return json({ error: 'function secrets missing' }, 500);
 
   const text = await req.text();
   let body: unknown = null;
@@ -60,8 +58,7 @@ Deno.serve(async (req) => {
   try {
     const result = await runIngest(mode, {
       rpc: supabaseRpc(admin),
-      embed: openAiEmbedder([OPENAI_KEY, OPENAI_KEY_FALLBACK]),
-      altKeys: ALT_KEYS,
+      keys: KEYS,
     });
     return json({ ok: true, ...result });
   } catch (e) {

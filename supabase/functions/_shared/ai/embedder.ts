@@ -1,5 +1,8 @@
-// Batched OpenAI embeddings (A§7). The API key is always passed in by the
-// caller; nothing here reads the environment.
+// Batched embeddings over FREE providers only (NVIDIA, Gemini). OpenAI is gone:
+// the paid key has no credits and the free-tier key cannot embed (HTTP 429
+// "no credits remaining", 2026-11-02). embedTexts refuses OpenAI's host, so no
+// code path can send an embedding request that could be billed.
+// The API key is always passed in by the caller; nothing here reads the environment.
 //
 // Batches are cut by input count AND estimated tokens, sent at most
 // `concurrency` at a time, and retried on 429 / 5xx / network errors /
@@ -23,6 +26,8 @@ export type EmbedOptions = {
   dimensions?: number;          // sent as `dimensions` (NVIDIA: 1536)
   normalize?: boolean;          // L2-normalise each vector
   extraBody?: Record<string, unknown>;   // provider fields (NVIDIA: input_type, encoding_format)
+  format?: 'openai' | 'gemini';          // request shape: OpenAI-style /embeddings (NVIDIA) or Gemini batchEmbedContents
+  taskType?: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY';   // Gemini only
   // Test seams.
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
@@ -75,16 +80,79 @@ export function makeBatches(texts: string[], maxInputs: number, maxTokens: numbe
   return batches;
 }
 
+// ── providers ────────────────────────────────────────────────────────────────
+// Two vector spaces, one model each, never compared with each other:
+//   ai_chunks.embedding      (the MAIN space)      always DEFAULT_CONFIG.EMBED_MODEL's provider
+//   ai_chunks.embedding_alt  (the SECOND space)    ai_assistant_config.embed_alt_provider
+// Both are 1536 dims.
+//   nvidia  llama-nemotron-embed-vl-1b-v2: asymmetric (documents 'passage', questions 'query')
+//   gemini  gemini-embedding-001 (native batchEmbedContents with RETRIEVAL_DOCUMENT /
+//           RETRIEVAL_QUERY task types), 1536 of its 3072 dims, so L2-normalised here
+export type EmbedProvider = 'nvidia' | 'gemini';
+export type AltProvider = EmbedProvider;   // back-compat name
+
+export const NVIDIA_EMBED_MODEL = 'nvidia/llama-nemotron-embed-vl-1b-v2';
+export const NVIDIA_EMBED_ENDPOINT = 'https://integrate.api.nvidia.com/v1/embeddings';
+export const GEMINI_EMBED_MODEL = 'gemini-embedding-001';
+export const GEMINI_EMBED_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+// The label stored in embedding_model / embed_model_alt; ai_alt_model_for() in SQL must agree.
+export const MODEL_LABEL: Record<EmbedProvider, string> = {
+  nvidia: 'nvidia:llama-nemotron-embed-vl-1b-v2',
+  gemini: `gemini:${GEMINI_EMBED_MODEL}`,
+};
+export const ALT_MODEL_LABEL = MODEL_LABEL;   // back-compat name
+export const ALT_EMBED_MODEL = MODEL_LABEL.nvidia;
+export const isAltProvider = (p: unknown): p is EmbedProvider => p === 'nvidia' || p === 'gemini';
+export const providerOfLabel = (label: string): EmbedProvider | null => {
+  const p = String(label ?? '').split(':')[0];
+  return isAltProvider(p) ? p : null;
+};
+// The provider of the MAIN space is fixed by the model label the pipeline is built for.
+export const MAIN_PROVIDER: EmbedProvider = providerOfLabel(DEFAULT_CONFIG.EMBED_MODEL) ?? 'nvidia';
+
+export type AltKeys = { nvidia?: string | null; nvidia2?: string | null; gemini?: string | null };
+export type EmbedKeys = AltKeys;
+
+// Every key of a provider, in order (NVIDIA has two).
+export const keysFor = (provider: EmbedProvider, keys: AltKeys): Array<string | null | undefined> =>
+  (provider === 'gemini' ? [keys.gemini] : [keys.nvidia, keys.nvidia2]);
+export const altKeysFor = keysFor;   // back-compat name
+
+export function embedOptions(provider: EmbedProvider, kind: 'passage' | 'query', extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
+  if (provider === 'gemini') {
+    return {
+      model: GEMINI_EMBED_MODEL, endpoint: GEMINI_EMBED_BASE, format: 'gemini', dims: 1536, dimensions: 1536, normalize: true,
+      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT',
+      // The free tier allows about 100 inputs and ~30k tokens a minute: small requests, paced by the worker.
+      batchInputs: 50, batchTokens: 20_000, concurrency: 1, maxRetries: 1, ...extra,
+    };
+  }
+  return {
+    model: NVIDIA_EMBED_MODEL, endpoint: NVIDIA_EMBED_ENDPOINT, format: 'openai', dims: 1536, dimensions: 1536,
+    extraBody: { input_type: kind, encoding_format: 'float' },
+    // Measured 2026-11-02: 128 passages (49k tokens) answer in 3 s; 70 rapid requests drew no 429.
+    batchInputs: 96, batchTokens: 40_000, concurrency: 1, maxRetries: 2, ...extra,
+  };
+}
+export const altEmbedOptions = embedOptions;   // back-compat name
+export const nvidiaEmbedOptions = (kind: 'passage' | 'query', extra: Partial<EmbedOptions> = {}) => embedOptions('nvidia', kind, extra);
+export const geminiEmbedOptions = (extra: Partial<EmbedOptions> = {}) => embedOptions('gemini', 'passage', extra);
+
 export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<EmbedResult> {
   if (!opts.apiKey) throw new EmbedError('embedTexts: apiKey is required', false);
   const empty = texts.findIndex((t) => typeof t !== 'string' || !t.trim());
   if (empty >= 0) throw new EmbedError(`embedTexts: input ${empty} is empty`, false);
 
-  const model = opts.model ?? DEFAULT_CONFIG.EMBED_MODEL;
+  const model = opts.model ?? NVIDIA_EMBED_MODEL;
   const dims = opts.dims ?? DEFAULT_CONFIG.EMBED_DIMS;
   const maxRetries = opts.maxRetries ?? DEFAULT_CONFIG.EMBED_MAX_RETRIES;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_CONFIG.EMBED_TIMEOUT_MS;
-  const endpoint = opts.endpoint ?? 'https://api.openai.com/v1/embeddings';
+  const endpoint = opts.endpoint ?? NVIDIA_EMBED_ENDPOINT;
+  const format = opts.format ?? 'openai';
+  if (/(^|\.)openai\.com$/i.test(new URL(endpoint).hostname)) {
+    throw new EmbedError('embedTexts: OpenAI embeddings are not used any more (free providers only)', false);
+  }
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const random = opts.random ?? Math.random;
@@ -96,26 +164,37 @@ export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<E
   const usage = { promptTokens: 0, totalTokens: 0 };
   let requests = 0;
 
-  async function once(input: string[]): Promise<{ data: { index: number; embedding: number[] }[]; usage?: { prompt_tokens?: number; total_tokens?: number } }> {
+  type Raw = { vectors: Array<{ index: number; embedding: number[] }>; tokens: number };
+  async function once(input: string[]): Promise<Raw> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     requests++;
     try {
       let res: Response;
       try {
-        res = await doFetch(endpoint, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${opts.apiKey}` },
-          body: JSON.stringify({ model, input, ...(opts.dimensions ? { dimensions: opts.dimensions } : {}), ...(opts.extraBody ?? {}) }),
-          signal: ctrl.signal,
-        });
+        res = format === 'gemini'
+          ? await doFetch(`${endpoint.replace(/\/$/, '')}/models/${model}:batchEmbedContents`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', 'x-goog-api-key': opts.apiKey },
+              body: JSON.stringify({ requests: input.map((t) => ({
+                model: `models/${model}`, content: { parts: [{ text: t }] },
+                taskType: opts.taskType ?? 'RETRIEVAL_DOCUMENT',
+                ...(opts.dimensions ? { outputDimensionality: opts.dimensions } : {}) })) }),
+              signal: ctrl.signal,
+            })
+          : await doFetch(endpoint, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: `Bearer ${opts.apiKey}` },
+              body: JSON.stringify({ model, input, ...(opts.dimensions ? { dimensions: opts.dimensions } : {}), ...(opts.extraBody ?? {}) }),
+              signal: ctrl.signal,
+            });
       } catch (e) {
         const timedOut = ctrl.signal.aborted;
         throw new EmbedError(timedOut ? `embeddings request timed out after ${timeoutMs} ms` : `embeddings network error: ${(e as Error)?.message ?? e}`, true);
       }
       if (!res.ok) {
-        const body = (await res.text().catch(() => '')).slice(0, 300);
-        // No credits / a refused key / a wait of hours is not a passing rate limit: retrying cannot help.
+        const body = (await res.text().catch(() => '')).slice(0, 1500);
+        // No quota / a refused key / a wait of hours is not a passing rate limit: retrying cannot help.
         const noCredit = !!providerAccountIssue({ status: res.status, message: body });
         const err = new EmbedError(`embeddings HTTP ${res.status}: ${body}`, !noCredit && (res.status === 429 || res.status >= 500), res.status);
         const ra = Number(res.headers.get('retry-after'));
@@ -126,7 +205,13 @@ export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<E
         }
         throw err;
       }
-      return await res.json();
+      const json = await res.json();
+      if (format === 'gemini') {
+        const list = Array.isArray(json?.embeddings) ? json.embeddings : [];
+        return { vectors: list.map((d: { values: number[] }, index: number) => ({ index, embedding: d.values })),
+                 tokens: input.reduce((a, t) => a + estimateTokens(t), 0) };
+      }
+      return { vectors: Array.isArray(json?.data) ? json.data : [], tokens: Number(json?.usage?.total_tokens ?? 0) };
     } finally {
       clearTimeout(timer);
     }
@@ -136,18 +221,18 @@ export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<E
     const input = idx.map((i) => texts[i]);
     for (let attempt = 0; ; attempt++) {
       try {
-        const json = await once(input);
-        if (!Array.isArray(json?.data) || json.data.length !== input.length) {
-          throw new EmbedError(`embeddings: expected ${input.length} vectors, got ${json?.data?.length ?? 0}`, false);
+        const raw = await once(input);
+        if (raw.vectors.length !== input.length) {
+          throw new EmbedError(`embeddings: expected ${input.length} vectors, got ${raw.vectors.length}`, false);
         }
-        for (const d of json.data) {
+        for (const d of raw.vectors) {
           if (!Array.isArray(d.embedding) || d.embedding.length !== dims) {
             throw new EmbedError(`embeddings: expected ${dims} dims, got ${d.embedding?.length}`, false);
           }
           vectors[idx[d.index]] = opts.normalize ? l2normalize(d.embedding) : d.embedding;
         }
-        usage.promptTokens += json.usage?.prompt_tokens ?? 0;
-        usage.totalTokens += json.usage?.total_tokens ?? 0;
+        usage.promptTokens += raw.tokens;
+        usage.totalTokens += raw.tokens;
         return;
       } catch (e) {
         const err = e instanceof EmbedError ? e : new EmbedError(String((e as Error)?.message ?? e), false);
@@ -167,51 +252,9 @@ export async function embedTexts(texts: string[], opts: EmbedOptions): Promise<E
   return { vectors, usage, requests, batches: batches.length };
 }
 
-// ── the second vector space (mig 406; providers mig 408) ────────────────────
-// ai_chunks.embedding_alt holds ONE model's vectors, chosen by
-// ai_assistant_config.embed_alt_provider and labelled in embed_model_alt:
-//   nvidia  llama-nemotron-embed-vl-1b-v2 — asymmetric: documents are embedded
-//           as 'passage', questions as 'query'
-//   gemini  gemini-embedding-001 — 1536 of its 3072 dims, so L2-normalised here
-// Never compared with OpenAI's space. Free keys: one request at a time.
-export type AltProvider = 'nvidia' | 'gemini';
-
-export const NVIDIA_EMBED_MODEL = 'nvidia/llama-nemotron-embed-vl-1b-v2';
-export const NVIDIA_EMBED_ENDPOINT = 'https://integrate.api.nvidia.com/v1/embeddings';
-export const GEMINI_EMBED_MODEL = 'gemini-embedding-001';
-export const GEMINI_EMBED_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/embeddings';
-
-// The label stored in embed_model_alt; ai_alt_model_for() in SQL must agree.
-export const ALT_MODEL_LABEL: Record<AltProvider, string> = {
-  nvidia: 'nvidia:llama-nemotron-embed-vl-1b-v2',
-  gemini: 'gemini:gemini-embedding-001',
-};
-export const ALT_EMBED_MODEL = ALT_MODEL_LABEL.nvidia;   // the default provider's label
-export const isAltProvider = (p: unknown): p is AltProvider => p === 'nvidia' || p === 'gemini';
-
-export function nvidiaEmbedOptions(kind: 'passage' | 'query', extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
-  return {
-    model: NVIDIA_EMBED_MODEL, endpoint: NVIDIA_EMBED_ENDPOINT, dims: 1536, dimensions: 1536,
-    extraBody: { input_type: kind, encoding_format: 'float' },
-    batchInputs: 32, batchTokens: 16_000, concurrency: 1, ...extra,
-  };
-}
-
-export function geminiEmbedOptions(extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
-  return {
-    model: GEMINI_EMBED_MODEL, endpoint: GEMINI_EMBED_ENDPOINT, dims: 1536, dimensions: 1536, normalize: true,
-    batchInputs: 100, batchTokens: 20_000, concurrency: 1, ...extra,
-  };
-}
-
-// Gemini embeds questions and documents the same way; NVIDIA does not.
-export function altEmbedOptions(provider: AltProvider, kind: 'passage' | 'query', extra: Partial<EmbedOptions> = {}): Partial<EmbedOptions> {
-  return provider === 'gemini' ? geminiEmbedOptions(extra) : nvidiaEmbedOptions(kind, extra);
-}
-
-// Keys in order (OpenAI: primary then fallback; NVIDIA: nvidia then nvidia2):
-// the next key is tried only on an account problem (no credits, key refused,
-// a wait of hours). Throws the last error when every key refused.
+// Keys in order (NVIDIA: nvidia then nvidia2): the next key is tried only on an
+// account problem (no quota, key refused, a wait of hours). Throws the last
+// error when every key refused.
 export async function embedWithKeys(texts: string[], keys: Array<string | null | undefined>, extra: Partial<EmbedOptions> = {}):
   Promise<EmbedResult & { keyIndex: number }> {
   const usable = keys.filter((k): k is string => !!k);
@@ -224,57 +267,46 @@ export async function embedWithKeys(texts: string[], keys: Array<string | null |
   throw last;
 }
 
-// Every key of the alt space's configured provider, in order.
-export const altKeysFor = (provider: AltProvider, keys: AltKeys): Array<string | null | undefined> =>
-  (provider === 'gemini' ? [keys.gemini] : [keys.nvidia, keys.nvidia2]);
+// A query vector remembers which model made it, so ai_search can refuse to compare it with
+// chunks from another model (WeakMap: the array itself stays a plain number[]).
+const VECTOR_MODEL = new WeakMap<object, string>();
+export function tagVector<T extends number[]>(v: T, model: string): T { VECTOR_MODEL.set(v, model); return v; }
+export const vectorModel = (v: number[] | null | undefined): string | null => (v ? VECTOR_MODEL.get(v) ?? null : null);
 
-export type AltKeys = { nvidia?: string | null; nvidia2?: string | null; gemini?: string | null };
-
-// ── query vectors for ai_search ──────────────────────────────────────────────
-// CONTRACT (ai_search mig 406; wired in agent/server.ts → searchIndex):
-//   const qv = await queryVectors(question, { openai, openaiFallback, nvidia, nvidia2, gemini },
-//                                 { altProvider: 'nvidia', alt: 'fallback' });
-//   rpc('ai_search', { p_query_embedding: qv.primary && vec(qv.primary),
-//                      p_query_embedding_alt: qv.alt && vec(qv.alt), ... })
-//   • primary: OpenAI (primary key, then the fallback key) → the `embedding` space.
-//   • alt:     the configured alt provider (ai_assistant_config.embed_alt_provider,
-//              default 'nvidia'; questions use input_type 'query') → the
-//              `embedding_alt` space. It must be the provider that FILLED that
-//              column, so never fall back to the other one here.
-//              alt:'fallback' (default) asks for it only when no OpenAI key could
-//              embed; 'always' also when one could (chunks written during an
-//              OpenAI outage have only an alt vector until the backfill runs);
-//              'never' skips it.
-//   • Both null → keyword-only search (ai_search still answers).
-//   • Never throws for a provider problem: issues[] says who failed and why
-//     (ProviderIssue from providerErrors.ts, or 'error'), for logs and notes.
+// ── query vectors ────────────────────────────────────────────────────────────
+// A question is embedded in EVERY space that holds document vectors, each by the
+// provider that filled it (never one provider's query against another's
+// documents): ai_search takes p_query_embedding (main space) and
+// p_query_embedding_alt (second space) and fuses them with the keywords.
+//   queryVectors(question, keys, { altProvider }) → { main, alt, issues }
+//   • main: MAIN_PROVIDER's key(s); alt: ai_assistant_config.embed_alt_provider's.
+//   • Either may be null (no key, provider down); both null → keyword-only search.
+//   • Never throws for a provider problem: issues[] says who failed and why.
 //   • Tests inject fetchImpl; nothing here reads the environment.
 export type QueryVectors = {
-  primary: number[] | null;
+  main: number[] | null;
   alt: number[] | null;
-  issues: Array<{ provider: 'openai' | AltProvider; issue: string; message: string }>;
+  issues: Array<{ provider: EmbedProvider; issue: string; message: string }>;
 };
 
-export async function queryVectors(text: string,
-  keys: { openai?: string | null; openaiFallback?: string | null } & AltKeys,
-  o: { alt?: 'fallback' | 'always' | 'never'; altProvider?: AltProvider; fetchImpl?: typeof fetch;
-       sleep?: (ms: number) => Promise<void>; timeoutMs?: number } = {}): Promise<QueryVectors> {
-  const out: QueryVectors = { primary: null, alt: null, issues: [] };
+export async function queryVectors(text: string, keys: AltKeys,
+  o: { altProvider?: EmbedProvider | null; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; timeoutMs?: number } = {}): Promise<QueryVectors> {
+  const out: QueryVectors = { main: null, alt: null, issues: [] };
   const q = String(text ?? '').trim();
   if (!q) return out;
   const common = { fetchImpl: o.fetchImpl, sleep: o.sleep, maxRetries: 1, timeoutMs: o.timeoutMs ?? 8000 };
-  const note = (provider: 'openai' | AltProvider, e: unknown) =>
-    out.issues.push({ provider, issue: providerAccountIssue(e) ?? 'error', message: String((e as Error)?.message ?? e).slice(0, 200) });
-  if (keys.openai || keys.openaiFallback) {
-    try { out.primary = (await embedWithKeys([q], [keys.openai, keys.openaiFallback], common)).vectors[0]; }
-    catch (e) { note('openai', e); }
-  }
-  const wantAlt = o.alt === 'always' || ((o.alt ?? 'fallback') === 'fallback' && !out.primary);
-  const provider = o.altProvider ?? 'nvidia';
-  const altKeys = altKeysFor(provider, keys);
-  if (wantAlt && altKeys.some(Boolean)) {
-    try { out.alt = (await embedWithKeys([q], altKeys, altEmbedOptions(provider, 'query', common))).vectors[0]; }
-    catch (e) { note(provider, e); }
-  }
+  const one = async (provider: EmbedProvider): Promise<number[] | null> => {
+    const list = keysFor(provider, keys);
+    if (!list.some(Boolean)) return null;
+    try { return (await embedWithKeys([q], list, embedOptions(provider, 'query', common))).vectors[0]; }
+    catch (e) {
+      out.issues.push({ provider, issue: providerAccountIssue(e) ?? 'error', message: String((e as Error)?.message ?? e).slice(0, 200) });
+      return null;
+    }
+  };
+  const altProvider = o.altProvider && o.altProvider !== MAIN_PROVIDER ? o.altProvider : null;
+  const [m, a] = await Promise.all([one(MAIN_PROVIDER), altProvider ? one(altProvider) : Promise.resolve(null)]);
+  out.main = m;
+  out.alt = a;
   return out;
 }

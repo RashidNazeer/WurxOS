@@ -149,7 +149,7 @@ try {
     }
   }
   else {
-    if (-not $envMap['OPEN_AI_API_KEY']) { Stop-Deploy 'OPEN_AI_API_KEY is missing in .env.dev.' }
+    # OpenAI is not used for embeddings any more (mig 432): ai-ingest needs the NVIDIA / Gemini keys set above, not OPEN_AI_API_KEY.
     if (-not $envMap['AI_INGEST_SECRET']) {
       if ($DryRun) { Write-Host 'AI_INGEST_SECRET is not in .env.dev: the real run generates one (32 random bytes, hex) and stores it there.' }
       else {
@@ -164,17 +164,17 @@ try {
         Write-Host 'generated a new AI_INGEST_SECRET and stored it in .env.dev (not shown).'
       }
     } else { Write-Host 'AI_INGEST_SECRET found in .env.dev (not shown).' }
-    if ($DryRun) { Write-Host "would run: supabase secrets set --env-file <temp file> --project-ref $DevRef   (OPEN_AI_API_KEY, AI_INGEST_SECRET)" }
+    if ($DryRun) { Write-Host "would run: supabase secrets set --env-file <temp file> --project-ref $DevRef   (AI_INGEST_SECRET)" }
     else {
       # Values go through a temp file, never the command line; deleted straight after.
       $tmpDir = Join-Path $env:TEMP 'claude'
       New-Item -ItemType Directory -Force $tmpDir | Out-Null
       $tmp = Join-Path $tmpDir ("deploy-dev-" + [guid]::NewGuid().ToString('N') + '.env')
       try {
-        [IO.File]::WriteAllText($tmp, "OPEN_AI_API_KEY=$($envMap['OPEN_AI_API_KEY'])`nAI_INGEST_SECRET=$($envMap['AI_INGEST_SECRET'])`n", (New-Object Text.UTF8Encoding $false))
+        [IO.File]::WriteAllText($tmp, "AI_INGEST_SECRET=$($envMap['AI_INGEST_SECRET'])`n", (New-Object Text.UTF8Encoding $false))
         Invoke-Supabase @('secrets', 'set', '--env-file', $tmp)
       } finally { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
-      Write-Host 'ok: OPEN_AI_API_KEY and AI_INGEST_SECRET set on dev.'
+      Write-Host 'ok: AI_INGEST_SECRET set on dev.'
     }
   }
 

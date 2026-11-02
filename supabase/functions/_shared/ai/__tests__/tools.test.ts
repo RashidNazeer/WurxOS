@@ -388,13 +388,13 @@ test('rank_brands: coverage over active brands, currencies apart, pending named'
   const db = fakeDb({ brands: BRANDS, reports: reps });
   const r = await runDataTool(db, BOSS, 'rank_brands', { metric: 'gmv_max_spend', period: 'August 2026' });
   assert.match(r.text, /Coverage: 2 of 3 active brands have an approved monthly report for August 2026 \(\+1 inactive brand\); 3 of 4 monthly reports in the period are approved \(not yet: 1 verified\)\./);
-  assert.match(r.text, /1\. Aqua Sonic — \$200\.00 \(August 2026\)\n2\. Old Brand — \$10\.00/);
+  assert.match(r.text, /1\. Aqua Sonic — \$200\.00 \(August 2026\)\n2\. Old Brand \(inactive brand\) — \$10\.00/);
   assert.match(r.text, /Not ranked \(different currency\): Longevity Box £50\.00\./);
-  assert.match(r.text, /Total: \$210\.00 across 2 reports; £50\.00 across 1 report \(currencies kept separate\)\./);
+  assert.match(r.text, /Total of ONLY the brands[^\n]*: \$210\.00 across 2 reports; £50\.00 across 1 report \(currencies kept separate\)\./);
   assert.match(r.text, /Cutler Nutritions · August 2026 \(monthly\): verified/);
   assert.ok(!r.text.includes('$100.00'));
   const roi = await runDataTool(db, BOSS, 'rank_brands', { metric: 'gmv_max_roi', period: 'August 2026' });
-  assert.match(roi.text, /1\. Old Brand — 4\.00[\s\S]*2\. Longevity Box — 3\.00[\s\S]*3\. Aqua Sonic — 2\.50/);   // ratios rank across currencies
+  assert.match(roi.text, /1\. Old Brand \(inactive brand\) — 4\.00[\s\S]*2\. Longevity Box — 3\.00[\s\S]*3\. Aqua Sonic — 2\.50/);   // ratios rank across currencies
 });
 
 test('rankCore: most common currency ranked, ties go to USD', () => {
@@ -427,7 +427,7 @@ test('non-Boss: brand tools only see brands can_view_brand allows', async () => 
   const reps = [weekly('b1', 24, '2026-09-13', 'approved', { gmv: '1' }), weekly('b2', 24, '2026-09-13', 'approved', { gmv: '2' })];
   const db = fakeDb({ brands: BRANDS, reports: reps }, { can_view_brand: (a: any) => a.b_id === 'b2' && a.uid === 'apc-1' });
   const apc = { userId: 'apc-1', role: 'apc' };
-  assert.match((await runDataTool(db, apc, 'list_brands', {})).text, /^Brands you can see \(1\):\n- Aqua Sonic/);
+  assert.match((await runDataTool(db, apc, 'list_brands', {})).text, /^Brands you can see \(1: 1 active, 0 inactive\):\n- Aqua Sonic/);
   assert.equal((await runDataTool(db, apc, 'get_top_creators', { brand: 'Cutler' })).text, 'No brand matches "Cutler".');
   const all = await runDataTool(db, apc, 'get_reports', {});
   assert.match(all.text, /Reports \(1 matched\):\n- Aqua Sonic/);
@@ -440,7 +440,7 @@ test('acl: uses ai_viewable_brand_ids when it exists, detected once; else the pe
   const loopRpc = { can_view_brand: (a: any) => { loopCalls++; return a.b_id === 'b2'; } };
   _resetAclProbe();
   const without = fakeDb({ brands: BRANDS, reports: reps }, loopRpc);
-  assert.match((await runDataTool(without, { userId: 'u1', role: 'apc' }, 'list_brands', {})).text, /^Brands you can see \(1\):\n- Aqua Sonic/);
+  assert.match((await runDataTool(without, { userId: 'u1', role: 'apc' }, 'list_brands', {})).text, /^Brands you can see \(1: 1 active, 0 inactive\):\n- Aqua Sonic/);
   assert.equal(loopCalls, BRANDS.length);
   // absent is remembered: no second probe, straight to the loop
   const probe = fakeDb({ brands: BRANDS, reports: reps }, { ...loopRpc, ai_viewable_brand_ids: () => { setCalls++; return ['b2']; } });
@@ -449,12 +449,12 @@ test('acl: uses ai_viewable_brand_ids when it exists, detected once; else the pe
   // fresh process with the function present: one call, no loop
   _resetAclProbe();
   loopCalls = 0;
-  assert.match((await runDataTool(probe, { userId: 'u1', role: 'apc' }, 'list_brands', {})).text, /^Brands you can see \(1\):\n- Aqua Sonic/);
+  assert.match((await runDataTool(probe, { userId: 'u1', role: 'apc' }, 'list_brands', {})).text, /^Brands you can see \(1: 1 active, 0 inactive\):\n- Aqua Sonic/);
   assert.deepEqual([setCalls, loopCalls], [1, 0]);
   // a transient error falls back to the loop and does not disable the RPC
   _resetAclProbe();
   const flaky = fakeDb({ brands: BRANDS, reports: reps }, { ...loopRpc, ai_viewable_brand_ids: () => { throw new Error('fetch failed'); } });
-  assert.match((await runDataTool(flaky, { userId: 'u1', role: 'apc' }, 'list_brands', {})).text, /^Brands you can see \(1\)/);
+  assert.match((await runDataTool(flaky, { userId: 'u1', role: 'apc' }, 'list_brands', {})).text, /^Brands you can see \(1: 1 active/);
   await runDataTool(probe, { userId: 'u1', role: 'apc' }, 'list_brands', {});
   assert.equal(setCalls, 2);
   _resetAclProbe();
@@ -472,7 +472,7 @@ test('get_reports: non-USD lines carry their currency; USD lines stay v1-identic
 
 test('get_performance: composites 4 at a time, one retry, failures said and ranked last', async () => {
   const ratings = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((id, i) => ({ user_id: id, month: '2026-08', metrics: {}, overall_score: 90 - i }));
-  const profiles = ratings.map((r, i) => ({ id: r.user_id, display_name: `Person ${i + 1}`, role: 'apc', deleted_at: null }));
+  const profiles = ratings.map((r, i) => ({ id: r.user_id, display_name: `Person ${i + 1}`, role: 'apc', is_active: true, deleted_at: null }));
   let inFlight = 0, peak = 0;
   const tries = new Map<string, number>();
   const db = fakeDb({ performance_ratings: ratings, profiles, performance_flags: [], performance_warnings: [] }, {
@@ -489,10 +489,71 @@ test('get_performance: composites 4 at a time, one retry, failures said and rank
   const r = await runDataTool(db, BOSS, 'get_performance', { month: '2026-08' });
   assert.ok(peak <= 4, `peak ${peak}`);
   assert.equal(tries.get('p1'), 2);
-  assert.match(r.text, /- Person 2 — composite 52\.0\/100 — Good/);
+  assert.match(r.text, /- Person 2 \(APC\) — composite 52\.0\/100 — Good/);
   const lines = r.text.split('\n').filter((l) => l.startsWith('- Person'));
-  assert.match(lines[lines.length - 1], /^- Person 1 — composite could not be loaded \(lookup failed\), so this is NOT the Performance page figure/);
+  assert.match(lines[lines.length - 1], /^- Person 1 \(APC\) — composite could not be loaded \(lookup failed\), so this is NOT the Performance page figure/);
   assert.match(r.text, /\(The composite could not be loaded for 1 of 6; they are listed last/);
+});
+
+test('get_performance (ranking): Team Leads without a rating row are ranked, and former employees are never ranked as staff', async () => {
+  // The real October shape: APCs have rating rows; TLs have NONE (their score is computed);
+  // a rated APC has since left (is_active false, deleted).
+  const profiles = [
+    { id: 'apc-new', display_name: 'Haseeb', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'apc-two', display_name: 'Umair Tariq', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'apc-gone', display_name: 'Ali Ahmad', role: 'apc', is_active: false, deleted_at: '2026-10-12' },
+    { id: 'tl-a', display_name: 'Muhammad Azam', role: 'tl', is_active: true, deleted_at: null },
+    { id: 'tl-b', display_name: 'Ali Hamza', role: 'tl', is_active: true, deleted_at: null },
+    { id: 'boss', display_name: 'The Boss', role: 'boss', is_active: true, deleted_at: null },
+  ];
+  const ratings = [
+    { user_id: 'apc-new', month: '2026-10', metrics: {}, overall_score: 60 },
+    { user_id: 'apc-two', month: '2026-10', metrics: {}, overall_score: 61 },
+    { user_id: 'apc-gone', month: '2026-10', metrics: {}, overall_score: 12.8 },
+  ];
+  const comp: Record<string, any> = {
+    'apc-new': { composite_score: 89, level: 'good' }, 'apc-two': { composite_score: 83, level: 'good' },
+    'apc-gone': { composite_score: 56, level: 'warning' },
+    'tl-a': { composite_score: 78, level: 'good' }, 'tl-b': { composite_score: 61, level: 'warning' },
+  };
+  const db = fakeDb({ performance_ratings: ratings, profiles, performance_flags: [], performance_warnings: [] },
+    { get_performance_composite: (a: any) => (comp[a.p_user] ? [comp[a.p_user]] : []) });
+  const r = await runDataTool(db, BOSS, 'get_performance', { month: '2026-10' });
+  // both roles are present, each name carries its role, and the TL ranking is right
+  assert.match(r.text, /\(TL\) \(2\):\n- Muhammad Azam \(TL\) — composite 78\.0\/100 — Good[^\n]*\n- Ali Hamza \(TL\) — composite 61\.0\/100 — Warning/);
+  assert.match(r.text, /\(APC\) \(2\):\n- Haseeb \(APC\) — composite 89\.0\/100 — Good[^\n]*\n- Umair Tariq \(APC\) — composite 83\.0\/100/);
+  // the former employee is NOT in any ranked group, but is named as left out
+  const ranked = r.text.split('FORMER employees')[0];
+  assert.doesNotMatch(ranked, /Ali Ahmad/);
+  assert.match(r.text, /FORMER employees \(NOT current staff[^\n]*\n- Ali Ahmad \(APC, former employee – left 2026-10-12\) — composite 56\.0\/100 — Warning/);
+  assert.doesNotMatch(r.text, /The Boss/);
+  // a role filter returns that role only
+  const tls = await runDataTool(db, BOSS, 'get_performance', { month: '2026-10', role: 'tl' });
+  assert.match(tls.text, /^Performance for 2026-10 — 2 active Team Lead/);
+  assert.doesNotMatch(tls.text, /Haseeb|Umair/);
+  assert.doesNotMatch(tls.text, /Ali Ahmad/);       // an APC, so not mentioned under a TL question
+});
+
+test('get_performance (ranking): withheld, unrated and unseen people are never ranked on a different number', async () => {
+  const profiles = [
+    { id: 'a', display_name: 'Scored', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'b', display_name: 'Withheld', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'c', display_name: 'Unrated', role: 'apc', is_active: true, deleted_at: null },
+    { id: 'd', display_name: 'Not Yours', role: 'apc', is_active: true, deleted_at: null },
+  ];
+  const ratings = [{ user_id: 'a', month: '2026-10', metrics: {}, overall_score: 10 }, { user_id: 'b', month: '2026-10', metrics: {}, overall_score: 99 }];
+  const comp: Record<string, any> = {
+    a: { composite_score: 70, level: 'good' }, b: { composite_score: null, level: 'pending_verification' }, c: { composite_score: null, level: 'not_rated' },
+  };
+  const db = fakeDb({ performance_ratings: ratings, profiles, performance_flags: [], performance_warnings: [] },
+    { get_performance_composite: (a: any) => (comp[a.p_user] ? [comp[a.p_user]] : []) });
+  const r = await runDataTool(db, BOSS, 'get_performance', { month: '2026-10' });
+  assert.match(r.text, /- Scored \(APC\) — composite 70\.0\/100 — Good/);   // the only ranked line
+  assert.match(r.text, /- Composite withheld \(incentive plan not yet verified by the OL\): Withheld/);
+  assert.match(r.text, /- No composite score returned for this month \(the tool does not say why[^\n]*: Unrated/);
+  assert.ok(r.text.indexOf('Scored (APC)') < r.text.indexOf('Composite withheld') && r.text.indexOf('Composite withheld') < r.text.indexOf('No composite score returned'));
+  assert.doesNotMatch(r.text, /Withheld \(APC\)|Unrated \(APC\)/);          // never given a number of their own
+  assert.doesNotMatch(r.text, /Not Yours/);                                  // nothing the caller may see about them
 });
 
 test('no report vs unapproved report: never blurred (Buddy smoke), in text and data', async () => {
@@ -549,7 +610,7 @@ test('salary: every non-Boss sees only their own, even where RLS would allow mor
   const olClient = fakeDb({ profiles: PEOPLE_ROWS, employee_compensation: [comp('u-apc', 111), comp('u-apc2', 222), comp('u-ol', 333)], salary_history: [] });
   const ol = { userId: 'u-ol', role: 'ol', userClient: olClient };
   const own = await runDataTool(fakeDb({}), ol, 'get_salary', {});
-  assert.equal(own.text, 'Salaries (1):\n- Ol One (ol): PKR 333 (since 2026-01-01)');
+  assert.equal(own.text, 'Salaries (1):\n- Ol One (OL): PKR 333 (since 2026-01-01)');
   assert.equal((await runDataTool(fakeDb({}), ol, 'get_salary', { person_name: 'Apc One' })).text, NOT_YOURS);
   assert.match((await runDataTool(fakeDb({}), ol, 'get_salary', { person_name: 'Ol One' })).text, /PKR 333/);
   // an APC with no row: a plain answer about themselves, nothing about others
@@ -562,7 +623,7 @@ test('people tools: RLS decides; a colleague you cannot see is a polite refusal,
   // TL: inc_select lets a manager read their reports' rows (u-apc reports to u-tl)
   const tlClient = fakeDb({ profiles: PEOPLE_ROWS, incentives: [inc('u-tl'), inc('u-apc')] });
   const tl = { userId: 'u-tl', role: 'tl', userClient: tlClient };
-  assert.match((await runDataTool(fakeDb({}), tl, 'get_incentives', { person_name: 'Apc One', month: '2026-08' })).text, /^Incentives for 2026-08 \(1 record\(s\)\):\n\nApc One — 2026-08/);
+  assert.match((await runDataTool(fakeDb({}), tl, 'get_incentives', { person_name: 'Apc One', month: '2026-08' })).text, /^Incentives for 2026-08 \(1 record\(s\)\):\n\nApc One \(APC\) — 2026-08/);
   assert.equal((await runDataTool(fakeDb({}), tl, 'get_incentives', { person_name: 'Apc Two', month: '2026-08' })).text, NOT_YOURS);
   const all = await runDataTool(fakeDb({}), tl, 'get_incentives', { month: '2026-08' });
   assert.match(all.text, /\(2 record\(s\)\)/);
@@ -577,7 +638,7 @@ test('people tools: RLS decides; a colleague you cannot see is a polite refusal,
     { get_performance_composite: (a: any) => (a.p_user === 'u-apc' ? [{ composite_score: 80, level: 'good' }] : []) });
   const me = { userId: 'u-apc', role: 'apc', userClient: perfClient };
   assert.equal((await runDataTool(fakeDb({}), me, 'get_performance', { person_name: 'Apc Two', month: '2026-08' })).text, NOT_YOURS);
-  assert.match((await runDataTool(fakeDb({}), me, 'get_performance', { person_name: 'Apc One', month: '2026-08' })).text, /^Apc One — composite 80\.0\/100 — Good/);
+  assert.match((await runDataTool(fakeDb({}), me, 'get_performance', { person_name: 'Apc One', month: '2026-08' })).text, /^Apc One \(APC\) — composite 80\.0\/100 — Good/);
 });
 
 test('page guards stricter than RLS: no Performance for developer/ads_manager, no Incentives for developer', async () => {
@@ -595,7 +656,7 @@ test('directory: email, responsibilities and employment type for Boss/OL only', 
   for (const role of ['apc', 'tl', 'pctl', 'ipc', 'developer', 'ads_manager']) {
     const t = (await ask(role)).text;
     assert.ok(!/Email|Secret duty|Employment|full-time/.test(t), role);
-    assert.match(t, /^Apc One\n- Role: Affiliate Program Coordinator \(APC\)\n- Reports to: Tl One \(Team Lead — Affiliate \(TL\)\)\n- Start date: 2026-01-01/);
+    assert.match(t, /^Apc One \(APC\)\n- Role: Affiliate Program Coordinator \(APC\)\n- Reports to: Tl One \(Team Lead — Affiliate \(TL\)\)\n- Start date: 2026-01-01/);
   }
   for (const role of ['ol', 'boss']) assert.match((await ask(role)).text, /- Email: u-apc@x\.test[\s\S]*- Employment: full-time[\s\S]*- Responsibilities: Secret duty/);
   const emp = await runDataTool(fakeDb({}), { userId: 'u-x', role: 'apc', userClient: fakeDb({ profiles: rows }) }, 'get_employees', {});
@@ -608,7 +669,7 @@ test('commission overlay: arithmetic via the service client on rows the caller c
   const user = fakeDb({ profiles: PEOPLE_ROWS, incentives: [row], brand_monthly_metrics: [] });   // no commission_line_state for users
   const svc = fakeDb({}, { commission_line_state: () => ({ completed: true, amount: 5600 }) });
   const r = await runDataTool(svc, { userId: 'u-apc', role: 'apc', userClient: user }, 'get_incentives', { month: '2026-08' });
-  assert.match(r.text, /Earned so far \(completed goals\): PKR 5,600 of PKR 5,600 potential\./);
+  assert.match(r.text, /earned PKR 5,600 of PKR 5,600 potential/);
 });
 
 test('reports with the caller JWT: can_view_report decides, including the author\'s own report', async () => {
@@ -619,7 +680,7 @@ test('reports with the caller JWT: can_view_report decides, including the author
   // the hidden brand's NAME is resolved via the service client, never its other rows
   assert.match(r.text, /- Old Brand · Week 3 \(Apr 19 - 25\) \(weekly, approved\): GMV 5/);
   assert.ok(!r.text.includes('Unknown brand'));
-  assert.match((await runDataTool(fakeDb({}), { userId: 'u-apc', role: 'apc', userClient: user }, 'list_brands', {})).text, /^Brands you can see \(1\):/);
+  assert.match((await runDataTool(fakeDb({}), { userId: 'u-apc', role: 'apc', userClient: user }, 'list_brands', {})).text, /^Brands you can see \(1: 1 active, 0 inactive\):/);
   const ov = await runDataTool(fakeDb({}), { userId: 'u-apc', role: 'apc', userClient: fakeDb({ brands: BRANDS.filter((b) => b.id === 'b2'), brand_monthly_metrics: [], reports: [], profiles: [] }) }, 'brand_overview', { brand: 'Aqua' });
   assert.match(ov.text, /Monthly targets: none I can show you\./);
 });
@@ -654,21 +715,21 @@ test('assignments: grouped by role, temporary cover marked, inactive and expired
 test('list_brands / brand_overview / get_brand_assignments show the assigned APCs, via the caller JWT for non-Boss', async () => {
   const boss = fakeDb({ brands: TEAM_BRANDS, brand_assignments: ASG, profiles: TEAM, brand_monthly_metrics: [], reports: [] });
   const lb = await runDataTool(boss, BOSS, 'list_brands', {});
-  assert.match(lb.text, /- Alpha \(active\) — owner: Tina TL; APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\); IPCs: Ivy IPC/);
-  assert.match(lb.text, /- Beta \(active\) — owner: Tina TL$/m);
+  assert.match(lb.text, /- Alpha \(active\) — owner: Tina TL \(TL\); APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\); IPCs: Ivy IPC/);
+  assert.match(lb.text, /- Beta \(active\) — owner: Tina TL \(TL\)$/m);
   const ov = await runDataTool(boss, BOSS, 'brand_overview', { brand: 'Alpha' });
-  assert.match(ov.text, /- Owner \(Team Lead\): Tina TL\n- Assigned: APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\); IPCs: Ivy IPC/);
+  assert.match(ov.text, /- Owner: Tina TL \(TL\)\n- Assigned: APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\); IPCs: Ivy IPC/);
   const who = await runDataTool(boss, BOSS, 'get_brand_assignments', { brand: 'Alpha', role: 'apc' });
   assert.match(who.text, /- Alpha \(active\) — APCs: Ali APC, Bea APC \(temporary cover until 12 Oct\)/);
   const mine = await runDataTool(boss, BOSS, 'get_brand_assignments', { person: 'Bea' });
   assert.match(mine.text, /^Brands Bea APC handles \(1\):\n- Alpha \(active\): assigned APC \(temporary cover until 12 Oct\)$/);
   const tl = await runDataTool(boss, BOSS, 'get_brand_assignments', { person: 'Tina' });
-  assert.match(tl.text, /- Alpha \(active\): owner \(Team Lead\)\n- Beta \(active\): owner \(Team Lead\)/);
+  assert.match(tl.text, /- Alpha \(active\): owner \(TL\)\n- Beta \(active\): owner \(TL\)/);
   // Non-Boss: read with the caller's client (RLS): the service client's rows are never used.
   const user = fakeDb({ brands: TEAM_BRANDS.slice(0, 1), brand_assignments: ASG.slice(0, 1), profiles: TEAM });
   const svc = fakeDb({ brands: TEAM_BRANDS, brand_assignments: ASG, profiles: TEAM });
   const apcView = await runDataTool(svc, { userId: 'a1', role: 'apc', userClient: user }, 'list_brands', {});
-  assert.match(apcView.text, /^Brands you can see \(1\):\n- Alpha \(active\) — owner: Tina TL; APCs: Ali APC$/);
+  assert.match(apcView.text, /^Brands you can see \(1: 1 active, 0 inactive\):\n- Alpha \(active\) — owner: Tina TL \(TL\); APCs: Ali APC$/);
 });
 
 test('tool catalog: every definition has an implementation and a JSON schema', () => {

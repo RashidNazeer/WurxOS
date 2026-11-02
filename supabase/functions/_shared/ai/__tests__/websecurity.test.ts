@@ -86,7 +86,7 @@ const SALARIES = {
   employee_compensation: [{ user_id: 'u-ali', basic_salary: 85000, effective_from: '2026-01-01', last_change_reason: null }],
   profiles: [{ id: 'u-ali', display_name: 'Ali Khan', role: 'apc' }],
 };
-const cfgRow = (extra: Record<string, unknown> = {}) => ({ id: 1, persona: '', model: 'gpt-5.4-mini', enabled: true, retrieval: {}, ...extra });
+const cfgRow = (extra: Record<string, unknown> = {}) => ({ id: 1, persona: '', model: 'gemini-3.5-flash-lite', model_key_slot: 'gemini', enabled: true, retrieval: {}, ...extra });
 const tables = (extra: Record<string, unknown> = {}) => ({
   ai_assistant_config: [cfgRow(extra)], ai_request_log: [], ai_conversations: [], ai_messages: [], brands: [], ...SALARIES,
 });
@@ -94,7 +94,7 @@ const WEB_ON = { web_search_enabled: true, web_providers: ['brave'] };
 const BRAVE_EMPTY = (urls: string[] = []) => (async (input: any) => { urls.push(String(input)); return json({ web: { results: [] } }); }) as typeof fetch;
 
 function deps(db: any, llm: any, o: Partial<CoreDeps> = {}): CoreDeps {
-  return { admin: db, searchRpc: (async () => []) as any, asUser: BOSS, apiKey: 'k', embed: async () => null, llm, now: () => NOW, requestId: 'req-ws', catalog: [], ...o };
+  return { admin: db, searchRpc: (async () => []) as any, asUser: BOSS, geminiKey: 'k', embed: async () => null, llm, now: () => NOW, requestId: 'req-ws', catalog: [], ...o };
 }
 const toolNames = (r: any): string[] => (r?.tools ?? []).map((t: any) => t.name);
 const WEBN = ['search_the_web', 'open_web_page'];
@@ -479,8 +479,8 @@ test('the data tools: another person\'s basic_salary is not in a non-Boss incent
   const profiles = [{ id: 'u-me', display_name: 'Me Self', role: 'tl' }, { id: 'u-ali', display_name: 'Ali Khan', role: 'apc' }];
   const userClient = fakeDb({ incentives: inc, profiles }) as any;   // RLS stand-in: sees both rows
   const r = await runDataTool(fakeDb({}) as any, { userId: 'u-me', role: 'tl', userClient } as any, 'get_incentives', { month: '2026-09' });
-  assert.match(r.text, /Me Self — 2026-09 \(basic salary/);
-  assert.match(r.text, /Ali Khan — 2026-09 \(verified/);
+  assert.match(r.text, /Me Self \(TL\) — basic salary/);
+  assert.match(r.text, /Ali Khan \(APC\) — 1 of 1 goals met; earned PKR [0-9,]+ of PKR [0-9,]+ potential; verified/);
   assert.doesNotMatch(r.text, /85,000/);
 });
 
@@ -506,31 +506,41 @@ test('F7: search_everything results (which include incentive-plan passages) are 
 });
 
 // ----- 4b. data leaving for a model provider
+// Every model is on a free tier (Owner 2026-11-02), so people / pay data may reach
+// Gemini, Groq and the OpenAI free tier. NVIDIA's API-catalog keys are for
+// prototyping / testing only: no private data goes there, and a turn that has
+// read it and has nothing else left fails closed.
 async function failover(withSalary: boolean) {
   _resetCooldowns();
-  const first = scripted([
-    ...(withSalary ? [{ toolCalls: [{ call_id: 'a', name: 'get_salary', arguments: '{}' }] }] : []),
-    { throws: Object.assign(new LlmError('insufficient_quota', 429), { code: 'insufficient_quota' }) },
-  ]);
   const chatSeen: any[] = [];
-  const chatLlm = async (r: any) => { chatSeen.push(JSON.parse(JSON.stringify({ input: r.input, endpoint: r.endpoint }))); r.onDelta?.('done');
-    return { text: 'done', toolCalls: [], output: [], usage: { input: 10, cached: 0, output: 5, reasoning: 0 }, status: 'completed' }; };
-  const catalog: any[] = [{ key_slot: 'gemini', model: 'gemini-3.6-flash', available: true, supports_tools: true, supports_stream: true, free: true, params: {} }];
-  const db = fakeDb(tables({ fallback_models: [{ key_slot: 'gemini', model: 'gemini-3.6-flash' }] }));
-  const r = await runTurn({ userId: BOSS, role: 'boss', message: 'what does Ali earn?' }, deps(db, first.llm, { chatLlm, geminiKey: 'g-test', catalog }), () => {});
+  let geminiCalls = 0;
+  const chatLlm = async (r: any) => {
+    chatSeen.push(JSON.parse(JSON.stringify({ input: r.input, endpoint: r.endpoint })));
+    if (String(r.endpoint).includes('googleapis')) {
+      if (withSalary && geminiCalls++ === 0) return { text: '', toolCalls: [{ call_id: 'a', name: 'get_salary', arguments: '{}' }], output: [{ type: 'function_call', call_id: 'a', name: 'get_salary', arguments: '{}' }], usage: { input: 10, cached: 0, output: 5, reasoning: 0 }, status: 'completed' };
+      throw Object.assign(new LlmError('insufficient_quota', 429), { code: 'insufficient_quota' });
+    }
+    r.onDelta?.('done');
+    return { text: 'done', toolCalls: [], output: [], usage: { input: 10, cached: 0, output: 5, reasoning: 0 }, status: 'completed' };
+  };
+  const catalog: any[] = [
+    { key_slot: 'gemini', model: 'gemini-3.5-flash-lite', available: true, supports_tools: true, supports_stream: true, free: true, params: {} },
+    { key_slot: 'nvidia', model: 'nvidia/nemotron-3-ultra-550b-a55b', available: true, supports_tools: true, supports_stream: true, free: true, params: {} }];
+  const db = fakeDb(tables({ fallback_models: [{ key_slot: 'nvidia', model: 'nvidia/nemotron-3-ultra-550b-a55b' }] }));
+  const r = await runTurn({ userId: BOSS, role: 'boss', message: 'what does Ali earn?' }, deps(db, null, { chatLlm, geminiKey: 'g-test', nvidiaKey: 'n-test', catalog }), () => {});
   return { r, chatSeen, db };
 }
 
-test('F8: once people-and-pay data is in the turn, a failover never sends it to a free-tier slot; the turn fails closed instead', async () => {
+test('F8: once people-and-pay data is in the turn, a failover never reaches a trial-terms (NVIDIA) slot; the turn fails closed instead', async () => {
   const { r, chatSeen } = await failover(true);
-  assert.deepEqual(chatSeen, [], 'nothing reached the Gemini endpoint');
-  assert.match(String(r.error), /No non-free model is available, and this turn has read private data/);
+  assert.ok(chatSeen.every((c) => !c.endpoint.includes('nvidia.com')), 'nothing reached the NVIDIA endpoint');
+  assert.match(String(r.error), /No model allowed for private data is available/);
 });
 
-test('F8 regression guard: with NO private data in the turn, failover to a free slot still works (Buddy must never go down)', async () => {
+test('F8 regression guard: with NO private data in the turn, failover to the last-resort NVIDIA slot still works (Buddy must never go down)', async () => {
   const { r, chatSeen } = await failover(false);
-  assert.equal(chatSeen.length, 1);
-  assert.match(chatSeen[0].endpoint, /generativelanguage\.googleapis\.com/);
+  assert.equal(chatSeen.length, 2);
+  assert.match(chatSeen[1].endpoint, /integrate\.api\.nvidia\.com/);
   assert.equal(r.error, undefined);
   assert.equal(r.answer, 'done');
 });

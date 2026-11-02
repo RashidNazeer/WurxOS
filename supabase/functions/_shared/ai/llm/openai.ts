@@ -1,4 +1,5 @@
-// OpenAI Responses API adapter (phase5-design.md §7). Pure TS over fetch:
+// OpenAI Responses API adapter (phase5-design.md §7), used only for the free-tier
+// model above. Pure TS over fetch:
 // runs on Deno and Node. The API key is always passed in.
 //
 // Stateless (store:false): each call sends the whole input, and the previous
@@ -11,23 +12,15 @@ import { providerAccountIssue, retryAfterMs } from '../providerErrors.ts';
 // a longer one moves the turn to the next model instead.
 export const MAX_RETRY_WAIT_MS = 20_000;
 
-export const ALLOWED_MODELS = ['gpt-5.4-mini', 'gpt-5.5', 'gpt-5.4-nano'] as const;
-export const DEFAULT_MODEL = 'gpt-5.4-mini';
-export const pickModel = (m: unknown): string => ((ALLOWED_MODELS as readonly string[]).includes(String(m)) ? String(m) : DEFAULT_MODEL);
+// Buddy uses FREE models only (Owner 2026-11-02). The one OpenAI model that may
+// ever be called is a free-tier one; the paid models (gpt-5.x) are gone, and
+// `respond` refuses anything not listed here before a byte leaves the process,
+// so a bad config row can never bill the account. A new free OpenAI model must
+// be added here AND be marked free in ai_model_catalog.
+export const FREE_OPENAI_MODELS: readonly string[] = ['gpt-6-luna'];
+export const isFreeOpenAiModel = (m: unknown): boolean => FREE_OPENAI_MODELS.includes(String(m));
 
 export type Effort = 'none' | 'minimal' | 'low' | 'medium' | 'high';
-
-// What a model accepts, where it differs (live-checked 2026-09-30): gpt-5.4-nano
-// rejects reasoning.effort 'minimal' (400), so an unsupported effort becomes
-// 'low' for that model instead of failing the turn. Nano otherwise takes the
-// same request: streaming, parallel function tools, encrypted reasoning, cache.
-export const MODEL_EFFORTS: Readonly<Record<string, readonly Effort[]>> = Object.freeze({
-  'gpt-5.4-nano': ['none', 'low', 'medium', 'high'],
-});
-export function effortFor(model: string, effort: Effort): Effort {
-  const ok = MODEL_EFFORTS[model];
-  return !ok || ok.includes(effort) ? effort : 'low';
-}
 
 // Provider-neutral function tool (tools/types.ts ToolDef has the same shape).
 export type FunctionTool = { name: string; description: string; parameters: Record<string, unknown> };
@@ -154,7 +147,7 @@ export function requestBody(r: LlmRequest): Record<string, unknown> {
     instructions: r.instructions,
     input,
     ...(r.tools?.length ? { tools: r.tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.parameters, strict: false })), parallel_tool_calls: true } : {}),
-    ...(r.effort ? { reasoning: { effort: effortFor(r.model, r.effort) } } : {}),
+    ...(r.effort ? { reasoning: { effort: r.effort } } : {}),
     ...(r.maxOutputTokens ? { max_output_tokens: r.maxOutputTokens } : {}),
     ...(r.promptCacheKey ? { prompt_cache_key: r.promptCacheKey } : {}),
     store: false,
@@ -217,6 +210,7 @@ export async function withRetries(r: LlmRequest, once: (io: CallIo) => Promise<L
 export function respond(r: LlmRequest): Promise<LlmResult> {
   const doFetch = r.fetchImpl ?? fetch;
   const endpoint = r.endpoint ?? 'https://api.openai.com/v1/responses';
+  if (!isFreeOpenAiModel(r.model)) return Promise.reject(new LlmError(`refused: ${r.model} is not a free OpenAI model (Buddy uses free models only)`, 400));
   return withRetries(r, async (io) => {
     let res: Response;
     try {

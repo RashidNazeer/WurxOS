@@ -12,6 +12,7 @@
 // (ai_search, ai_get_chunks), which applies the caller's ACL.
 
 import type { Rpc } from '../ingest/db.ts';
+import { vectorModel } from '../embedder.ts';
 import { estimateTokens } from '../text.ts';
 import { retrievalConfig, type RetrievalConfig } from './config.ts';
 import { budgetFor, INDEX_ORDER, INDEXES, quotaFor, type IndexName } from './indexes.ts';
@@ -31,8 +32,8 @@ export type Reranker = (query: string, items: Array<{ id: string; title: string;
 export type SearchDeps = {
   rpc: Rpc;
   embed: (text: string) => Promise<number[] | null>;
-  // The second vector space (mig 406, NVIDIA): asked only when `embed` gives no
-  // vector, and searched as its own arm (p_query_embedding_alt).
+  // The second vector space (Gemini, mig 432): asked in parallel with `embed`, searched as its own arm
+  // (p_query_embedding_alt).
   embedAlt?: (text: string) => Promise<number[] | null>;
   asUser?: string | null;       // service role only (Slack relay, eval); else the JWT decides
   config?: RetrievalConfig;
@@ -247,6 +248,10 @@ export async function searchIndex(index: IndexName, query: string, filters: Sear
   const weeks = isReports ? [filters.weekNumber ?? []].flat().filter((w) => Number.isInteger(w) && w > 0) : [];
   const keywordText = [q, ...extra, ...weeks.map((w) => `week ${w}`)].join(' ');
 
+  // The question is embedded in the MAIN space (NVIDIA, the one with the full corpus). Only if that fails is the second
+  // space (Gemini) asked: it is a safety net with a small free allowance (1,000 a day, shared with the backfill) and
+  // its retrieval quality is not measured. Either way the vector carries its model label and ai_search compares it only
+  // with that model's chunks. Neither available: keywords only.
   let embedding: number[] | null = null;
   try { embedding = await deps.embed(q); } catch { embedding = null; }
   let embeddingAlt: number[] | null = null;
@@ -254,6 +259,8 @@ export async function searchIndex(index: IndexName, query: string, filters: Sear
     try { embeddingAlt = await deps.embedAlt(q); } catch { embeddingAlt = null; }
   }
   if (!embedding && !embeddingAlt) notes.push('embedding unavailable: keyword search only');
+  const labelMain = embedding ? vectorModel(embedding) : null;
+  const labelAlt = embeddingAlt ? vectorModel(embeddingAlt) : null;
 
   const hasPeriod = !!(filters.periodFrom || filters.periodTo);
   const crossBrand = isReports && !filters.brandIds?.length;
@@ -268,6 +275,8 @@ export async function searchIndex(index: IndexName, query: string, filters: Sear
     p_as_user: deps.asUser ?? undefined,
     p_sections: sections ?? undefined,
     ...(embeddingAlt ? { p_query_embedding_alt: vecLiteral(embeddingAlt) } : {}),
+    ...(labelMain ? { p_query_model: labelMain } : {}),
+    ...(labelAlt ? { p_query_model_alt: labelAlt } : {}),
   });
   // "How is Obagi doing?" is about the latest reports, which a generic query
   // may not rank into the pool at all: for a brand without a period, the best

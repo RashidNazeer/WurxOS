@@ -27,14 +27,15 @@ test('classification: quota (either wording), refused key, and ordinary errors',
 test('messages: plain for everyone, actionable for the Boss', () => {
   assert.equal(providerIssueMessage('quota', 'apc'), "Buddy can't reach its AI service right now: the AI account needs attention. Please tell the Boss.");
   assert.equal(providerIssueMessage('auth', 'ol'), providerIssueMessage('quota', 'apc'));
-  assert.equal(providerIssueMessage('quota', 'boss'), 'OpenAI credits are used up: top up the OpenAI account (platform.openai.com → Billing).');
+  assert.equal(providerIssueMessage('quota', 'boss', [{ issue: 'quota', slot: 'gemini', model: 'gemini-3.5-flash-lite' }]), 'Gemini has no free quota left on its key (gemini-3.5-flash-lite).');
+  assert.doesNotMatch(providerIssueMessage('quota', 'boss'), /credits|billing|top up/i);   // there is no paid account to top up
   assert.match(providerIssueMessage('auth', 'boss'), /API key/);
 });
 
 test('no retry on a quota 429 (model and embeddings); a real rate limit is still retried', async () => {
   let calls = 0;
   const quota = async () => { calls++; return res(429, QUOTA_BODY); };
-  await assert.rejects(respond({ apiKey: 'k', model: 'gpt-5.4-mini', instructions: 'i', input: [], fetchImpl: quota as any }), /insufficient_quota/);
+  await assert.rejects(respond({ apiKey: 'k', model: 'gpt-6-luna', instructions: 'i', input: [], fetchImpl: quota as any }), /insufficient_quota/);
   assert.equal(calls, 1);
   calls = 0;
   await assert.rejects(embedTexts(['x'], { apiKey: 'k', fetchImpl: quota as any, sleep: async () => {} }), (e: any) => e instanceof EmbedError && !e.retryable);
@@ -77,17 +78,18 @@ test('a turn hit by no credits: plain message for a user, billing hint for the B
     const events: any[] = [];
     const llm = async () => { throw new LlmError(`model HTTP 429: ${NO_CREDITS_BODY}`, 429); };
     await runTurn({ userId: 'u1', role, message: 'hi' }, {
-      admin: db, searchRpc: async () => [], asUser: 'u1', apiKey: 'k', embed: async () => [0.1], llm, requestId: 'r1',
+      admin: db, searchRpc: async () => [], asUser: 'u1', geminiKey: 'k', embed: async () => [0.1], llm, requestId: 'r1',
     }, (e) => events.push(e));
     const shown = events.find((e) => e.error).error;
-    assert.equal(shown, providerIssueMessage('quota', role));
+    if (role === 'boss') assert.ok(shown.startsWith('Gemini has no free quota left on its key (gemini-3.5-flash-lite).'), shown);
+    else assert.equal(shown, providerIssueMessage('quota', role));
     const reply = db.inserts.ai_messages.find((m: any) => m.role === 'assistant');
     assert.deepEqual([reply.status, reply.meta.error], ['error', shown]);
     const log = db.inserts.ai_request_log[0];
     assert.deepEqual([log.flags.provider_quota, log.flags.provider_issue], [true, 'quota']);
     assert.ok(!log.flags.deadline_hit);
   }
-  assert.ok(!/credit|OpenAI|billing/i.test(providerIssueMessage('quota', 'apc')), 'no technical detail for users');
+  assert.ok(!/credit|OpenAI|billing|Gemini/i.test(providerIssueMessage('quota', 'apc')), 'no technical detail for users');
 });
 
 test('F2: every ai_usage_log row carries every column (no NULL from a bulk insert)', () => {
@@ -103,7 +105,7 @@ test('F2: every ai_usage_log row carries every column (no NULL from a bulk inser
 
 // ── the ingest worker ───────────────────────────────────────────────────────
 
-test('ingest: no credits → chunks written pending (keyword-searchable), OpenAI asked once per run and its space deferred (mig 406)', async () => {
+test('ingest: no credits → chunks written pending (keyword-searchable), the provider is asked once per run and its space deferred (mig 432)', async () => {
   const s = { source_id: 'r1', indexable: true, fp: 'fp1', payload: { row: F.weeklyLegacy(), brand: F.CTX.brand } };
   const calls: Array<[string, any]> = [];
   const rpc = async (fn: string, args: any = {}) => {
@@ -126,14 +128,16 @@ test('ingest: no credits → chunks written pending (keyword-searchable), OpenAI
   assert.ok(writes.every(([, a]) => a.p_chunks.every((c: any) => c.embedding === null)), 'without vectors: pending');
   assert.equal(asked, 1, 'a provider with no credits is asked once per run');
   const defer = calls.find(([f]) => f === 'ai_vector_defer')!;
-  assert.deepEqual([defer[1].p_space, defer[1].p_seconds], ['primary', PROVIDER_DEFER_SECONDS]);
+  assert.deepEqual([defer[1].p_space, defer[1].p_seconds], ['main', PROVIDER_DEFER_SECONDS]);
   assert.equal(calls.filter(([f]) => f === 'ai_ingest_fail' || f === 'ai_ingest_defer').length, 0);
   assert.deepEqual([stats.failed, stats.provider_issue], [0, 'quota']);
-  // an ordinary embedding error: also written pending, the space not deferred
+  // an ordinary (transient) error: also written pending; the space is put aside for 2 minutes, not 30
   const s2 = emptyStats();
   const before = calls.filter(([f]) => f === 'ai_vector_defer').length;
   await processBatch([{ id: 3, source_type: 'report', source_id: 'r3', op: 'upsert', attempts: 1 }],
     { rpc, workerId: 'w', pipelineVersion: PIPELINE_VERSION, model: DEFAULT_CONFIG.EMBED_MODEL, embed: async () => { throw new Error('socket hang up'); } }, s2);
   assert.deepEqual([s2.failed, s2.provider_issue], [0, null]);
-  assert.equal(calls.filter(([f]) => f === 'ai_vector_defer').length, before);
+  const after = calls.filter(([f]) => f === 'ai_vector_defer');
+  assert.equal(after.length, before + 1);
+  assert.equal(after.at(-1)![1].p_seconds, 120);
 });

@@ -11,14 +11,15 @@ import type { Rpc } from '../ingest/db.ts';
 import { retrievalConfig } from '../retrieval/config.ts';
 import type { Reranker } from '../retrieval/search.ts';
 import { respond, type InputItem, type LlmRequest, type LlmResult, type Usage } from '../llm/openai.ts';
-import { chooseTargets, coolDown, coolingDown, endpointFor, extraFor, isThinking, keyFor, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
+import { chooseTargets, coolDown, coolingDown, persistCooldown, endpointFor, extraFor, isThinking, keyFor, THINKING_MIN_OUTPUT, omitFor, rememberOmit, rememberParams, resolveRoleConfig, safetyNet, SLOTS, unsupportedParam, type CatalogRow, type KeySlot, type Keys, type Target } from './models.ts';
 import { chatRespond } from '../llm/chat.ts';
 import { stripToolMarkup } from '../llm/textTools.ts';
 import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
 import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIssue } from '../providerErrors.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
-import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
+import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic, pktDateString } from './prompt.ts';
+import { correctionMessage, personNames, redactClaims, summarize, verifyAnswer, type Evidence } from './grounding.ts';
 import { budgetFor, budgetFromError, estimate, fitRequest, learnBudget } from './compact.ts';
 import { CiteRegistry, newTurnGuard, runTool, toolDefsFor, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
 import { usableProviders, webAllowedForRole, webConfig, type WebEnv, type WebKeys, type WebUsage } from '../web/index.ts';
@@ -80,8 +81,7 @@ export type CoreDeps = {
   searchRpc: Rpc;                    // search RPCs as the caller (JWT) or service role + asUser
   asUser: string | null;
   userClient?: any;                  // supabase-js client with the caller's JWT (data tools, RLS); absent = none
-  apiKey: string;                    // OPEN_AI_API_KEY (the 'primary' slot)
-  fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot)
+  fallbackKey?: string | null;       // OPEN_AI_API_KEY_FALLBACK (the 'fallback' slot: the OpenAI FREE tier; there is no paid key)
   groqKey?: string | null;           // GROQ_API_KEY (the 'groq' slot, Chat Completions)
   geminiKey?: string | null;         // GEMINI_API_KEY (the 'gemini' slot, Chat Completions)
   nvidiaKey?: string | null;         // NVIDIA_API_KEY (the 'nvidia' slot; free, dev/test only)
@@ -102,6 +102,7 @@ export type CoreDeps = {
   llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam (also used for chat slots unless chatLlm is set)
   chatLlm?: (r: LlmRequest) => Promise<LlmResult>;
   requestId?: string;
+  grounding?: boolean;               // false = do not hold and check the answer (tests of other behaviour); default on
 };
 
 export type TurnResult = { requestId: string; conversationId: string | null; messageId?: string; answer: string; sources: unknown[]; error?: string; httpStatus?: number; cancelled?: boolean };
@@ -218,7 +219,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   // fallbacks. `target` moves down it on an account error (no credits, key refused).
   let catalog: CatalogRow[] = deps.catalog ?? [];
   if (!deps.catalog) { try { catalog = (await admin.from('ai_model_catalog').select('*')).data ?? []; } catch { catalog = []; } }
-  const keys: Keys = { primary: deps.apiKey, fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
+  const keys: Keys = { fallback: deps.fallbackKey ?? null, groq: deps.groqKey ?? null, gemini: deps.geminiKey ?? null,
     nvidia: deps.nvidiaKey ?? null, nvidia2: deps.nvidia2Key ?? null };
   const override: string | Target | null = deps.model ? (deps.modelKeySlot ? { keySlot: deps.modelKeySlot, model: deps.model } : deps.model) : null;
   // Per-role models (mig 404): the Boss / a developer picks the model per role.
@@ -359,6 +360,11 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     retrieval, agent, ctx: { userId: req.userId, role: req.role, ...(deps.userClient ? { userClient: deps.userClient } : {}) }, now,
   };
   const cstream = new CitationStream(reg.has, () => serious);
+  // Grounding (agent/grounding.ts): the answer is held until every name, figure, date, role and status in it has
+  // been checked against this turn's tool results, then sent once. `evidence` = the full text of each tool result.
+  const verify = deps.grounding !== false;
+  const evidence: string[] = [];
+  const sendNow = (d: string) => { if (!verify) emit({ delta: d }); };
   let answer = '';
   let firstTokenMs: number | null = null;
   const onDelta = (d: string) => {
@@ -368,7 +374,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (!safe) return;
     if (firstTokenMs == null) firstTokenMs = Date.now() - t0;
     answer += safe;
-    emit({ delta: safe });
+    sendNow(safe);
   };
   let costSum = 0;
   let unpriced = false;
@@ -395,19 +401,17 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     for (let paramTries = 0; ;) {
       // A model that just failed for quota / limit / a refused key is skipped
       // (the last one left is always tried).
-      // Pay data must not fail over onto a free tier. Once a people/pay tool
-      // has returned, its output is in `input`, and every later model call
-      // carries it — so a quota error on the paid key would have handed
-      // salaries to Gemini/Groq/NVIDIA free endpoints, whose terms are not
-      // what we would choose for payroll (QA F8). Free slots are skipped from
-      // that moment; if only free ones remain the turn fails, which is the
-      // right way round.
+      // Every model is on a free tier now (Owner 2026-11-02), so people / pay
+      // data goes to the free providers the Boss configured. The one exception:
+      // NVIDIA's API-catalog keys are for prototyping / testing only (their
+      // terms), so once a people/pay tool has returned, those slots are skipped
+      // and, if nothing else is left, the turn fails rather than send payroll there.
       if (turnGuard?.sensitiveUsed) {
-        for (let guard = 0; SLOTS[target.keySlot].free && ti + 1 < targets.length && guard < targets.length; guard++) {
+        for (let guard = 0; SLOTS[target.keySlot].trial && ti + 1 < targets.length && guard < targets.length; guard++) {
           ((flags.skipped_free_tier ??= []) as string[]).push(tag(target));
-          moveOn('private data in this turn: free tiers skipped');
+          moveOn('private data in this turn: trial-terms slots skipped');
         }
-        if (SLOTS[target.keySlot].free) throw new Error('No non-free model is available, and this turn has read private data.');
+        if (SLOTS[target.keySlot].trial) throw new Error('No model allowed for private data is available.');
       }
       for (let c = coolingDown(target); c && ti + 1 < targets.length; c = coolingDown(target)) {
         ((flags.skipped_cooling ??= []) as string[]).push(tag(target));
@@ -473,7 +477,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
           continue;
         }
         if (issue) chainIssues.push({ issue, model: target.model, slot: target.keySlot, waitMs: (e as any)?.retryAfterMs ?? null });
-        if (!(e as any)?.streamed) coolDown(target, e);
+        if (!(e as any)?.streamed) { coolDown(target, e); void persistCooldown(admin, target, catalog); }   // not awaited: no DB write between a failed model and the next
         const status = Number((e as any)?.status);
         const why = issue ?? ((e as any)?.code === 'bad_tool_format' ? 'bad_tool_format'
           : status === 429 ? 'rate_limit' : (e as any)?.code === 'first_byte_timeout' ? 'no_response' : status >= 500 ? 'server_error' : 'error');
@@ -500,6 +504,49 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   if (webEnv) flags.web = { providers: usableProviders(webEnv), merge: webCfg.merge };
   const input: InputItem[] = [...history, { role: 'user', content: message }];
   let step = 'start';
+
+  // Check the finished answer (agent/grounding.ts), allow ONE corrective retry that shows the model the offending
+  // claims, and replace whatever is still unsupported with a plain "could not verify" note. Then send it, once.
+  let grounded = false;
+  const groundAnswer = async (allowRetry: boolean) => {
+    if (!verify || grounded) return;
+    grounded = true;
+    if (!answer.trim()) return;
+    const saved = step;
+    step = 'grounding';
+    const priorAssistant = (hist ?? []).filter((r: any) => r.role === 'assistant').map((r: any) => String(r.content ?? ''));
+    const userTexts = [message, ...(hist ?? []).filter((r: any) => r.role === 'user').map((r: any) => String(r.content ?? ''))];
+    const people = await personNames(admin);
+    const evFor = (): Evidence => ({ tools: evidence, user: userTexts, now: `NOW: ${pktDateString(now)}.`, priorAssistant, people });
+    let v = verifyAnswer(answer, evFor());
+    const g = { retried: false, replaced: false };
+    if (v.claims.length && allowRetry && !cancelled && left() > agent.ANSWER_RESERVE_MS) {
+      emit({ status: 'Double-checking the figures…' });
+      g.retried = true;
+      const first = v.claims;
+      input.push({ role: 'assistant', content: answer }, { role: 'user', content: correctionMessage(first) });
+      let redo = '';
+      const cs = new CitationStream(reg.has, () => serious);
+      try {
+        const res = await ask({
+          instructions: serious ? `${instructions}\nThis is a SERIOUS topic: no emoji, no jokes.` : instructions,
+          tools: undefined, effort: agent.EFFORT_ANSWER as any, maxOutputTokens: agent.ANSWER_MAX_OUTPUT_TOKENS,
+          onDelta: (d: string) => { if (!cancelled) redo += cs.push(d.replace(/【/g, '[').replace(/】/g, ']')); },
+        });
+        usage = add(usage, res.usage);
+        redo += cs.flush();
+        if (redo.trim()) answer = redo.trim();
+      } catch (e) {
+        if (cancelCtrl.signal.aborted || (e as any)?.cancelled || cancelled) throw e;
+        flags.grounding_retry_error = String((e as Error)?.message ?? e).slice(0, 120);   // the first answer is checked and redacted below
+      }
+      v = verifyAnswer(answer, evFor());
+    }
+    if (v.claims.length) { answer = redactClaims(answer, v.claims); g.replaced = true; }
+    flags.grounding = summarize(v, g);
+    for (let i = 0; i < answer.length; i += 400) emit({ delta: answer.slice(i, i + 400) });
+    step = saved;
+  };
 
   emit({ status: 'On it…' });
   try {
@@ -542,13 +589,13 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       const toolBudget = Math.max(3000, left() - agent.ANSWER_RESERVE_MS);
       env.agent = { ...agent, SEARCH_TIMEOUT_MS: Math.min(agent.SEARCH_TIMEOUT_MS, toolBudget), DATA_TOOL_TIMEOUT_MS: Math.min(agent.DATA_TOOL_TIMEOUT_MS, toolBudget) };
       const outs = await Promise.all(calls.map((c) => runTool(env, reg, c.name, c.arguments)));
-      outs.forEach((o, i) => { toolLogs.push(o.log); input.push({ type: 'function_call_output', call_id: calls[i].call_id, output: o.output }); });
+      outs.forEach((o, i) => { evidence.push(o.output); toolLogs.push(o.log); input.push({ type: 'function_call_output', call_id: calls[i].call_id, output: o.output }); });
       for (const c of skipped) {
         input.push({ type: 'function_call_output', call_id: c.call_id, output: `Skipped: at most ${agent.MAX_PARALLEL_TOOLS} tool calls per round. Call it again next round if you still need it.` });
       }
     }
     const held = cstream.flush();
-    if (held && !cancelled) { answer += held; emit({ delta: held }); }
+    if (held && !cancelled) { answer += held; sendNow(held); }
     // Reasoning can eat the whole output budget: retry once, bigger, without tools.
     step = 'answer';
     if (!answer.trim() && !cancelled && left() > agent.ANSWER_RESERVE_MS) {
@@ -560,7 +607,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     }
     if (await checkCancel()) throw new Stop();
     const tail = cstream.flush();
-    if (tail) { answer += tail; emit({ delta: tail }); }
+    if (tail) { answer += tail; sendNow(tail); }
     // Last safety net: tool-call markup is never part of an answer.
     if (/<tool_call|<function=|<\/parameter>|<\|tool_call\|>/.test(answer)) {
       flags.stripped_tool_markup = true;
@@ -569,11 +616,13 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (!answer.trim()) {
       const sorry = "Sorry, I couldn't put an answer together this time. Could you try asking again, maybe a little more specifically?";
       answer = sorry;
-      emit({ delta: sorry });
+      sendNow(sorry);
     }
+    await groundAnswer(true);
   } catch (e) {
     if (e instanceof Stop || (e as any)?.cancelled || cancelled) {
       cancelled = true;
+      await groundAnswer(false);
       emit({ cancelled: true });
     } else {
       error = scrubSecrets(String((e as Error)?.message ?? e)).slice(0, 500);
@@ -589,7 +638,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       };
       console.error(`assistant turn ${requestId} failed at ${step}:`, JSON.stringify(flags.error_detail));
       const tail = cstream.flush();
-      if (tail) { answer += tail; emit({ delta: tail }); }
+      if (tail) { answer += tail; sendNow(tail); }
+      await groundAnswer(false);   // whatever partial text there is gets the same check before it is shown
       // Nothing worked. Account problems met anywhere in the chain are named;
       // models that were only busy or silent get one line after them.
       const busy = !account && !flags.deadline_hit && (status === 429 || (status ?? 0) >= 500 || (e as any)?.code === 'first_byte_timeout');

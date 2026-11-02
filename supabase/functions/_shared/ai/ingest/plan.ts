@@ -16,7 +16,7 @@
 //           vectors by hash, whatever their position)
 
 import { chunkDocument } from '../chunker.ts';
-import { chunkParamsFor, pipelineSalt } from '../config.ts';
+import { chunkParamsFor, DEFAULT_CONFIG, pipelineSalt } from '../config.ts';
 import { extractors } from '../extractors/index.ts';
 import { docHash } from '../hash.ts';
 import type { Chunk, ExtractedDoc, Extractor } from '../types.ts';
@@ -87,12 +87,12 @@ export async function planDocument(type: string, src: SourceRecord | null, exist
   }
 
   const doc: ExtractedDoc = ex.toDocument(row, ctx);
-  const hash = await docHash(doc, pipelineSalt(type, o.pipelineVersion), o.model);
+  const hash = await docHash(doc, pipelineSalt(type, o.pipelineVersion), DEFAULT_CONFIG.HASH_MODEL);
   if (existing && existing.status === 'active' && existing.doc_hash === hash) {
     return existing.source_fp === src.fp ? { action: 'skip' } : { action: 'touch', fp: src.fp };
   }
 
-  const { chunks, capped } = await chunkDocument(doc, chunkParamsFor(type), { model: o.model });
+  const { chunks, capped } = await chunkDocument(doc, chunkParamsFor(type), { model: DEFAULT_CONFIG.HASH_MODEL });
   const stored = existing?.chunk_hashes ?? [];
   const known = new Set(stored);
   const toEmbed: Chunk[] = [];
