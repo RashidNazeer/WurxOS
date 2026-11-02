@@ -29,7 +29,7 @@ pg_cron runs in **GMT** on dev (`show cron.timezone`). PKT = GMT+5.
 | Step | What it does |
 |---|---|
 | (a) | `npx supabase projects list` must work and show the dev project. |
-| (b) | Sets the function secrets `OPEN_AI_API_KEY` and `AI_INGEST_SECRET` on dev. The values come from `..\.env.dev` through a temporary env file, never the command line. If `AI_INGEST_SECRET` is missing, a random 32-byte hex secret is generated and appended to `..\.env.dev`. It is never printed. |
+| (b) | Sets the function secrets `AI_INGEST_SECRET` and the free embedding keys (`NVIDIA_API_KEY`, `NVIDIA_API_KEY_2`, `GEMINI_API_KEY`) on dev. The values come from `..\.env.dev` through a temporary env file, never the command line. If `AI_INGEST_SECRET` is missing, a random 32-byte hex secret is generated and appended to `..\.env.dev`. It is never printed. |
 | (c) | `supabase functions deploy ai-ingest` and `tts-crawl`, each with `--no-verify-jwt --use-api --project-ref <dev> --workdir <repo root>`. |
 | (d) | `node scripts/db-dev.mjs apply 379 380 374 375 381`. It stops at the first failure, which is rolled back; the migrations before it stay applied. |
 | (e) | `node scripts/deploy-dev-config.mjs` sets `app_config.ai_ingest_url`, `ai_crawl_url` and `ai_ingest_secret`. `--check` shows them without the secret. |
@@ -132,6 +132,77 @@ A run is recorded in `ai_ingest_runs` with `kind='sweep'` and `stats.trigger` se
 | Resume the jobs | re-run 375's three `cron.schedule(...)` lines (safe to repeat) |
 | Remove everything | unschedule the five `ai-*` jobs (three from 375, two from 381) and `drop trigger ai_kb_articles_acl on public.kb_articles;` |
 
+## Embeddings: free providers only (mig 432)
+
+OpenAI is not used for embeddings. The paid key has had no credits since 2026-10-02, and the free-tier key cannot embed either (`HTTP 429 you have no credits remaining`, tested 2026-11-02). `embedTexts` refuses `api.openai.com`, and a unit test fails if any retrieval or ingest file names it.
+
+| Space | Column | Provider and model | Dimensions | Search role |
+|---|---|---|---|---|
+| **main** | `ai_chunks.embedding`, label in `embedding_model` | NVIDIA `llama-nemotron-embed-vl-1b-v2` (documents `passage`, questions `query`) | 1536 | The space searches rely on. Takes every type in `free_provider_sources` (including reports). |
+| **second** | `ai_chunks.embedding_alt`, label in `embed_model_alt` | Gemini `gemini-embedding-001` (`RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`), `ai_assistant_config.embed_alt_provider` | 1536 | A safety net for company docs and TikTok articles if NVIDIA is down. |
+
+- **One model per column, never mixed.** `ai_search` filters each arm by the model label, and now also takes `p_query_model` / `p_query_model_alt`: a query vector that is unlabelled (an old caller) or labelled with another model than the space holds is ignored, not compared. A question is embedded by NVIDIA first; only if that fails is Gemini asked (its allowance is small and its quality was not measured). Each vector is fused with the keyword arm by RRF at 20 : 1 (see the benchmark below).
+- **Privacy is per provider.** NVIDIA sees `free_provider_sources` (the Boss setting). Gemini sees `gemini_provider_sources` AND `free_provider_sources`; the default leaves out `report` and `incentive`, because Google's unpaid tier may use submitted content to improve its products. `incentive` (pay data) is on no list, so those chunks are **keyword-only for good**. The database enforces this in `ai_ingest_write` and `ai_vector_fill`, not only the worker.
+- **Free limits (measured 2026-11-02/03).** NVIDIA: 70 rapid requests drew no 429, a batch of 128 chunks (49k tokens) answers in 3 s; the worker uses batches of 96 and a 1.2 s gap. Gemini: **100 inputs per minute and 1,000 inputs per day, per model** (a 429 says `limit: 1000 … retry in 13h`). A question costs one of them, so the backfill keeps 150 back (`ai_alt_budget()`: at most 850 vectors per rolling 24 h).
+- **Re-embed time (production, 13,339 chunks).** The 8,245 NVIDIA vectors are moved, not re-embedded. About 4,858 chunks wait for NVIDIA: roughly 1.9 M tokens, about 51 requests of 96, so **one or two ticks** (a few minutes, outside quiet hours 18:00-02:00 PKT). Gemini fills about 850 a day: its ~6,000 company and TikTok chunks take **about a week**, and new content after that.
+
+### States and recovery
+
+`ai_vector_state` holds one row per space only while it is deferred. Every failure defers the space and a success clears it (`ai_vector_ok`), so nothing stays "down":
+
+| Event | Deferred for |
+|---|---|
+| quota, key refused (401/403) after both NVIDIA keys, a limit of hours | the provider's stated wait (at most 6 h), else 30 min |
+| passing 429 (per minute), 5xx, timeout, network | the stated wait, at least 1 min; else 2 min |
+| no API key configured for the provider | 1 h, error text `no API key configured for <provider>` |
+| the provider refuses one chunk (400) | nothing: the batch is halved until the bad row stands alone (`skipped_rows`) |
+
+`select public.ai_ingest_tick();` wakes the worker only when work that can be done exists (a type allowed on a free provider, the space not deferred, the daily allowance not used). The incentive chunks no longer wake it every minute.
+
+### Stats (`ai_ingest_stats()`, new fields for the settings screen)
+
+| Field | Meaning |
+|---|---|
+| `vector_pending` | chunks **waiting** for a vector: none yet, and a free provider may embed them |
+| `vectors.keyword_only_not_allowed`, `keyword_only_by_type` | chunks no free provider may see (incentive): keyword search only, not waiting |
+| `vectors.spaces.main` / `.alt` | `{provider, model, filled, missing, not_allowed, allowed_types, status, next_try_at, last_error}` |
+| `vectors.spaces.*.status` | `complete`, `filling`, `down` (deferred after an error; see `last_error`), `paused_quiet_hours`, `daily_limit` (second space only; resumes by itself) |
+| `vectors.by_space.none` | chunks no space finds by meaning (waiting plus keyword-only) |
+| `vectors.main_provider/main_model/alt_provider/alt_model` | what fills each space |
+
+Old keys are kept (`by_space`, `main_missing`, `alt_filled`, `alt_models`, `pending_by_type`, `state`).
+
+### Benchmark (own data, 2026-11-03)
+
+2,386 chunks (all app guides, KB and AI docs, 1,800 TikTok articles) and 127 questions (120 paraphrased by a free LLM from a known chunk, 7 real questions from `ai_request_log` with hand-labelled documents). Scripts and notes: `scripts/embed-bench/`.
+
+| System | recall@5 | recall@10 | MRR |
+|---|---|---|---|
+| keywords only (BM25 approximation) | 0.600 | 0.700 | 0.454 |
+| **NVIDIA dense** | **0.908** | **0.975** | **0.789** |
+| NVIDIA + keywords, RRF 1:1 | 0.783 | 0.858 | 0.618 |
+| NVIDIA + keywords, RRF 3:1 (through the real `ai_search`, DEV) | 0.700 | 0.883 | 0.515 |
+| NVIDIA + keywords, RRF 20:1 (through the real `ai_search`, DEV) | 0.900 | 0.967 | 0.736 |
+| keywords only, the real Postgres arm (DEV) | 0.208 | 0.300 | 0.152 |
+
+Chunk-level gold (n = 120); the BM25 rows are an offline approximation, the DEV rows go through the real function. The Postgres keyword arm is weak on natural-language questions (recall@5 0.21 alone), so it is kept as a tiebreaker (weight 1 against 20), not an equal partner; the questions are paraphrases, which favour meaning over words, so exact names and week numbers rely on that tiebreaker. A better keyword arm (for example `websearch_to_tsquery` with an AND-first pass) is the next retrieval gain. Gemini could not be measured: its free tier (1,000 inputs a day per model) was used up before a comparable corpus could be embedded; re-run `scripts/embed-bench` tomorrow on a corpus of at most 800 chunks.
+
+### Rollout order (production)
+
+1. Blank `app_config.ai_ingest_url` (the minute tick then does nothing).
+2. Apply 432 during quiet hours (18:00-02:00 PKT). It drops and rebuilds the ten HNSW indexes inside one transaction, which holds an exclusive lock on `ai_chunks`: Buddy search and ingest wait for it. DEV took 7-16 s for 2.5k rows; production has 13k rows and 8k vectors to index, so expect a few minutes (an estimate, not measured).
+3. Deploy `ai-ingest` and `assistant` (the new code). Make sure the function secrets `NVIDIA_API_KEY`, `NVIDIA_API_KEY_2` and `GEMINI_API_KEY` are set on `ai-ingest`.
+4. Restore `ai_ingest_url`.
+
+If the order is broken: the OLD `ai-ingest` on the new database refuses to run (`pipeline mismatch`, it embeds nothing, no harm). The OLD `assistant` on the new database sends no model label, so every semantic arm is ignored and search is keyword-only until it is redeployed (no wrong-model comparison). The NEW functions on the OLD database fail on the missing 12-argument `ai_search`.
+
+### Operations
+
+- Check: `select public.ai_ingest_stats()->'vectors'->'spaces';`. Healthy: both `complete`, or `filling` / `daily_limit` with a falling `missing`.
+- Gemini never recovers by itself after a refused key: replace the secret, then `delete from public.ai_vector_state where space = 'alt';`.
+- Re-embed a space from scratch: `select public.ai_vector_reset_alt();` (second) or `select public.ai_vector_reset_main();` (main). The backfill refills them.
+- Switch the second provider: `update ai_assistant_config set embed_alt_provider = 'gemini'` (it must differ from the main one; the database refuses a switch while the column holds another model's vectors, run `ai_vector_reset_alt()` first).
+
 ## Health
 
 ```sql
@@ -171,4 +242,4 @@ select id, status_code, left(content, 200) as body, error_msg, created
 
 ## Cost
 
-A sweep reads every source in about 1.5–3 s of database time and queues only what differs from the store. The worker embeds only chunks whose text is new. An idle queue makes no function calls.
+A sweep reads every source in about 1.5–3 s of database time and queues only what differs from the store. The worker embeds only chunks whose text is new, on the free tiers (no billed call exists). An idle queue makes no function calls.

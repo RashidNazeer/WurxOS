@@ -3,12 +3,11 @@
 // (esm.sh in Deno, npm in Node).
 
 import { supabaseRpc } from '../ingest/db.ts';
-import { cachedEmbedder, openAiQueryEmbedder, openAiReranker } from '../retrieval/rerank.ts';
-import { RETRIEVAL_DEFAULTS } from '../retrieval/config.ts';
+import { cachedEmbedder } from '../retrieval/rerank.ts';
 import { DEFAULT_CONFIG } from '../config.ts';
 import { pricesFrom, UsageMeter } from '../prices.ts';
 import { providerAccountIssue } from '../providerErrors.ts';
-import { altEmbedOptions, altKeysFor, embedWithKeys, type AltProvider } from '../embedder.ts';
+import { embedOptions, embedWithKeys, isAltProvider, keysFor, MAIN_PROVIDER, MODEL_LABEL, tagVector, type EmbedProvider } from '../embedder.ts';
 import { isSlot, refreshModels, type KeySlot } from './models.ts';
 import { cleanPageContext, cleanSurface, requestCancel, type CoreDeps } from './core.ts';
 import { json, turnResponse, type TurnHttp } from './http.ts';
@@ -84,56 +83,67 @@ export type ServerEnv = {
   nvidia2Key?: string | null;            // NVIDIA_API_KEY_2: the 'nvidia2' key slot
   tavilyKey?: string | null;             // TAVILY_API_KEY: web search + page extraction (mig 415)
   braveKey?: string | null;              // BRAVE_API_KEY: web search (mig 416)
-  altProvider?: AltProvider;             // which provider filled embedding_alt (mig 408; default nvidia)
+  altProvider?: EmbedProvider;           // fallback when ai_embed_settings() cannot be read (tests); the database says which provider filled embedding_alt
   modelKeySlot?: KeySlot;                // with modelOverride: that key (serve-assistant --key-slot)
   noRateLimit?: boolean;                 // local testing only (serve-assistant); the edge function never sets it
 };
 
-// Query embeddings: the primary key, then the fallback key. When every key
-// refuses for an account reason (no credits, key refused), embeddings count as
-// down for 10 minutes in this worker (no more calls) and search runs on
-// keywords only.
+// Query embeddings (OpenAI is gone: free providers only). A question is embedded in EACH vector space that
+// holds document vectors, by the provider that filled it: the MAIN space by NVIDIA (query input type), the
+// second by ai_assistant_config.embed_alt_provider (Gemini, RETRIEVAL_QUERY), read from the database so a
+// config change can never leave questions in another model's space. Each vector carries its model label
+// (tagVector), and ai_search ignores a vector whose label is not the space's model. One provider failing
+// leaves the other serving; both failing means keyword-only. A failing provider is not asked again for a
+// while (10 min after an account problem, 1 min after a timeout or 5xx), so a search never waits on a dead API.
 export const EMBED_DOWN_MS = 600_000;
-let embedDownUntil = 0;
-export const _resetEmbedDown = () => { embedDownUntil = 0; };   // tests
-// The second vector space (mig 406): an NVIDIA query vector for `embedding_alt`
-// (keys nvidia, then nvidia2; input_type 'query'). searchIndex asks for it only
-// when the OpenAI embed gave none. Down for 10 minutes on an account problem too.
-let altDownUntil = 0;
-export function altQueryEmbedder(env: ServerEnv): ((t: string) => Promise<number[] | null>) | undefined {
-  // Must be the provider that FILLED embedding_alt
-  // (ai_assistant_config.embed_alt_provider, mig 408; default nvidia).
-  const provider = env.altProvider ?? 'nvidia';
-  const keys = altKeysFor(provider, { nvidia: env.nvidiaKey, nvidia2: env.nvidia2Key, gemini: env.geminiKey }).filter(Boolean) as string[];
-  if (!keys.length) return undefined;
+export const EMBED_BLIP_MS = 60_000;
+const downUntil: Record<'main' | 'alt', number> = { main: 0, alt: 0 };
+export const _resetEmbedDown = () => { downUntil.main = 0; downUntil.alt = 0; };   // tests
+
+export type QuerySettings = { alt_provider: EmbedProvider | null };
+
+// ai_embed_settings() is service-only, so it is read with the admin client; cached for 60 s.
+export function querySettings(admin: any, fallback?: EmbedProvider): () => Promise<QuerySettings> {
+  let at = 0;
+  let cur: QuerySettings = { alt_provider: fallback ?? null };
+  return async () => {
+    if (Date.now() - at < 60_000) return cur;
+    at = Date.now();
+    try {
+      const { data, error } = await admin.rpc('ai_embed_settings');
+      if (!error && data) cur = { alt_provider: isAltProvider(data.alt_provider) && data.alt_provider !== MAIN_PROVIDER ? data.alt_provider : null };
+    } catch { /* keep the last known */ }
+    return cur;
+  };
+}
+
+function oneSpace(space: 'main' | 'alt', provider: () => Promise<EmbedProvider | null>, env: ServerEnv): (t: string) => Promise<number[]> {
   const one = async (text: string): Promise<number[]> => {
-    if (Date.now() < altDownUntil) throw new Error('alt query embeddings unavailable');
-    try { return (await embedWithKeys([text], keys, altEmbedOptions(provider, 'query', { fetchImpl: env.fetchImpl, maxRetries: 1, timeoutMs: 8000 }))).vectors[0]; }
-    catch (e) { if (providerAccountIssue(e)) altDownUntil = Date.now() + EMBED_DOWN_MS; throw e; }
+    if (Date.now() < downUntil[space]) throw new Error(`${space} query embeddings unavailable`);
+    const p = await provider();
+    const keys = p ? keysFor(p, { nvidia: env.nvidiaKey, nvidia2: env.nvidia2Key, gemini: env.geminiKey }).filter(Boolean) as string[] : [];
+    if (!p || !keys.length) { downUntil[space] = Date.now() + EMBED_BLIP_MS; throw new Error(`no ${space} embedding key`); }
+    try {
+      const v = (await embedWithKeys([text], keys, embedOptions(p, 'query', { fetchImpl: env.fetchImpl, maxRetries: 1, timeoutMs: 8000 }))).vectors[0];
+      return tagVector(v, MODEL_LABEL[p]);
+    } catch (e) {
+      downUntil[space] = Date.now() + (providerAccountIssue(e) ? EMBED_DOWN_MS : EMBED_BLIP_MS);
+      throw e;
+    }
   };
   return cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS);
 }
 
-// `down` feeds the keyword-only prompt note in core.ts: true only when no query
-// vector can be made at all (neither OpenAI nor the NVIDIA alt space).
-export function chainEmbedder(env: ServerEnv, meter: UsageMeter):
+// `down` feeds the keyword-only prompt note in core.ts: true only when no query vector can be made at all.
+export function chainEmbedder(env: ServerEnv, _meter?: UsageMeter, settings?: () => Promise<QuerySettings>):
   { embed: (t: string) => Promise<number[]>; alt?: (t: string) => Promise<number[] | null>; down: () => boolean } {
-  const slots = ([['primary', env.openAiKey], ['fallback', env.openAiKeyFallback]] as const).filter(([, k]) => !!k);
-  const one = async (text: string): Promise<number[]> => {
-    if (Date.now() < embedDownUntil) throw new Error('query embeddings unavailable: no OpenAI key can embed right now');
-    let last: unknown = null;
-    for (const [slot, key] of slots) {
-      try { return await openAiQueryEmbedder(key as string, env.fetchImpl, meter.onEmbed(DEFAULT_CONFIG.EMBED_MODEL, slot))(text); }
-      catch (e) { last = e; if (!providerAccountIssue(e)) throw e; }
-    }
-    embedDownUntil = Date.now() + EMBED_DOWN_MS;
-    throw last;
-  };
-  const alt = altQueryEmbedder(env);
+  const st = settings ?? (async () => ({ alt_provider: env.altProvider && env.altProvider !== MAIN_PROVIDER ? env.altProvider : null }));
+  const embed = oneSpace('main', async () => MAIN_PROVIDER, env);
+  const alt = oneSpace('alt', async () => (await st()).alt_provider, env);
   return {
-    embed: cachedEmbedder(one, DEFAULT_CONFIG.QUERY_EMBED_CACHE_TTL_MS),
+    embed,
     alt,
-    down: () => Date.now() < embedDownUntil && (!alt || Date.now() < altDownUntil),
+    down: () => Date.now() < downUntil.main && Date.now() < downUntil.alt,
   };
 }
 
@@ -144,7 +154,7 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     ? env.createClient(env.url, env.anonKey, { global: { headers: { Authorization: `Bearer ${caller.token}` } }, auth: { persistSession: false, autoRefreshToken: false } })
     : null;
   const meter = new UsageMeter();
-  const emb = chainEmbedder(env, meter);
+  const emb = chainEmbedder(env, meter, querySettings(admin, env.altProvider));
   return {
     admin,
     searchRpc: supabaseRpc(userClient ?? admin),
@@ -166,7 +176,6 @@ export function makeDeps(env: ServerEnv, admin: any, caller: Caller): CoreDeps {
     embed: emb.embed,
     ...(emb.alt ? { embedAlt: emb.alt } : {}),
     embedDown: emb.down,
-    rerank: openAiReranker({ apiKey: env.openAiKey, model: RETRIEVAL_DEFAULTS.RERANK_MODEL, fetchImpl: env.fetchImpl, onUsage: meter.onRerank(RETRIEVAL_DEFAULTS.RERANK_MODEL) }),
     meter,
   };
 }

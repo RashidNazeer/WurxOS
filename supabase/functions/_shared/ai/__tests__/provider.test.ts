@@ -105,7 +105,7 @@ test('F2: every ai_usage_log row carries every column (no NULL from a bulk inser
 
 // ── the ingest worker ───────────────────────────────────────────────────────
 
-test('ingest: no credits → chunks written pending (keyword-searchable), OpenAI asked once per run and its space deferred (mig 406)', async () => {
+test('ingest: no credits → chunks written pending (keyword-searchable), the provider is asked once per run and its space deferred (mig 432)', async () => {
   const s = { source_id: 'r1', indexable: true, fp: 'fp1', payload: { row: F.weeklyLegacy(), brand: F.CTX.brand } };
   const calls: Array<[string, any]> = [];
   const rpc = async (fn: string, args: any = {}) => {
@@ -128,14 +128,16 @@ test('ingest: no credits → chunks written pending (keyword-searchable), OpenAI
   assert.ok(writes.every(([, a]) => a.p_chunks.every((c: any) => c.embedding === null)), 'without vectors: pending');
   assert.equal(asked, 1, 'a provider with no credits is asked once per run');
   const defer = calls.find(([f]) => f === 'ai_vector_defer')!;
-  assert.deepEqual([defer[1].p_space, defer[1].p_seconds], ['primary', PROVIDER_DEFER_SECONDS]);
+  assert.deepEqual([defer[1].p_space, defer[1].p_seconds], ['main', PROVIDER_DEFER_SECONDS]);
   assert.equal(calls.filter(([f]) => f === 'ai_ingest_fail' || f === 'ai_ingest_defer').length, 0);
   assert.deepEqual([stats.failed, stats.provider_issue], [0, 'quota']);
-  // an ordinary embedding error: also written pending, the space not deferred
+  // an ordinary (transient) error: also written pending; the space is put aside for 2 minutes, not 30
   const s2 = emptyStats();
   const before = calls.filter(([f]) => f === 'ai_vector_defer').length;
   await processBatch([{ id: 3, source_type: 'report', source_id: 'r3', op: 'upsert', attempts: 1 }],
     { rpc, workerId: 'w', pipelineVersion: PIPELINE_VERSION, model: DEFAULT_CONFIG.EMBED_MODEL, embed: async () => { throw new Error('socket hang up'); } }, s2);
   assert.deepEqual([s2.failed, s2.provider_issue], [0, null]);
-  assert.equal(calls.filter(([f]) => f === 'ai_vector_defer').length, before);
+  const after = calls.filter(([f]) => f === 'ai_vector_defer');
+  assert.equal(after.length, before + 1);
+  assert.equal(after.at(-1)![1].p_seconds, 120);
 });

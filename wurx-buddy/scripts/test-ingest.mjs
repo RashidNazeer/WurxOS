@@ -33,7 +33,8 @@ import { ASSISTANT, devDbUrl, readEnv, SSL, stripBom } from './dev-env.mjs';
 import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../../supabase/functions/_shared/ai/config.ts';
 import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
 import { importArticles } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { openAiEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
+import { embedOptions, embedWithKeys, MODEL_LABEL } from '../../supabase/functions/_shared/ai/embedder.ts';
+import { providerEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const MODEL = DEFAULT_CONFIG.EMBED_MODEL;
 const REAL = !process.argv.includes('--no-real');
@@ -424,8 +425,8 @@ try {
 
   // ---------------------------------------------------------- the real embedder, 3 tiny texts
   if (REAL) {
-    const key = readEnv().OPEN_AI_API_KEY;
-    if (!key) throw new Error('OPEN_AI_API_KEY missing in ../.env.dev');
+    const key = readEnv().NEM_API;
+    if (!key) throw new Error('NEM_API (an NVIDIA key) missing in ../.env.dev');
     const realRecs = [
       { id: 'qa-real-1', kind: 'essay', url: 'https://example.com/r1', title: 'Refund window', text: 'Refunds must be requested within 30 days.' },
       { id: 'qa-real-2', kind: 'essay', url: 'https://example.com/r2', title: 'Labels', text: 'Shipping labels print from the Orders page.' },
@@ -433,14 +434,14 @@ try {
     ];
     await importArticles(c, realRecs);
     await enqueue(realRecs.map((r) => ['tts_article', r.id]));
-    const real = await runWorker({ rpc, embed: openAiEmbedder(key), pipelineVersion: pipeline, workerId: 'test-real' });
+    const real = await runWorker({ rpc, embed: providerEmbedder('nvidia', { nvidia: key }), pipelineVersion: pipeline, workerId: 'test-real' });
     // One batch; more than one request only if the network made it retry.
     check('real embedder: 3 texts in one batch, < 200 tokens', real.embedded_chunks === 3 && real.embed_calls === 1 && real.embed_requests >= 1 && real.embed_requests <= 5 && real.embed_tokens > 0 && real.embed_tokens < 200, JSON.stringify({ n: real.embedded_chunks, req: real.embed_requests, tok: real.embed_tokens }));
-    const qvec = (await openAiEmbedder(key)(['how many days do I have to ask for my money back'])).vectors[0];
+    const qvec = (await embedWithKeys(['how many days do I have to ask for my money back'], [key], embedOptions('nvidia', 'query'))).vectors[0];
     await c.query('savepoint real');
     await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: ppl.boss, role: 'authenticated' })]);
     await c.query('set local role authenticated');
-    const hits = await q(`select source_id from public.ai_search($1::extensions.vector, null, array['tts_article'], null, null, null, 10, null) where source_id like 'qa-real-%'`, [vecLit(qvec)]);
+    const hits = await q(`select source_id from public.ai_search($1::extensions.vector, null, array['tts_article'], null, null, null, 10, null, null, null, $2, null) where source_id like 'qa-real-%'`, [vecLit(qvec), MODEL_LABEL.nvidia]);
     await c.query('rollback to savepoint real');
     check('real embedder: semantic search ranks the refund article first', hits[0]?.source_id === 'qa-real-1', hits.map((h) => h.source_id).join(','));
   }

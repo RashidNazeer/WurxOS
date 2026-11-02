@@ -31,9 +31,12 @@ export function parseMode(body: unknown): IngestMode | null {
 
 export async function runIngest(mode: IngestMode, o: {
   rpc: Rpc;
-  embed: Embedder;
-  embedAlt?: Embedder;      // the alt space (mig 406), if the caller built it
-  altKeys?: AltKeys;        // or its keys: the provider is a setting (mig 408)
+  keys?: AltKeys;           // the free providers' API keys: the worker builds each space's embedder from them
+  altKeys?: AltKeys;        // back-compat name of keys
+  embed?: Embedder;         // test seams: embedders for the main / second vector space
+  embedAlt?: Embedder;
+  fetchImpl?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
   timeBudgetMs?: number;
   now?: () => number;
   log?: (msg: string) => void;
@@ -48,6 +51,6 @@ export async function runIngest(mode: IngestMode, o: {
     out.skipped_drain = true;
     return out;
   }
-  out.stats = await runWorker({ rpc: o.rpc, embed: o.embed, embedAlt: o.embedAlt, altKeys: o.altKeys, timeBudgetMs: left, now, log: o.log });
+  out.stats = await runWorker({ rpc: o.rpc, embed: o.embed, embedAlt: o.embedAlt, keys: o.keys ?? o.altKeys, fetchImpl: o.fetchImpl, sleep: o.sleep, timeBudgetMs: left, now, log: o.log });
   return out;
 }

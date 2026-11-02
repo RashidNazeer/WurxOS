@@ -161,7 +161,7 @@ const sectionLine = (s: DocSection, heading?: string) =>
   `§ ${s.title}${heading ? ` › ${heading.slice(0, HEADING_MAX_CHARS)}` : ''}`;
 
 export async function chunkDocument(doc: ExtractedDoc, params: ChunkParams, opts: ChunkOptions = {}): Promise<ChunkResult> {
-  const model = opts.model ?? DEFAULT_CONFIG.EMBED_MODEL;
+  const model = opts.model ?? DEFAULT_CONFIG.HASH_MODEL;
   const rowsPer = opts.tableRowsPerChunk ?? DEFAULT_CONFIG.TABLE_ROWS_PER_CHUNK;
   const cap = opts.maxChunksPerDoc ?? DEFAULT_CONFIG.MAX_CHUNKS_PER_DOC;
   const embedMax = opts.embedMaxTokens ?? DEFAULT_CONFIG.EMBED_MAX_TOKENS;

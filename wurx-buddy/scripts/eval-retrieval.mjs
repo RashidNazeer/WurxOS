@@ -35,8 +35,7 @@ import { retrievalConfig } from '../../supabase/functions/_shared/ai/retrieval/c
 import { indexForSourceType } from '../../supabase/functions/_shared/ai/retrieval/indexes.ts';
 import { detectPeriods } from '../../supabase/functions/_shared/ai/retrieval/resolve.ts';
 import { searchEverything, searchIndex } from '../../supabase/functions/_shared/ai/retrieval/search.ts';
-import { embedTexts } from '../../supabase/functions/_shared/ai/embedder.ts';
-import { openAiReranker } from '../../supabase/functions/_shared/ai/retrieval/rerank.ts';
+import { embedOptions, embedWithKeys, MODEL_LABEL, tagVector } from '../../supabase/functions/_shared/ai/embedder.ts';
 
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
@@ -53,7 +52,8 @@ if (ignored.length) { console.error(`bad --set keys: ${ignored.join(', ')}`); pr
 for (const k of Object.keys(sets)) if (!(k in cfg)) { console.error(`unknown --set key ${k}`); process.exit(1); }
 
 const env = readEnv();
-if (!env.OPEN_AI_API_KEY) { console.error('OPEN_AI_API_KEY missing in ../.env.dev'); process.exit(1); }
+const NV_KEYS = [env.NEM_API, env.OPEN_AI_NVA].filter(Boolean);
+if (!NV_KEYS.length) { console.error('no NVIDIA key (NEM_API / OPEN_AI_NVA) in ../.env.dev'); process.exit(1); }
 
 pg.types.setTypeParser(1082, (v) => v);   // date → 'YYYY-MM-DD', as PostgREST returns it
 const pool = new pg.Pool({ connectionString: devDbUrl(), ssl: SSL, max: 4, statement_timeout: 30_000 });
@@ -103,14 +103,14 @@ let embedTokens = 0, embedCalls = 0;
 async function embedAll(texts) {
   const todo = [...new Set(texts.map((t) => t.trim()))].filter((t) => !embCache[t]);
   if (todo.length) {
-    const r = await embedTexts(todo, { apiKey: env.OPEN_AI_API_KEY });
+    const r = await embedWithKeys(todo, NV_KEYS, embedOptions('nvidia', 'query'));
     todo.forEach((t, i) => { embCache[t] = r.vectors[i]; });
     embedTokens += r.usage.totalTokens;
     embedCalls += r.requests;
     if (cacheFile) fs.writeFileSync(cacheFile, JSON.stringify(embCache));
   }
 }
-const embed = async (t) => embCache[t.trim()] ?? (await embedAll([t]), embCache[t.trim()]);
+const embed = async (t) => tagVector(embCache[t.trim()] ?? (await embedAll([t]), embCache[t.trim()]), MODEL_LABEL.nvidia);
 
 // ── data ──
 const questions = fs.readFileSync(path.join(ASSISTANT, 'tests/eval/questions.jsonl'), 'utf8')
@@ -125,8 +125,7 @@ const brands = (await query(`select id::text, brand_name from brands`)).rows;
 // token usage is counted and printed with the run.
 // Scores are cached with the RPC results, so a rerun costs nothing.
 const rerankUsage = { calls: 0, input_tokens: 0, output_tokens: 0 };
-const reranker = cfg.RERANK_ENABLED ? openAiReranker({ apiKey: env.OPEN_AI_API_KEY, model: cfg.RERANK_MODEL,
-  onUsage: (u) => { rerankUsage.calls++; rerankUsage.input_tokens += u.input_tokens; rerankUsage.output_tokens += u.output_tokens; } }) : null;
+const reranker = null;   // the only reranker was OpenAI's (paid): removed in mig 432
 const deps = {
   rpc, embed, asUser: boss, config: cfg, now: new Date(),
   rerank: reranker ? async (q, items) => {
