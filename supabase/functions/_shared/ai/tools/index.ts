@@ -42,7 +42,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_incentives',
-    description: 'Get monthly incentive & bonus goals (target vs achieved, PKR amount, completed/verified/paid) for one employee, or for ALL employees when no name is given. Month format YYYY-MM; omit for the latest month with data.',
+    description: 'Get monthly incentive & bonus goals (target vs achieved, PKR amount, completed/verified/paid) for one employee, or for ALL employees when no name is given (one compact line each; name a person for the goal-by-goal detail). Former employees are listed separately. Month format YYYY-MM; omit for the latest month with data.',
     parameters: {
       type: 'object',
       properties: {
@@ -53,7 +53,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_salary',
-    description: 'Get current basic salary (PKR) and recent change history for one employee, or for ALL employees when no name is given. The Boss has no salary and is excluded.',
+    description: 'Get current basic salary (PKR) and recent change history for one employee, or for ALL employees when no name is given (current staff with their total, then people with no salary record, then former employees apart). The Boss has no salary and is excluded.',
     parameters: { type: 'object', properties: { person_name: { type: 'string', description: 'Employee name; omit to list everyone.' } } },
   },
   {
@@ -99,7 +99,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'get_leave',
-    description: "Get leave requests for one employee, or across everyone. Filter by status (approved/pending/rejected/cancelled) and/or type (wfh, emergency, medical, half_leave). Month filters by the leave's start date (YYYY-MM). Compact one line per request.",
+    description: "Get leave requests for one employee, or across everyone. Filter by status (approved/pending/rejected/cancelled) and/or type (wfh, emergency, medical, half_leave). Month (YYYY-MM) returns every request that overlaps that month. Rejected/cancelled requests took no leave. Former employees are marked.",
     parameters: {
       type: 'object',
       properties: {
@@ -112,12 +112,12 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'list_brands',
-    description: 'List client brands with their status, owner (the Team Lead) and the APCs/IPCs assigned to each. Use for "which brands do we have / who owns X".',
+    description: 'List client brands with their status (active/inactive counts), owner (shown with their real role) and the APCs/IPCs assigned to each. Use for "which brands do we have / who owns X".',
     parameters: { type: 'object', properties: {} },
   },
   {
     name: 'get_brand_assignments',
-    description: "Who handles which brand: per brand the owner (Team Lead) and the assigned APCs/IPCs (temporary cover marked). Use for 'which APC is responsible for / assigned to / handles brand X' and 'which brands does person Y handle'. Never infer APCs from reports or owners; use this.",
+    description: "Who handles which brand: per brand the owner (shown with their real role) and the assigned APCs/IPCs (temporary cover marked). Use for 'which APC is responsible for / assigned to / handles brand X' and 'which brands does person Y handle'. Never infer APCs from reports or owners; use this.",
     parameters: {
       type: 'object',
       properties: {

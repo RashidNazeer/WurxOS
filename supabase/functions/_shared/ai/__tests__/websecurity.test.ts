@@ -479,8 +479,8 @@ test('the data tools: another person\'s basic_salary is not in a non-Boss incent
   const profiles = [{ id: 'u-me', display_name: 'Me Self', role: 'tl' }, { id: 'u-ali', display_name: 'Ali Khan', role: 'apc' }];
   const userClient = fakeDb({ incentives: inc, profiles }) as any;   // RLS stand-in: sees both rows
   const r = await runDataTool(fakeDb({}) as any, { userId: 'u-me', role: 'tl', userClient } as any, 'get_incentives', { month: '2026-09' });
-  assert.match(r.text, /Me Self — 2026-09 \(basic salary/);
-  assert.match(r.text, /Ali Khan — 2026-09 \(verified/);
+  assert.match(r.text, /Me Self \(TL\) — basic salary/);
+  assert.match(r.text, /Ali Khan \(APC\) — 1 of 1 goals met; earned PKR [0-9,]+ of PKR [0-9,]+ potential; verified/);
   assert.doesNotMatch(r.text, /85,000/);
 });
 

@@ -9,7 +9,8 @@ import { allowed, isBoss, rlsDecides, viewableBrandIds } from './acl.ts';
 import { assignmentText, coverText, loadAssignments } from './assignments.ts';
 import { fmtMoney, fmtNum, fmtSigned, normTier, parseMetric, reportCurrency } from './metrics.ts';
 import { addDays, applyPeriod, type Period, resolveBrands, resolvePeriod } from './period.ts';
-import { clip, has, htmlToText, insightBlock, metricsLine, tableBlock, writtenBlock } from './v1format.ts';
+import { clip, has, htmlToText, insightBlock, karachiMonthNow, metricsLine, tableBlock, writtenBlock } from './v1format.ts';
+import { loadPeople, roleCode, who } from './who.ts';
 
 export type Out = { text: string; source: ToolSource; data?: unknown };
 
@@ -761,10 +762,14 @@ export async function rankBrands(admin: Db, ctx: ToolCtx, args: any): Promise<Ou
   ];
   if (metric.startsWith('gmv_max_')) lines.push('GMV Max figures come from each report\'s GMV Max table: the Overall row when present, else the sum of campaign rows; ROI = total GMV ÷ total spend, never an average of campaign ROIs.');
   if (!ranked.length) lines.push(`No brand has a readable ${spec.label} for this period.`);
-  ranked.slice(0, topN).forEach((x, i) => lines.push(`${i + 1}. ${brandName(x.r)} — ${fmtMetric(metric, x.v.value!, x.v.currency)} (${periodOf(x.r)})`));
+  const inactiveName = new Set(inScope.filter((b: any) => !activeIds.has(b.id)).map((b: any) => b.id));
+  const tagBrand = (r: any) => `${brandName(r)}${inactiveName.has(r.brand_id) ? ' (inactive brand)' : ''}`;
+  ranked.slice(0, topN).forEach((x, i) => lines.push(`${i + 1}. ${tagBrand(x.r)} — ${fmtMetric(metric, x.v.value!, x.v.currency)} (${periodOf(x.r)})`));
   if (ranked.length > topN) lines.push(`(${ranked.length - topN} more ranked brands not shown; raise top_n to see them.)`);
   if (apart.length) lines.push(`Not ranked (different currency): ${apart.map((x) => `${brandName(x.r)} ${fmtMetric(metric, x.v.value!, x.v.currency)}`).join('; ')}.`);
-  if (totals.length) lines.push(`Total: ${totals.map((t) => `${fmtMoney(t.sum, t.currency)} across ${t.reports} report${t.reports > 1 ? 's' : ''}`).join('; ')}${totals.length > 1 ? ' (currencies kept separate)' : ''}.`);
+  if (totals.length) lines.push(`Total of ONLY the brands with a readable figure here (not the whole portfolio${reported.length > covered ? '; includes inactive brands' : ''}): ${totals.map((t) => `${fmtMoney(t.sum, t.currency)} across ${t.reports} report${t.reports > 1 ? 's' : ''}`).join('; ')}${totals.length > 1 ? ' (currencies kept separate)' : ''}.`);
+  const noReport = active.filter((b: any) => !latest.has(b.id) && !pend.some((p: any) => p.brand_id === b.id));
+  if (noReport.length) lines.push(`Active brands with NO ${typeLabel} at all for this period: ${noReport.map((b: any) => b.brand_name).join(', ')}.`);
   if (missing.length) lines.push(`No readable ${spec.label}: ${missing.map((x) => `${brandName(x.r)} (${x.v.note})`).join('; ')}.`);
   return { text: lines.join('\n') + pendingBlock(pend), source: src, data: { ranked: ranked.map((x) => ({ brand: brandName(x.r), value: x.v.value, currency: x.v.currency, report_id: x.r.id })), totals, covered, active: active.length } };
 }
@@ -812,16 +817,19 @@ export async function getGmvMax(admin: Db, ctx: ToolCtx, args: any): Promise<Out
   src.currency = curs.size === 1 ? [...curs][0] as string : 'mixed';
   const n = (v: unknown) => (v == null || v === '' ? null : Number(v));
   const m = (v: unknown, c: string) => (n(v) == null || !Number.isFinite(n(v)!) ? 'n/a' : fmtMoney(n(v)!, c));
+  const { data: bst } = await admin.from('brands').select('id, status').in('id', [...new Set(rows.map((r: any) => r.brand_id).filter(Boolean))]);
+  const inactiveBrand = new Set((bst || []).filter((b: any) => String(b.status).toLowerCase() !== 'active').map((b: any) => b.id));
   const blocks = rows.map((r: any) => {
     const c = r.currency || 'USD';
-    const head = `- ${r.brand_name || 'Unknown brand'} · ${r.period_label || r.period_start} (${r.period || 'report'}, ${c}): spend ${m(r.cost, c)}, gross revenue ${m(r.gross_revenue, c)}, ROI ${n(r.roi) != null ? n(r.roi)!.toFixed(2) : 'n/a'}, SKU orders ${n(r.sku_orders) != null ? fmtNum(n(r.sku_orders)!) : 'n/a'}, cost per order ${m(r.cost_per_order, c)}`;
+    const head = `- ${r.brand_name || 'Unknown brand'}${inactiveBrand.has(r.brand_id) ? ' (inactive brand)' : ''} · ${r.period_label || r.period_start} (${r.period || 'report'}, ${c}): spend ${m(r.cost, c)}, gross revenue ${m(r.gross_revenue, c)}, ROI ${n(r.roi) != null ? n(r.roi)!.toFixed(2) : 'n/a'}, SKU orders ${n(r.sku_orders) != null ? fmtNum(n(r.sku_orders)!) : 'n/a'}, cost per order ${m(r.cost_per_order, c)}`;
     const camps = (Array.isArray(r.campaigns) ? r.campaigns : []).slice(0, 8).map((k: any) =>
       `    • ${String(k.campaignName || k.campaignId || 'campaign').trim()}${k.status ? ` [${k.status}]` : ''}: spend ${m(k.cost, c)}, revenue ${m(k.grossRevenue, c)}, ROI ${n(k.roi) != null ? n(k.roi)!.toFixed(2) : 'n/a'}${n(k.targetRoi) != null ? ` (target ${n(k.targetRoi)!.toFixed(2)})` : ''}, orders ${n(k.skuOrders) != null ? fmtNum(n(k.skuOrders)!) : 'n/a'}`);
     const more = Array.isArray(r.campaigns) && r.campaigns.length > 8 ? [`    …and ${r.campaigns.length - 8} more campaigns`] : [];
     const notes = r.notes ? [`    Notes: ${clip(htmlToText(r.notes), 300)}`] : [];
     return [head, ...camps, ...more, ...notes].join('\n');
   });
-  return { text: `GMV Max reports (${rows.length}):\n` + blocks.join('\n'), source: src };
+  const newest = String(rows[0].period_label || rows[0].period_start);
+  return { text: `GMV Max reports (${rows.length}${period ? '' : `; no period was asked, so these are simply the most recent ones on file, newest: ${newest}`}):\n` + blocks.join('\n'), source: src };
 }
 
 // ------------------------------------------------------------------ brand_overview
@@ -839,8 +847,8 @@ export async function brandOverview(admin: Db, ctx: ToolCtx, args: any): Promise
   const cur = (full?.currency || 'USD').toUpperCase();
   let owner = '';
   if (full?.owner_id) {
-    const { data: o } = await admin.from('profiles').select('display_name').eq('id', full.owner_id).maybeSingle();
-    owner = o?.display_name || 'unknown';
+    const { data: o } = await admin.from('profiles').select('display_name, role, is_active, deleted_at').eq('id', full.owner_id).maybeSingle();
+    owner = o ? who(o) : 'unknown';
   }
   const { data: mets, error: me } = await admin.from('brand_monthly_metrics')
     .select('month_key, gmv_target, gmv_achieved, samples_target, samples_achieved, roi_target, roi_achieved, gmv_max_allocated, gmv_max_used, paid_collab_allocated, paid_collab_used')
@@ -854,8 +862,9 @@ export async function brandOverview(admin: Db, ctx: ToolCtx, args: any): Promise
     return `${label} ${g != null ? f(g) : 'n/a'} of ${t != null ? f(t) : 'no'} target${pct}`;
   };
   const money = (n: number) => fmtMoney(n, cur);
-  const metLines = (mets || []).map((m: any) => '  - ' + m.month_key + ': ' + [
-    pair('GMV', m.gmv_achieved, m.gmv_target, money),
+  const thisMonth = karachiMonthNow();
+  const metLines = (mets || []).map((m: any) => '  - ' + m.month_key + (String(m.month_key) >= thisMonth ? ' (month still in progress, figures so far)' : '') + ': ' + [
+    pair('GMV (goal tracking)', m.gmv_achieved, m.gmv_target, money),
     pair('samples', m.samples_achieved, m.samples_target, fmtNum),
     pair('ROI', m.roi_achieved, m.roi_target, (n) => n.toFixed(2)),
     num(m.gmv_max_allocated) != null || num(m.gmv_max_used) != null ? `GMV Max budget used ${num(m.gmv_max_used) != null ? money(num(m.gmv_max_used)!) : 'n/a'} of ${num(m.gmv_max_allocated) != null ? money(num(m.gmv_max_allocated)!) : 'n/a'}` : null,
@@ -875,11 +884,11 @@ export async function brandOverview(admin: Db, ctx: ToolCtx, args: any): Promise
   const lines = [
     `${full?.brand_name || b.brand_name}${full?.client_name ? ` (client: ${full.client_name})` : ''}`,
     `- Status: ${full?.status || 'n/a'} · tier: ${normTier(full?.tier) ?? 'not set'} · currency: ${cur}`,
-    `- Owner (Team Lead): ${owner || 'not set'}`,
+    `- Owner: ${owner || 'not set'}`,
     `- Assigned: ${assignmentText((await loadAssignments(admin, [b.id])).get(b.id)) || 'nobody assigned'}`,
     full?.gmv_max_status || full?.paid_collab_status ? `- GMV Max: ${full?.gmv_max_status || 'n/a'} · paid collab: ${full?.paid_collab_status || 'n/a'}` : null,
     full?.last_sale_generated_date ? `- Last sale generated: ${full.last_sale_generated_date}` : null,
-    metLines.length ? `- Monthly targets vs achieved (latest ${metLines.length}):\n${metLines.join('\n')}` : isBoss(ctx) ? '- Monthly targets: none recorded.' : '- Monthly targets: none I can show you.',   // bmm RLS is narrower than brands; no hint which
+    metLines.length ? `- Monthly targets vs achieved (latest ${metLines.length}; the goal-tracking figures are the ones entered for goals and incentives, and can differ from the GMV in the approved report):\n${metLines.join('\n')}` : isBoss(ctx) ? '- Monthly targets: none recorded.' : '- Monthly targets: none I can show you.',   // bmm RLS is narrower than brands; no hint which
     r ? `- Latest approved report: ${periodOf(r)} (${r.type}, ${reportCurrency(r)}): ${metricsLineCur(r.data || {}, reportCurrency(r))}` : '- No approved report yet.',
   ].filter(Boolean);
   return { text: lines.join('\n') + pendingBlock(pend), source: src };
@@ -894,16 +903,15 @@ export async function listBrands(admin: Db, ctx: ToolCtx): Promise<Out> {
   const brands = (all || []).filter((b: any) => !visible || visible.has(b.id));
   if (!brands.length) return { text: 'No brands found.', source: src };
   const ids = brands.map((b: any) => b.owner_id).filter(Boolean);
-  const { data: profs } = await admin.from('profiles').select('id, display_name').in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000']);
-  const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+  const owners = await loadPeople(admin, ids);
   // Owner = the Team Lead; the APCs/IPCs come from brand_assignments.
   const assigned = await loadAssignments(admin, brands.map((b: any) => b.id));
   src.ids = brands.map((b: any) => b.id).slice(0, 50);
   src.extra = { assignments: 'brand_assignments' };
   return {
-    text: `${visible ? 'Brands you can see' : 'Brands'} (${brands.length}):\n` + brands.map((b: any) => {
+    text: `${visible ? 'Brands you can see' : 'Brands'} (${brands.length}: ${brands.filter((b: any) => String(b.status).toLowerCase() === 'active').length} active, ${brands.filter((b: any) => String(b.status).toLowerCase() !== 'active').length} inactive):\n` + brands.map((b: any) => {
       const team = assignmentText(assigned.get(b.id));
-      return `- ${b.brand_name} (${b.status || 'n/a'})${b.owner_id ? ` — owner: ${nameOf.get(b.owner_id) || 'unknown'}` : ''}${team ? `; ${team}` : ''}`;
+      return `- ${b.brand_name} (${b.status || 'n/a'})${b.owner_id ? ` — owner: ${owners.has(b.owner_id) ? who(owners.get(b.owner_id)) : 'unknown'}` : ''}${team ? `; ${team}` : ''}`;
     }).join('\n'),
     source: src,
   };
@@ -933,23 +941,24 @@ export async function getBrandAssignments(admin: Db, ctx: ToolCtx, args: any): P
   if (!list.length) return { text: 'No brands found.', source: src };
   const assigned = await loadAssignments(admin, list.map((b: any) => b.id));
   const ownerIds = [...new Set(list.map((b: any) => b.owner_id).filter(Boolean))];
-  const { data: owners } = ownerIds.length ? await admin.from('profiles').select('id, display_name').in('id', ownerIds) : { data: [] };
-  const ownerName = new Map<string, string>((owners || []).map((p: any) => [p.id, String(p.display_name)]));
+  const ownerRows = await loadPeople(admin, ownerIds as string[]);
+  const ownerName = new Map<string, string>([...ownerRows].map(([id, p]) => [id, String(p.display_name)]));
+  const ownerRel = (id: string) => `owner (${roleCode(ownerRows.get(id)?.role)})`;
   const role = args?.role ? String(args.role).toLowerCase() : null;
   const rows: Array<{ brand: string; brand_id: string; person: string; relation: string; until: string | null }> = [];
   const lines: string[] = [];
   for (const b of list) {
     const team = (assigned.get(b.id) ?? []).filter((a) => !role || a.role === role);
     const owner = b.owner_id ? ownerName.get(b.owner_id) ?? 'unknown' : null;
-    if (owner && (!role || role === 'tl' || role === 'owner')) rows.push({ brand: b.brand_name, brand_id: b.id, person: owner, relation: 'owner (Team Lead)', until: null });
+    if (owner && (!role || role === 'tl' || role === 'owner')) rows.push({ brand: b.brand_name, brand_id: b.id, person: owner, relation: ownerRel(b.owner_id), until: null });
     for (const a of team) rows.push({ brand: b.brand_name, brand_id: b.id, person: a.name, relation: `assigned ${a.role.toUpperCase()}`, until: a.until });
     if (person) {
-      const mine = [b.owner_id === person.id ? 'owner (Team Lead)' : null,
+      const mine = [b.owner_id === person.id ? ownerRel(b.owner_id) : null,
         ...team.filter((a) => a.user_id === person.id).map((a) => `assigned ${a.role.toUpperCase()}${coverText(a)}`)]
         .filter(Boolean);
       if (mine.length) lines.push(`- ${b.brand_name} (${b.status || 'n/a'}): ${mine.join(', ')}`);
     } else {
-      const ownerPart = role && role !== 'tl' && role !== 'owner' ? '' : `owner (Team Lead): ${owner ?? 'not set'}`;
+      const ownerPart = role && role !== 'tl' && role !== 'owner' ? '' : `owner: ${b.owner_id && owner ? who(ownerRows.get(b.owner_id)) : 'not set'}`;
       const teamPart = role === 'tl' || role === 'owner' ? '' : assignmentText(team) || 'no APC/IPC assigned';
       lines.push(`- ${b.brand_name} (${b.status || 'n/a'}) — ${[ownerPart, teamPart].filter(Boolean).join('; ')}`);
     }
@@ -959,7 +968,7 @@ export async function getBrandAssignments(admin: Db, ctx: ToolCtx, args: any): P
   if (person) {
     return { text: lines.length ? `Brands ${person.display_name} handles (${lines.length}):\n${lines.join('\n')}` : `${person.display_name} owns no brand and is assigned to none that you can see.`, source: src, data };
   }
-  return { text: `Brand teams (${lines.length}; owner = Team Lead, assigned = APCs/IPCs):\n${lines.join('\n')}`, source: src, data };
+  return { text: `Brand teams (${lines.length}; each owner is shown with their real role; assigned = APCs/IPCs):\n${lines.join('\n')}`, source: src, data };
 }
 
 // ------------------------------------------------------------------ get_agenda_tasks
@@ -997,12 +1006,11 @@ export async function getAgendaTasks(admin: Db, ctx: ToolCtx, args: any): Promis
   rows = rows.slice(0, CAP);
   if (!rows.length) return { text: `No agenda tasks found${person ? ` for ${person.display_name}` : ''}${args?.status ? ` (${args.status})` : ''}.`, source: src };
   const ids = [...new Set(rows.map((t: any) => t.assignee_id).filter(Boolean))];
-  const { data: profs } = ids.length ? await admin.from('profiles').select('id, display_name').in('id', ids) : { data: [] };
-  const nameOf = new Map((profs || []).map((p: any) => [p.id, p.display_name]));
+  const people = await loadPeople(admin, ids as string[]);
   src.ids = rows.map((t: any) => t.id);
   const lines = rows.map((t: any) => {
     const det = t.details ? clip(htmlToText(t.details), 200) : '';
-    return `- [${t.status || '?'}] ${String(t.title || '(untitled)').trim()}${t.brand?.brand_name ? ` — ${t.brand.brand_name}` : ''}${t.assignee_id ? ` · ${nameOf.get(t.assignee_id) || 'unknown'}` : ''}${t.due_date ? ` · due ${t.due_date}` : ''}${det ? ` — ${det}` : ''}${t.link ? ` (${t.link})` : ''}`;
+    return `- [${t.status || '?'}] ${String(t.title || '(untitled)').trim()}${t.brand?.brand_name ? ` — ${t.brand.brand_name}` : ''}${t.assignee_id ? ` · ${people.has(t.assignee_id) ? who(people.get(t.assignee_id)) : 'unknown'}` : ''}${t.due_date ? ` · due ${t.due_date}` : ''}${det ? ` — ${det}` : ''}${t.link ? ` (${t.link})` : ''}`;
   });
   return {
     text: `Agenda tasks (${rows.length}):\n` + lines.join('\n') +
