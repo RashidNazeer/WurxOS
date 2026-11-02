@@ -28,6 +28,8 @@ import {
 } from './BrandCustomSections';
 import { formatPctChange } from '../../utils/formatPctChange';
 import PasteParsePanel from './PasteParsePanel';
+import { productTotalsSummary, productTotalsMessages } from '../../lib/reportTotalsCheck';
+import ProductTotalsWarning from './ProductTotalsWarning';
 import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
 import { loadColumns } from '../../lib/gmvMaxLayout';
 import { useSectionPresets } from './SectionPresetBar';
@@ -892,6 +894,26 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
   // Validation — return array of missing field names. Disabled sections
   // (via the inline toggle on each SectionHeader) are skipped entirely so
   // hiding a section also hides its required-field checks.
+  // Product table vs the totals above it (GMV, orders, videos). Shown live under the table and
+  // used by validate() to block Submit while they disagree.
+  const _sym = currencySymbol(data.currency || DEFAULT_CURRENCY);
+  const fmtProd = (n, money) => (money
+    ? `${_sym}${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : Number(n).toLocaleString());
+  const productSummary = (() => {
+    const en = resolveWeeklySectionsEnabled(data.sectionsEnabled);
+    if (!en.overallPerformance || !en.productHighlights) return [];
+    const op = data.overallPerformance || {};
+    return productTotalsSummary({
+      products: data.productHighlights, fmt: fmtProd,
+      checks: [
+        { key: 'gmv', label: 'GMV', total: op.gmv, productKey: 'gmv', money: true },
+        // Older reports call this column "Units Sold", which is not orders.
+        ...(productUnitsLbl === 'Orders' ? [{ key: 'orders', label: 'Orders', total: op.orders, productKey: 'unitsSold' }] : []),
+        { key: 'videos', label: 'Videos', total: op.videosPosted, productKey: 'newVideos' },
+      ],
+    });
+  })();
   const validate = () => {
     const missing = [];
     const en = resolveWeeklySectionsEnabled(data.sectionsEnabled);
@@ -930,6 +952,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
       missing.push('GMV Max (at least 1 with campaign)');
     if (en.productHighlights && !(data.productHighlights || []).some(p => p.productName && p.productName.trim()))
       missing.push('Product Highlights (at least 1 with product name)');
+    if (en.productHighlights) missing.push(...productTotalsMessages(productSummary.filter(r => r.state === 'mismatch'), 'Product Highlights'));
 
     if (en.upcomingCampaigns && (!data.upcomingCampaigns || !data.upcomingCampaigns.trim()))
       missing.push('Current & Upcoming Campaigns');
@@ -1858,6 +1881,7 @@ export default function WeeklyReportForm({ editReportId, onSaved, onCancel, pref
             { key: 'samplesApprovedMtd', label: 'Samples MTD', type: 'number', width: '95px' },
             { key: 'notes', label: 'Notes', width: '130px' },
           ]} />
+        <ProductTotalsWarning rows={productSummary} fmt={fmtProd} />
         <BuiltinExtras sectionKey="productHighlights" sectionTitle="Product Highlights"
           fields={brandSectionExtras.productHighlights || []} data={data} setData={setData} curSym={curSym}
           previousReport={previousReport} disabled={!selectedBrand?.id}
