@@ -7,10 +7,10 @@ import { fakeDb } from '../../../supabase/functions/_shared/ai/__tests__/fixture
 const dir = resolve(dirname(fileURLToPath(import.meta.url)), '.snapshot');
 export const hasSnapshot = () => existsSync(resolve(dir, 'tables.json'));
 
-export function loadSnapshot() {
+export function loadSnapshot({ pseudo = false } = {}) {
   if (!hasSnapshot()) throw new Error('No snapshot. Run: node wurx-buddy/tests/truth/snapshot.mjs');
-  const tables = JSON.parse(readFileSync(resolve(dir, 'tables.json'), 'utf8'));
-  const rpcData = JSON.parse(readFileSync(resolve(dir, 'rpc.json'), 'utf8'));
+  const tables = JSON.parse(readFileSync(resolve(dir, pseudo ? 'pseudo-tables.json' : 'tables.json'), 'utf8'));
+  const rpcData = JSON.parse(readFileSync(resolve(dir, pseudo ? 'pseudo-rpc.json' : 'rpc.json'), 'utf8'));
   // reports.brand_id embeds: fakeDb resolves `brand:brand_id(...)` against brands.
   const rpc = {
     get_performance_composite: ({ p_user, p_month }) => { const c = rpcData.composite[`${p_user}|${p_month}`]; return c ? [c] : []; },
