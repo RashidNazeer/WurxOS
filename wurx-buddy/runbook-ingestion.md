@@ -142,7 +142,7 @@ OpenAI is not used for embeddings. The paid key has had no credits since 2026-10
 | **second** | `ai_chunks.embedding_alt`, label in `embed_model_alt` | Gemini `gemini-embedding-001` (`RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`), `ai_assistant_config.embed_alt_provider` | 1536 | A safety net for company docs and TikTok articles if NVIDIA is down. |
 
 - **One model per column, never mixed.** `ai_search` filters each arm by the model label, and now also takes `p_query_model` / `p_query_model_alt`: a query vector that is unlabelled (an old caller) or labelled with another model than the space holds is ignored, not compared. A question is embedded by NVIDIA first; only if that fails is Gemini asked (its allowance is small and its quality was not measured). Each vector is fused with the keyword arm by RRF at 20 : 1 (see the benchmark below).
-- **Privacy is per provider.** NVIDIA sees `free_provider_sources` (the Boss setting). Gemini sees `gemini_provider_sources` AND `free_provider_sources`; the default leaves out `report` and `incentive`, because Google's unpaid tier may use submitted content to improve its products. `incentive` (pay data) is on no list, so those chunks are **keyword-only for good**. The database enforces this in `ai_ingest_write` and `ai_vector_fill`, not only the worker.
+- **Privacy is per provider.** NVIDIA sees `free_provider_sources` (the Boss setting). Gemini sees `gemini_provider_sources` AND `free_provider_sources`; the default now includes `report` (Boss decision 2026-11-03: client reports may go to Gemini's free tier, accepting that Google's unpaid tier may use submitted content to improve its products) and leaves out `incentive`. `incentive` (pay data) is on no list, so those chunks are **keyword-only for good**. The database enforces this in `ai_ingest_write` and `ai_vector_fill`, not only the worker.
 - **Free limits (measured 2026-11-02/03).** NVIDIA: 70 rapid requests drew no 429, a batch of 128 chunks (49k tokens) answers in 3 s; the worker uses batches of 96 and a 1.2 s gap. Gemini: **100 inputs per minute and 1,000 inputs per day, per model** (a 429 says `limit: 1000 … retry in 13h`). A question costs one of them, so the backfill keeps 150 back (`ai_alt_budget()`: at most 850 vectors per rolling 24 h).
 - **Re-embed time (production, 13,339 chunks).** The 8,245 NVIDIA vectors are moved, not re-embedded. About 4,858 chunks wait for NVIDIA: roughly 1.9 M tokens, about 51 requests of 96, so **one or two ticks** (a few minutes, outside quiet hours 18:00-02:00 PKT). Gemini fills about 850 a day: its ~6,000 company and TikTok chunks take **about a week**, and new content after that.
 
@@ -243,3 +243,10 @@ select id, status_code, left(content, 200) as body, error_msg, created
 ## Cost
 
 A sweep reads every source in about 1.5–3 s of database time and queues only what differs from the store. The worker embeds only chunks whose text is new, on the free tiers (no billed call exists). An idle queue makes no function calls.
+
+
+## Decisions recorded (Boss, 2026-11-03)
+
+1. **Pay and performance data may reach free chat providers** (Gemini, Groq, the OpenAI free tier). It never goes to NVIDIA, whose keys are testing-only: if only NVIDIA is left for such a question the turn fails rather than sending it there. Free tiers may keep or learn from what they receive; the Boss accepted that.
+2. **Reports may be embedded by Gemini** (the second search space), as well as NVIDIA. **Incentive/pay documents are never embedded** by any free provider and stay keyword-searchable only.
+3. **The old `ai-chat` function is deleted** (it ran on the paid OpenAI key and nothing calls it any more). Order matters in production: deploy `slack-events` and `assistant` first, then delete `ai-chat`.

@@ -386,3 +386,13 @@ test('no retrieval/embedding source file names api.openai.com, and the paid rera
   }
   assert.ok(!/OPEN_AI_API_KEY/.test(fs.readFileSync(path.resolve(AI, '../../ai-ingest/index.ts'), 'utf8')), 'ai-ingest does not read the OpenAI secrets');
 });
+
+test('Boss decision 2026-11-03: Gemini may get reports, and pay data (incentive) is on no provider list', () => {
+  const sql = fs.readFileSync(path.resolve(AI, '../../../migrations/432_buddy_free_embeddings.sql'), 'utf8');
+  const m = sql.match(/gemini_provider_sources text\[\] not null\s+default array\[([^\]]+)\]/);
+  assert.ok(m, 'the gemini_provider_sources default is in the migration');
+  const list = m![1].replace(/'/g, '').split(',').map((x) => x.trim());
+  assert.ok(list.includes('report'), 'reports are allowed on Gemini');
+  assert.ok(!list.includes('incentive'), 'incentive is never allowed');
+  assert.ok(!/array\[[^\]]*'incentive'[^\]]*\]\s*(;|\))\s*\n\s*--?\s*free/i.test(sql));
+});

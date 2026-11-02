@@ -169,7 +169,7 @@ type BatchOptions = PlanOptions & {
 };
 
 const DEFAULT_MAIN_SOURCES = ['kb_article', 'ai_doc', 'app_guide', 'report', 'tts_article'];
-const DEFAULT_ALT_SOURCES = ['kb_article', 'ai_doc', 'app_guide', 'tts_article'];
+const DEFAULT_ALT_SOURCES = ['kb_article', 'ai_doc', 'app_guide', 'report', 'tts_article'];   // Boss decision 2026-11-03: reports may go to Gemini; incentive (pay) never
 
 const errText = (e: unknown) => String((e as Error)?.message ?? e).slice(0, 1000);
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

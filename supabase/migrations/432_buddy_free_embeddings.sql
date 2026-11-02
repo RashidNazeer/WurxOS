@@ -25,15 +25,16 @@
 --      'primary' → 'main'.
 -- Privacy: each PROVIDER has its own allow-list of document types. NVIDIA: free_provider_sources
 -- (the existing Boss setting). Gemini: gemini_provider_sources ∩ free_provider_sources, default
--- WITHOUT report and incentive (Google's unpaid tier may use submitted content to improve its
--- products; client report data stays off it). 'incentive' is on no list.
+-- WITH report (Boss decision, 2026-11-03: client reports may go to Gemini's free tier; Google's unpaid tier
+-- may use submitted content to improve its products, and the Boss accepted that for reports).
+-- 'incentive' (pay data) is on no list: it is never embedded by any free provider.
 -- ai_search: a query vector is used only if it is labelled with the space's own model; an unlabelled or
 -- other-model vector is ignored, never compared (the old assistant, which sends no label, is safely keyword-only).
 -- ============================================================
 
 -- ── settings ─────────────────────────────────────────────────────────────
 alter table public.ai_assistant_config add column if not exists gemini_provider_sources text[] not null
-  default array['kb_article', 'ai_doc', 'app_guide', 'tts_article'];
+  default array['kb_article', 'ai_doc', 'app_guide', 'report', 'tts_article'];
 
 create or replace function public.ai_embed_model() returns text
 language sql stable as $$ select 'nvidia:llama-nemotron-embed-vl-1b-v2'::text $$;

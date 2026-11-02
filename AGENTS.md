@@ -58,7 +58,7 @@ portals — everything an agency needs.
 ### Edge Functions
 - In `supabase/functions/*/index.ts` (Deno). Deploy via
   `supabase functions deploy <name>`.
-- Active functions: `ai-chat`, `create-user`, `creator-sheet`, `delete-user`,
+- Active functions: `assistant` (Wurx Buddy chat), `ai-ingest`, `tts-crawl`, `create-user`, `creator-sheet`, `delete-user`,
   `euka-api`, `euka-checkpoint-autofill`, `euka-report-autofill`,
   `mark-notification-read`, `send-push`, `slack-events`, `snooze-notification`,
   `tiktok-oauth`, `video-review-targets`, `wipe-data`. (`euka-sync` is RETIRED —
