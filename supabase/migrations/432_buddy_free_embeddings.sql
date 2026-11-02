@@ -61,9 +61,11 @@ grant  execute on function public.ai_space_provider(text) to service_role;
 create or replace function public.ai_provider_sources(p_provider text) returns text[]
 language sql stable security definer set search_path = public as $$
   select case p_provider
-           when 'nvidia' then coalesce((select c.free_provider_sources from public.ai_assistant_config c where c.id = 1), '{}')
-           when 'gemini' then coalesce((select array(select x from unnest(c.gemini_provider_sources) x where x = any(c.free_provider_sources))
-                                          from public.ai_assistant_config c where c.id = 1), '{}')
+           -- 'incentive' (pay data) is removed here whatever the Boss settings say: the guarantee that it
+           -- never reaches a free provider must not depend on a default list staying clean.
+           when 'nvidia' then array_remove(coalesce((select c.free_provider_sources from public.ai_assistant_config c where c.id = 1), '{}'), 'incentive')
+           when 'gemini' then array_remove(coalesce((select array(select x from unnest(c.gemini_provider_sources) x where x = any(c.free_provider_sources))
+                                          from public.ai_assistant_config c where c.id = 1), '{}'), 'incentive')
            else '{}'::text[]
          end;
 $$;

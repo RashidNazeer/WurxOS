@@ -180,7 +180,8 @@ export async function embedState(o: BatchOptions): Promise<EmbedState> {
     const ready = async (space: Space) => (await o.rpc('ai_vector_ready', { p_space: space }).catch(() => true)) !== false;
     const altProvider: EmbedProvider | null = s.alt_provider === null || s.alt_provider === 'none' ? null
       : isAltProvider(s.alt_provider) ? s.alt_provider : (MAIN_PROVIDER === 'nvidia' ? 'gemini' : 'nvidia');
-    const strs = (v: unknown, d: string[]) => (Array.isArray(v) ? v.map(String) : d);
+    // 'incentive' (pay data) is never allowed on a free provider, whatever a setting says (the database strips it too).
+    const strs = (v: unknown, d: string[]) => (Array.isArray(v) ? v.map(String) : d).filter((x) => x !== 'incentive');
     o.state = {
       settings: {
         main_provider: MAIN_PROVIDER, main_model: typeof s.model === 'string' ? s.model : DEFAULT_CONFIG.EMBED_MODEL,

@@ -396,3 +396,10 @@ test('Boss decision 2026-11-03: Gemini may get reports, and pay data (incentive)
   assert.ok(!list.includes('incentive'), 'incentive is never allowed');
   assert.ok(!/array\[[^\]]*'incentive'[^\]]*\]\s*(;|\))\s*\n\s*--?\s*free/i.test(sql));
 });
+
+test('pay data is excluded by the DATABASE, not only by clean default lists: ai_provider_sources strips incentive for every provider', () => {
+  const sql = fs.readFileSync(path.resolve(AI, '../../../migrations/432_buddy_free_embeddings.sql'), 'utf8');
+  const fn = sql.slice(sql.indexOf('create or replace function public.ai_provider_sources'), sql.indexOf('create or replace function public.ai_space_sources'));
+  assert.equal((fn.match(/array_remove(/g) || []).length, 2, 'both providers go through array_remove');
+  assert.equal((fn.match(/'incentive')/g) || []).length, 2, "both remove 'incentive'");
+});
