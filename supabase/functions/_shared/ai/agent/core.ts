@@ -18,7 +18,8 @@ import { agentConfig, type AgentConfig } from './config.ts';
 import { costUsd, pricesFrom, type Prices, type UsageMeter } from '../prices.ts';
 import { providerAccountIssue, providerIssueMessage, scrubSecrets, type ChainIssue } from '../providerErrors.ts';
 import { CitationStream, citedIds, numbersWithoutData } from './citations.ts';
-import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic } from './prompt.ts';
+import { buildInstructions, compactInstructions, effectivePersona, isSeriousTopic, pktDateString } from './prompt.ts';
+import { correctionMessage, personNames, redactClaims, summarize, verifyAnswer, type Evidence } from './grounding.ts';
 import { budgetFor, budgetFromError, estimate, fitRequest, learnBudget } from './compact.ts';
 import { CiteRegistry, newTurnGuard, runTool, toolDefsFor, TOOL_STATUS, type ToolEnv, type ToolLog } from './tools.ts';
 import { usableProviders, webAllowedForRole, webConfig, type WebEnv, type WebKeys, type WebUsage } from '../web/index.ts';
@@ -102,6 +103,7 @@ export type CoreDeps = {
   llm?: (r: LlmRequest) => Promise<LlmResult>;   // test seam (also used for chat slots unless chatLlm is set)
   chatLlm?: (r: LlmRequest) => Promise<LlmResult>;
   requestId?: string;
+  grounding?: boolean;               // false = do not hold and check the answer (tests of other behaviour); default on
 };
 
 export type TurnResult = { requestId: string; conversationId: string | null; messageId?: string; answer: string; sources: unknown[]; error?: string; httpStatus?: number; cancelled?: boolean };
@@ -359,6 +361,11 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     retrieval, agent, ctx: { userId: req.userId, role: req.role, ...(deps.userClient ? { userClient: deps.userClient } : {}) }, now,
   };
   const cstream = new CitationStream(reg.has, () => serious);
+  // Grounding (agent/grounding.ts): the answer is held until every name, figure, date, role and status in it has
+  // been checked against this turn's tool results, then sent once. `evidence` = the full text of each tool result.
+  const verify = deps.grounding !== false;
+  const evidence: string[] = [];
+  const sendNow = (d: string) => { if (!verify) emit({ delta: d }); };
   let answer = '';
   let firstTokenMs: number | null = null;
   const onDelta = (d: string) => {
@@ -368,7 +375,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (!safe) return;
     if (firstTokenMs == null) firstTokenMs = Date.now() - t0;
     answer += safe;
-    emit({ delta: safe });
+    sendNow(safe);
   };
   let costSum = 0;
   let unpriced = false;
@@ -501,6 +508,49 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
   const input: InputItem[] = [...history, { role: 'user', content: message }];
   let step = 'start';
 
+  // Check the finished answer (agent/grounding.ts), allow ONE corrective retry that shows the model the offending
+  // claims, and replace whatever is still unsupported with a plain "could not verify" note. Then send it, once.
+  let grounded = false;
+  const groundAnswer = async (allowRetry: boolean) => {
+    if (!verify || grounded) return;
+    grounded = true;
+    if (!answer.trim()) return;
+    const saved = step;
+    step = 'grounding';
+    const priorAssistant = (hist ?? []).filter((r: any) => r.role === 'assistant').map((r: any) => String(r.content ?? ''));
+    const userTexts = [message, ...(hist ?? []).filter((r: any) => r.role === 'user').map((r: any) => String(r.content ?? ''))];
+    const people = await personNames(admin);
+    const evFor = (): Evidence => ({ tools: evidence, user: userTexts, now: `NOW: ${pktDateString(now)}.`, priorAssistant, people });
+    let v = verifyAnswer(answer, evFor());
+    const g = { retried: false, replaced: false };
+    if (v.claims.length && allowRetry && !cancelled && left() > agent.ANSWER_RESERVE_MS) {
+      emit({ status: 'Double-checking the figures…' });
+      g.retried = true;
+      const first = v.claims;
+      input.push({ role: 'assistant', content: answer }, { role: 'user', content: correctionMessage(first) });
+      let redo = '';
+      const cs = new CitationStream(reg.has, () => serious);
+      try {
+        const res = await ask({
+          instructions: serious ? `${instructions}\nThis is a SERIOUS topic: no emoji, no jokes.` : instructions,
+          tools: undefined, effort: agent.EFFORT_ANSWER as any, maxOutputTokens: agent.ANSWER_MAX_OUTPUT_TOKENS,
+          onDelta: (d: string) => { if (!cancelled) redo += cs.push(d.replace(/【/g, '[').replace(/】/g, ']')); },
+        });
+        usage = add(usage, res.usage);
+        redo += cs.flush();
+        if (redo.trim()) answer = redo.trim();
+      } catch (e) {
+        if (cancelCtrl.signal.aborted || (e as any)?.cancelled || cancelled) throw e;
+        flags.grounding_retry_error = String((e as Error)?.message ?? e).slice(0, 120);   // the first answer is checked and redacted below
+      }
+      v = verifyAnswer(answer, evFor());
+    }
+    if (v.claims.length) { answer = redactClaims(answer, v.claims); g.replaced = true; }
+    flags.grounding = summarize(v, g);
+    for (let i = 0; i < answer.length; i += 400) emit({ delta: answer.slice(i, i + 400) });
+    step = saved;
+  };
+
   emit({ status: 'On it…' });
   try {
     for (let round = 0; ; round++) {
@@ -542,13 +592,13 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       const toolBudget = Math.max(3000, left() - agent.ANSWER_RESERVE_MS);
       env.agent = { ...agent, SEARCH_TIMEOUT_MS: Math.min(agent.SEARCH_TIMEOUT_MS, toolBudget), DATA_TOOL_TIMEOUT_MS: Math.min(agent.DATA_TOOL_TIMEOUT_MS, toolBudget) };
       const outs = await Promise.all(calls.map((c) => runTool(env, reg, c.name, c.arguments)));
-      outs.forEach((o, i) => { toolLogs.push(o.log); input.push({ type: 'function_call_output', call_id: calls[i].call_id, output: o.output }); });
+      outs.forEach((o, i) => { evidence.push(o.output); toolLogs.push(o.log); input.push({ type: 'function_call_output', call_id: calls[i].call_id, output: o.output }); });
       for (const c of skipped) {
         input.push({ type: 'function_call_output', call_id: c.call_id, output: `Skipped: at most ${agent.MAX_PARALLEL_TOOLS} tool calls per round. Call it again next round if you still need it.` });
       }
     }
     const held = cstream.flush();
-    if (held && !cancelled) { answer += held; emit({ delta: held }); }
+    if (held && !cancelled) { answer += held; sendNow(held); }
     // Reasoning can eat the whole output budget: retry once, bigger, without tools.
     step = 'answer';
     if (!answer.trim() && !cancelled && left() > agent.ANSWER_RESERVE_MS) {
@@ -560,7 +610,7 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     }
     if (await checkCancel()) throw new Stop();
     const tail = cstream.flush();
-    if (tail) { answer += tail; emit({ delta: tail }); }
+    if (tail) { answer += tail; sendNow(tail); }
     // Last safety net: tool-call markup is never part of an answer.
     if (/<tool_call|<function=|<\/parameter>|<\|tool_call\|>/.test(answer)) {
       flags.stripped_tool_markup = true;
@@ -569,11 +619,13 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
     if (!answer.trim()) {
       const sorry = "Sorry, I couldn't put an answer together this time. Could you try asking again, maybe a little more specifically?";
       answer = sorry;
-      emit({ delta: sorry });
+      sendNow(sorry);
     }
+    await groundAnswer(true);
   } catch (e) {
     if (e instanceof Stop || (e as any)?.cancelled || cancelled) {
       cancelled = true;
+      await groundAnswer(false);
       emit({ cancelled: true });
     } else {
       error = scrubSecrets(String((e as Error)?.message ?? e)).slice(0, 500);
@@ -589,7 +641,8 @@ export async function runTurn(req: TurnRequest, deps: CoreDeps, emit: Emit): Pro
       };
       console.error(`assistant turn ${requestId} failed at ${step}:`, JSON.stringify(flags.error_detail));
       const tail = cstream.flush();
-      if (tail) { answer += tail; emit({ delta: tail }); }
+      if (tail) { answer += tail; sendNow(tail); }
+      await groundAnswer(false);   // whatever partial text there is gets the same check before it is shown
       // Nothing worked. Account problems met anywhere in the chain are named;
       // models that were only busy or silent get one line after them.
       const busy = !account && !flags.deadline_hit && (status === 429 || (status ?? 0) >= 500 || (e as any)?.code === 'first_byte_timeout');

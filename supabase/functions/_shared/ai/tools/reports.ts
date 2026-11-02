@@ -323,6 +323,12 @@ export async function getReports(admin: Db, ctx: ToolCtx, args: any, svc?: Db): 
   if (error) throw error;
   let rows: any[] = reps || [];
   let lead = '';
+  // "Week 2" is a substring of Week 20 to 29: a bare week number means exactly that week.
+  const wk = /^week\s*(\d+)$/i.exec(String(args?.period || '').trim());
+  if (wk && rows.length) {
+    const exact = new RegExp('\\bweek\\s*' + wk[1] + '(?!\\d)', 'i');
+    rows = rows.filter((r: any) => exact.test(String(r.period_label || '')));
+  }
   let periodStatus: PeriodStatus | null = args?.period && rows.length ? 'approved' : null;
   const resolved = args?.period ? resolvePeriod(args.period) : null;
   if (!rows.length && resolved && resolved.kind !== 'label') {
