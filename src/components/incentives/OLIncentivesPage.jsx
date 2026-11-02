@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatPKR } from '../../lib/format';
-import { Avatar, Button, ProgressBar, useConfirm } from '../ui';
+import { Avatar, Button, ProgressBar, useConfirm, useToast } from '../ui';
+import { downloadSalaryCsv, previousMonth } from '../../lib/salaryCsv';
 import {
   getIncentives, getMostRecentPriorPlan, listIncentivesMonth, listUsersByRoles,
   updateIncentivesProgress, savePlan, verifyIncentives, notifyIncentiveEmployee,
@@ -727,6 +728,8 @@ export default function OLIncentivesPage() {
   const [detailsTarget, setDetailsTarget] = useState(null);
   const [verifying, setVerifying] = useState(null);
   const [showFetchAchieved, setShowFetchAchieved] = useState(false);
+  const [salaryBusy, setSalaryBusy] = useState(false);
+  const toast = useToast();
   const [reloadKey, setReloadKey] = useState(0);
 
   // Search + filters (apcs/ipcs tabs)
@@ -978,6 +981,13 @@ export default function OLIncentivesPage() {
     setShowEditOwn(false);
   }
 
+  async function handleDownloadSalaries() {
+    setSalaryBusy(true);
+    try { await downloadSalaryCsv(previousMonth()); }
+    catch (e) { toast.error(e.message || String(e)); }
+    finally { setSalaryBusy(false); }
+  }
+
   // Stats for selected tab (APC or IPC)
   const totalPayout   = list.reduce((s, u) => { const r = records[u.id]; return r ? s + calcBreakdown(r).total : s; }, 0);
   const recordsCount  = list.filter(u => records[u.id]).length;
@@ -1165,13 +1175,20 @@ export default function OLIncentivesPage() {
                   <i className="bi bi-x-circle" /> Clear
                 </button>
               )}
-              {tab === 'apcs' && (
-                <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 ms-auto"
-                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={() => setShowFetchAchieved(true)}>
-                  <i className="bi bi-journal-arrow-down" /> Fetch achieved from workbook
+              <div className="d-inline-flex gap-2 ms-auto">
+                {tab === 'apcs' && (
+                  <button className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                    style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={() => setShowFetchAchieved(true)}>
+                    <i className="bi bi-journal-arrow-down" /> Fetch achieved from workbook
+                  </button>
+                )}
+                <button className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1" disabled={salaryBusy}
+                  style={{ borderRadius: 'var(--radius-sm)', fontSize: '0.72rem' }} onClick={handleDownloadSalaries}
+                  title={`Calculated salaries for everyone, ${getMonthLabel(previousMonth())}`}>
+                  <i className={`bi ${salaryBusy ? 'bi-hourglass-split' : 'bi-filetype-csv'}`} /> Download {getMonthLabel(previousMonth())} salaries
                 </button>
-              )}
-              <span className={`text-muted small ${tab === 'apcs' ? '' : 'ms-auto'}`} style={{ fontSize: '0.75rem' }}>
+              </div>
+              <span className="text-muted small" style={{ fontSize: '0.75rem' }}>
                 {list.length} of {baseList.length}
               </span>
             </div>
