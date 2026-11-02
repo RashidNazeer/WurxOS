@@ -101,6 +101,8 @@ export const TRUTH_RULES = [
   '5. Rank only the people the tool listed, inside the group it put them in. If the tool says you see only some people, never call anyone the highest or lowest overall.',
   '6. "Team Lead" means TL; a PCTL is a Paid Collab Team Lead, and the Boss and OLs are not TLs. Say which you mean.',
   '7. Leave balances, leave quotas and anything no tool returns: say you cannot see it.',
+  '8. APC, IPC, TL, PCTL, OL are role codes: write them exactly as the tools write them. Never spell them out, translate them or invent a long form.',
+  '9. Say nothing about a month, week or period the tools did not return. The calendar is not a source: never write that a period "is not in yet" unless a tool says so. Never give an example or a likely reason for a gap.',
 ].join('\n');
 
 export const TOOL_RULES = [

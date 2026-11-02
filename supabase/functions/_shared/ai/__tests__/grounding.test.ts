@@ -172,3 +172,19 @@ test('parseLabels reads the who() format and the role headings', () => {
 test('an answer with no names, numbers or dates produces no claims (how-to answers stay untouched)', () => {
   assert.deepEqual(kinds('Open [Leave](/leave), pick the dates, and submit. Your Team Lead approves it [S1].', ev([])), []);
 });
+
+test('periods (D2): a month the tools did not return is not taken from the calendar; "not in yet" needs a tool to say so', () => {
+  const e = ev(['Performance for 2026-10 - Haseeb (APC) composite 89.0/100'], { now: 'NOW: Monday 2026-11-02 23:40 PKT.' });
+  assert.deepEqual(kinds('October scores: Haseeb (APC) has 89.0/100.', e), []);
+  assert.ok(kinds("November ratings aren't in yet.", e).some((k) => k.startsWith('date:')));
+  assert.ok(kinds('Haseeb (APC) has 89.0/100 for October; this month is not in yet.', e).some((k) => k.startsWith('date:')));
+  assert.deepEqual(kinds('Today is 2026-11-02.', e), []);
+  assert.deepEqual(kinds('The October report is not yet approved.', ev(['The October report is not yet approved (figures withheld).'])), []);
+});
+
+test('role codes (E1): never expanded into words the tools did not print', () => {
+  const e = ev(['- Haseeb (APC) composite 89.0/100'], {});
+  assert.ok(kinds('Haseeb is an Associate Program Coordinator (APC).', e).some((k) => k.startsWith('role:')));
+  assert.deepEqual(kinds('Haseeb (APC) has 89.0/100.', e), []);
+  assert.deepEqual(kinds('Haseeb is an Affiliate Program Coordinator (APC).', ev(['Haseeb (APC)', 'Affiliate Program Coordinator (APC) (3):'])), []);
+});

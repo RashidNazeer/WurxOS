@@ -80,6 +80,7 @@ const CURRENT_RE = /\b(?:current(?:ly)? (?:employees?|staff|members?|employed|wo
 
 const ABSENT_RE = /\b(?:no|did not have|didn't have|does not have|doesn't have|has no|have no|without|missing|not recorded|not rated|not available|unavailable)\b[^.\n]{0,60}\b(?:composite|scores?|entries|entry)\b|\b(?:composite|scores?)\b[^.\n]{0,40}\b(?:not recorded|missing|not available|unavailable|not rated)\b/i;
 const SCORE_LINE = /composite \d|\d\/100/i;
+const PERIOD_ABSENCE_RE = /\b(?:aren't|are not|isn't|is not|hasn't|haven't|has not|have not|not) (?:in|available|submitted|recorded|rated|published)(?: yet)?\b|\bnot yet (?:in|available|rated|recorded|submitted|published)\b|\b(?:yet to|still to) (?:be )?(?:come|submitted|rated|recorded)\b/i;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // --------------------------------------------------------------------------- numbers
@@ -370,6 +371,35 @@ export function verifyAnswer(answer: string, ev: Evidence): Verdict {
       // a day mentioned with the right month but no year, or a month the user/NOW/tools named
       if (!d.strict && evDates.has(d.key)) continue;
       flag('date', d.text, unitNo, sentence, 'this date / month does not appear in the tool results, your question or today\'s date');
+    }
+  });
+
+  // Rules D2/E1 (added after the free-model benchmark): months and periods come from the tools or the user, NOT
+  // from the calendar, so "November ratings aren't in yet" after a tool returned October is caught; and a role
+  // code is never expanded into words the tools did not print ("APC" -> "Associate Program Coordinator").
+  const monthEv = dateKeys([...evTexts, ...userTexts].join('\n'));
+  const supportLow = support.join('\n').toLowerCase();
+  const CANON = ['affiliate program coordinator', 'influencer program coordinator', 'team lead', 'paid collab team lead', 'operation lead', 'ads manager', 'developer'];
+  seg.flat.forEach((u, unitNo) => {
+    const sentence = u.text;
+    for (const d of dateMentions(sentence)) {
+      if (d.strict || evDates.has(d.key) === false) continue;
+      if (d.key.startsWith('M') && !monthEv.has(d.key) && !d.strict) flag('date', d.text, unitNo, sentence, 'this month is not in any tool result or in your question (do not say anything about periods the tools did not return)');
+    }
+    if (PERIOD_ABSENCE_RE.test(sentence) && (new RegExp('\\b(?:' + MON_RE + ')\\b', 'i').test(sentence) || /\b(?:this|next|current|last) (?:month|week|quarter)\b/i.test(sentence))) {
+      const phrase = (PERIOD_ABSENCE_RE.exec(sentence)?.[0] ?? '').toLowerCase();
+      if (!supportLow.includes(phrase)) flag('date', phrase, unitNo, sentence, 'a claim that a period is not in yet, which no tool result says');
+    }
+    for (const m of sentence.matchAll(/((?:[A-Z][a-z]+ ){1,5})\((APC|IPC|PCTL|TL|OL)\)/g)) {
+      const words = m[1].trim();
+      const wl = words.toLowerCase();
+      if (CANON.some((c) => wl.endsWith(c)) && supportLow.includes(wl)) continue;
+      if (supportLow.includes((words + ' (' + m[2] + ')').toLowerCase())) continue;
+      if (nameDict.some((n) => words.endsWith(n))) continue;
+      if (labels.has(wl)) continue;
+      const parts = words.split(' ');
+      if (parts.some((_, i) => labels.has(parts.slice(i).join(' ').toLowerCase()))) continue;
+      flag('role', words + ' (' + m[2] + ')', unitNo, sentence, 'role codes are written exactly as the tools write them; this expansion is not in any tool result');
     }
   });
 

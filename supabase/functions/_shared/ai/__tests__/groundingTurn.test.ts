@@ -130,3 +130,8 @@ test('a how-to answer that invents a figure or a person without any tool is caug
   const { r } = await run([{ stream: ['Haseeb (APC) scored 89.0 / 100 last month.'] }, { stream: ['I do not have that data right now.'] }]);
   assert.equal(r.answer, 'I do not have that data right now.');
 });
+
+test('no text after the tool calls: a plain "could not answer" message, never an invented one', async () => {
+  const { r } = await run([CALL, { stream: [] }, { stream: [] }]);
+  assert.match(r.answer, /^Sorry, I couldn't put an answer together/);
+});

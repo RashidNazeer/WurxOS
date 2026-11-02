@@ -198,3 +198,16 @@ test('get_agenda_tasks: an assignee who left is marked', async () => {
   const r = await runDataTool(fakeDb({ agenda_tasks: tasks, profiles: P, brands: B }), BOSS, 'get_agenda_tasks', {});
   assert.ok(r.text.includes('Gus Gone (APC, former employee – left 2026-10-12)'));
 });
+
+test('get_reports: "Week 2" means Week 2, not Weeks 20-29', async () => {
+  const w = (n: number) => ({ id: `w${n}`, brand_id: 'b1', type: 'weekly', status: 'approved', period_label: `Week ${n} (Jan 1 - 7)`, period_start: `2026-01-${String(n).padStart(2, '0')}`, period_end: '2026-01-31', data: { overallPerformance: { gmv: String(n * 100) } } });
+  const db = fakeDb({ brands: [{ id: 'b1', brand_name: 'Alpha', status: 'active', currency: 'USD' }], reports: [w(2), w(22), w(25)] });
+  const r = await runDataTool(db, BOSS, 'get_reports', { brand_name: 'Alpha', period: 'Week 2' });
+  assert.ok(r.text.includes('Week 2 (') && !r.text.includes('Week 22') && !r.text.includes('Week 25'));
+});
+
+test('the prompt carries the TRUTH RULES in both the full and the compact form', async () => {
+  const { buildInstructions, compactInstructions, BUDDY_PERSONA, TRUTH_RULES } = await import('../agent/prompt.ts');
+  assert.ok(buildInstructions({ persona: BUDDY_PERSONA, role: 'apc' }).prefix.includes(TRUTH_RULES));
+  assert.ok(compactInstructions({ persona: BUDDY_PERSONA, role: 'apc' }).includes('exactly as the tools write them'));
+});
