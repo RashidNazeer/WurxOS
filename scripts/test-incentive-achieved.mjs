@@ -34,6 +34,37 @@ const std = (total, auth, hdr) => sheetOf([
   ['Total GMV from GMV Max', 1000, 800, 1000, 900, 1000, 1200.5],
 ], hdr);
 
+// ── next month: the sheet grows a column pair every month ──────────
+const grow = (hdr, add) => [...hdr, ...add];
+t('Nov goal added first (no achieved yet): Oct still reads, Nov refuses (never zeroes)', () => {
+  const hdr = grow(HDR, ['Nov 26']);
+  const s = W.readBrandSheet([['Brand title'], hdr,
+    ['Total Videos Made', null, 100, null, 200, null, 422, null],
+    ['Video authorized ', 0.95, 90, 0.95, 180, 0.95, 377, 0.95]]);
+  assert.equal(A.getAchieved(s, 'video_authorized', '2026-10').value, 89.34);
+  assert.ok(A.getAchieved(s, 'video_authorized', '2026-11').unavailable);
+});
+t('Nov achieved column arrives: Nov reads, Oct unchanged', () => {
+  const hdr = grow(HDR, ['Nov 26', 'Nov 1-30']);
+  const s = W.readBrandSheet([['Brand title'], hdr,
+    ['Total Videos Made', null, 100, null, 200, null, 422, null, 500],
+    ['Video authorized ', 0.95, 90, 0.95, 180, 0.95, 377, 0.95, 450]]);
+  assert.equal(A.getAchieved(s, 'video_authorized', '2026-11').value, 90);
+  assert.equal(A.getAchieved(s, 'video_authorized', '2026-10').value, 89.34);
+});
+t('year rollover: Dec then Jan 27 resolve to 2026-12 / 2027-01', () => {
+  const hdr = ['Brand', 'Nov 26', 'Nov 1-30', 'Dec 26', 'Dec 1-31', 'Jan 27', 'Jan 1-31'];
+  const s = W.readBrandSheet([['Brand title'], hdr,
+    ['Total Videos Made', null, 100, null, 200, null, 300],
+    ['Video authorized ', 0.95, 90, 0.95, 150, 0.95, 270]]);
+  assert.equal(A.getAchieved(s, 'video_authorized', '2026-11').value, 90);
+  assert.equal(A.getAchieved(s, 'video_authorized', '2026-12').value, 75);
+  assert.equal(A.getAchieved(s, 'video_authorized', '2027-01').value, 90);
+});
+t('earlier months keep resolving after a new month is appended', () => {
+  assert.equal(A.getAchieved(std(422, 377), 'video_authorized', '2026-09').value, 90);
+});
+
 // ── getAchieved ────────────────────────────────────────────────────
 t('video_authorized = authorized / total * 100, 2dp, with detail', () => {
   const r = A.getAchieved(std(422, 377), 'video_authorized', '2026-10');
