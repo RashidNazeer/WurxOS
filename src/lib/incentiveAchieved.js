@@ -12,6 +12,15 @@
 // Aurelia -- a bare label naming the same month); otherwise the month refuses
 // rather than returning a neighbour's number.
 //
+// THE RULE (the sheet is edited month by month, so this is what must stay true):
+//   * Each month is a PAIR of columns. LEFT = the month's GOAL, headed with the
+//     month ("Oct 26"). RIGHT = what was ACHIEVED, headed with the day range
+//     ("Oct 1-31"). Both are read from the same row of the brand's tab.
+//   * Video Authorized achieved is a COUNT; the figure we store is
+//     authorized ÷ "Total Videos Made" × 100 (JoyMode Oct: 377 / 422 = 89.34%).
+//   * A month whose achieved column is missing or blank is skipped, never zeroed:
+//     as a brand's sheet gains its "Oct 1-31" column the next fetch picks it up.
+//
 // Pure: no supabase, no DOM. Safe to import in plain node.
 // ============================================================
 import { OPTION_BY_KEY, parseCell, looksAchieved, yearHintOf } from './incentiveWorkbook.js';
