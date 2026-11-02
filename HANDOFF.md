@@ -21,26 +21,16 @@ machine) can pick up any feature without losing context. Read this, then
   one. `npx vercel --prod --yes` currently fails from this machine ("Not
   authorized") — don't rely on it; merge the PR instead. Check a deploy with
   `gh api repos/RashidNazeer/WurxOS/deployments --jq '.[0:3][]|{environment,created_at,sha}'`.
-- **Supabase** project ref `xoaaidgvblondjpvxjqp`. Highest migration file: **429**.
+- **Supabase** project ref `xoaaidgvblondjpvxjqp`. Highest migration file: **430** (applied).
 - **Stack**: Vite + React 19 + Supabase (Postgres/RLS/Realtime/Edge Functions) +
   TanStack Query + Vercel. Money is PKR; brand GMV figures are per-brand currency.
 
 ## ⚠ Do these first
 
-1. **Migration 429 is merged but NOT applied to production.**
-   `supabase/migrations/429_weekly_rating_one_score_per_week.sql` makes the
-   monthly checkpoint average per WEEK (an APC under 2+ TLs is rated once per TL
-   meeting, which counted that week twice). Until applied, the weekly popup shows
-   the averaged score but the stored monthly score still double-counts. It was
-   tested in a rolled-back transaction on real data (3 APCs change by ±1 point).
-   It also re-rolls every affected month, so it is safe to apply at any time.
-1b. **Migration 430 + PR "OL removes a flag directly" (`feat/ol-remove-flag`) is
-   OPEN and deliberately NOT merged.** It was written by another Claude session;
-   a rolled-back test on real data passed (short reason refused, non-OL refused,
-   flag deleted, one `flag_removal_log` row, 3 notifications, direct log writes
-   blocked). The UI change removes the old "Request removal" button for OLs, so
-   merging the PR BEFORE applying 430 would leave OLs with a button that errors.
-   Apply 430 first, then merge.
+1. **Migrations 429 and 430 were applied to production on 2026-11-02** and are in the ledger.
+   429: monthly checkpoint averages per WEEK (verified: 3 APCs moved by 1 point as predicted).
+   430: an OL removes any flag directly with a reason (`flag_remove_by_ol`, `flag_removal_log`); PR #81 merged.
+   Nothing from this session is pending.
 2. **The migration ledger has gaps.** Production's
    `supabase_migrations.schema_migrations` does not list 402, 415–418 or 421–427,
    although the objects from 421–427 ARE live (applied outside the CLI). So
