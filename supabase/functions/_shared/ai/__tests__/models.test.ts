@@ -184,27 +184,27 @@ test('an unpriced model costs 0 and is marked unpriced', async () => {
 
 // ── embeddings across keys ──────────────────────────────────────────────────
 
-test('query embeddings: primary, then the fallback key; both out of credit → down for 10 minutes, no more calls', async () => {
+test('query embeddings: free providers only; every refused/out-of-quota provider → down for 10 minutes, no more calls (the OpenAI keys are never used)', async () => {
   _resetEmbedDown();
   const hits: string[] = [];
-  const mk = (fallbackOk: boolean) => async (_u: any, init: any) => {
-    const key = String(init.headers.authorization).slice(7);
-    hits.push(key);
-    if (key === 'pk' || !fallbackOk) return new Response(QUOTA, { status: 429 });
+  const mk = (ok: boolean) => async (url: any, init: any) => {
+    hits.push(String(url));
+    if (!ok) return new Response(QUOTA, { status: 429 });
     return new Response(JSON.stringify({ data: [{ index: 0, embedding: new Array(1536).fill(0) }], usage: { prompt_tokens: 3, total_tokens: 3 } }), { status: 200 });
   };
-  const meter = new UsageMeter();
-  const good = chainEmbedder({ openAiKey: 'pk', openAiKeyFallback: 'fk', fetchImpl: mk(true) as any } as any, meter);
+  const env = (ok: boolean) => ({ openAiKey: 'pk', openAiKeyFallback: 'fk', nvidiaKey: 'nv', fetchImpl: mk(ok) as any } as any);
+  const good = chainEmbedder(env(true), new UsageMeter());
   assert.equal((await good.embed('a')).length, 1536);
-  assert.deepEqual(hits, ['pk', 'fk']);
-  assert.equal(meter.embed.keySlot, 'fallback');
+  assert.ok(hits.every((u) => u.includes('nvidia.com')), 'only NVIDIA was asked');
   hits.length = 0;
-  const bad = chainEmbedder({ openAiKey: 'pk', openAiKeyFallback: 'fk', fetchImpl: mk(false) as any } as any, new UsageMeter());
+  const bad = chainEmbedder(env(false), new UsageMeter());
   await assert.rejects(bad.embed('b'));
+  await assert.rejects(bad.alt!('b'));   // no second provider configured here
   assert.equal(bad.down(), true);
   const before = hits.length;
   await assert.rejects(bad.embed('c'));
   assert.equal(hits.length, before, 'no call while down');
+  assert.ok(!hits.some((u) => u.includes('openai.com')));
   _resetEmbedDown();
 });
 

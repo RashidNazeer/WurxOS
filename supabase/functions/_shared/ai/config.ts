@@ -50,7 +50,10 @@ export const DEFAULT_CONFIG = Object.freeze({
   TABLE_ROWS_PER_CHUNK: 12,
   MAX_CHUNKS_PER_DOC: 40,
   // Embedding
-  EMBED_MODEL: 'text-embedding-3-small',
+  // Mixed into every doc_hash and content_hash. It is the OLD model name on purpose: changing it would
+  // re-chunk and re-embed all 13k stored chunks (their hashes are stored), and the vectors are not keyed by it any more.
+  HASH_MODEL: 'text-embedding-3-small',
+  EMBED_MODEL: 'nvidia:llama-nemotron-embed-vl-1b-v2',   // the MAIN vector space (embedding); label = provider:model, same as SQL ai_embed_model()
   EMBED_DIMS: 1536,
   EMBED_BATCH_INPUTS: 96,
   EMBED_BATCH_TOKENS: 250_000,

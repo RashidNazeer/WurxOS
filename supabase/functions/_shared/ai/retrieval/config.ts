@@ -40,7 +40,7 @@ export const RETRIEVAL_DEFAULTS = Object.freeze({
   // LLM rerank (§2.5). On (Lead decision after the WP-A eval: reports
   // narrative 0.847 → 0.902), but only for search_reports without a brand
   // filter; searchIndex needs a `rerank` dep for it to run at all.
-  RERANK_ENABLED: true,
+  RERANK_ENABLED: false,              // the only reranker was OpenAI's (paid); off until a free one exists
   RERANK_INDEXES: ['reports'] as string[],   // where it runs when enabled (§2.5: per index)
   RERANK_CANDIDATES: 20,
   FEDERATED_RERANK: false,            // federated search stays one fast round
