@@ -355,6 +355,118 @@ export function explainGmvMaxPaste(raw) {
   return 'Found the start-time lines but could not tell where each campaign name begins. Copy the table from its header down to the last campaign row, then paste again.';
 }
 
+/**
+ * After a successful parse: which report fields came back blank for EVERY row, and
+ * why that usually is. TikTok copies only the columns currently rendered on screen,
+ * so a paste can hold the campaign names and Cost but none of the performance
+ * columns — the parse "works" and the report quietly gets half-empty rows.
+ */
+export function warnGmvMaxPaste(rows) {
+  if (!rows || !rows.length) return '';
+  const FIELDS = [['spend', 'Cost'], ['orders', 'SKU orders'], ['cpo', 'Cost per order'], ['gmv', 'Gross revenue'], ['roi', 'ROI']];
+  const blank = FIELDS.filter(([k]) => rows.every(r => r[k] === '' || r[k] == null)).map(([, label]) => label);
+  if (!blank.length) return '';
+  return `Not found in the paste: ${blank.join(', ')}. TikTok only copies the columns that are on screen. `
+    + 'In TikTok\'s column picker show just Campaign name, Cost, SKU orders, Cost per order, Gross revenue and ROI '
+    + '(so they all fit without scrolling), copy again, and update "TikTok changed its columns?" to match — or fill those cells in by hand.';
+}
+
+// Campaigns in a paste with NO start-time line (the APC trimmed TikTok's columns and
+// dropped Schedule time) are told apart by the row buttons TikTok prints under every
+// campaign name: "Analytics", then "Edit".
+function buttonAnchors(lines) {
+  const a = [];
+  for (let i = 1; i < lines.length - 1; i++) {
+    if (/^analytics$/i.test(lines[i]) && /^edit$/i.test(lines[i + 1])) a.push(i);
+  }
+  return a;
+}
+
+// ROI = the last bare decimal in the block; Gross revenue and Cost per order = the two
+// money cells left of it; SKU orders = the last bare integer left of those. Same rule as
+// the start-time path, over an explicit [lo, hi) range.
+function readTailByShape(lines, lo, hi) {
+  const out = { roi: '', gmv: '', cpo: '', orders: '' };
+  let roiIdx = -1;
+  for (let k = hi - 1; k > lo; k--) {
+    if (PURE_DECIMAL_RE.test(lines[k])) { out.roi = lines[k]; roiIdx = k; break; }
+  }
+  if (roiIdx < 0) return out;
+  const usd = [];
+  for (let k = roiIdx - 1; k > lo && usd.length < 2; k--) if (USD_VALUE_RE.test(lines[k])) usd.push({ k, v: lines[k] });
+  if (usd[0]) out.gmv = stripUsd(usd[0].v);
+  if (usd[1]) out.cpo = stripUsd(usd[1].v);
+  for (let k = (usd[1] ? usd[1].k : roiIdx) - 1; k > lo; k--) {
+    if (PURE_INT_RE.test(lines[k]) && !USD_VALUE_RE.test(lines[k])) { out.orders = lines[k].replace(/,/g, ''); break; }
+  }
+  return out;
+}
+
+function parseByButtons(lines, anchors, columns) {
+  const rows = [];
+  for (let c = 0; c < anchors.length; c++) {
+    const a = anchors[c];
+    const campaign = lines[a - 1];
+    const from = a + 2;                                   // first line after "Edit"
+    const to = c + 1 < anchors.length ? anchors[c + 1] - 1 : lines.length;
+    const byLayout = {};
+    const hits = columns ? mapByLayout(lines, from, to, columns, byLayout) : 0;
+    const tail = readTailByShape(lines, from - 1, to);
+    const L = hits >= 2 ? byLayout : {};
+
+    // The declared layout can silently misalign when it doesn't match what TikTok
+    // actually copied (a column added or hidden since the APC last updated it), and a
+    // misaligned read still looks like plausible numbers. The metrics are linked:
+    //   ROI = GMV / Cost   and   Cost = SKU orders x Cost per order
+    // so check them against each other. A read that breaks the link is rejected.
+    const read = (r) => {
+      const o = Number(r.orders), p = Number(r.cpo), g = Number(r.gmv), i = Number(r.roi);
+      if (!o || !p || !g || !i) return null;                       // not enough to judge
+      const cost = o * p;
+      return Math.abs(g / i - cost) / cost < 0.03;                 // 3%: ROI is rounded to 2dp
+    };
+    const lc = read(L), tc = read(tail);
+    // A read that PASSES the check wins (the declared layout first, then the shape
+    // read). One that fails is thrown away. Only when neither can be checked do we
+    // merge them, as the start-time path does.
+    let pick;
+    if (lc === true) pick = L;
+    else if (tc === true) pick = tail;
+    else if (lc === false) pick = { roi: '', gmv: '', cpo: '', orders: '' };     // a gap beats a wrong number
+    else pick = { roi: L.roi ?? tail.roi, gmv: L.gmv ?? tail.gmv, cpo: L.cpo ?? tail.cpo, orders: L.orders ?? tail.orders };
+    // Cost must agree with orders x cost-per-order. Net Cost sits a percent or two under
+    // Cost; rounding in Cost per order is far smaller than that.
+    const cost = Number(pick.orders) * Number(pick.cpo);
+    const agrees = (v) => cost > 0 && Math.abs(Number(v) - cost) / cost < 0.005 + (Number(pick.orders) * 0.005) / cost;
+    let spend = L.spend && lc !== false && agrees(L.spend) ? L.spend : '';
+    if (!spend && cost > 0) {
+      // The layout didn't name Cost (or named the wrong column): it is still the one money
+      // cell in the block that matches orders x cost-per-order, which Net Cost and the
+      // coupon columns do not. If nothing matches, Cost was not copied and stays blank.
+      let best = null;
+      for (let k = from; k < to; k++) {
+        if (!USD_VALUE_RE.test(lines[k]) || !agrees(stripUsd(lines[k]))) continue;
+        const v = stripUsd(lines[k]);
+        if (v === pick.gmv || v === pick.cpo) continue;
+        if (!best || Math.abs(Number(v) - cost) < Math.abs(Number(best) - cost)) best = v;
+      }
+      spend = best || '';
+    }
+    // Cost is only ever taken from a declared Cost column: with no start-time line
+    // there is no safe way to tell it from the budget, and a wrong spend is worse than a gap.
+    rows.push({
+      campaign,
+      spend,
+      roi: pick.roi ?? '',
+      orders: pick.orders ?? '',
+      cpo: pick.cpo ?? '',
+      gmv: pick.gmv ?? '',
+      notes: '',
+    });
+  }
+  return rows;
+}
+
 export function parseGmvMaxText(raw, opts) {
   if (!raw || !raw.trim()) return [];
   const columns = opts && Array.isArray(opts.columns) && opts.columns.length >= 4 ? opts.columns : null;
@@ -362,6 +474,9 @@ export function parseGmvMaxText(raw, opts) {
 
   const dts = [];
   for (let i = 0; i < lines.length; i++) if (DATETIME_RE.test(lines[i])) dts.push(i);
+
+  const anchors = buttonAnchors(lines);
+  if (anchors.length && dts.length < anchors.length) return parseByButtons(lines, anchors, columns);
 
   // Campaign name = the FIRST line of each campaign block. Find it by scanning
   // DOWN from the previous campaign's start-time (or the top of the paste for

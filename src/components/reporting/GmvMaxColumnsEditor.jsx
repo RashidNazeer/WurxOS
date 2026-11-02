@@ -56,6 +56,12 @@ export default function GmvMaxColumnsEditor({ accent = 'var(--danger)' }) {
             Copy the <b>column header row</b> from TikTok Shop&apos;s campaign list and paste it
             below — one name per line, or comma separated. Keep them in the order TikTok shows
             them, including columns we don&apos;t use. The parser needs the order, not the names.
+            <div className="mt-1">
+              <b>Important:</b> TikTok only copies the columns that are on screen. For a complete
+              paste, use TikTok&apos;s column picker to show just <b>Campaign name, Cost, SKU orders,
+              Cost per order, Gross revenue and ROI</b> so they all fit without scrolling, then
+              copy the campaign list and update this box to match.
+            </div>
           </div>
           <textarea
             className="form-control form-control-sm mt-2"

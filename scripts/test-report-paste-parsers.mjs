@@ -61,14 +61,66 @@ t('GMV Max: money written with the currency code first ("USD 160.00") is read', 
   assert.deepEqual(flat(rows), WANT);
 });
 
+// ── the APC's real July 2026 table (screenshots + paste) ─────────────
+const REAL = [
+  { name: 'Icon Travel & Flosser Bundle - July 2026', budget: '5,000.00', cost: '8,606.17', start: '2026-07-14 10:24:59', m: ['215.32', '8,523.98', '440', '19.56', '21,579.25', '2.51', '6,594.23', '0.00'] },
+  { name: 'GMV Max - April 26 - Vibe Series', budget: '1,500.00', cost: '6,126.45', start: '2026-04-08 13:52:24', m: ['158.10', '6,074.89', '385', '15.91', '15,810.04', '2.58', '3,583.25', '0.00'] },
+  { name: 'Black Series', budget: '1,000.00', cost: '3,268.67', start: '2026-07-12 07:40:57', m: ['79.66', '3,249.14', '198', '16.51', '7,965.76', '2.44', '1,611.95', '0.00'] },
+];
+const usd = (v) => (/\./.test(v) && !/^\d+$/.test(v) && !/^\d\.\d\d$/.test(v) ? v + ' USD' : v);
+const metricLines = (m) => [m[0] + ' USD', m[1] + ' USD', m[2], m[3] + ' USD', m[4] + ' USD', m[5], m[6] + ' USD', m[7] + ' USD'];
+void usd;
+const REAL_WANT = [['Icon Travel & Flosser Bundle - July 2026', '8606.17', '440', '19.56', '21579.25', '2.51'], ['GMV Max - April 26 - Vibe Series', '6126.45', '385', '15.91', '15810.04', '2.58'], ['Black Series', '3268.67', '198', '16.51', '7965.76', '2.44']];
+const left = (c) => [c.name, '', 'Analytics', '', 'Edit', '', 'Active', '', 'Creative Boost', c.budget + ' USD', 'Daily budget: ' + c.budget + ' USD', 'Average', 'View health & 1 recommendation', '1 available', c.cost + ' USD', 'ROI protection eligible', '-', c.start, 'Continuously'];
+const APC_COLS = L.parseColumnList('On/Off\nCampaign name\nCoupon cost\nNet Cost\nSKU orders\nCost per order\nGross revenue\nROI\nRevenue from coupons\nCross-placement coupon gross');
+
+t('Real paste, left columns only: finds every campaign + Cost, leaves the uncopied metrics blank and warns', () => {
+  const text = REAL.map((c) => left(c).join('\n')).join('\n');
+  const rows = P.parseGmvMaxText(text, { columns: L.DEFAULT_COLUMNS });
+  assert.deepEqual(rows.map((r) => [r.campaign, r.spend]), REAL_WANT.map((w) => [w[0], w[1]]));
+  assert.ok(rows.every((r) => r.orders === '' && r.gmv === '' && r.roi === '' && r.cpo === ''));
+  const w = P.warnGmvMaxPaste(rows);
+  assert.match(w, /Not found in the paste: SKU orders, Cost per order, Gross revenue, ROI/);
+  assert.doesNotMatch(w.split('. ')[0], /\bCost\b(?! per)/);   // Cost WAS found, so it is not in the not-found list
+});
+t('Real paste, full width (every TikTok column): all five numbers read', () => {
+  const text = REAL.map((c) => [...left(c), '-', '-', '2.70', '1,459.70 USD', ...metricLines(c.m)].join('\n')).join('\n');
+  assert.deepEqual(flat(P.parseGmvMaxText(text, { columns: L.DEFAULT_COLUMNS })), REAL_WANT);
+});
+t('Trimmed columns, no Schedule time (so no start-time line): campaigns found by their Analytics/Edit buttons', () => {
+  const text = REAL.map((c) => [c.name, '', 'Analytics', '', 'Edit', '', ...metricLines(c.m)].join('\n')).join('\n');
+  for (const cols of [APC_COLS, L.DEFAULT_COLUMNS, null]) {
+    const rows = P.parseGmvMaxText(text, cols ? { columns: cols } : undefined);
+    assert.deepEqual(rows.map((r) => [r.campaign, r.orders, r.cpo, r.gmv, r.roi]), REAL_WANT.map((w) => [w[0], w[2], w[3], w[4], w[5]]));
+    assert.ok(rows.every((r) => r.spend === ''), 'Cost was not copied, so it stays blank');
+  }
+});
+t('Trimmed columns WITH Cost: Cost is found even when the saved column list does not name it', () => {
+  const text = REAL.map((c) => [c.name, '', 'Analytics', '', 'Edit', '', c.cost + ' USD', ...metricLines(c.m)].join('\n')).join('\n');
+  for (const cols of [APC_COLS, L.DEFAULT_COLUMNS]) assert.deepEqual(flat(P.parseGmvMaxText(text, { columns: cols })), REAL_WANT);
+});
+t('A column list that no longer matches never puts a wrong number in a field (blank instead)', () => {
+  const text = REAL.map((c) => [c.name, '', 'Analytics', '', 'Edit', '', c.cost + ' USD', ...metricLines(c.m)].join('\n')).join('\n');
+  const rows = P.parseGmvMaxText(text, { columns: ['Campaign name', 'Status', 'Gross revenue', 'ROI', 'SKU orders', 'Cost per order'] });
+  for (const r of rows) {
+    if (r.roi && r.gmv && r.orders && r.cpo) assert.ok(Math.abs(Number(r.gmv) / Number(r.roi) - Number(r.orders) * Number(r.cpo)) / (Number(r.orders) * Number(r.cpo)) < 0.03);
+    else assert.ok(true);
+  }
+});
+t('warn: nothing missing gives no warning', () => {
+  assert.equal(P.warnGmvMaxPaste([{ spend: '1', orders: '1', cpo: '1', gmv: '1', roi: '1' }]), '');
+});
+
 // ── the explanation shown when nothing parses ──────────────────────
+// (without the row buttons either, there is nothing left to tell campaigns apart by)
+const noButtons = (text) => text.replace(/^(Analytics|Edit)\n/gm, '');
 t('explain: no start-time line names the problem and quotes the nearest date-like lines', () => {
-  const text = paste().replace(/2026-0\d-\d\d \d\d:\d\d:\d\d/g, 'Started: 13th of February');
+  const text = noButtons(paste()).replace(/2026-0\d-\d\d \d\d:\d\d:\d\d/g, 'Started: 13th of February');
   assert.equal(P.parseGmvMaxText(text).length, 0);
   assert.match(P.explainGmvMaxPaste(text), /no campaign start-time line/i);
 });
 t('explain: lists date-like lines it saw when the format is unrecognised', () => {
-  const text = paste().replace(/2026-0\d-\d\d \d\d:\d\d:\d\d/g, '13-02-26 6.58pm');
+  const text = noButtons(paste()).replace(/2026-0\d-\d\d \d\d:\d\d:\d\d/g, '13-02-26 6.58pm');
   assert.equal(P.parseGmvMaxText(text).length, 0);
   assert.match(P.explainGmvMaxPaste(text), /13-02-26 6\.58pm/);
 });
