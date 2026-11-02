@@ -26,9 +26,11 @@ import ReportReturnNotice from './ReportReturnNotice';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
 import PasteParsePanel from './PasteParsePanel';
+import { productTotalsSummary, productTotalsMessages } from '../../lib/reportTotalsCheck';
+import ProductTotalsWarning from './ProductTotalsWarning';
 import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
 import { loadColumns } from '../../lib/gmvMaxLayout';
-import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
+import { parseGmvMaxText, explainGmvMaxPaste, warnGmvMaxPaste, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionCard title it belongs to.
@@ -536,6 +538,20 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
 
   // Validation — only required fields from sections that are still enabled.
   // If user has unticked a section, we don't enforce its required fields.
+  // Product table vs the totals above it (GMV only: its column is "Units Sold", which is not orders). Shown live under the table and
+  // used by validate() to block Submit while they disagree.
+  const _sym = currencySymbol(data.currency || DEFAULT_CURRENCY);
+  const fmtProd = (n, money) => (money
+    ? `${_sym}${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : Number(n).toLocaleString());
+  const productSummary = (() => {
+    const en = resolveSectionsEnabled(data.sectionsEnabled);
+    if (!en.keyMetrics || !en.productAnalytics) return [];
+    return productTotalsSummary({
+      products: data.productAnalytics, fmt: fmtProd,
+      checks: [{ key: 'gmv', label: 'GMV', total: data.keyMetrics?.gmv, productKey: 'gmv', money: true }],
+    });
+  })();
   const validate = () => {
     const missing = [];
     const en = resolveSectionsEnabled(data.sectionsEnabled);
@@ -559,6 +575,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
       missing.push('Top Videos (at least 1)');
     if (en.productAnalytics && !(data.productAnalytics || []).some(p => (p.productName && p.productName.trim()) || (p.productId && p.productId.trim())))
       missing.push('Product Analytics (at least 1)');
+    if (en.productAnalytics) missing.push(...productTotalsMessages(productSummary.filter(r => r.state === 'mismatch'), 'Product Analytics'));
     if (en.gmvMax && !(data.gmvMax || []).some(g => g.campaign && g.campaign.trim()))
       missing.push('GMV Max Performance (at least 1 campaign)');
     return missing;
@@ -1150,6 +1167,7 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
             { key: 'samplesApproved', label: 'Samples Approved', type: 'number', width: '120px', placeholder: '376' },
           ]}
           addLabel="Add Product" />
+        <ProductTotalsWarning rows={productSummary} fmt={fmtProd} />
       </SectionCard>
       )}
 
@@ -1162,6 +1180,8 @@ export default function MonthlyReportForm({ editReportId, onSaved, onCancel }) {
           noun="campaign"
           accent="var(--danger)"
           parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+          explain={explainGmvMaxPaste}
+          warn={warnGmvMaxPaste}
           onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
           hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this month</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV.</>}
         />

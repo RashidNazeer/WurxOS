@@ -28,9 +28,11 @@ import { useReportAutosave, loadDraft } from '../../utils/reportDraftAutosave';
 import { useDialogs } from '../common/useDialogs';
 import SaveStatus from './SaveStatus';
 import PasteParsePanel from './PasteParsePanel';
+import { productTotalsSummary, productTotalsMessages } from '../../lib/reportTotalsCheck';
+import ProductTotalsWarning from './ProductTotalsWarning';
 import GmvMaxColumnsEditor from './GmvMaxColumnsEditor';
 import { loadColumns } from '../../lib/gmvMaxLayout';
-import { parseGmvMaxText, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
+import { parseGmvMaxText, explainGmvMaxPaste, warnGmvMaxPaste, mergeGmvMaxRows } from '../../utils/reportPasteParsers';
 import { ReportIssuesContext, IssueList, groupIssues, scrollToIssue } from './reportIssues';
 
 // validate() message -> the SectionHeader title it belongs to.
@@ -660,6 +662,24 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
 
   // Validation — return array of missing field names. Disabled sections
   // (via the inline toggle on each SectionHeader) are skipped entirely.
+  // Product table vs the totals above it (GMV, videos; its column is "Units Sold", which is not orders). Shown live under the table and
+  // used by validate() to block Submit while they disagree.
+  const _sym = currencySymbol(data.currency || DEFAULT_CURRENCY);
+  const fmtProd = (n, money) => (money
+    ? `${_sym}${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : Number(n).toLocaleString());
+  const productSummary = (() => {
+    const en = resolveWeeklySectionsEnabled(data.sectionsEnabled);
+    if (!en.overallPerformance || !en.productHighlights) return [];
+    const op = data.overallPerformance || {};
+    return productTotalsSummary({
+      products: data.productHighlights, fmt: fmtProd,
+      checks: [
+        { key: 'gmv', label: 'GMV', total: op.gmv, productKey: 'gmv', money: true },
+        { key: 'videos', label: 'Videos', total: op.videosPosted, productKey: 'newVideos' },
+      ],
+    });
+  })();
   const validate = () => {
     const missing = [];
     if (!selectedPeriod) missing.push('Bi-weekly period');
@@ -695,6 +715,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
       missing.push('GMV Max (at least 1 with campaign)');
     if (en.productHighlights && !(data.productHighlights || []).some(p => p.productName && p.productName.trim()))
       missing.push('Product Highlights (at least 1 with product name)');
+    if (en.productHighlights) missing.push(...productTotalsMessages(productSummary.filter(r => r.state === 'mismatch'), 'Product Highlights'));
 
     if (en.upcomingCampaigns && (!data.upcomingCampaigns || !data.upcomingCampaigns.trim()))
       missing.push('Current & Upcoming Campaigns');
@@ -1198,6 +1219,8 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             noun="campaign"
             accent="var(--danger)"
             parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+            explain={explainGmvMaxPaste}
+            warn={warnGmvMaxPaste}
             onApply={rows => setData(d => ({ ...d, gmvMax: mergeGmvMaxRows(d.gmvMax, rows) }))}
             hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>this report period</b>, copy the whole <b>Campaign list</b> and paste it here. We&apos;ll pull each campaign&apos;s spend, ROI, orders, CPO &amp; GMV. Then switch the filter to <b>month-to-date</b> and paste into the MTD box below.</>}
           />
@@ -1236,6 +1259,8 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
             noun="campaign"
             accent="var(--danger)"
             parse={t => parseGmvMaxText(t, { columns: loadColumns() })}
+            explain={explainGmvMaxPaste}
+            warn={warnGmvMaxPaste}
             onApply={rows => setData(d => ({ ...d, gmvMaxMtd: mergeGmvMaxRows(d.gmvMaxMtd, rows) }))}
             hint={<>Set TikTok Shop&apos;s GMV Max date filter to <b>month-to-date</b>, copy the whole <b>Campaign list</b> and paste it here — same format as the box above.</>}
           />
@@ -1274,6 +1299,7 @@ export default function BiWeeklyReportForm({ editReportId, onSaved, onCancel, pr
               { key: 'samplesApprovedMtd', label: 'Samples MTD', type: 'number', width: '95px' },
               { key: 'notes', label: 'Notes', width: '130px' },
             ]} />
+          <ProductTotalsWarning rows={productSummary} fmt={fmtProd} />
           <InsightArea value={data.productHighlightsInsights} onChange={v => setData(d => ({ ...d, productHighlightsInsights: v }))}
             loading={!!aiLoading.products || !!aiLoading.all}
             onGenerate={() => runAi('products', generateProductsInsight, 'productHighlightsInsights')} />

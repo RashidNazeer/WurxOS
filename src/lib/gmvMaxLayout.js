@@ -96,7 +96,7 @@ export function typeForColumn(name) {
   // Money is checked BEFORE counts on purpose: "Cost per order" and "Avg order
   // value" both contain "order" but hold money, and mis-typing one column
   // misaligns every column after it.
-  if (/cost|revenue|budget|spend|price|gmv|value|amount|cpo/.test(n)) return 'money';
+  if (/cost|revenue|budget|spend|price|gmv|value|amount|cpo|investment|coupon/.test(n)) return 'money';
   if (/\border(s)?\b|units|quantity|count/.test(n)) return 'int';
   return 'text';
 }
