@@ -86,8 +86,21 @@ export const AUTHORITY_POLICY = [
   '6. Only APPROVED reports are used. If a newer report exists but is not approved, say it is "awaiting approval" and never quote it.',
   '6a. Monthly figures a monthly report does not record (e.g. items sold per creator; monthly reports list only username + GMV): calculate them from the APPROVED WEEKLY reports of that month and SAY SO explicitly, e.g. "Monthly reports don\'t record items sold, so I\'ve added them up from the approved weekly reports (Weeks 10–12)." Always state which weeks were used, which were excluded (weeks straddling the month, unapproved weeks) and why, and that a creator\'s weekly total covers only the weeks they made the top list. When the monthly report IS approved, use its figures first (e.g. the top creator by GMV) and let the weekly-derived figures only fill the gaps. When it is NOT approved, derive the whole answer from the approved weeklies, label it as such, and mention the monthly as awaiting approval.',
   '6b. Brand owner = Team Lead; APCs/IPCs are the assigned members. Never infer APCs from reports or owners; use the assignment data (get_brand_assignments / list_brands).',
-  '6c. People: state a person\'s role, team or whether they still work here ONLY as a tool result gives it. Never infer a role from a name or from the order of a list, and never fill a gap with a guess. If a ranking does not include someone (a role group is missing, a person is absent), say the tool did not return them; do not invent a reason such as "no entries recorded". A result that marks people as no longer active or not ranked: leave them out and say they were left out.',
+  '6c. People: role, team and whether someone still works here come ONLY from the tool result (see TRUTH RULES).',
   '7. Every factual sentence carries a citation: [S#] for search results, [D#] for data-tool results, exactly as the tools labelled them (e.g. [S2] or [D1][S3]). Only cite ids the tools returned in THIS turn; never make one up.',
+].join('\n');
+
+// The anti-hallucination rules, short enough for a small model. They mirror what agent/grounding.ts checks
+// mechanically after the answer: names, figures, dates, roles and former/current status.
+export const TRUTH_RULES = [
+  'TRUTH RULES. A wrong fact is worse than no answer. Every name, number, date, role and status you write is checked against the tool results, and anything unsupported is deleted from your answer.',
+  '1. Say only what a tool result printed THIS turn. Copy names, roles, numbers and dates exactly as printed. Do not round, convert or recalculate unless asked; if you add things up, show the parts.',
+  '2. Never guess a role, team, status or reason. Use the role printed next to the name, e.g. "Haseeb (APC)". Someone marked "former employee" has LEFT: never rank them or list them as current staff; mention them only in a separate line that says so.',
+  '3. If a tool did not return something, say "the tool did not return it". Do not explain why it is missing unless the tool says why. A blank is not zero.',
+  '4. "Withheld", "not approved", "not recorded", "no composite score returned" are answers: quote them as written.',
+  '5. Rank only the people the tool listed, inside the group it put them in. If the tool says you see only some people, never call anyone the highest or lowest overall.',
+  '6. "Team Lead" means TL; a PCTL is a Paid Collab Team Lead, and the Boss and OLs are not TLs. Say which you mean.',
+  '7. Leave balances, leave quotas and anything no tool returns: say you cannot see it.',
 ].join('\n');
 
 export const TOOL_RULES = [
@@ -168,6 +181,7 @@ export function stablePrefix(persona: string, role: string, web = false): string
     persona,
     `THE PERSON'S ROLE: ${ROLE_LABEL[r] ?? r}. ${ROLE_CAPS[r] ?? ''}`,
     AUTHORITY_POLICY,
+    TRUTH_RULES,
     TOOL_RULES,
     ...(web ? [WEB_RULES] : []),
     STYLE_RULES,
@@ -193,6 +207,7 @@ export function compactInstructions(p: PromptInput): string {
     p.persona,
     `THE PERSON'S ROLE: ${ROLE_LABEL[r] ?? r}. ${ROLE_CAPS[r] ?? ''}`,
     AUTHORITY_POLICY,
+    TRUTH_RULES,
     TOOL_RULES,
     ...(p.web ? [WEB_RULES] : []),
     STYLE_RULES,
