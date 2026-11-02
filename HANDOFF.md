@@ -34,6 +34,13 @@ machine) can pick up any feature without losing context. Read this, then
    the averaged score but the stored monthly score still double-counts. It was
    tested in a rolled-back transaction on real data (3 APCs change by ±1 point).
    It also re-rolls every affected month, so it is safe to apply at any time.
+1b. **Migration 430 + PR "OL removes a flag directly" (`feat/ol-remove-flag`) is
+   OPEN and deliberately NOT merged.** It was written by another Claude session;
+   a rolled-back test on real data passed (short reason refused, non-OL refused,
+   flag deleted, one `flag_removal_log` row, 3 notifications, direct log writes
+   blocked). The UI change removes the old "Request removal" button for OLs, so
+   merging the PR BEFORE applying 430 would leave OLs with a button that errors.
+   Apply 430 first, then merge.
 2. **The migration ledger has gaps.** Production's
    `supabase_migrations.schema_migrations` does not list 402, 415–418 or 421–427,
    although the objects from 421–427 ARE live (applied outside the CLI). So
@@ -96,14 +103,23 @@ achieved; `src/lib/incentiveWorkbookLoad.js` fetches + parses (shared by both
 modals); `FetchAchievedModal.jsx` previews and writes. Video Authorized
 achieved = authorized count ÷ Total Videos Made × 100. A missing/blank achieved
 cell is skipped, never zeroed, so a sheet that gains its next column is picked up
-on the next click. GMV-Max / attendance / OL-brand lines are never filled from the
-sheet (they have a derived source). Paid plans are skipped; verified plans are
+on the next click (every click re-downloads the sheet, bypassing Google's cache,
+and re-reads the plans; Google itself takes ~5 min to publish an edit). A line
+made by hand with no workbook marker is matched by name when its text is exactly
+an option's name and it has a brand (this is how Apothecary's lines fill).
+Attendance / OL-brand lines are never filled from the sheet. **GMV Max lines
+derive from `brand_monthly_metrics.gmv_achieved`** (what the APC enters at
+clock-in), so for a CLOSED month the preview offers a separate "Brand GMV Max
+figure" row that writes the sheet's number to that one source
+(`saveBrandGmvAchieved`, partial upsert, OL/Boss via `bmm_all`); for the open
+month those lines are skipped because the daily clock-in would overwrite it. The
+preview lists skipped brands grouped with the reason. Paid plans are skipped; verified plans are
 flagged but **editing one does not reset its verification** — open decision.
 Reality check: against the Oct downloaded copy only 3 of 90 tabs could produce an
 October Video Authorized figure (the rest lack a header row, an achieved column,
 or have year-less headers). The preview lists each skip with its reason; fixing
 the sheet's headers is the lever. Tests: `node scripts/test-incentive-achieved.mjs`
-(41) and `node scripts/incentive-workbook-tests.mjs` (23).
+(44) and `node scripts/incentive-workbook-tests.mjs` (23).
 Known pre-existing quirks left alone: the target resolver assumes the current
 calendar year for year-less headers (7 tabs likely a year off) and reads
 "March 1 - March 31" as 2031.
