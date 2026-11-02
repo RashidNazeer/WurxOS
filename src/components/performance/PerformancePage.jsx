@@ -8,7 +8,7 @@ import {
   // Mutations
   saveRating, saveFlag, saveWarning, getV1Weights, saveV1Weights,
   // Flag removal request flow
-  requestFlagRemoval, decideFlagRemoval, removeFlagDirect,
+  removeFlagAsOl, decideFlagRemoval, removeFlagDirect,
   listFlagRemovalRequests,
   // Attendance — single source of truth (SQL). Never recompute here.
   fetchAttendanceBreakdown, fetchAttendanceBreakdownBulk,
@@ -408,19 +408,16 @@ function ViewFlagsModal({
   const isBoss = currentUserRole === 'boss';
   const isOl   = currentUserRole === 'ol';
 
-  // OL can request removal of flags THEY created; Boss can delete
-  // directly. Both actions go through server-side RPCs that enforce
-  // the same rules — these checks just hide the buttons when they
-  // wouldn't succeed.
-  const canRequestRemoval = (f) =>
-    isOl && f.addedBy === currentUserId && !pendingRemovals[f.id];
-  const canBossRemove = (f) => isBoss;
+  // Boss deletes directly; an OL removes any flag but must give a reason
+  // (kept in flag_removal_log). The RPCs enforce this; these checks only
+  // hide buttons that wouldn't succeed.
+  const canRemove = () => isBoss || isOl;
 
-  async function handleRequestRemoval(flag) {
+  async function handleOlRemove(flag) {
     const reason = await askText(
-      'Why should this flag be removed? Boss will see your reason.\n\n(Short explanation, e.g. "Was a misunderstanding — the campaign was completed on time.")',
+      'Why is this flag being removed? The reason is recorded and the flagged person is notified.',
       '',
-      { title: 'Request flag removal', confirmLabel: 'Send request' },
+      { title: 'Remove flag', confirmLabel: 'Remove flag' },
     );
     if (!reason || !reason.trim()) return;
     if (reason.trim().length < 3) {
@@ -429,11 +426,11 @@ function ViewFlagsModal({
     }
     setBusy((b) => ({ ...b, [flag.id]: true }));
     try {
-      await requestFlagRemoval(flag.id, reason.trim());
-      onFlagsChanged?.({ kind: 'request', flag });
-      toast.success('Removal request sent to Boss for approval.');
+      await removeFlagAsOl(flag.id, reason.trim());
+      onFlagsChanged?.({ kind: 'removed', flag });
+      toast.success('Flag removed.');
     } catch (err) {
-      toast.error('Failed to send request: ' + (err.message || 'unknown error'));
+      toast.error('Failed to remove flag: ' + (err.message || 'unknown error'));
     } finally {
       setBusy((b) => ({ ...b, [flag.id]: false }));
     }
@@ -530,33 +527,19 @@ function ViewFlagsModal({
                         </span>
                       </div>
                     )}
-                    {/* Action buttons — OL who created the flag can
-                        request removal; Boss can remove directly. */}
-                    {(canRequestRemoval(f) || canBossRemove(f)) && (
+                    {/* Boss removes directly; OL removes with a reason. */}
+                    {canRemove() && (
                       <div className="d-flex gap-2 mt-2">
-                        {canBossRemove(f) ? (
-                          <button
+                        <button
                             className="btn btn-sm d-inline-flex align-items-center gap-1"
                             style={{
                               background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)', color: 'var(--danger)',
                               borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', padding: '3px 10px',
                             }}
                             disabled={isBusy}
-                            onClick={() => handleBossRemove(f)}>
+                            onClick={() => (isBoss ? handleBossRemove(f) : handleOlRemove(f))}>
                             <i className="bi bi-trash" /> {isBusy ? 'Removing…' : 'Remove flag'}
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-sm d-inline-flex align-items-center gap-1"
-                            style={{
-                              background: 'var(--surface-1)', border: '1px solid color-mix(in srgb, var(--info) 35%, transparent)', color: 'var(--info)',
-                              borderRadius: 'var(--radius-sm)', fontSize: '0.7rem', padding: '3px 10px',
-                            }}
-                            disabled={isBusy}
-                            onClick={() => handleRequestRemoval(f)}>
-                            <i className="bi bi-send" /> {isBusy ? 'Sending…' : 'Request removal'}
-                          </button>
-                        )}
+                        </button>
                       </div>
                     )}
                   </div>

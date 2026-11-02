@@ -526,6 +526,12 @@ export async function removeFlagDirect(flagId) {
   if (error) throw new Error(error.message);
 }
 
+// OL-only: remove any flag (TL / APC / IPC) immediately; a reason is required.
+export async function removeFlagAsOl(flagId, reason) {
+  const { error } = await supabase.rpc('flag_remove_by_ol', { p_flag_id: flagId, p_reason: reason });
+  if (error) throw new Error(error.message);
+}
+
 // Pending removal requests for any flags the current user is involved
 // in (as flag owner, requester, or Boss). RLS filters automatically.
 export async function listFlagRemovalRequests({ status = null } = {}) {
