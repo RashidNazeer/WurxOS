@@ -16,7 +16,9 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { OPTION_BY_KEY } from '../../lib/incentiveWorkbook';
-import { buildAchievedUpdates, applyChangesToPlan } from '../../lib/incentiveAchieved';
+import { buildAchievedUpdates, applyChangesToPlan, optionForLine } from '../../lib/incentiveAchieved';
+import { listBrandMetricsForMonth, saveBrandGmvAchieved } from '../../lib/brandMetricsApi';
+import { karachiMonth } from '../../lib/serverTime';
 import { fetchWorkbookBuffer, parseWorkbookForBrands } from '../../lib/incentiveWorkbookLoad';
 import { getIncentiveWorkbookUrl, listStoredPlans, updateIncentivesProgress } from '../../lib/incentivesApi';
 
@@ -41,6 +43,8 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [checked, setChecked] = useState(() => new Set());
+  const [gmvBefore, setGmvBefore] = useState(null);  // brandId -> brand_monthly_metrics.gmv_achieved; null if unreadable
+  const [metricChecked, setMetricChecked] = useState(() => new Set());
   const [phase, setPhase] = useState('preview');   // preview | applying | done
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [results, setResults] = useState([]);
@@ -56,11 +60,15 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
       const brands = new Map();
       for (const p of ps) {
         for (const it of [...p.incentives, ...p.bonuses]) {
-          if (it?.wbOption && it.brandId) brands.set(it.brandId, { id: it.brandId, name: it.brandName || '' });
+          if (it?.brandId && (it.source === 'gmv_max' || optionForLine(it))) brands.set(it.brandId, { id: it.brandId, name: it.brandName || '' });
         }
       }
       if (!mounted.current) return;
       setPlans(ps);
+      try {
+        const rows = await listBrandMetricsForMonth(month);
+        if (mounted.current) setGmvBefore(Object.fromEntries(Object.entries(rows).map(([id, r]) => [id, r.gmv_achieved == null ? null : Number(r.gmv_achieved)])));
+      } catch { if (mounted.current) setGmvBefore(null); }
       if (!brands.size) { setSheets({}); return; }
       const map = await parseWorkbookForBrands(await getBuffer(), [...brands.values()]);
       if (!mounted.current) return;
@@ -87,12 +95,17 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
   }, []);
 
   const result = useMemo(
-    () => (plans && sheets ? buildAchievedUpdates({ plans, sheetsByBrand: sheets, month }) : null),
-    [plans, sheets, month],
+    () => (plans && sheets ? buildAchievedUpdates({ plans, sheetsByBrand: sheets, month, gmvMaxBefore: gmvBefore, monthClosed: month < karachiMonth() }) : null),
+    [plans, sheets, month, gmvBefore],
   );
-  useEffect(() => { setChecked(new Set((result?.changes || []).map(keyOf))); }, [result]);
+  useEffect(() => {
+    setChecked(new Set((result?.changes || []).map(keyOf)));
+    setMetricChecked(new Set((result?.metricUpdates || []).map((m) => m.brandId)));
+  }, [result]);
 
   const picked = (result?.changes || []).filter((c) => checked.has(keyOf(c)));
+  const pickedMetrics = (result?.metricUpdates || []).filter((m) => metricChecked.has(m.brandId));
+  const nothingToDo = !result?.changes.length && !result?.metricUpdates.length;
   const byUser = useMemo(() => {
     const m = new Map();
     for (const c of result?.changes || []) m.set(c.userId, [...(m.get(c.userId) || []), c]);
@@ -113,8 +126,8 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
   }, [result]);
   const willComplete = picked.filter((c) => c.completedAfter && !c.completedBefore).length;
   const willUncomplete = picked.filter((c) => !c.completedAfter && c.completedBefore).length;
-  const hasPlanLines = !!plans?.some((p) => [...p.incentives, ...p.bonuses].some((i) => i?.wbOption && i.brandId));
-  const noColumn = !!result && !result.changes.length && result.skipped.some((s) => /achieved column|target column resolved/.test(s.reason));
+  const hasPlanLines = !!plans?.some((p) => [...p.incentives, ...p.bonuses].some((i) => i?.brandId && (i.source === 'gmv_max' || optionForLine(i))));
+  const noColumn = !!result && nothingToDo && result.skipped.some((s) => /achieved column|target column resolved/.test(s.reason));
 
   function toggle(c) {
     setChecked((prev) => { const n = new Set(prev); const k = keyOf(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
@@ -130,12 +143,23 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
   function close() { if (phase !== 'applying') onClose(); }
 
   async function apply() {
-    if (busy.current || !picked.length) return;
+    if (busy.current || (!picked.length && !pickedMetrics.length)) return;
     busy.current = true;
     const groups = new Map();
     for (const c of picked) groups.set(c.userId, [...(groups.get(c.userId) || []), c]);
-    setPhase('applying'); setProgress({ done: 0, total: groups.size });
+    setPhase('applying'); setProgress({ done: 0, total: groups.size + pickedMetrics.length });
     const out = [];
+    // The brand figure first, so the GMV Max lines it feeds read the new number straight away.
+    for (const m of pickedMetrics) {
+      const name = `${m.brandName} · brand GMV Max`;
+      try {
+        await saveBrandGmvAchieved(m.brandId, month, m.after);
+        out.push({ name, ok: true, text: `set to ${Number(m.after).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
+      } catch (err) {
+        out.push({ name, ok: false, error: err?.message || String(err) });
+      }
+      if (mounted.current) setProgress((p) => ({ ...p, done: p.done + 1 }));
+    }
     for (const [userId, cs] of groups) {
       try {
         const [fresh] = await listStoredPlans(month, [userId]);
@@ -216,13 +240,32 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
                     <input type="checkbox" checked={allOn} onChange={toggleAll} /> Select all
                   </label>
                 </div>
-              ) : (
+              ) : nothingToDo && (
                 <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-2)', fontSize: 13, color: 'var(--text-primary)' }}>
                   {!hasPlanLines
                     ? `No APC plan for ${monthLabel} has workbook-linked lines, so there is nothing to fetch.`
                     : noColumn
                       ? `The workbook has no achieved column for ${monthLabel} yet, so no figures can be fetched. Try again once the month's column is filled in.`
                       : 'Nothing to update: every workbook-linked line already matches the workbook (or could not be read — see "Not filled" below).'}
+                </div>
+              )}
+
+              {result.metricUpdates.length > 0 && (
+                <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 12px', background: 'var(--surface-2)', fontWeight: 700, fontSize: 13 }}>
+                    Brand GMV Max figure (feeds every GMV Max line of that brand)
+                  </div>
+                  {result.metricUpdates.map((m) => (
+                    <label key={m.brandId} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 12px', borderTop: '1px solid var(--border-subtle)', cursor: 'pointer', fontSize: 12.5 }}>
+                      <input type="checkbox" checked={metricChecked.has(m.brandId)} style={{ marginTop: 3 }}
+                        onChange={() => setMetricChecked((prev) => { const n = new Set(prev); if (n.has(m.brandId)) n.delete(m.brandId); else n.add(m.brandId); return n; })} />
+                      <span style={{ flex: 1 }}>
+                        <strong>{m.brandName}</strong>: {m.before == null ? 'not set' : Number(m.before).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {' → '}<strong>{Number(m.after).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        <span style={{ display: 'block', color: 'var(--text-muted)' }}>{m.lines.join(' · ')}</span>
+                      </span>
+                    </label>
+                  ))}
                 </div>
               )}
 
@@ -299,10 +342,10 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontWeight: 800, fontSize: 14, color: failed.length ? 'var(--warning-text, #92400e)' : 'var(--success-text)' }}>
                 <i className={`bi ${failed.length ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'} me-1`} />
-                {okCount} of {results.length} APC{results.length === 1 ? '' : 's'} updated{failed.length ? `, ${failed.length} failed` : ''}
+                {okCount} of {results.length} update{results.length === 1 ? '' : 's'} saved{failed.length ? `, ${failed.length} failed` : ''}
               </div>
               {results.filter((r) => r.ok).map((r) => (
-                <div key={r.name} style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.name}: {r.n} line{r.n === 1 ? '' : 's'} updated</div>
+                <div key={r.name} style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.name}: {r.text || `${r.n} line${r.n === 1 ? '' : 's'} updated`}</div>
               ))}
               <div>
                 <button type="button" className="wx-btn wx-btn-ghost" style={{ fontSize: 12 }}
@@ -327,8 +370,8 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
             {phase === 'done' ? 'Close' : 'Cancel'}
           </button>
           {phase === 'preview' && (
-            <button type="button" className="wx-btn wx-btn-primary" onClick={apply} disabled={loading || !picked.length}>
-              <i className="bi bi-check2 me-1" /> Apply {picked.length} change{picked.length === 1 ? '' : 's'}
+            <button type="button" className="wx-btn wx-btn-primary" onClick={apply} disabled={loading || (!picked.length && !pickedMetrics.length)}>
+              <i className="bi bi-check2 me-1" /> Apply {picked.length + pickedMetrics.length} change{picked.length + pickedMetrics.length === 1 ? '' : 's'}
             </button>
           )}
         </div>

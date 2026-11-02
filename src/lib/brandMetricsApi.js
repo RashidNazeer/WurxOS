@@ -124,6 +124,28 @@ export async function saveBrandGoals(brandId, monthKey, targets) {
   return data;
 }
 
+// Write ONLY gmv_achieved for a CLOSED month, from the brand workbook. Same partial
+// upsert as saveBrandGoals, for the same reason: every other column is left alone.
+// Never call this for the current month; the APC's daily clock-in (mig 311) would
+// simply overwrite it.
+export async function saveBrandGmvAchieved(brandId, monthKey, value) {
+  const n = Number(value);
+  if (!brandId || !monthKey || !Number.isFinite(n) || n < 0) throw new Error('Not a valid GMV figure.');
+  const { data: sess } = await supabase.auth.getSession();
+  const { data, error } = await supabase
+    .from('brand_monthly_metrics')
+    .upsert({
+      brand_id: brandId, month_key: monthKey, gmv_achieved: n,
+      updated_at: new Date().toISOString(), updated_by: sess?.session?.user?.id || null,
+    }, { onConflict: 'brand_id,month_key' })
+    .select('gmv_achieved')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('No row came back — you may not have permission to edit this brand.');
+  if (Number(data.gmv_achieved) !== n) throw new Error(`Saved ${data.gmv_achieved}, expected ${n}.`);
+  return data;
+}
+
 // Who is on this brand's "Total Revenue in GMV Max" incentive for the month,
 // and whether the brand's figure has reached their target (mig 366).
 //

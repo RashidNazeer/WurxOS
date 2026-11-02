@@ -240,12 +240,38 @@ t('derived-source lines (gmv_max / attendance / ol_brands) are skipped with a re
   assert.equal(skipped.length, 3);
   assert.ok(skipped.every((s) => s.reason && s.userName === 'Ali'));
 });
-t('lines without wbOption or brandId are not candidates (not even skipped)', () => {
+t('lines without a brand, or with no marker and a name matching no option, are not candidates', () => {
   const { changes, skipped } = A.buildAchievedUpdates({
-    plans: [plan({ incentives: [line({ wbOption: undefined }), line({ brandId: undefined })] })],
+    plans: [plan({ incentives: [line({ wbOption: undefined, text: 'Bring a friend' }), line({ brandId: undefined })] })],
     sheetsByBrand: sheets, month: '2026-10',
   });
   assert.equal(changes.length + skipped.length, 0);
+});
+t('a hand-made line (no marker) whose text is exactly an option name is matched by name', () => {
+  const { changes } = A.buildAchievedUpdates({
+    plans: [plan({ incentives: [line({ wbOption: undefined, text: 'Creators with more than three videos' })] })],
+    sheetsByBrand: sheets, month: '2026-10',
+  });
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].optionKey, 'creators_3plus');
+  assert.equal(changes[0].after, 32);
+});
+t('GMV Max lines: closed month returns the brand figure once; open month and no-tab skip; no line is written', () => {
+  const gmvLine = (o) => line({ id: 'g', text: 'Total Revenue in GMV Max', wbOption: undefined, source: 'gmv_max', targetValue: '250000', ...o });
+  const two = [plan({ userId: 'u1', userName: 'Ali', incentives: [gmvLine({})] }), plan({ userId: 'u2', userName: 'Tl', incentives: [gmvLine({ id: 'g2' })] })];
+  const closed = A.buildAchievedUpdates({ plans: two, sheetsByBrand: sheets, month: '2026-10', gmvMaxBefore: { b1: 500 }, monthClosed: true });
+  assert.equal(closed.changes.length, 0);
+  assert.equal(closed.metricUpdates.length, 1);
+  assert.deepEqual([closed.metricUpdates[0].brandId, closed.metricUpdates[0].before, closed.metricUpdates[0].after], ['b1', 500, 1200.5]);
+  assert.equal(closed.metricUpdates[0].lines.length, 2);
+  const same = A.buildAchievedUpdates({ plans: two, sheetsByBrand: sheets, month: '2026-10', gmvMaxBefore: { b1: 1200.5 }, monthClosed: true });
+  assert.equal(same.metricUpdates.length, 0);
+  const open = A.buildAchievedUpdates({ plans: two, sheetsByBrand: sheets, month: '2026-10', gmvMaxBefore: { b1: 500 }, monthClosed: false });
+  assert.equal(open.metricUpdates.length, 0);
+  assert.match(open.skipped[0].reason, /still open/);
+  const none = A.buildAchievedUpdates({ plans: two, sheetsByBrand: { b1: { missing: true } }, month: '2026-10', gmvMaxBefore: {}, monthClosed: true });
+  assert.equal(none.metricUpdates.length, 0);
+  assert.match(none.skipped[0].reason, /no tab/);
 });
 t('no change emitted when after === before', () => {
   const { changes, skipped } = A.buildAchievedUpdates({
@@ -271,8 +297,8 @@ t('unavailable / blank / missing sheet is a Skip and NEVER zeroes the line', () 
   assert.equal(changes.length, 0);
   assert.equal(skipped.length, 3);
   assert.match(skipped[0].reason, /blank/);
-  assert.match(skipped[1].reason, /no sheet/);
-  assert.match(skipped[2].reason, /no sheet/);
+  assert.match(skipped[1].reason, /no tab/);
+  assert.match(skipped[2].reason, /no tab/);
 });
 t('video_authorized line gets the percentage, bonuses section handled too', () => {
   const { changes } = A.buildAchievedUpdates({
