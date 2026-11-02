@@ -104,6 +104,11 @@ portals — everything an agency needs.
   request once, when all approve; any rejection is final; the Boss can always decide. Single-team APCs
   have no rows and use the old chain.
 
+### Incentive workbook (goal vs achieved)
+- The OL's Google Sheet (`app_config.incentive_workbook_url`, mig 423) has one tab per brand. Each month is a column PAIR: LEFT = goal ("Oct 26"), RIGHT = achieved ("Oct 1-31"). `incentiveWorkbook.js` reads goals; `incentiveAchieved.js` reads achieved for the OL's "Fetch achieved from workbook" button (APC Incentives tab, preview before write).
+- Video Authorized achieved = authorized count ÷ Total Videos Made × 100. A missing or blank achieved cell is skipped, never zeroed. GMV-Max/attendance/OL-brand lines keep their own derived source.
+- Many tabs lag (no header row, no achieved column yet, year-less headers); the preview lists every skip with its reason.
+
 ### Realtime
 - Supabase Realtime channels are used across the app — incentives, profiles,
   notifications, brands. Each subscribes to `postgres_changes` on its table.

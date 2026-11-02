@@ -590,6 +590,22 @@ export async function upsertIncentives(userId, month, patch) {
   return data;
 }
 
+// STORED plans for a month, with no derived overlay (attendance / gmv_max /
+// ol_brands). Bulk writers read these so a read-time figure can never be
+// written back as if it were data. Shaped for incentiveAchieved.js.
+export async function listStoredPlans(month, userIds) {
+  if (!userIds?.length) return [];
+  const { data, error } = await supabase
+    .from('incentives')
+    .select('id, user_id, incentives, bonuses, verified, payout_cleared')
+    .eq('month', month).in('user_id', userIds);
+  if (error) throw new Error(error.message);
+  return (data || []).map((r) => ({
+    id: r.id, userId: r.user_id, verified: !!r.verified, payoutCleared: !!r.payout_cleared,
+    incentives: r.incentives || [], bonuses: r.bonuses || [],
+  }));
+}
+
 export function recomputeCompletion(items) {
   return (items || []).map((it) => ({ ...it, completed: autoComplete(it) }));
 }

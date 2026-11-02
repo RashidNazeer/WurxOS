@@ -20,12 +20,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   INCENTIVE_OPTIONS, MAX_SELECTIONS_PER_APC,
-  readBrandSheet, getTarget, formatTarget, availableMonths, buildSelectionChanges,
+  getTarget, formatTarget, availableMonths, buildSelectionChanges,
 } from '../../lib/incentiveWorkbook';
+import { canon, fetchWorkbookBuffer, parseWorkbookForBrands } from '../../lib/incentiveWorkbookLoad';
 import { getIncentiveWorkbookUrl, setIncentiveWorkbookUrl } from '../../lib/incentivesApi';
 
 const uid4 = () => Math.random().toString(36).slice(2, 10);
-const canon = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const selKey = (brandId, optionKey) => `${brandId}::${optionKey}`;
 
 function monthLabel(ym) {
@@ -97,16 +97,10 @@ export default function WorkbookIncentivesModal({
   async function loadFrom(url) {
     setWbError(''); setSheets(null); setParsing(true);
     try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`The sheet could not be fetched (HTTP ${res.status}). Check it is still published to the web.`);
-      await parseBuffer(await res.arrayBuffer());
+      await parseBuffer(await fetchWorkbookBuffer(url));
       setSource(`the shared sheet, fetched just now`);
     } catch (err) {
-      setWbError(
-        /Failed to fetch|NetworkError/i.test(err?.message || '')
-          ? 'Could not reach the sheet. It may no longer be published to the web — republish it, or upload the file below.'
-          : (err?.message || String(err)),
-      );
+      setWbError(err?.message || String(err));
       setSheets(null);
     } finally {
       setParsing(false);
@@ -143,28 +137,7 @@ export default function WorkbookIncentivesModal({
   }
 
   async function parseBuffer(buf) {
-    {
-      const XLSX = await import('xlsx');
-      const wb = XLSX.read(buf, { type: 'array' });
-      if (!wb.SheetNames?.length) throw new Error('That workbook has no sheets.');
-
-      // Sheets were renamed to the app's brand names, so an exact match is the
-      // normal case; canonical is a fallback, never a fuzzy guess.
-      const byCanon = new Map(wb.SheetNames.map((n) => [canon(n), n]));
-      const map = {};
-      let found = 0;
-      for (const b of brands) {
-        const name = wb.Sheets[b.name] ? b.name : byCanon.get(canon(b.name));
-        if (!name) { map[b.id] = { missing: true }; continue; }
-        const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null, blankrows: false });
-        map[b.id] = { ...readBrandSheet(grid), sheetName: name };
-        found++;
-      }
-      if (!found) {
-        throw new Error(`None of this person's brands has a tab in that workbook. Tab names must match the brand names in WurxOS — run scripts/rename-google-sheet-tabs.gs on the sheet if they do not.`);
-      }
-      setSheets(map);
-    }
+    setSheets(await parseWorkbookForBrands(buf, brands));
   }
 
   function toggle(brandId, optionKey) {

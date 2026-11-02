@@ -2,10 +2,11 @@
 // The brand incentive workbook: which options exist, and what TARGET each
 // brand carries for a given month.
 //
-// TARGETS ONLY. The workbook holds a target and an achieved figure per month;
-// only the target is read. Achieved already has a source in WurxOS -- the APC
-// enters it at clock-in (mig 311) and the GMV-Max line derives it (mig 317) --
-// and two sources for one number is how they drift.
+// THIS FILE READS TARGETS. The workbook holds a target and an achieved figure per
+// month; the achieved half is read by incentiveAchieved.js (the OL's "Fetch
+// achieved" button). GMV-Max, attendance and OL-brand lines are NOT filled from
+// it: they already have a derived source (mig 311/317) and two sources for one
+// number is how they drift.
 //
 // ── THE COLUMN LAYOUT, AND WHY IT IS READ POSITIONALLY ─────────────────────
 // Each month occupies TWO columns, target first:
@@ -113,7 +114,7 @@ const withoutDayRange = (label) => norm(label).replace(new RegExp(DAY_RANGE.sour
  * "February (1-25)" as 2025 — the two-digit pattern happily matches a day, and
  * a sheet whose last column is a date range ends up anchored years out.
  */
-function yearHintOf(label) {
+export function yearHintOf(label) {
   const s = withoutDayRange(label);
   const four = s.match(/\b(20\d{2})\b/);
   if (four) return Number(four[1]);
