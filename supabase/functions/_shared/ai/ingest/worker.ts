@@ -404,7 +404,12 @@ export async function runWorker(opts: WorkerOptions): Promise<RunStats> {
     if (!o.embedAlt && opts.altKeys) {
       const st = await embedState(o);
       o.embedAlt = altEmbedder(st.settings.alt_provider, opts.altKeys, opts.fetchImpl);
-      st.altDown = !o.embedAlt || st.altDown;
+      // embedState() ran BEFORE the embedder existed, so it stored altDown = true ("no
+      // embedder"). `!o.embedAlt || st.altDown` therefore kept it true for good, and the
+      // fallback never ran: with OpenAI out of credits, nothing was embedded for a month.
+      // Recompute from what is true now: the embedder exists, and the provider is not deferred.
+      const altReady = (await o.rpc('ai_vector_ready', { p_space: 'alt' }).catch(() => true)) !== false;
+      st.altDown = !o.embedAlt || !altReady;
     }
     if (record) runId = await o.rpc('ai_ingest_run_start', { p_kind: 'ingest', p_worker: o.workerId });
     while (now() - t0 < budget) {
