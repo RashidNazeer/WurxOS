@@ -16,7 +16,7 @@
 //
 // Allowed roles: boss and developer always, plus ai_assistant_config.allowed_roles.
 // Env (function secrets): GEMINI_API_KEY, GROQ_API_KEY, OPEN_AI_API_KEY_FALLBACK (OpenAI FREE tier), NVIDIA_API_KEY (last resort),
-//   OPEN_AI_API_KEY (EMBEDDINGS only; no chat model uses it), NVIDIA_API_KEY_2 (optional), TAVILY_API_KEY + BRAVE_API_KEY (optional, web search), AI_INTERNAL_SECRET,
+// NVIDIA_API_KEY_2 (optional), TAVILY_API_KEY + BRAVE_API_KEY (optional, web search), AI_INTERNAL_SECRET,
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (automatic).
 // Deploy: NOT YET — only with the Owner's go (TEAM.md rule 0/3), --project-ref dev.
 // ============================================================
@@ -29,7 +29,6 @@ const env: ServerEnv = {
   url: Deno.env.get('SUPABASE_URL')!,
   serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   anonKey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-  openAiKey: Deno.env.get('OPEN_AI_API_KEY') ?? Deno.env.get('OPENAI_API_KEY') ?? '',
   openAiKeyFallback: Deno.env.get('OPEN_AI_API_KEY_FALLBACK') ?? null,
   groqKey: Deno.env.get('GROQ_API_KEY') ?? null,
   geminiKey: Deno.env.get('GEMINI_API_KEY') ?? null,

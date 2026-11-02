@@ -207,7 +207,7 @@ test('query embeddings: free providers only; every refused/out-of-quota provider
     if (!ok) return new Response(QUOTA, { status: 429 });
     return new Response(JSON.stringify({ data: [{ index: 0, embedding: new Array(1536).fill(0) }], usage: { prompt_tokens: 3, total_tokens: 3 } }), { status: 200 });
   };
-  const env = (ok: boolean) => ({ openAiKey: 'pk', openAiKeyFallback: 'fk', nvidiaKey: 'nv', fetchImpl: mk(ok) as any } as any);
+  const env = (ok: boolean) => ({ openAiKeyFallback: 'fk', nvidiaKey: 'nv', fetchImpl: mk(ok) as any } as any);
   const good = chainEmbedder(env(true), new UsageMeter());
   assert.equal((await good.embed('a')).length, 1536);
   assert.ok(hits.every((u) => u.includes('nvidia.com')), 'only NVIDIA was asked');

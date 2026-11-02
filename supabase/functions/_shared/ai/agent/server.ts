@@ -75,7 +75,6 @@ export async function checkProfile(admin: any, userId: string, token: string | n
 
 export type ServerEnv = {
   url: string; serviceKey: string; anonKey: string; createClient: CreateClient; fetchImpl?: typeof fetch; modelOverride?: string;
-  openAiKey: string;                     // OPEN_AI_API_KEY: EMBEDDINGS / RERANK ONLY (retrieval side); no chat model uses it
   openAiKeyFallback?: string | null;     // OPEN_AI_API_KEY_FALLBACK: the 'fallback' key slot = OpenAI FREE tier (optional)
   groqKey?: string | null;               // GROQ_API_KEY: the 'groq' key slot (optional, free tier)
   geminiKey?: string | null;             // GEMINI_API_KEY: the 'gemini' key slot (optional, free tier)
