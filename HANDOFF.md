@@ -1,126 +1,203 @@
 # WurxOS v2 — Session Handoff
 
-Last updated: **2026-08-11**. Written to resume work in a fresh Claude Code
-session on another machine without losing context. Read this, then `CLAUDE.md`,
-then `.claude/memory/`.
+Last updated: **2026-11-02**. Written so a fresh Claude Code session (or a new
+machine) can pick up any feature without losing context. Read this, then
+`CLAUDE.md`, then `.claude/memory/`.
 
 > **Paste this as your first message in a new session:**
 > *"Read HANDOFF.md, CLAUDE.md and .claude/memory/ before doing anything, then
-> tell me what state the project is in and what's pending. I'm continuing work
-> from another machine."*
+> tell me what state the project is in and what's pending. I'm continuing work."*
 
 ---
 
 ## TL;DR — where things stand
 
 - **Live** at https://wurxos.vercel.app (Vercel project `wurxos`). ~30 users.
-- **Repo** `RashidNazeer/WurxOS` (private). **`main` IS the production code** as
-  of 2026-08-11 — `feature/brand-linked-incentives` (54 commits that had been
-  running in prod while main sat behind) was merged in. Revert point: tag
-  `stable-pre-main-merge-2026-08-11`.
-- **Supabase** project ref `xoaaidgvblondjpvxjqp`. Migrations at **318**.
+- **Repo** `RashidNazeer/WurxOS` (private). `main` is the production code and is
+  **protected: changes only land through a pull request** (a direct push is
+  rejected with GH013). Workflow: branch → push → `gh pr create` → `gh pr merge --merge`.
+- **Deploys**: Vercel builds `main` automatically from GitHub when a PR merges
+  (`Production – wurxos`). The `wurxosdev` Vercel project is a second, preview
+  one. `npx vercel --prod --yes` currently fails from this machine ("Not
+  authorized") — don't rely on it; merge the PR instead. Check a deploy with
+  `gh api repos/RashidNazeer/WurxOS/deployments --jq '.[0:3][]|{environment,created_at,sha}'`.
+- **Supabase** project ref `xoaaidgvblondjpvxjqp`. Highest migration file: **429**.
 - **Stack**: Vite + React 19 + Supabase (Postgres/RLS/Realtime/Edge Functions) +
-  TanStack Query + Vercel. Money is PKR; brand GMV figures are per-brand currency
-  ($ mostly, £ for Longevity Box).
-- **Deploy** = ship the working tree: `npm run build` then
-  `npx vercel --prod --yes`. **Vercel deploys whatever branch is checked out.**
-  Migrations: `supabase db push --include-all`.
+  TanStack Query + Vercel. Money is PKR; brand GMV figures are per-brand currency.
+
+## ⚠ Do these first
+
+1. **Migration 429 is merged but NOT applied to production.**
+   `supabase/migrations/429_weekly_rating_one_score_per_week.sql` makes the
+   monthly checkpoint average per WEEK (an APC under 2+ TLs is rated once per TL
+   meeting, which counted that week twice). Until applied, the weekly popup shows
+   the averaged score but the stored monthly score still double-counts. It was
+   tested in a rolled-back transaction on real data (3 APCs change by ±1 point).
+   It also re-rolls every affected month, so it is safe to apply at any time.
+1b. **Migration 430 + PR "OL removes a flag directly" (`feat/ol-remove-flag`) is
+   OPEN and deliberately NOT merged.** It was written by another Claude session;
+   a rolled-back test on real data passed (short reason refused, non-OL refused,
+   flag deleted, one `flag_removal_log` row, 3 notifications, direct log writes
+   blocked). The UI change removes the old "Request removal" button for OLs, so
+   merging the PR BEFORE applying 430 would leave OLs with a button that errors.
+   Apply 430 first, then merge.
+2. **The migration ledger has gaps.** Production's
+   `supabase_migrations.schema_migrations` does not list 402, 415–418 or 421–427,
+   although the objects from 421–427 ARE live (applied outside the CLI). So
+   `supabase db push --include-all` would try to re-run them. Before using the
+   CLI, run `supabase migration repair --status applied <versions…>` for the
+   ones that are really live, or keep applying files directly (see below) and
+   insert the ledger row yourself (`insert into supabase_migrations.schema_migrations(version,name) …`).
+3. **Rotate secrets** that were handled in plain sight during earlier sessions:
+   the Supabase personal access token (in `.env.production`), and the Euka and
+   Reacher API keys.
+4. **Muhammad Asad Aman's password** was reset in the database by hand on
+   2026-10-30 (the app has no reset flow). Ask him to change it; the app has no
+   change-password screen yet — that is a real gap worth building.
+
+## How to apply a migration (what has actually worked)
+
+The Supabase CLI is not linked on this machine. The path used: POST the SQL to
+`https://api.supabase.com/v1/projects/xoaaidgvblondjpvxjqp/database/query` with
+the PAT from `.env.production` (`SUPABASE_ACCESS_TOKEN`), then insert the ledger
+row. **Test first, inside a single request that ends in `raise exception`** so
+it rolls back and the message carries your before/after snapshot. For RLS tests
+use `set local role authenticated` + `set local request.jwt.claims`. The Claude
+Code auto-mode classifier blocks writing to production unless you explicitly say
+so in the request ("apply 429 to production").
+
+Always check for number collisions before pushing:
+`ls supabase/migrations | cut -c1-3 | sort | uniq -d` (must print nothing).
 
 ---
 
-## What shipped most recently (2026-08-10/11)
+## What shipped since the last handoff (Aug → Nov 2026)
 
-Five commits, all in prod. Each has a long commit message with the reasoning —
-`git log` is the real record; this is the index.
+`git log --merges origin/main` is the real record; this is the index. Newest first.
 
-1. **`ed29887` — Euka: Apothecary linked, Cutler restored.** Apothecary is an
-   own-key Euka brand (secret `EUKA_API_KEY_APOTHECARY`, mig 314). Cutler was
-   broken because a *dead dedicated key* shadowed the working shared one —
-   `eukaKeyForSlug()` prefers `EUKA_API_KEY_<SLUG>` over the shared key, so
-   unsetting the stale secret fixed it. **Lesson: when a brand moves shared↔own,
-   the secret set is the switch; the DB rows barely matter.**
-2. **`25bfbd3` — Euka API drift repaired.** Euka changed their API under us and
-   both failures were SILENT (swallowed by `.catch()`):
-   `/dashboard/top-products-by-video-revenue` was removed (→
-   `products-performance`), and `/data-export` now needs `brand_id` **as well as**
-   `store_id` — and brand_id is what actually *scopes* the rows, so a mismatched
-   pair silently returns another brand's data. The pairing is now stored in
-   `euka_stores.euka_brand_id` (mig 315) and injected server-side.
-   **Their published OpenAPI spec is stale — verify params against the live API.**
-3. **`a28370e` — the Ads Manager role** (mig 316). Replaces the pile of
-   special-cases one person was carried on. `ads_manager_brands` is OL-curated in
-   Settings and does double duty: it's the person's entire brand *visibility*
-   (one clause in `can_view_brand`) AND the brand groups of their incentive plan.
-   Deliberately NOT `brand_assignments`, which means "coordinates this brand" and
-   would have pulled ads managers into reports/checkpoints/video-reviews queries.
-4. **`171a2ac` — GMV-Max achieved is derived, not typed** (mig 317). Per-brand
-   "Total Revenue in GMV Max" items now take their achieved from
-   `brand_monthly_metrics.gmv_achieved` — the figure an APC enters at clock-in —
-   via `source:'gmv_max'`. Third derived source after attendance and ol_brands,
-   same pattern: fill at read time, strip before save, freeze at payout.
-5. **`a3eb026` — PCTLs can read Brand Analytics** for every brand (mig 318),
-   read-only.
+| When | What | Migration |
+|---|---|---|
+| Nov 2 | **OL "Fetch achieved from workbook"** (Incentives → APC tab) + **"Download <last month> salaries" CSV** | – |
+| Nov 1 | One averaged checkpoint score per week for APCs under several TLs | 429 (not applied) |
+| Oct 29 | Amazon Halo "Download all sheets" zip button; Lake City office removed from clock-in choices | – |
+| Oct 28–29 | **APCs across several Team Leads**: teams derived from brand assignments; one leave/WFH request approved by every affected TL | 428 |
+| Oct 27 | Reacher + Euka fixes; lint gate; **performance month lock** + autolock + lock previews | 424–427 |
+| Oct 21–26 | Incentive workbook link (goals read from the OL's Google Sheet), APC incentive options (max 5), brand handler chip, brand goals bulk CSV, Euka checkpoint/dashboard fixes | 422, 423 |
+| Oct 12 | Ex-employees (OL can retire an APC/TL, access cut), Wurx Buddy web search, hide inactive brands | 415–417, 421 |
+| Oct 3–9 | Brand temp cover, glass UI polish, approvals mark-read, Boss acknowledgements, IPC sees paid-collab brands | 414, 418–420 |
+
+### The three features from the last two sessions, in detail
+
+**APCs across several TLs (mig 428)** — see the section in `CLAUDE.md`. The
+`apc_team_leads` view derives membership; nothing is stored, so nothing drifts.
+Leave/WFH for an APC whose live brands span 2+ TLs gets one
+`leave_request_approvers` row per TL (snapshot at submit, never recalculated);
+`leave_decide` flips the request once when ALL approve, any rejection is final,
+the Boss can always decide. Never derive a brand's TL from the APC's `reports_to`.
+
+**Incentive workbook, goal vs achieved** — the OL's Google Sheet
+(`app_config.incentive_workbook_url`) has one tab per brand. Each month is a
+column PAIR: LEFT = goal (`Oct 26`), RIGHT = achieved (`Oct 1-31`).
+`src/lib/incentiveWorkbook.js` reads goals; `src/lib/incentiveAchieved.js` reads
+achieved; `src/lib/incentiveWorkbookLoad.js` fetches + parses (shared by both
+modals); `FetchAchievedModal.jsx` previews and writes. Video Authorized
+achieved = authorized count ÷ Total Videos Made × 100. A missing/blank achieved
+cell is skipped, never zeroed, so a sheet that gains its next column is picked up
+on the next click (every click re-downloads the sheet, bypassing Google's cache,
+and re-reads the plans; Google itself takes ~5 min to publish an edit). A line
+made by hand with no workbook marker is matched by name when its text is exactly
+an option's name and it has a brand (this is how Apothecary's lines fill).
+Attendance / OL-brand lines are never filled from the sheet. **GMV Max lines
+derive from `brand_monthly_metrics.gmv_achieved`** (what the APC enters at
+clock-in), so for a CLOSED month the preview offers a separate "Brand GMV Max
+figure" row that writes the sheet's number to that one source
+(`saveBrandGmvAchieved`, partial upsert, OL/Boss via `bmm_all`); for the open
+month those lines are skipped because the daily clock-in would overwrite it. The
+preview lists skipped brands grouped with the reason. Paid plans are skipped; verified plans are
+flagged but **editing one does not reset its verification** — open decision.
+Reality check: against the Oct downloaded copy only 3 of 90 tabs could produce an
+October Video Authorized figure (the rest lack a header row, an achieved column,
+or have year-less headers). The preview lists each skip with its reason; fixing
+the sheet's headers is the lever. Tests: `node scripts/test-incentive-achieved.mjs`
+(44) and `node scripts/incentive-workbook-tests.mjs` (23).
+Known pre-existing quirks left alone: the target resolver assumes the current
+calendar year for year-less headers (7 tabs likely a year off) and reads
+"March 1 - March 31" as 2031.
+
+**Salary CSV** — `src/lib/salaryCsv.js`. Calculated salary = basic + earned
+incentives + earned bonuses from the stored plan of the previous Karachi month
+(`previousMonth()`); Boss excluded; people with no plan listed with a note;
+unverified plans marked. UTF-8 BOM so Excel reads it.
 
 ---
 
 ## Invariants you can break by accident
 
-- **Derived incentive items** (`source` = `attendance` | `ol_brands` |
-  `gmv_max`) are filled at READ time and must never be persisted. Every save
-  path goes through `stripAttendanceForSave`; every read path through
-  `applyDerivedAutofill`. **Any new derived source must be frozen in BOTH
-  `inc_clear_payout` AND `inc_reset_and_roll`** — missing the second one
-  underpaid someone once (mig 294).
-- `gmv_max` differs from the other two: it derives **achievedValue only**.
-  Completion stays a human tick, so no month-closed money gate.
-- **Incentive item brand links** (`brandId`) must survive every
-  save/reconstruct path. Dropping one is a recurring bug class.
-- **Editing your own incentive = Achieved only, never Target.** Managers set
-  targets.
-- **Never hard-delete a user** from the Supabase dashboard — `profiles.id →
-  auth.users` cascades. Use the `delete-user` edge function (soft delete).
-- **Adding a role**: the `profiles.role` CHECK was created inline in mig 001, so
-  its name is Postgres-chosen — drop it by *shape*, not name (see mig 316). And
-  `getMenuForRole` falls back to the APC menu for an unknown role, so a new role
-  without a `MENUS` entry silently inherits the APC sidebar.
+- **Derived incentive items** (`source` = `attendance` | `ol_brands` | `gmv_max`)
+  are filled at READ time and never persisted. Saves go through
+  `stripAttendanceForSave`; reads through `applyDerivedAutofill`. Any new derived
+  source must be frozen in BOTH `inc_clear_payout` AND `inc_reset_and_roll`.
+- **A composite performance score is withheld until the OL verifies the person's
+  incentive plan** (mig 257, Boss decision 2026-07-15, anti self-inflation:
+  `level = 'pending_verification'`). A TL's "Team score" is the average of their
+  APCs' composites, so while APC plans are unverified every TL's team score reads
+  "—". This is by design, not a bug. Verifying plans is what unblocks it.
+- **Month-end locks** (mig 424–426): closed months are snapshotted in
+  `performance_month_snapshots`; recomputes must not rewrite a locked month.
+- **Incentive item brand links** (`brandId`) must survive every save/reconstruct
+  path. **Editing your own incentive = Achieved only, never Target.**
+- **Never hard-delete a user** from the Supabase dashboard — use the
+  `delete-user` edge function (soft delete). **Adding a role**: drop the
+  `profiles.role` CHECK by shape, not name (mig 316), and give it a `MENUS` entry.
+- **Triggers don't fire retroactively** — ship a backfill with any invariant trigger.
+- **Never reuse a migration number**, even on another branch (CLAUDE.md).
+- **Never a bare `window.location.reload()`** — `requestAppReload()` only.
 
 ---
 
-## Local environment gotchas
+## Environment (current machine)
 
-- **`.env.local` is NOT in the repo** (correctly). You need it before
-  `npm run dev` works — at minimum `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_ANON_KEY`. Copy it from the other machine over a private
-  channel. It also holds the service-role key used by `scripts/*.mjs` and the
-  Euka API keys.
-- **Toolchain PATH**: on the Windows box, `git` / `node` / `supabase` / `vercel`
-  are installed and on the persistent PATH, but a running VS Code session holds
-  a stale PATH snapshot. Inject per command:
-  `$env:Path = "C:\Program Files\Git\cmd;C:\Program Files\nodejs;$env:USERPROFILE\scoop\shims;$env:APPDATA\npm;" + $env:Path`
-- **Supabase + Vercel CLI auth** are per-user and interactive — run
-  `supabase login` and `vercel login` once on the new machine, then
-  `supabase link --project-ref xoaaidgvblondjpvxjqp` and `vercel link`
-  (project `wurxos`, NOT `wurxossupabase`).
-- **Flaky ISP**: transient `fetch failed` / connect timeouts are normal. Retry
-  before diagnosing.
+- Project path `C:\Users\Umar Wurx\Wurx Stuff\Wurx Stuff\WurxOS`. Claude's
+  per-project memory lives OUTSIDE the repo at
+  `C:\Users\Umar Wurx\.claude\projects\c--Users-Umar-Wurx-Wurx-Stuff-Wurx-Stuff-WurxOS\memory\`
+  (the folder name is the project path with every non-alphanumeric character
+  replaced by `-`). It is not in git: copy it to carry it over; cloning to the
+  same path makes the name match. It holds payroll/personnel detail, so it is
+  deliberately uncommitted.
+- Env files (never committed): `.env.local` (anon key + service role for
+  `scripts/*.mjs`), `.env.production` (holds the Supabase PAT). Copy over a private channel.
+- Local-only, untracked, on purpose: `DEPENDENCIES.md`, `GMV MAX Intel/`, and local
+  edits to `.claude/settings.local.json`.
+- Flaky ISP: transient `fetch failed` / timeouts are normal. Retry before diagnosing.
+- Verification before a PR: `npx eslint src` (0 errors; ~147 pre-existing warnings),
+  `npm test` (503 pass; a "failing tests" block listing `GAP:` todo tests is pre-existing),
+  `npm run build`.
 
 ---
 
-## Open items (nothing is blocked, these are choices)
+## Open items (choices, not blockers)
 
-- **`IncentiveForm` doesn't prefill Basic Salary** from
-  `employee_compensation` when an OL creates a plan by hand, so hand-made plans
-  start at 0. Mig 199 set the invariant but only enforces it on a salary change
-  and at rollover. Offered, not shipped.
-- **Three APCs have no `employee_compensation` row at all**, so their salary
-  snapshots are 0 with nothing to sync from.
-- **`EUKA_SHARED_BRANDS` has two dead entries** (`louisveillejerky`,
-  `transformation`) — those stores no longer exist on the shared Euka account.
-  They show as dead options in the Boss brand dropdown.
-- **Ads Managers are absent from the Team Hierarchy org chart** (it builds
-  OL → TL/PCTL → APC/IPC) and from `/performance` (role filter). Both are
-  intentional today; both are additive if wanted.
-- The older running log of investigated issues is `Pending fixes -IMP.md`.
+- **Apply migration 429** (above) and repair the ledger gaps.
+- **Verification reset**: should editing a verified incentive plan reset
+  `verified`? Today it doesn't, and nothing server-side blocks the edit.
+- **Team score before verification**: decide whether TLs should get a team score
+  from APC performance pillars while composites are withheld (policy change).
+- **Romail's Oct 26–27** was recorded as approved leave (1 paid, 1 unpaid
+  by quota) after a Boss approval given outside the app; flip via the Boss paid
+  override if wrong. Row id `a19d5234-a50e-43ca-8f10-b035c2f8bc7f`.
+- **Stale tab clocking in at Lake City**: the DB check still allows `lakecity`
+  (history needs it); only the UI choices were removed.
+- **No change-password / forgot-password screen** exists.
+- **Workbook tabs** need header fixes before most brands can fetch achieved
+  (see above). Year-less / "March 1 - March 31" resolver quirks are unfixed.
+- Older items still open from the previous handoff: `IncentiveForm` doesn't
+  prefill basic salary from `employee_compensation`; three APCs have no
+  `employee_compensation` row; two dead `EUKA_SHARED_BRANDS` entries; Ads
+  Managers absent from the org chart and `/performance`. The longer running log
+  of investigated issues is `Pending fixes -IMP.md`; mobile work is in
+  `PENDING_FEATURES.md`.
+- Unmerged old branches on origin (`chore/merge-all-local`, `feat/owner-decisions`,
+  etc.) were not touched; check before deleting.
 
 ---
 
@@ -128,28 +205,12 @@ Five commits, all in prod. Each has a long commit message with the reasoning —
 
 | What | Where |
 |---|---|
-| App code | `src/` — pages in `src/pages/`, shared UI in `src/components/`, data access in `src/lib/*Api.js` |
-| Incentives (the most intricate area) | `src/components/incentives/` + `src/lib/incentivesApi.js` |
+| App code | `src/` — pages `src/pages/`, shared UI `src/components/`, data access `src/lib/*Api.js` |
+| Incentives (the most intricate area) | `src/components/incentives/` + `src/lib/incentivesApi.js`, `incentiveWorkbook*.js`, `incentiveAchieved.js`, `salaryCsv.js` |
+| Performance | `src/components/performance/`, `src/lib/weeklyRatingsApi.js`, `performanceApi.js`, `tlPerfApi.js` |
+| Team / leave | `src/lib/teamApi.js`, `brandsApi.js`, `leaveApi.js`, `src/components/leave/` |
 | Migrations | `supabase/migrations/NNN_name.sql` — read the LATEST one touching a policy; early ones get superseded |
 | Edge functions | `supabase/functions/*/index.ts` (Deno) — deploy individually |
-| One-off / parity scripts | `scripts/*.mjs`, `migration/*.mjs` (read `.env.local` for a service-role client) |
+| Scripts | `scripts/*.mjs`, `migration/*.mjs` |
 | Design tokens | `src/styles/tokens.css` — never hardcode hex |
-| Project memories (partial, in-repo) | `.claude/memory/` |
-
----
-
-## The context that does NOT travel with a git clone
-
-Claude Code keeps per-project memories **outside** the repo, at
-`C:\Users\<you>\.claude\projects\<project-path-mangled>\memory\`. On the origin
-machine that is `d--Milestone-WurxOS-V2` and it holds **~62 files** — far more
-than the 6 committed under `.claude/memory/`. A clone does **not** bring them.
-
-To carry them over: copy that whole `memory` folder into the same location on
-the new machine. The folder name is the project directory path with every
-non-alphanumeric character replaced by `-`, so **cloning to the same path
-(`d:\Milestone\WurxOS V2\Wurxos-V2`, opened with the parent as the working
-directory) makes the name match exactly** and everything just resolves.
-
-They are deliberately not committed: they contain internal personnel and payroll
-detail, and this repo is shared with outside collaborators.
+| Project memories (partial, in repo) | `.claude/memory/` |
