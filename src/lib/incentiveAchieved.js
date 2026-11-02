@@ -79,7 +79,8 @@ function achievedColumn(sheet, monthKey) {
  * Returns { value, unit, detail } or { unavailable: '<why>' }.
  */
 export function getAchieved(sheet, optionKey, monthKey) {
-  if (!sheet || sheet.missing || !sheet.ok) return { unavailable: sheet?.reason || 'sheet could not be read' };
+  if (!sheet || sheet.missing) return { unavailable: 'this brand has no tab in the workbook (the tab name must match the brand name in WurxOS exactly)' };
+  if (!sheet.ok) return { unavailable: sheet.reason || 'this brand\'s tab could not be read' };
   const opt = OPTION_BY_KEY[optionKey];
   if (!opt) return { unavailable: `unknown option "${optionKey}"` };
 

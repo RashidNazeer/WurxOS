@@ -96,6 +96,19 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
     for (const c of result?.changes || []) m.set(c.userId, [...(m.get(c.userId) || []), c]);
     return m;
   }, [result]);
+  // Skips grouped by brand: brand -> reason -> { options, users }, so one broken
+  // tab reads as one line instead of one line per APC per option.
+  const skippedByBrand = useMemo(() => {
+    const brands = new Map(); const plansSkipped = [];
+    for (const s of result?.skipped || []) {
+      if (!s.brandName) { plansSkipped.push(s); continue; }
+      const reasons = brands.get(s.brandName) || new Map();
+      const e = reasons.get(s.reason) || { options: new Set(), users: new Set() };
+      e.options.add(s.label); e.users.add(s.userName);
+      reasons.set(s.reason, e); brands.set(s.brandName, reasons);
+    }
+    return { brands: [...brands].sort((a, b) => a[0].localeCompare(b[0])), plansSkipped };
+  }, [result]);
   const willComplete = picked.filter((c) => c.completedAfter && !c.completedBefore).length;
   const willUncomplete = picked.filter((c) => !c.completedAfter && c.completedBefore).length;
   const hasPlanLines = !!plans?.some((p) => [...p.incentives, ...p.bonuses].some((i) => i?.wbOption && i.brandId));
@@ -207,7 +220,7 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
                     ? `No APC plan for ${monthLabel} has workbook-linked lines, so there is nothing to fetch.`
                     : noColumn
                       ? `The workbook has no achieved column for ${monthLabel} yet, so no figures can be fetched. Try again once the month's column is filled in.`
-                      : 'Nothing to update: every workbook-linked line already matches the workbook (or could not be read — see Skipped below).'}
+                      : 'Nothing to update: every workbook-linked line already matches the workbook (or could not be read — see "Not filled" below).'}
                 </div>
               )}
 
@@ -246,13 +259,26 @@ export default function FetchAchievedModal({ users, month, monthLabel, onApplied
               })}
 
               {result.skipped.length > 0 && (
-                <details>
-                  <summary style={{ fontSize: 12.5, color: 'var(--text-muted)', cursor: 'pointer' }}>Skipped ({result.skipped.length})</summary>
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {result.skipped.map((s, i) => (
-                      <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>{s.userName}</strong>
-                        {s.brandName ? ` · ${s.brandName}` : ''} · {s.label}: {s.reason}
+                <details open={skippedByBrand.brands.length <= 12}>
+                  <summary style={{ fontSize: 12.5, color: 'var(--warning-text)', cursor: 'pointer', fontWeight: 600 }}>
+                    Not filled: {skippedByBrand.brands.length} brand{skippedByBrand.brands.length === 1 ? '' : 's'}
+                    {skippedByBrand.plansSkipped.length ? ` + ${skippedByBrand.plansSkipped.length} plan${skippedByBrand.plansSkipped.length === 1 ? '' : 's'}` : ''}
+                  </summary>
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {skippedByBrand.brands.map(([brand, reasons]) => (
+                      <div key={brand} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        <strong style={{ color: 'var(--text-primary)' }}>{brand}</strong>
+                        {[...reasons].map(([reason, e]) => (
+                          <div key={reason} style={{ paddingLeft: 10 }}>
+                            {reason}
+                            <span style={{ opacity: 0.8 }}> — {[...e.options].join(', ')} ({[...e.users].join(', ')})</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {skippedByBrand.plansSkipped.map((s, i) => (
+                      <div key={`p${i}`} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        <strong style={{ color: 'var(--text-primary)' }}>{s.userName}</strong>: {s.reason}
                       </div>
                     ))}
                   </div>
