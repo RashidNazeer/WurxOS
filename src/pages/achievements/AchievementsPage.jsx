@@ -87,13 +87,17 @@ export default function AchievementsPage() {
   );
 }
 
+// The standard reward per award (mig 433 stores it; this covers the moments before it is applied).
+const FALLBACK_REWARD = { apc_of_the_month: 10000, tl_of_the_month: 15000 };
+
 function AchievementCard({ type, month, record, onChanged }) {
+  const standard = type.default_reward ?? FALLBACK_REWARD[type.key] ?? '';
   const announced = record?.status === 'announced';
   const seen = record?.status === 'acknowledged';
   const locked = announced || seen;
 
   const [winnerId, setWinnerId] = useState(record?.winner_id || '');
-  const [reward, setReward] = useState(record?.reward_amount ?? '');
+  const [reward, setReward] = useState(record ? record.reward_amount : standard);
   const [msg, setMsg] = useState(record?.message || '');
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -102,10 +106,10 @@ function AchievementCard({ type, month, record, onChanged }) {
   // underneath us; the form must follow it rather than keep stale text.
   useEffect(() => {
     setWinnerId(record?.winner_id || '');
-    setReward(record?.reward_amount ?? '');
+    setReward(record ? record.reward_amount : standard);
     setMsg(record?.message || '');
     setErr('');
-  }, [record?.id, record?.status, record?.winner_id, record?.reward_amount, record?.message]);
+  }, [record?.id, record?.status, record?.winner_id, record?.reward_amount, record?.message, standard]);
 
   const { data: candidates = [] } = useQuery({
     queryKey: ['achievement-candidates', type.key, month],
@@ -189,7 +193,7 @@ function AchievementCard({ type, month, record, onChanged }) {
 
       {/* ── Reward ─────────────────────────────────────────────────── */}
       <div>
-        <FieldLabel>Reward (PKR)</FieldLabel>
+        <FieldLabel>Reward (PKR){standard !== '' && !locked ? ` — standard ${formatPKR(standard)}` : ''}</FieldLabel>
         {locked ? (
           <div style={{ fontWeight: 700, fontSize: 14 }}>
             {formatPKR(record?.reward_amount || 0)}
@@ -201,7 +205,7 @@ function AchievementCard({ type, month, record, onChanged }) {
           </div>
         ) : (
           <input type="number" min="0" step="500" className="wx-input" style={{ width: '100%' }}
-            value={reward} placeholder="e.g. 10000"
+            value={reward} placeholder={`Standard: ${standard}`}
             onChange={(e) => setReward(e.target.value)}
             onBlur={() => saveWinner(winnerId || null, reward)}
             disabled={busy === 'winner'} />
