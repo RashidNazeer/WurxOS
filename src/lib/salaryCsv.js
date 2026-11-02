@@ -73,6 +73,8 @@ export async function downloadSalaryCsv(month = previousMonth()) {
   if (error) throw new Error(error.message);
   const records = {};
   for (const r of recs) if (r.userId && ROLES.includes(r.userRole)) records[r.userId] = r;
+  if (!profs?.length) throw new Error('No employees were returned. You may not have permission to read the team list.');
+  if (!recs.length) throw new Error(`There are no incentive plans for ${month}, so there are no salaries to calculate. Nothing was downloaded.`);
   const people = (profs || []).map((p) => ({ id: p.id, name: p.display_name, role: p.role, email: p.email }));
   const csv = buildSalaryCsv({ month, people, records });
 

@@ -10,7 +10,13 @@ export async function fetchWorkbookBuffer(url) {
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`The sheet could not be fetched (HTTP ${res.status}). Check it is still published to the web.`);
-    return await res.arrayBuffer();
+    const buf = await res.arrayBuffer();
+    // An unpublished or private sheet answers 200 with a Google sign-in PAGE; an xlsx is a zip ("PK").
+    const head = new Uint8Array(buf.slice(0, 2));
+    if (head[0] !== 0x50 || head[1] !== 0x4b) {
+      throw new Error("The link returned a web page, not a spreadsheet. In Google Sheets use File > Share > Publish to web, publish the ENTIRE document, then save the link again — or upload the file below.");
+    }
+    return buf;
   } catch (err) {
     throw /Failed to fetch|NetworkError/i.test(err?.message || '')
       ? new Error('Could not reach the sheet. It may no longer be published to the web — republish it, or upload the file below.')
@@ -25,7 +31,9 @@ export async function fetchWorkbookBuffer(url) {
  */
 export async function parseWorkbookForBrands(buf, brands) {
   const XLSX = await import('xlsx');
-  const wb = XLSX.read(buf, { type: 'array' });
+  let wb;
+  try { wb = XLSX.read(buf, { type: 'array' }); }
+  catch { throw new Error('That file could not be read as a spreadsheet. Upload an .xlsx file.'); }
   if (!wb.SheetNames?.length) throw new Error('That workbook has no sheets.');
 
   const byCanon = new Map(wb.SheetNames.map((n) => [canon(n), n]));
@@ -39,7 +47,7 @@ export async function parseWorkbookForBrands(buf, brands) {
     found++;
   }
   if (!found) {
-    throw new Error(`None of this person's brands has a tab in that workbook. Tab names must match the brand names in WurxOS — run scripts/rename-google-sheet-tabs.gs on the sheet if they do not.`);
+    throw new Error('None of the brands on these plans has a tab in that workbook. Tab names must match the brand names in WurxOS — run scripts/rename-google-sheet-tabs.gs on the sheet if they do not.');
   }
   return map;
 }
