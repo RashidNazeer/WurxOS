@@ -27,7 +27,8 @@
 -- (the existing Boss setting). Gemini: gemini_provider_sources ∩ free_provider_sources, default
 -- WITHOUT report and incentive (Google's unpaid tier may use submitted content to improve its
 -- products; client report data stays off it). 'incentive' is on no list.
--- ai_search: a query vector tagged with another model than the space's is ignored, never compared.
+-- ai_search: a query vector is used only if it is labelled with the space's own model; an unlabelled or
+-- other-model vector is ignored, never compared (the old assistant, which sends no label, is safely keyword-only).
 -- ============================================================
 
 -- ── settings ─────────────────────────────────────────────────────────────
@@ -449,8 +450,8 @@ declare
   v_model text := public.ai_embed_model();
   v_amodel text := public.ai_embed_model_alt();
   v_types text[] := public.ai_source_types();
-  W_SEM constant float := 3.0;   -- RRF weights: measured on our data (wurx-buddy/benchmark)
-  W_ALT constant float := 2.0;
+  W_SEM constant float := 20.0;   -- RRF weights (benchmark 2026-11-03: dense alone recall@5 0.908; dense:keywords 3:1 gave 0.700, 20:1 0.900)
+  W_ALT constant float := 20.0;
   W_KW  constant float := 1.0;
   v_known text[] := array['kb_article', 'ai_doc', 'app_guide', 'report', 'tts_article', 'incentive'];
   v_docs  uuid[];
@@ -462,9 +463,10 @@ declare
   v_sort  text;
   v_company boolean; v_reports boolean; v_tiktok boolean; v_incent boolean; v_other boolean;
 begin
-  -- NEVER compare vectors of different models: a query vector made by another model than the space holds is ignored.
-  if p_query_model is not null and p_query_model is distinct from v_model then p_query_embedding := null; end if;
-  if p_query_model_alt is not null and p_query_model_alt is distinct from v_amodel then p_query_embedding_alt := null; end if;
+  -- NEVER compare vectors of different models. A query vector counts only if it says which model made it AND that
+  -- is the space's model: an unlabelled one (an old caller) or another model's is ignored, and that arm falls back to keywords.
+  if p_query_embedding is not null and p_query_model is distinct from v_model then p_query_embedding := null; end if;
+  if p_query_embedding_alt is not null and p_query_model_alt is distinct from v_amodel then p_query_embedding_alt := null; end if;
   v_uid := case when auth.role() = 'service_role' and p_as_user is not null then p_as_user else auth.uid() end;
   if v_uid is null then return; end if;
 
@@ -646,18 +648,22 @@ declare
   v_main   text[] := public.ai_space_sources('main');
   v_alt    text[] := public.ai_space_sources('alt');
   v_always boolean := coalesce((select c.embed_alt_always from public.ai_assistant_config c where c.id = 1), true);
+  -- hoisted: these are SECURITY DEFINER functions, so inside the EXISTS they would run once per chunk
+  v_ready_m boolean := public.ai_vector_ready('main');
+  v_ready_a boolean := public.ai_vector_ready('alt') and public.ai_alt_budget() > 0;
+  v_allowed boolean := public.ai_vector_backfill_allowed();
 begin
   -- Ingestion rests in the evening (mig 407): no worker is woken.
   if public.ai_ingest_quiet_now() then return; end if;
   if not exists (select 1 from public.ai_ingest_queue
                   where (status = 'pending' and not_before <= now())
                      or (status = 'processing' and locked_at < now() - interval '10 minutes'))
-     and not (public.ai_vector_backfill_allowed()
+     and not (v_allowed
               and exists (select 1 from public.ai_chunks c
                             join public.ai_documents d on d.id = c.document_id and d.status = 'active'
-                           where (c.embedding is null and c.source_type = any(v_main) and public.ai_vector_ready('main'))
+                           where (c.embedding is null and c.source_type = any(v_main) and v_ready_m)
                               or (c.embedding_alt is null and c.source_type = any(v_alt) and (c.vector_pending or v_always)
-                                  and public.ai_vector_ready('alt') and public.ai_alt_budget() > 0))) then
+                                  and v_ready_a))) then
     return;
   end if;
   select value into v_url    from public.app_config where key = 'ai_ingest_url';

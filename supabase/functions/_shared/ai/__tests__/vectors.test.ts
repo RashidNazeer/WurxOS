@@ -193,22 +193,31 @@ test('chainEmbedder: after the window the provider is asked again (it never stay
   _resetEmbedDown();
 });
 
-test('searchIndex: asks both spaces in parallel, passes each vector with its label; one down → the other still searches; both down → keywords', async () => {
+test('searchIndex: asks NVIDIA first and Gemini only if that fails (each vector labelled); both down → keywords', async () => {
   const calls: any[] = [];
   const rpc = async (fn: string, args: any) => { calls.push([fn, args]); return []; };
+  let altAsked = 0;
   const main = async () => tagVector(vec(1), MODEL_LABEL.nvidia);
-  const alt = async () => tagVector(vec(2), MODEL_LABEL.gemini);
+  const alt = async () => { altAsked++; return tagVector(vec(2), MODEL_LABEL.gemini); };
   const r1 = await searchIndex('company', 'apply for leave', {}, { rpc, embed: main, embedAlt: alt });
   const a1 = calls.at(-1)[1];
-  assert.deepEqual([a1.p_query_model, a1.p_query_model_alt, a1.p_query_embedding !== null, a1.p_query_embedding_alt !== undefined], [MODEL_LABEL.nvidia, MODEL_LABEL.gemini, true, true]);
+  assert.deepEqual([a1.p_query_model, a1.p_query_embedding !== null, a1.p_query_embedding_alt, altAsked], [MODEL_LABEL.nvidia, true, undefined, 0]);
   assert.ok(!r1.notes.some((n) => /keyword/.test(n)));
   await searchIndex('company', 'apply for leave', {}, { rpc, embed: async () => { throw new Error('nvidia down'); }, embedAlt: alt });
   const a2 = calls.at(-1)[1];
-  assert.deepEqual([a2.p_query_embedding, a2.p_query_model, a2.p_query_model_alt], [null, undefined, MODEL_LABEL.gemini]);
+  assert.deepEqual([a2.p_query_embedding, a2.p_query_model, a2.p_query_model_alt, altAsked], [null, undefined, MODEL_LABEL.gemini, 1]);
   const r3 = await searchIndex('company', 'apply for leave', {}, { rpc, embed: async () => { throw new Error('x'); }, embedAlt: async () => { throw new Error('y'); } });
   const a3 = calls.at(-1)[1];
   assert.deepEqual([a3.p_query_embedding, a3.p_query_embedding_alt], [null, undefined]);
   assert.ok(r3.notes.some((n) => /keyword/.test(n)));
+});
+
+test('migration 432: an unlabelled or other-model query vector is ignored by ai_search (strict guard); the weights keep keywords a tiebreaker', () => {
+  const sql = fs.readFileSync(path.resolve(AI, '../../../migrations/432_buddy_free_embeddings.sql'), 'utf8');
+  assert.match(sql, /if p_query_embedding is not null and p_query_model is distinct from v_model then p_query_embedding := null/);
+  assert.match(sql, /if p_query_embedding_alt is not null and p_query_model_alt is distinct from v_amodel then p_query_embedding_alt := null/);
+  assert.match(sql, /W_SEM constant float := 20.0;/);
+  assert.match(sql, /W_KW  constant float := 1.0;/);
 });
 
 // ── the worker: spaces, privacy, states ───────────────────────────────────

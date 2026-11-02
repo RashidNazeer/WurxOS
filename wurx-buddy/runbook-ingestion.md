@@ -141,7 +141,7 @@ OpenAI is not used for embeddings. The paid key has had no credits since 2026-10
 | **main** | `ai_chunks.embedding`, label in `embedding_model` | NVIDIA `llama-nemotron-embed-vl-1b-v2` (documents `passage`, questions `query`) | 1536 | The space searches rely on. Takes every type in `free_provider_sources` (including reports). |
 | **second** | `ai_chunks.embedding_alt`, label in `embed_model_alt` | Gemini `gemini-embedding-001` (`RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`), `ai_assistant_config.embed_alt_provider` | 1536 | A safety net for company docs and TikTok articles if NVIDIA is down. |
 
-- **One model per column, never mixed.** `ai_search` filters each arm by the model label, and now also takes `p_query_model` / `p_query_model_alt`: a query vector labelled with another model than the space holds is ignored, not compared. Questions are embedded in both spaces in parallel, each by the provider that filled it, and fused with the keyword arm (RRF weights 3 : 2 : 1 for main : second : keywords, measured; see the benchmark below).
+- **One model per column, never mixed.** `ai_search` filters each arm by the model label, and now also takes `p_query_model` / `p_query_model_alt`: a query vector that is unlabelled (an old caller) or labelled with another model than the space holds is ignored, not compared. A question is embedded by NVIDIA first; only if that fails is Gemini asked (its allowance is small and its quality was not measured). Each vector is fused with the keyword arm by RRF at 20 : 1 (see the benchmark below).
 - **Privacy is per provider.** NVIDIA sees `free_provider_sources` (the Boss setting). Gemini sees `gemini_provider_sources` AND `free_provider_sources`; the default leaves out `report` and `incentive`, because Google's unpaid tier may use submitted content to improve its products. `incentive` (pay data) is on no list, so those chunks are **keyword-only for good**. The database enforces this in `ai_ingest_write` and `ai_vector_fill`, not only the worker.
 - **Free limits (measured 2026-11-02/03).** NVIDIA: 70 rapid requests drew no 429, a batch of 128 chunks (49k tokens) answers in 3 s; the worker uses batches of 96 and a 1.2 s gap. Gemini: **100 inputs per minute and 1,000 inputs per day, per model** (a 429 says `limit: 1000 … retry in 13h`). A question costs one of them, so the backfill keeps 150 back (`ai_alt_budget()`: at most 850 vectors per rolling 24 h).
 - **Re-embed time (production, 13,339 chunks).** The 8,245 NVIDIA vectors are moved, not re-embedded. About 4,858 chunks wait for NVIDIA: roughly 1.9 M tokens, about 51 requests of 96, so **one or two ticks** (a few minutes, outside quiet hours 18:00-02:00 PKT). Gemini fills about 850 a day: its ~6,000 company and TikTok chunks take **about a week**, and new content after that.
@@ -181,9 +181,20 @@ Old keys are kept (`by_space`, `main_missing`, `alt_filled`, `alt_models`, `pend
 | keywords only (BM25 approximation) | 0.600 | 0.700 | 0.454 |
 | **NVIDIA dense** | **0.908** | **0.975** | **0.789** |
 | NVIDIA + keywords, RRF 1:1 | 0.783 | 0.858 | 0.618 |
-| NVIDIA + keywords, RRF 3:1 | 0.850 | 0.933 | 0.672 |
+| NVIDIA + keywords, RRF 3:1 (through the real `ai_search`, DEV) | 0.700 | 0.883 | 0.515 |
+| NVIDIA + keywords, RRF 20:1 (through the real `ai_search`, DEV) | 0.900 | 0.967 | 0.736 |
+| keywords only, the real Postgres arm (DEV) | 0.208 | 0.300 | 0.152 |
 
-Chunk-level gold (n = 120). Gemini could not be measured: its free tier (1,000 inputs a day per model) was used up before a comparable corpus could be embedded; re-run `scripts/embed-bench` tomorrow on a corpus of at most 800 chunks.
+Chunk-level gold (n = 120); the BM25 rows are an offline approximation, the DEV rows go through the real function. The Postgres keyword arm is weak on natural-language questions (recall@5 0.21 alone), so it is kept as a tiebreaker (weight 1 against 20), not an equal partner; the questions are paraphrases, which favour meaning over words, so exact names and week numbers rely on that tiebreaker. A better keyword arm (for example `websearch_to_tsquery` with an AND-first pass) is the next retrieval gain. Gemini could not be measured: its free tier (1,000 inputs a day per model) was used up before a comparable corpus could be embedded; re-run `scripts/embed-bench` tomorrow on a corpus of at most 800 chunks.
+
+### Rollout order (production)
+
+1. Blank `app_config.ai_ingest_url` (the minute tick then does nothing).
+2. Apply 432 during quiet hours (18:00-02:00 PKT). It drops and rebuilds the ten HNSW indexes inside one transaction, which holds an exclusive lock on `ai_chunks`: Buddy search and ingest wait for it. DEV took 7-16 s for 2.5k rows; production has 13k rows and 8k vectors to index, so expect a few minutes (an estimate, not measured).
+3. Deploy `ai-ingest` and `assistant` (the new code). Make sure the function secrets `NVIDIA_API_KEY`, `NVIDIA_API_KEY_2` and `GEMINI_API_KEY` are set on `ai-ingest`.
+4. Restore `ai_ingest_url`.
+
+If the order is broken: the OLD `ai-ingest` on the new database refuses to run (`pipeline mismatch`, it embeds nothing, no harm). The OLD `assistant` on the new database sends no model label, so every semantic arm is ignored and search is keyword-only until it is redeployed (no wrong-model comparison). The NEW functions on the OLD database fail on the missing 12-argument `ai_search`.
 
 ### Operations
 

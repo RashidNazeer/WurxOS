@@ -33,7 +33,7 @@ import { ASSISTANT, devDbUrl, readEnv, SSL, stripBom } from './dev-env.mjs';
 import { DEFAULT_CONFIG, PIPELINE_VERSION } from '../../supabase/functions/_shared/ai/config.ts';
 import { pgRpc } from '../../supabase/functions/_shared/ai/ingest/db.ts';
 import { importArticles } from '../../supabase/functions/_shared/ai/ingest/ttsImport.ts';
-import { embedOptions, embedWithKeys } from '../../supabase/functions/_shared/ai/embedder.ts';
+import { embedOptions, embedWithKeys, MODEL_LABEL } from '../../supabase/functions/_shared/ai/embedder.ts';
 import { providerEmbedder, runWorker } from '../../supabase/functions/_shared/ai/ingest/worker.ts';
 
 const MODEL = DEFAULT_CONFIG.EMBED_MODEL;
@@ -441,7 +441,7 @@ try {
     await c.query('savepoint real');
     await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: ppl.boss, role: 'authenticated' })]);
     await c.query('set local role authenticated');
-    const hits = await q(`select source_id from public.ai_search($1::extensions.vector, null, array['tts_article'], null, null, null, 10, null) where source_id like 'qa-real-%'`, [vecLit(qvec)]);
+    const hits = await q(`select source_id from public.ai_search($1::extensions.vector, null, array['tts_article'], null, null, null, 10, null, null, null, $2, null) where source_id like 'qa-real-%'`, [vecLit(qvec), MODEL_LABEL.nvidia]);
     await c.query('rollback to savepoint real');
     check('real embedder: semantic search ranks the refund article first', hits[0]?.source_id === 'qa-real-1', hits.map((h) => h.source_id).join(','));
   }

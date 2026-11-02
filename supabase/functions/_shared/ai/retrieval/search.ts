@@ -248,13 +248,16 @@ export async function searchIndex(index: IndexName, query: string, filters: Sear
   const weeks = isReports ? [filters.weekNumber ?? []].flat().filter((w) => Number.isInteger(w) && w > 0) : [];
   const keywordText = [q, ...extra, ...weeks.map((w) => `week ${w}`)].join(' ');
 
-  // The question is embedded in EVERY vector space that has document vectors, each by the provider that filled it
-  // (main: NVIDIA, second: Gemini), in parallel. One provider down leaves the other serving; both down, keywords.
-  // Each vector is labelled with its model and ai_search ignores a label that is not the space's model.
-  const [embedding, embeddingAlt] = await Promise.all([
-    Promise.resolve().then(() => deps.embed(q)).catch(() => null),
-    deps.embedAlt ? Promise.resolve().then(() => deps.embedAlt!(q)).catch(() => null) : Promise.resolve(null),
-  ]);
+  // The question is embedded in the MAIN space (NVIDIA, the one with the full corpus). Only if that fails is the second
+  // space (Gemini) asked: it is a safety net with a small free allowance (1,000 a day, shared with the backfill) and
+  // its retrieval quality is not measured. Either way the vector carries its model label and ai_search compares it only
+  // with that model's chunks. Neither available: keywords only.
+  let embedding: number[] | null = null;
+  try { embedding = await deps.embed(q); } catch { embedding = null; }
+  let embeddingAlt: number[] | null = null;
+  if (!embedding && deps.embedAlt) {
+    try { embeddingAlt = await deps.embedAlt(q); } catch { embeddingAlt = null; }
+  }
   if (!embedding && !embeddingAlt) notes.push('embedding unavailable: keyword search only');
   const labelMain = embedding ? vectorModel(embedding) : null;
   const labelAlt = embeddingAlt ? vectorModel(embeddingAlt) : null;

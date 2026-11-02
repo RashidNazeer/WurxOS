@@ -88,11 +88,11 @@ async function guard() {
     return rows[0].n;
   };
   const right = await run(MODEL_LABEL.nvidia), wrong = await run('gemini:gemini-embedding-001'), legacy = await run(null);
-  console.log(`label guard: matching label → ${right} rows; another model's label → ${wrong} rows (ignored); no label → ${legacy} rows`);
+  console.log(`label guard: matching label → ${right} rows; another model's label → ${wrong} rows (ignored); no label → ${legacy} rows (ignored: old callers are keyword-only, never mixed)`);
 }
 
 await snapshot('BEFORE (production-shaped)');
-if (!has('apply') && !has('worker')) {
+if (!has('apply') && !has('worker') && !has('retrieval')) {
   await retrieval('before: question vector against the second space only (the only working one)', false, true);
 }
 
@@ -115,6 +115,11 @@ if (has('apply')) {
   const before = await sig();
   await c.query('begin'); await c.query(sql); const after = await sig(); await c.query('rollback');
   console.log(`idempotent: second run leaves the data ${before === after ? 'IDENTICAL' : 'CHANGED (BUG)'}`);
+  await guard();
+}
+
+if (has('retrieval')) {
+  await retrieval('after: NVIDIA question vector against the MAIN space (complete)', true, false);
   await guard();
 }
 
