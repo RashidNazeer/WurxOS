@@ -11,9 +11,10 @@ import {
 } from '../../lib/buddyApi';
 import {
   ALL_ROLES, ALWAYS_ROLES, BUDDY_GREETING, greetingIsDefault, nextAllowedRoles,
-  FALLBACK_MAX, DEFAULT_SLOT_META, keySlotMeta, chainAdd, chainMove, chainRemove, creditsExhausted, fmtUsd, lastChecked,
+  FALLBACK_MAX, DEFAULT_SLOT_META, keySlotMeta, chainAdd, chainMove, chainRemove, creditsExhausted, FREE_TIER_NOTE, fmtUsd, lastChecked,
   modelLabel, modelOptions, optionKey, parseOptionKey, allOptions, filterOptions, slotLabel,
-  chainEntryStatus, vectorsByModel, ingestProgress, ingestRing, quietHours, hhmm, freeSourcesValue, toggleInList, fmtCount,
+  chainEntryStatus, vectorsByModel, ingestProgress, ingestRing, quietHours, hhmm, freeSourcesValue, geminiSourcesValue, toggleInList, fmtCount,
+  embeddingSpaces, keywordOnlyInfo, NEVER_FREE_SOURCES,
   ROLE_MODEL_ROLES, roleLabel, normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups,
   WEB_MAX_RESULTS_RANGE, webProviderLabel, normalizeWebConfig, webProviderRows, webProviderToggle, validateSearxngUrl, webConfigError,
 } from '../../lib/buddyLogic';
@@ -166,8 +167,8 @@ function IngestionCard({ readOnly }) {
             sub={quiet?.activeNow && quiet.nextAllowedAt ? `after quiet hours: ${fmt(quiet.nextAllowedAt)}` : null} />
           <Stat label="Queued" value={(q.pending || 0) + (q.processing || 0)} />
           <Stat label="Failed" value={q.failed || 0} warn={(q.failed || 0) > 0} />
-          {/* mig 402: saved and keyword-searchable, still waiting for a main-key vector. */}
-          {stats.vector_pending != null && <Stat label="Waiting for vectors" value={fmtCount(stats.vector_pending)} warn={Number(stats.vector_pending) > 0} />}
+          {/* Saved and keyword-searchable, waiting for a free provider to give them a vector. */}
+          {prog?.vectors && <Stat label="Waiting for a vector" value={fmtCount(prog.vectors.waiting)} />}
         </div>
       )}
       {quiet && <QuietHoursRow readOnly={readOnly} />}
@@ -175,15 +176,8 @@ function IngestionCard({ readOnly }) {
         <Progress label="Reading documents" done={prog.queue.done} total={prog.queue.total} pct={prog.queue.pct}
           note={`${fmtCount(prog.queue.left)} left in the queue`} />
       )}
-      {prog?.vectors && (
-        <Progress label="AI search vectors" done={prog.vectors.ready} total={prog.vectors.total} pct={prog.vectors.pct}
-          note={prog.vectors.pending === 0
-            ? 'Every document is searchable by meaning.'
-            : `${fmtCount(prog.vectors.pending)} waiting for the main key${prog.vectors.withAlt > 0
-              ? ` — ${fmtCount(prog.vectors.withAlt)} of them already searchable through a fallback provider`
-              : ', searchable by keyword in the meantime'}.`} />
-      )}
-      {vectors.length > 0 && (
+      <VectorCoverage stats={stats} quiet={quiet} />
+      {vectors.length > 0 && !stats?.vectors?.spaces && (
         <div className="mt-2">
           <div className="bd-group-label px-0">Vectors by model</div>
           {vectors.map((v) => (
@@ -210,7 +204,53 @@ function IngestionCard({ readOnly }) {
   );
 }
 
-// Ingestion on free providers (mig 402). Each control shows only once its
+// "Searchable by meaning": the progress bar, each search space (Main: NVIDIA,
+// Second: Gemini) and the chunks kept keyword-only on purpose. Exported so it can
+// be rendered with sample stats.
+export function VectorCoverage({ stats, quiet, when = fmt }) {
+  const prog = ingestProgress(stats);
+  const spaces = embeddingSpaces(stats, { when, quietNext: quiet?.nextAllowedAt });
+  const kw = keywordOnlyInfo(stats);
+  if (!prog?.vectors && !spaces && !kw.count) return null;
+  const v = prog?.vectors;
+  return (
+    <>
+      {v && (
+        <Progress label="Searchable by meaning" done={v.ready} total={v.total} pct={v.pct}
+          note={v.waiting === 0
+            ? 'Every document that may be sent to a free provider is searchable by meaning.'
+            : `${fmtCount(v.waiting)} waiting for a free provider. They are searchable by keyword in the meantime.`} />
+      )}
+      {spaces && (
+        <div className="mt-2">
+          <div className="bd-group-label px-0">Search spaces</div>
+          {spaces.map((s) => (
+            <div key={s.key} className="mb-2" data-space={s.key}>
+              <div className="bd-row-line">
+                <span className="fw-semibold">{s.title}: {s.provider}</span>
+                <code className="text-truncate ms-2">{s.model}</code>
+                <span className="ms-auto">{s.statusText}</span>
+              </div>
+              <div className="bd-card-sub">
+                {fmtCount(s.filled)} chunks have a vector · {fmtCount(s.waiting)} waiting
+                {s.notAllowed > 0 && ` · ${fmtCount(s.notAllowed)} kept off ${s.provider} by the privacy rules`}
+              </div>
+              {s.detail && <div className="bd-card-sub">{s.detail}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+      {kw.count > 0 && (
+        <div className="bd-card-sub mt-1">
+          <i className="bi bi-lock" aria-hidden="true" /> Keyword search only, by design (pay data is never sent to a free provider): {fmtCount(kw.count)} chunks
+          {kw.rows.length > 0 && ` (${kw.rows.map((r) => `${r.type} ${fmtCount(r.count)}`).join(', ')})`}.
+        </div>
+      )}
+    </>
+  );
+}
+
+// Ingestion on free providers (mig 402, 432). Each control shows only once its
 // column exists on ai_assistant_config; the Boss edits, developers view.
 function IngestionFallbacks({ readOnly }) {
   const [saved, setSaved] = useState(null);
@@ -218,6 +258,7 @@ function IngestionFallbacks({ readOnly }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const types = INGEST_SOURCES.map(([t]) => t);
+  const sendable = INGEST_SOURCES.filter(([t]) => !NEVER_FREE_SOURCES.includes(t));
 
   useEffect(() => {
     getAiConfig().then((c) => {
@@ -225,6 +266,7 @@ function IngestionFallbacks({ readOnly }) {
       const d = {};
       if ('embed_alt_always' in c) d.embed_alt_always = !!c.embed_alt_always;
       if ('free_provider_sources' in c) d.free_provider_sources = freeSourcesValue(c.free_provider_sources, types);
+      if ('gemini_provider_sources' in c) d.gemini_provider_sources = geminiSourcesValue(c.gemini_provider_sources, types);
       if (Object.keys(d).length) { setSaved(d); setDraft(d); }
     }).catch(() => { /* optional section: nothing to show */ });
   }, []);
@@ -240,7 +282,7 @@ function IngestionFallbacks({ readOnly }) {
 
   return (
     <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-      <h4 className="bd-subhead mt-0">Free providers for ingestion</h4>
+      <h4 className="bd-subhead mt-0">Free providers for search vectors</h4>
       <fieldset disabled={readOnly} className="bd-fieldset">
         <legend className="visually-hidden">Free providers for ingestion</legend>
         {'embed_alt_always' in draft && (
@@ -248,24 +290,44 @@ function IngestionFallbacks({ readOnly }) {
             <input className="form-check-input" type="checkbox" role="switch" id="bd-embed-alt" checked={draft.embed_alt_always}
               onChange={(e) => setDraft({ ...draft, embed_alt_always: e.target.checked })} />
             <label className="form-check-label small" htmlFor="bd-embed-alt">Also build the Gemini search index</label>
-            <div className="bd-card-sub">Keeps a second set of vectors on Gemini, so search still works if OpenAI embeddings are unavailable.</div>
+            <div className="bd-card-sub">Keeps a second set of vectors on Gemini, so search still works if NVIDIA is down or rate-limited. Gemini only receives the types ticked for it below.</div>
           </div>
         )}
         {'free_provider_sources' in draft && (
           <>
-            <div className="small fw-semibold mb-1">Document types allowed to go to free AI providers</div>
+            <div className="small fw-semibold mb-1">Document types allowed to go to free AI providers (NVIDIA)</div>
             <div className="bd-roles">
-              {INGEST_SOURCES.map(([t, label]) => (
+              {sendable.map(([t, label]) => (
                 <div key={t} className="form-check">
                   <input className="form-check-input" type="checkbox" id={`bd-free-src-${t}`} checked={draft.free_provider_sources.includes(t)}
                     onChange={(e) => setDraft({ ...draft, free_provider_sources: toggleInList(draft.free_provider_sources, t, e.target.checked, types) })} />
-                  <label className="form-check-label small" htmlFor={`bd-free-src-${t}`}>
-                    {label}{t === 'incentive' && <span className="bd-card-sub"> · Contains pay amounts</span>}
-                  </label>
+                  <label className="form-check-label small" htmlFor={`bd-free-src-${t}`}>{label}</label>
                 </div>
               ))}
             </div>
-            <div className="bd-card-sub mt-1">Free providers may keep or learn from what they're sent. Unticked types stay on the paid OpenAI key only.</div>
+            <div className="bd-card-sub mt-1">
+              Free providers may keep or learn from what they are sent. Unticked types are only found by keyword.
+              Incentive plans (pay data) are never sent to a free provider, whatever is ticked here: they stay keyword-search only.
+            </div>
+          </>
+        )}
+        {'gemini_provider_sources' in draft && (
+          <>
+            <div className="small fw-semibold mb-1 mt-2">Of those, the types Gemini may also receive</div>
+            <div className="bd-roles">
+              {sendable.map(([t, label]) => (
+                <div key={t} className="form-check">
+                  <input className="form-check-input" type="checkbox" id={`bd-gem-src-${t}`} checked={draft.gemini_provider_sources.includes(t)}
+                    disabled={'free_provider_sources' in draft && !draft.free_provider_sources.includes(t)}
+                    onChange={(e) => setDraft({ ...draft, gemini_provider_sources: toggleInList(draft.gemini_provider_sources, t, e.target.checked, types) })} />
+                  <label className="form-check-label small" htmlFor={`bd-gem-src-${t}`}>{label}</label>
+                </div>
+              ))}
+            </div>
+            <div className="bd-card-sub mt-1">
+              Google's free tier may use what it receives to improve its products, so client reports are off by default.
+              A type is only sent to Gemini if it is ticked in both lists.
+            </div>
           </>
         )}
       </fieldset>
@@ -538,7 +600,7 @@ function ExcludedCard({ readOnly }) {
 
 // ── model and fallbacks (mig 397) ───────────────────────────────────
 // Any model the Boss's keys can use. ai_model_catalog lists what each key
-// (main = paid, fallback = free) can do, filled by "Refresh model list"; the
+// (all free tiers) can do, filled by "Refresh model list"; the
 // database refuses a model that can't run Buddy (no tools / streaming).
 function ModelCard({ readOnly }) {
   const [catalog, setCatalog] = useState(null);
@@ -584,7 +646,7 @@ function ModelCard({ readOnly }) {
   const shownCount = allOptions(shown).length;
   const dirty = saved && draft && JSON.stringify(saved) !== JSON.stringify(draft);
   const checkedAt = lastChecked(catalog);
-  const noCredits = creditsExhausted(catalog || [], refresh);
+  const noCredits = creditsExhausted(catalog || [], refresh, draft?.model_key_slot || 'gemini');
 
   const doRefresh = async () => {
     setMsg(''); setElapsed(0);
@@ -620,9 +682,10 @@ function ModelCard({ readOnly }) {
       {noCredits && (
         <div className="bd-banner" role="alert">
           <i className="bi bi-exclamation-triangle" aria-hidden="true" />
-          <span>The main model's key has no quota left: Buddy is answering with its backup models.</span>
+          <span>The main model's free allowance is used up for now (free tiers reset by themselves): Buddy is answering with its backup models.</span>
         </div>
       )}
+      <div className="bd-card-sub mb-2">{FREE_TIER_NOTE}</div>
       {loadErr && <LoadError what="the model settings" onRetry={load} compact />}
       {!draft && !loadErr && <SkeletonLines n={4} />}
       {draft && (
@@ -653,7 +716,7 @@ function ModelCard({ readOnly }) {
           </fieldset>
           <div id="bd-model-badges" className="bd-badges mt-1">
             <span className="bd-badge-chip">{slotLabel(draft.model_key_slot, meta)}</span>
-            {current?.badges.map((b) => <span key={b} className={`bd-badge-chip ${b === 'Not usable' || b === 'Needs credits' ? 'is-warn' : ''}`}>{b}</span>)}
+            {current?.badges.map((b) => <span key={b} className={`bd-badge-chip ${b === 'Not usable' || b === 'Free limit reached' ? 'is-warn' : ''}`}>{b}</span>)}
           </div>
 
           {/* Developers may refresh too: it only re-reads what the keys can do. */}
@@ -713,7 +776,7 @@ function ModelCard({ readOnly }) {
               </div>
             )}
             <div className="bd-card-sub mt-1">
-              Tried in this order when the main model fails (quota, rate limit or the key; up to {FALLBACK_MAX}). Buddy uses free models only. Free tiers may keep or learn from what they are sent (OpenAI free tier, Google, Groq); NVIDIA keys are for testing only and are used as a last resort, never for people or pay data.
+              Tried in this order when the main model fails (free limit reached, a rate limit or an outage; up to {FALLBACK_MAX}). The OpenAI free-tier key can only run gpt-6-luna. NVIDIA keys are for testing only, so NVIDIA is the last resort and never sees people or pay data.
             </div>
             {'auto_failover' in draft && (
               <div className="form-check form-switch mt-2">

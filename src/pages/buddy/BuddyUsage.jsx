@@ -3,12 +3,12 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { usageSummary, setMonthlyBudget, listKeySlots } from '../../lib/buddyApi';
 import { LoadError } from '../../components/buddy/BuddyThread';
 import {
-  DEFAULT_SLOT_META, USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, keySlotMeta, keySlotRows, pktDate, usageRange,
+  DEFAULT_SLOT_META, FREE_TIER_NOTE, USAGE_KIND_LABEL, fmtCount, fmtMs, fmtPct, fmtUsd, keySlotMeta, keySlotRows, pktDate, usageRange,
 } from '../../lib/buddyLogic';
 
 // Buddy settings → Usage (the Boss and developers; ai_usage_summary checks
 // ai_can_view_settings, mig 401). Estimates from our own request log × the
-// configured prices; the providers' dashboards are the exact bill.
+// configured prices (free models: $0); the providers' dashboards show real usage.
 // Lazy-loaded (it pulls in recharts).
 
 const PRESETS = [['7d', '7 days'], ['30d', '30 days'], ['month', 'This month'], ['custom', 'Custom']];
@@ -71,6 +71,7 @@ export default function BuddyUsage({ readOnly }) {
       {!data && !err && <UsageSkeleton />}
       {data && (
         <>
+          <div className="bd-card-sub mb-2">{FREE_TIER_NOTE}</div>
           <div className="bd-stats bd-usage-cards">
             <Tile label="This month so far" value={fmtUsd(mtd.est_cost_usd)} sub={mtd.days_elapsed ? `${mtd.days_elapsed} of ${mtd.days_in_month} days` : null} />
             <Tile label="Projected month end" value={fmtUsd(mtd.projected_month_usd)} />
@@ -243,8 +244,7 @@ function Prices({ prices }) {
         </table>
       </div>
       <div className="bd-card-sub">
-        These are estimates; the OpenAI dashboard is the exact bill:{' '}
-        <a href="https://platform.openai.com/usage" target="_blank" rel="noopener noreferrer">platform.openai.com/usage</a>.
+        These are estimates from our own request log. Buddy runs on free tiers, so a model with no price here counts as $0; each provider's own dashboard shows its real usage and limits.
       </div>
     </details>
   );

@@ -17,8 +17,9 @@ import {
   slotsOf, slotLabel, allOptions, filterOptions, keySlotRows, KEY_SLOTS,
   TRANSIENT_REASON, chainEntryStatus, vectorsByModel, freeSourcesValue, toggleInList,
   keySlotMeta, canEditSettings,
-  normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, setRoleEconomy, budgetSaverState, modelSourceLabel,
+  normalizeRoleModels, roleModelView, setRoleMain, setRoleBackups, budgetSaverState, modelSourceLabel,
   ingestRing, quietHours, hhmm,
+  ingestProgress, embeddingSpaces, keywordOnlyInfo, geminiSourcesValue,
 } from '../src/lib/buddyLogic.js';
 import { markdownToHtml } from '../src/lib/markdownCore.js';
 
@@ -381,62 +382,62 @@ async function watchTests() {
 
 // ── models (mig 397): usable filter, badges, picker groups, fallback chain ──
 {
-  const row = (o) => ({ key_slot: 'primary', available: true, supports_tools: true, supports_stream: true, free: false, last_error: null, ...o });
+  const row = (o) => ({ key_slot: 'gemini', available: true, supports_tools: true, supports_stream: true, free: true, last_error: null, ...o });
   const cat = [
-    row({ model: 'gpt-5.4-mini' }),
-    row({ model: 'gpt-5.5', available: false, supports_tools: false, supports_stream: false, last_error: 'HTTP 429: insufficient_quota' }),
-    row({ model: 'gpt-4.1-weird', available: false, last_error: 'HTTP 404: model_not_found' }),
-    row({ model: 'gpt-x-notools', supports_tools: false }),
-    row({ model: 'gpt-x-nostream', supports_stream: false }),
-    row({ key_slot: 'fallback', model: 'gpt-6-luna', free: true }),
-    row({ key_slot: 'fallback', model: 'gpt-6-quota', available: false, last_error: 'HTTP 429: insufficient_quota' }),
+    row({ model: 'gemini-3.5-flash-lite' }),
+    row({ model: 'gemini-3.6-flash', available: false, supports_tools: false, supports_stream: false, last_error: 'HTTP 429: quota exceeded' }),
+    row({ model: 'gemini-weird', available: false, last_error: 'HTTP 404: model_not_found' }),
+    row({ model: 'gemini-x-notools', supports_tools: false }),
+    row({ model: 'gemini-x-nostream', supports_stream: false }),
+    row({ key_slot: 'fallback', model: 'gpt-6-luna' }),
+    row({ key_slot: 'fallback', model: 'gpt-5.4-mini', free: false }),
   ];
   const by = (slot, m) => cat.find((r) => r.key_slot === slot && r.model === m);
 
-  // Usable = available with tools and streaming, or a built-in on the main key that failed only for credits.
-  check('usable: working model', catalogRowUsable(by('primary', 'gpt-5.4-mini')));
-  check('usable: built-in out of credits stays choosable', catalogRowUsable(by('primary', 'gpt-5.5')));
-  check('usable: not for other failures / no tools / no stream', !catalogRowUsable(by('primary', 'gpt-4.1-weird'))
-    && !catalogRowUsable(by('primary', 'gpt-x-notools')) && !catalogRowUsable(by('primary', 'gpt-x-nostream')));
-  check('usable: quota exemption is main-key built-ins only', !catalogRowUsable(by('fallback', 'gpt-6-quota')));
+  // Usable = available with tools and streaming; on the OpenAI free-tier key, gpt-6-luna alone. No credit exemption any more.
+  check('usable: working model', catalogRowUsable(by('gemini', 'gemini-3.5-flash-lite')));
+  check('usable: out of quota is NOT usable (no paid top-up exemption)', !catalogRowUsable(by('gemini', 'gemini-3.6-flash')));
+  check('usable: not for other failures / no tools / no stream', !catalogRowUsable(by('gemini', 'gemini-weird'))
+    && !catalogRowUsable(by('gemini', 'gemini-x-notools')) && !catalogRowUsable(by('gemini', 'gemini-x-nostream')));
+  check('usable: OpenAI free-tier key allows gpt-6-luna only', catalogRowUsable(by('fallback', 'gpt-6-luna')) && !catalogRowUsable(by('fallback', 'gpt-5.4-mini')));
 
   check('badges: free + tools + streaming', modelBadges(by('fallback', 'gpt-6-luna')).join() === 'Free,Tools ✓,Streaming ✓');
-  check('badges: needs credits, still usable', modelBadges(by('primary', 'gpt-5.5')).join() === 'Needs credits');
-  check('badges: not usable', modelBadges(by('primary', 'gpt-x-notools')).includes('Not usable'));
+  check('badges: free limit reached, not usable', modelBadges(by('gemini', 'gemini-3.6-flash')).join() === 'Free,Free limit reached,Not usable');
+  check('badges: not usable', modelBadges(by('gemini', 'gemini-x-notools')).includes('Not usable'));
 
   const opts = modelOptions(cat);
-  check('picker: grouped by key', opts.primary.length === 5 && opts.fallback.length === 2);
-  check('picker: usable first, built-ins first', opts.primary.slice(0, 2).map((o) => o.model).join() === 'gpt-5.4-mini,gpt-5.5' && opts.primary[2].usable === false,
-    opts.primary.map((o) => o.model).join());
-  const nt = opts.primary.find((o) => o.model === 'gpt-x-notools');
+  check('picker: grouped by key, no primary group', opts.gemini.length === 5 && opts.fallback.length === 2 && !('primary' in opts));
+  check('picker: usable first, then A to Z', opts.gemini[0].model === 'gemini-3.5-flash-lite' && opts.gemini[1].usable === false,
+    opts.gemini.map((o) => o.model).join());
+  const nt = opts.gemini.find((o) => o.model === 'gemini-x-notools');
   check('picker: unusable carries a reason', !nt.usable && /tool calling/.test(nt.reason));
-  check('picker: unusable reason from last_error', /model_not_found/.test(opts.primary.find((o) => o.model === 'gpt-4.1-weird').reason));
-  check('picker: friendly labels for the three built-ins', modelLabel('gpt-5.4-nano') === 'gpt-5.4-nano (cheapest)'
-    && modelLabel('gpt-5.4-mini') === 'gpt-5.4-mini (recommended)' && modelLabel('gpt-5.5') === 'gpt-5.5 (strongest)' && modelLabel('gpt-6-luna') === 'gpt-6-luna');
+  check('picker: unusable reason from last_error', /model_not_found/.test(opts.gemini.find((o) => o.model === 'gemini-weird').reason));
+  check('picker: paid OpenAI model on the free key says why', /allows gpt-6-luna only/.test(opts.fallback.find((o) => o.model === 'gpt-5.4-mini').reason));
+  check('picker: no friendly paid labels', modelLabel('gpt-5.4-nano') === 'gpt-5.4-nano' && modelLabel('gpt-6-luna') === 'gpt-6-luna');
   const empty = modelOptions([]);
-  check('picker: empty catalog → the three built-ins on the main key', empty.primary.map((o) => o.model).sort().join() === 'gpt-5.4-mini,gpt-5.4-nano,gpt-5.5'
-    && empty.primary.every((o) => o.usable) && empty.fallback.length === 0);
+  check('picker: empty catalog → only the free-tier key offers its one free model', empty.fallback.map((o) => o.model).join() === 'gpt-6-luna'
+    && empty.fallback.every((o) => o.usable) && empty.gemini.length === 0 && !('primary' in empty));
   const k = optionKey('fallback', 'gpt-6-luna');
   check('option keys round-trip (model names may contain dots)', JSON.stringify(parseOptionKey(k)) === '{"key_slot":"fallback","model":"gpt-6-luna"}');
 
-  // Credits banner.
-  check('credits: from the refresh result', creditsExhausted(cat, { slots: { primary: { credits_exhausted: true } } }) === true
-    && creditsExhausted(cat, { slots: { primary: { credits_exhausted: false } } }) === false);
-  const dry = [row({ model: 'gpt-5.4-mini', available: false, last_error: 'HTTP 429: insufficient_quota' }), row({ model: 'gpt-5.5', available: false, last_error: 'credit balance exhausted' })];
-  check('credits: from the catalog after a reload', creditsExhausted(dry, null) && !creditsExhausted(cat, null) && !creditsExhausted([], null));
+  // Quota banner (free allowance used up).
+  check('quota banner: from the refresh result', creditsExhausted(cat, { slots: { gemini: { credits_exhausted: true } } }, 'gemini') === true
+    && creditsExhausted(cat, { slots: { gemini: { credits_exhausted: false } } }, 'gemini') === false);
+  const dry = [row({ model: 'gemini-a', available: false, last_error: 'HTTP 429: RESOURCE_EXHAUSTED quota' }), row({ model: 'gemini-b', available: false, last_error: 'rate limit' })];
+  check('quota banner: from the catalog after a reload', creditsExhausted(dry, null, 'gemini') && !creditsExhausted(dry, null, 'groq') && !creditsExhausted(cat, null, 'gemini') && !creditsExhausted([], null));
   check('last checked: newest checked_at', lastChecked([{ checked_at: '2026-10-01T10:00:00Z' }, { checked_at: '2026-10-01T11:00:00Z' }]) === '2026-10-01T11:00:00.000Z' && lastChecked([]) === null);
 
   // Fallback chain.
   const a = { key_slot: 'fallback', model: 'gpt-6-luna' };
   let c = chainAdd([], a);
   check('chain: add', c.length === 1 && c[0].model === 'gpt-6-luna');
-  check('chain: no duplicates', chainAdd(c, { ...a }).length === 1 && chainAdd(c, { key_slot: 'primary', model: 'gpt-6-luna' }).length === 2);
-  for (let i = 0; i < 20; i++) c = chainAdd(c, { key_slot: 'primary', model: `m${i}` });
+  check('chain: no duplicates', chainAdd(c, { ...a }).length === 1 && chainAdd(c, { key_slot: 'gemini', model: 'gpt-6-luna' }).length === 2);
+  for (let i = 0; i < 20; i++) c = chainAdd(c, { key_slot: 'gemini', model: `m${i}` });
   check('chain: capped at 6 (MAX_FALLBACKS / the mig 401 trigger)', c.length === FALLBACK_MAX && FALLBACK_MAX === 6);
   check('chain: a smaller cap from the backend is honoured', chainAdd([a, { key_slot: 'gemini', model: 'g' }], { key_slot: 'groq', model: 'q' }, 2).length === 2);
   check('chain: any key slot is kept as is', chainAdd([], { key_slot: 'gemini', model: 'gemini-3.5-flash' })[0].key_slot === 'gemini'
     && chainAdd([], { model: 'x' }).length === 0);
-  const three = [{ key_slot: 'primary', model: 'a' }, { key_slot: 'primary', model: 'b' }, { key_slot: 'primary', model: 'c' }];
+  const three = [{ key_slot: 'gemini', model: 'a' }, { key_slot: 'gemini', model: 'b' }, { key_slot: 'gemini', model: 'c' }];
   check('chain: move up / down', chainMove(three, 1, -1).map((x) => x.model).join() === 'b,a,c' && chainMove(three, 1, 1).map((x) => x.model).join() === 'a,c,b');
   check('chain: moves past the ends do nothing', chainMove(three, 0, -1) === three && chainMove(three, 2, 1) === three);
   check('chain: remove', chainRemove(three, 1).map((x) => x.model).join() === 'a,c');
@@ -454,22 +455,22 @@ async function watchTests() {
 {
   const row = (o) => ({ available: true, supports_tools: true, supports_stream: true, free: false, last_error: null, ...o });
   const cat = [
-    row({ key_slot: 'primary', model: 'gpt-5.4-mini' }),
+    row({ key_slot: 'fallback', model: 'gpt-6-luna', free: true }),
     row({ key_slot: 'gemini', model: 'gemini-3.5-flash', free: true }),
     row({ key_slot: 'gemini', model: 'gemini-embedding-001', supports_tools: false, supports_stream: false }),
     row({ key_slot: 'groq', model: 'llama-4-scout', free: true }),
     row({ key_slot: 'mistral', model: 'mistral-small' }),
   ];
-  check('slots: the four known, in order, then extras', slotsOf(cat).join() === 'primary,fallback,gemini,groq,mistral');
+  check('slots: the five free ones, in order, then extras (no primary)', slotsOf(cat).join() === 'gemini,groq,fallback,nvidia,nvidia2,mistral');
   check('slots: built-in labels mirror ai_key_slots', slotLabel('gemini') === 'Gemini (free)' && slotLabel('groq') === 'Groq (free)'
-    && slotLabel('primary') === 'OpenAI' && slotLabel('fallback') === 'OpenAI (fallback key)' && slotLabel('mistral') === 'mistral');
+    && slotLabel('fallback') === 'OpenAI (free tier)' && /last resort/.test(slotLabel('nvidia')) && slotLabel('mistral') === 'mistral');
   const meta = keySlotMeta([
-    { slot: 'groq', label: 'Groq (free)', sort: 4 }, { slot: 'primary', label: 'OpenAI', sort: 1 },
-    { slot: 'gemini', label: 'Google Gemini', sort: 3 }, { slot: 'fallback', label: 'OpenAI (fallback key)', sort: 2 },
+    { slot: 'groq', label: 'Groq (free)', sort: 4 }, { slot: 'gemini', label: 'Google Gemini', sort: 3 },
+    { slot: 'fallback', label: 'OpenAI (free tier)', sort: 2 }, { slot: 'nvidia', label: 'NVIDIA', sort: 1 },
   ]);
-  check('key slots: order and labels come from the table', meta.order.join() === 'primary,fallback,gemini,groq'
+  check('key slots: order and labels come from the table', meta.order.join() === 'nvidia,fallback,gemini,groq'
     && slotLabel('gemini', meta) === 'Google Gemini' && slotsOf(cat, meta).at(-1) === 'mistral');
-  check('key slots: empty / unreadable table → built-in labels', keySlotMeta([]).order.join() === 'primary,fallback,gemini,groq' && keySlotMeta(null).labels.primary === 'OpenAI');
+  check('key slots: empty / unreadable table → built-in labels', keySlotMeta([]).order.join() === KEY_SLOTS.join() && keySlotMeta(null).labels.fallback === 'OpenAI (free tier)' && !('primary' in keySlotMeta(null).labels));
   check('key slots: usage rows follow the table', keySlotRows({}, meta)[2].label === 'Google Gemini');
   check('settings: the Boss and active developers edit; nobody else',
     canEditSettings({ role: 'boss', is_active: true }) && canEditSettings({ role: 'developer', is_active: true })
@@ -478,15 +479,15 @@ async function watchTests() {
   const opts = modelOptions(cat);
   check('picker: every catalogued model is listed, unusable ones too', allOptions(opts).length === 5
     && opts.gemini.find((o) => o.model === 'gemini-embedding-001')?.usable === false && /tool calling/.test(opts.gemini[1].reason));
-  check('picker: groups for all providers', opts.groq.length === 1 && opts.fallback.length === 0 && opts.mistral.length === 1);
-  const f = filterOptions(opts, 'GEMINI', { key_slot: 'primary', model: 'gpt-5.4-mini' });
+  check('picker: groups for all providers', opts.groq.length === 1 && opts.fallback.length === 1 && opts.mistral.length === 1);
+  const f = filterOptions(opts, 'GEMINI', { key_slot: 'fallback', model: 'gpt-6-luna' });
   check('search: case-insensitive, across groups', f.gemini.length === 2 && f.groq.length === 0);
-  check('search: the chosen model is always kept', f.primary.length === 1 && f.primary[0].model === 'gpt-5.4-mini');
+  check('search: the chosen model is always kept', f.fallback.length === 1 && f.fallback[0].model === 'gpt-6-luna');
   check('search: empty query → everything', filterOptions(opts, '  ', null) === opts);
 
-  const rows = keySlotRows({ primary: { questions: 3, fallback_used: 0, est_cost_usd: 0.01 }, gemini: { questions: 2, fallback_used: 2, est_cost_usd: 0 } });
-  check('usage by key: the four slots, labelled, zeros when unused', rows.map((r) => r.slot).join() === KEY_SLOTS.join()
-    && rows[0].questions === 3 && rows[1].questions === 0 && rows[2].label === 'Gemini (free)' && rows[3].est_cost_usd === 0);
+  const rows = keySlotRows({ gemini: { questions: 3, fallback_used: 0, est_cost_usd: 0.01 }, groq: { questions: 2, fallback_used: 2, est_cost_usd: 0 } });
+  check('usage by key: the five slots, labelled, zeros when unused', rows.map((r) => r.slot).join() === KEY_SLOTS.join()
+    && rows[0].questions === 3 && rows[1].questions === 2 && rows[0].label === 'Gemini (free)' && rows[2].est_cost_usd === 0 && rows[3].questions === 0);
   check('usage by key: extra slots appended', keySlotRows({ mistral: { questions: 1 } }).at(-1).slot === 'mistral');
 
   const fbRow = rowToMessage({ id: 'g', role: 'assistant', content: 'x', status: 'done', meta: { model: 'gemini-3.5-flash', key_slot: 'gemini', fallback_used: { from: 'primary:gpt-5.4-mini', to: 'gemini:gemini-3.5-flash', reason: 'quota' } } });
@@ -522,23 +523,80 @@ async function watchTests() {
     && toggleInList(['kb_article', 'report'], 'report', false, types).join() === 'kb_article');
 }
 
+// ── mig 432: searchable by meaning, the two search spaces, keyword-only pay data ──
+{
+  const sp = (o) => ({ provider: 'nvidia', model: 'nvidia:llama-nemotron-embed-vl-1b-v2', filled: 0, missing: 0, not_allowed: 0, status: 'complete', next_try_at: null, last_error: null, ...o });
+  // 1000 chunks: 700 main+second, 100 main only, 50 second only, 40 waiting, 110 incentive (keyword-only).
+  const stats = {
+    queue: { done: 90, pending: 10 },
+    vector_pending: 40,
+    vectors: {
+      by_space: { main: 800, alt: 750, none: 150 }, main_missing: 50, waiting: 40, keyword_only_not_allowed: 110,
+      keyword_only_by_type: { incentive: 110 },
+      spaces: {
+        main: sp({ filled: 800, missing: 40, not_allowed: 110, status: 'filling' }),
+        alt: sp({ provider: 'gemini', model: 'gemini:gemini-embedding-001', filled: 750, missing: 90, not_allowed: 160, status: 'filling', daily_budget_left: 640 }),
+      },
+    },
+  };
+  const p = ingestProgress(stats);
+  check('progress: a chunk with a vector in either space counts once', p.vectors.ready === 850 && p.vectors.waiting === 40 && p.vectors.total === 890);
+  check('progress: keyword-only pay data is not waiting and not in the bar', p.vectors.keywordOnly === 110 && p.vectors.pct === 96 && p.vectors.pending === 40);
+  check('progress: queue still reported', p.queue.pct === 90 && p.queue.left === 10);
+  const done = ingestProgress({ ...stats, vectors: { ...stats.vectors, waiting: 0, none: 110 } });
+  check('progress: nothing waiting → 100% even with keyword-only chunks', done.vectors.pct === 100 && done.vectors.waiting === 0);
+
+  // An older database: no spaces, vector_pending = no MAIN vector, maybe pending_with_alt.
+  const old = ingestProgress({ vector_pending: 30, documents: { kb_article: { chunks: 60 }, report: { chunks: 40 } }, vectors: { alt_filled: 10, pending_with_alt: 10 } });
+  check('progress (old shape): total from the documents, fallback-covered chunks count as ready', old.vectors.ready === 80 && old.vectors.waiting === 20 && old.vectors.total === 100 && old.vectors.pct === 80, JSON.stringify(old.vectors));
+  const older = ingestProgress({ vector_pending: 25, vectors: { alt_filled: 0 } });
+  check('progress (oldest shape): no totals at all → no bar, no crash', older.vectors.ready === 0 && older.vectors.waiting === 25 && older.vectors.pct === 0);
+  check('progress: no stats / empty stats', ingestProgress(null) === null && ingestProgress({}).vectors === null);
+
+  const when = (x) => `@${x}`;
+  check('spaces: old database has none', embeddingSpaces({ vector_pending: 3, vectors: {} }) === null && embeddingSpaces(null) === null);
+  const [m, a] = embeddingSpaces(stats, { when });
+  check('spaces: main is NVIDIA, second is Gemini, counts and model without the prefix', m.title === 'Main search' && m.provider === 'NVIDIA' && m.filled === 800 && m.waiting === 40
+    && m.model === 'llama-nemotron-embed-vl-1b-v2' && a.title === 'Second search' && a.provider === 'Gemini' && a.filled === 750 && a.waiting === 90);
+  check('spaces: filling shows the Gemini daily allowance left', a.status === 'filling' && /640 more allowed today/.test(a.detail) && m.detail === '');
+  const st = (x) => embeddingSpaces({ vectors: { spaces: { main: sp(x) } } }, { when, quietNext: '2026-11-04T04:00' })[0];
+  check('spaces: complete', st({}).statusText === 'Complete');
+  const down = st({ status: 'down', next_try_at: 'T1', last_error: 'HTTP 429' });
+  check('spaces: down shows next try and the last error', down.statusText === 'Paused after an error' && down.detail === 'Next try @T1. Last error: HTTP 429');
+  check('spaces: down with no error text', st({ status: 'down' }).detail === '');
+  check('spaces: quiet hours say when they resume', st({ status: 'paused_quiet_hours' }).detail === 'Resumes @2026-11-04T04:00.');
+  const lim = embeddingSpaces({ vectors: { spaces: { alt: sp({ provider: 'gemini', status: 'daily_limit', next_try_at: 'T2' }) } } }, { when })[0];
+  check('spaces: daily limit resumes by itself', lim.statusText === 'Daily free limit reached' && /Gemini's free allowance for the day is used up/.test(lim.detail) && /next try @T2/.test(lim.detail));
+  check('spaces: an unknown status falls back to filling', st({ status: 'weird' }).status === 'filling');
+
+  const kw = keywordOnlyInfo(stats);
+  check('keyword-only: count and types', kw.count === 110 && kw.rows.length === 1 && kw.rows[0].type === 'incentive');
+  check('keyword-only: older database → zero', keywordOnlyInfo({ vectors: {} }).count === 0 && keywordOnlyInfo(null).count === 0);
+
+  const types = ['kb_article', 'ai_doc', 'app_guide', 'tts_article', 'report', 'incentive'];
+  check('free sources: incentive is never offered or kept, even if saved', freeSourcesValue(['incentive', 'report'], types).join() === 'report');
+  check('gemini sources: default leaves out reports and pay data', geminiSourcesValue(undefined, types).join() === 'kb_article,ai_doc,app_guide,tts_article');
+  check('gemini sources: saved list kept, incentive dropped', geminiSourcesValue(['report', 'incentive'], types).join() === 'report');
+}
+
 // ── models by role: helpers only (the card ships once role_models exists) ──
 {
-  const global = { model: 'gpt-5.4-mini', model_key_slot: 'primary', fallback_models: [{ key_slot: 'gemini', model: 'gemini-3.5-flash' }] };
-  let rm = normalizeRoleModels({ apc: { model: 'x', key_slot: 'groq', junk: 1, economy: { model: 'g', key_slot: 'gemini' } }, ol: { junk: true } });
-  check('role models: only the known shape survives', JSON.stringify(rm) === '{"apc":{"model":"x","key_slot":"groq","economy":{"key_slot":"gemini","model":"g"}}}', JSON.stringify(rm));
+  const global = { model: 'gemini-3.5-flash-lite', model_key_slot: 'gemini', fallback_models: [{ key_slot: 'groq', model: 'openai/gpt-oss-120b' }] };
+  let rm = normalizeRoleModels({ apc: { model: 'x', key_slot: 'groq', junk: 1 }, ol: { junk: true } });
+  check('role models: only the known shape survives', JSON.stringify(rm) === '{"apc":{"model":"x","key_slot":"groq"}}', JSON.stringify(rm));
   const tl = roleModelView(rm, 'tl', global);
-  check('role models: inherit shows the global model and chain', tl.main.inherit && tl.main.model === 'gpt-5.4-mini' && tl.backups.inherit && tl.backups.chain.length === 1 && tl.economy === null);
+  check('role models: inherit shows the global model and chain', tl.main.inherit && tl.main.model === 'gemini-3.5-flash-lite' && tl.backups.inherit && tl.backups.chain.length === 1);
+  check('role models: inherit with no global slot defaults to gemini, not a paid slot', roleModelView({}, 'tl', {}).main.key_slot === 'gemini');
   const apc = roleModelView(rm, 'apc', global);
-  check('role models: override + economy', !apc.main.inherit && apc.main.model === 'x' && apc.economy.model === 'g' && apc.backups.inherit);
+  check('role models: override', !apc.main.inherit && apc.main.model === 'x' && apc.backups.inherit);
   rm = setRoleBackups(rm, 'apc', [{ key_slot: 'groq', model: 'a' }]);
   check('role models: custom backups', !roleModelView(rm, 'apc', global).backups.inherit);
-  rm = setRoleMain(setRoleEconomy(setRoleBackups(rm, 'apc', null), 'apc', null), 'apc', null);
+  rm = setRoleMain(setRoleBackups(rm, 'apc', null), 'apc', null);
   check('role models: clearing every override removes the role', !('apc' in rm));
   const s = budgetSaverState(80, { budget_usd: 50, budget_used_pct: 85 });
   check('budget saver: active at/over the threshold', s.hasBudget && s.active && s.usedPct === 85);
   check('budget saver: no budget → never active', !budgetSaverState(80, { budget_usd: null, budget_used_pct: null }).hasBudget && !budgetSaverState(80, {}).active);
-  check('model source labels', modelSourceLabel('economy') === 'budget saver (economy)' && modelSourceLabel(null) === null);
+  check('model source labels', modelSourceLabel('role') === 'role setting' && modelSourceLabel(null) === null);
 }
 
 // ── Markdown (marked, GFM) ──────────────────────────────────────────
